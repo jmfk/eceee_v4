@@ -293,6 +293,43 @@ const actionWithoutCaption = (action = {}) => {
     return rest
 }
 
+const normalizeBlockAudio = (audio = null) => {
+    if (!audio || typeof audio !== 'object') return null
+    const normalizeClip = (clip = null, fallbackSource = '') => {
+        if (!clip || typeof clip !== 'object') return null
+        const normalizedClip = {
+            source: clip.source || fallbackSource || 'recorded',
+            url: textValue(clip.url),
+            fullUrl: textValue(clip.fullUrl),
+            startMs: Number(clip.startMs || 0),
+            endMs: Number(clip.endMs || 0),
+            trimStartMs: Number(clip.trimStartMs || 0),
+            trimEndMs: Number(clip.trimEndMs || 0)
+        }
+
+        return normalizedClip.url ? normalizedClip : null
+    }
+    const clips = Object.entries(audio.clips || {}).reduce((result, [key, clip]) => {
+        const normalizedClip = normalizeClip(clip, key)
+        if (normalizedClip) result[key] = normalizedClip
+        return result
+    }, {})
+
+    const primaryClip = normalizeClip(audio, audio.source)
+    if (primaryClip?.source && !clips[primaryClip.source]) clips[primaryClip.source] = primaryClip
+    const preferredSource = audio.source || (clips.recorded ? 'recorded' : clips.elevenlabs ? 'elevenlabs' : primaryClip?.source || 'recorded')
+    const activeClip = clips[preferredSource] || clips.recorded || clips.elevenlabs || primaryClip
+    if (!activeClip?.url) return null
+
+    const normalized = {
+        ...activeClip,
+        source: preferredSource,
+        clips
+    }
+
+    return normalized.url ? normalized : null
+}
+
 export const createScriptBlock = (type = 'click') => ({
     caption: '',
     action: type ? createAction(type) : null
@@ -306,10 +343,17 @@ export const normalizeScriptBlock = (block = {}, fallbackCaption = '') => {
         : block
     const caption = textValue(block.caption ?? actionSource?.caption ?? fallbackCaption ?? '')
 
-    return {
+    const normalized = {
         caption,
-        action: actionSource?.type ? normalizeAction(actionWithoutCaption(actionSource)) : null
+        action: actionSource?.type ? normalizeAction(actionWithoutCaption(actionSource)) : null,
+        transcript: textValue(block.transcript ?? actionSource?.transcript ?? ''),
+        vttText: textValue(block.vttText ?? actionSource?.vttText ?? '')
     }
+
+    const audio = normalizeBlockAudio(block.audio ?? actionSource?.audio)
+    if (audio) normalized.audio = audio
+
+    return normalized
 }
 
 const legacyActionsToScript = (guide = {}) => {
@@ -342,6 +386,7 @@ export const guideToScriptDraft = (guide, section) => {
         sourcePath: guide?.sourcePath || '',
         title: guide?.title || '',
         summary: guide?.summary || '',
+        startUrl: guide?.startUrl || guide?.recordingStartUrl || '',
         order: Number.isFinite(Number(guide?.order)) ? Number(guide.order) : 999,
         language: guide?.language || 'en',
         sourceLanguage: guide?.sourceLanguage || '',
@@ -399,6 +444,7 @@ export const createMarkdownFromDraft = (draft) => {
         frontmatterLine('uuid', draft.uuid || stableUuidFromSeed(draft.id || draft.title || '')),
         frontmatterLine('title', draft.title),
         frontmatterLine('summary', draft.summary),
+        frontmatterLine('startUrl', draft.startUrl),
         frontmatterLine('order', draft.order),
         frontmatterLine('language', draft.language || 'en'),
         frontmatterLine('sourceLanguage', draft.sourceLanguage),
@@ -425,11 +471,17 @@ export const createMarkdownFromDraft = (draft) => {
         .filter(Boolean)
         .map((step, index) => `${index + 1}. ${step}`)
     const scriptJson = JSON.stringify(script
-        .map(block => ({
-            caption: trimString(block.caption),
-            action: block.action ? serializeAction(block.action) : null
-        }))
-        .filter(block => block.caption || block.action), null, 2)
+        .map(block => {
+            const serialized = {
+                caption: trimString(block.caption),
+                action: block.action ? serializeAction(block.action) : null
+            }
+            if (trimString(block.transcript)) serialized.transcript = trimString(block.transcript)
+            if (trimString(block.vttText)) serialized.vttText = trimString(block.vttText)
+            if (block.audio) serialized.audio = normalizeBlockAudio(block.audio)
+            return serialized
+        })
+        .filter(block => block.caption || block.action || block.audio || block.transcript || block.vttText), null, 2)
 
     return [
         frontmatter.join('\n'),

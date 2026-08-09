@@ -53,6 +53,7 @@ const PageWidgetHeaderWithSlots = ({
     // Cut props
     onCut = null,
     pageId = null,
+    versionId = null,
     widgetPath = null,
     // Copy/Paste props for slot-level
     widgets = null,
@@ -108,6 +109,7 @@ const PageWidgetHeaderWithSlots = ({
         // Build metadata for cut operation
         const cutMetadata = {
             pageId: pageId,
+            versionId: versionId,
             widgetPaths: widgetPath ? [widgetPath] : [`${slotName}/${widget.id}`],
             widgets: {
                 [slotName]: [widget.id]

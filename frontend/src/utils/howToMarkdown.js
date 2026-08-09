@@ -118,11 +118,20 @@ const scriptAction = (item = {}) => {
     const caption = item.caption || action.caption || ''
 
     if (!action.type && caption) {
-        return { type: 'caption', caption }
+        return {
+            type: 'caption',
+            caption,
+            ...(item.transcript ? { transcript: item.transcript } : {}),
+            ...(item.vttText ? { vttText: item.vttText } : {}),
+            ...(item.audio ? { audio: item.audio } : {})
+        }
     }
 
     return {
         ...action,
+        ...(item.transcript ? { transcript: item.transcript } : {}),
+        ...(item.vttText ? { vttText: item.vttText } : {}),
+        ...(item.audio ? { audio: item.audio } : {}),
         ...(caption ? { caption } : {})
     }
 }
@@ -194,6 +203,7 @@ export const parseHowToMarkdown = (source, fallbackId = '') => {
                 uuid: frontmatter.uuid || frontmatter.guideUuid || '',
                 title,
                 summary,
+                startUrl: frontmatter.startUrl || frontmatter.recordingStartUrl || '',
                 order: Number(frontmatter.order || 999),
                 videoUrl: frontmatter.videoUrl || '',
                 mp4Url: frontmatter.mp4Url || '',
@@ -275,6 +285,7 @@ export const parseHowToMarkdown = (source, fallbackId = '') => {
             uuid,
             title: guide.title,
             summary: parseGuideSummary(guideBody),
+            startUrl: extractCommentValue(guideBody, 'startUrl') || extractCommentValue(guideBody, 'recordingStartUrl'),
             videoUrl,
             mp4Url,
             captionsUrl,

@@ -63,4 +63,29 @@ describe('howToRecorder', () => {
             }
         ])
     })
+
+    it('attaches recorded audio metadata by action timing', () => {
+        const blocks = convertRecordedEventsToScriptBlocks([
+            { kind: 'click', target: target({ role: 'button', name: 'Open' }), timestamp: 2000 },
+            { kind: 'click', target: target({ role: 'button', name: 'Save' }), timestamp: 5000 }
+        ], {
+            audio: {
+                startedAt: 1000,
+                durationMs: 8000,
+                fullAudioUrl: '/__howto-script-editor/record/abc/audio/full',
+                clipBaseUrl: '/__howto-script-editor/record/abc/audio'
+            }
+        })
+
+        expect(blocks[0].audio).toMatchObject({
+            source: 'recorded',
+            url: '/__howto-script-editor/record/abc/audio/block-001.webm',
+            fullUrl: '/__howto-script-editor/record/abc/audio/full',
+            startMs: 0,
+            endMs: 3850,
+            trimStartMs: 0,
+            trimEndMs: 0
+        })
+        expect(blocks[1].audio.url).toBe('/__howto-script-editor/record/abc/audio/block-002.webm')
+    })
 })

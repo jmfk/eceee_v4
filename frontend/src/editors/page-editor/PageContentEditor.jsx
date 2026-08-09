@@ -7,7 +7,6 @@
 
 import React, { forwardRef, useState, useEffect } from 'react';
 import ReactLayoutRenderer from './ReactLayoutRenderer';
-import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { getDefaultLayout } from '../../utils/defaultLayout';
 import { useTheme } from '../../hooks/useTheme';
 

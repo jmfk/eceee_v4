@@ -7,7 +7,6 @@ import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer'
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
-import { OperationTypes } from '../../contexts/unified-data/types/operations'
 
 /**
  * EASY Headline Widget Component
@@ -69,7 +68,7 @@ const HeadlineWidget = ({
     }
 
     // UDC Integration
-    const { useExternalChanges, getState, publishUpdate } = useUnifiedData()
+    const { useExternalChanges, getState } = useUnifiedData()
     const componentId = useMemo(() => `headlinewidget-${widgetId || 'preview'}`, [widgetId])
     const fieldComponentId = useMemo(() => `field-${widgetId || 'preview'}-content`, [widgetId])
     const contextType = useEditorContext()
@@ -132,21 +131,11 @@ const HeadlineWidget = ({
             const updatedConfig = { ...configRef.current, content: newContent }
             setConfig(updatedConfig)
 
-            // Publish to field-level path for form field sync
-            const fieldSourceId = `${componentId}-field-content`
-            publishUpdate(fieldSourceId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: widgetId,
-                config: { content: newContent },
-                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-                slotName: slotName,
-                contextType: contextType
-            })
-
             if (onConfigChange) {
                 onConfigChange(updatedConfig)
             }
         }
-    }, [fieldComponentId, widgetId, slotName, publishUpdate, contextType, widgetPath, onConfigChange])
+    }, [widgetId, slotName, onConfigChange])
 
     // Initialize editor in editor mode
     useEffect(() => {
@@ -324,4 +313,3 @@ HeadlineWidget.metadata = {
 }
 
 export default HeadlineWidget
-

@@ -5,7 +5,7 @@ import { execSync, spawn } from 'node:child_process'
 import { createReadStream, existsSync, readFileSync, readdirSync } from 'node:fs'
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { convertRecordedEventsToScriptBlocks } from './src/utils/howToRecorder.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -180,6 +180,28 @@ const waitForChildExit = (child, timeoutMs = 10000) => new Promise(resolve => {
   })
 })
 
+const runProcess = (command, args, options = {}) => new Promise((resolveRun, rejectRun) => {
+  const child = spawn(command, args, {
+    cwd: options.cwd || __dirname,
+    env: process.env,
+    stdio: ['ignore', 'pipe', 'pipe']
+  })
+  const output = []
+  const appendOutput = chunk => output.push(chunk.toString())
+
+  child.stdout.on('data', appendOutput)
+  child.stderr.on('data', appendOutput)
+  child.on('error', rejectRun)
+  child.on('close', code => {
+    const text = output.join('')
+    if (code === 0) {
+      resolveRun(text)
+      return
+    }
+    rejectRun(new Error(text || `${command} exited with code ${code}`))
+  })
+})
+
 const runCodexAgent = ({ prompt, outputPath, sandbox = 'workspace-write' }, onChunk = () => {}) => new Promise((resolveRun, rejectRun) => {
   const codexCommand = process.env.CODEX_CLI || '/Applications/Codex.app/Contents/Resources/codex'
   const repoRoot = path.resolve(__dirname, '..')
@@ -253,11 +275,23 @@ const normalizeRenderLanguages = (value) => {
   return normalized.length > 0 ? normalized : ['sv']
 }
 
+const resolveStartUrl = (baseUrl, startUrl = '') => {
+  const value = String(startUrl || '').trim()
+  if (!value) return baseUrl
+
+  try {
+    return new URL(value, baseUrl).toString()
+  } catch {
+    return baseUrl
+  }
+}
+
 const docsRoot = path.join(__dirname, 'src/docs/how-to')
 const translationsRoot = path.join(__dirname, 'src/docs/how-to-translations')
 const publicRoot = path.join(__dirname, 'public')
 const renderLogRoot = path.join(__dirname, '.howto-script-preview', 'render-logs')
 const recordingRoot = path.join(__dirname, '.howto-script-preview', 'recordings')
+const blockAudioRoot = path.join(__dirname, '.howto-script-preview', 'block-audio')
 const videoOverrideFolder = 'overrides'
 const usePolling = ['1', 'true', 'yes'].includes(String(process.env.VITE_USE_POLLING || '').toLowerCase())
 let lastOverwriteUndo = null
@@ -267,7 +301,15 @@ const publicAssetContentType = (filePath) => {
   const extension = path.extname(filePath).toLowerCase()
 
   if (extension === '.mp4' || extension === '.m4v') return 'video/mp4'
-  if (extension === '.webm') return 'video/webm'
+  if (extension === '.webm') {
+    return filePath.includes(`${path.sep}audio-clips${path.sep}`)
+      || filePath.includes(`${path.sep}block-audio${path.sep}`)
+      || path.basename(filePath) === 'microphone.webm'
+      ? 'audio/webm'
+      : 'video/webm'
+  }
+  if (extension === '.mp3') return 'audio/mpeg'
+  if (extension === '.m4a') return 'audio/mp4'
   if (extension === '.ogv' || extension === '.ogg') return 'video/ogg'
   if (extension === '.vtt') return 'text/vtt; charset=utf-8'
   if (extension === '.json') return 'application/json; charset=utf-8'
@@ -393,21 +435,382 @@ const readRecordingSnapshot = async (id, baseUrl = '') => {
   const events = await safeReadJsonFile(paths.eventsPath, [])
   const metadata = await safeReadJsonFile(paths.metadataPath, {})
   const rawVideoPath = Array.isArray(metadata.rawVideos) ? metadata.rawVideos[0] || '' : ''
+  const referenceVideoPath = metadata.referenceVideoPath || ''
+  const microphonePath = metadata.microphonePath || ''
   const status = session?.status || metadata.status || 'unknown'
   const log = session?.log || ''
-  const blocks = convertRecordedEventsToScriptBlocks(events, { baseUrl: baseUrl || session?.baseUrl || metadata.baseUrl || '' })
+  const hasAudioClips = Array.isArray(metadata.audioClips) && metadata.audioClips.length > 0
+  const snapshotBaseUrl = baseUrl || session?.baseUrl || metadata.baseUrl || ''
+  const snapshotStartUrl = session?.startUrl || metadata.startUrl || ''
+  const blocks = convertRecordedEventsToScriptBlocks(events, {
+    baseUrl: snapshotBaseUrl,
+    audio: microphonePath && hasAudioClips ? {
+      startedAt: metadata.microphoneStartedAt || 0,
+      durationMs: metadata.microphoneStoppedAt && metadata.microphoneStartedAt ? metadata.microphoneStoppedAt - metadata.microphoneStartedAt : 0,
+      fullAudioUrl: `/__howto-script-editor/record/${paths.id}/audio/full`,
+      clipBaseUrl: `/__howto-script-editor/record/${paths.id}/audio`
+    } : null
+  })
 
   return {
     id: paths.id,
     status,
-    baseUrl: baseUrl || session?.baseUrl || metadata.baseUrl || '',
+    baseUrl: snapshotBaseUrl,
+    startUrl: snapshotStartUrl,
     log,
     events,
     blocks,
     eventCount: events.length,
     rawVideoPath,
     rawVideoUrl: rawVideoPath ? `/__howto-script-editor/record/${paths.id}/raw-video` : '',
+    referenceVideoPath,
+    referenceVideoUrl: referenceVideoPath ? `/__howto-script-editor/record/${paths.id}/reference-video` : '',
+    microphonePath,
+    microphoneUrl: microphonePath ? `/__howto-script-editor/record/${paths.id}/audio/full` : '',
     error: session?.error || metadata.error || ''
+  }
+}
+
+const extractRecordingAudioClips = async (id, baseUrl = '') => {
+  const paths = recordingPathsFor(id)
+  const metadata = await safeReadJsonFile(paths.metadataPath, {})
+  const microphonePath = metadata.microphonePath || ''
+  if (!microphonePath || !existsSync(microphonePath)) return []
+
+  const events = await safeReadJsonFile(paths.eventsPath, [])
+  const blocks = convertRecordedEventsToScriptBlocks(events, {
+    baseUrl: baseUrl || metadata.baseUrl || '',
+    audio: {
+      startedAt: metadata.microphoneStartedAt || 0,
+      durationMs: metadata.microphoneStoppedAt && metadata.microphoneStartedAt ? metadata.microphoneStoppedAt - metadata.microphoneStartedAt : 0,
+      fullAudioUrl: `/__howto-script-editor/record/${paths.id}/audio/full`,
+      clipBaseUrl: `/__howto-script-editor/record/${paths.id}/audio`
+    }
+  })
+  const clipsDir = path.join(paths.outputDir, 'audio-clips')
+  const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg'
+  const clips = []
+
+  await mkdir(clipsDir, { recursive: true })
+
+  for (const [index, block] of blocks.entries()) {
+    if (!block.audio?.url) continue
+    const clipName = `block-${String(index + 1).padStart(3, '0')}.webm`
+    const clipPath = path.join(clipsDir, clipName)
+    const startSeconds = Math.max(0, Number(block.audio.startMs || 0) / 1000)
+    const durationSeconds = Math.max(0.25, (Number(block.audio.endMs || 0) - Number(block.audio.startMs || 0)) / 1000)
+
+    await runProcess(ffmpegPath, [
+      '-y',
+      '-ss', String(startSeconds),
+      '-t', String(durationSeconds),
+      '-i', microphonePath,
+      '-vn',
+      '-c:a', 'libopus',
+      '-b:a', '96k',
+      clipPath
+    ])
+
+    clips.push({
+      name: clipName,
+      path: clipPath,
+      url: `/__howto-script-editor/record/${paths.id}/audio/${clipName}`,
+      startMs: block.audio.startMs,
+      endMs: block.audio.endMs
+    })
+  }
+
+  await writeFile(paths.metadataPath, JSON.stringify({
+    ...metadata,
+    audioClips: clips
+  }, null, 2), 'utf8')
+
+  return clips
+}
+
+const ensureRecordingAudioClips = async (id, baseUrl = '', session = null) => {
+  const paths = recordingPathsFor(id)
+  const metadata = await safeReadJsonFile(paths.metadataPath, {})
+  if (Array.isArray(metadata.audioClips) && metadata.audioClips.length > 0) {
+    return metadata.audioClips
+  }
+
+  const clips = await extractRecordingAudioClips(id, baseUrl)
+  if (session && clips.length > 0) {
+    session.log += `\nSplit microphone audio into ${clips.length} block clip${clips.length === 1 ? '' : 's'}.\n`
+  }
+  if (session && clips.length === 0) {
+    session.log += '\nNo microphone audio clips were created for this recording.\n'
+  }
+  return clips
+}
+
+const muxRecordingReferenceVideo = async (id, session = null) => {
+  const paths = recordingPathsFor(id)
+  const metadata = await safeReadJsonFile(paths.metadataPath, {})
+  const rawVideoPath = Array.isArray(metadata.rawVideos) ? metadata.rawVideos[0] || '' : ''
+  const microphonePath = metadata.microphonePath || ''
+  const referenceVideoPath = path.join(paths.outputDir, 'reference-with-audio.webm')
+
+  if (metadata.referenceVideoPath && existsSync(metadata.referenceVideoPath)) {
+    return metadata.referenceVideoPath
+  }
+  if (!rawVideoPath || !existsSync(rawVideoPath)) {
+    if (session) session.log += '\nNo raw reference video was available to combine with microphone audio.\n'
+    return ''
+  }
+  if (!microphonePath || !existsSync(microphonePath)) {
+    if (session) session.log += '\nNo microphone audio was available to combine with the reference video.\n'
+    return ''
+  }
+
+  if (session) session.log += '\nCombining raw reference video with microphone audio...\n'
+
+  await runProcess(process.env.FFMPEG_PATH || 'ffmpeg', [
+    '-y',
+    '-i', rawVideoPath,
+    '-i', microphonePath,
+    '-map', '0:v:0',
+    '-map', '1:a:0',
+    '-c:v', 'copy',
+    '-c:a', 'libopus',
+    '-shortest',
+    referenceVideoPath
+  ])
+
+  await writeFile(paths.metadataPath, JSON.stringify({
+    ...metadata,
+    referenceVideoPath,
+    referenceVideoWithAudio: true
+  }, null, 2), 'utf8')
+
+  if (session) session.log += `Reference video with audio: ${referenceVideoPath}\n`
+  return referenceVideoPath
+}
+
+const finalizeRecordingAssets = (id, baseUrl = '', session = null, options = {}) => {
+  if (session?.finalizePromise) return session.finalizePromise
+
+  const terminalStatus = options.terminalStatus || session?.terminalStatus || session?.status || 'stopped'
+  const promise = ensureRecordingAudioClips(id, baseUrl, session)
+    .then(() => {
+      const shouldMuxReferenceVideo = Boolean(options.recordReferenceVideoWithAudio || session?.recordReferenceVideoWithAudio)
+      return shouldMuxReferenceVideo ? muxRecordingReferenceVideo(id, session) : null
+    })
+    .catch(error => {
+      if (session) {
+        session.log += `\nRecording finalization failed: ${error.message}\n`
+        session.error = session.error || error.message
+      }
+      return null
+    })
+    .finally(() => {
+      if (session) {
+        session.status = session.error && terminalStatus !== 'stopped' ? 'error' : terminalStatus
+        session.finalizePromise = null
+      }
+    })
+
+  if (session) session.finalizePromise = promise
+  return promise
+}
+
+const blockAudioPathFor = (kind, fileName) => {
+  const safeKind = safeSegment(kind, '')
+  const safeName = path.basename(fileName || '')
+  if (!safeKind || !safeName) throw new Error('Audio path is required.')
+
+  const targetPath = path.join(blockAudioRoot, safeKind, safeName)
+  const relativePath = path.relative(blockAudioRoot, targetPath)
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    throw new Error('Invalid audio path.')
+  }
+
+  return targetPath
+}
+
+const editorAudioPathFromUrl = (audioUrl = '') => {
+  const rawValue = String(audioUrl || '').trim()
+  if (!rawValue) throw new Error('Audio URL is required.')
+
+  if (path.isAbsolute(rawValue)) return rawValue
+
+  let pathname = rawValue
+  try {
+    pathname = new URL(rawValue, 'http://localhost').pathname
+  } catch {
+    pathname = rawValue.split('?')[0]
+  }
+
+  const parts = pathname.split('/').filter(Boolean)
+  const blockAudioIndex = parts.indexOf('block-audio')
+  if (blockAudioIndex >= 0) {
+    return blockAudioPathFor(parts[blockAudioIndex + 1] || '', parts[blockAudioIndex + 2] || '')
+  }
+
+  const recordIndex = parts.indexOf('record')
+  if (recordIndex >= 0) {
+    const id = parts[recordIndex + 1] || ''
+    const action = parts[recordIndex + 2] || ''
+    const audioName = parts[recordIndex + 3] || ''
+    if (action !== 'audio') throw new Error('Unsupported recording asset URL.')
+    const paths = recordingPathsFor(id)
+    return audioName === 'full'
+      ? path.join(paths.outputDir, 'microphone.webm')
+      : path.join(paths.outputDir, 'audio-clips', path.basename(audioName))
+  }
+
+  throw new Error('Unsupported audio URL.')
+}
+
+const transcribeAudioClip = async ({ audioUrl = '', language = 'en' } = {}) => {
+  const audioPath = editorAudioPathFromUrl(audioUrl)
+  if (!existsSync(audioPath)) throw new Error('Audio clip not found on disk.')
+
+  const normalizedLanguage = safeSegment(language, 'en')
+  const transcriptPath = `${audioPath}.${normalizedLanguage}.transcript.json`
+  if (existsSync(transcriptPath)) {
+    const cached = JSON.parse(await readFile(transcriptPath, 'utf8'))
+    if (cached.text) return cached
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is required to transcribe audio clips.')
+  }
+
+  const buffer = await readFile(audioPath)
+  const form = new FormData()
+  form.append('model', process.env.OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe')
+  form.append('response_format', 'json')
+  if (normalizedLanguage) form.append('language', normalizedLanguage)
+  form.append('file', new Blob([buffer], { type: publicAssetContentType(audioPath) }), path.basename(audioPath))
+
+  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+    },
+    body: form
+  })
+
+  const responseText = await response.text()
+  if (!response.ok) {
+    throw new Error(`Audio transcription failed: ${response.status} ${responseText}`)
+  }
+
+  const data = JSON.parse(responseText)
+  const payload = {
+    source: 'openai',
+    model: process.env.OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
+    language: normalizedLanguage,
+    text: data.text || '',
+    audioPath,
+    createdAt: new Date().toISOString()
+  }
+
+  await writeFile(transcriptPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
+  return payload
+}
+
+const getEnvVoiceIdForLanguage = (language = '') => {
+  const normalized = safeSegment(language, '').toUpperCase().replace(/-/g, '_')
+  return normalized
+    ? process.env[`ELEVENLABS_VOICE_ID_${normalized}`] || process.env[`HOWTO_VOICE_ID_${normalized}`] || process.env.ELEVENLABS_VOICE_ID || process.env.HOWTO_VOICE_ID || ''
+    : process.env.ELEVENLABS_VOICE_ID || process.env.HOWTO_VOICE_ID || ''
+}
+
+const generateElevenLabsBlockAudio = async ({ text = '', language = 'en', guideId = 'guide', blockIndex = 0 } = {}) => {
+  const trimmedText = String(text || '').trim()
+  if (!trimmedText) throw new Error('Caption text is required to generate ElevenLabs audio.')
+  if (!process.env.ELEVENLABS_API_KEY) throw new Error('ELEVENLABS_API_KEY is required to generate ElevenLabs audio.')
+
+  const voiceId = getEnvVoiceIdForLanguage(language)
+  if (!voiceId) throw new Error('Set ELEVENLABS_VOICE_ID or a language-specific ELEVENLABS_VOICE_ID_<LANG> value.')
+
+  const modelId = process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2'
+  const outputFormat = process.env.ELEVENLABS_OUTPUT_FORMAT || 'mp3_44100_128'
+  const payload = {
+    provider: 'elevenlabs',
+    voiceId,
+    modelId,
+    outputFormat,
+    language,
+    text: trimmedText
+  }
+  const hash = createHash('sha256').update(JSON.stringify(payload)).digest('hex').slice(0, 24)
+  const fileName = [
+    safeSegment(guideId, 'guide'),
+    safeSegment(language, 'en'),
+    `block-${String(Number(blockIndex || 0) + 1).padStart(3, '0')}`,
+    hash
+  ].join('-').concat('.mp3')
+  const audioPath = blockAudioPathFor('elevenlabs', fileName)
+  const metadataPath = audioPath.replace(/\.mp3$/, '.json')
+
+  await mkdir(path.dirname(audioPath), { recursive: true })
+
+  if (!existsSync(audioPath)) {
+    const url = new URL(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`)
+    url.searchParams.set('output_format', outputFormat)
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json',
+        'Accept': 'audio/mpeg'
+      },
+      body: JSON.stringify({
+        text: trimmedText,
+        model_id: modelId
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`ElevenLabs speech generation failed: ${response.status} ${await response.text()}`)
+    }
+
+    await writeFile(audioPath, Buffer.from(await response.arrayBuffer()))
+    await writeFile(metadataPath, `${JSON.stringify({ ...payload, audioPath, createdAt: new Date().toISOString() }, null, 2)}\n`, 'utf8')
+  }
+
+  return {
+    source: 'elevenlabs',
+    url: `/__howto-script-editor/block-audio/elevenlabs/${fileName}`,
+    startMs: 0,
+    endMs: 0,
+    trimStartMs: 0,
+    trimEndMs: 0
+  }
+}
+
+const saveRecordedBlockAudio = async ({ base64 = '', mimeType = '', language = 'en', guideId = 'guide', blockIndex = 0, durationMs = 0 } = {}) => {
+  if (!base64) throw new Error('Recorded audio data is required.')
+  const normalizedMimeType = String(mimeType || '').toLowerCase()
+  const extension = normalizedMimeType.includes('mpeg')
+    ? '.mp3'
+    : normalizedMimeType.includes('mp4')
+    ? '.m4a'
+    : normalizedMimeType.includes('ogg')
+    ? '.ogg'
+    : '.webm'
+  const fileName = [
+    safeSegment(guideId, 'guide'),
+    safeSegment(language, 'en'),
+    `block-${String(Number(blockIndex || 0) + 1).padStart(3, '0')}`,
+    randomUUID().slice(0, 8)
+  ].join('-').concat(extension)
+  const audioPath = blockAudioPathFor('recorded', fileName)
+
+  await mkdir(path.dirname(audioPath), { recursive: true })
+  await writeFile(audioPath, Buffer.from(base64, 'base64'))
+
+  return {
+    source: 'recorded',
+    url: `/__howto-script-editor/block-audio/recorded/${fileName}`,
+    startMs: 0,
+    endMs: Math.max(0, Number(durationMs || 0)),
+    trimStartMs: 0,
+    trimEndMs: 0
   }
 }
 
@@ -1301,8 +1704,10 @@ const howToScriptEditorPlugin = () => ({
         const id = randomUUID().slice(0, 8)
         const paths = recordingPathsFor(id)
         const baseUrl = String(body.baseUrl || 'http://localhost:3000').trim()
+        const startUrl = resolveStartUrl(baseUrl, body.startUrl || body.recordingStartUrl || '')
         const username = String(body.username || '').trim()
         const password = String(body.password || '')
+        const recordReferenceVideoWithAudio = Boolean(body.recordReferenceVideoWithAudio || body.referenceVideoWithAudio)
 
         await mkdir(paths.outputDir, { recursive: true })
         const storageState = await createAuthState({
@@ -1314,15 +1719,19 @@ const howToScriptEditorPlugin = () => ({
         const session = {
           id,
           baseUrl,
+          startUrl,
           outputDir: paths.outputDir,
-          log: `Starting action recorder against ${baseUrl}\n`,
+          recordReferenceVideoWithAudio,
+          log: `Starting action recorder against ${baseUrl}\nStart URL: ${startUrl}\nReference video with audio: ${recordReferenceVideoWithAudio ? 'on' : 'off'}\n`,
           status: 'starting',
           error: '',
-          child: null
+          child: null,
+          finalizePromise: null
         }
         const recorder = runHowToRecorder([
           '--session-id', id,
           '--base-url', baseUrl,
+          '--start-url', startUrl,
           '--output-dir', paths.outputDir,
           ...(storageState ? ['--storage-state', storageState] : [])
         ], text => {
@@ -1340,12 +1749,15 @@ const howToScriptEditorPlugin = () => ({
           session.log += `\nERROR: ${error.message}\n`
         })
         recorder.child.once('exit', code => {
-          if (session.status !== 'stopping' && session.status !== 'stopped') {
-            session.status = code === 0 ? 'closed' : 'error'
-          }
-          if (code !== 0 && session.status === 'error' && !session.error) {
+          const terminalStatus = code === 0
+            ? (session.status === 'stopping' || session.status === 'stopped' ? 'stopped' : 'closed')
+            : 'error'
+          if (code !== 0 && !session.error) {
             session.error = `Recorder exited with code ${code}`
           }
+          session.terminalStatus = terminalStatus
+          session.status = 'finalizing'
+          finalizeRecordingAssets(id, baseUrl, session, { terminalStatus })
         })
 
         sendJson(res, 200, {
@@ -1377,6 +1789,9 @@ const howToScriptEditorPlugin = () => ({
         }
 
         if (session) session.status = 'stopped'
+        await finalizeRecordingAssets(id, session?.baseUrl || body.baseUrl || '', session, {
+          recordReferenceVideoWithAudio: Boolean(body.recordReferenceVideoWithAudio || body.referenceVideoWithAudio)
+        })
         sendJson(res, 200, await readRecordingSnapshot(id, session?.baseUrl || body.baseUrl || ''))
       } catch (error) {
         sendJson(res, 500, { error: error.message })
@@ -1390,7 +1805,7 @@ const howToScriptEditorPlugin = () => ({
       const id = recordIndex >= 0 ? parts[recordIndex + 1] || '' : parts[0] || ''
       const action = recordIndex >= 0 ? parts[recordIndex + 2] || '' : parts[1] || ''
 
-      if (!id || !['events', 'raw-video'].includes(action)) {
+      if (!id || !['events', 'raw-video', 'reference-video', 'audio'].includes(action)) {
         next()
         return
       }
@@ -1412,18 +1827,110 @@ const howToScriptEditorPlugin = () => ({
         }
 
         const snapshot = await readRecordingSnapshot(id, url.searchParams.get('baseUrl') || '')
-        if (!snapshot.rawVideoPath || !existsSync(snapshot.rawVideoPath)) {
-          sendJson(res, 404, { error: 'Raw recording video not found.' })
+        let assetPath = snapshot.rawVideoPath
+
+        if (action === 'reference-video') {
+          assetPath = snapshot.referenceVideoPath
+        }
+
+        if (action === 'audio') {
+          const audioName = parts[recordIndex >= 0 ? recordIndex + 3 : 2] || ''
+          assetPath = audioName === 'full'
+            ? snapshot.microphonePath
+            : path.join(recordingPathsFor(id).outputDir, 'audio-clips', path.basename(audioName))
+        }
+
+        if (!assetPath || !existsSync(assetPath)) {
+          const missingMessage = action === 'audio'
+            ? 'Recorded audio not found.'
+            : action === 'reference-video'
+              ? 'Reference video with audio not found.'
+              : 'Raw recording video not found.'
+          sendJson(res, 404, { error: missingMessage })
           return
         }
 
         const outputDir = recordingPathsFor(id).outputDir
-        const relativePath = path.relative(outputDir, snapshot.rawVideoPath)
+        const relativePath = path.relative(outputDir, assetPath)
         if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-          throw new Error('Invalid raw recording video path.')
+          throw new Error('Invalid recording asset path.')
         }
 
-        await servePublicAsset(req, res, snapshot.rawVideoPath)
+        await servePublicAsset(req, res, assetPath)
+      } catch (error) {
+        sendJson(res, 500, { error: error.message })
+      }
+    })
+
+    server.middlewares.use('/__howto-script-editor/block-audio/recorded', async (req, res, next) => {
+      if (req.method !== 'POST') {
+        next()
+        return
+      }
+
+      try {
+        const body = await readRequestJson(req)
+        const clip = await saveRecordedBlockAudio(body)
+        sendJson(res, 200, { audio: clip })
+      } catch (error) {
+        sendJson(res, 500, { error: error.message })
+      }
+    })
+
+    server.middlewares.use('/__howto-script-editor/block-audio/elevenlabs', async (req, res, next) => {
+      if (req.method === 'POST') {
+        try {
+          const body = await readRequestJson(req)
+          const clip = await generateElevenLabsBlockAudio(body)
+          sendJson(res, 200, { audio: clip })
+        } catch (error) {
+          sendJson(res, 500, { error: error.message })
+        }
+        return
+      }
+
+      next()
+    })
+
+    server.middlewares.use('/__howto-script-editor/block-audio/transcribe', async (req, res) => {
+      if (req.method !== 'POST') {
+        sendJson(res, 405, { error: 'Method not allowed' })
+        return
+      }
+
+      try {
+        const body = await readRequestJson(req)
+        sendJson(res, 200, { transcript: await transcribeAudioClip(body) })
+      } catch (error) {
+        sendJson(res, 500, { error: error.message })
+      }
+    })
+
+    server.middlewares.use('/__howto-script-editor/block-audio', async (req, res, next) => {
+      const url = new URL(req.url || '', 'http://localhost')
+      const parts = url.pathname.split('/').filter(Boolean)
+      const blockAudioIndex = parts.indexOf('block-audio')
+      const kind = blockAudioIndex >= 0 ? parts[blockAudioIndex + 1] || '' : parts[0] || ''
+      const fileName = blockAudioIndex >= 0 ? parts[blockAudioIndex + 2] || '' : parts[1] || ''
+
+      if (!kind || !fileName) {
+        next()
+        return
+      }
+
+      if (!['GET', 'HEAD'].includes(req.method || '')) {
+        sendJson(res, 405, { error: 'Method not allowed' })
+        return
+      }
+
+      try {
+        const assetPath = blockAudioPathFor(kind, fileName)
+        if (!existsSync(assetPath)) {
+          sendJson(res, 404, { error: 'Block audio not found.' })
+          return
+        }
+
+        await servePublicAsset(req, res, assetPath)
       } catch (error) {
         sendJson(res, 500, { error: error.message })
       }
