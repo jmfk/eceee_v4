@@ -442,7 +442,7 @@ const IsolatedFormRenderer = React.memo(forwardRef(({
             })}
         </div>
     )
-}, (prevProps, nextProps) => {
+}), (prevProps, nextProps) => {
     // Custom comparison: only rerender if props actually changed
     // Return true if props are equal (prevent rerender), false if different (allow rerender)
 
@@ -452,6 +452,8 @@ const IsolatedFormRenderer = React.memo(forwardRef(({
     if (prevProps.contextType !== nextProps.contextType) return false
     if (prevProps.namespace !== nextProps.namespace) return false
     if (prevProps.publishChanges !== nextProps.publishChanges) return false
+    if (prevProps.onWidgetChange !== nextProps.onWidgetChange) return false
+    if (prevProps.onDirtyChange !== nextProps.onDirtyChange) return false
 
     // Compare schema reference (should be stable)
     if (prevProps.initschema !== nextProps.initschema) return false
@@ -509,6 +511,6 @@ const IsolatedFormRenderer = React.memo(forwardRef(({
 
     // All props are equal, prevent rerender
     return true
-}))
+})
 
 export default IsolatedFormRenderer

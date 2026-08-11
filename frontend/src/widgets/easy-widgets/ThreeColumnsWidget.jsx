@@ -275,6 +275,10 @@ const ThreeColumnsWidget = ({
                         onOpenWidgetEditor={onOpenWidgetEditor}
                         onSlotChange={handleSlotChange}
                         parentComponentId={parentComponentId}
+                        pageId={context?.pageId || props.pageId}
+                        versionId={context?.versionId || props.versionId}
+                        webpageData={context?.webpageData || props.webpageData}
+                        pageVersionData={context?.pageVersionData || props.pageVersionData}
                         parentSlotName={slotName}
                         widgetPath={widgetPath}
                         emptyMessage="No widgets in left column"
@@ -306,6 +310,10 @@ const ThreeColumnsWidget = ({
                         onOpenWidgetEditor={onOpenWidgetEditor}
                         onSlotChange={handleSlotChange}
                         parentComponentId={parentComponentId}
+                        pageId={context?.pageId || props.pageId}
+                        versionId={context?.versionId || props.versionId}
+                        webpageData={context?.webpageData || props.webpageData}
+                        pageVersionData={context?.pageVersionData || props.pageVersionData}
                         parentSlotName={slotName}
                         widgetPath={widgetPath}
                         emptyMessage="No widgets in center column"
@@ -337,6 +345,10 @@ const ThreeColumnsWidget = ({
                         onOpenWidgetEditor={onOpenWidgetEditor}
                         onSlotChange={handleSlotChange}
                         parentComponentId={parentComponentId}
+                        pageId={context?.pageId || props.pageId}
+                        versionId={context?.versionId || props.versionId}
+                        webpageData={context?.webpageData || props.webpageData}
+                        pageVersionData={context?.pageVersionData || props.pageVersionData}
                         parentSlotName={slotName}
                         widgetPath={widgetPath}
                         emptyMessage="No widgets in right column"
@@ -516,4 +528,3 @@ ThreeColumnsWidget.metadata = {
 };
 
 export default ThreeColumnsWidget;
-
