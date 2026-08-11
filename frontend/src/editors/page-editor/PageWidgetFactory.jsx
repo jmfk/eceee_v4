@@ -8,6 +8,7 @@ import React, { useState, useEffect, useRef, useMemo, Component } from 'react'
 import { Layout, Settings, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X, AlertCircle, Edit3 } from 'lucide-react'
 import { getWidgetComponent, getWidgetDisplayName, getWidgetIcon } from '../../widgets'
 import { renderWidgetPreview } from '../../utils/widgetPreview'
+import { createPageWidgetConfigChangeHandler } from '../../utils/pageEditorPropAdapter'
 import PageWidgetHeader from './PageWidgetHeader'
 import { useClipboard } from '../../contexts/ClipboardContext'
 
@@ -21,7 +22,7 @@ const normalizeForCSS = (value) => {
  * PageEditor Widget Factory - Layout-based widget rendering
  * 
  * This factory is specifically designed for PageEditor's layout-based approach
- * with LayoutRenderer integration, version management, and publishing workflows.
+ * with ReactLayoutRenderer integration, version management, and publishing workflows.
  */
 const PageWidgetFactory = ({
     widget,
@@ -41,7 +42,6 @@ const PageWidgetFactory = ({
     widgetId,
     slotName: passedSlotName,
     // PageEditor-specific props
-    layoutRenderer,
     versionId,
     isPublished = false,
     onVersionChange,
@@ -86,6 +86,11 @@ const PageWidgetFactory = ({
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
     const actualSlotName = passedSlotName || slotName || widget?.slotName
+    const resolvedPageId = pageId || webpageData?.id
+    const resolvedVersionId = versionId || pageVersionData?.id || pageVersionData?.versionId
+    const headerWidgetPath = Array.isArray(widgetPath) && widgetPath.length > 0
+        ? widgetPath.join('/')
+        : (buildWidgetPath ? buildWidgetPath(actualSlotName, actualWidgetId) : `${actualSlotName}/${actualWidgetId}`)
     
     // Get global hover tracking for paste markers
     const { hoveredWidgetId, setHoveredWidget, clearHoveredWidget } = useClipboard();
@@ -99,26 +104,10 @@ const PageWidgetFactory = ({
     const [pasteHoverPosition, setPasteHoverPosition] = useState(null) // 'before' | 'after' | null
     const widgetRef = useRef(null)
 
-    // Create a stable config change handler that integrates with LayoutRenderer
+    // Active React editor path: widgets emit config changes upward; ReactLayoutRenderer owns UDC publishing.
     const stableConfigChangeHandler = useMemo(() => {
-        return onConfigChange ? (newConfig) => {
-            // PageEditor-specific: Update through LayoutRenderer for immediate visual feedback
-            if (layoutRenderer) {
-                const updatedWidget = { ...widget, config: newConfig }
-                layoutRenderer.updateWidget(actualSlotName, index, updatedWidget)
-            }
-            // Handle different onConfigChange signatures:
-            // - Top-level: (widgetId, slotName, newConfig)
-            // - Nested: (newConfig)
-            if (onConfigChange.length === 1) {
-                // Nested widget handler - just pass config
-                onConfigChange(newConfig)
-            } else {
-                // Top-level widget handler - pass full args
-                onConfigChange(widget.id, slotName, newConfig)
-            }
-        } : undefined
-    }, [onConfigChange, widget.id, slotName, layoutRenderer, actualSlotName, index, widget])
+        return createPageWidgetConfigChangeHandler({ onConfigChange, widget, slotName })
+    }, [onConfigChange, widget, slotName])
 
     // PageEditor-specific edit handler with version awareness
     const handleEdit = () => {
@@ -226,7 +215,7 @@ const PageWidgetFactory = ({
             const result = await renderWidgetPreview(widget, {
                 versionId,
                 publishingContext: isPublished,
-                layoutContext: layoutRenderer?.getLayoutContext(),
+                layoutContext: null,
                 previewMode: defaultToViewMode ? 'view' : 'edit',
                 slotType,
                 isInherited: isInheritedWidget
@@ -261,7 +250,7 @@ const PageWidgetFactory = ({
     const customActions = CoreWidgetComponent?.customActions?.(widget, {
         pageId: pageId || webpageData?.id,
         themeId: webpageData?.theme,
-        layoutRenderer
+        layoutRenderer: null
     })
 
     if (!CoreWidgetComponent) {
@@ -354,7 +343,6 @@ const PageWidgetFactory = ({
                                 widgetId={actualWidgetId}
                                 slotName={actualSlotName}
                                 widgetType={widget.type}
-                                layoutRenderer={layoutRenderer}
                                 versionId={versionId}
                                 isPublished={isPublished}
                                 parentComponentId={parentComponentId}
@@ -485,8 +473,9 @@ const PageWidgetFactory = ({
                     widget={widget}
                     onPaste={onPaste ? handlePaste : undefined}
                     onCut={undefined}
-                    pageId={pageId || webpageData?.id}
-                    widgetPath={buildWidgetPath ? buildWidgetPath(actualSlotName, actualWidgetId) : `${actualSlotName}/${actualWidgetId}`}
+                    pageId={resolvedPageId}
+                    versionId={resolvedVersionId}
+                    widgetPath={headerWidgetPath}
                     // Selection props
                     slotName={actualSlotName}
                     isSelected={isWidgetSelected ? isWidgetSelected(actualSlotName, actualWidgetId) : false}
@@ -555,7 +544,6 @@ const PageWidgetFactory = ({
                                 widgetId={actualWidgetId}
                                 slotName={actualSlotName}
                                 widgetType={widget.type}
-                                layoutRenderer={layoutRenderer}
                                 versionId={versionId}
                                 isPublished={isPublished}
                                 namespace={namespace}
@@ -681,7 +669,6 @@ const PageWidgetFactory = ({
                         slotName={actualSlotName}
                         widgetType={widget.type}
                         // PageEditor-specific props
-                        layoutRenderer={layoutRenderer}
                         versionId={versionId}
                         isPublished={isPublished}
                         // Context props for container widgets

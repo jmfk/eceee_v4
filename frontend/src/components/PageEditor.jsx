@@ -34,7 +34,8 @@ import { pagesApi, layoutsApi, versionsApi, themesApi, namespacesApi } from '../
 import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
 import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary, processLoadedVersionData } from '../utils/smartSaveUtils'
-import { WIDGET_ACTIONS } from '../utils/widgetConstants'
+import { applyWidgetUpdateToWidgetMap } from '../utils/pageEditorWidgetState'
+import { saveWidgetEditorChanges } from '../utils/pageEditorWidgetSave'
 import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
@@ -170,7 +171,7 @@ function deriveTodoItemsFromError(errorString) {
  * Version Management:
  * - Initial load: Regular page API populates pageData
  * - Switching versions: Version API response gets transformed and merged into pageData
- * - ContentEditor always uses pageData.widgets as single source of truth
+ * - PageContentEditor/ReactLayoutRenderer receive widgets from canonical pageVersionData/localWidgets state
  */
 const PageEditor = () => {
     const { pageId, tab } = useParams()
@@ -529,7 +530,7 @@ const PageEditor = () => {
                         }
                         // Otherwise, keep current dirty state (user has unsaved local changes)
 
-                        // Publish update through UDC to notify ContentEditor and other components
+                        // Publish update through UDC to notify active editor components
                         if (versionId && conflictResult.mergedVersion.widgets) {
                             const udcComponentId = `page-editor-${pageId}-websocket-merge`;
                             publishUpdate(udcComponentId, OperationTypes.UPDATE_PAGE_VERSION_DATA, {
@@ -1142,9 +1143,9 @@ const PageEditor = () => {
 
     // Handle page data updates - route to appropriate data structure
     const updatePageData = useCallback(async (updates) => {
-        // Handle version changes from LayoutRenderer
+        // Handle version changes from active React editor controls
         if (updates.versionChanged && updates.pageVersionData) {
-            // This is a version switch from LayoutRenderer, use switchToVersion
+            // This is a version switch from editor controls, use switchToVersion
             const versionId = updates.pageVersionData.id || updates.pageVersionData.versionId;
             await switchToVersion(versionId);
             return; // Don't set dirty for version switches
@@ -1241,8 +1242,10 @@ const PageEditor = () => {
             // Collect all data from editors (no saving yet)
             const collectedData = {};
 
+            const versionDataOverrides = saveOptions.versionDataOverrides || {};
+
             // Collect current widget data from pageVersionData (always current after fix)
-            collectedData.widgets = pageVersionData?.widgets || {};
+            collectedData.widgets = versionDataOverrides.widgets || pageVersionData?.widgets || {};
 
             if (contentEditorRef.current && contentEditorRef.current.saveWidgets) {
                 try {
@@ -1279,6 +1282,7 @@ const PageEditor = () => {
 
             const currentVersionDataForSave = {
                 ...pageVersionData,
+                ...versionDataOverrides,
                 widgets: collectedData.widgets
             };
 
@@ -1339,7 +1343,7 @@ const PageEditor = () => {
                         saveOptions
                     });
                     setShowConflictModal(true);
-                    return; // Don't proceed with save
+                    return { saved: false, reason: 'conflict', saveResult }; // Don't proceed with save
                 }
             }
 
@@ -1357,7 +1361,7 @@ const PageEditor = () => {
                 updatedVersionData = {
                     ...updatedVersionData,
                     ...saveResult.versionResult,
-                    widgets: collectedData.widgets // Preserve collected widgets
+                    widgets: currentVersionDataForSave.widgets // Preserve collected widgets
                 };
 
                 // Update current version
@@ -1394,6 +1398,8 @@ const PageEditor = () => {
             queryClient.invalidateQueries(['page', webpageData?.id || pageId]);
             queryClient.invalidateQueries(['pages', 'root']);
 
+            return { saved: true, saveResult };
+
         } catch (error) {
             console.error('❌ SMART SAVE: Save failed', error);
             addNotification(
@@ -1410,6 +1416,7 @@ const PageEditor = () => {
                     setErrorTodoItems(prev => mergeTodoItems(prev, items))
                 }
             }
+            throw error;
         }
     }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, queryClient, currentVersion]); // Removed loadVersionsPreserveCurrent to break circular dependency
 
@@ -1629,7 +1636,7 @@ const PageEditor = () => {
             setLocalWidgets(resolved.version.widgets);
         }
 
-        // Publish update through UDC to notify ContentEditor
+        // Publish update through UDC to notify active editor components
         if (versionId && resolved.version.widgets) {
             const udcComponentId = `page-editor-${pageId}-conflict-resolve`;
             publishUpdate(udcComponentId, OperationTypes.UPDATE_PAGE_VERSION_DATA, {
@@ -1684,37 +1691,53 @@ const PageEditor = () => {
         setEditingWidget(null)
     }, [])
 
-    const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
-        if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
-            // Update the widget through the LayoutRenderer using UPDATE action
-            const renderer = contentEditorRef.current.layoutRenderer
+    const applyWidgetUpdateToPageState = useCallback((updatedWidget) => {
+        if (!updatedWidget?.id) return
 
-            // Use UPDATE action for real-time preview updates
-            renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, updatedWidget.slotName, updatedWidget)
-            renderer.updateSlot(updatedWidget.slotName, renderer.getSlotWidgetData(updatedWidget.slotName))
-        }
-    }, [])
+        setLocalWidgets(prev => applyWidgetUpdateToWidgetMap(prev || pageVersionData?.widgets || {}, updatedWidget))
+        setPageVersionData(prev => prev ? ({
+            ...prev,
+            widgets: applyWidgetUpdateToWidgetMap(prev.widgets || {}, updatedWidget)
+        }) : prev)
+        setEditingWidget(prev => prev && String(prev.id) === String(updatedWidget.id)
+            ? { ...prev, ...updatedWidget, config: { ...(prev.config || {}), ...(updatedWidget.config || {}) } }
+            : prev
+        )
+    }, [pageVersionData?.widgets])
+
+    const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
+        applyWidgetUpdateToPageState(updatedWidget)
+        const slotName = updatedWidget?.slotName || updatedWidget?.slot || updatedWidget?.context?.slotName
+        if (!updatedWidget?.id || !slotName) return
+
+        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+            id: updatedWidget.id,
+            slotName,
+            contextType: 'page',
+            pageId,
+            versionId,
+            config: updatedWidget.config || {},
+            widgetUpdates: updatedWidget.widgetUpdates,
+            widgetPath: updatedWidget.widgetPath || updatedWidget.context?.widgetPath
+        })
+    }, [applyWidgetUpdateToPageState, publishUpdate, componentId, pageId, versionId])
 
     const handleSaveWidget = useCallback(async (updatedWidget) => {
-        // With validation-driven sync, widget data is already in canonical state
-        // Just need to update the visual representation and show success
-
-        if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
-            // Update the visual representation via LayoutRenderer
-            const renderer = contentEditorRef.current.layoutRenderer
-            renderer.executeWidgetDataCallback(WIDGET_ACTIONS.EDIT, updatedWidget.slotName, updatedWidget)
-            renderer.updateSlot(updatedWidget.slotName, renderer.getSlotWidgetData(updatedWidget.slotName))
-        }
-
-        addNotification(
-            `Widget "${updatedWidget.name}" saved successfully`,
-            'success'
+        const widgetsForSave = applyWidgetUpdateToWidgetMap(
+            pageVersionData?.widgets || {},
+            updatedWidget
         )
 
-        // Reset dirty state and close editor
-        setIsDirty(false)
-        handleCloseWidgetEditor()
-    }, [addNotification, handleCloseWidgetEditor])
+        return await saveWidgetEditorChanges(updatedWidget, {
+            applyWidgetUpdate: applyWidgetUpdateToPageState,
+            persistChanges: () => handleActualSave({
+                description: `Widget "${updatedWidget.name || updatedWidget.id}" saved`,
+                versionDataOverrides: { widgets: widgetsForSave }
+            }),
+            addNotification,
+            closeWidgetEditor: handleCloseWidgetEditor
+        })
+    }, [addNotification, applyWidgetUpdateToPageState, handleActualSave, handleCloseWidgetEditor, pageVersionData?.widgets])
 
     // Subscribe to widget events using direct subscription
     // Widget events now handled through UnifiedDataContext
@@ -1753,21 +1776,7 @@ const PageEditor = () => {
                     }
                 })
 
-                // Also update the visual representation for real-time preview
-                if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
-                    const renderer = contentEditorRef.current.layoutRenderer
-                    renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, payload.slotName, payload.widget)
-                    renderer.updateSlot(payload.slotName, renderer.getSlotWidgetData(payload.slotName))
-                }
-
                 return
-            }
-
-            // For structural changes (position, add, remove), trigger full re-render
-            if (contentEditorRef.current && contentEditorRef.current.layoutRenderer) {
-                const renderer = contentEditorRef.current.layoutRenderer
-                renderer.executeWidgetDataCallback(WIDGET_ACTIONS.UPDATE, payload.slotName, payload.widget)
-                renderer.updateSlot(payload.slotName, renderer.getSlotWidgetData(payload.slotName))
             }
         }
 
@@ -1861,9 +1870,10 @@ const PageEditor = () => {
 
                         // Save the widget changes using the panel's save method
                         if (widgetEditorRef.current) {
-                            const savedWidget = widgetEditorRef.current.saveCurrentWidget()
-                            if (savedWidget) {
-                                await handleSaveWidget(savedWidget)
+                            try {
+                                await widgetEditorRef.current.saveCurrentWidget()
+                            } catch {
+                                // handleActualSave already shows the failure; keep the panel open.
                             }
                         }
                     } else {

@@ -5,13 +5,14 @@
  * complex backend/frontend protocol. Simple, flexible, and maintainable.
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Layout } from 'lucide-react';
-import { getLayoutComponent, getLayoutMetadata, layoutExists, LAYOUT_REGISTRY } from '../../layouts';
+import { getLayoutComponent, getLayoutMetadata, LAYOUT_REGISTRY } from '../../layouts';
 import { useWidgets, createDefaultWidgetConfig } from '../../hooks/useWidgets';
 import PageWidgetSelectionModal from './PageWidgetSelectionModal';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
+import { versionsApi } from '../../api/versions';
 import ImportDialog from '../../components/ImportDialog';
 import { copyWidgetsToClipboard, cutWidgetsToClipboard } from '../../utils/clipboardService';
 import { Clipboard, Scissors, X, ChevronDown, ChevronUp } from 'lucide-react';
@@ -22,6 +23,99 @@ const filterValidWidgets = (widgets) => {
     return Array.isArray(widgets)
         ? widgets.filter(w => w != null && typeof w === 'object' && w.id != null)
         : []
+}
+
+export const isDifferentWidgetSourceContext = ({ sourcePageId, sourceVersionId, currentPageId, currentVersionId }) => {
+    const sourcePageDiffers = sourcePageId && currentPageId && String(sourcePageId) !== String(currentPageId);
+    const sourceVersionDiffers = sourceVersionId && currentVersionId && String(sourceVersionId) !== String(currentVersionId);
+
+    return Boolean(sourcePageDiffers || sourceVersionDiffers);
+}
+
+const removeNestedWidgetFromSlot = (slotWidgets, pathSegment) => {
+    if (!Array.isArray(pathSegment) || pathSegment.length < 1) {
+        return slotWidgets;
+    }
+
+    const currentWidgetId = pathSegment[0];
+
+    if (pathSegment.length === 1) {
+        return filterValidWidgets(slotWidgets)
+            .filter(widget => String(widget.id) !== String(currentWidgetId))
+            .map((widget, index) => ({ ...widget, order: index }));
+    }
+
+    if (pathSegment.length < 3) {
+        return slotWidgets;
+    }
+
+    const validWidgets = filterValidWidgets(slotWidgets);
+    const widgetIndex = validWidgets.findIndex(widget => String(widget.id) === String(currentWidgetId));
+    if (widgetIndex === -1) {
+        return validWidgets;
+    }
+
+    const widget = validWidgets[widgetIndex];
+    const nestedSlotName = pathSegment[1];
+    const nestedSlots = widget.config?.slots || {};
+    const nestedSlotWidgets = filterValidWidgets(nestedSlots[nestedSlotName] || []);
+    const updatedNestedSlot = removeNestedWidgetFromSlot(nestedSlotWidgets, pathSegment.slice(2));
+
+    const updatedWidgets = [...validWidgets];
+    updatedWidgets[widgetIndex] = {
+        ...widget,
+        config: {
+            ...widget.config,
+            slots: {
+                ...nestedSlots,
+                [nestedSlotName]: updatedNestedSlot
+            }
+        }
+    };
+
+    return updatedWidgets;
+}
+
+const removeWidgetAtPathFromWidgetMap = (widgetMap, pathParts) => {
+    if (!widgetMap || !Array.isArray(pathParts) || pathParts.length < 2) {
+        return widgetMap || {};
+    }
+
+    const topSlot = pathParts[0];
+    const slotWidgets = filterValidWidgets(widgetMap[topSlot] || []);
+
+    return {
+        ...widgetMap,
+        [topSlot]: removeNestedWidgetFromSlot(slotWidgets, pathParts.slice(1))
+    };
+}
+
+const removeCutMetadataFromWidgetMap = (widgetMap, cutMetadata) => {
+    let updatedWidgets = widgetMap || {};
+
+    if (cutMetadata?.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
+        cutMetadata.widgetPaths.forEach(widgetPath => {
+            if (typeof widgetPath !== 'string') return;
+            updatedWidgets = removeWidgetAtPathFromWidgetMap(updatedWidgets, widgetPath.split('/'));
+        });
+        return updatedWidgets;
+    }
+
+    if (cutMetadata?.widgets && typeof cutMetadata.widgets === 'object') {
+        Object.entries(cutMetadata.widgets).forEach(([key, widgetIds]) => {
+            if (!Array.isArray(widgetIds)) return;
+
+            const keyParts = key.split('/');
+            widgetIds.forEach(widgetId => {
+                const pathParts = keyParts.length === 3
+                    ? [...keyParts, widgetId]
+                    : [key, widgetId];
+                updatedWidgets = removeWidgetAtPathFromWidgetMap(updatedWidgets, pathParts);
+            });
+        });
+    }
+
+    return updatedWidgets;
 }
 
 const ReactLayoutRenderer = forwardRef(({
@@ -63,16 +157,14 @@ const ReactLayoutRenderer = forwardRef(({
     const contextType = 'page';
 
     // Subscribe to UDC state changes from external sources only
-    useExternalChanges(componentId, (state) => {
+    useExternalChanges(componentId, () => {
         // External changes will be handled by PageEditor
         // ReactLayoutRenderer will get updates via props (widgets)
     })
 
     // Use shared widget hook
     const {
-        addWidget,
-        updateWidget,
-        deleteWidget
+        addWidget
     } = useWidgets(widgets);
 
     // Widget modal state
@@ -94,6 +186,7 @@ const ReactLayoutRenderer = forwardRef(({
 
     // Toolbar collapse state
     const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
+    const [pasteError, setPasteError] = useState(null);
 
     // Get global clipboard state
     const { clipboardData, pasteModeActive, pasteModePaused, togglePasteMode, clearClipboardState, refreshClipboard } = useClipboard();
@@ -111,19 +204,96 @@ const ReactLayoutRenderer = forwardRef(({
         const parts = widgetPath.split('/');
         if (parts.length === 2) {
             // Top-level: "slotName/widgetId"
-            return { slotName: parts[0], widgetId: parts[1], isNested: false };
-        } else if (parts.length === 4) {
-            // Nested: "slotName/containerId/nestedSlot/nestedWidgetId"
+            return { slotName: parts[0], widgetId: parts[1], pathParts: parts, isNested: false };
+        } else if (parts.length >= 4 && parts.length % 2 === 0) {
+            // Nested: "slotName/containerId/nestedSlot/nestedWidgetId[/nestedSlot/nestedWidgetId...]"
             return {
                 slotName: parts[0],
                 containerId: parts[1],
                 nestedSlot: parts[2],
-                nestedWidgetId: parts[3],
+                nestedWidgetId: parts[parts.length - 1],
+                pathParts: parts,
                 isNested: true
             };
         }
         return null;
     }, []);
+
+    const publishCutSourceRemovals = useCallback(async (cutMetadata) => {
+        const sourcePageId = cutMetadata.pageId;
+        const sourceVersionId = cutMetadata.versionId;
+
+        if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
+            for (const widgetPath of cutMetadata.widgetPaths) {
+                const parsed = parseWidgetPath(widgetPath);
+                if (!parsed) continue;
+
+                await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                    id: parsed.isNested ? parsed.nestedWidgetId : parsed.widgetId,
+                    contextType: contextType,
+                    pageId: sourcePageId,
+                    versionId: sourceVersionId,
+                    widgetPath: parsed.pathParts
+                });
+            }
+        } else if (cutMetadata.widgets) {
+            for (const widgetIds of Object.values(cutMetadata.widgets)) {
+                if (!Array.isArray(widgetIds)) continue;
+                for (const widgetId of widgetIds) {
+                    await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                        id: widgetId,
+                        contextType: contextType,
+                        pageId: sourcePageId,
+                        versionId: sourceVersionId,
+                    });
+                }
+            }
+        }
+    }, [componentId, contextType, parseWidgetPath, publishUpdate]);
+
+    const prepareCutSourceWidgets = useCallback(async (cutMetadata) => {
+        const sourcePageId = cutMetadata?.pageId;
+        const sourceVersionId = cutMetadata?.versionId;
+
+        if (!sourceVersionId) {
+            throw new Error('The cut source version is missing. Copy the widget again and retry.');
+        }
+
+        const state = getState?.();
+        const loadedSourceVersion = state?.versions?.[String(sourceVersionId)] || state?.versions?.[sourceVersionId];
+        const sourceVersion = sourcePageId
+            ? await versionsApi.getPageVersion(sourcePageId, sourceVersionId)
+            : await versionsApi.get(sourceVersionId);
+        const authoritativeSourceVersion = sourceVersion?.data || sourceVersion || loadedSourceVersion;
+        const publicationStatus = authoritativeSourceVersion?.publicationStatus;
+
+        if (publicationStatus !== 'draft') {
+            const statusLabel = publicationStatus || 'an unknown publication state';
+            throw new Error(
+                `Only draft versions can be changed. Source version ${sourceVersionId} is ${statusLabel}.`
+            );
+        }
+
+        const sourceWidgets = authoritativeSourceVersion?.widgets || {};
+        const updatedSourceWidgets = removeCutMetadataFromWidgetMap(sourceWidgets, cutMetadata);
+
+        return {
+            sourceVersionId,
+            loadedSourceVersion,
+            updatedSourceWidgets
+        };
+    }, [getState]);
+
+    const persistCutSourceWidgets = useCallback(async (cutMetadata, preparedSource = null) => {
+        const sourceUpdate = preparedSource || await prepareCutSourceWidgets(cutMetadata);
+        await versionsApi.updateWidgets(sourceUpdate.sourceVersionId, {
+            widgets: sourceUpdate.updatedSourceWidgets
+        });
+
+        if (sourceUpdate.loadedSourceVersion) {
+            await publishCutSourceRemovals(cutMetadata);
+        }
+    }, [prepareCutSourceWidgets, publishCutSourceRemovals]);
 
     // Page context for widgets - includes all necessary context data
     const pageContext = useMemo(() => ({
@@ -211,6 +381,8 @@ const ReactLayoutRenderer = forwardRef(({
                         config: newWidget.config,
                         slot: slotName,
                         contextType: contextType,
+                        pageId: context?.pageId || webpageData?.id,
+                        versionId,
                         order: widgetOrder
                     });
                 }
@@ -252,7 +424,9 @@ const ReactLayoutRenderer = forwardRef(({
                 // Publish to Unified Data Context
                 await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                     id: widget.id,
-                    contextType: contextType
+                    contextType: contextType,
+                    pageId: context?.pageId || webpageData?.id,
+                    versionId
                 });
 
                 break;
@@ -280,6 +454,7 @@ const ReactLayoutRenderer = forwardRef(({
                         slot: slotName,
                         contextType: contextType,
                         pageId: context?.pageId || webpageData?.id,
+                        versionId,
                         widgets: updatedWidgetsUp
                     });
                 }
@@ -308,6 +483,7 @@ const ReactLayoutRenderer = forwardRef(({
                         slot: slotName,
                         contextType: contextType,
                         pageId: context?.pageId || webpageData?.id,
+                        versionId,
                         widgets: updatedWidgetsDown
                     });
                 }
@@ -315,17 +491,18 @@ const ReactLayoutRenderer = forwardRef(({
             }
 
             case 'paste': {
+                setPasteError(null);
+
                 // widget is the pasted widget, args[0] is the index to insert after
                 const pastedWidget = widget;
                 const insertAfterIndex = args[0];
                 const insertPosition = insertAfterIndex + 1;
                 const clipboardMetadata = args[1]; // Optional: { operation, metadata } from clipboard
+                const currentPageId = context?.pageId || webpageData?.id;
 
                 // Start with current widgets state
                 let updatedWidgets = { ...widgets };
-
-                // Store pasted widget ID to ensure we don't accidentally delete it
-                const pastedWidgetId = pastedWidget.id;
+                let preparedCutSource = null;
 
                 // Add the pasted widget FIRST to ensure correct insert position
                 // Filter valid widgets first to remove any undefined entries
@@ -338,12 +515,17 @@ const ReactLayoutRenderer = forwardRef(({
                 if (clipboardMetadata && clipboardMetadata.operation === 'cut' && clipboardMetadata.metadata) {
                     const cutMetadata = clipboardMetadata.metadata;
 
-                    // Check if this is a cross-page cut/paste operation
+                    // Check if this is a cross-page or cross-version cut/paste operation
                     const sourcePageId = cutMetadata.pageId;
-                    const currentPageId = context?.pageId || webpageData?.id;
-                    const isCrossPage = sourcePageId && currentPageId && sourcePageId !== currentPageId;
+                    const sourceVersionId = cutMetadata.versionId;
+                    const isCrossSourceContext = isDifferentWidgetSourceContext({
+                        sourcePageId,
+                        sourceVersionId,
+                        currentPageId,
+                        currentVersionId: versionId
+                    });
 
-                    if (!isCrossPage) {
+                    if (!isCrossSourceContext) {
                         // For same-page operations, remove widgets from updatedWidgets
                         let widgetsDeleted = false;
 
@@ -366,8 +548,7 @@ const ReactLayoutRenderer = forwardRef(({
                                             w => {
                                                 const widgetIdStr = String(w.id);
                                                 const parsedIdStr = String(parsed.widgetId);
-                                                const pastedIdStr = String(pastedWidgetId);
-                                                return widgetIdStr !== parsedIdStr && widgetIdStr !== pastedIdStr;
+                                                return widgetIdStr !== parsedIdStr;
                                             }
                                         );
 
@@ -378,7 +559,9 @@ const ReactLayoutRenderer = forwardRef(({
                                             // Publish UDC operation
                                             await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                                                 id: parsed.widgetId,
-                                                contextType: contextType
+                                                contextType: contextType,
+                                                pageId: currentPageId,
+                                                versionId
                                             });
                                         }
                                     }
@@ -411,6 +594,8 @@ const ReactLayoutRenderer = forwardRef(({
                                                     id: parsed.containerId,
                                                     slotName: parsed.slotName,
                                                     contextType: contextType,
+                                                    pageId: currentPageId,
+                                                    versionId,
                                                     config: containerWidget.config
                                                 });
                                             }
@@ -436,8 +621,7 @@ const ReactLayoutRenderer = forwardRef(({
                                                 w => {
                                                     if (!w) return false;
                                                     const widgetIdStr = String(w.id);
-                                                    const pastedIdStr = String(pastedWidgetId);
-                                                    return !widgetIds.map(String).includes(widgetIdStr) && widgetIdStr !== pastedIdStr;
+                                                    return !widgetIds.map(String).includes(widgetIdStr);
                                                 }
                                             );
 
@@ -455,6 +639,8 @@ const ReactLayoutRenderer = forwardRef(({
                                                     id: containerId,
                                                     slotName: slotName,
                                                     contextType: contextType,
+                                                    pageId: currentPageId,
+                                                    versionId,
                                                     config: containerWidget.config
                                                 });
                                             }
@@ -474,9 +660,8 @@ const ReactLayoutRenderer = forwardRef(({
                                         updatedWidgets[slotName] = validWidgets.filter(
                                             widget => {
                                                 const widgetIdStr = String(widget.id);
-                                                const pastedIdStr = String(pastedWidgetId);
                                                 const widgetIdsStr = widgetIds.map(String);
-                                                return !widgetIdsStr.includes(widgetIdStr) && widgetIdStr !== pastedIdStr;
+                                                return !widgetIdsStr.includes(widgetIdStr);
                                             }
                                         );
 
@@ -486,7 +671,9 @@ const ReactLayoutRenderer = forwardRef(({
                                             for (const widgetId of widgetIds) {
                                                 await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                                                     id: widgetId,
-                                                    contextType: contextType
+                                                    contextType: contextType,
+                                                    pageId: currentPageId,
+                                                    versionId
                                                 });
                                             }
                                         }
@@ -495,38 +682,13 @@ const ReactLayoutRenderer = forwardRef(({
                             }
                         }
 
-                        // ALWAYS clear cut state and selection after paste (even if deletion didn't work)
-                        // This ensures the UI updates correctly
-                        setCutWidgets(new Set());
-                        setSelectedWidgets(new Set());
                     } else {
-                        // For cross-page operations, publish REMOVE_WIDGET operations to UDC for the source page
-                        if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
-                            for (const widgetPath of cutMetadata.widgetPaths) {
-                                const parsed = parseWidgetPath(widgetPath);
-                                if (!parsed) continue;
-
-                                await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
-                                    id: parsed.isNested ? parsed.nestedWidgetId : parsed.widgetId,
-                                    contextType: contextType,
-                                    pageId: sourcePageId,
-                                });
-                            }
-                        } else if (cutMetadata.widgets) {
-                            for (const [key, widgetIds] of Object.entries(cutMetadata.widgets)) {
-                                for (const widgetId of widgetIds) {
-                                    await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
-                                        id: widgetId,
-                                        contextType: contextType,
-                                        pageId: sourcePageId,
-                                    });
-                                }
-                            }
+                        try {
+                            preparedCutSource = await prepareCutSourceWidgets(cutMetadata);
+                        } catch (error) {
+                            setPasteError(error?.message || 'The cut source could not be validated.');
+                            break;
                         }
-
-                        // Clear selection for cross-page operations too
-                        setCutWidgets(new Set());
-                        setSelectedWidgets(new Set());
                     }
                 }
 
@@ -552,8 +714,26 @@ const ReactLayoutRenderer = forwardRef(({
                         config: pastedWidget.config,
                         slot: slotName,
                         contextType: contextType,
+                        pageId: currentPageId,
+                        versionId,
                         order: insertPosition
                     });
+                }
+
+                if (clipboardMetadata?.operation === 'cut' && clipboardMetadata.metadata) {
+                    if (preparedCutSource) {
+                        try {
+                            await persistCutSourceWidgets(clipboardMetadata.metadata, preparedCutSource);
+                        } catch (error) {
+                            setPasteError(
+                                `Widget was pasted, but the cut source was not removed: ${error?.message || 'The source version could not be updated.'}`
+                            );
+                            break;
+                        }
+                    }
+
+                    setCutWidgets(new Set());
+                    setSelectedWidgets(new Set());
                 }
 
                 break;
@@ -580,6 +760,8 @@ const ReactLayoutRenderer = forwardRef(({
                     id: widget.id,
                     slotName,
                     contextType: contextType,
+                    pageId: context?.pageId || webpageData?.id,
+                    versionId,
                     config: newConfig
                 });
                 break;
@@ -588,7 +770,7 @@ const ReactLayoutRenderer = forwardRef(({
             default:
                 break;
         }
-    }, [widgets, onWidgetChange, onOpenWidgetEditor, addWidget, publishUpdate, componentId, versionId, isPublished, onVersionChange, context, webpageData, contextType]);
+    }, [widgets, onWidgetChange, onOpenWidgetEditor, addWidget, publishUpdate, componentId, versionId, isPublished, onVersionChange, context, webpageData, contextType, prepareCutSourceWidgets, persistCutSourceWidgets]);
 
     // Widget modal handlers
     const handleShowWidgetModal = useCallback((slotName, slotMetadata = null, replacementInfo = null) => {
@@ -718,7 +900,12 @@ const ReactLayoutRenderer = forwardRef(({
         // Publish removals to Unified Data Context for all widgets in this slot
         const existingWidgetsInSlot = widgets[slotName] || [];
         for (const w of existingWidgetsInSlot) {
-            await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: w.id });
+            await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                id: w.id,
+                contextType: contextType,
+                pageId: context?.pageId || webpageData?.id,
+                versionId
+            });
         }
     }, [widgets, onWidgetChange, publishUpdate, componentId, versionId, isPublished]);
 
@@ -753,6 +940,8 @@ const ReactLayoutRenderer = forwardRef(({
                 config: widget.config,
                 slot: importSlotName,
                 contextType: contextType,
+                pageId: context?.pageId || webpageData?.id,
+                versionId,
                 order: currentSlotWidgets.length + importedWidgets.indexOf(widget)
             });
         }
@@ -790,6 +979,7 @@ const ReactLayoutRenderer = forwardRef(({
         // Build metadata for cut operation (track which widgets to delete using widget paths)
         const cutMetadata = {
             pageId: context?.pageId || webpageData?.id, // Store source pageId for cross-page cut/paste
+            versionId,
             widgetPaths: selected.map(item => item.widgetPath),
             widgets: {} // Keep backward compatibility: { slotName: [widgetIds] }
         };
@@ -826,44 +1016,25 @@ const ReactLayoutRenderer = forwardRef(({
         await refreshClipboard();
     }, [getSelectedWidgets, context, webpageData, refreshClipboard]);
 
-    const handleDeleteCutWidgets = useCallback(async (cutMetadata) => {
+    const handleDeleteCutWidgets = useCallback(async (cutMetadata, preparedSource = null) => {
         // Delete widgets that were cut and pasted
         // Supports both new format (widgetPaths) and old format (widgets object)
 
-        // Check if this is a cross-page cut/paste operation
+        // Check if this is a cross-page or cross-version cut/paste operation
         const sourcePageId = cutMetadata.pageId;
+        const sourceVersionId = cutMetadata.versionId;
         const currentPageId = context?.pageId || webpageData?.id;
-        const isCrossPage = sourcePageId && currentPageId && sourcePageId !== currentPageId;
+        const isCrossSourceContext = isDifferentWidgetSourceContext({
+            sourcePageId,
+            sourceVersionId,
+            currentPageId,
+            currentVersionId: versionId
+        });
 
-        // For cross-page operations, we need to publish REMOVE_WIDGET operations to UDC
-        // for the source page, not the current page
-        if (isCrossPage) {
-            // Publish REMOVE_WIDGET operations to UDC for the source page
-            if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
-                for (const widgetPath of cutMetadata.widgetPaths) {
-                    const parsed = parseWidgetPath(widgetPath);
-                    if (!parsed) continue;
-
-                    // Publish to UDC for the source page
-                    await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
-                        id: parsed.isNested ? parsed.nestedWidgetId : parsed.widgetId,
-                        contextType: contextType,
-                        pageId: sourcePageId, // Specify source page
-                    });
-                }
-            } else if (cutMetadata.widgets) {
-                // Handle old format
-                for (const [key, widgetIds] of Object.entries(cutMetadata.widgets)) {
-                    for (const widgetId of widgetIds) {
-                        await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
-                            id: widgetId,
-                            contextType: contextType,
-                            pageId: sourcePageId, // Specify source page
-                        });
-                    }
-                }
-            }
-            return; // Don't update local widgets for cross-page operations
+        // For cross-page/cross-version operations, persist the source version directly.
+        if (isCrossSourceContext) {
+            await persistCutSourceWidgets(cutMetadata, preparedSource);
+            return; // Don't update local widgets for cross-context operations
         }
 
         // For same-page operations, update local widgets
@@ -890,7 +1061,9 @@ const ReactLayoutRenderer = forwardRef(({
                             hasChanges = true;
                             await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                                 id: parsed.widgetId,
-                                contextType: contextType
+                                contextType: contextType,
+                                pageId: currentPageId,
+                                versionId
                             });
                         }
                     }
@@ -923,6 +1096,8 @@ const ReactLayoutRenderer = forwardRef(({
                                     id: parsed.containerId,
                                     slotName: parsed.slotName,
                                     contextType: contextType,
+                                    pageId: currentPageId,
+                                    versionId,
                                     config: containerWidget.config
                                 });
                             }
@@ -965,6 +1140,8 @@ const ReactLayoutRenderer = forwardRef(({
                                     id: containerId,
                                     slotName: slotName,
                                     contextType: contextType,
+                                    pageId: currentPageId,
+                                    versionId,
                                     config: containerWidget.config
                                 });
                             }
@@ -986,7 +1163,9 @@ const ReactLayoutRenderer = forwardRef(({
                             for (const widgetId of widgetIds) {
                                 await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
                                     id: widgetId,
-                                    contextType: contextType
+                                    contextType: contextType,
+                                    pageId: currentPageId,
+                                    versionId
                                 });
                             }
                         }
@@ -1002,7 +1181,7 @@ const ReactLayoutRenderer = forwardRef(({
         // Clear cut state and selection
         setCutWidgets(new Set());
         setSelectedWidgets(new Set());
-    }, [widgets, onWidgetChange, publishUpdate, componentId, contextType, parseWidgetPath, context, webpageData]);
+    }, [widgets, onWidgetChange, publishUpdate, componentId, contextType, parseWidgetPath, context, webpageData, persistCutSourceWidgets]);
 
     // Handle paste at specific position
     const handlePasteAtPosition = useCallback(async (slotName, position, widgetPath = [], keepClipboard = false) => {
@@ -1010,9 +1189,33 @@ const ReactLayoutRenderer = forwardRef(({
             return;
         }
 
+        setPasteError(null);
+
         // Get widget(s) from clipboard
         const widgetsToPaste = clipboardData.data;
         const isCut = clipboardData.operation === 'cut';
+        let preparedCutSource = null;
+
+        if (isCut && clipboardData.metadata) {
+            const sourcePageId = clipboardData.metadata.pageId;
+            const sourceVersionId = clipboardData.metadata.versionId;
+            const currentPageId = context?.pageId || webpageData?.id;
+            const isCrossSourceContext = isDifferentWidgetSourceContext({
+                sourcePageId,
+                sourceVersionId,
+                currentPageId,
+                currentVersionId: versionId
+            });
+
+            if (isCrossSourceContext) {
+                try {
+                    preparedCutSource = await prepareCutSourceWidgets(clipboardData.metadata);
+                } catch (error) {
+                    setPasteError(error?.message || 'The cut source could not be validated.');
+                    return;
+                }
+            }
+        }
 
         // Generate new IDs for pasted widgets
         const pastedWidgets = widgetsToPaste.map(w => ({
@@ -1165,6 +1368,8 @@ const ReactLayoutRenderer = forwardRef(({
                 id: firstAncestor.widget.id,
                 slotName: topSlotName,
                 contextType: contextType,
+                pageId: context?.pageId || webpageData?.id,
+                versionId,
                 config: updatedChild.config
             });
         } else {
@@ -1192,6 +1397,8 @@ const ReactLayoutRenderer = forwardRef(({
                     config: widget.config,
                     slot: slotName,
                     contextType: contextType,
+                    pageId: context?.pageId || webpageData?.id,
+                    versionId,
                     order: position + i
                 });
             }
@@ -1199,14 +1406,21 @@ const ReactLayoutRenderer = forwardRef(({
 
         // Handle cut operation - delete from source
         if (isCut && clipboardData.metadata) {
-            await handleDeleteCutWidgets(clipboardData.metadata);
+            try {
+                await handleDeleteCutWidgets(clipboardData.metadata, preparedCutSource);
+            } catch (error) {
+                setPasteError(
+                    `Widget was pasted, but the cut source was not removed: ${error?.message || 'The source version could not be updated.'}`
+                );
+                return;
+            }
         }
 
         // Clear clipboard after paste unless shift key was held (or it's a cut operation - always clear for cut)
         if (!keepClipboard || isCut) {
             await clearClipboardState();
         }
-    }, [clipboardData, widgets, onWidgetChange, publishUpdate, componentId, contextType, handleDeleteCutWidgets, clearClipboardState]);
+    }, [clipboardData, widgets, onWidgetChange, publishUpdate, componentId, contextType, context, webpageData, versionId, prepareCutSourceWidgets, handleDeleteCutWidgets, clearClipboardState]);
 
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName);
@@ -1296,7 +1510,7 @@ const ReactLayoutRenderer = forwardRef(({
     // Render the layout component
     // Make this div act like an iframe - break out of parent constraints and use full viewport width
     return (
-        <div className="react-layout-renderer w-full h-full relative cms-content">
+        <div className="react-layout-renderer w-full h-full relative cms-content" data-testid="page-editor-surface">
             {/* Bulk Action Toolbar - Floating */}
             {selectedCount > 0 && (
                 <>
@@ -1354,6 +1568,23 @@ const ReactLayoutRenderer = forwardRef(({
                         </div>
                     )}
                 </>
+            )}
+
+            {pasteError && (
+                <div
+                    role="alert"
+                    className="mx-4 mb-4 flex items-start justify-between gap-3 rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                >
+                    <span>{pasteError}</span>
+                    <button
+                        type="button"
+                        onClick={() => setPasteError(null)}
+                        className="font-medium text-amber-800 hover:text-amber-950"
+                        aria-label="Dismiss paste error"
+                    >
+                        Dismiss
+                    </button>
+                </div>
             )}
 
             <LayoutComponent

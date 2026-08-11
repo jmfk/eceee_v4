@@ -1,0 +1,455 @@
+import React from 'react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import ReactLayoutRenderer, { isDifferentWidgetSourceContext } from '../ReactLayoutRenderer'
+
+const publishUpdateMock = vi.hoisted(() => vi.fn())
+const getStateMock = vi.hoisted(() => vi.fn())
+const updateWidgetsMock = vi.hoisted(() => vi.fn())
+const getPageVersionMock = vi.hoisted(() => vi.fn())
+
+vi.mock('../../../contexts/unified-data/context/UnifiedDataContext', () => ({
+    useUnifiedData: () => ({
+        useExternalChanges: vi.fn(),
+        publishUpdate: publishUpdateMock,
+        getState: getStateMock
+    })
+}))
+
+vi.mock('../../../api/versions', () => ({
+    versionsApi: {
+        getPageVersion: getPageVersionMock,
+        updateWidgets: updateWidgetsMock
+    }
+}))
+
+vi.mock('../../../contexts/ClipboardContext', () => ({
+    useClipboard: () => ({
+        clipboardData: null,
+        pasteModeActive: false,
+        pasteModePaused: false,
+        togglePasteMode: vi.fn(),
+        clearClipboardState: vi.fn(),
+        refreshClipboard: vi.fn()
+    })
+}))
+
+vi.mock('../../../hooks/useWidgets', () => ({
+    useWidgets: () => ({
+        addWidget: vi.fn()
+    }),
+    createDefaultWidgetConfig: vi.fn(() => ({}))
+}))
+
+vi.mock('../../../layouts', () => ({
+    getLayoutComponent: () => function TestLayout({ onWidgetAction, onDeleteCutWidgets }) {
+        return (
+            <div>
+                <button
+                    type="button"
+                    onClick={() => onDeleteCutWidgets({
+                        pageId: 'page-1',
+                        versionId: 'version-a',
+                        widgetPaths: ['main/source-widget']
+                    })}
+                >
+                    Delete cut source
+                </button>
+                <button
+                    type="button"
+                    onClick={() => onDeleteCutWidgets({
+                        pageId: 'page-1',
+                        versionId: 'version-a',
+                        widgetPaths: ['main/container-widget/content/source-nested']
+                    })}
+                >
+                    Delete nested cut source
+                </button>
+                <button
+                    type="button"
+                    onClick={() => onWidgetAction(
+                        'paste',
+                        'main',
+                        {
+                            id: 'pasted-widget',
+                            type: 'easy_widgets.ContentWidget',
+                            config: { content: 'Pasted' }
+                        },
+                        -1,
+                        {
+                            operation: 'cut',
+                            metadata: {
+                                pageId: 'page-1',
+                                versionId: 'version-a',
+                                widgetPaths: ['main/source-widget']
+                            }
+                        }
+                    )}
+                >
+                    Paste cut source
+                </button>
+                <button
+                    type="button"
+                    onClick={() => onWidgetAction(
+                        'paste',
+                        'main',
+                        {
+                            id: 'pasted-nested-widget',
+                            type: 'easy_widgets.ContentWidget',
+                            config: { content: 'Pasted nested' }
+                        },
+                        -1,
+                        {
+                            operation: 'cut',
+                            metadata: {
+                                pageId: 'page-1',
+                                versionId: 'version-a',
+                                widgetPaths: ['main/container-widget/content/source-nested']
+                            }
+                        }
+                    )}
+                >
+                    Paste nested cut source
+                </button>
+            </div>
+        )
+    },
+    getLayoutMetadata: () => ({}),
+    LAYOUT_REGISTRY: { main_layout: true }
+}))
+
+vi.mock('../PageWidgetSelectionModal', () => ({
+    default: () => null
+}))
+
+vi.mock('../../../components/ImportDialog', () => ({
+    default: () => null
+}))
+
+const baseProps = {
+    layoutName: 'main_layout',
+    widgets: {
+        main: [
+            {
+                id: 'destination-widget',
+                type: 'easy_widgets.ContentWidget',
+                config: { content: 'Existing destination' }
+            }
+        ]
+    },
+    currentVersion: { id: 'version-b' },
+    webpageData: { id: 'page-1' },
+    context: { pageId: 'page-1' },
+    sharedComponentId: 'renderer-test'
+}
+
+describe('ReactLayoutRenderer cut source context', () => {
+    beforeEach(() => {
+        publishUpdateMock.mockReset()
+        getStateMock.mockReset()
+        updateWidgetsMock.mockReset()
+        getPageVersionMock.mockReset()
+        updateWidgetsMock.mockResolvedValue({})
+        getStateMock.mockReturnValue({
+            versions: {
+                'version-a': {
+                    id: 'version-a',
+                    pageId: 'page-1',
+                    publicationStatus: 'draft',
+                    widgets: {
+                        main: [
+                            {
+                                id: 'source-widget',
+                                type: 'easy_widgets.ContentWidget',
+                                config: { content: 'Source' }
+                            },
+                            {
+                                id: 'container-widget',
+                                type: 'easy_widgets.ContainerWidget',
+                                config: {
+                                    slots: {
+                                        content: [
+                                            {
+                                                id: 'source-nested',
+                                                type: 'easy_widgets.ContentWidget',
+                                                config: { content: 'Nested source' }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        })
+    })
+
+    it('treats same-page different-version cuts as cross-context', () => {
+        expect(isDifferentWidgetSourceContext({
+            sourcePageId: 'page-1',
+            sourceVersionId: 'version-a',
+            currentPageId: 'page-1',
+            currentVersionId: 'version-b'
+        })).toBe(true)
+    })
+
+    it('deletes cut widgets from the source version when page id matches but version differs', async () => {
+        const onWidgetChange = vi.fn()
+
+        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete cut source' }))
+
+        await waitFor(() => {
+            expect(publishUpdateMock).toHaveBeenCalledOnce()
+        })
+        expect(updateWidgetsMock).toHaveBeenCalledWith(
+            'version-a',
+            {
+                widgets: {
+                    main: [
+                        expect.objectContaining({ id: 'container-widget', order: 0 })
+                    ]
+                }
+            }
+        )
+        expect(publishUpdateMock).toHaveBeenCalledWith(
+            'renderer-test',
+            'REMOVE_WIDGET',
+            {
+                id: 'source-widget',
+                contextType: 'page',
+                pageId: 'page-1',
+                versionId: 'version-a',
+                widgetPath: ['main', 'source-widget']
+            }
+        )
+        expect(onWidgetChange).not.toHaveBeenCalled()
+    })
+
+    it('fetches and persists the source version when it is not loaded locally', async () => {
+        const onWidgetChange = vi.fn()
+        getStateMock.mockReturnValue({ versions: {} })
+        getPageVersionMock.mockResolvedValue({
+            publicationStatus: 'draft',
+            widgets: {
+                main: [
+                    {
+                        id: 'source-widget',
+                        type: 'easy_widgets.ContentWidget',
+                        config: { content: 'Source' }
+                    }
+                ]
+            }
+        })
+
+        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete cut source' }))
+
+        await waitFor(() => {
+            expect(updateWidgetsMock).toHaveBeenCalledOnce()
+        })
+        expect(getPageVersionMock).toHaveBeenCalledWith('page-1', 'version-a')
+        expect(updateWidgetsMock).toHaveBeenCalledWith(
+            'version-a',
+            { widgets: { main: [] } }
+        )
+        expect(publishUpdateMock).not.toHaveBeenCalled()
+        expect(onWidgetChange).not.toHaveBeenCalled()
+    })
+
+    it('refuses to remove a cut source from a published version', async () => {
+        const onWidgetChange = vi.fn()
+        getPageVersionMock.mockResolvedValue({
+            publicationStatus: 'published',
+            widgets: {
+                main: [
+                    {
+                        id: 'source-widget',
+                        type: 'easy_widgets.ContentWidget',
+                        config: { content: 'Published source' }
+                    }
+                ]
+            }
+        })
+
+        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Paste cut source' }))
+
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+            'Only draft versions can be changed. Source version version-a is published.'
+        )
+        expect(updateWidgetsMock).not.toHaveBeenCalled()
+        expect(publishUpdateMock).not.toHaveBeenCalled()
+        expect(onWidgetChange).not.toHaveBeenCalled()
+    })
+
+    it('sends widgetPath when deleting nested cut widgets from a source version', async () => {
+        const onWidgetChange = vi.fn()
+
+        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete nested cut source' }))
+
+        await waitFor(() => {
+            expect(publishUpdateMock).toHaveBeenCalledOnce()
+        })
+        expect(updateWidgetsMock).toHaveBeenCalledWith(
+            'version-a',
+            {
+                widgets: {
+                    main: [
+                        expect.objectContaining({ id: 'source-widget' }),
+                        expect.objectContaining({
+                            id: 'container-widget',
+                            config: {
+                                slots: {
+                                    content: []
+                                }
+                            }
+                        })
+                    ]
+                }
+            }
+        )
+        expect(publishUpdateMock).toHaveBeenCalledWith(
+            'renderer-test',
+            'REMOVE_WIDGET',
+            {
+                id: 'source-nested',
+                contextType: 'page',
+                pageId: 'page-1',
+                versionId: 'version-a',
+                widgetPath: ['main', 'container-widget', 'content', 'source-nested']
+            }
+        )
+        expect(onWidgetChange).not.toHaveBeenCalled()
+    })
+
+    it('keeps paste on the destination version and removes the cut source from its original version', async () => {
+        const onWidgetChange = vi.fn()
+
+        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Paste cut source' }))
+
+        await waitFor(() => {
+            expect(publishUpdateMock).toHaveBeenCalledTimes(2)
+        })
+        expect(updateWidgetsMock).toHaveBeenCalledWith(
+            'version-a',
+            {
+                widgets: {
+                    main: [
+                        expect.objectContaining({ id: 'container-widget', order: 0 })
+                    ]
+                }
+            }
+        )
+        expect(publishUpdateMock).toHaveBeenNthCalledWith(
+            1,
+            'renderer-test',
+            'ADD_WIDGET',
+            {
+                id: 'pasted-widget',
+                type: 'easy_widgets.ContentWidget',
+                config: { content: 'Pasted' },
+                slot: 'main',
+                contextType: 'page',
+                pageId: 'page-1',
+                versionId: 'version-b',
+                order: 0
+            }
+        )
+        expect(publishUpdateMock).toHaveBeenNthCalledWith(
+            2,
+            'renderer-test',
+            'REMOVE_WIDGET',
+            {
+                id: 'source-widget',
+                contextType: 'page',
+                pageId: 'page-1',
+                versionId: 'version-a',
+                widgetPath: ['main', 'source-widget']
+            }
+        )
+        expect(onWidgetChange).toHaveBeenCalledWith(
+            {
+                main: [
+                    expect.objectContaining({ id: 'pasted-widget' }),
+                    expect.objectContaining({ id: 'destination-widget' })
+                ]
+            },
+            { sourceId: 'pasted-widget' }
+        )
+    })
+
+    it('keeps nested cut paste on the destination version and removes the nested source by path', async () => {
+        const onWidgetChange = vi.fn()
+
+        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Paste nested cut source' }))
+
+        await waitFor(() => {
+            expect(publishUpdateMock).toHaveBeenCalledTimes(2)
+        })
+        expect(updateWidgetsMock).toHaveBeenCalledWith(
+            'version-a',
+            {
+                widgets: {
+                    main: [
+                        expect.objectContaining({ id: 'source-widget' }),
+                        expect.objectContaining({
+                            id: 'container-widget',
+                            config: {
+                                slots: {
+                                    content: []
+                                }
+                            }
+                        })
+                    ]
+                }
+            }
+        )
+        expect(publishUpdateMock).toHaveBeenNthCalledWith(
+            1,
+            'renderer-test',
+            'ADD_WIDGET',
+            {
+                id: 'pasted-nested-widget',
+                type: 'easy_widgets.ContentWidget',
+                config: { content: 'Pasted nested' },
+                slot: 'main',
+                contextType: 'page',
+                pageId: 'page-1',
+                versionId: 'version-b',
+                order: 0
+            }
+        )
+        expect(publishUpdateMock).toHaveBeenNthCalledWith(
+            2,
+            'renderer-test',
+            'REMOVE_WIDGET',
+            {
+                id: 'source-nested',
+                contextType: 'page',
+                pageId: 'page-1',
+                versionId: 'version-a',
+                widgetPath: ['main', 'container-widget', 'content', 'source-nested']
+            }
+        )
+        expect(onWidgetChange).toHaveBeenCalledWith(
+            {
+                main: [
+                    expect.objectContaining({ id: 'pasted-nested-widget' }),
+                    expect.objectContaining({ id: 'destination-widget' })
+                ]
+            },
+            { sourceId: 'pasted-nested-widget' }
+        )
+    })
+})

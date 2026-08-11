@@ -51,7 +51,7 @@ export type PageOperation =
  * Widget operation payloads with explicit TypeScript types
  */
 export type WidgetContext =
-  | { contextType: 'page'; pageId: string }
+  | { contextType: 'page'; pageId: string; versionId?: string }
   | { contextType: 'object'; objectId: string };
 
 export type AddWidgetPayload = WidgetContext & {
@@ -89,6 +89,7 @@ export type MoveWidgetPayload = WidgetContext & {
 
 export type RemoveWidgetPayload = WidgetContext & {
   id: string;
+  widgetPath?: string[]; // Full path for nested widgets: [topSlot, widgetId, slot, widgetId, ..., targetId]
 };
 
 export type AnyWidgetPayload =

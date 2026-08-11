@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { DataManager } from './DataManager'
 import { OperationTypes } from '../types/operations'
 import { createAppState, createPage, createVersion, createWidget } from '../../../test/unifiedDataTestUtils'
@@ -164,5 +164,230 @@ describe('DataManager state operations', () => {
 
         expect(nestedWidget.config.text).toBe('Nested headline updated')
         expect(manager.getState().metadata.isDirty).toBe(true)
+    })
+
+    it('removes nested widgets by widgetPath', () => {
+        const manager = new DataManager(createAppState({
+            versions: {
+                'version-1': createVersion({
+                    widgets: {
+                        main: [
+                            createWidget({
+                                id: 'section-1',
+                                type: 'layout.SectionWidget',
+                                config: {
+                                    slots: {
+                                        content: [
+                                            createWidget({
+                                                id: 'headline-1',
+                                                type: 'content.HeadlineWidget',
+                                                config: { text: 'Remove me' }
+                                            }),
+                                            createWidget({
+                                                id: 'headline-2',
+                                                type: 'content.HeadlineWidget',
+                                                config: { text: 'Keep me' }
+                                            })
+                                        ]
+                                    }
+                                }
+                            }),
+                            createWidget({
+                                id: 'top-level-sibling',
+                                type: 'content.TextWidget',
+                                config: { content: 'Keep top-level sibling' }
+                            })
+                        ]
+                    }
+                })
+            }
+        }))
+
+        manager.dispatch({
+            type: OperationTypes.REMOVE_WIDGET,
+            payload: {
+                id: 'headline-1',
+                contextType: 'page',
+                pageId: 'page-1',
+                widgetPath: ['main', 'section-1', 'content', 'headline-1']
+            }
+        })
+
+        const state = manager.getState()
+        const contentSlot = state.versions['version-1'].widgets.main[0].config.slots.content
+
+        expect(contentSlot.map((widget: any) => widget.id)).toEqual(['headline-2'])
+        expect(contentSlot[0].order).toBe(0)
+        expect(state.versions['version-1'].widgets.main.map((widget: any) => widget.id)).toEqual([
+            'section-1',
+            'top-level-sibling'
+        ])
+        expect(state.metadata.isDirty).toBe(true)
+    })
+
+    it('honors explicit page and version targets for cross-page widget operations', () => {
+        const pageB = createPage({
+            id: 'page-2',
+            title: 'Target Page',
+            currentVersionId: 'version-2',
+            availableVersions: ['version-2']
+        })
+        const versionB = createVersion({
+            id: 'version-2',
+            pageId: 'page-2',
+            widgets: {
+                main: [
+                    createWidget({
+                        id: 'widget-b',
+                        config: { content: 'Page B original' }
+                    })
+                ]
+            }
+        })
+        const manager = new DataManager(createAppState({
+            pages: {
+                'page-1': createPage(),
+                'page-2': pageB
+            },
+            versions: {
+                'version-1': createVersion({
+                    widgets: {
+                        main: [
+                            createWidget({
+                                id: 'widget-a',
+                                config: { content: 'Page A original' }
+                            })
+                        ]
+                    }
+                }),
+                'version-2': versionB
+            },
+            metadata: {
+                currentPageId: 'page-1',
+                currentVersionId: 'version-1'
+            }
+        }))
+
+        manager.dispatch({
+            type: OperationTypes.ADD_WIDGET,
+            payload: {
+                id: 'widget-b-pasted',
+                type: 'content.TextWidget',
+                slot: 'main',
+                contextType: 'page',
+                pageId: 'page-2',
+                versionId: 'version-2',
+                config: { content: 'Pasted into page B' },
+                order: 1
+            }
+        })
+
+        manager.dispatch({
+            type: OperationTypes.REMOVE_WIDGET,
+            payload: {
+                id: 'widget-b',
+                contextType: 'page',
+                pageId: 'page-2',
+                versionId: 'version-2'
+            }
+        })
+
+        expect(manager.getState().versions['version-1'].widgets.main.map(widget => widget.id)).toEqual(['widget-a'])
+        expect(manager.getState().versions['version-2'].widgets.main.map(widget => widget.id)).toEqual(['widget-b-pasted'])
+    })
+})
+
+describe('DataManager subscriptions', () => {
+    const flushQueuedCallbacks = () => new Promise(resolve => queueMicrotask(resolve))
+
+    it('notifies subscribers for two synchronous updates in dispatch order', async () => {
+        const manager = new DataManager(createAppState())
+        const received: boolean[] = []
+
+        manager.subscribe(
+            state => state.metadata.isDirty,
+            value => received.push(value)
+        )
+
+        manager.dispatch({
+            type: OperationTypes.SET_DIRTY,
+            payload: { isDirty: true }
+        })
+        manager.dispatch({
+            type: OperationTypes.SET_DIRTY,
+            payload: { isDirty: false }
+        })
+
+        await flushQueuedCallbacks()
+
+        expect(received).toEqual([true, false])
+    })
+
+    it('passes the snapshot selected when the callback was queued, not later state', async () => {
+        const manager = new DataManager(createAppState())
+        const snapshots: Array<{ isDirty: boolean }> = []
+
+        manager.subscribe(
+            state => ({ isDirty: state.metadata.isDirty }),
+            value => snapshots.push(value),
+            { equalityFn: () => false }
+        )
+
+        manager.dispatch({
+            type: OperationTypes.SET_DIRTY,
+            payload: { isDirty: true }
+        })
+        manager.dispatch({
+            type: OperationTypes.SET_DIRTY,
+            payload: { isDirty: false }
+        })
+
+        await flushQueuedCallbacks()
+
+        expect(snapshots).toEqual([{ isDirty: true }, { isDirty: false }])
+    })
+
+    it('routes selector errors through subscription onError without throwing dispatch', () => {
+        const manager = new DataManager(createAppState())
+        const callback = vi.fn()
+        const onError = vi.fn()
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+        manager.subscribe(
+            () => {
+                throw new Error('selector failed')
+            },
+            callback,
+            { onError }
+        )
+
+        expect(() => manager.dispatch({
+            type: OperationTypes.SET_DIRTY,
+            payload: { isDirty: true }
+        })).not.toThrow()
+
+        expect(onError).toHaveBeenCalledWith(expect.any(Error))
+        expect(callback).not.toHaveBeenCalled()
+        consoleErrorSpy.mockRestore()
+    })
+
+    it('does not fire queued callbacks after unsubscribe', async () => {
+        const manager = new DataManager(createAppState())
+        const callback = vi.fn()
+
+        const unsubscribe = manager.subscribe(
+            state => state.metadata.isDirty,
+            callback
+        )
+
+        manager.dispatch({
+            type: OperationTypes.SET_DIRTY,
+            payload: { isDirty: true }
+        })
+        unsubscribe()
+
+        await flushQueuedCallbacks()
+
+        expect(callback).not.toHaveBeenCalled()
     })
 })

@@ -25,6 +25,10 @@ const SelfContainedSlotEditor = ({
     parentWidgetId,
     parentSlotName, // Top-level slot where parent widget lives (legacy)
     contextType = 'page',
+    pageId = null,
+    versionId = null,
+    webpageData = null,
+    pageVersionData = null,
     onWidgetEdit,
     onOpenWidgetEditor,
     onSlotChange,
@@ -67,6 +71,7 @@ const SelfContainedSlotEditor = ({
     // State
     const [widgets, setWidgets] = useState([...initialWidgets]);
     const [isWidgetModalOpen, setIsWidgetModalOpen] = useState(false);
+    const [pasteError, setPasteError] = useState(null);
 
     // Refs
     const menuRef = useRef(null);
@@ -227,10 +232,12 @@ const SelfContainedSlotEditor = ({
      * @param {string} mode - 'replace' or 'append'
      * @param {Object} metadata - Optional metadata for cut operations { operation: 'cut', metadata: {...} }
      */
-    const handlePasteToSlot = useCallback((pastedWidgets, mode, metadata) => {
+    const handlePasteToSlot = useCallback(async (pastedWidgets, mode, metadata) => {
         if (!pastedWidgets || !Array.isArray(pastedWidgets)) {
             return;
         }
+
+        setPasteError(null);
 
         let newWidgets;
         if (mode === 'replace') {
@@ -244,9 +251,12 @@ const SelfContainedSlotEditor = ({
 
         // If this was a cut operation, delete the original widgets
         if (metadata && metadata.operation === 'cut' && metadata.metadata && onDeleteCutWidgets) {
-            onDeleteCutWidgets(metadata.metadata).catch(() => {
-                // Silently handle errors - deletion failure shouldn't break paste
-            });
+            try {
+                await onDeleteCutWidgets(metadata.metadata);
+            } catch (error) {
+                const reason = error?.message || 'The source version could not be updated.';
+                setPasteError(`Widgets were pasted, but the cut source was not removed: ${reason}`);
+            }
         }
     }, [widgets, notifySlotChange, onDeleteCutWidgets]);
 
@@ -289,6 +299,23 @@ const SelfContainedSlotEditor = ({
                 widgets={widgets}
                 onPasteToSlot={handlePasteToSlot}
             />
+
+            {pasteError && (
+                <div
+                    role="alert"
+                    className="mt-3 flex items-start justify-between gap-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                >
+                    <span>{pasteError}</span>
+                    <button
+                        type="button"
+                        onClick={() => setPasteError(null)}
+                        className="font-medium text-amber-800 hover:text-amber-950"
+                        aria-label="Dismiss paste error"
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            )}
 
             <div className="widgets-list">
                 {widgets.length === 0 ? (
@@ -346,6 +373,10 @@ const SelfContainedSlotEditor = ({
                                     onOpenWidgetEditor={onOpenWidgetEditor}
                                     // Pass parent context for nested widgets
                                     parentComponentId={parentComponentId}
+                                    pageId={pageId}
+                                    versionId={versionId}
+                                    webpageData={webpageData}
+                                    pageVersionData={pageVersionData}
                                     // Widget path for infinite nesting
                                     widgetPath={fullWidgetPath}
                                     // Legacy nested widget props (deprecated)
@@ -423,6 +454,10 @@ SelfContainedSlotEditor.propTypes = {
     onOpenWidgetEditor: PropTypes.func,
     onSlotChange: PropTypes.func,
     parentComponentId: PropTypes.string,
+    pageId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    versionId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    webpageData: PropTypes.object,
+    pageVersionData: PropTypes.object,
     widgetPath: PropTypes.array,
     showAddButton: PropTypes.bool,
     showMoveButtons: PropTypes.bool,

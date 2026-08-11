@@ -10,7 +10,6 @@ import { User, ImagePlus } from 'lucide-react'
 import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
-import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 import OptimizedImage from '../../components/media/OptimizedImage'
 import MediaSelectModal from '../../components/media/MediaSelectModal'
@@ -19,7 +18,7 @@ import MediaSelectModal from '../../components/media/MediaSelectModal'
  * Vanilla JS Editor Wrapper Component for Bio Text
  * Wraps the vanilla JS ContentWidgetEditorRenderer for React integration
  */
-const BioTextEditor = memo(({ content, onChange, className, namespace, slotDimensions, pageId, siteRootId }) => {
+const BioTextEditor = memo(({ content, contentUpdateSource = 'external', onChange, className, namespace, slotDimensions, pageId, siteRootId }) => {
     const containerRef = useRef(null)
     const rendererRef = useRef(null)
     const lastExternalContentRef = useRef(content)
@@ -66,16 +65,16 @@ const BioTextEditor = memo(({ content, onChange, className, namespace, slotDimen
         }
     }, [])
 
-    // Separate effect for content updates
+    // Separate effect for content updates - keep the vanilla renderer aligned with React's canonical prop.
     useEffect(() => {
-        if (rendererRef.current && content !== lastExternalContentRef.current) {
+        if (rendererRef.current) {
             const currentEditorContent = rendererRef.current.content
-            if (content !== currentEditorContent) {
+            if (contentUpdateSource !== 'local' && content !== currentEditorContent) {
                 rendererRef.current.updateConfig({ content })
-                lastExternalContentRef.current = content
             }
+            lastExternalContentRef.current = content
         }
-    }, [content])
+    }, [content, contentUpdateSource])
 
     // Separate effect for other config updates
     useEffect(() => {
@@ -134,18 +133,56 @@ const BioWidget = memo(({
     slotConfig = null,
     context = {}
 }) => {
-    const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
+    const { useExternalChanges, getState } = useUnifiedData()
     const configRef = useRef(config)
+    const bioTextUpdateSourceRef = useRef('external')
+    const latestLocalBioTextRef = useRef(config?.bioText)
+    const pendingLocalBioTextEchoesRef = useRef(new Set())
     const [, forceRerender] = useState({})
     const setConfig = (newConfig) => {
         configRef.current = newConfig
     }
     const componentId = `widget-${widgetId}`
     const contextType = useEditorContext()
+    const ownerComponentId = context?.pageId && context?.versionId
+        ? `page-editor-${context.pageId}-${context.versionId}`
+        : null
 
     // State for image edit modal
     const [showImageModal, setShowImageModal] = useState(false)
     const [editingField, setEditingField] = useState(null)
+
+    const syncIncomingConfig = useCallback((nextConfig) => {
+        const nextBioText = nextConfig?.bioText
+        const isPendingLocalEcho = pendingLocalBioTextEchoesRef.current.has(nextBioText)
+
+        if (!hasWidgetContentChanged(configRef.current, nextConfig)) {
+            if (isPendingLocalEcho) {
+                pendingLocalBioTextEchoesRef.current.delete(nextBioText)
+            }
+            return
+        }
+
+        if (isPendingLocalEcho && nextBioText !== latestLocalBioTextRef.current) {
+            pendingLocalBioTextEchoesRef.current.delete(nextBioText)
+            return
+        }
+
+        if (isPendingLocalEcho) {
+            pendingLocalBioTextEchoesRef.current.delete(nextBioText)
+            bioTextUpdateSourceRef.current = 'local'
+        } else {
+            pendingLocalBioTextEchoesRef.current.clear()
+            bioTextUpdateSourceRef.current = 'external'
+        }
+
+        setConfig(nextConfig)
+        forceRerender({})
+    }, [])
+
+    useEffect(() => {
+        syncIncomingConfig(config)
+    }, [config, syncIncomingConfig])
 
     useEffect(() => {
         if (!widgetId || !slotName) {
@@ -154,19 +191,21 @@ const BioWidget = memo(({
         const currentState = getState()
         const widget = lookupWidget(currentState, widgetId, slotName, contextType, widgetPath)
         const udcConfig = widget?.config
-        if (udcConfig && hasWidgetContentChanged(configRef.current, udcConfig)) {
-            setConfig(udcConfig)
-            forceRerender({})
+        if (udcConfig) {
+            syncIncomingConfig(udcConfig)
         }
     }, [])
 
     // Subscribe to external changes
-    useExternalChanges(componentId, (state) => {
+    useExternalChanges(componentId, (state, metadata) => {
+        if (ownerComponentId && metadata?.sourceId === ownerComponentId) {
+            return
+        }
+
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
         const newConfig = widget?.config
-        if (newConfig && hasWidgetContentChanged(configRef.current, newConfig)) {
-            setConfig(newConfig)
-            forceRerender({})
+        if (newConfig) {
+            syncIncomingConfig(newConfig)
         }
     })
 
@@ -177,38 +216,21 @@ const BioWidget = memo(({
                 ...configRef.current,
                 bioText: newContent
             }
+            latestLocalBioTextRef.current = newContent
+            pendingLocalBioTextEchoesRef.current.add(newContent)
+            bioTextUpdateSourceRef.current = 'local'
             setConfig(updatedConfig)
-            publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: widgetId,
-                config: updatedConfig,
-                widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-                slotName: slotName,
-                contextType: contextType,
-                ...(nestedParentWidgetId && {
-                    parentWidgetId: nestedParentWidgetId,
-                    parentSlotName: nestedParentSlotName
-                })
-            })
+            onConfigChange?.(updatedConfig)
         }
-    }, [componentId, widgetId, slotName, contextType, publishUpdate, widgetPath, nestedParentWidgetId, nestedParentSlotName])
+    }, [onConfigChange])
 
     // Image change handler for quick edit
     const handleImageChange = useCallback((fieldName, newImage) => {
         const updatedConfig = { ...configRef.current, [fieldName]: newImage }
         setConfig(updatedConfig)
         forceRerender({})
-        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-            id: widgetId,
-            config: updatedConfig,
-            widgetPath: widgetPath.length > 0 ? widgetPath : undefined,
-            slotName: slotName,
-            contextType: contextType,
-            ...(nestedParentWidgetId && {
-                parentWidgetId: nestedParentWidgetId,
-                parentSlotName: nestedParentSlotName
-            })
-        })
-    }, [componentId, widgetId, slotName, publishUpdate, contextType, widgetPath, nestedParentWidgetId, nestedParentSlotName])
+        onConfigChange?.(updatedConfig)
+    }, [onConfigChange])
 
     const image = configRef.current.image
     const bioText = configRef.current.bioText || ''
@@ -253,6 +275,7 @@ const BioWidget = memo(({
                     )}
                     <BioTextEditor
                         content={bioText}
+                        contentUpdateSource={bioTextUpdateSourceRef.current}
                         onChange={handleBioTextChange}
                         className=""
                         namespace={namespace}
@@ -331,7 +354,10 @@ const BioWidget = memo(({
         prevProps.themeId === nextProps.themeId &&
         prevProps.widgetId === nextProps.widgetId &&
         prevProps.slotName === nextProps.slotName &&
-        prevProps.widgetType === nextProps.widgetType
+        prevProps.widgetType === nextProps.widgetType &&
+        prevProps.onConfigChange === nextProps.onConfigChange &&
+        prevProps.context?.pageId === nextProps.context?.pageId &&
+        prevProps.context?.versionId === nextProps.context?.versionId
     )
 })
 
@@ -357,4 +383,3 @@ BioWidget.metadata = {
 }
 
 export default BioWidget
-

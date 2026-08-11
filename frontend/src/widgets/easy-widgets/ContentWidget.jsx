@@ -5,7 +5,7 @@
  * Widget type: easy_widgets.ContentWidget
  */
 
-import React, { useRef, useEffect, useCallback, memo, useState } from 'react'
+import React, { useRef, useEffect, useLayoutEffect, useCallback, memo, useState } from 'react'
 import { FileText } from 'lucide-react'
 import ContentWidgetEditorRenderer from './ContentWidgetEditorRenderer.js'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
@@ -51,14 +51,63 @@ const cleanHTML = (html) => {
  * Vanilla JS Editor Wrapper Component
  * Wraps the vanilla JS ContentWidgetEditorRenderer for React integration
  */
-const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slotDimensions, pageId, siteRootId }) => {
+const ContentWidgetEditor = memo(({ content, contentUpdateSource = 'external', onChange, className, namespace, slotDimensions, pageId, siteRootId, widgetId }) => {
     const containerRef = useRef(null)
     const rendererRef = useRef(null)
     const lastExternalContentRef = useRef(content)
+    const editorElementRef = useRef(null)
     const focusHandlerRef = useRef(null)
     const blurHandlerRef = useRef(null)
+    const listenerSetupTimeoutRef = useRef(null)
 
-    useEffect(() => {
+    const removeEditorListeners = useCallback(() => {
+        const editorElement = editorElementRef.current
+        if (editorElement) {
+            if (focusHandlerRef.current) {
+                editorElement.removeEventListener('focus', focusHandlerRef.current)
+            }
+            if (blurHandlerRef.current) {
+                editorElement.removeEventListener('blur', blurHandlerRef.current)
+            }
+        }
+
+        editorElementRef.current = null
+        focusHandlerRef.current = null
+        blurHandlerRef.current = null
+    }, [])
+
+    const bindEditorListeners = useCallback(() => {
+        const editorElement = containerRef.current?.querySelector('[contenteditable="true"]') ||
+            rendererRef.current?.editorElement
+        if (!editorElement || !rendererRef.current) {
+            return false
+        }
+
+        if (
+            editorElementRef.current === editorElement &&
+            focusHandlerRef.current &&
+            blurHandlerRef.current
+        ) {
+            return true
+        }
+
+        removeEditorListeners()
+
+        focusHandlerRef.current = () => {
+            rendererRef.current?.activate()
+        }
+
+        blurHandlerRef.current = () => {
+            rendererRef.current?.deactivate()
+        }
+
+        editorElement.addEventListener('focus', focusHandlerRef.current)
+        editorElement.addEventListener('blur', blurHandlerRef.current)
+        editorElementRef.current = editorElement
+        return true
+    }, [removeEditorListeners])
+
+    useLayoutEffect(() => {
         if (containerRef.current && !rendererRef.current) {
             // Initialize vanilla JS renderer with detached toolbar mode
             rendererRef.current = new ContentWidgetEditorRenderer(containerRef.current, {
@@ -75,44 +124,36 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
             rendererRef.current.render()
             lastExternalContentRef.current = content
 
-            // Set up focus/blur handlers for activation/deactivation
-            // Wait for the editor element to be created
-            setTimeout(() => {
-                const editorElement = containerRef.current?.querySelector('[contenteditable="true"]')
-                if (editorElement && rendererRef.current) {
-                    // Create handler functions
-                    focusHandlerRef.current = () => {
-                        if (rendererRef.current) {
-                            rendererRef.current.activate()
-                        }
-                    }
-
-                    blurHandlerRef.current = () => {
-                        if (rendererRef.current) {
-                            rendererRef.current.deactivate()
-                        }
-                    }
-
-                    // Add event listeners
-                    editorElement.addEventListener('focus', focusHandlerRef.current)
-                    editorElement.addEventListener('blur', blurHandlerRef.current)
-                }
-            }, 0)
-        }
-    }, [])
-
-    // Separate effect for content updates - only update if content is externally changed
-    useEffect(() => {
-        if (rendererRef.current && content !== lastExternalContentRef.current) {
-            const currentEditorContent = rendererRef.current.content
-            // Only update if the new content differs from what the editor currently has
-            // This prevents the editor from updating itself when it's the source of the change
-            if (content !== currentEditorContent) {
-                rendererRef.current.updateConfig({ content })
-                lastExternalContentRef.current = content
+            if (!bindEditorListeners()) {
+                listenerSetupTimeoutRef.current = setTimeout(bindEditorListeners, 0)
             }
         }
-    }, [content])
+
+        return () => {
+            if (listenerSetupTimeoutRef.current) {
+                clearTimeout(listenerSetupTimeoutRef.current)
+                listenerSetupTimeoutRef.current = null
+            }
+
+            removeEditorListeners()
+
+            if (rendererRef.current) {
+                rendererRef.current.destroy()
+                rendererRef.current = null
+            }
+        }
+    }, [bindEditorListeners, removeEditorListeners])
+
+    // Separate effect for content updates - keep the vanilla renderer aligned with React's canonical prop.
+    useEffect(() => {
+        if (rendererRef.current) {
+            const currentEditorContent = rendererRef.current.content
+            if (contentUpdateSource !== 'local' && content !== currentEditorContent) {
+                rendererRef.current.updateConfig({ content })
+            }
+            lastExternalContentRef.current = content
+        }
+    }, [content, contentUpdateSource])
 
     // Separate effect for onChange, className, namespace, slotDimensions, and pageId updates
     useEffect(() => {
@@ -125,31 +166,13 @@ const ContentWidgetEditor = memo(({ content, onChange, className, namespace, slo
                 pageId,
                 siteRootId
             })
-        }
-    }, [onChange, className, namespace, slotDimensions, pageId, siteRootId])
-
-    useEffect(() => {
-        return () => {
-            // Clean up event listeners
-            const editorElement = containerRef.current?.querySelector('[contenteditable="true"]')
-            if (editorElement) {
-                if (focusHandlerRef.current) {
-                    editorElement.removeEventListener('focus', focusHandlerRef.current)
-                }
-                if (blurHandlerRef.current) {
-                    editorElement.removeEventListener('blur', blurHandlerRef.current)
-                }
-            }
-
-            // Destroy renderer
-            if (rendererRef.current) {
-                rendererRef.current.destroy()
-                rendererRef.current = null
+            if (!editorElementRef.current) {
+                bindEditorListeners()
             }
         }
-    }, [])
+    }, [onChange, className, namespace, slotDimensions, pageId, siteRootId, bindEditorListeners])
 
-    return <div ref={containerRef} className="" />
+    return <div ref={containerRef} className="" data-testid={widgetId ? `content-widget-editor-${widgetId}` : undefined} />
 })
 
 /**
@@ -179,26 +202,62 @@ const ContentWidget = memo(({
     const [localConfig, setLocalConfig] = useState(config);
     const localConfigRef = useRef(localConfig);
     const onConfigChangeRef = useRef(onConfigChange);
+    const contentUpdateSourceRef = useRef('external');
+    const latestLocalContentRef = useRef(config?.content);
+    const pendingLocalContentEchoesRef = useRef(new Set());
     const componentId = `widget-${widgetId}`;
     const contextType = useEditorContext();
+    const ownerComponentId = context?.pageId && context?.versionId
+        ? `page-editor-${context.pageId}-${context.versionId}`
+        : null;
 
     // Keep refs in sync for stable callback references
     localConfigRef.current = localConfig;
     onConfigChangeRef.current = onConfigChange;
 
+    const syncIncomingConfig = useCallback((nextConfig) => {
+        const nextContent = nextConfig?.content;
+        const isPendingLocalEcho = pendingLocalContentEchoesRef.current.has(nextContent);
+
+        if (!hasWidgetContentChanged(localConfigRef.current, nextConfig)) {
+            if (isPendingLocalEcho) {
+                pendingLocalContentEchoesRef.current.delete(nextContent);
+            }
+            return;
+        }
+
+        if (isPendingLocalEcho && nextContent !== latestLocalContentRef.current) {
+            pendingLocalContentEchoesRef.current.delete(nextContent);
+            return;
+        }
+
+        if (isPendingLocalEcho) {
+            pendingLocalContentEchoesRef.current.delete(nextContent);
+            contentUpdateSourceRef.current = 'local';
+        } else {
+            pendingLocalContentEchoesRef.current.clear();
+            contentUpdateSourceRef.current = 'external';
+        }
+
+        localConfigRef.current = nextConfig;
+        setLocalConfig(nextConfig);
+    }, []);
+
     // Sync from incoming prop changes (e.g. undo, conflict resolution, WidgetEditorPanel save)
     useEffect(() => {
-        if (hasWidgetContentChanged(localConfigRef.current, config)) {
-            setLocalConfig(config);
-        }
-    }, [config]);
+        syncIncomingConfig(config);
+    }, [config, syncIncomingConfig]);
 
     // Subscribe to external UDC changes (e.g. cross-tab sync, WidgetEditorPanel writing to same widget)
-    useExternalChanges(componentId, (state) => {
+    useExternalChanges(componentId, (state, metadata) => {
+        if (ownerComponentId && metadata?.sourceId === ownerComponentId) {
+            return;
+        }
+
         const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath);
         const newConfig = widget?.config;
-        if (newConfig && hasWidgetContentChanged(localConfigRef.current, newConfig)) {
-            setLocalConfig(newConfig);
+        if (newConfig) {
+            syncIncomingConfig(newConfig);
         }
     });
 
@@ -211,25 +270,29 @@ const ContentWidget = memo(({
                 ...localConfigRef.current,
                 content: newContent
             };
+            latestLocalContentRef.current = newContent;
+            pendingLocalContentEchoesRef.current.add(newContent);
+            contentUpdateSourceRef.current = 'local';
+            localConfigRef.current = updatedConfig;
             setLocalConfig(updatedConfig);
             if (onConfigChangeRef.current) {
                 onConfigChangeRef.current(updatedConfig);
             }
         }
-    // Intentionally empty deps: uses refs so callback identity stays stable
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     if (mode === 'editor') {
         return (
             <ContentWidgetEditor
                 content={localConfig.content}
+                contentUpdateSource={contentUpdateSourceRef.current}
                 onChange={handleContentChange}
                 className=""
                 namespace={namespace}
                 slotDimensions={slotConfig?.dimensions}
                 pageId={context?.pageId}
                 siteRootId={context?.siteRootId}
+                widgetId={widgetId}
             />
         )
     }
@@ -246,7 +309,10 @@ const ContentWidget = memo(({
         prevProps.themeId === nextProps.themeId &&
         prevProps.widgetId === nextProps.widgetId &&
         prevProps.slotName === nextProps.slotName &&
-        prevProps.widgetType === nextProps.widgetType
+        prevProps.widgetType === nextProps.widgetType &&
+        prevProps.onConfigChange === nextProps.onConfigChange &&
+        prevProps.context?.pageId === nextProps.context?.pageId &&
+        prevProps.context?.versionId === nextProps.context?.versionId
     );
 })
 
