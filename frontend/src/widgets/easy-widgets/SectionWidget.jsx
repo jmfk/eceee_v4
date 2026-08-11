@@ -366,6 +366,10 @@ const SectionWidget = ({
                         onOpenWidgetEditor={onOpenWidgetEditor}
                         onSlotChange={handleSlotChange}
                         parentComponentId={parentComponentId}
+                        pageId={context?.pageId || props.pageId}
+                        versionId={context?.versionId || props.versionId}
+                        webpageData={context?.webpageData || props.webpageData}
+                        pageVersionData={context?.pageVersionData || props.pageVersionData}
                         // Selection props
                         selectedWidgets={selectedWidgets}
                         cutWidgets={cutWidgets}
@@ -572,4 +576,3 @@ SectionWidget.metadata = {
 };
 
 export default SectionWidget;
-

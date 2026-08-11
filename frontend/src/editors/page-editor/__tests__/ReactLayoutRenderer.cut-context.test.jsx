@@ -4,12 +4,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ReactLayoutRenderer, { isDifferentWidgetSourceContext } from '../ReactLayoutRenderer'
 
 const publishUpdateMock = vi.hoisted(() => vi.fn())
+const getStateMock = vi.hoisted(() => vi.fn())
+const updateWidgetsMock = vi.hoisted(() => vi.fn())
+const getPageVersionMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../../contexts/unified-data/context/UnifiedDataContext', () => ({
     useUnifiedData: () => ({
         useExternalChanges: vi.fn(),
-        publishUpdate: publishUpdateMock
+        publishUpdate: publishUpdateMock,
+        getState: getStateMock
     })
+}))
+
+vi.mock('../../../api/versions', () => ({
+    versionsApi: {
+        getPageVersion: getPageVersionMock,
+        updateWidgets: updateWidgetsMock
+    }
 }))
 
 vi.mock('../../../contexts/ClipboardContext', () => ({
@@ -135,6 +146,43 @@ const baseProps = {
 describe('ReactLayoutRenderer cut source context', () => {
     beforeEach(() => {
         publishUpdateMock.mockReset()
+        getStateMock.mockReset()
+        updateWidgetsMock.mockReset()
+        getPageVersionMock.mockReset()
+        updateWidgetsMock.mockResolvedValue({})
+        getStateMock.mockReturnValue({
+            versions: {
+                'version-a': {
+                    id: 'version-a',
+                    pageId: 'page-1',
+                    publicationStatus: 'draft',
+                    widgets: {
+                        main: [
+                            {
+                                id: 'source-widget',
+                                type: 'easy_widgets.ContentWidget',
+                                config: { content: 'Source' }
+                            },
+                            {
+                                id: 'container-widget',
+                                type: 'easy_widgets.ContainerWidget',
+                                config: {
+                                    slots: {
+                                        content: [
+                                            {
+                                                id: 'source-nested',
+                                                type: 'easy_widgets.ContentWidget',
+                                                config: { content: 'Nested source' }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        })
     })
 
     it('treats same-page different-version cuts as cross-context', () => {
@@ -156,6 +204,16 @@ describe('ReactLayoutRenderer cut source context', () => {
         await waitFor(() => {
             expect(publishUpdateMock).toHaveBeenCalledOnce()
         })
+        expect(updateWidgetsMock).toHaveBeenCalledWith(
+            'version-a',
+            {
+                widgets: {
+                    main: [
+                        expect.objectContaining({ id: 'container-widget', order: 0 })
+                    ]
+                }
+            }
+        )
         expect(publishUpdateMock).toHaveBeenCalledWith(
             'renderer-test',
             'REMOVE_WIDGET',
@@ -170,6 +228,65 @@ describe('ReactLayoutRenderer cut source context', () => {
         expect(onWidgetChange).not.toHaveBeenCalled()
     })
 
+    it('fetches and persists the source version when it is not loaded locally', async () => {
+        const onWidgetChange = vi.fn()
+        getStateMock.mockReturnValue({ versions: {} })
+        getPageVersionMock.mockResolvedValue({
+            publicationStatus: 'draft',
+            widgets: {
+                main: [
+                    {
+                        id: 'source-widget',
+                        type: 'easy_widgets.ContentWidget',
+                        config: { content: 'Source' }
+                    }
+                ]
+            }
+        })
+
+        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete cut source' }))
+
+        await waitFor(() => {
+            expect(updateWidgetsMock).toHaveBeenCalledOnce()
+        })
+        expect(getPageVersionMock).toHaveBeenCalledWith('page-1', 'version-a')
+        expect(updateWidgetsMock).toHaveBeenCalledWith(
+            'version-a',
+            { widgets: { main: [] } }
+        )
+        expect(publishUpdateMock).not.toHaveBeenCalled()
+        expect(onWidgetChange).not.toHaveBeenCalled()
+    })
+
+    it('refuses to remove a cut source from a published version', async () => {
+        const onWidgetChange = vi.fn()
+        getPageVersionMock.mockResolvedValue({
+            publicationStatus: 'published',
+            widgets: {
+                main: [
+                    {
+                        id: 'source-widget',
+                        type: 'easy_widgets.ContentWidget',
+                        config: { content: 'Published source' }
+                    }
+                ]
+            }
+        })
+
+        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Paste cut source' }))
+
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+            'Only draft versions can be changed. Source version version-a is published.'
+        )
+        expect(updateWidgetsMock).not.toHaveBeenCalled()
+        expect(publishUpdateMock).not.toHaveBeenCalled()
+        expect(onWidgetChange).not.toHaveBeenCalled()
+    })
+
     it('sends widgetPath when deleting nested cut widgets from a source version', async () => {
         const onWidgetChange = vi.fn()
 
@@ -180,6 +297,24 @@ describe('ReactLayoutRenderer cut source context', () => {
         await waitFor(() => {
             expect(publishUpdateMock).toHaveBeenCalledOnce()
         })
+        expect(updateWidgetsMock).toHaveBeenCalledWith(
+            'version-a',
+            {
+                widgets: {
+                    main: [
+                        expect.objectContaining({ id: 'source-widget' }),
+                        expect.objectContaining({
+                            id: 'container-widget',
+                            config: {
+                                slots: {
+                                    content: []
+                                }
+                            }
+                        })
+                    ]
+                }
+            }
+        )
         expect(publishUpdateMock).toHaveBeenCalledWith(
             'renderer-test',
             'REMOVE_WIDGET',
@@ -204,20 +339,18 @@ describe('ReactLayoutRenderer cut source context', () => {
         await waitFor(() => {
             expect(publishUpdateMock).toHaveBeenCalledTimes(2)
         })
-        expect(publishUpdateMock).toHaveBeenNthCalledWith(
-            1,
-            'renderer-test',
-            'REMOVE_WIDGET',
+        expect(updateWidgetsMock).toHaveBeenCalledWith(
+            'version-a',
             {
-                id: 'source-widget',
-                contextType: 'page',
-                pageId: 'page-1',
-                versionId: 'version-a',
-                widgetPath: ['main', 'source-widget']
+                widgets: {
+                    main: [
+                        expect.objectContaining({ id: 'container-widget', order: 0 })
+                    ]
+                }
             }
         )
         expect(publishUpdateMock).toHaveBeenNthCalledWith(
-            2,
+            1,
             'renderer-test',
             'ADD_WIDGET',
             {
@@ -229,6 +362,18 @@ describe('ReactLayoutRenderer cut source context', () => {
                 pageId: 'page-1',
                 versionId: 'version-b',
                 order: 0
+            }
+        )
+        expect(publishUpdateMock).toHaveBeenNthCalledWith(
+            2,
+            'renderer-test',
+            'REMOVE_WIDGET',
+            {
+                id: 'source-widget',
+                contextType: 'page',
+                pageId: 'page-1',
+                versionId: 'version-a',
+                widgetPath: ['main', 'source-widget']
             }
         )
         expect(onWidgetChange).toHaveBeenCalledWith(
@@ -252,20 +397,26 @@ describe('ReactLayoutRenderer cut source context', () => {
         await waitFor(() => {
             expect(publishUpdateMock).toHaveBeenCalledTimes(2)
         })
-        expect(publishUpdateMock).toHaveBeenNthCalledWith(
-            1,
-            'renderer-test',
-            'REMOVE_WIDGET',
+        expect(updateWidgetsMock).toHaveBeenCalledWith(
+            'version-a',
             {
-                id: 'source-nested',
-                contextType: 'page',
-                pageId: 'page-1',
-                versionId: 'version-a',
-                widgetPath: ['main', 'container-widget', 'content', 'source-nested']
+                widgets: {
+                    main: [
+                        expect.objectContaining({ id: 'source-widget' }),
+                        expect.objectContaining({
+                            id: 'container-widget',
+                            config: {
+                                slots: {
+                                    content: []
+                                }
+                            }
+                        })
+                    ]
+                }
             }
         )
         expect(publishUpdateMock).toHaveBeenNthCalledWith(
-            2,
+            1,
             'renderer-test',
             'ADD_WIDGET',
             {
@@ -277,6 +428,18 @@ describe('ReactLayoutRenderer cut source context', () => {
                 pageId: 'page-1',
                 versionId: 'version-b',
                 order: 0
+            }
+        )
+        expect(publishUpdateMock).toHaveBeenNthCalledWith(
+            2,
+            'renderer-test',
+            'REMOVE_WIDGET',
+            {
+                id: 'source-nested',
+                contextType: 'page',
+                pageId: 'page-1',
+                versionId: 'version-a',
+                widgetPath: ['main', 'container-widget', 'content', 'source-nested']
             }
         )
         expect(onWidgetChange).toHaveBeenCalledWith(

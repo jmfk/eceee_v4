@@ -86,6 +86,11 @@ const PageWidgetFactory = ({
     // Use passed props or extract from widget
     const actualWidgetId = widgetId || widget?.id
     const actualSlotName = passedSlotName || slotName || widget?.slotName
+    const resolvedPageId = pageId || webpageData?.id
+    const resolvedVersionId = versionId || pageVersionData?.id || pageVersionData?.versionId
+    const headerWidgetPath = Array.isArray(widgetPath) && widgetPath.length > 0
+        ? widgetPath.join('/')
+        : (buildWidgetPath ? buildWidgetPath(actualSlotName, actualWidgetId) : `${actualSlotName}/${actualWidgetId}`)
     
     // Get global hover tracking for paste markers
     const { hoveredWidgetId, setHoveredWidget, clearHoveredWidget } = useClipboard();
@@ -468,9 +473,9 @@ const PageWidgetFactory = ({
                     widget={widget}
                     onPaste={onPaste ? handlePaste : undefined}
                     onCut={undefined}
-                    pageId={pageId || webpageData?.id}
-                    versionId={versionId || pageVersionData?.id || pageVersionData?.versionId}
-                    widgetPath={buildWidgetPath ? buildWidgetPath(actualSlotName, actualWidgetId) : `${actualSlotName}/${actualWidgetId}`}
+                    pageId={resolvedPageId}
+                    versionId={resolvedVersionId}
+                    widgetPath={headerWidgetPath}
                     // Selection props
                     slotName={actualSlotName}
                     isSelected={isWidgetSelected ? isWidgetSelected(actualSlotName, actualWidgetId) : false}

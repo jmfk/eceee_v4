@@ -12,6 +12,7 @@ import { useWidgets, createDefaultWidgetConfig } from '../../hooks/useWidgets';
 import PageWidgetSelectionModal from './PageWidgetSelectionModal';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
+import { versionsApi } from '../../api/versions';
 import ImportDialog from '../../components/ImportDialog';
 import { copyWidgetsToClipboard, cutWidgetsToClipboard } from '../../utils/clipboardService';
 import { Clipboard, Scissors, X, ChevronDown, ChevronUp } from 'lucide-react';
@@ -29,6 +30,92 @@ export const isDifferentWidgetSourceContext = ({ sourcePageId, sourceVersionId, 
     const sourceVersionDiffers = sourceVersionId && currentVersionId && String(sourceVersionId) !== String(currentVersionId);
 
     return Boolean(sourcePageDiffers || sourceVersionDiffers);
+}
+
+const removeNestedWidgetFromSlot = (slotWidgets, pathSegment) => {
+    if (!Array.isArray(pathSegment) || pathSegment.length < 1) {
+        return slotWidgets;
+    }
+
+    const currentWidgetId = pathSegment[0];
+
+    if (pathSegment.length === 1) {
+        return filterValidWidgets(slotWidgets)
+            .filter(widget => String(widget.id) !== String(currentWidgetId))
+            .map((widget, index) => ({ ...widget, order: index }));
+    }
+
+    if (pathSegment.length < 3) {
+        return slotWidgets;
+    }
+
+    const validWidgets = filterValidWidgets(slotWidgets);
+    const widgetIndex = validWidgets.findIndex(widget => String(widget.id) === String(currentWidgetId));
+    if (widgetIndex === -1) {
+        return validWidgets;
+    }
+
+    const widget = validWidgets[widgetIndex];
+    const nestedSlotName = pathSegment[1];
+    const nestedSlots = widget.config?.slots || {};
+    const nestedSlotWidgets = filterValidWidgets(nestedSlots[nestedSlotName] || []);
+    const updatedNestedSlot = removeNestedWidgetFromSlot(nestedSlotWidgets, pathSegment.slice(2));
+
+    const updatedWidgets = [...validWidgets];
+    updatedWidgets[widgetIndex] = {
+        ...widget,
+        config: {
+            ...widget.config,
+            slots: {
+                ...nestedSlots,
+                [nestedSlotName]: updatedNestedSlot
+            }
+        }
+    };
+
+    return updatedWidgets;
+}
+
+const removeWidgetAtPathFromWidgetMap = (widgetMap, pathParts) => {
+    if (!widgetMap || !Array.isArray(pathParts) || pathParts.length < 2) {
+        return widgetMap || {};
+    }
+
+    const topSlot = pathParts[0];
+    const slotWidgets = filterValidWidgets(widgetMap[topSlot] || []);
+
+    return {
+        ...widgetMap,
+        [topSlot]: removeNestedWidgetFromSlot(slotWidgets, pathParts.slice(1))
+    };
+}
+
+const removeCutMetadataFromWidgetMap = (widgetMap, cutMetadata) => {
+    let updatedWidgets = widgetMap || {};
+
+    if (cutMetadata?.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
+        cutMetadata.widgetPaths.forEach(widgetPath => {
+            if (typeof widgetPath !== 'string') return;
+            updatedWidgets = removeWidgetAtPathFromWidgetMap(updatedWidgets, widgetPath.split('/'));
+        });
+        return updatedWidgets;
+    }
+
+    if (cutMetadata?.widgets && typeof cutMetadata.widgets === 'object') {
+        Object.entries(cutMetadata.widgets).forEach(([key, widgetIds]) => {
+            if (!Array.isArray(widgetIds)) return;
+
+            const keyParts = key.split('/');
+            widgetIds.forEach(widgetId => {
+                const pathParts = keyParts.length === 3
+                    ? [...keyParts, widgetId]
+                    : [key, widgetId];
+                updatedWidgets = removeWidgetAtPathFromWidgetMap(updatedWidgets, pathParts);
+            });
+        });
+    }
+
+    return updatedWidgets;
 }
 
 const ReactLayoutRenderer = forwardRef(({
@@ -59,7 +146,7 @@ const ReactLayoutRenderer = forwardRef(({
 }, ref) => {
 
     // Get UDC context (but use shared componentId from PageEditor)
-    const { useExternalChanges, publishUpdate } = useUnifiedData();
+    const { useExternalChanges, publishUpdate, getState } = useUnifiedData();
 
     // Get version context
     const versionId = currentVersion?.id || pageVersionData?.versionId;
@@ -99,6 +186,7 @@ const ReactLayoutRenderer = forwardRef(({
 
     // Toolbar collapse state
     const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
+    const [pasteError, setPasteError] = useState(null);
 
     // Get global clipboard state
     const { clipboardData, pasteModeActive, pasteModePaused, togglePasteMode, clearClipboardState, refreshClipboard } = useClipboard();
@@ -130,6 +218,82 @@ const ReactLayoutRenderer = forwardRef(({
         }
         return null;
     }, []);
+
+    const publishCutSourceRemovals = useCallback(async (cutMetadata) => {
+        const sourcePageId = cutMetadata.pageId;
+        const sourceVersionId = cutMetadata.versionId;
+
+        if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
+            for (const widgetPath of cutMetadata.widgetPaths) {
+                const parsed = parseWidgetPath(widgetPath);
+                if (!parsed) continue;
+
+                await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                    id: parsed.isNested ? parsed.nestedWidgetId : parsed.widgetId,
+                    contextType: contextType,
+                    pageId: sourcePageId,
+                    versionId: sourceVersionId,
+                    widgetPath: parsed.pathParts
+                });
+            }
+        } else if (cutMetadata.widgets) {
+            for (const widgetIds of Object.values(cutMetadata.widgets)) {
+                if (!Array.isArray(widgetIds)) continue;
+                for (const widgetId of widgetIds) {
+                    await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
+                        id: widgetId,
+                        contextType: contextType,
+                        pageId: sourcePageId,
+                        versionId: sourceVersionId,
+                    });
+                }
+            }
+        }
+    }, [componentId, contextType, parseWidgetPath, publishUpdate]);
+
+    const prepareCutSourceWidgets = useCallback(async (cutMetadata) => {
+        const sourcePageId = cutMetadata?.pageId;
+        const sourceVersionId = cutMetadata?.versionId;
+
+        if (!sourceVersionId) {
+            throw new Error('The cut source version is missing. Copy the widget again and retry.');
+        }
+
+        const state = getState?.();
+        const loadedSourceVersion = state?.versions?.[String(sourceVersionId)] || state?.versions?.[sourceVersionId];
+        const sourceVersion = sourcePageId
+            ? await versionsApi.getPageVersion(sourcePageId, sourceVersionId)
+            : await versionsApi.get(sourceVersionId);
+        const authoritativeSourceVersion = sourceVersion?.data || sourceVersion || loadedSourceVersion;
+        const publicationStatus = authoritativeSourceVersion?.publicationStatus;
+
+        if (publicationStatus !== 'draft') {
+            const statusLabel = publicationStatus || 'an unknown publication state';
+            throw new Error(
+                `Only draft versions can be changed. Source version ${sourceVersionId} is ${statusLabel}.`
+            );
+        }
+
+        const sourceWidgets = authoritativeSourceVersion?.widgets || {};
+        const updatedSourceWidgets = removeCutMetadataFromWidgetMap(sourceWidgets, cutMetadata);
+
+        return {
+            sourceVersionId,
+            loadedSourceVersion,
+            updatedSourceWidgets
+        };
+    }, [getState]);
+
+    const persistCutSourceWidgets = useCallback(async (cutMetadata, preparedSource = null) => {
+        const sourceUpdate = preparedSource || await prepareCutSourceWidgets(cutMetadata);
+        await versionsApi.updateWidgets(sourceUpdate.sourceVersionId, {
+            widgets: sourceUpdate.updatedSourceWidgets
+        });
+
+        if (sourceUpdate.loadedSourceVersion) {
+            await publishCutSourceRemovals(cutMetadata);
+        }
+    }, [prepareCutSourceWidgets, publishCutSourceRemovals]);
 
     // Page context for widgets - includes all necessary context data
     const pageContext = useMemo(() => ({
@@ -327,6 +491,8 @@ const ReactLayoutRenderer = forwardRef(({
             }
 
             case 'paste': {
+                setPasteError(null);
+
                 // widget is the pasted widget, args[0] is the index to insert after
                 const pastedWidget = widget;
                 const insertAfterIndex = args[0];
@@ -336,6 +502,7 @@ const ReactLayoutRenderer = forwardRef(({
 
                 // Start with current widgets state
                 let updatedWidgets = { ...widgets };
+                let preparedCutSource = null;
 
                 // Add the pasted widget FIRST to ensure correct insert position
                 // Filter valid widgets first to remove any undefined entries
@@ -515,41 +682,13 @@ const ReactLayoutRenderer = forwardRef(({
                             }
                         }
 
-                        // ALWAYS clear cut state and selection after paste (even if deletion didn't work)
-                        // This ensures the UI updates correctly
-                        setCutWidgets(new Set());
-                        setSelectedWidgets(new Set());
                     } else {
-                        // For cross-page/cross-version operations, publish REMOVE_WIDGET operations to UDC for the source context
-                        if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
-                            for (const widgetPath of cutMetadata.widgetPaths) {
-                                const parsed = parseWidgetPath(widgetPath);
-                                if (!parsed) continue;
-
-                                await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
-                                    id: parsed.isNested ? parsed.nestedWidgetId : parsed.widgetId,
-                                    contextType: contextType,
-                                    pageId: sourcePageId,
-                                    versionId: sourceVersionId,
-                                    widgetPath: parsed.pathParts
-                                });
-                            }
-                        } else if (cutMetadata.widgets) {
-                            for (const [key, widgetIds] of Object.entries(cutMetadata.widgets)) {
-                                for (const widgetId of widgetIds) {
-                                    await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
-                                        id: widgetId,
-                                        contextType: contextType,
-                                        pageId: sourcePageId,
-                                        versionId: sourceVersionId,
-                                    });
-                                }
-                            }
+                        try {
+                            preparedCutSource = await prepareCutSourceWidgets(cutMetadata);
+                        } catch (error) {
+                            setPasteError(error?.message || 'The cut source could not be validated.');
+                            break;
                         }
-
-                        // Clear selection for cross-page operations too
-                        setCutWidgets(new Set());
-                        setSelectedWidgets(new Set());
                     }
                 }
 
@@ -579,6 +718,22 @@ const ReactLayoutRenderer = forwardRef(({
                         versionId,
                         order: insertPosition
                     });
+                }
+
+                if (clipboardMetadata?.operation === 'cut' && clipboardMetadata.metadata) {
+                    if (preparedCutSource) {
+                        try {
+                            await persistCutSourceWidgets(clipboardMetadata.metadata, preparedCutSource);
+                        } catch (error) {
+                            setPasteError(
+                                `Widget was pasted, but the cut source was not removed: ${error?.message || 'The source version could not be updated.'}`
+                            );
+                            break;
+                        }
+                    }
+
+                    setCutWidgets(new Set());
+                    setSelectedWidgets(new Set());
                 }
 
                 break;
@@ -615,7 +770,7 @@ const ReactLayoutRenderer = forwardRef(({
             default:
                 break;
         }
-    }, [widgets, onWidgetChange, onOpenWidgetEditor, addWidget, publishUpdate, componentId, versionId, isPublished, onVersionChange, context, webpageData, contextType]);
+    }, [widgets, onWidgetChange, onOpenWidgetEditor, addWidget, publishUpdate, componentId, versionId, isPublished, onVersionChange, context, webpageData, contextType, prepareCutSourceWidgets, persistCutSourceWidgets]);
 
     // Widget modal handlers
     const handleShowWidgetModal = useCallback((slotName, slotMetadata = null, replacementInfo = null) => {
@@ -861,7 +1016,7 @@ const ReactLayoutRenderer = forwardRef(({
         await refreshClipboard();
     }, [getSelectedWidgets, context, webpageData, refreshClipboard]);
 
-    const handleDeleteCutWidgets = useCallback(async (cutMetadata) => {
+    const handleDeleteCutWidgets = useCallback(async (cutMetadata, preparedSource = null) => {
         // Delete widgets that were cut and pasted
         // Supports both new format (widgetPaths) and old format (widgets object)
 
@@ -876,37 +1031,9 @@ const ReactLayoutRenderer = forwardRef(({
             currentVersionId: versionId
         });
 
-        // For cross-page/cross-version operations, publish REMOVE_WIDGET operations
-        // to UDC for the source context, not the current editing context.
+        // For cross-page/cross-version operations, persist the source version directly.
         if (isCrossSourceContext) {
-            // Publish REMOVE_WIDGET operations to UDC for the source context
-            if (cutMetadata.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
-                for (const widgetPath of cutMetadata.widgetPaths) {
-                    const parsed = parseWidgetPath(widgetPath);
-                    if (!parsed) continue;
-
-                    // Publish to UDC for the source context
-                    await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
-                        id: parsed.isNested ? parsed.nestedWidgetId : parsed.widgetId,
-                        contextType: contextType,
-                        pageId: sourcePageId,
-                        versionId: sourceVersionId,
-                        widgetPath: parsed.pathParts
-                    });
-                }
-            } else if (cutMetadata.widgets) {
-                // Handle old format
-                for (const [key, widgetIds] of Object.entries(cutMetadata.widgets)) {
-                    for (const widgetId of widgetIds) {
-                        await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
-                            id: widgetId,
-                            contextType: contextType,
-                            pageId: sourcePageId,
-                            versionId: sourceVersionId,
-                        });
-                    }
-                }
-            }
+            await persistCutSourceWidgets(cutMetadata, preparedSource);
             return; // Don't update local widgets for cross-context operations
         }
 
@@ -1054,7 +1181,7 @@ const ReactLayoutRenderer = forwardRef(({
         // Clear cut state and selection
         setCutWidgets(new Set());
         setSelectedWidgets(new Set());
-    }, [widgets, onWidgetChange, publishUpdate, componentId, contextType, parseWidgetPath, context, webpageData]);
+    }, [widgets, onWidgetChange, publishUpdate, componentId, contextType, parseWidgetPath, context, webpageData, persistCutSourceWidgets]);
 
     // Handle paste at specific position
     const handlePasteAtPosition = useCallback(async (slotName, position, widgetPath = [], keepClipboard = false) => {
@@ -1062,9 +1189,33 @@ const ReactLayoutRenderer = forwardRef(({
             return;
         }
 
+        setPasteError(null);
+
         // Get widget(s) from clipboard
         const widgetsToPaste = clipboardData.data;
         const isCut = clipboardData.operation === 'cut';
+        let preparedCutSource = null;
+
+        if (isCut && clipboardData.metadata) {
+            const sourcePageId = clipboardData.metadata.pageId;
+            const sourceVersionId = clipboardData.metadata.versionId;
+            const currentPageId = context?.pageId || webpageData?.id;
+            const isCrossSourceContext = isDifferentWidgetSourceContext({
+                sourcePageId,
+                sourceVersionId,
+                currentPageId,
+                currentVersionId: versionId
+            });
+
+            if (isCrossSourceContext) {
+                try {
+                    preparedCutSource = await prepareCutSourceWidgets(clipboardData.metadata);
+                } catch (error) {
+                    setPasteError(error?.message || 'The cut source could not be validated.');
+                    return;
+                }
+            }
+        }
 
         // Generate new IDs for pasted widgets
         const pastedWidgets = widgetsToPaste.map(w => ({
@@ -1255,14 +1406,21 @@ const ReactLayoutRenderer = forwardRef(({
 
         // Handle cut operation - delete from source
         if (isCut && clipboardData.metadata) {
-            await handleDeleteCutWidgets(clipboardData.metadata);
+            try {
+                await handleDeleteCutWidgets(clipboardData.metadata, preparedCutSource);
+            } catch (error) {
+                setPasteError(
+                    `Widget was pasted, but the cut source was not removed: ${error?.message || 'The source version could not be updated.'}`
+                );
+                return;
+            }
         }
 
         // Clear clipboard after paste unless shift key was held (or it's a cut operation - always clear for cut)
         if (!keepClipboard || isCut) {
             await clearClipboardState();
         }
-    }, [clipboardData, widgets, onWidgetChange, publishUpdate, componentId, contextType, handleDeleteCutWidgets, clearClipboardState]);
+    }, [clipboardData, widgets, onWidgetChange, publishUpdate, componentId, contextType, context, webpageData, versionId, prepareCutSourceWidgets, handleDeleteCutWidgets, clearClipboardState]);
 
     // Get layout component
     const LayoutComponent = getLayoutComponent(layoutName);
@@ -1410,6 +1568,23 @@ const ReactLayoutRenderer = forwardRef(({
                         </div>
                     )}
                 </>
+            )}
+
+            {pasteError && (
+                <div
+                    role="alert"
+                    className="mx-4 mb-4 flex items-start justify-between gap-3 rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                >
+                    <span>{pasteError}</span>
+                    <button
+                        type="button"
+                        onClick={() => setPasteError(null)}
+                        className="font-medium text-amber-800 hover:text-amber-950"
+                        aria-label="Dismiss paste error"
+                    >
+                        Dismiss
+                    </button>
+                </div>
             )}
 
             <LayoutComponent

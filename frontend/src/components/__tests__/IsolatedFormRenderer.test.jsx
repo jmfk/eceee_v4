@@ -5,6 +5,7 @@ import IsolatedFormRenderer from '../IsolatedFormRenderer'
 
 let externalChangeCallbacks = []
 let publishUpdateMock = vi.fn()
+let schemaFieldRenderCount = 0
 
 vi.mock('../../api/widgetSchemas.js', () => ({
     getWidgetSchema: vi.fn(() => Promise.resolve({ properties: {} })),
@@ -22,11 +23,14 @@ vi.mock('../../contexts/unified-data/context/UnifiedDataContext', () => ({
 }))
 
 vi.mock('../forms/SchemaFieldRenderer.jsx', () => ({
-    default: ({ fieldName, onChange }) => (
-        <button type="button" onClick={() => onChange(fieldName, `<p>${fieldName} update</p>`)}>
-            Change {fieldName}
-        </button>
-    )
+    default: ({ fieldName, onChange }) => {
+        schemaFieldRenderCount += 1
+        return (
+            <button type="button" onClick={() => onChange(fieldName, `<p>${fieldName} update</p>`)}>
+                Change {fieldName}
+            </button>
+        )
+    }
 }))
 
 const baseWidget = {
@@ -46,6 +50,7 @@ describe('IsolatedFormRenderer active prop ownership', () => {
     beforeEach(() => {
         externalChangeCallbacks = []
         publishUpdateMock = vi.fn()
+        schemaFieldRenderCount = 0
         vi.clearAllMocks()
     })
 
@@ -177,5 +182,73 @@ describe('IsolatedFormRenderer active prop ownership', () => {
 
         expect(onWidgetChange).not.toHaveBeenCalled()
         expect(publishUpdateMock).not.toHaveBeenCalled()
+    })
+
+    it('does not rerender fields for equivalent object props', () => {
+        const onWidgetChange = vi.fn()
+        const { rerender } = render(
+            <IsolatedFormRenderer
+                initWidgetData={{ ...baseWidget, config: { ...baseWidget.config } }}
+                initschema={schema}
+                contextType="page"
+                widgetId="content-1"
+                slotName="main"
+                context={{ contextType: 'page', pageId: '101', versionId: '201' }}
+                publishChanges={false}
+                onWidgetChange={onWidgetChange}
+            />
+        )
+
+        expect(schemaFieldRenderCount).toBe(1)
+
+        rerender(
+            <IsolatedFormRenderer
+                initWidgetData={{ ...baseWidget, config: { ...baseWidget.config } }}
+                initschema={schema}
+                contextType="page"
+                widgetId="content-1"
+                slotName="main"
+                context={{ contextType: 'page', pageId: '101', versionId: '201' }}
+                publishChanges={false}
+                onWidgetChange={onWidgetChange}
+            />
+        )
+
+        expect(schemaFieldRenderCount).toBe(1)
+    })
+
+    it('uses the latest parent callback after memoized props change', () => {
+        const firstOnWidgetChange = vi.fn()
+        const latestOnWidgetChange = vi.fn()
+        const { rerender } = render(
+            <IsolatedFormRenderer
+                initWidgetData={baseWidget}
+                initschema={schema}
+                contextType="page"
+                widgetId="content-1"
+                slotName="main"
+                context={{ contextType: 'page', pageId: '101', versionId: '201' }}
+                publishChanges={false}
+                onWidgetChange={firstOnWidgetChange}
+            />
+        )
+
+        rerender(
+            <IsolatedFormRenderer
+                initWidgetData={baseWidget}
+                initschema={schema}
+                contextType="page"
+                widgetId="content-1"
+                slotName="main"
+                context={{ contextType: 'page', pageId: '101', versionId: '201' }}
+                publishChanges={false}
+                onWidgetChange={latestOnWidgetChange}
+            />
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: 'Change content' }))
+
+        expect(firstOnWidgetChange).not.toHaveBeenCalled()
+        expect(latestOnWidgetChange).toHaveBeenCalledOnce()
     })
 })
