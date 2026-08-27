@@ -233,11 +233,14 @@ ROOT_URLCONF = "config.urls"
 ASGI_APPLICATION = "config.asgi.application"
 
 # Channel Layers for WebSocket support
+REDIS_NAMESPACE = config("ECEEE_REDIS_NAMESPACE", default="eceee_v4")
+REDIS_KEY_PREFIX = f"{REDIS_NAMESPACE}:"
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
             "hosts": [config("REDIS_URL", default="redis://redis:6379/0")],
+            "prefix": REDIS_KEY_PREFIX,
         },
     },
 }
@@ -302,6 +305,7 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": config("REDIS_URL", default="redis://redis:6379/0"),
+        "KEY_PREFIX": REDIS_NAMESPACE,
     }
 }
 
@@ -351,7 +355,7 @@ SITE_ID = 1
 
 # CORS Configuration for React frontend
 CORS_ALLOWED_ORIGINS = config(
-    "CORS_ALLOWED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000"
+    "CORS_ALLOWED_ORIGINS", default="http://localhost:10100,http://127.0.0.1:10100"
 ).split(",")
 
 CORS_ALLOW_CREDENTIALS = True
@@ -359,7 +363,7 @@ CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only in development
 
 # CSRF Configuration
 CSRF_TRUSTED_ORIGINS = config(
-    "CSRF_TRUSTED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000"
+    "CSRF_TRUSTED_ORIGINS", default="http://localhost:10100,http://127.0.0.1:10100"
 ).split(",")
 
 # CSRF Cookie settings for React frontend
@@ -585,6 +589,8 @@ else:
 # Celery Configuration (for background tasks)
 CELERY_BROKER_URL = config("REDIS_URL", default="redis://redis:6379/0")
 CELERY_RESULT_BACKEND = config("REDIS_URL", default="redis://redis:6379/0")
+CELERY_BROKER_TRANSPORT_OPTIONS = {"global_keyprefix": REDIS_KEY_PREFIX}
+CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {"global_keyprefix": REDIS_KEY_PREFIX}
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
@@ -640,7 +646,7 @@ AWS_S3_OBJECT_PARAMETERS = {
 
 # Playwright Service Configuration for Content Import
 PLAYWRIGHT_SERVICE_URL = config(
-    "PLAYWRIGHT_SERVICE_URL", default="http://localhost:5000"
+    "PLAYWRIGHT_SERVICE_URL", default="http://localhost:10107"
 )
 
 # Media File Handling Configuration

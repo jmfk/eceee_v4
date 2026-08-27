@@ -47,7 +47,7 @@ class ImgProxyService:
         """
         Prefer a same-origin proxy for local imgproxy URLs in development.
 
-        Some browsers and extensions block CSS background images from localhost:8080.
+        Some browsers and extensions block CSS background images from localhost:10106.
         A same-origin Django URL avoids that without changing the signed imgproxy path.
         """
         if not self.use_same_origin_proxy or not configured_public_url:

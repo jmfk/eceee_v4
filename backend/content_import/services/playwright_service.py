@@ -15,7 +15,7 @@ class PlaywrightService:
     def __init__(self):
         """Initialize Playwright service with configured URL."""
         self.base_url = getattr(
-            settings, "PLAYWRIGHT_SERVICE_URL", "http://localhost:5000"
+            settings, "PLAYWRIGHT_SERVICE_URL", "http://localhost:10107"
         )
 
     def capture_screenshot(

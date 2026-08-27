@@ -64,7 +64,7 @@ const getReadableSourcePath = (sourcePath = '') => sourcePath
     .replace(/^src\//, 'frontend/src/')
 
 const DEFAULT_DEMO_SETTINGS = {
-    baseUrl: 'http://localhost:3000',
+    baseUrl: 'http://localhost:10100',
     username: 'demo',
     password: 'demo',
     recordReferenceVideoWithAudio: false
@@ -1673,7 +1673,7 @@ const QualityPanel = ({
                         label="Demo base URL"
                         value={demoSettings.baseUrl}
                         onChange={baseUrl => onDemoSettingsChange({ ...demoSettings, baseUrl })}
-                        placeholder="http://localhost:3000"
+                        placeholder="http://localhost:10100"
                         disabled={isRendering}
                     />
                     <div className="grid grid-cols-2 gap-3">

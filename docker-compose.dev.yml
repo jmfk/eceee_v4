@@ -11,26 +11,27 @@ services:
     restart: "no"
     environment:
       - DEBUG=1
-      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@eceee-v4-db:5432/eceee_v4}
+      - DATABASE_URL=${DATABASE_URL:?Run make configure-local-infra}
       - POSTGRES_DB=${POSTGRES_DB:-eceee_v4}
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_HOST=${POSTGRES_HOST:-eceee-v4-db}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${POSTGRES_USER:-local_eceee_v4}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Run make configure-local-infra}
+      - POSTGRES_HOST=${POSTGRES_HOST:-host.docker.internal}
+      - POSTGRES_PORT=${POSTGRES_PORT:-10300}
       - ALLOWED_HOSTS=localhost,127.0.0.1,backend,frontend,testserver
-      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001
-      - CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001
+      - CORS_ALLOWED_ORIGINS=http://localhost:${FRONTEND_PORT:-10100},http://127.0.0.1:${FRONTEND_PORT:-10100}
+      - CSRF_TRUSTED_ORIGINS=http://localhost:${FRONTEND_PORT:-10100},http://127.0.0.1:${FRONTEND_PORT:-10100}
       - SECRET_KEY=dev-secret-key-change-in-production
-      - AWS_ACCESS_KEY_ID=minioadmin
-      - AWS_SECRET_ACCESS_KEY=minioadmin
-      - AWS_STORAGE_BUCKET_NAME=eceee-media
-      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://localhost:9000}
-      - AWS_S3_INTERNAL_ENDPOINT_URL=${AWS_S3_INTERNAL_ENDPOINT_URL:-http://eceee-v4-minio:9000}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-eceee-v4}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:?Run make configure-local-infra}
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:-eceee-media}
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://localhost:10302}
+      - AWS_S3_INTERNAL_ENDPOINT_URL=${AWS_S3_INTERNAL_ENDPOINT_URL:-http://host.docker.internal:10302}
       - AWS_S3_REGION_NAME=us-east-1
       - AWS_S3_USE_SSL=False
-      - REDIS_URL=${REDIS_URL:-redis://eceee-v4-redis:6379/0}
+      - REDIS_URL=${REDIS_URL:?Run make configure-local-infra}
+      - ECEEE_REDIS_NAMESPACE=${ECEEE_REDIS_NAMESPACE:-eceee_v4}
       - IMGPROXY_URL=${IMGPROXY_URL:-http://eceee-v4-imgproxy:8080}
-      - IMGPROXY_PUBLIC_URL=${IMGPROXY_PUBLIC_URL:-http://localhost:8080}
+      - IMGPROXY_PUBLIC_URL=http://localhost:${ECEEE_IMGPROXY_PORT:-10106}
       - IMGPROXY_KEY=943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881
       - IMGPROXY_SALT=520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -50,7 +51,7 @@ services:
       - backend_static:/app/staticfiles
       - ./backend/media:/app/media
     ports:
-      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+      - "127.0.0.1:${BACKEND_PORT:-10101}:8000"
     command: >
       sh -c "python manage.py migrate &&
              uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload --reload-include '*.html'"
@@ -70,11 +71,12 @@ services:
     container_name: ${FRONTEND_CONTAINER_NAME:-eceee-v4-frontend}
     restart: "no"
     environment:
-      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000/api}
-      - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL:-http://localhost:8000}
-      - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:8000}
+      - REACT_APP_API_URL=http://localhost:${BACKEND_PORT:-10101}/api
+      - REACT_APP_BACKEND_URL=http://localhost:${BACKEND_PORT:-10101}
+      - VITE_WS_URL=ws://localhost:${BACKEND_PORT:-10101}
       - VITE_BACKEND_URL=${VITE_BACKEND_URL:-http://backend:8000}
-      - VITE_IMGPROXY_URL=http://localhost:8080
+      - VITE_IMGPROXY_URL=http://localhost:${ECEEE_IMGPROXY_PORT:-10106}
+      - VITE_DEV_SERVER_PORT=3000
       - VITE_ENABLE_CONTEXT_MENU_TOGGLE=true
       - VITE_GIT_COMMIT_HASH=${VITE_GIT_COMMIT_HASH:-}
       - VITE_USE_POLLING=${VITE_USE_POLLING:-false}
@@ -89,7 +91,7 @@ services:
       - ./.git:/repo/.git:ro
       - frontend_node_modules:/app/node_modules
     ports:
-      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
+      - "127.0.0.1:${FRONTEND_PORT:-10100}:3000"
     command: npm run dev -- --host 0.0.0.0
     stdin_open: true
     tty: true
@@ -106,24 +108,25 @@ services:
     restart: "no"
     environment:
       - DEBUG=1
-      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@eceee-v4-db:5432/eceee_v4}
+      - DATABASE_URL=${DATABASE_URL:?Run make configure-local-infra}
       - POSTGRES_DB=${POSTGRES_DB:-eceee_v4}
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_HOST=${POSTGRES_HOST:-eceee-v4-db}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${POSTGRES_USER:-local_eceee_v4}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Run make configure-local-infra}
+      - POSTGRES_HOST=${POSTGRES_HOST:-host.docker.internal}
+      - POSTGRES_PORT=${POSTGRES_PORT:-10300}
       - ALLOWED_HOSTS=localhost,127.0.0.1,backend,frontend,testserver
       - SECRET_KEY=dev-secret-key-change-in-production
-      - AWS_ACCESS_KEY_ID=minioadmin
-      - AWS_SECRET_ACCESS_KEY=minioadmin
-      - AWS_STORAGE_BUCKET_NAME=eceee-media
-      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://localhost:9000}
-      - AWS_S3_INTERNAL_ENDPOINT_URL=${AWS_S3_INTERNAL_ENDPOINT_URL:-http://eceee-v4-minio:9000}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-eceee-v4}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:?Run make configure-local-infra}
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:-eceee-media}
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://localhost:10302}
+      - AWS_S3_INTERNAL_ENDPOINT_URL=${AWS_S3_INTERNAL_ENDPOINT_URL:-http://host.docker.internal:10302}
       - AWS_S3_REGION_NAME=us-east-1
       - AWS_S3_USE_SSL=False
-      - REDIS_URL=${REDIS_URL:-redis://eceee-v4-redis:6379/0}
+      - REDIS_URL=${REDIS_URL:?Run make configure-local-infra}
+      - ECEEE_REDIS_NAMESPACE=${ECEEE_REDIS_NAMESPACE:-eceee_v4}
       - IMGPROXY_URL=${IMGPROXY_URL:-http://eceee-v4-imgproxy:8080}
-      - IMGPROXY_PUBLIC_URL=${IMGPROXY_PUBLIC_URL:-http://localhost:8080}
+      - IMGPROXY_PUBLIC_URL=http://localhost:${ECEEE_IMGPROXY_PORT:-10106}
       - IMGPROXY_KEY=943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881
       - IMGPROXY_SALT=520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5
       - OPENAI_API_KEY=${OPENAI_API_KEY}

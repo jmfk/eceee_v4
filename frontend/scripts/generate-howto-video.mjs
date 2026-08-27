@@ -33,7 +33,7 @@ const getEnvVoiceIdForLanguage = (language = '') => {
 
 const parseArgs = (argv) => {
   const args = {
-    baseUrl: process.env.HOWTO_BASE_URL || 'http://127.0.0.1:3100',
+    baseUrl: process.env.HOWTO_BASE_URL || 'http://127.0.0.1:10100',
     outputDir: process.env.HOWTO_OUTPUT_DIR || '',
     publicDir: process.env.HOWTO_PUBLIC_DIR || '',
     docsDir: process.env.HOWTO_DOCS_DIR || join(frontendRoot, 'src/docs/how-to'),
@@ -201,7 +201,7 @@ Options:
   --all                    Record every help guide.
   --topic <id>             Record the first guide in a help topic.
   --guide <id>             Record one guide.
-  --base-url <url>         Running frontend URL. Defaults to HOWTO_BASE_URL or http://127.0.0.1:3100.
+  --base-url <url>         Running frontend URL. Defaults to HOWTO_BASE_URL or http://127.0.0.1:10100.
   --output-dir <path>      Recording output folder. Defaults to frontend/public/howto-videos/prod/<language>.
   --public-dir <path>      Folder copied into the help site. Defaults to frontend/public/howto-videos/prod/<language>.
   --docs-dir <path>        Markdown guide folder. Defaults to frontend/src/docs/how-to.

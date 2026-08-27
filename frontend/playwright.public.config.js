@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const BASE_URL = process.env.PLAYWRIGHT_PUBLIC_BASE_URL || 'http://public-regression.localhost:8000'
+const BASE_URL = process.env.PLAYWRIGHT_PUBLIC_BASE_URL || 'http://public-regression.localhost:10101'
 
 export default defineConfig({
   testDir: './e2e/public',

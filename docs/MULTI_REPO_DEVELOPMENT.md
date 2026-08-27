@@ -1,84 +1,41 @@
-# Multi-Repository & Branch Development
+# Shared OrbStack development
 
-This guide explains how to set up a secondary repository instance (e.g., for working on a specific branch or a separate project) that connects to a shared infrastructure (PostgreSQL, Redis, MinIO, imgproxy).
+ECEEE is a consumer of the machine-wide services in the sibling `shared-local-infrastructure` repository. That repository is the sole lifecycle owner of PostgreSQL, Redis, and MinIO; ECEEE owns only its application containers and stateless imgproxy.
 
-## 🏗️ Shared Infrastructure Architecture
+## First-time setup
 
-Instead of each repository instance running its own set of database and infrastructure containers, we use a **Shared Infrastructure** model.
+1. Ensure OrbStack is running and `docker context show` returns `orbstack`.
+2. In `../shared-local-infrastructure`, start the admitted services with `make up`, `make cache-up`, and `make object-storage-up`.
+3. In this repository, run:
 
-1.  **Main Repository**: Runs the "Source of Truth" infrastructure services.
-2.  **Secondary Repository**: Runs only the application services (Backend, Frontend) and connects to the shared infrastructure via a shared Docker network.
+   ```bash
+   make configure-local-infra
+   make shared-infra-check
+   make servers
+   ```
 
-## 🚀 Setup Instructions
+The configuration helper reads provider-managed credentials without printing them, atomically updates the ignored repo-root `.env`, and sets mode 0600.
 
-### 1. Prepare the Main Repository
-In your main repository instance, ensure the shared infrastructure is running. The main repository should have a `docker-compose.infra.yml` or similar that exposes services on the `eceee_shared_network`.
+## Isolation contract
 
-```bash
-# In the main repo
-make servers  # Starts db, redis, minio, imgproxy
-```
+| Service | Shared endpoint | ECEEE isolation |
+|---|---|---|
+| PostgreSQL 17 | `127.0.0.1:10300` | database `eceee_v4`, role `local_eceee_v4` |
+| Redis 7.4 | `127.0.0.1:10301` | ACL user `eceee_v4`, keys/channels `eceee_v4:*` |
+| MinIO | `127.0.0.1:10302` (`10303` console) | access key `eceee-v4`, bucket `eceee-media` |
 
-### 2. Prepare this Repository
-In this repository instance, you need to configure your `.env` to point to the shared infrastructure and join the shared network.
+Do not run provider `down`, reset, or volume deletion commands from this project. `make infra-down` stops only ECEEE's imgproxy. `make clean` likewise leaves shared service containers and volumes untouched.
 
-#### Automatic Setup
-Run the following command to automatically initialize your `.env` and configure the hostnames:
+`make demo-reset-site` is the only destructive shared-database workflow. It is hard-limited to the separately admitted disposable database `eceee_demo`; it cannot reset `eceee_v4` or any other consumer database.
 
-```bash
-make use-external-infra
-```
+## Tests
 
-This will:
-- Create a `.env` file if it doesn't exist.
-- Update `POSTGRES_HOST`, `REDIS_URL`, etc., to use the shared container names (`eceee_v4_db`, `eceee_v4_redis`, etc.).
-- Verify connectivity to the shared services.
+PostgreSQL-backed tests use `docker-compose.test-infra.yml`, which has isolated, disposable PostgreSQL, Redis, and MinIO services with no published host ports. `make test-infra-down` removes only those test resources. Tests never create, flush, or drop data in the shared development services.
 
-#### Manual Verification
-You can check if your repository is correctly configured and connected to the shared infrastructure using:
+## Health checks
 
-```bash
-make check-conf
-```
+- `make shared-infra-check` validates OrbStack, provider endpoints, secret-file permissions, and the local `.env` contract without printing credentials.
+- `make check-servers` reports the shared services plus the ECEEE application endpoints.
+- `make check-conf` validates the local consumer contract.
 
-## 🔄 Branch-Based Database Replication
-
-When working on a specific branch, you often want a copy of the main database to avoid polluting the shared data.
-
-### Replicate Database
-Run the following command to clone the current database into a new one named after your current git branch:
-
-```bash
-make replicate-db
-```
-
-**What it does:**
-1.  Detects your current git branch (e.g., `feature/my-task`).
-2.  Creates a new database on the shared Postgres server named `feature_my_task` using the current DB as a template.
-3.  Updates your `.env` file (`POSTGRES_DB` and `DATABASE_URL`) to use this new database.
-
-### Apply Changes
-After replicating the database, you must restart your local backend to pick up the new configuration:
-
-```bash
-make restart
-```
-
-## 🔍 Health Checks
-
-Use these commands to verify your environment status:
-
--   `make check-servers`: Comprehensive health check of both local apps and external infrastructure.
--   `make check-conf`: Detailed report on `.env` settings, network connectivity, and the actual database the backend is using.
-
-## 🛠️ Summary of Commands
-
-| Command | Description |
-|---------|-------------|
-| `make use-external-infra` | Initialize/Update `.env` for shared infra |
-| `make check-conf` | Check DB and network configuration |
-| `make check-servers` | Verify status of all local and external services |
-| `make replicate-db` | Clone DB to a branch-specific version |
-| `make backend` | Start only the local backend |
-| `make frontend` | Start only the local frontend |
-
+The old `make use-external-infra` name remains as a backwards-compatible alias for `make configure-local-infra`.

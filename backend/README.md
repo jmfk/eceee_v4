@@ -15,9 +15,9 @@ docker-compose up backend
 docker-compose up
 
 # Access backend
-# API: http://localhost:8000
-# Admin: http://localhost:8000/admin/
-# API Docs: http://localhost:8000/api/docs/
+# API: http://localhost:10101
+# Admin: http://localhost:10101/admin/
+# API Docs: http://localhost:10101/api/docs/
 ```
 
 ## 📋 Project Overview
@@ -30,7 +30,7 @@ The eceee_v4 backend is a robust Django application that provides a comprehensiv
 
 - **Django 4.2+** - Python web framework
 - **Django REST Framework** - API development
-- **PostgreSQL 15** - Primary database with UUID support
+- **PostgreSQL 17** - Shared local database with an ECEEE-specific role
 - **Redis** - Caching and session storage
 - **Celery** - Background task processing
 - **Pydantic** - Data validation and serialization
@@ -221,9 +221,9 @@ PageWidget (N) ←→ (1) WidgetType (legacy)
 - `GET /api/webpages/publication_status/` - Get publication status
 
 ### API Documentation
-- **Swagger UI**: http://localhost:8000/api/docs/
-- **ReDoc**: http://localhost:8000/api/redoc/
-- **OpenAPI Schema**: http://localhost:8000/api/schema/
+- **Swagger UI**: http://localhost:10101/api/docs/
+- **ReDoc**: http://localhost:10101/api/redoc/
+- **OpenAPI Schema**: http://localhost:10101/api/schema/
 
 ## 🧪 Testing
 

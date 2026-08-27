@@ -1,0 +1,59 @@
+services:
+  test-db:
+    image: postgres:17-alpine
+    restart: "no"
+    environment:
+      POSTGRES_DB: eceee_v4_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: test-only
+    volumes:
+      - test_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d eceee_v4_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  test-redis:
+    image: redis:7.4-alpine
+    restart: "no"
+    volumes:
+      - test_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  test-minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: "no"
+    environment:
+      MINIO_ROOT_USER: test-eceee
+      MINIO_ROOT_PASSWORD: test-eceee-secret
+    command: server /data
+    volumes:
+      - test_minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  test-minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    restart: "no"
+    depends_on:
+      test-minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-ceu"]
+    command:
+      - |
+        mc alias set test http://test-minio:9000 test-eceee test-eceee-secret >/dev/null
+        mc mb --ignore-existing test/eceee-media >/dev/null
+        mc anonymous set download test/eceee-media >/dev/null
+
+volumes:
+  test_postgres_data:
+  test_redis_data:
+  test_minio_data:

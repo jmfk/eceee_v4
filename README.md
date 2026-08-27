@@ -6,22 +6,20 @@ A comprehensive, AI-assisted development environment featuring Django backend, R
 
 ### Prerequisites
 
-- **Docker Desktop** (with Docker Compose)
+- **OrbStack** with the Docker context set to `orbstack`
+- The sibling `shared-local-infrastructure` repository provisioned and running
 - **Node.js** 18+ and npm
 - **Python** 3.11+
 - **Git**
 
-### One-Command Setup
+### Setup
 
 ```bash
-./scripts/start-dev.sh
+make configure-local-infra
+make servers
 ```
 
-This script will:
-- Build all Docker containers
-- Start all services
-- Run database migrations
-- Display access URLs and useful commands
+`configure-local-infra` writes the ignored mode-0600 `.env` from provider-managed credentials. `make servers` starts only ECEEE-owned application containers and imgproxy; PostgreSQL, Redis, and MinIO remain lifecycle-owned by `../shared-local-infrastructure`.
 
 ## 📋 Project Overview
 
@@ -32,7 +30,7 @@ ECEEE v4 is a modern content management system built with AI-assisted developmen
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   React Frontend│    │  Django Backend │    │   PostgreSQL    │
-│   (Port 3000)   │◄──►│   (Port 8000)   │◄──►│   (Port 5432)   │
+│  (Port 10100)   │◄──►│  (Port 10101)   │◄──►│ (Shared 10300)  │
 │                 │    │                 │    │                 │
 │ • Vite          │    │ • REST API      │    │ • Primary DB    │
 │ • Tailwind CSS  │    │ • HTMX Views    │    │ • UUID Support  │
@@ -44,7 +42,7 @@ ECEEE v4 is a modern content management system built with AI-assisted developmen
                                  │
                     ┌─────────────────┐
                     │     Redis       │
-                    │   (Port 6379)   │
+                    │ (Shared 10301)  │
                     │                 │
                     │ • Caching       │
                     │ • Sessions      │
@@ -121,7 +119,7 @@ We've achieved **100% frontend test success rate** - transforming from 31 failin
 ### Backend
 - **Django 4.2+** - Python web framework
 - **Django REST Framework** - API development
-- **PostgreSQL 15** - Primary database
+- **PostgreSQL 17** - Shared local primary database
 - **Redis** - Caching and session storage
 - **Celery** - Background task processing
 - **HTMX** - Server-side dynamic interactions
@@ -174,28 +172,31 @@ See [Frontend Refactoring Guide](docs/FRONTEND_REFACTORING_GUIDE.md) for detaile
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Frontend | http://localhost:3000 | React application |
-| Backend API | http://localhost:8000 | Django REST API |
-| Admin Panel | http://localhost:8000/admin/ | Django admin interface |
-| API Docs | http://localhost:8000/api/docs/ | Interactive API documentation |
-| HTMX Examples | http://localhost:8000/htmx/ | Server-side interaction demos |
-| Debug Toolbar | http://localhost:8000/__debug__/ | Django debug information |
-| Silk Profiling | http://localhost:8000/silk/ | Performance profiling |
-| Metrics | http://localhost:8000/metrics/ | Prometheus metrics |
+| Frontend | http://localhost:10100 | React application |
+| Backend API | http://localhost:10101 | Django REST API |
+| Admin Panel | http://localhost:10101/admin/ | Django admin interface |
+| API Docs | http://localhost:10101/api/docs/ | Interactive API documentation |
+| MinIO API | http://localhost:10302 | Shared S3-compatible object storage |
+| MinIO Console | http://localhost:10303 | Shared object storage administration |
+| Imgproxy | http://localhost:10106 | Image transformation service |
+| Playwright renderer | http://localhost:10107 | Website rendering service |
+
+ECEEE owns the local application range `10100-10199` in the machine-wide port registry. Shared services use their provider-owned range `10300-10309`; ECEEE does not start, stop, reset, or delete those containers or volumes.
 
 ### Database Access
 
 - **Host**: localhost
-- **Port**: 5432
+- **Port**: 10300
 - **Database**: eceee_v4
-- **Username**: postgres
-- **Password**: postgres
+- **Username**: local_eceee_v4
+- **Password**: generated under the shared provider's ignored `secrets/projects/`
 
 ### Redis Access
 
 - **Host**: localhost
-- **Port**: 6379
+- **Port**: 10301
 - **Database**: 0
+- **User/namespace**: eceee_v4 / `eceee_v4:*`
 
 ## 📁 Project Structure
 
@@ -433,9 +434,9 @@ CSRF_COOKIE_SECURE=True
 
 ### API Documentation
 
-- **Swagger UI**: http://localhost:8000/api/docs/
-- **ReDoc**: http://localhost:8000/api/redoc/
-- **OpenAPI Schema**: http://localhost:8000/api/schema/
+- **Swagger UI**: http://localhost:10101/api/docs/
+- **ReDoc**: http://localhost:10101/api/redoc/
+- **OpenAPI Schema**: http://localhost:10101/api/schema/
 
 ### Detailed Documentation
 For comprehensive documentation including architecture, development guides, API references, and component libraries, see the **[Complete Documentation Index](DOCUMENTATION_INDEX.md)** which organizes all project documentation by category and user role.

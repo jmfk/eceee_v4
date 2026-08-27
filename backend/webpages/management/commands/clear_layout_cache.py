@@ -9,6 +9,7 @@ from django.core.management.base import BaseCommand
 from django.core.cache import cache
 
 from webpages.layout_registry import layout_registry
+from utils.cache import clear_project_cache
 
 
 class Command(BaseCommand):
@@ -44,7 +45,7 @@ class Command(BaseCommand):
         if clear_all:
             self.stdout.write("Clearing ALL caches...")
             if not dry_run:
-                cache.clear()
+                clear_project_cache(cache)
                 self.stdout.write(
                     self.style.SUCCESS("✅ All caches cleared successfully")
                 )

@@ -6,7 +6,7 @@ Guidance for AI coding agents working in this repository.
 
 ECEEE v4 is a Docker-based CMS stack with:
 
-- Backend: Django 4.2+, Django REST Framework, PostgreSQL 15, Redis, Celery, HTMX, Pydantic.
+- Backend: Django 4.2+, Django REST Framework, PostgreSQL 17 locally, Redis, Celery, HTMX, Pydantic.
 - Frontend: React 19, Vite, Tailwind CSS, React Query, Zustand, React Router, Vitest.
 - Supporting services: MinIO, ImgProxy, Playwright rendering service, theme sync service, deployment scripts under `deploy/`.
 

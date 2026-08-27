@@ -9,7 +9,7 @@ const frontendRoot = resolve(__dirname, '..')
 
 const parseArgs = (argv) => {
   const args = {
-    baseUrl: process.env.HOWTO_BASE_URL || 'http://localhost:3000',
+    baseUrl: process.env.HOWTO_BASE_URL || 'http://localhost:10100',
     startUrl: process.env.HOWTO_START_URL || '',
     outputDir: '',
     storageState: '',

@@ -15,7 +15,7 @@ docker-compose up frontend
 docker-compose up
 
 # Access frontend
-open http://localhost:3000
+open http://localhost:10100
 ```
 
 ## 📋 Project Overview
@@ -218,8 +218,8 @@ docker-compose exec frontend npm run preview
 ```
 
 ### Environment Configuration
-- Development: `http://localhost:3000`
-- Backend API: `http://localhost:8000`
+- Development: `http://localhost:10100`
+- Backend API: `http://localhost:10101`
 - Production: Configure via environment variables
 
 ## 🏆 Achievements

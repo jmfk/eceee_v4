@@ -331,7 +331,7 @@ class WebPageAdmin(HostnameUpdateMixin, admin.ModelAdmin):
                     "</h4>"
                     '<p style="margin-bottom: 10px;">Root pages (without a parent) require at least one hostname configured for the multi-site system to recognize them.</p>'
                     '<ul style="margin-bottom: 10px; padding-left: 20px;">'
-                    "<li><strong>Development:</strong> Use <code>localhost:8000</code> or <code>127.0.0.1:8000</code></li>"
+                    "<li><strong>Development:</strong> Use <code>localhost:10101</code> or <code>127.0.0.1:10101</code></li>"
                     "<li><strong>Production:</strong> Use your full domain, e.g., <code>example.com</code></li>"
                     "<li><strong>Wildcard:</strong> Use <code>*</code> to match any host (development only)</li>"
                     "</ul>"

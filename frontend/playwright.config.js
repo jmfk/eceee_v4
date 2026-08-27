@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const PORT = process.env.PLAYWRIGHT_PORT || 3100
+const PORT = process.env.PLAYWRIGHT_PORT || process.env.ECEEE_FRONTEND_E2E_PORT || 10108
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:${PORT}`
 
 export default defineConfig({

@@ -7,6 +7,18 @@ export
 # Global help request check
 HELP_REQUESTED := $(filter --help -h help,$(MAKECMDGOALS))
 
+# Reserved local host ports (port-space-registry block 10100-10199)
+FRONTEND_PORT ?= 10100
+BACKEND_PORT ?= 10101
+ECEEE_IMGPROXY_PORT ?= 10106
+ECEEE_PLAYWRIGHT_PORT ?= 10107
+ECEEE_FRONTEND_E2E_PORT ?= 10108
+ECEEE_FRONTEND_PREVIEW_PORT ?= 10109
+SHARED_POSTGRES_PORT ?= 10300
+SHARED_REDIS_PORT ?= 10301
+SHARED_MINIO_API_PORT ?= 10302
+SHARED_MINIO_CONSOLE_PORT ?= 10303
+
 # Port validation helper
 define check_port
 	@if [ -n "$(1)" ]; then \
@@ -30,7 +42,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db use-external-infra change-ports prepare-test-infra refresh-db-collation replicate-db list-dbs switch-db prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db configure-local-infra shared-infra-check use-external-infra change-ports prepare-test-infra test-infra-down refresh-db-collation replicate-db list-dbs switch-db prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -86,7 +98,7 @@ help: ## Show this help message (use: make help [target])
 		echo "  get-jwt-token USER=username [SERVER=url]    Get JWT token for user (expires in 60min)"; \
 		echo "  list-api-tokens [SERVER=url]                List all API tokens"; \
 		echo "  test-api-auth TOKEN=token [SERVER=url]      Test API token authentication"; \
-		echo "  Note: SERVER defaults to http://localhost:8000"; \
+		echo "  Note: SERVER defaults to http://localhost:10101"; \
 		echo ""; \
 		echo "Sample Data:"; \
 		echo "  sample-content    Create sample content (10 items)"; \
@@ -161,7 +173,8 @@ help: ## Show this help message (use: make help [target])
 		echo "  clear-layout-cache-all Clear ALL caches (nuclear option)"; \
 		echo "  check-servers          Check if backend and frontend servers are up"; \
 		echo "  check-conf             Check database and server configuration"; \
-		echo "  use-external-infra     Setup .env to use shared infrastructure"; \
+		echo "  configure-local-infra  Configure .env for shared OrbStack services"; \
+		echo "  shared-infra-check     Validate OrbStack and ECEEE service isolation"; \
 		echo "  change-ports           Change backend and frontend ports"; \
 		echo "  list-dbs               List all database clones"; \
 		echo "  switch-db DB=name      Switch current database in .env"; \
@@ -182,13 +195,13 @@ servers: infra-up
 
 # Run Django backend server
 backend:
-	@BP=$$(grep "^BACKEND_PORT=" .env | cut -d= -f2 || echo "8000"); \
+	@BP="$${BACKEND_PORT:-10101}"; \
 	 echo "🚀 Starting Backend on http://localhost:$$BP (internal: 8000)"; \
 	 docker-compose -f docker-compose.dev.yml up backend
 
 # Run React frontend dev server
 frontend:
-	@FP=$$(grep "^FRONTEND_PORT=" .env | cut -d= -f2 || echo "3000"); \
+	@FP="$${FRONTEND_PORT:-10100}"; \
 	 echo "🚀 Starting Frontend on http://localhost:$$FP (internal: 3000)"; \
 	 VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) docker-compose -f docker-compose.dev.yml up frontend
 
@@ -219,9 +232,9 @@ changepassword:
 	docker-compose -f docker-compose.dev.yml exec backend python manage.py changepassword admin
 
 # API Token Management
-SERVER ?= http://localhost:8000
+SERVER ?= http://localhost:10101
 HOWTO_PROD_BASE_URL ?= https://app.eceee.org
-HOWTO_DEMO_BASE_URL ?= http://localhost:3000
+HOWTO_DEMO_BASE_URL ?= http://localhost:10100
 HOWTO_AUTH_STATE ?= .auth/eceee-prod-storage-state.json
 HOWTO_LANGUAGE ?= sv
 HOWTO_TRANSLATION_PROVIDER ?=
@@ -241,8 +254,8 @@ HOWTO_EXTRA_FLAGS ?=
 HOWTO_SCRIPT_EDITOR_PATH ?= /help/script-editor
 DEMO_EXPORT ?= demo/summerstudy.eceee.org-20260525-181814-871e39ea.zip
 DEMO_DB ?= eceee_demo
-DEMO_BACKEND_PORT ?= 8000
-DEMO_FRONTEND_PORT ?= 3000
+DEMO_BACKEND_PORT ?= 10101
+DEMO_FRONTEND_PORT ?= 10100
 DEMO_HOSTNAMES ?= localhost,127.0.0.1
 DEMO_USER ?= demo
 DEMO_PASSWORD ?= demo
@@ -512,38 +525,50 @@ shell:
 
 # Start and validate the local services required by make test.
 prepare-test-infra:
-	@command -v docker-compose >/dev/null 2>&1 || (echo "Error: docker-compose is required to run tests."; exit 1)
-	@DB_NAME=$$(grep '^POSTGRES_DB=' .env 2>/dev/null | cut -d= -f2 || true); \
-	DB_NAME=$${DB_NAME:-eceee_v4}; \
-	case "$$DB_NAME" in -*|*[!A-Za-z0-9_-]*|"") echo "Error: Invalid POSTGRES_DB '$$DB_NAME'."; exit 1;; esac; \
-	echo "Starting test infrastructure..."; \
-	docker-compose -f docker-compose.infra.yml up -d db redis minio imgproxy; \
+	@command -v docker >/dev/null 2>&1 || (echo "Error: Docker is required to run tests."; exit 1)
+	@python3 scripts/configure_orbstack.py --backend-port "$(BACKEND_PORT)" --frontend-port "$(FRONTEND_PORT)" --check-only >/dev/null
+	@echo "Starting isolated ephemeral test infrastructure..."; \
+	docker compose -f docker-compose.test-infra.yml up -d test-db test-redis test-minio test-minio-init; \
+	docker compose -f docker-compose.infra.yml up -d imgproxy; \
 	echo "Waiting for Postgres..."; \
 	i=0; \
-	until docker-compose -f docker-compose.infra.yml exec -T db pg_isready -U postgres >/dev/null 2>&1; do \
+	until docker compose -f docker-compose.test-infra.yml exec -T test-db pg_isready -U postgres -d eceee_v4_test >/dev/null 2>&1; do \
 		i=$$((i + 1)); \
 		if [ $$i -ge 30 ]; then echo "Error: Postgres did not become ready."; exit 1; fi; \
 		sleep 1; \
-	done; \
-	if ! docker-compose -f docker-compose.infra.yml exec -T db psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$DB_NAME'" | grep -q 1; then \
-		echo "Creating local database '$$DB_NAME'..."; \
-		docker-compose -f docker-compose.infra.yml exec -T db createdb -U postgres "$$DB_NAME"; \
-	fi
+	done
+
+test-infra-down: ## Stop and remove only ECEEE's disposable test services and data.
+	docker compose -f docker-compose.test-infra.yml down -v
 
 # Clear stale local Postgres collation metadata before creating Django test databases.
 refresh-db-collation: prepare-test-infra
-	@DB_NAME=$$(grep '^POSTGRES_DB=' .env 2>/dev/null | cut -d= -f2 || true); \
-	DB_NAME=$${DB_NAME:-eceee_v4}; \
-	docker-compose -f docker-compose.infra.yml exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
-		-c "UPDATE pg_database SET datcollversion = NULL WHERE datname IN ('template1', 'postgres', 'test_$$DB_NAME');" >/dev/null
+	docker compose -f docker-compose.test-infra.yml exec -T test-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+		-c "UPDATE pg_database SET datcollversion = NULL WHERE datname IN ('template1', 'postgres', 'test_eceee_v4_test');" >/dev/null
 
 # Run backend tests
 backend-test: prepare-test-infra refresh-db-collation
-	docker-compose -f docker-compose.dev.yml run --rm --no-deps -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --keepdb --verbosity=2 --failfast --noinput
+	docker compose -f docker-compose.dev.yml run --rm --no-deps -T \
+		-e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres \
+		-e POSTGRES_DB=eceee_v4_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=test-only \
+		-e POSTGRES_HOST=test-db -e POSTGRES_PORT=5432 \
+		-e DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test \
+		-e REDIS_URL=redis://test-redis:6379/0 \
+		-e AWS_ACCESS_KEY_ID=test-eceee -e AWS_SECRET_ACCESS_KEY=test-eceee-secret \
+		-e AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
+		backend python manage.py test --keepdb --verbosity=2 --failfast --noinput
 
 # Run backend tests in parallel once the suite is stable.
 backend-test-parallel: prepare-test-infra refresh-db-collation
-	docker-compose -f docker-compose.dev.yml run --rm --no-deps -T -e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres backend python manage.py test --keepdb --parallel auto --verbosity=2 --failfast --noinput
+	docker compose -f docker-compose.dev.yml run --rm --no-deps -T \
+		-e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres \
+		-e POSTGRES_DB=eceee_v4_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=test-only \
+		-e POSTGRES_HOST=test-db -e POSTGRES_PORT=5432 \
+		-e DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test \
+		-e REDIS_URL=redis://test-redis:6379/0 \
+		-e AWS_ACCESS_KEY_ID=test-eceee -e AWS_SECRET_ACCESS_KEY=test-eceee-secret \
+		-e AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
+		backend python manage.py test --keepdb --parallel auto --verbosity=2 --failfast --noinput
 
 # Run frontend tests
 frontend-test: prepare-test-infra
@@ -566,7 +591,7 @@ frontend-admin-e2e-test:
 # Run public browser regression tests against the Django public renderer
 frontend-public-e2e-test: prepare-test-infra
 	docker-compose -f docker-compose.dev.yml up -d backend
-	@BP=$${BACKEND_PORT:-8000}; \
+	@BP=$${BACKEND_PORT:-10101}; \
 	echo "Waiting for backend on http://127.0.0.1:$$BP..."; \
 	i=0; \
 	until curl -fsS "http://127.0.0.1:$$BP/health/" >/dev/null 2>&1; do \
@@ -591,12 +616,12 @@ playwright-test:
 lint:
 	cd frontend && npm run lint
 
-howto-script-editor: ## Start the local video script editor (use: make howto-script-editor [FP=3000])
+howto-script-editor: ## Start the local video script editor (use: make howto-script-editor [FP=10100])
 ifneq ($(HELP_REQUESTED),)
 	@$(call print_help,howto-script-editor)
 else
-	@FP="$${FP:-$$(grep "^FRONTEND_PORT=" .env 2>/dev/null | cut -d= -f2 || echo "3000")}"; \
-	if [ -z "$$FP" ]; then FP="3000"; fi; \
+	@FP="$${FP:-$${FRONTEND_PORT:-10100}}"; \
+	if [ -z "$$FP" ]; then FP="10100"; fi; \
 	echo "🎬 Starting video script editor on http://localhost:$$FP$(HOWTO_SCRIPT_EDITOR_PATH)"; \
 	cd frontend && VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) npm run dev -- --host 0.0.0.0 --port "$$FP" --strictPort --open "$(HOWTO_SCRIPT_EDITOR_PATH)"
 endif
@@ -912,13 +937,13 @@ docker-up: infra-up
 
 # Stop all Docker Compose services
 docker-down:
-	docker-compose -f docker-compose.dev.yml down
-	docker-compose -f docker-compose.infra.yml down
+	docker compose -f docker-compose.dev.yml down
+	docker compose -f docker-compose.infra.yml down
 
 # Restart all Docker Compose services
 restart:
-	docker-compose -f docker-compose.dev.yml restart
-	docker-compose -f docker-compose.infra.yml restart
+	docker compose -f docker-compose.dev.yml restart
+	docker compose -f docker-compose.infra.yml restart imgproxy
 
 # Stop Playwright service
 playwright-down:
@@ -933,9 +958,10 @@ clean:
 	find backend -type d -name '__pycache__' -exec rm -rf {} +
 	rm -rf backend/*.pyc backend/*.pyo backend/.pytest_cache
 	rm -rf frontend/node_modules frontend/dist
-	docker-compose -f docker-compose.dev.yml down -v
-	docker-compose -f docker-compose.infra.yml down -v
-	cd playwright-service && docker-compose down -v
+	docker compose -f docker-compose.dev.yml down -v
+	docker compose -f docker-compose.infra.yml down
+	docker compose -f docker-compose.test-infra.yml down -v
+	cd playwright-service && docker compose down -v
 
 # ECEEE Components Sync Commands
 #sync-from: ## Sync components FROM eceee-components TO eceee_v4
@@ -947,14 +973,20 @@ clean:
 # 	@./sync-to-eceee-components.sh
 
 # Environment & Health Checks
-infra-up: ## Run infrastructure services
-	docker-compose -f docker-compose.infra.yml up -d
+configure-local-infra: ## Configure ignored .env for the shared OrbStack services.
+	python3 scripts/configure_orbstack.py --backend-port "$(BACKEND_PORT)" --frontend-port "$(FRONTEND_PORT)"
 
-infra-down: ## Stop infrastructure services
-	docker-compose -f docker-compose.infra.yml down
+shared-infra-check: ## Validate OrbStack, shared endpoints, and ECEEE's local configuration.
+	python3 scripts/configure_orbstack.py --backend-port "$(BACKEND_PORT)" --frontend-port "$(FRONTEND_PORT)" --check-only
 
-infra-restart: ## Restart infrastructure services
-	docker-compose -f docker-compose.infra.yml restart
+infra-up: shared-infra-check ## Start only ECEEE-owned stateless infrastructure.
+	docker compose -f docker-compose.infra.yml up -d imgproxy
+
+infra-down: ## Stop only ECEEE-owned stateless infrastructure.
+	docker compose -f docker-compose.infra.yml down
+
+infra-restart: shared-infra-check ## Restart only ECEEE-owned stateless infrastructure.
+	docker compose -f docker-compose.infra.yml restart imgproxy
 
 clear-layout-cache: ## Clear layout-related caches to force refresh
 	@echo "🧹 Clearing layout caches..."
@@ -967,9 +999,8 @@ clear-layout-cache-all: ## Clear all caches (nuclear option)
 check-servers: ## Check if backend and frontend servers are up
 	@echo "🔍 Checking status of services..."
 	@echo ""
-	@# Load ports from .env if it exists
-	@BP=$$(grep "^BACKEND_PORT=" .env | cut -d= -f2 || echo "8000"); \
-	 FP=$$(grep "^FRONTEND_PORT=" .env | cut -d= -f2 || echo "3000"); \
+	@BP="$${BACKEND_PORT:-10101}"; \
+	 FP="$${FRONTEND_PORT:-10100}"; \
 	 check_http() { \
 		name=$$1; url=$$2; \
 		status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 $$url 2>/dev/null); \
@@ -985,111 +1016,19 @@ check-servers: ## Check if backend and frontend servers are up
 	 check_http "Backend (Django)" "http://localhost:$$BP/health/"; \
 	 check_http "Frontend (Vite)" "http://localhost:$$FP/"; \
 	 echo ""; \
-	 echo "--- External Infra (main repo) ---"; \
-	 status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:9000/minio/health/live 2>/dev/null); \
+	 echo "--- Shared OrbStack Services ---"; \
+	 status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:$${SHARED_MINIO_API_PORT:-10302}/minio/health/live 2>/dev/null); \
 	 if [ "$$status" = "200" ]; then printf "%-25s [\033[0;32mUP\033[0m]\n" "MinIO"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "MinIO"; fi; \
-	 status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:8080/health 2>/dev/null); \
+	 status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:$${ECEEE_IMGPROXY_PORT:-10106}/health 2>/dev/null); \
 	 if [ "$$status" = "200" ]; then printf "%-25s [\033[0;32mUP\033[0m]\n" "ImgProxy"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "ImgProxy"; fi; \
-	 if nc -z localhost 6379 2>/dev/null; then printf "%-25s [\033[0;32mUP\033[0m]\n" "Redis"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "Redis"; fi; \
-	 if nc -z localhost 5432 2>/dev/null; then printf "%-25s [\033[0;32mUP\033[0m]\n" "Postgres"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "Postgres"; fi; \
+	 if nc -z localhost $${SHARED_REDIS_PORT:-10301} 2>/dev/null; then printf "%-25s [\033[0;32mUP\033[0m]\n" "Redis"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "Redis"; fi; \
+	 if nc -z localhost $${SHARED_POSTGRES_PORT:-10300} 2>/dev/null; then printf "%-25s [\033[0;32mUP\033[0m]\n" "Postgres"; else printf "%-25s [\033[0;33mOFFLINE\033[0m]\n" "Postgres"; fi; \
 	 echo ""
 
-use-external-infra: ## Update .env to use the shared infrastructure from the other repo (use: make use-external-infra [BP=8001] [FP=3001])
-	$(call check_help,use-external-infra)
-	@echo "🔄 Preparing .env file..."
-	@if [ ! -f .env ]; then \
-		if [ -f .env.template ]; then \
-			cp .env.template .env; \
-			echo "✅ Created .env from .env.template"; \
-		else \
-			echo "POSTGRES_DB=eceee_v4" > .env; \
-			echo "POSTGRES_HOST=db" >> .env; \
-			echo "DATABASE_URL=postgresql://postgres:postgres@db:5432/eceee_v4" >> .env; \
-			echo "REDIS_URL=redis://redis:6379/0" >> .env; \
-			echo "✅ Created minimal .env"; \
-		fi \
-	fi
-	@# Validate requested ports if provided
-	$(call check_port,$(BP))
-	$(call check_port,$(FP))
-	@echo "🔄 Configuring unique project name and ports for this instance..."
-	@BP_VAL=$${BP:-8001}; \
-	 FP_VAL=$${FP:-3001}; \
-	 if ! grep -q "COMPOSE_PROJECT_NAME" .env; then \
-		DIR_NAME=$$(basename $$(pwd) | tr '[:upper:]' '[:lower:]' | tr '_' '-'); \
-		echo "\n# Multi-instance Configuration" >> .env; \
-		echo "COMPOSE_PROJECT_NAME=eceee-v4-$$DIR_NAME" >> .env; \
-		echo "BACKEND_PORT=$$BP_VAL" >> .env; \
-		echo "FRONTEND_PORT=$$FP_VAL" >> .env; \
-	 else \
-		if [ -n "$(BP)" ]; then sed -i '' "s/^BACKEND_PORT=.*/BACKEND_PORT=$(BP)/" .env 2>/dev/null || sed -i "s/^BACKEND_PORT=.*/BACKEND_PORT=$(BP)/" .env; fi; \
-		if [ -n "$(FP)" ]; then sed -i '' "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$(FP)/" .env 2>/dev/null || sed -i "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$(FP)/" .env; fi; \
-	 fi
-	@BP_OLD=$$(grep "^BACKEND_PORT=" .env | cut -d= -f2 || echo "8000"); \
-	 FP_OLD=$$(grep "^FRONTEND_PORT=" .env | cut -d= -f2 || echo "3000"); \
-	 BP_NEW=$${BP:-$$BP_OLD}; \
-	 FP_NEW=$${FP:-$$FP_OLD}; \
-	 if [ "$$BP_NEW" != "$$BP_OLD" ]; then \
-		echo "🔄 Updating Backend port: $$BP_OLD -> $$BP_NEW"; \
-		if [ "$$(uname)" = "Darwin" ]; then \
-			sed -i '' "s/^BACKEND_PORT=.*/BACKEND_PORT=$$BP_NEW/" .env; \
-			sed -i '' "s/:$$BP_OLD/:$$BP_NEW/g" .env; \
-		else \
-			sed -i "s/^BACKEND_PORT=.*/BACKEND_PORT=$$BP_NEW/" .env; \
-			sed -i "s/:$$BP_OLD/:$$BP_NEW/g" .env; \
-		fi \
-	 fi; \
-	 if [ "$$FP_NEW" != "$$FP_OLD" ]; then \
-		echo "🔄 Updating Frontend port: $$FP_OLD -> $$FP_NEW"; \
-		if [ "$$(uname)" = "Darwin" ]; then \
-			sed -i '' "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$$FP_NEW/" .env; \
-			sed -i '' "s/:$$FP_OLD/:$$FP_NEW/g" .env; \
-		else \
-			sed -i "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$$FP_NEW/" .env; \
-			sed -i "s/:$$FP_OLD/:$$FP_NEW/g" .env; \
-		fi \
-	 fi
-	@echo "🔄 Updating .env to use hyphenated shared infrastructure names..."
-	@if [ "$$(uname)" = "Darwin" ]; then \
-		sed -i '' 's/^POSTGRES_HOST=db/POSTGRES_HOST=eceee-v4-db/' .env; \
-		sed -i '' 's/@db:5432/@eceee-v4-db:5432/' .env; \
-		sed -i '' 's/^REDIS_URL=redis:\/\/redis:6379/REDIS_URL=redis:\/\/eceee-v4-redis:6379/' .env; \
-		sed -i '' 's/eceee_v4_minio/eceee-v4-minio/g' .env; \
-		sed -i '' 's/eceee_v4_db/eceee-v4-db/g' .env; \
-		sed -i '' 's/eceee_v4_redis/eceee-v4-redis/g' .env; \
-		sed -i '' 's/eceee_v4_imgproxy/eceee-v4-imgproxy/g' .env; \
-		sed -i '' 's/^AWS_S3_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/localhost:9000/' .env; \
-		sed -i '' 's/^AWS_S3_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/localhost:9000/' .env; \
-		sed -i '' 's/^AWS_S3_INTERNAL_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_INTERNAL_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/' .env; \
-	else \
-		sed -i 's/^POSTGRES_HOST=db/POSTGRES_HOST=eceee-v4-db/' .env; \
-		sed -i 's/@db:5432/@eceee-v4-db:5432/' .env; \
-		sed -i 's/^REDIS_URL=redis:\/\/redis:6379/REDIS_URL=redis:\/\/eceee-v4-redis:6379/' .env; \
-		sed -i 's/eceee_v4_minio/eceee-v4-minio/g' .env; \
-		sed -i 's/eceee_v4_db/eceee-v4-db/g' .env; \
-		sed -i 's/eceee_v4_redis/eceee-v4-redis/g' .env; \
-		sed -i 's/eceee_v4_imgproxy/eceee-v4-imgproxy/g' .env; \
-		sed -i 's/^AWS_S3_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/localhost:9000/' .env; \
-		sed -i 's/^AWS_S3_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/AWS_S3_ENDPOINT_URL=http:\/\/localhost:9000/' .env; \
-		sed -i 's/^AWS_S3_INTERNAL_ENDPOINT_URL=http:\/\/minio:9000/AWS_S3_INTERNAL_ENDPOINT_URL=http:\/\/eceee-v4-minio:9000/' .env; \
-	fi
-	@# Check if summerstudy is in /etc/hosts and update if so
-	@if grep -q "summerstudy" /etc/hosts; then \
-		echo "🔄 Detected 'summerstudy' in hosts, ensuring URLs use it..."; \
-		if [ "$$(uname)" = "Darwin" ]; then \
-			sed -i '' 's/localhost:/summerstudy:/g' .env; \
-		else \
-			sed -i 's/localhost:/summerstudy:/g' .env; \
-		fi \
-	fi
-	@echo "✅ .env updated. Checking configuration..."
-	@make check-conf
-	@echo "🔄 Normalizing database hostnames (stripping ports)..."
-	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from webpages.models import WebPage; [p.save() for p in WebPage.objects.filter(parent__isnull=True)]"
+use-external-infra: configure-local-infra ## Backwards-compatible alias for configure-local-infra.
 
-change-ports: ## Change backend and frontend ports (use: make change-ports BP=8002 FP=3002)
+change-ports: ## Change backend and frontend ports (use: make change-ports BP=10101 FP=10100)
 	$(call check_help,change-ports)
-	@if [ ! -f .env ]; then echo "❌ Error: .env file not found. Run make use-external-infra first."; exit 1; fi
 	@if [ -z "$(BP)" ] && [ -z "$(FP)" ]; then \
 		echo "❌ Error: Either BP (Backend Port) or FP (Frontend Port) is required."; \
 		$(call print_help,change-ports); \
@@ -1097,90 +1036,10 @@ change-ports: ## Change backend and frontend ports (use: make change-ports BP=80
 	fi
 	$(call check_port,$(BP))
 	$(call check_port,$(FP))
-	@BP_OLD=$$(grep "^BACKEND_PORT=" .env | cut -d= -f2 || echo "8000"); \
-	 FP_OLD=$$(grep "^FRONTEND_PORT=" .env | cut -d= -f2 || echo "3000"); \
-	 BP_NEW=$${BP:-$$BP_OLD}; \
-	 FP_NEW=$${FP:-$$FP_OLD}; \
-	 if [ "$$BP_NEW" = "$$BP_OLD" ] && [ "$$FP_NEW" = "$$FP_OLD" ]; then \
-		echo "ℹ️  No port changes requested."; \
-	 else \
-		echo "🔄 Changing ports in .env..."; \
-		if [ "$$BP_NEW" != "$$BP_OLD" ]; then \
-			echo "  Backend: $$BP_OLD -> $$BP_NEW"; \
-			if [ "$$(uname)" = "Darwin" ]; then \
-				sed -i '' "s/^BACKEND_PORT=.*/BACKEND_PORT=$$BP_NEW/" .env; \
-				sed -i '' "s/:$$BP_OLD/:$$BP_NEW/g" .env; \
-			else \
-				sed -i "s/^BACKEND_PORT=.*/BACKEND_PORT=$$BP_NEW/" .env; \
-				sed -i "s/:$$BP_OLD/:$$BP_NEW/g" .env; \
-			fi \
-		fi; \
-		if [ "$$FP_NEW" != "$$FP_OLD" ]; then \
-			echo "  Frontend: $$FP_OLD -> $$FP_NEW"; \
-			if [ "$$(uname)" = "Darwin" ]; then \
-				sed -i '' "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$$FP_NEW/" .env; \
-				sed -i '' "s/:$$FP_OLD/:$$FP_NEW/g" .env; \
-			else \
-				sed -i "s/^FRONTEND_PORT=.*/FRONTEND_PORT=$$FP_NEW/" .env; \
-				sed -i "s/:$$FP_OLD/:$$FP_NEW/g" .env; \
-			fi \
-		fi; \
-		echo "✅ Ports updated. Please restart your containers:"; \
-		echo "   docker-compose -f docker-compose.dev.yml up -d backend frontend"; \
-	 fi
+	python3 scripts/configure_orbstack.py --backend-port "$${BP:-$(BACKEND_PORT)}" --frontend-port "$${FP:-$(FRONTEND_PORT)}"
 
 check-conf: ## Check current database and server configuration
-	@echo "🔍 Checking configuration..."
-	@echo ""
-	@echo "--- Database Configuration ---"
-	@if [ -f .env ]; then \
-		DB_ENV=$$(grep '^POSTGRES_DB=' .env | cut -d= -f2); \
-		if [ -n "$$DB_ENV" ]; then \
-			printf "%-25s \033[0;34m$$DB_ENV\033[0m\n" ".env POSTGRES_DB:"; \
-		else \
-			printf "%-25s \033[0;33mDEFAULT (eceee_v4)\033[0m\n" ".env POSTGRES_DB:"; \
-		fi; \
-		DB_HOST=$$(grep '^POSTGRES_HOST=' .env | cut -d= -f2); \
-		printf "%-25s \033[0;34m$${DB_HOST:-eceee-v4-db}\033[0m\n" "Postgres Host:"; \
-	else \
-		printf "%-25s \033[0;33mNONE (using defaults)\033[0m\n" ".env configuration:"; \
-	fi
-	@printf "%-25s " "Backend actual DB:"
-	@docker-compose -f docker-compose.dev.yml run --rm -T backend python manage.py shell -c "from django.conf import settings; print(settings.DATABASES['default']['NAME'])" 2>/dev/null || echo "\033[0;31mERROR: Could not query backend\033[0m"
-	@if [ -f .env ]; then \
-		DB_HOST=$$(grep '^POSTGRES_HOST=' .env | cut -d= -f2); \
-		if [ "$$DB_HOST" = "db" ]; then \
-			echo ""; \
-			echo "\033[0;33m⚠️  Warning: POSTGRES_HOST is still set to 'db' in .env.\033[0m"; \
-			echo "Run \033[0;36mmake use-external-infra\033[0m to fix this."; \
-		fi; \
-	fi
-	@echo ""
-	@echo "--- Service Connectivity (from Backend) ---"
-	@check_conn() { \
-		name=$$1; host=$$2; port=$$3; \
-		if docker-compose -f docker-compose.dev.yml run --rm -T backend python -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('$$host', int('$$port'))); s.close()" >/dev/null 2>&1; then \
-			printf "%-25s [\033[0;32mCONNECTED\033[0m] to $$host:$$port\n" "$$name:"; \
-		else \
-			printf "%-25s [\033[0;31mFAILED\033[0m] to $$host:$$port\n" "$$name:"; \
-		fi; \
-	}; \
-	DB_HOST=$$(grep '^POSTGRES_HOST=' .env | cut -d= -f2 || echo "eceee-v4-db"); \
-	REDIS_URL=$$(grep '^REDIS_URL=' .env | cut -d= -f2 || echo "redis://eceee-v4-redis:6379/0"); \
-	REDIS_HOST=$$(echo $$REDIS_URL | sed -e 's/redis:\/\///' -e 's/[:\/].*//'); \
-	REDIS_PORT=$$(echo $$REDIS_URL | sed -e 's/.*://' -e 's/\/.*//' | grep -E '^[0-9]+$$' || echo "6379"); \
-	check_conn "Postgres" "$$DB_HOST" "5432"; \
-	check_conn "Redis" "$$REDIS_HOST" "$$REDIS_PORT"; \
-	check_conn "MinIO" "eceee-v4-minio" "9000"; \
-	check_conn "ImgProxy" "eceee-v4-imgproxy" "8080"; \
-	echo ""
-	@echo "--- Server Network Configuration ---"
-	@if docker network inspect eceee_shared_network >/dev/null 2>&1; then \
-		printf "%-25s [\033[0;32mCONNECTED\033[0m] (eceee_shared_network)\n" "Shared Network:"; \
-	else \
-		printf "%-25s [\033[0;31mMISSING\033[0m] (eceee_shared_network)\n" "Shared Network:"; \
-	fi
-	@echo ""
+	python3 scripts/configure_orbstack.py --backend-port "$(BACKEND_PORT)" --frontend-port "$(FRONTEND_PORT)" --check-only
 
 check-db: check-conf ## Alias for check-conf
 

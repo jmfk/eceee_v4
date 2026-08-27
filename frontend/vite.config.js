@@ -1703,7 +1703,7 @@ const howToScriptEditorPlugin = () => ({
         const body = await readRequestJson(req)
         const id = randomUUID().slice(0, 8)
         const paths = recordingPathsFor(id)
-        const baseUrl = String(body.baseUrl || 'http://localhost:3000').trim()
+        const baseUrl = String(body.baseUrl || 'http://localhost:10100').trim()
         const startUrl = resolveStartUrl(baseUrl, body.startUrl || body.recordingStartUrl || '')
         const username = String(body.username || '').trim()
         const password = String(body.password || '')
@@ -2166,7 +2166,7 @@ const howToScriptEditorPlugin = () => ({
         const sectionId = safeSegment(body.sectionId, 'editor')
         const markdown = String(body.markdown || '')
         const markdowns = body.markdowns && typeof body.markdowns === 'object' ? body.markdowns : {}
-        const baseUrl = String(body.baseUrl || 'http://localhost:3000').trim()
+        const baseUrl = String(body.baseUrl || 'http://localhost:10100').trim()
         const username = String(body.username || '').trim()
         const password = String(body.password || '')
         const languages = normalizeRenderLanguages(body.languages || body.language || 'sv')
@@ -2490,7 +2490,7 @@ export default defineConfig({
   // Development server configuration
   server: {
     host: '0.0.0.0', // Allow external connections for Docker
-    port: 3000,
+    port: Number(process.env.VITE_DEV_SERVER_PORT || 10100),
     allowedHosts: true, // Allow all hosts (dev only) to support custom hostnames like 'summerstudy'
     proxy: {
       '/api': {
@@ -2541,6 +2541,12 @@ export default defineConfig({
         '**/howto-audio-cache/**',
       ],
     },
+  },
+
+  preview: {
+    host: '127.0.0.1',
+    port: Number(process.env.VITE_PREVIEW_PORT || process.env.ECEEE_FRONTEND_PREVIEW_PORT || 10109),
+    strictPort: true,
   },
 
   // Build configuration

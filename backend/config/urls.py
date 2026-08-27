@@ -81,7 +81,7 @@ urlpatterns = [
         MediaFileProxyView.as_view(),
         name="media-file-proxy-root",
     ),
-    # Same-origin imgproxy relay for local browsers that block localhost:8080 assets.
+    # Same-origin imgproxy relay for local browsers that block localhost:10106 assets.
     path(
         "imgproxy/<path:path>",
         ImgProxyProxyView.as_view(),
