@@ -453,6 +453,11 @@ class InheritanceEnhancementTest(TestCase):
             identifier="default",
             defaults={"name": "Default Tenant", "created_by": self.user}
         )
+        from easy_layouts.layouts.main_layout import MainLayoutLayout
+        from webpages.layout_registry import layout_registry
+
+        if not layout_registry.is_registered("main_layout"):
+            layout_registry.register(MainLayoutLayout)
 
         self.theme = PageTheme.objects.create(
             name="Test Theme",

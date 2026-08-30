@@ -278,7 +278,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
             # Add some extra metadata for the template endpoint
             response_data = {
                 "layout_name": pk,
-                "layout_type": layout.type,
+                "layout_type": layout.to_dict().get("type", "code"),
                 "template_html": structure.get("html", ""),
                 "template_css": structure.get("css", ""),
                 "parsed_slots": structure.get("slots", []),

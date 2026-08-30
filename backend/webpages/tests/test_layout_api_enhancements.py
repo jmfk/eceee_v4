@@ -139,25 +139,25 @@ class LayoutAPIMetricsTests(APITestCase):
     @patch("webpages.views.code_layout_views.logger")
     def test_metrics_logging_for_template_endpoint(self, mock_logger):
         """Test that template data requests are logged with INFO level"""
-        from django.db import connection
-        if connection.vendor == 'sqlite':
-            self.skipTest("Template parsing issues on SQLite/Test env")
-        # Get a layout name first
-        list_response = self.client.get("/api/v1/webpages/layouts/")
-        if list_response.data["results"]:
-            layout_name = list_response.data["results"][0]["name"]
+        layout_name = "metrics_test_layout"
+        layout = MagicMock(template_name="layouts/metrics_test_layout.html")
+        layout.to_dict.return_value = {"type": "code"}
 
+        with patch(
+            "webpages.layout_registry.layout_registry.get_layout",
+            return_value=layout,
+        ), patch(
+            "webpages.utils.template_parser.LayoutSerializer.serialize_layout",
+            return_value={"structure": {}},
+        ):
             response = self.client.get(
                 f"/api/v1/webpages/layouts/{layout_name}/template/"
             )
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-            # Verify INFO level logging for template requests
-            mock_logger.info.assert_called()
-            call_args = mock_logger.info.call_args[0][0]
-
-            self.assertIn("Template data request", call_args)
-            self.assertIn("template_data", call_args)
+        mock_logger.info.assert_called_once_with(
+            f"Template data request: {layout_name}"
+        )
 
     @patch("webpages.views.code_layout_views.logger")
     def test_metrics_include_request_metadata(self, mock_logger):

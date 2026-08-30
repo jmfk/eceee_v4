@@ -188,6 +188,7 @@ class LayoutTemplateEndpointTests(APITestCase):
             ]
             for field in expected_fields:
                 self.assertIn(field, response.data)
+            self.assertEqual(response.data["layout_type"], "code")
 
 
 class LayoutSerializerTests(TestCase):

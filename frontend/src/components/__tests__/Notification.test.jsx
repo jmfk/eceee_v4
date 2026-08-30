@@ -81,33 +81,21 @@ describe('Notification', () => {
     })
 
     it('shows technical details in development mode', () => {
-        const originalEnv = process.env.NODE_ENV
-        process.env.NODE_ENV = 'development'
-
         const error = new Error('Test error')
         error.stack = 'Error: Test error\n    at test.js:1:1'
 
-        render(<Notification message={error} onClose={mockOnClose} />)
+        render(<Notification message={error} onClose={mockOnClose} showTechnicalDetails />)
 
         expect(screen.getByText('Show technical details')).toBeInTheDocument()
-
-        // Restore original environment
-        process.env.NODE_ENV = originalEnv
     })
 
     it('does not show technical details in production mode', () => {
-        const originalEnv = process.env.NODE_ENV
-        process.env.NODE_ENV = 'production'
-
         const error = new Error('Test error')
         error.stack = 'Error: Test error\n    at test.js:1:1'
 
-        render(<Notification message={error} onClose={mockOnClose} />)
+        render(<Notification message={error} onClose={mockOnClose} showTechnicalDetails={false} />)
 
         expect(screen.queryByText('Show technical details')).not.toBeInTheDocument()
-
-        // Restore original environment
-        process.env.NODE_ENV = originalEnv
     })
 
     it('does not render when no message is provided', () => {
@@ -155,4 +143,4 @@ describe('Notification', () => {
 
         expect(screen.getByText('An error occurred')).toBeInTheDocument()
     })
-}) 
+})

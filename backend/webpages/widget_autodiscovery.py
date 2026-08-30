@@ -97,9 +97,9 @@ def validate_single_widget_type(widget_type):
         if not widget_type.name:
             issues.append(f"Widget '{widget_name}' missing required 'name' attribute")
 
-        if not widget_type.template_name:
+        if not widget_type.template_name and not widget_type.mustache_template_name:
             issues.append(
-                f"Widget '{widget_name}' missing required 'template_name' attribute"
+                f"Widget '{widget_name}' must define 'template_name' or 'mustache_template_name'"
             )
 
         # 2. Check configuration model

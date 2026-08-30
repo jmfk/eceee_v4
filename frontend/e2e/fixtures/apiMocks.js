@@ -144,6 +144,10 @@ export async function mockCmsApi(page, { authenticated = false, pageEditor = fal
     clipboard: {},
   }
 
+  await page.routeWebSocket('**/ws/pages/**', webSocket => {
+    webSocket.send(JSON.stringify({ type: 'connection_established' }))
+  })
+
   await page.route('**/api/v1/webpages/themes/**/styles.css*', route => route.fulfill({
     status: 200,
     contentType: 'text/css',
@@ -196,6 +200,19 @@ export async function mockCmsApi(page, { authenticated = false, pageEditor = fal
         next: null,
         previous: null,
         results: pageEditor ? [editorState.page] : rootPages,
+      })
+    }
+
+    if (url.pathname === '/api/v1/webpages/pages/deleted/' && method === 'GET') {
+      if (!isAuthenticated) {
+        return json(route, { detail: 'Authentication credentials were not provided.' }, 401)
+      }
+
+      return json(route, {
+        count: 0,
+        next: null,
+        previous: null,
+        results: [],
       })
     }
 

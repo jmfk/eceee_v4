@@ -14,17 +14,7 @@ from django.test import TestCase, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth.models import User
 from unittest.mock import patch, MagicMock, Mock
-import boto3
-import uuid
 from botocore.exceptions import ClientError
-try:
-    from moto import mock_aws
-    MOTO_INSTALLED = True
-except ImportError:
-    MOTO_INSTALLED = False
-    # Define a dummy decorator if moto is not installed
-    def mock_aws(func):
-        return func
 
 import io
 from PIL import Image
@@ -55,21 +45,10 @@ class S3MediaStorageTest(TestCase):
             tenant=self.tenant
         )
 
-    @mock_aws
-    def test_s3_storage_initialization(self):
+    @patch("boto3.client")
+    def test_s3_storage_initialization(self, mock_boto_client):
         """Test S3MediaStorage initialization"""
-        if not MOTO_INSTALLED:
-            self.skipTest("moto not installed")
-        # Create mock S3 bucket
-        conn = boto3.resource(
-            "s3",
-            region_name="us-east-1",
-            endpoint_url="http://minio:9000",
-            aws_access_key_id="minioadmin",
-            aws_secret_access_key="minioadmin",
-        )
-        bucket_name = f"test-bucket-{uuid.uuid4().hex}"
-        conn.create_bucket(Bucket=bucket_name)
+        bucket_name = "test-bucket"
 
         with override_settings(
             AWS_STORAGE_BUCKET_NAME=bucket_name,
@@ -82,6 +61,7 @@ class S3MediaStorageTest(TestCase):
             self.assertIsNotNone(storage.bucket_name)
             self.assertEqual(storage.bucket_name, bucket_name)
             self.assertEqual(storage.endpoint_url, "http://minio:9000")
+            self.assertTrue(mock_boto_client.called)
 
     @patch("boto3.client")
     def test_upload_file_to_s3(self, mock_boto_client):

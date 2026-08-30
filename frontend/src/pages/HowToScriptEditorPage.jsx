@@ -765,7 +765,7 @@ const BlockAudioEditor = ({
         })
     }
 
-    const useClip = source => {
+    const selectClip = source => {
         if (!clips[source]) return
         onChange({
             ...clips[source],
@@ -895,12 +895,12 @@ const BlockAudioEditor = ({
                 </div>
                 <div className="flex flex-wrap gap-1">
                     {recordedClip && (
-                        <button type="button" onClick={() => useClip('recorded')} disabled={disabled || activeSource === 'recorded'} className="rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
+                        <button type="button" onClick={() => selectClip('recorded')} disabled={disabled || activeSource === 'recorded'} className="rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
                             Use recorded
                         </button>
                     )}
                     {elevenLabsClip && (
-                        <button type="button" onClick={() => useClip('elevenlabs')} disabled={disabled || activeSource === 'elevenlabs'} className="rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
+                        <button type="button" onClick={() => selectClip('elevenlabs')} disabled={disabled || activeSource === 'elevenlabs'} className="rounded border border-blue-200 bg-white px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
                             Use ElevenLabs
                         </button>
                     )}

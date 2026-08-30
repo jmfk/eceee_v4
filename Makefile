@@ -586,7 +586,18 @@ test-parallel: backend-test-parallel frontend-test
 
 # Run admin browser regression tests
 frontend-admin-e2e-test:
-	cd frontend && npm run test:e2e:admin
+	docker compose -f docker-compose.dev.yml up -d frontend
+	@FP=$${FRONTEND_PORT:-10100}; \
+	echo "Waiting for frontend on http://127.0.0.1:$$FP..."; \
+	i=0; \
+	until curl -fsS "http://127.0.0.1:$$FP/" >/dev/null 2>&1; do \
+		i=$$((i + 1)); \
+		if [ $$i -ge 60 ]; then echo "Error: frontend did not become ready."; exit 1; fi; \
+		sleep 1; \
+	done
+	docker compose -f docker-compose.dev.yml run --rm --no-deps -T \
+		-e PLAYWRIGHT_BASE_URL=http://frontend:3000 \
+		frontend-e2e npm run test:e2e:admin
 
 # Run public browser regression tests against the Django public renderer
 frontend-public-e2e-test: prepare-test-infra
@@ -599,8 +610,10 @@ frontend-public-e2e-test: prepare-test-infra
 		if [ $$i -ge 60 ]; then echo "Error: backend did not become ready."; exit 1; fi; \
 		sleep 1; \
 	done; \
-	docker-compose -f docker-compose.dev.yml exec -T backend python manage.py seed_public_regression_site --hostname public-regression.localhost; \
-	cd frontend && PLAYWRIGHT_PUBLIC_BASE_URL="http://public-regression.localhost:$$BP" npm run test:e2e:public
+	docker-compose -f docker-compose.dev.yml exec -T backend python manage.py seed_public_regression_site --hostname public-regression.test; \
+	docker compose -f docker-compose.dev.yml run --rm --no-deps -T \
+		-e PLAYWRIGHT_PUBLIC_BASE_URL=http://public-regression.test:8000 \
+		frontend-e2e npm run test:e2e:public
 
 # Run frontend browser regression tests, public side first
 frontend-e2e-test: frontend-public-e2e-test frontend-admin-e2e-test

@@ -92,6 +92,15 @@ class ModularWidgetArchitectureTest(TestCase):
         self.assertIn("total_count", summary)
         self.assertIn("widget_types", summary)
 
+    def test_widget_validation_accepts_mustache_only_widgets(self):
+        """Mustache-backed widgets should not require a Django template too."""
+        from webpages.widget_autodiscovery import validate_single_widget_type
+
+        header_widget = widget_type_registry.get_widget_type("Header")
+
+        self.assertIsNotNone(header_widget)
+        self.assertEqual(validate_single_widget_type(header_widget), [])
+
     def test_widget_registry_persistence_across_requests(self):
         """Test that widget registry persists properly across different operations"""
         initial_count = len(widget_type_registry.get_widget_names())
