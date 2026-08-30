@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, memo, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     ChevronRight,
@@ -21,6 +22,7 @@ import {
     Search,
     Download,
     Upload,
+    MoreHorizontal,
 } from 'lucide-react'
 import { pagesApi } from '../api'
 import { getPageDisplayUrl, isRootPage, sanitizePageData } from '../utils/apiValidation.js'
@@ -30,7 +32,6 @@ import pageTreeUtils from '../utils/pageTreeUtils'
 
 // Separate component for publication status icon that only re-renders when status changes
 const PublicationStatusIcon = memo(({
-    pageId,
     publicationStatus,
     canToggle,
     isToggling,
@@ -116,16 +117,24 @@ const PublicationStatusIcon = memo(({
     return (
         <Tooltip text={getTooltipText()} position="top">
             <div className="flex items-center gap-1.5">
-                <div
-                    className={`flex-shrink-0 ${canToggle ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-help'} ${isToggling ? 'opacity-50' : ''}`}
-                    onClick={canToggle ? onToggle : undefined}
-                >
-                    {isToggling ? (
-                        <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
-                    ) : (
-                        getStatusIcon()
-                    )}
-                </div>
+                {canToggle ? (
+                    <button
+                        type="button"
+                        disabled={isToggling}
+                        aria-label={getTooltipText()}
+                        className={`flex min-h-8 min-w-8 shrink-0 cursor-pointer items-center justify-center rounded transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${isToggling ? 'opacity-50' : ''}`}
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            onToggle()
+                        }}
+                    >
+                        {isToggling ? <Loader2 className="h-3 w-3 animate-spin text-blue-500" /> : getStatusIcon()}
+                    </button>
+                ) : (
+                    <span className="flex min-h-8 min-w-8 shrink-0 cursor-help items-center justify-center" aria-label={getTooltipText()}>
+                        {getStatusIcon()}
+                    </span>
+                )}
                 <span className={`text-xs font-medium ${getStatusTextColor()}`}>
                     {getStatusText()}
                 </span>
@@ -140,6 +149,118 @@ const PublicationStatusIcon = memo(({
 })
 
 PublicationStatusIcon.displayName = 'PublicationStatusIcon'
+
+const PageActionOverflowMenu = ({ page, pageTestId, actions }) => {
+    const [isOpen, setIsOpen] = useState(false)
+    const [position, setPosition] = useState({ top: 0, left: 0 })
+    const buttonRef = useRef(null)
+    const menuRef = useRef(null)
+
+    useEffect(() => {
+        if (!isOpen) return undefined
+
+        const updatePosition = () => {
+            if (!buttonRef.current) return
+
+            const buttonRect = buttonRef.current.getBoundingClientRect()
+            const menuWidth = Math.min(240, window.innerWidth - 16)
+            const menuHeight = menuRef.current?.offsetHeight || 320
+            const left = Math.max(8, Math.min(buttonRect.right - menuWidth, window.innerWidth - menuWidth - 8))
+            const spaceBelow = window.innerHeight - buttonRect.bottom
+            const top = spaceBelow >= menuHeight + 8
+                ? buttonRect.bottom + 8
+                : Math.max(8, buttonRect.top - menuHeight - 8)
+
+            setPosition({ top, left })
+        }
+
+        const handlePointerDown = (event) => {
+            if (!buttonRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) {
+                setIsOpen(false)
+            }
+        }
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                setIsOpen(false)
+                buttonRef.current?.focus()
+            }
+        }
+
+        updatePosition()
+        menuRef.current?.querySelector('button:not(:disabled)')?.focus()
+        document.addEventListener('mousedown', handlePointerDown)
+        document.addEventListener('keydown', handleKeyDown)
+        window.addEventListener('resize', updatePosition)
+        window.addEventListener('scroll', updatePosition, true)
+
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown)
+            document.removeEventListener('keydown', handleKeyDown)
+            window.removeEventListener('resize', updatePosition)
+            window.removeEventListener('scroll', updatePosition, true)
+        }
+    }, [isOpen])
+
+    const openMenu = (event) => {
+        event.stopPropagation()
+        setIsOpen(previous => !previous)
+    }
+
+    const runAction = (event, action) => {
+        event.stopPropagation()
+        if (action.disabled) return
+        setIsOpen(false)
+        action.onClick()
+    }
+
+    return (
+        <>
+            <Tooltip text="More page actions" position="top">
+                <button
+                    ref={buttonRef}
+                    type="button"
+                    data-testid={`page-tree-actions-${pageTestId}`}
+                    onClick={openMenu}
+                    aria-label={`More actions for ${page.title}`}
+                    aria-haspopup="menu"
+                    aria-expanded={isOpen}
+                    className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 xl:hidden"
+                >
+                    <MoreHorizontal className="h-5 w-5" />
+                </button>
+            </Tooltip>
+            {isOpen && createPortal(
+                <div
+                    ref={menuRef}
+                    role="menu"
+                    aria-label={`Actions for ${page.title}`}
+                    data-testid={`page-tree-actions-menu-${pageTestId}`}
+                    className="fixed z-[10020] max-h-[calc(100vh-1rem)] w-60 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-xl"
+                    style={position}
+                >
+                    {actions.map((action) => {
+                        const Icon = action.icon
+                        return (
+                            <button
+                                key={action.label}
+                                type="button"
+                                role="menuitem"
+                                data-testid={action.testId}
+                                disabled={action.disabled}
+                                onClick={(event) => runAction(event, action)}
+                                className={`flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40 ${action.danger ? 'text-red-700 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-50'}`}
+                            >
+                                <Icon className="h-4 w-4 shrink-0" />
+                                <span>{action.label}</span>
+                            </button>
+                        )
+                    })}
+                </div>,
+                document.body
+            )}
+        </>
+    )
+}
 
 const PageTreeNode = memo(({
     page: initialPage,
@@ -664,13 +785,53 @@ const PageTreeNode = memo(({
             <Folder className="w-4 h-4 text-blue-500" />
     }
 
+    const secondaryActions = [
+        {
+            label: 'Move up',
+            icon: ChevronUp,
+            onClick: handleMoveUp,
+            disabled: !canMoveUp,
+            desktopTestId: `page-tree-move-up-${pageTestId}`,
+            testId: `page-tree-move-up-menu-${pageTestId}`,
+        },
+        {
+            label: 'Move down',
+            icon: ChevronDown,
+            onClick: handleMoveDown,
+            disabled: !canMoveDown,
+            desktopTestId: `page-tree-move-down-${pageTestId}`,
+            testId: `page-tree-move-down-menu-${pageTestId}`,
+        },
+        { label: 'Cut', icon: Scissors, onClick: handleCut, testId: `page-tree-cut-menu-${pageTestId}` },
+        {
+            label: 'Import as child',
+            icon: Upload,
+            onClick: handleImport,
+            ariaLabel: `Import external site under ${page.title}`,
+            testId: `page-tree-import-menu-${pageTestId}`,
+        },
+        ...(level === 0 && onExport ? [{
+            label: 'Export site package',
+            icon: Download,
+            onClick: handleExport,
+            ariaLabel: `Export root site package for ${page.title}`,
+            testId: `page-tree-export-menu-${pageTestId}`,
+        }] : []),
+        ...((cutPageIds.length > 0 || copyPageIds.length > 0) ? [
+            { label: 'Paste above', icon: FileText, onClick: () => onPaste?.(page, 'above') },
+            { label: 'Paste below', icon: FileText, onClick: () => onPaste?.(page, 'below') },
+            { label: 'Paste as child', icon: FileText, onClick: () => onPaste?.(page, 'child') },
+        ] : []),
+        { label: 'Delete', icon: Trash2, onClick: handleDelete, danger: true, testId: `page-tree-delete-menu-${pageTestId}` },
+    ]
+
     return (
         <div className="select-none">
             {/* Main node */}
             <div
                 data-testid={`page-tree-node-${pageTestId}`}
                 className={`
-                    flex items-center px-2 ${rowHeight === 'spacious' ? 'py-4' : 'py-2.5'} ${isSelected ? 'hover:bg-blue-200' : 'hover:bg-gray-50'} group relative
+                    page-tree-row flex flex-wrap items-start gap-x-2 px-2 ${rowHeight === 'spacious' ? 'py-4' : 'py-2.5'} ${isSelected ? 'hover:bg-blue-200' : 'hover:bg-gray-50'} group relative
                     ${isCut && isSelected ? 'opacity-70 bg-orange-100 border-l-4 border-blue-500 ring-2 ring-orange-300' : ''}
                     ${isCut && !isSelected ? 'opacity-60 bg-orange-50' : ''}
                     ${isCopied && isSelected && !isCut ? 'opacity-70 bg-green-100 border-l-4 border-blue-500 ring-2 ring-green-300' : ''}
@@ -686,21 +847,26 @@ const PageTreeNode = memo(({
                     ${animationDirection === 'right' ? 'transform translate-x-8' : ''}
                     ${onPageClick ? 'cursor-pointer' : ''}
                 `}
-                style={{ paddingLeft: `${level * 24 + 8}px` }}
+                style={{
+                    '--tree-indent-mobile': `${Math.min(level, 3) * 12 + 8}px`,
+                    '--tree-indent-desktop': `${level * 24 + 8}px`,
+                }}
                 onClick={handleRowClick}
             >
                 {/* Expand/collapse button */}
                 <button
+                    type="button"
                     data-testid={`page-tree-expand-${pageTestId}`}
                     onClick={(e) => {
                         e.stopPropagation()
                         handleToggleExpand()
                     }}
                     className={`
-                            mr-1 p-1.5 rounded transition-all duration-200 hover:shadow-sm
+                            flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded transition-all duration-200 hover:shadow-sm xl:min-h-8 xl:min-w-8
                             ${!hasChildren ? 'opacity-30 cursor-default' : 'hover:bg-gray-200'}
                         `}
                     disabled={isLoading || !hasChildren}
+                    aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${page.title}`}
                 >
                     {isLoading ? (
                         <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
@@ -712,78 +878,84 @@ const PageTreeNode = memo(({
                 </button>
 
                 {/* Page content area */}
-                <div className="flex-1 min-w-0 flex items-center gap-2">
-                    {/* Page icon */}
-                    <div className="mr-2">
-                        <div>
-                            {getFolderIcon()}
-                        </div>
-                    </div>
-
-                    {/* Page info */}
-                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                <div className="min-w-0 flex-1 xl:flex xl:items-center xl:gap-3">
+                    {/* Page identity */}
+                    <div data-testid={`page-tree-identity-${pageTestId}`} className="flex min-w-0 items-start gap-2 xl:flex-1 xl:items-center">
+                        <div className="flex min-h-8 shrink-0 items-center">{getFolderIcon()}</div>
                         {page.isSearchResult && (
-                            <div className="flex items-center">
+                            <div className="flex min-h-8 shrink-0 items-center">
                                 <Search className="w-3 h-3 text-blue-500" />
                             </div>
                         )}
-                        <span
-                            className="truncate font-medium text-sm cursor-pointer hover:text-blue-600 hover:underline transition-colors"
-                            onClick={handleTitleClick}
-                            title="Click to edit page"
-                        >
-                            {highlightSearchTerm(page.title, searchTerm)}
-                        </span>
-                        {isTopLevel ? (
+                        <div className="min-w-0 flex-1">
                             <button
-                                onClick={handleHostnameClick}
-                                className="text-xs text-gray-500 truncate hover:text-blue-600 hover:underline cursor-pointer transition-colors"
-                                title="Click to edit hostnames"
+                                type="button"
+                                className="block max-w-full truncate text-left text-sm font-medium transition-colors hover:text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                onClick={(event) => {
+                                    event.stopPropagation()
+                                    handleTitleClick()
+                                }}
+                                title={page.title}
+                                aria-label={`Edit ${page.title}`}
                             >
-                                {sanitizedPage.hostnames && sanitizedPage.hostnames.length > 0
-                                    ? sanitizedPage.hostnames[0]
-                                    : '(hostname missing)'}
+                                {highlightSearchTerm(page.title, searchTerm)}
                             </button>
-                        ) : isEditingSlug ? (
-                            <div className="flex items-center gap-1">
-                                <span className="text-xs text-gray-500">/</span>
-                                <input
-                                    type="text"
-                                    value={editingSlug}
-                                    onChange={(e) => setEditingSlug(e.target.value)}
-                                    onKeyDown={handleSlugKeyDown}
-                                    className="truncate text-xs bg-white border border-blue-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0 flex-1"
-                                    autoFocus
-                                    disabled={updateSlugMutation.isPending}
-                                />
+                            {isTopLevel ? (
                                 <button
-                                    onClick={handleSlugSave}
-                                    disabled={updateSlugMutation.isPending}
-                                    className="p-0.5 rounded hover:bg-green-100 text-green-600 transition-colors disabled:opacity-50"
-                                    title="Save slug (Enter)"
+                                    type="button"
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        handleHostnameClick()
+                                    }}
+                                    className="block max-w-full truncate text-left text-xs text-gray-500 transition-colors hover:text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                    title={sanitizedPage.hostnames?.[0] || 'Hostname missing — click to edit'}
                                 >
-                                    <Save className="w-4 h-4" />
+                                    {sanitizedPage.hostnames?.[0] || '(hostname missing)'}
                                 </button>
+                            ) : isEditingSlug ? (
+                                <div className="flex min-w-0 items-center gap-1" onClick={(event) => event.stopPropagation()}>
+                                    <span className="text-xs text-gray-500">/</span>
+                                    <input
+                                        type="text"
+                                        value={editingSlug}
+                                        onChange={(event) => setEditingSlug(event.target.value)}
+                                        onKeyDown={handleSlugKeyDown}
+                                        className="min-w-0 flex-1 truncate rounded border border-blue-300 bg-white px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        autoFocus
+                                        disabled={updateSlugMutation.isPending}
+                                        aria-label={`Slug for ${page.title}`}
+                                    />
+                                    <button type="button" onClick={handleSlugSave} disabled={updateSlugMutation.isPending} className="rounded p-1 text-green-600 hover:bg-green-100 disabled:opacity-50" title="Save slug (Enter)" aria-label="Save slug">
+                                        <Save className="w-4 h-4" />
+                                    </button>
+                                    <button type="button" onClick={handleSlugCancel} disabled={updateSlugMutation.isPending} className="rounded p-1 text-red-600 hover:bg-red-100 disabled:opacity-50" title="Cancel (Escape)" aria-label="Cancel slug editing">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ) : (
                                 <button
-                                    onClick={handleSlugCancel}
-                                    disabled={updateSlugMutation.isPending}
-                                    className="p-0.5 rounded hover:bg-red-100 text-red-600 transition-colors disabled:opacity-50"
-                                    title="Cancel (Escape)"
+                                    type="button"
+                                    className="block max-w-full truncate text-left text-xs text-gray-500 transition-colors hover:text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        handleSlugClick()
+                                    }}
+                                    title={page.slug || 'Click to edit slug'}
                                 >
-                                    <X className="w-4 h-4" />
+                                    {highlightSearchTerm(page.slug || '', searchTerm)}
                                 </button>
-                            </div>
-                        ) : (
-                            <span
-                                className="text-xs text-gray-500 truncate cursor-pointer hover:text-blue-600 hover:underline transition-colors"
-                                onClick={handleSlugClick}
-                                title="Click to edit slug"
-                            >
-                                {highlightSearchTerm(page.slug || '', searchTerm)}
+                            )}
+                        </div>
+                        {hasChildren && (
+                            <span className="shrink-0 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500" title={`${page.childrenCount} child pages`}>
+                                {page.childrenCount}
                             </span>
                         )}
+                    </div>
+
+                    {/* Publication and version metadata */}
+                    <div data-testid={`page-tree-metadata-${pageTestId}`} className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 pl-10 xl:mt-0 xl:shrink-0 xl:pl-0">
                         <PublicationStatusIcon
-                            pageId={page.id}
                             publicationStatus={page.publicationStatus}
                             canToggle={canTogglePublication()}
                             isToggling={isTogglingPublication}
@@ -793,14 +965,14 @@ const PageTreeNode = memo(({
                         />
 
                         {/* Version badges */}
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-1">
                             {/* Published version badge */}
                             {page.publishedVersionNumber && (
                                 <Tooltip
                                     text={`Published version ${page.publishedVersionNumber}${page.publishedEffectiveDate ? ` on ${new Date(page.publishedEffectiveDate).toLocaleDateString()}` : ''}`}
                                     position="top"
                                 >
-                                    <span className="px-1 py-0.5 text-[10px] font-medium bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 rounded border border-green-200 hover:border-green-300 flex items-center gap-0.5 transition-colors cursor-help">
+                                    <span className="flex items-center gap-0.5 whitespace-nowrap rounded border border-green-200 bg-green-50 px-1 py-0.5 text-[10px] font-medium text-green-600 transition-colors hover:border-green-300 hover:bg-green-100 hover:text-green-700">
                                         📗 v{page.publishedVersionNumber}
                                     </span>
                                 </Tooltip>
@@ -812,7 +984,7 @@ const PageTreeNode = memo(({
                                     text={`Draft version ${page.latestDraftVersionNumber} (unpublished changes)`}
                                     position="top"
                                 >
-                                    <span className="px-1 py-0.5 text-[10px] font-medium bg-yellow-50 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-700 rounded border border-yellow-200 hover:border-yellow-300 flex items-center gap-0.5 transition-colors cursor-help">
+                                    <span className="flex items-center gap-0.5 whitespace-nowrap rounded border border-yellow-200 bg-yellow-50 px-1 py-0.5 text-[10px] font-medium text-yellow-600 transition-colors hover:border-yellow-300 hover:bg-yellow-100 hover:text-yellow-700">
                                         ✏️ v{page.latestDraftVersionNumber}
                                     </span>
                                 </Tooltip>
@@ -824,7 +996,7 @@ const PageTreeNode = memo(({
                                     text={`Version ${page.scheduledVersionNumber} scheduled for ${new Date(page.scheduledEffectiveDate).toLocaleString()}`}
                                     position="top"
                                 >
-                                    <span className="px-1 py-0.5 text-[10px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 rounded border border-blue-200 hover:border-blue-300 flex items-center gap-0.5 transition-colors cursor-help">
+                                    <span className="flex items-center gap-0.5 whitespace-nowrap rounded border border-blue-200 bg-blue-50 px-1 py-0.5 text-[10px] font-medium text-blue-600 transition-colors hover:border-blue-300 hover:bg-blue-100 hover:text-blue-700">
                                         📅 v{page.scheduledVersionNumber} → {new Date(page.scheduledEffectiveDate).toLocaleDateString()}
                                     </span>
                                 </Tooltip>
@@ -838,7 +1010,7 @@ const PageTreeNode = memo(({
                             if (isErrorCode) {
                                 return (
                                     <Tooltip text={`HTTP ${slug} Error Page`} position="top">
-                                        <span className="ml-1 px-1.5 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded border border-red-300">
+                                        <span className="whitespace-nowrap rounded border border-red-300 bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
                                             {slug}
                                         </span>
                                     </Tooltip>
@@ -850,7 +1022,7 @@ const PageTreeNode = memo(({
                         {/* Hostname warning for top-level pages */}
                         {needsHostnameWarning && (
                             <Tooltip text="Missing hostname - This top-level page needs at least one hostname" position="top">
-                                <div className="cursor-help ml-1">
+                                <div className="cursor-help" aria-label="Missing hostname">
                                     <AlertTriangle className="w-4 h-4 text-amber-500" />
                                 </div>
                             </Tooltip>
@@ -858,164 +1030,68 @@ const PageTreeNode = memo(({
                     </div>
                 </div>
 
-                {/* Children count */}
-                {hasChildren && (
-                    <span className="text-xs text-gray-400 mr-2 cursor-help">
-                        ({page.childrenCount})
-                    </span>
-                )}
-
-                {/* Action buttons - always visible */}
-                <div className="flex items-center gap-1">
+                {/* Primary actions stay visible; secondary actions collapse below xl. */}
+                <div data-testid={`page-tree-primary-actions-${pageTestId}`} className="mt-1 flex w-full shrink-0 items-center justify-end gap-1 pl-10 sm:mt-0 sm:w-auto sm:pl-0">
                     <Tooltip text="Edit" position="top">
                         <button
+                            type="button"
                             data-testid={`page-tree-edit-${pageTestId}`}
                             onClick={(e) => {
                                 e.stopPropagation()
                                 handleEdit()
                             }}
-                            className="p-1.5 rounded hover:bg-gray-200 text-gray-500 hover:text-blue-600 transition-colors"
+                            aria-label={`Edit ${page.title}`}
+                            className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 transition-colors hover:bg-gray-200 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 xl:min-h-8 xl:min-w-8"
                         >
                             <Edit className="w-4 h-4" />
                         </button>
                     </Tooltip>
 
-                    <Tooltip text="Move up" position="top">
-                        <button
-                            data-testid={`page-tree-move-up-${pageTestId}`}
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                handleMoveUp()
-                            }}
-                            disabled={!canMoveUp}
-                            className="p-1.5 rounded hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                            <ChevronUp className="w-4 h-4" />
-                        </button>
-                    </Tooltip>
-
-                    <Tooltip text="Move down" position="top">
-                        <button
-                            data-testid={`page-tree-move-down-${pageTestId}`}
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                handleMoveDown()
-                            }}
-                            disabled={!canMoveDown}
-                            className="p-1.5 rounded hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                            <ChevronDown className="w-4 h-4" />
-                        </button>
-                    </Tooltip>
-
-                    <Tooltip text="Cut" position="top">
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                handleCut()
-                            }}
-                            className="p-1.5 rounded hover:bg-gray-200 text-gray-500 hover:text-orange-600 transition-colors"
-                        >
-                            <Scissors className="w-4 h-4" />
-                        </button>
-                    </Tooltip>
-
                     <Tooltip text="Add child page" position="top">
                         <button
+                            type="button"
                             data-testid={`page-tree-add-child-${pageTestId}`}
                             onClick={(e) => {
                                 e.stopPropagation()
                                 handleAddPageBelow()
                             }}
-                            className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-600 transition-colors"
+                            aria-label={`Add child page under ${page.title}`}
+                            className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 transition-colors hover:bg-green-100 hover:text-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 xl:min-h-8 xl:min-w-8"
                         >
                             <Plus className="w-4 h-4" />
                         </button>
                     </Tooltip>
 
-                    <Tooltip text="Import external site as subpage of this page" position="top">
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                handleImport()
-                            }}
-                            aria-label={`Import external site under ${page.title}`}
-                            className="p-1.5 rounded hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition-colors"
-                        >
-                            <Upload className="w-4 h-4" />
-                        </button>
-                    </Tooltip>
+                    <div className="hidden items-center gap-1 xl:flex">
+                        {secondaryActions.map((action) => {
+                            const Icon = action.icon
+                            return (
+                                <Tooltip key={action.label} text={action.label} position="top">
+                                    <button
+                                        type="button"
+                                        data-testid={action.desktopTestId}
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                            action.onClick()
+                                        }}
+                                        disabled={action.disabled}
+                                        aria-label={action.ariaLabel || `${action.label} ${page.title}`}
+                                        className={`flex min-h-8 min-w-8 items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-30 ${action.danger ? 'text-gray-500 hover:bg-red-100 hover:text-red-700' : 'text-gray-500 hover:bg-gray-200 hover:text-blue-600'}`}
+                                    >
+                                        <Icon className="h-4 w-4" />
+                                    </button>
+                                </Tooltip>
+                            )
+                        })}
+                    </div>
 
-                    {level === 0 && onExport && (
-                        <Tooltip text="Export root site package" position="top">
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleExport()
-                                }}
-                                aria-label={`Export root site package for ${page.title}`}
-                                className="p-1.5 rounded hover:bg-indigo-100 text-gray-500 hover:text-indigo-600 transition-colors"
-                            >
-                                <Download className="w-4 h-4" />
-                            </button>
-                        </Tooltip>
-                    )}
-
-                    {(cutPageIds.length > 0 || copyPageIds.length > 0) && (
-                        <>
-                            <Tooltip text="Paste above" position="top">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onPaste?.(page, 'above')
-                                    }}
-                                    className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
-                                >
-                                    <span className="text-xs font-semibold">📋↑</span>
-                                </button>
-                            </Tooltip>
-                            <Tooltip text="Paste below" position="top">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onPaste?.(page, 'below')
-                                    }}
-                                    className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
-                                >
-                                    <span className="text-xs font-semibold">📋↓</span>
-                                </button>
-                            </Tooltip>
-                            <Tooltip text="Paste as child" position="top">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onPaste?.(page, 'child')
-                                    }}
-                                    className="p-1.5 rounded hover:bg-green-100 text-gray-500 hover:text-green-700 transition-colors"
-                                >
-                                    <span className="text-xs font-semibold">📋→</span>
-                                </button>
-                            </Tooltip>
-                        </>
-                    )}
-
-                    <Tooltip text="Delete" position="top">
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                handleDelete()
-                            }}
-                            className="p-1.5 rounded hover:bg-red-100 text-gray-500 hover:text-red-700 transition-colors"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                    </Tooltip>
+                    <PageActionOverflowMenu page={page} pageTestId={pageTestId} actions={secondaryActions} />
                 </div>
             </div>
 
             {/* Children */}
             {isExpanded && childrenRef.current && childrenRef.current.length > 0 && (
-                <div className="ml-4">
+                <div>
                     {childrenRef.current.map((child, index) => (
                         <PageTreeNode
                             key={child.id}

@@ -63,8 +63,8 @@ describe('PageTreeNode - Title Click Behavior', () => {
 
         const titleElement = screen.getByText('Test Page')
         expect(titleElement).toBeInTheDocument()
-        expect(titleElement).toHaveClass('cursor-pointer')
-        expect(titleElement.tagName).toBe('SPAN')
+        expect(titleElement.tagName).toBe('BUTTON')
+        expect(titleElement).toHaveAccessibleName('Edit Test Page')
     })
 
     it('should call onEdit when title is clicked', async () => {
@@ -87,7 +87,7 @@ describe('PageTreeNode - Title Click Behavior', () => {
         )
 
         const titleElement = screen.getByText('Test Page')
-        expect(titleElement).toHaveAttribute('title', 'Click to edit page')
+        expect(titleElement).toHaveAttribute('title', 'Test Page')
     })
 
     it('should not call onEdit if not provided', async () => {
@@ -102,4 +102,4 @@ describe('PageTreeNode - Title Click Behavior', () => {
         // Should complete without errors
         expect(titleElement).toBeInTheDocument()
     })
-}) 
+})

@@ -1187,7 +1187,7 @@ const TreePageManager = () => {
     }
 
     return (
-        <div className="flex flex-col bg-white shadow-lg rounded-lg overflow-hidden h-full max-h-screen">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-white shadow-lg">
             {/* Fixed Header - Responsive */}
             <div className="flex-shrink-0 border-b border-gray-200 bg-white">
                 {/* Tabs and Actions */}

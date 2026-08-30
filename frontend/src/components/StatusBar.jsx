@@ -89,13 +89,21 @@ const StatusBar = ({
         return 'Notification';
     };
 
+    const clipboardCount = clipboardData?.data?.length || 0;
+    const clipboardLabel = clipboardCount > 0
+        ? `${clipboardCount} widget${clipboardCount === 1 ? '' : 's'} ${clipboardData.operation === 'cut' ? 'cut' : 'copied'}${pasteModePaused ? ', paused' : ', active'}`
+        : 'Clipboard empty';
+
     return (
-        <div className={`bg-white border-t border-gray-200 px-4 py-2 ${className} relative`}>
+        <div
+            data-testid="status-bar"
+            className={`relative border-t border-gray-200 bg-white px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4 ${className}`}
+        >
             {/* Notification History Dropdown */}
             {showHistory && notifications.length > 0 && (
                 <div
                     ref={historyRef}
-                    className="absolute bottom-full left-4 right-4 mb-2 bg-white border border-gray-300 rounded-lg shadow-2xl z-50 max-h-96 overflow-hidden flex flex-col"
+                    className="absolute bottom-full left-2 right-2 z-50 mb-2 flex max-h-[min(24rem,70vh)] flex-col overflow-hidden rounded-lg border border-gray-300 bg-white shadow-2xl sm:left-4 sm:right-4"
                 >
                     {/* Header */}
                     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
@@ -165,17 +173,18 @@ const StatusBar = ({
                 </div>
             )}
 
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex min-w-0 flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
                 {/* Notification area */}
-                <div className="flex items-center space-x-2 flex-1 min-w-0">
+                <div className="flex min-h-8 w-full min-w-0 flex-1 items-center space-x-2 sm:w-auto">
                     {notifications.length > 0 ? (
                         <>
                             {/* Notification navigation */}
                             <button
                                 onClick={() => navigateNotifications('prev')}
                                 disabled={currentNotificationIndex === 0}
-                                className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex min-h-9 min-w-9 items-center justify-center rounded hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
                                 title="Previous notification"
+                                aria-label="Previous notification"
                             >
                                 <ChevronLeft className="w-4 h-4 text-gray-600" />
                             </button>
@@ -196,15 +205,16 @@ const StatusBar = ({
                             </div>
 
                             {/* Notification counter and navigation */}
-                            <span className="text-xs text-gray-500 flex-shrink-0">
+                            <span className="hidden text-xs text-gray-500 sm:inline sm:flex-shrink-0">
                                 {currentNotificationIndex + 1} of {notifications.length}
                             </span>
 
                             <button
                                 onClick={() => navigateNotifications('next')}
                                 disabled={currentNotificationIndex === notifications.length - 1}
-                                className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex min-h-9 min-w-9 items-center justify-center rounded hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
                                 title="Next notification"
+                                aria-label="Next notification"
                             >
                                 <ChevronRight className="w-4 h-4 text-gray-600" />
                             </button>
@@ -212,8 +222,9 @@ const StatusBar = ({
                             {/* Clear button */}
                             <button
                                 onClick={clearNotifications}
-                                className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                                className="flex min-h-9 min-w-9 items-center justify-center rounded text-gray-600 hover:bg-gray-100"
                                 title="Clear all notifications"
+                                aria-label="Clear all notifications"
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>
@@ -242,70 +253,72 @@ const StatusBar = ({
                     )}
                 </div>
 
-                {stickyStatusContent && (
-                    <div className="flex items-center flex-shrink-0 ml-4">
-                        {stickyStatusContent}
-                    </div>
-                )}
+                <div data-testid="status-bar-actions" className="flex min-w-0 items-center justify-end gap-2 sm:shrink-0">
+                    {stickyStatusContent && (
+                        <div className="hidden shrink-0 items-center lg:flex">
+                            {stickyStatusContent}
+                        </div>
+                    )}
 
-                {/* Clipboard Indicator - Always Visible Three States */}
-                <div className={`flex items-center space-x-2 px-3 py-1 border rounded text-xs flex-shrink-0 ml-4 transition-all ${
+                    {/* Clipboard Indicator - compact below lg, descriptive on desktop. */}
+                    <div
+                        title={clipboardLabel}
+                        className={`flex min-h-9 min-w-9 shrink-0 items-center justify-center gap-2 rounded border px-2 text-xs transition-all lg:px-3 ${
                     !clipboardData || !clipboardData.data || clipboardData.data.length === 0
                         ? 'bg-gray-50 border-gray-200 text-gray-400'
                         : pasteModePaused 
                             ? 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200 cursor-pointer' 
                             : 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 cursor-pointer'
-                }`}>
-                    <Clipboard className="w-3 h-3" />
-                    {clipboardData && clipboardData.data && clipboardData.data.length > 0 ? (
-                        <>
-                            <button
-                                onClick={togglePasteMode}
-                                disabled={!togglePasteMode}
-                                className="flex items-center space-x-2"
-                                title={pasteModePaused ? 'Click to activate paste mode' : 'Click to pause paste mode (or press ESC / Right-click)'}
-                            >
-                                {clipboardData.operation === 'cut' ? (
-                                    <Scissors className="w-3 h-3" />
-                                ) : (
-                                    <Copy className="w-3 h-3" />
-                                )}
-                                <span className="font-medium">
-                                    {clipboardData.data.length} widget{clipboardData.data.length !== 1 ? 's' : ''} {clipboardData.operation === 'cut' ? 'cut' : 'copied'}
-                                </span>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                                    pasteModePaused ? 'bg-gray-200 text-gray-600' : 'bg-purple-200 text-purple-800'
-                                }`}>
-                                    {pasteModePaused ? 'PAUSED' : 'ACTIVE'}
-                                </span>
-                            </button>
-                            <button
-                                onClick={clearClipboardState}
-                                className="ml-1 p-1 hover:bg-red-100 rounded transition-colors"
-                                title="Clear clipboard"
-                            >
-                                <X className="w-3 h-3 text-red-600" />
-                            </button>
-                        </>
-                    ) : (
-                        <span className="font-medium">Empty</span>
-                    )}
-                </div>
+                        }`}
+                    >
+                        <button
+                            type="button"
+                            onClick={clipboardCount > 0 ? togglePasteMode : undefined}
+                            disabled={clipboardCount === 0 || !togglePasteMode}
+                            aria-label={clipboardCount > 0 ? `${clipboardLabel}. Toggle paste mode` : clipboardLabel}
+                            className="flex min-h-9 min-w-9 items-center justify-center lg:hidden"
+                        >
+                            <Clipboard className="h-4 w-4" />
+                        </button>
+                        <Clipboard className="hidden h-4 w-4 shrink-0 lg:block" />
+                        {clipboardCount > 0 ? (
+                            <>
+                                <button
+                                    onClick={togglePasteMode}
+                                    disabled={!togglePasteMode}
+                                    className="hidden items-center gap-2 lg:flex"
+                                    title={pasteModePaused ? 'Click to activate paste mode' : 'Click to pause paste mode (or press ESC / Right-click)'}
+                                >
+                                    {clipboardData.operation === 'cut' ? <Scissors className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                                    <span className="font-medium">{clipboardCount} widget{clipboardCount === 1 ? '' : 's'} {clipboardData.operation === 'cut' ? 'cut' : 'copied'}</span>
+                                    <span className={`rounded px-1.5 py-0.5 text-[10px] ${pasteModePaused ? 'bg-gray-200 text-gray-600' : 'bg-purple-200 text-purple-800'}`}>
+                                        {pasteModePaused ? 'PAUSED' : 'ACTIVE'}
+                                    </span>
+                                </button>
+                                <button onClick={clearClipboardState} className="hidden rounded p-1 transition-colors hover:bg-red-100 lg:block" title="Clear clipboard" aria-label="Clear clipboard">
+                                    <X className="h-3 w-3 text-red-600" />
+                                </button>
+                            </>
+                        ) : (
+                            <span className="hidden font-medium lg:inline">Empty</span>
+                        )}
+                    </div>
 
-                {/* Right side - Combined save and version control */}
-                <div className="flex items-center space-x-3 text-gray-600 flex-shrink-0 ml-4">
-                    <SaveVersionControl
-                        currentVersion={currentVersion}
-                        availableVersions={availableVersions}
-                        onVersionChange={onVersionChange}
-                        onSaveClick={onSaveClick}
-                        onSaveNewClick={onSaveNewClick}
-                        onUndoChanges={onUndoChanges}
-                        isSaving={isSaving}
-                        isNewPage={isNewPage}
-                        validationState={validationState}
-                        isDirty={isDirty}
-                    />
+                    {/* Right side - Combined save and version control */}
+                    <div className="flex shrink-0 items-center text-gray-600">
+                        <SaveVersionControl
+                            currentVersion={currentVersion}
+                            availableVersions={availableVersions}
+                            onVersionChange={onVersionChange}
+                            onSaveClick={onSaveClick}
+                            onSaveNewClick={onSaveNewClick}
+                            onUndoChanges={onUndoChanges}
+                            isSaving={isSaving}
+                            isNewPage={isNewPage}
+                            validationState={validationState}
+                            isDirty={isDirty}
+                        />
+                    </div>
                 </div>
             </div>
         </div>

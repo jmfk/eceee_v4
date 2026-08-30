@@ -216,8 +216,8 @@ const AppRoutes = () => {
               <Navbar />
               <GlobalWysiwygToolbar />
               <main className="flex-1 overflow-hidden">
-                <div className="h-full overflow-y-auto">
-                  <div className="container mx-auto px-4 py-8">
+                <div className="h-full min-h-0 overflow-hidden">
+                  <div className="container mx-auto h-full min-h-0 px-2 py-2 sm:px-4 sm:py-4 lg:py-8">
                     <TreePageManager />
                   </div>
                 </div>

@@ -23,6 +23,94 @@ const rootPages = [
   },
 ]
 
+const responsiveRootPages = [
+  {
+    id: 101,
+    title: 'Summer Study programme and registration information for every participant',
+    slug: 'summer-study',
+    parent: null,
+    sortOrder: 10,
+    children: [],
+    childrenCount: 3,
+    hostnames: [],
+    publicationStatus: 'published',
+    latestVersionNumber: 12,
+    publishedVersionNumber: 11,
+    hasUnpublishedChanges: true,
+    latestDraftVersionNumber: 12,
+  },
+]
+
+const responsiveChildren = {
+  101: [
+    {
+      id: 102,
+      title: 'Published conference programme with an exceptionally long descriptive page title',
+      slug: 'published-conference-programme-with-long-title',
+      parent: 101,
+      sortOrder: 10,
+      children: [],
+      childrenCount: 1,
+      publicationStatus: 'published',
+      latestVersionNumber: 4,
+      publishedVersionNumber: 4,
+    },
+    {
+      id: 103,
+      title: 'Draft registration details and author instructions',
+      slug: 'draft-registration-details',
+      parent: 101,
+      sortOrder: 20,
+      children: [],
+      childrenCount: 0,
+      publicationStatus: 'draft',
+      latestVersionNumber: 9,
+      hasUnpublishedChanges: true,
+      latestDraftVersionNumber: 9,
+    },
+    {
+      id: 104,
+      title: 'Scheduled venue and travel information',
+      slug: 'scheduled-venue-travel',
+      parent: 101,
+      sortOrder: 30,
+      children: [],
+      childrenCount: 0,
+      publicationStatus: 'scheduled',
+      latestVersionNumber: 3,
+      scheduledVersionNumber: 3,
+      scheduledEffectiveDate: '2026-09-15T08:00:00.000Z',
+    },
+  ],
+  102: [
+    {
+      id: 105,
+      title: 'Deeply nested speaker resources and downloadable material',
+      slug: 'speaker-resources-downloads',
+      parent: 102,
+      sortOrder: 10,
+      children: [],
+      childrenCount: 1,
+      publicationStatus: 'unpublished',
+      latestVersionNumber: 2,
+    },
+  ],
+  105: [
+    {
+      id: 106,
+      title: 'Final deeply nested accessibility checklist for session chairs',
+      slug: 'accessibility-checklist-session-chairs',
+      parent: 105,
+      sortOrder: 10,
+      children: [],
+      childrenCount: 0,
+      publicationStatus: 'published',
+      latestVersionNumber: 7,
+      publishedVersionNumber: 7,
+    },
+  ],
+}
+
 const clone = value => JSON.parse(JSON.stringify(value))
 
 const createEditorPage = () => ({
@@ -135,7 +223,7 @@ export const testTokens = {
   refresh: REFRESH_TOKEN,
 }
 
-export async function mockCmsApi(page, { authenticated = false, pageEditor = false } = {}) {
+export async function mockCmsApi(page, { authenticated = false, pageEditor = false, responsivePages = false } = {}) {
   const editorState = {
     page: createEditorPage(),
     version: createEditorVersion(),
@@ -195,11 +283,16 @@ export async function mockCmsApi(page, { authenticated = false, pageEditor = fal
         return json(route, { detail: 'Authentication credentials were not provided.' }, 401)
       }
 
+      const parentId = url.searchParams.get('parent')
+      const pageResults = responsivePages
+        ? (parentId ? responsiveChildren[parentId] || [] : responsiveRootPages)
+        : (pageEditor ? [editorState.page] : rootPages)
+
       return json(route, {
-        count: rootPages.length,
+        count: pageResults.length,
         next: null,
         previous: null,
-        results: pageEditor ? [editorState.page] : rootPages,
+        results: pageResults,
       })
     }
 

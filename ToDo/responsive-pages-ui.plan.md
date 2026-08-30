@@ -3,7 +3,7 @@
 ## Status
 
 - **Priority:** High
-- **State:** Todo
+- **State:** In progress
 - **Surface:** Frontend page manager and shared application chrome
 
 ## Problem
@@ -23,6 +23,25 @@ desktop screens without overlapping text, clipped controls, hidden content, or
 page-level horizontal scrolling.
 
 ## Scope
+
+### Completed in this batch
+
+- Page-tree identity, publication metadata, version badges, warnings, and
+  actions now occupy separate responsive regions.
+- Edit and add-child remain directly available; secondary row actions use a
+  labelled, keyboard-accessible overflow menu below 1280 CSS pixels.
+- Deep hierarchy indentation is capped on phones while the full hierarchy is
+  retained on desktop.
+- The shared bottom status/save bar stacks on phones, compacts Git and clipboard
+  state, respects safe-area insets, and stays outside the scrollable content.
+- Component and Playwright regressions cover long titles, warning/draft/
+  scheduled/published states, deep nesting, menu geometry, and bottom-bar
+  clearance at phone and tablet widths.
+
+### Remaining
+
+- Finish the separate application-navigation collapse/menu work described
+  below; it is outside the page-tree/action/bottom-bar batch.
 
 ### Application navigation
 
@@ -58,21 +77,21 @@ page-level horizontal scrolling.
 
 ## Acceptance Criteria
 
-- [ ] The Pages and Deleted views work at viewport widths of 320, 375, 768,
+- [x] The Pages and Deleted views work at viewport widths of 320, 375, 768,
       1024, and 1440 CSS pixels.
-- [ ] No text, badge, icon, or button overlaps another interactive element.
-- [ ] There is no page-level horizontal scrollbar at the tested widths.
-- [ ] Nested page hierarchy remains understandable and operable.
-- [ ] Primary page actions remain directly available; secondary actions remain
+- [x] No text, badge, icon, or button overlaps another interactive element.
+- [x] There is no page-level horizontal scrollbar at the tested widths.
+- [x] Nested page hierarchy remains understandable and operable.
+- [x] Primary page actions remain directly available; secondary actions remain
       available through a labelled overflow menu.
-- [ ] Every icon-only action has an accessible name and a visible tooltip or
+- [x] Every icon-only action has an accessible name and a visible tooltip or
       equivalent explanation.
-- [ ] Keyboard navigation and focus indicators work throughout the toolbar,
+- [x] Keyboard navigation and focus indicators work throughout the toolbar,
       page tree, menus, and bottom bar.
-- [ ] The bottom bar does not obscure the final page row or notification content.
-- [ ] Published, draft, warning, long-title, and deeply nested rows are covered
+- [x] The bottom bar does not obscure the final page row or notification content.
+- [x] Published, draft, warning, long-title, and deeply nested rows are covered
       by responsive component tests.
-- [ ] Browser tests or visual snapshots cover phone, tablet, and desktop layouts.
+- [x] Browser tests or visual snapshots cover phone, tablet, and desktop layouts.
 
 ## Verification Checklist
 
@@ -91,4 +110,3 @@ page-level horizontal scrolling.
 - Shared navigation/header components
 - Shared bottom status/save controls
 - Responsive component tests under `frontend/src/components/__tests__/`
-
