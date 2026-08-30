@@ -71,8 +71,8 @@ describe('PageTreeNode - Inline Slug Editing', () => {
 
         const slugElement = screen.getByText('test-page')
         expect(slugElement).toBeInTheDocument()
-        expect(slugElement).toHaveClass('cursor-pointer')
-        expect(slugElement.tagName).toBe('SPAN')
+        expect(slugElement.tagName).toBe('BUTTON')
+        expect(slugElement).toHaveAttribute('title', 'test-page')
     })
 
     it('should enter edit mode when slug is clicked', async () => {
