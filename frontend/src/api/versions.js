@@ -61,7 +61,7 @@ export const versionsApi = {
      * @returns {Promise<Object>} Updated version
      */
     updateWidgets: wrapApiCall(async (versionId, widgetData) => {
-        return api.patch(`${endpoints.versions.detail(versionId)}/widgets/`, widgetData)
+        return api.patch(`${endpoints.versions.detail(versionId)}widgets/`, widgetData)
     }, 'versions.updateWidgets'),
 
     /**

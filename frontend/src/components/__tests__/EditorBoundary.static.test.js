@@ -119,4 +119,14 @@ describe('page editor active/legacy boundaries', () => {
         expect(layoutRendererSource).toContain('LEGACY/QUARANTINED')
         expect(pageEditorSource).not.toMatch(/from ['"][^'"]*\/ContentEditor(?:\.jsx)?['"]/)
     })
+
+    it('finalizes cross-version cut sources only after the destination save', () => {
+        const pageEditorSource = readSource('src/components/PageEditor.jsx')
+        const destinationSaveIndex = pageEditorSource.indexOf('const saveResult = await smartSave(')
+        const sourceCleanupIndex = pageEditorSource.indexOf('await finalizePendingCutSources(')
+
+        expect(destinationSaveIndex).toBeGreaterThan(-1)
+        expect(sourceCleanupIndex).toBeGreaterThan(destinationSaveIndex)
+        expect(pageEditorSource).toContain('onQueueCutSourceRemoval={queueCutSourceRemoval}')
+    })
 })

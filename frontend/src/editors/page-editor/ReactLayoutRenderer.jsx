@@ -5,7 +5,7 @@
  * complex backend/frontend protocol. Simple, flexible, and maintainable.
  */
 
-import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Layout } from 'lucide-react';
 import { getLayoutComponent, getLayoutMetadata, LAYOUT_REGISTRY } from '../../layouts';
 import { useWidgets, createDefaultWidgetConfig } from '../../hooks/useWidgets';
@@ -134,6 +134,7 @@ const ReactLayoutRenderer = forwardRef(({
     // Local widget state management
     sharedComponentId,
     publishWidgetOperation,
+    onQueueCutSourceRemoval,
     // Widget inheritance props
     inheritedWidgets = {},
     slotInheritanceRules = {},
@@ -187,6 +188,7 @@ const ReactLayoutRenderer = forwardRef(({
     // Toolbar collapse state
     const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
     const [pasteError, setPasteError] = useState(null);
+    const pendingCutSourcesRef = useRef(new Map());
 
     // Get global clipboard state
     const { clipboardData, pasteModeActive, pasteModePaused, togglePasteMode, clearClipboardState, refreshClipboard } = useClipboard();
@@ -294,6 +296,29 @@ const ReactLayoutRenderer = forwardRef(({
             await publishCutSourceRemovals(cutMetadata);
         }
     }, [prepareCutSourceWidgets, publishCutSourceRemovals]);
+
+    const queueCutSourceRemoval = useCallback((cutMetadata) => {
+        const key = JSON.stringify({
+            pageId: cutMetadata?.pageId,
+            versionId: cutMetadata?.versionId,
+            widgetPaths: cutMetadata?.widgetPaths,
+            widgets: cutMetadata?.widgets
+        });
+
+        if (onQueueCutSourceRemoval) {
+            onQueueCutSourceRemoval(key, () => persistCutSourceWidgets(cutMetadata), versionId);
+            return;
+        }
+
+        pendingCutSourcesRef.current.set(key, cutMetadata);
+    }, [onQueueCutSourceRemoval, persistCutSourceWidgets, versionId]);
+
+    const finalizePendingCutSources = useCallback(async () => {
+        for (const [key, cutMetadata] of pendingCutSourcesRef.current.entries()) {
+            await persistCutSourceWidgets(cutMetadata);
+            pendingCutSourcesRef.current.delete(key);
+        }
+    }, [persistCutSourceWidgets]);
 
     // Page context for widgets - includes all necessary context data
     const pageContext = useMemo(() => ({
@@ -722,14 +747,7 @@ const ReactLayoutRenderer = forwardRef(({
 
                 if (clipboardMetadata?.operation === 'cut' && clipboardMetadata.metadata) {
                     if (preparedCutSource) {
-                        try {
-                            await persistCutSourceWidgets(clipboardMetadata.metadata, preparedCutSource);
-                        } catch (error) {
-                            setPasteError(
-                                `Widget was pasted, but the cut source was not removed: ${error?.message || 'The source version could not be updated.'}`
-                            );
-                            break;
-                        }
+                        queueCutSourceRemoval(clipboardMetadata.metadata);
                     }
 
                     setCutWidgets(new Set());
@@ -770,7 +788,7 @@ const ReactLayoutRenderer = forwardRef(({
             default:
                 break;
         }
-    }, [widgets, onWidgetChange, onOpenWidgetEditor, addWidget, publishUpdate, componentId, versionId, isPublished, onVersionChange, context, webpageData, contextType, prepareCutSourceWidgets, persistCutSourceWidgets]);
+    }, [widgets, onWidgetChange, onOpenWidgetEditor, addWidget, publishUpdate, componentId, versionId, isPublished, onVersionChange, context, webpageData, contextType, prepareCutSourceWidgets, queueCutSourceRemoval]);
 
     // Widget modal handlers
     const handleShowWidgetModal = useCallback((slotName, slotMetadata = null, replacementInfo = null) => {
@@ -1014,7 +1032,7 @@ const ReactLayoutRenderer = forwardRef(({
         await cutWidgetsToClipboard(widgetsToCut, cutMetadata);
         // Immediately refresh clipboard state in current window
         await refreshClipboard();
-    }, [getSelectedWidgets, context, webpageData, refreshClipboard]);
+    }, [getSelectedWidgets, context, webpageData, versionId, refreshClipboard]);
 
     const handleDeleteCutWidgets = useCallback(async (cutMetadata, preparedSource = null) => {
         // Delete widgets that were cut and pasted
@@ -1031,9 +1049,13 @@ const ReactLayoutRenderer = forwardRef(({
             currentVersionId: versionId
         });
 
-        // For cross-page/cross-version operations, persist the source version directly.
+        // For cross-page/cross-version operations, validate now but defer source
+        // deletion until PageEditor has durably saved the destination version.
         if (isCrossSourceContext) {
-            await persistCutSourceWidgets(cutMetadata, preparedSource);
+            if (!preparedSource) {
+                await prepareCutSourceWidgets(cutMetadata);
+            }
+            queueCutSourceRemoval(cutMetadata);
             return; // Don't update local widgets for cross-context operations
         }
 
@@ -1181,7 +1203,7 @@ const ReactLayoutRenderer = forwardRef(({
         // Clear cut state and selection
         setCutWidgets(new Set());
         setSelectedWidgets(new Set());
-    }, [widgets, onWidgetChange, publishUpdate, componentId, contextType, parseWidgetPath, context, webpageData, persistCutSourceWidgets]);
+    }, [widgets, onWidgetChange, publishUpdate, componentId, contextType, parseWidgetPath, context, webpageData, versionId, prepareCutSourceWidgets, queueCutSourceRemoval]);
 
     // Handle paste at specific position
     const handlePasteAtPosition = useCallback(async (slotName, position, widgetPath = [], keepClipboard = false) => {
@@ -1452,7 +1474,8 @@ const ReactLayoutRenderer = forwardRef(({
         getLayoutName: () => layoutName,
         getLayoutMetadata: () => getLayoutMetadata(layoutName),
         getCurrentWidgets: () => widgets,
-    }), [widgets, layoutName, versionId, isPublished]);
+        finalizePendingCutSources,
+    }), [widgets, layoutName, versionId, isPublished, finalizePendingCutSources]);
 
     // Calculate selected count for toolbar
     const selectedCount = getSelectedCount();

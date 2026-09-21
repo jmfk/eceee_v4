@@ -143,6 +143,12 @@ const baseProps = {
     sharedComponentId: 'renderer-test'
 }
 
+const renderRenderer = (props = {}) => {
+    const ref = React.createRef()
+    render(<ReactLayoutRenderer ref={ref} {...baseProps} {...props} />)
+    return ref
+}
+
 describe('ReactLayoutRenderer cut source context', () => {
     beforeEach(() => {
         publishUpdateMock.mockReset()
@@ -197,13 +203,18 @@ describe('ReactLayoutRenderer cut source context', () => {
     it('deletes cut widgets from the source version when page id matches but version differs', async () => {
         const onWidgetChange = vi.fn()
 
-        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+        const ref = renderRenderer({ onWidgetChange })
 
         fireEvent.click(screen.getByRole('button', { name: 'Delete cut source' }))
 
         await waitFor(() => {
-            expect(publishUpdateMock).toHaveBeenCalledOnce()
+            expect(getPageVersionMock).toHaveBeenCalledOnce()
         })
+        expect(updateWidgetsMock).not.toHaveBeenCalled()
+        expect(publishUpdateMock).not.toHaveBeenCalled()
+
+        await ref.current.finalizePendingCutSources()
+
         expect(updateWidgetsMock).toHaveBeenCalledWith(
             'version-a',
             {
@@ -244,13 +255,17 @@ describe('ReactLayoutRenderer cut source context', () => {
             }
         })
 
-        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+        const ref = renderRenderer({ onWidgetChange })
 
         fireEvent.click(screen.getByRole('button', { name: 'Delete cut source' }))
 
         await waitFor(() => {
-            expect(updateWidgetsMock).toHaveBeenCalledOnce()
+            expect(getPageVersionMock).toHaveBeenCalledOnce()
         })
+        expect(updateWidgetsMock).not.toHaveBeenCalled()
+
+        await ref.current.finalizePendingCutSources()
+
         expect(getPageVersionMock).toHaveBeenCalledWith('page-1', 'version-a')
         expect(updateWidgetsMock).toHaveBeenCalledWith(
             'version-a',
@@ -275,7 +290,7 @@ describe('ReactLayoutRenderer cut source context', () => {
             }
         })
 
-        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+        renderRenderer({ onWidgetChange })
 
         fireEvent.click(screen.getByRole('button', { name: 'Paste cut source' }))
 
@@ -290,13 +305,18 @@ describe('ReactLayoutRenderer cut source context', () => {
     it('sends widgetPath when deleting nested cut widgets from a source version', async () => {
         const onWidgetChange = vi.fn()
 
-        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+        const ref = renderRenderer({ onWidgetChange })
 
         fireEvent.click(screen.getByRole('button', { name: 'Delete nested cut source' }))
 
         await waitFor(() => {
-            expect(publishUpdateMock).toHaveBeenCalledOnce()
+            expect(getPageVersionMock).toHaveBeenCalledOnce()
         })
+        expect(updateWidgetsMock).not.toHaveBeenCalled()
+        expect(publishUpdateMock).not.toHaveBeenCalled()
+
+        await ref.current.finalizePendingCutSources()
+
         expect(updateWidgetsMock).toHaveBeenCalledWith(
             'version-a',
             {
@@ -332,23 +352,14 @@ describe('ReactLayoutRenderer cut source context', () => {
     it('keeps paste on the destination version and removes the cut source from its original version', async () => {
         const onWidgetChange = vi.fn()
 
-        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+        const ref = renderRenderer({ onWidgetChange })
 
         fireEvent.click(screen.getByRole('button', { name: 'Paste cut source' }))
 
         await waitFor(() => {
-            expect(publishUpdateMock).toHaveBeenCalledTimes(2)
+            expect(publishUpdateMock).toHaveBeenCalledOnce()
         })
-        expect(updateWidgetsMock).toHaveBeenCalledWith(
-            'version-a',
-            {
-                widgets: {
-                    main: [
-                        expect.objectContaining({ id: 'container-widget', order: 0 })
-                    ]
-                }
-            }
-        )
+        expect(updateWidgetsMock).not.toHaveBeenCalled()
         expect(publishUpdateMock).toHaveBeenNthCalledWith(
             1,
             'renderer-test',
@@ -362,6 +373,19 @@ describe('ReactLayoutRenderer cut source context', () => {
                 pageId: 'page-1',
                 versionId: 'version-b',
                 order: 0
+            }
+        )
+
+        await ref.current.finalizePendingCutSources()
+
+        expect(updateWidgetsMock).toHaveBeenCalledWith(
+            'version-a',
+            {
+                widgets: {
+                    main: [
+                        expect.objectContaining({ id: 'container-widget', order: 0 })
+                    ]
+                }
             }
         )
         expect(publishUpdateMock).toHaveBeenNthCalledWith(
@@ -390,13 +414,32 @@ describe('ReactLayoutRenderer cut source context', () => {
     it('keeps nested cut paste on the destination version and removes the nested source by path', async () => {
         const onWidgetChange = vi.fn()
 
-        render(<ReactLayoutRenderer {...baseProps} onWidgetChange={onWidgetChange} />)
+        const ref = renderRenderer({ onWidgetChange })
 
         fireEvent.click(screen.getByRole('button', { name: 'Paste nested cut source' }))
 
         await waitFor(() => {
-            expect(publishUpdateMock).toHaveBeenCalledTimes(2)
+            expect(publishUpdateMock).toHaveBeenCalledOnce()
         })
+        expect(updateWidgetsMock).not.toHaveBeenCalled()
+        expect(publishUpdateMock).toHaveBeenNthCalledWith(
+            1,
+            'renderer-test',
+            'ADD_WIDGET',
+            {
+                id: 'pasted-nested-widget',
+                type: 'easy_widgets.ContentWidget',
+                config: { content: 'Pasted nested' },
+                slot: 'main',
+                contextType: 'page',
+                pageId: 'page-1',
+                versionId: 'version-b',
+                order: 0
+            }
+        )
+
+        await ref.current.finalizePendingCutSources()
+
         expect(updateWidgetsMock).toHaveBeenCalledWith(
             'version-a',
             {
@@ -413,21 +456,6 @@ describe('ReactLayoutRenderer cut source context', () => {
                         })
                     ]
                 }
-            }
-        )
-        expect(publishUpdateMock).toHaveBeenNthCalledWith(
-            1,
-            'renderer-test',
-            'ADD_WIDGET',
-            {
-                id: 'pasted-nested-widget',
-                type: 'easy_widgets.ContentWidget',
-                config: { content: 'Pasted nested' },
-                slot: 'main',
-                contextType: 'page',
-                pageId: 'page-1',
-                versionId: 'version-b',
-                order: 0
             }
         )
         expect(publishUpdateMock).toHaveBeenNthCalledWith(
