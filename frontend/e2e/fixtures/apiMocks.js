@@ -357,6 +357,13 @@ export async function mockCmsApi(page, { authenticated = false, pageEditor = fal
       return json(route, { count: 0, next: null, previous: null, results: [] })
     }
 
+    // The application flushes page-view telemetry while a document reloads.
+    // Keep that background request from tripping the strict console-error guard.
+    if (url.pathname === '/api/v1/statistics/ingest/' && method === 'POST') {
+      const body = request.postDataJSON()
+      return json(route, { accepted: body.events?.length || 0 }, 202)
+    }
+
     return json(route, { detail: `Unhandled test API route: ${method} ${url.pathname}` }, 404)
   })
 
