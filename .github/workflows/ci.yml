@@ -38,8 +38,15 @@ jobs:
           cat >> .env <<'EOF'
           AWS_S3_ENDPOINT_URL=http://minio:9000
           AWS_S3_INTERNAL_ENDPOINT_URL=http://minio:9000
+          DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test
+          POSTGRES_PASSWORD=test-only
+          REDIS_URL=redis://test-redis:6379/0
+          AWS_ACCESS_KEY_ID=test-eceee
+          AWS_SECRET_ACCESS_KEY=test-eceee-secret
           IMGPROXY_URL=http://imgproxy:8080
           IMGPROXY_PUBLIC_URL=http://localhost:8080
+          IMGPROXY_KEY=ci-only-imgproxy-key
+          IMGPROXY_SALT=ci-only-imgproxy-salt
           EOF
 
       - name: Run backend lint
@@ -83,8 +90,15 @@ jobs:
           cat >> .env <<'EOF'
           AWS_S3_ENDPOINT_URL=http://minio:9000
           AWS_S3_INTERNAL_ENDPOINT_URL=http://minio:9000
+          DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test
+          POSTGRES_PASSWORD=test-only
+          REDIS_URL=redis://test-redis:6379/0
+          AWS_ACCESS_KEY_ID=test-eceee
+          AWS_SECRET_ACCESS_KEY=test-eceee-secret
           IMGPROXY_URL=http://imgproxy:8080
           IMGPROXY_PUBLIC_URL=http://localhost:8080
+          IMGPROXY_KEY=ci-only-imgproxy-key
+          IMGPROXY_SALT=ci-only-imgproxy-salt
           EOF
 
       - name: Run backend tests
@@ -95,6 +109,7 @@ jobs:
         run: |
           docker compose -f docker-compose.dev.yml down -v --remove-orphans
           docker compose -f docker-compose.infra.yml -f docker-compose.ci.yml down -v --remove-orphans
+          docker compose -f docker-compose.test-infra.yml down -v --remove-orphans
 
   frontend-tests:
     name: Frontend unit tests
@@ -110,8 +125,15 @@ jobs:
           cat >> .env <<'EOF'
           AWS_S3_ENDPOINT_URL=http://minio:9000
           AWS_S3_INTERNAL_ENDPOINT_URL=http://minio:9000
+          DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test
+          POSTGRES_PASSWORD=test-only
+          REDIS_URL=redis://test-redis:6379/0
+          AWS_ACCESS_KEY_ID=test-eceee
+          AWS_SECRET_ACCESS_KEY=test-eceee-secret
           IMGPROXY_URL=http://imgproxy:8080
           IMGPROXY_PUBLIC_URL=http://localhost:8080
+          IMGPROXY_KEY=ci-only-imgproxy-key
+          IMGPROXY_SALT=ci-only-imgproxy-salt
           EOF
 
       - name: Run frontend unit tests
@@ -122,6 +144,7 @@ jobs:
         run: |
           docker compose -f docker-compose.dev.yml down -v --remove-orphans
           docker compose -f docker-compose.infra.yml -f docker-compose.ci.yml down -v --remove-orphans
+          docker compose -f docker-compose.test-infra.yml down -v --remove-orphans
 
   frontend-e2e:
     name: Frontend Playwright
@@ -143,8 +166,15 @@ jobs:
           cat >> .env <<'EOF'
           AWS_S3_ENDPOINT_URL=http://minio:9000
           AWS_S3_INTERNAL_ENDPOINT_URL=http://minio:9000
+          DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test
+          POSTGRES_PASSWORD=test-only
+          REDIS_URL=redis://test-redis:6379/0
+          AWS_ACCESS_KEY_ID=test-eceee
+          AWS_SECRET_ACCESS_KEY=test-eceee-secret
           IMGPROXY_URL=http://imgproxy:8080
           IMGPROXY_PUBLIC_URL=http://localhost:8080
+          IMGPROXY_KEY=ci-only-imgproxy-key
+          IMGPROXY_SALT=ci-only-imgproxy-salt
           EOF
 
       - name: Install frontend dependencies
@@ -171,3 +201,4 @@ jobs:
         run: |
           docker compose -f docker-compose.dev.yml down -v --remove-orphans
           docker compose -f docker-compose.infra.yml -f docker-compose.ci.yml down -v --remove-orphans
+          docker compose -f docker-compose.test-infra.yml down -v --remove-orphans
