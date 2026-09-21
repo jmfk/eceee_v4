@@ -5,9 +5,10 @@ This command is useful for development when you need to force refresh
 layout data without restarting the Django server.
 """
 
-from django.core.management.base import BaseCommand
 from django.core.cache import cache
+from django.core.management.base import BaseCommand
 
+from utils.cache import clear_project_cache
 from webpages.layout_registry import layout_registry
 
 
@@ -37,40 +38,28 @@ class Command(BaseCommand):
         dry_run = options.get("dry_run")
 
         if dry_run:
-            self.stdout.write(
-                self.style.WARNING("DRY RUN: No caches will actually be cleared")
-            )
+            self.stdout.write(self.style.WARNING("DRY RUN: No caches will actually be cleared"))
 
         if clear_all:
             self.stdout.write("Clearing ALL caches...")
             if not dry_run:
-                cache.clear()
-                self.stdout.write(
-                    self.style.SUCCESS("✅ All caches cleared successfully")
-                )
+                clear_project_cache(cache)
+                self.stdout.write(self.style.SUCCESS("✅ All caches cleared successfully"))
 
         elif layout_name:
             self.stdout.write(f"Clearing cache for layout: {layout_name}")
             if not dry_run:
                 layout_registry._invalidate_layout_caches(layout_name)
-                self.stdout.write(
-                    self.style.SUCCESS(f"✅ Cache cleared for layout: {layout_name}")
-                )
+                self.stdout.write(self.style.SUCCESS(f"✅ Cache cleared for layout: {layout_name}"))
 
         else:
             self.stdout.write("Clearing all layout-related caches...")
             if not dry_run:
                 layout_registry._invalidate_all_layout_caches()
-                self.stdout.write(
-                    self.style.SUCCESS("✅ All layout caches cleared successfully")
-                )
+                self.stdout.write(self.style.SUCCESS("✅ All layout caches cleared successfully"))
 
         if dry_run:
-            self.stdout.write(
-                self.style.WARNING(
-                    "DRY RUN COMPLETE: Use without --dry-run to actually clear caches"
-                )
-            )
+            self.stdout.write(self.style.WARNING("DRY RUN COMPLETE: Use without --dry-run to actually clear caches"))
 
         # Show current registered layouts
         layouts = layout_registry.list_layouts(active_only=False)

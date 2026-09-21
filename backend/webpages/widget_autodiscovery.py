@@ -6,9 +6,10 @@ It follows the same pattern as the layout autodiscovery system.
 """
 
 import logging
+from importlib import import_module
+
 from django.apps import apps
 from django.core.management.color import make_style
-from importlib import import_module
 
 from .widget_registry import widget_type_registry
 
@@ -23,7 +24,6 @@ def autodiscover_widgets():
     Looks for a 'widgets' module in each app and imports it to trigger
     widget type registration.
     """
-
 
     for app_config in apps.get_app_configs():
         app_name = app_config.name
@@ -46,9 +46,6 @@ def autodiscover_widgets():
         except Exception as e:
             logger.error(f"Unexpected error loading widgets from {app_name}: {e}")
             continue
-
-    # Log summary
-    widget_count = len(widget_type_registry.list_widget_types())
 
 
 def validate_widget_types():
@@ -97,18 +94,14 @@ def validate_single_widget_type(widget_type):
         if not widget_type.name:
             issues.append(f"Widget '{widget_name}' missing required 'name' attribute")
 
-        if not widget_type.template_name:
-            issues.append(
-                f"Widget '{widget_name}' missing required 'template_name' attribute"
-            )
+        if not widget_type.template_name and not widget_type.mustache_template_name:
+            issues.append(f"Widget '{widget_name}' must define 'template_name' or 'mustache_template_name'")
 
         # 2. Check configuration model
         try:
             config_model = widget_type.configuration_model
             if not config_model:
-                issues.append(
-                    f"Widget '{widget_name}' missing configuration_model property"
-                )
+                issues.append(f"Widget '{widget_name}' missing configuration_model property")
             else:
                 # Check if the model can be instantiated with defaults
                 try:
@@ -120,45 +113,31 @@ def validate_single_widget_type(widget_type):
                     try:
                         model_fields = config_model.model_fields
                         if not model_fields:
-                            issues.append(
-                                f"Widget '{widget_name}' configuration model has no fields"
-                            )
+                            issues.append(f"Widget '{widget_name}' configuration model has no fields")
                     except Exception as e:
-                        issues.append(
-                            f"Widget '{widget_name}' configuration model structure error: {str(e)}"
-                        )
+                        issues.append(f"Widget '{widget_name}' configuration model structure error: {str(e)}")
 
         except Exception as e:
-            issues.append(
-                f"Widget '{widget_name}' configuration_model property error: {str(e)}"
-            )
+            issues.append(f"Widget '{widget_name}' configuration_model property error: {str(e)}")
 
         # 3. Test validation methods
         try:
             # Test with empty configuration
             is_valid, errors = widget_type.validate_configuration({})
             if not is_valid and not errors:
-                issues.append(
-                    f"Widget '{widget_name}' validate_configuration returned invalid but no errors"
-                )
+                issues.append(f"Widget '{widget_name}' validate_configuration returned invalid but no errors")
 
         except Exception as e:
-            issues.append(
-                f"Widget '{widget_name}' validate_configuration method error: {str(e)}"
-            )
+            issues.append(f"Widget '{widget_name}' validate_configuration method error: {str(e)}")
 
         # 4. Test defaults method
         try:
             defaults = widget_type.get_configuration_defaults()
             if not isinstance(defaults, dict):
-                issues.append(
-                    f"Widget '{widget_name}' get_configuration_defaults must return dict"
-                )
+                issues.append(f"Widget '{widget_name}' get_configuration_defaults must return dict")
 
         except Exception as e:
-            issues.append(
-                f"Widget '{widget_name}' get_configuration_defaults method error: {str(e)}"
-            )
+            issues.append(f"Widget '{widget_name}' get_configuration_defaults method error: {str(e)}")
 
     except Exception as e:
         issues.append(f"Widget '{widget_name}' general validation error: {str(e)}")
@@ -215,17 +194,15 @@ def print_widget_type_summary():
 
     summary = get_widget_type_summary()
 
-    print(style.SUCCESS(f"\n=== Widget Types Summary ==="))
+    print(style.SUCCESS("\n=== Widget Types Summary ==="))
     print(f"Total widget types: {summary['total_count']}")
     print(f"Active widget types: {summary['active_count']}")
 
     if summary["widget_types"]:
-        print(style.SUCCESS(f"\nRegistered Widget Types:"))
+        print(style.SUCCESS("\nRegistered Widget Types:"))
 
         for widget_info in summary["widget_types"]:
-            status = (
-                style.SUCCESS("✓") if widget_info["is_active"] else style.WARNING("✗")
-            )
+            status = style.SUCCESS("✓") if widget_info["is_active"] else style.WARNING("✗")
             print(f"  {status} {widget_info['name']}")
             print(f"    Description: {widget_info['description']}")
             print(f"    Template: {widget_info['template_name']}")
@@ -233,9 +210,8 @@ def print_widget_type_summary():
             if "error" in widget_info:
                 print(style.ERROR(f"    Error: {widget_info['error']}"))
             else:
-                print(
-                    f"    Fields: {widget_info.get('total_fields', 0)} total, {len(widget_info.get('required_fields', []))} required"
-                )
+                required_count = len(widget_info.get("required_fields", []))
+                print(f"    Fields: {widget_info.get('total_fields', 0)} total, " f"{required_count} required")
 
             print()  # Empty line between widgets
     else:

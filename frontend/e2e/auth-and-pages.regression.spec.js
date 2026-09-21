@@ -84,7 +84,6 @@ test.describe('CMS auth and page management regressions', () => {
       )).toBe(false)
     })
   }
-
   for (const viewport of [
     { name: 'phone', width: 375, height: 812 },
     { name: 'tablet', width: 768, height: 1024 },

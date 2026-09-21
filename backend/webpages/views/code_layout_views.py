@@ -4,16 +4,16 @@ Code Layout ViewSet for managing code-based layouts.
 Provides API endpoints for layout discovery, validation, and management.
 """
 
-from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from django.utils import timezone
 import logging
 import time
+
 from django.core.cache import cache
+from django.utils import timezone
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from ..serializers import LayoutSerializer
-from ..utils.template_parser import LayoutSerializer as TemplateLayoutSerializer
 
 # Setup logging for API metrics
 logger = logging.getLogger("webpages.api")
@@ -30,9 +30,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
 
     def _get_api_version(self, request):
         """Get API version from request headers or query params"""
-        version = request.META.get("HTTP_API_VERSION") or request.query_params.get(
-            "version", "v1"
-        )
+        version = request.META.get("HTTP_API_VERSION") or request.query_params.get("version", "v1")
         return version
 
     def _get_client_ip(self, request):
@@ -58,7 +56,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         # Simple rate tracking using cache
         client_ip = self._get_client_ip(request)
         cache_key = f"rate_limit:{endpoint_type}:{client_ip}"
-        
+
         try:
             current_requests = cache.get(cache_key, 0)
             # Update cache with expiry of 1 hour
@@ -100,10 +98,11 @@ class CodeLayoutViewSet(viewsets.ViewSet):
 
     def _add_caching_headers(self, response, layout_name=None):
         """Add proper HTTP caching headers"""
-        from django.utils.http import http_date
-        from django.utils import timezone
-        from django.conf import settings
         import time
+
+        from django.conf import settings
+        from django.utils import timezone
+        from django.utils.http import http_date
 
         # Use shorter cache times in development
         if settings.DEBUG:
@@ -125,10 +124,9 @@ class CodeLayoutViewSet(viewsets.ViewSet):
 
     def list(self, request):
         """Get all registered code-based layouts"""
+        from ..layout_autodiscovery import autodiscover_layouts, get_layout_summary
         from ..layout_registry import layout_registry
-        from ..layout_autodiscovery import get_layout_summary
-        from ..layout_autodiscovery import autodiscover_layouts
-        
+
         # Ensure layouts are discovered
         autodiscover_layouts()
 
@@ -174,9 +172,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         layout = layout_registry.get_layout(pk)
         if not layout:
             error_data = {"error": f"Layout '{pk}' not found"}
-            return self._create_formatted_response(
-                error_data, request, status.HTTP_404_NOT_FOUND
-            )
+            return self._create_formatted_response(error_data, request, status.HTTP_404_NOT_FOUND)
 
         api_version = self._get_api_version(request)
 
@@ -231,9 +227,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
                 "error": "No default layout available",
                 "message": "No active layouts are registered",
             }
-            return self._create_formatted_response(
-                error_data, request, status.HTTP_404_NOT_FOUND
-            )
+            return self._create_formatted_response(error_data, request, status.HTTP_404_NOT_FOUND)
 
         api_version = self._get_api_version(request)
 
@@ -262,9 +256,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         layout = layout_registry.get_layout(pk)
         if not layout:
             error_data = {"error": f"Layout '{pk}' not found"}
-            return self._create_formatted_response(
-                error_data, request, status.HTTP_404_NOT_FOUND
-            )
+            return self._create_formatted_response(error_data, request, status.HTTP_404_NOT_FOUND)
 
         # Log metrics for template requests
         logger.info(f"Template data request: {pk}")
@@ -274,11 +266,11 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         try:
             template_data = serializer.serialize_layout(layout)
             structure = template_data.get("structure", {})
-            
+
             # Add some extra metadata for the template endpoint
             response_data = {
                 "layout_name": pk,
-                "layout_type": layout.type,
+                "layout_type": layout.to_dict().get("type", "code"),
                 "template_html": structure.get("html", ""),
                 "template_css": structure.get("css", ""),
                 "parsed_slots": structure.get("slots", []),
@@ -287,16 +279,14 @@ class CodeLayoutViewSet(viewsets.ViewSet):
                 "cache_info": {"cached": False},
                 "last_modified": timezone.now().isoformat(),
             }
-            
+
             response = self._create_formatted_response(response_data, request)
             response = self._add_caching_headers(response, layout_name=pk)
             response = self._add_rate_limiting_headers(response, request, "template")
             return response
         except Exception as e:
             error_data = {"error": f"Failed to parse template: {str(e)}"}
-            response = self._create_formatted_response(
-                error_data, request, status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            response = self._create_formatted_response(error_data, request, status.HTTP_500_INTERNAL_SERVER_ERROR)
             response = self._add_rate_limiting_headers(response, request, "template")
             return response
 
@@ -305,14 +295,12 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         """Reload all layouts (admin/dev use)"""
         if not request.user.is_staff:
             error_data = {"error": "Only staff can reload layouts"}
-            return self._create_formatted_response(
-                error_data, request, status.HTTP_403_FORBIDDEN
-            )
+            return self._create_formatted_response(error_data, request, status.HTTP_403_FORBIDDEN)
 
         # Log metrics for admin operations
         self._log_metrics(request, "reload")
 
-        from ..layout_autodiscovery import reload_layouts, get_layout_summary
+        from ..layout_autodiscovery import get_layout_summary, reload_layouts
 
         try:
             reload_layouts()
@@ -325,18 +313,14 @@ class CodeLayoutViewSet(viewsets.ViewSet):
             return response
         except Exception as e:
             error_data = {"error": f"Failed to reload layouts: {str(e)}"}
-            return self._create_formatted_response(
-                error_data, request, status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return self._create_formatted_response(error_data, request, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=["get"])
     def validate(self, request):
         """Validate all registered layouts (admin/dev use)"""
         if not request.user.is_staff:
             error_data = {"error": "Only staff can validate layouts"}
-            return self._create_formatted_response(
-                error_data, request, status.HTTP_403_FORBIDDEN
-            )
+            return self._create_formatted_response(error_data, request, status.HTTP_403_FORBIDDEN)
 
         # Log metrics for admin operations
         self._log_metrics(request, "validate")
@@ -351,15 +335,13 @@ class CodeLayoutViewSet(viewsets.ViewSet):
             return response
         except Exception as e:
             error_data = {"error": f"Layout validation failed: {str(e)}"}
-            return self._create_formatted_response(
-                error_data, request, status.HTTP_400_BAD_REQUEST
-            )
+            return self._create_formatted_response(error_data, request, status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=["get"])
     def all_slots(self, request):
         """
         Get all unique slot names from all registered layouts and widgets.
-        
+
         Returns a list of all slots with metadata about which layouts or widgets define them.
         """
         from ..layout_registry import layout_registry
@@ -448,10 +430,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
                 slot_map[slot_name]["widgets"].append(widget_name)
 
         # Convert to list and sort by order (then by name if order is the same)
-        slots_list = sorted(
-            slot_map.values(), 
-            key=lambda x: (x["metadata"].get("order", 999), x["name"])
-        )
+        slots_list = sorted(slot_map.values(), key=lambda x: (x["metadata"].get("order", 999), x["name"]))
 
         response_data = {
             "slots": slots_list,

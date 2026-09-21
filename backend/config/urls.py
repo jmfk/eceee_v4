@@ -11,23 +11,24 @@ This configuration includes:
 - Multi-site hostname-aware routing
 """
 
-from django.contrib import admin
-from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
 from django.http import JsonResponse
+from django.urls import include, path
+from django.views.decorators.csrf import ensure_csrf_cookie
 from drf_spectacular.views import (
     SpectacularAPIView,
-    SpectacularSwaggerView,
     SpectacularRedocView,
+    SpectacularSwaggerView,
 )
-from django.views.decorators.csrf import ensure_csrf_cookie
+
+from file_manager.views.imgproxy_proxy import ImgProxyProxyView
+from file_manager.views.utils import MediaFileProxyView
 
 # Import hostname-aware views for multi-site functionality
 from webpages.public_views import HostnamePageView
-from webpages.views.lightbox import lightbox_item_view, lightbox_group_view
-from file_manager.views.utils import MediaFileProxyView
-from file_manager.views.imgproxy_proxy import ImgProxyProxyView
+from webpages.views.lightbox import lightbox_group_view, lightbox_item_view
 
 
 def health_check(request):
@@ -81,7 +82,7 @@ urlpatterns = [
         MediaFileProxyView.as_view(),
         name="media-file-proxy-root",
     ),
-    # Same-origin imgproxy relay for local browsers that block localhost:8080 assets.
+    # Same-origin imgproxy relay for local browsers that block localhost:10106 assets.
     path(
         "imgproxy/<path:path>",
         ImgProxyProxyView.as_view(),

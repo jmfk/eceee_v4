@@ -5,27 +5,19 @@ Tests backward compatibility, template data inclusion, caching,
 API versioning, and the new template endpoint.
 """
 
-from django.test import TestCase, Client
 from django.contrib.auth.models import User
-from django.urls import reverse
+from django.test import TestCase, override_settings
 from rest_framework import status
-from rest_framework.test import APITestCase, APIClient
-import json
-from unittest.mock import patch, MagicMock
-from django.test import override_settings
+from rest_framework.test import APIClient, APITestCase
 
 
-@override_settings(
-    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-)
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class LayoutAPIUnifiedEndpointTests(APITestCase):
     """Test that unified layout endpoints work correctly"""
 
     def setUp(self):
         self.client = APIClient()
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
 
     def test_unified_layouts_list_endpoint(self):
         """Test that /api/v1/webpages/layouts/ works correctly"""
@@ -80,17 +72,13 @@ class LayoutAPIUnifiedEndpointTests(APITestCase):
         self.assertIsInstance(response.data, list)
 
 
-@override_settings(
-    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-)
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class LayoutAPIPhase13EnhancementsTests(APITestCase):
     """Test new Phase 1.3 features: template data, versioning, caching"""
 
     def setUp(self):
         self.client = APIClient()
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
 
     def test_new_layouts_endpoint(self):
         """Test the new unified /api/v1/webpages/layouts/ endpoint"""
@@ -138,17 +126,13 @@ class LayoutAPIPhase13EnhancementsTests(APITestCase):
             self.assertIn("Last-Modified", response)
 
 
-@override_settings(
-    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-)
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class LayoutTemplateEndpointTests(APITestCase):
     """Test the new /api/layouts/{id}/template/ endpoint"""
 
     def setUp(self):
         self.client = APIClient()
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
 
     def test_template_endpoint_exists(self):
         """Test that the template endpoint exists and responds"""
@@ -157,9 +141,7 @@ class LayoutTemplateEndpointTests(APITestCase):
         if list_response.data["results"]:
             layout_name = list_response.data["results"][0]["name"]
 
-            response = self.client.get(
-                f"/api/v1/webpages/layouts/{layout_name}/template/"
-            )
+            response = self.client.get(f"/api/v1/webpages/layouts/{layout_name}/template/")
             self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_template_endpoint_structure(self):
@@ -169,9 +151,7 @@ class LayoutTemplateEndpointTests(APITestCase):
         if list_response.data["results"]:
             layout_name = list_response.data["results"][0]["name"]
 
-            response = self.client.get(
-                f"/api/v1/webpages/layouts/{layout_name}/template/"
-            )
+            response = self.client.get(f"/api/v1/webpages/layouts/{layout_name}/template/")
             self.assertEqual(response.status_code, status.HTTP_200_OK)
 
             # Verify expected fields
@@ -188,6 +168,7 @@ class LayoutTemplateEndpointTests(APITestCase):
             ]
             for field in expected_fields:
                 self.assertIn(field, response.data)
+            self.assertEqual(response.data["layout_type"], "code")
 
 
 class LayoutSerializerTests(TestCase):
@@ -245,17 +226,13 @@ class LayoutSerializerTests(TestCase):
         self.assertIn("slots", serializer.data["template_data"])
 
 
-@override_settings(
-    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-)
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class LayoutAPIPermissionsTests(APITestCase):
     """Test API permissions and authentication"""
 
     def setUp(self):
         self.client = APIClient()
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
         self.staff_user = User.objects.create_user(
             username="staff",
             email="staff@example.com",
@@ -285,9 +262,7 @@ class LayoutAPIPermissionsTests(APITestCase):
         if list_response.data["results"]:
             layout_name = list_response.data["results"][0]["name"]
 
-            response = self.client.get(
-                f"/api/v1/webpages/layouts/{layout_name}/template/"
-            )
+            response = self.client.get(f"/api/v1/webpages/layouts/{layout_name}/template/")
             self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_reload_endpoint_requires_staff(self):
@@ -307,9 +282,7 @@ class LayoutAPIPermissionsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
-@override_settings(
-    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-)
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class LayoutAPIConditionalRequestsTests(APITestCase):
     """Test conditional requests (ETags, Last-Modified) for Phase 1.3"""
 
@@ -331,9 +304,7 @@ class LayoutAPIConditionalRequestsTests(APITestCase):
 
             # Request with If-None-Match should return 304 if unchanged
             # Note: This test assumes the layout hasn't changed
-            response2 = self.client.get(
-                f"/api/v1/webpages/layouts/{layout_name}/", HTTP_IF_NONE_MATCH=etag
-            )
+            response2 = self.client.get(f"/api/v1/webpages/layouts/{layout_name}/", HTTP_IF_NONE_MATCH=etag)
             # Since we're not implementing full conditional logic yet,
             # this should still return 200, but ETag should be consistent
             self.assertEqual(response2.get("ETag"), etag)

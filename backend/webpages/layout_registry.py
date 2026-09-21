@@ -5,11 +5,12 @@ This module provides the infrastructure for registering layout classes directly 
 enabling third-party apps to provide custom layouts without database entries.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional, Type
-from django.template.loader import get_template
-from django.core.exceptions import ImproperlyConfigured
 import logging
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional, Type
+
+from django.core.exceptions import ImproperlyConfigured
+from django.template.loader import get_template
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +35,7 @@ class BaseLayout(ABC):
 
     def __init__(self):
         if self.name is None:
-            raise ImproperlyConfigured(
-                f"Layout class {self.__class__.__name__} must define a 'name' attribute"
-            )
+            raise ImproperlyConfigured(f"Layout class {self.__class__.__name__} must define a 'name' attribute")
 
     @property
     @abstractmethod
@@ -88,27 +87,19 @@ class BaseLayout(ABC):
         config = self.slot_configuration
 
         if not isinstance(config, dict):
-            raise ImproperlyConfigured(
-                f"Layout {self.name} slot_configuration must return a dictionary"
-            )
+            raise ImproperlyConfigured(f"Layout {self.name} slot_configuration must return a dictionary")
 
         if "slots" not in config:
-            raise ImproperlyConfigured(
-                f"Layout {self.name} slot_configuration must contain a 'slots' key"
-            )
+            raise ImproperlyConfigured(f"Layout {self.name} slot_configuration must contain a 'slots' key")
 
         if not isinstance(config["slots"], list):
             raise ImproperlyConfigured(f"Layout {self.name} slots must be a list")
 
         for slot in config["slots"]:
             if not isinstance(slot, dict):
-                raise ImproperlyConfigured(
-                    f"Layout {self.name} each slot must be a dictionary"
-                )
+                raise ImproperlyConfigured(f"Layout {self.name} each slot must be a dictionary")
             if "name" not in slot:
-                raise ImproperlyConfigured(
-                    f"Layout {self.name} each slot must have a 'name' field"
-                )
+                raise ImproperlyConfigured(f"Layout {self.name} each slot must have a 'name' field")
 
     def get_template(self):
         """Get the Django template for this layout."""
@@ -151,9 +142,7 @@ class LayoutRegistry:
             layout_class: A subclass of BaseLayout
         """
         if not issubclass(layout_class, BaseLayout):
-            raise ImproperlyConfigured(
-                f"Layout class {layout_class.__name__} must inherit from BaseLayout"
-            )
+            raise ImproperlyConfigured(f"Layout class {layout_class.__name__} must inherit from BaseLayout")
 
         # Create instance to validate and get name
         instance = layout_class()
@@ -161,13 +150,10 @@ class LayoutRegistry:
 
         name = instance.name
         if name in self._layouts:
-            logger.warning(
-                f"Layout '{name}' is being re-registered. Previous registration will be overwritten."
-            )
+            logger.warning(f"Layout '{name}' is being re-registered. Previous registration will be overwritten.")
 
         self._layouts[name] = layout_class
         self._instances[name] = instance
-
 
         # Invalidate caches when layout changes
         self._invalidate_layout_caches(name)
@@ -251,7 +237,6 @@ class LayoutRegistry:
                 cache.delete(cache_key)
                 logger.debug(f"Cleared list cache key: {cache_key}")
 
-
         except Exception as e:
             logger.warning(f"Failed to invalidate caches for layout {layout_name}: {e}")
 
@@ -267,18 +252,11 @@ class LayoutRegistry:
             for layout_name in layout_names:
                 self._invalidate_layout_caches(layout_name)
 
-            # Clear any remaining layout-related cache patterns
-            cache_patterns = [
-                "simplified_layout:*",
-                "layout_json:*",
-                "layout_template:*",
-                "layout_registry:*",
-                "simplified_layouts_list",
-            ]
+            # The shared Redis ACL forbids database-wide flushes. This removes
+            # only keys inside ECEEE's configured Django cache namespace.
+            from utils.cache import clear_project_cache
 
-            # Django's cache doesn't support pattern deletion by default,
-            # so we clear the entire cache as a fallback
-            cache.clear()
+            clear_project_cache(cache)
 
         except Exception as e:
             logger.warning(f"Failed to invalidate all layout caches: {e}")

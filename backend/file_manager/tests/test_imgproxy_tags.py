@@ -2,26 +2,31 @@
 Tests for imgproxy template tags.
 """
 
-from django.test import TestCase
+from unittest.mock import Mock
+
+from django.conf import settings
 from django.template import Context, Template
+from django.test import TestCase
+
 from file_manager.templatetags.imgproxy_tags import (
+    _extract_metadata,
+    _extract_url_from_image,
+    has_image,
     imgproxy,
     imgproxy_img,
     imgproxy_url,
-    has_image,
-    _extract_url_from_image,
-    _extract_metadata,
 )
-from unittest.mock import Mock, patch
 
 
 class ImgproxyUrlAssertions:
     def assertImgproxyUrl(self, url):
+        public_url = settings.IMGPROXY_PUBLIC_URL.rstrip("/")
         self.assertTrue(
             url.startswith("/imgproxy/")
             or 'src="/imgproxy/' in url
-            or "imgproxy:8080" in url
-            or "localhost:8080" in url
+            or url.startswith(f"{public_url}/")
+            or f'src="{public_url}/' in url,
+            f"Expected an imgproxy URL using {public_url} or the same-origin relay",
         )
 
 
