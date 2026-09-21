@@ -398,7 +398,7 @@ const findGuides = (docs, args) => {
   return match.doc && match.guide ? [match] : []
 }
 
-const actionableActionTypes = new Set(['click', 'fill', 'select'])
+const actionableActionTypes = new Set(['click', 'hoverClick', 'fill', 'select'])
 
 const countActionableSteps = (guide) => (
   (guide.actions || []).filter(action => actionableActionTypes.has(action.type)).length
@@ -2148,6 +2148,86 @@ const copyAudioPart = async (sourcePath, partPath) => {
   }
 }
 
+const recordedAudioPathFromUrl = (url = '') => {
+  const value = String(url || '')
+  if (!value) return ''
+
+  let pathname = value
+  try {
+    pathname = new URL(value, 'http://localhost').pathname
+  } catch {
+    pathname = value.split('?')[0]
+  }
+
+  const parts = pathname.split('/').filter(Boolean)
+  const blockAudioIndex = parts.indexOf('block-audio')
+  if (blockAudioIndex >= 0) {
+    const kind = parts[blockAudioIndex + 1]
+    const fileName = parts[blockAudioIndex + 2]
+    const validName = /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(fileName || '')
+    if (!['recorded', 'elevenlabs'].includes(kind) || !validName || parts.length !== blockAudioIndex + 3) return ''
+    return join(frontendRoot, '.howto-script-preview', 'block-audio', kind, fileName)
+  }
+
+  const recordIndex = parts.indexOf('record')
+  if (recordIndex === -1) return ''
+
+  const id = parts[recordIndex + 1]
+  const action = parts[recordIndex + 2]
+  const audioName = parts[recordIndex + 3]
+  const validId = /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id || '')
+  const validName = /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(audioName || '')
+  if (!validId || action !== 'audio' || !validName || parts.length !== recordIndex + 4) return ''
+
+  if (audioName === 'full') {
+    return join(frontendRoot, '.howto-script-preview', 'recordings', id, 'microphone.webm')
+  }
+
+  return join(frontendRoot, '.howto-script-preview', 'recordings', id, 'audio-clips', audioName || '')
+}
+
+const prepareRecordedAudioPart = async (audio = {}, partPath, args) => {
+  const sourcePath = recordedAudioPathFromUrl(audio.url)
+  if (!sourcePath || !existsSync(sourcePath)) return null
+
+  const trimStartMs = Math.max(0, Number(audio.trimStartMs || 0))
+  const trimEndMs = Math.max(0, Number(audio.trimEndMs || 0))
+
+  const sourceDurationSeconds = await getMediaDurationSeconds(sourcePath, args.ffmpegPath)
+  const startSeconds = trimStartMs / 1000
+  const durationSeconds = Math.max(0.25, sourceDurationSeconds - startSeconds - (trimEndMs / 1000))
+
+  await runCommand(args.ffmpegPath, [
+    '-y',
+    '-ss', String(startSeconds),
+    '-t', String(durationSeconds),
+    '-i', sourcePath,
+    '-vn',
+    '-c:a', 'libmp3lame',
+    '-q:a', '3',
+    partPath
+  ])
+
+  return partPath
+}
+
+const resolveBlockAudio = (audio = {}) => {
+  if (!audio || typeof audio !== 'object') return null
+  const clips = audio.clips && typeof audio.clips === 'object' ? audio.clips : {}
+  const activeClip = audio.url
+    ? audio
+    : clips.recorded
+    || clips.elevenlabs
+    || null
+
+  if (!activeClip?.url) return null
+
+  return {
+    ...activeClip,
+    source: activeClip.source || audio.source || 'recorded'
+  }
+}
+
 const prepareActionSegments = async (args, guide, actions, safeName) => {
   console.log('  - Preparing per-step narration')
 
@@ -2165,7 +2245,24 @@ const prepareActionSegments = async (args, guide, actions, safeName) => {
       partIndex: index + 1
     }
 
-    if (args.voiceProvider === 'elevenlabs' && args.segmentedNarration && caption) {
+    const blockAudio = resolveBlockAudio(action.audio)
+
+    if (blockAudio?.url && ['recorded', 'elevenlabs'].includes(blockAudio.source)) {
+      const partPath = join(args.workDir, `${safeName}-part-${String(index + 1).padStart(2, '0')}-${blockAudio.source}.mp3`)
+      const recordedPartPath = await prepareRecordedAudioPart(blockAudio, partPath, args)
+
+      if (recordedPartPath) {
+        const durationSeconds = await getMediaDurationSeconds(recordedPartPath, args.ffmpegPath)
+        segment.audioPath = recordedPartPath
+        segment.audioDurationMs = Math.ceil(durationSeconds * 1000)
+        segment.cached = false
+        segment.audioSource = blockAudio.source
+        segment.recorded = blockAudio.source === 'recorded'
+        console.log(`    Part ${index + 1}: ${blockAudio.source} audio ${formatDuration(durationSeconds)} -> ${recordedPartPath}`)
+      }
+    }
+
+    if (!segment.audioPath && args.voiceProvider === 'elevenlabs' && args.segmentedNarration && caption) {
       const narration = await createElevenLabsSpeech(caption, args)
       const partPath = join(args.workDir, `${safeName}-part-${String(index + 1).padStart(2, '0')}.mp3`)
 
@@ -2175,6 +2272,7 @@ const prepareActionSegments = async (args, guide, actions, safeName) => {
       segment.audioPath = partPath
       segment.audioDurationMs = Math.ceil(durationSeconds * 1000)
       segment.cached = narration.cached
+      segment.audioSource = 'elevenlabs'
 
       console.log(`    Part ${index + 1}: ${formatDuration(durationSeconds)} -> ${partPath}`)
     }
@@ -2284,7 +2382,8 @@ const recordGuide = async (browser, args, { doc, guide }) => {
         at: narrationStart,
         durationMs: segment.audioDurationMs,
         text: caption,
-        partIndex: segment.partIndex
+        partIndex: segment.partIndex,
+        recorded: Boolean(segment.recorded)
       })
       await page.waitForTimeout(action.narrationLeadMs ?? args.narrationActionLeadMs)
     } else if (caption) {
@@ -2362,7 +2461,7 @@ const recordGuide = async (browser, args, { doc, guide }) => {
     if (narrationAudioPath) {
       audioPaths.push(narrationAudioPath)
       manifestAudio.narration = {
-        provider: 'elevenlabs',
+        provider: narrationEvents.some(event => event.recorded) ? 'recorded-or-elevenlabs' : 'elevenlabs',
         mode: 'segmented',
         language: args.language,
         voiceId: args.voiceId,
@@ -2373,7 +2472,8 @@ const recordGuide = async (browser, args, { doc, guide }) => {
           audio: event.audioPath,
           at: event.at,
           durationMs: event.durationMs,
-          text: event.text
+          text: event.text,
+          recorded: Boolean(event.recorded)
         }))
       }
     }

@@ -293,6 +293,43 @@ const actionWithoutCaption = (action = {}) => {
     return rest
 }
 
+const normalizeBlockAudio = (audio = null) => {
+    if (!audio || typeof audio !== 'object') return null
+    const normalizeClip = (clip = null, fallbackSource = '') => {
+        if (!clip || typeof clip !== 'object') return null
+        const normalizedClip = {
+            source: clip.source || fallbackSource || 'recorded',
+            url: textValue(clip.url),
+            fullUrl: textValue(clip.fullUrl),
+            startMs: Number(clip.startMs || 0),
+            endMs: Number(clip.endMs || 0),
+            trimStartMs: Number(clip.trimStartMs || 0),
+            trimEndMs: Number(clip.trimEndMs || 0)
+        }
+
+        return normalizedClip.url ? normalizedClip : null
+    }
+    const clips = Object.entries(audio.clips || {}).reduce((result, [key, clip]) => {
+        const normalizedClip = normalizeClip(clip, key)
+        if (normalizedClip) result[key] = normalizedClip
+        return result
+    }, {})
+
+    const primaryClip = normalizeClip(audio, audio.source)
+    if (primaryClip?.source && !clips[primaryClip.source]) clips[primaryClip.source] = primaryClip
+    const preferredSource = audio.source || (clips.recorded ? 'recorded' : clips.elevenlabs ? 'elevenlabs' : primaryClip?.source || 'recorded')
+    const activeClip = clips[preferredSource] || clips.recorded || clips.elevenlabs || primaryClip
+    if (!activeClip?.url) return null
+
+    const normalized = {
+        ...activeClip,
+        source: preferredSource,
+        clips
+    }
+
+    return normalized.url ? normalized : null
+}
+
 export const createScriptBlock = (type = 'click') => ({
     caption: '',
     action: type ? createAction(type) : null
@@ -306,10 +343,15 @@ export const normalizeScriptBlock = (block = {}, fallbackCaption = '') => {
         : block
     const caption = textValue(block.caption ?? actionSource?.caption ?? fallbackCaption ?? '')
 
-    return {
+    const normalized = {
         caption,
         action: actionSource?.type ? normalizeAction(actionWithoutCaption(actionSource)) : null
     }
+
+    const audio = normalizeBlockAudio(block.audio ?? actionSource?.audio)
+    if (audio) normalized.audio = audio
+
+    return normalized
 }
 
 const legacyActionsToScript = (guide = {}) => {
@@ -425,11 +467,15 @@ export const createMarkdownFromDraft = (draft) => {
         .filter(Boolean)
         .map((step, index) => `${index + 1}. ${step}`)
     const scriptJson = JSON.stringify(script
-        .map(block => ({
-            caption: trimString(block.caption),
-            action: block.action ? serializeAction(block.action) : null
-        }))
-        .filter(block => block.caption || block.action), null, 2)
+        .map(block => {
+            const serialized = {
+                caption: trimString(block.caption),
+                action: block.action ? serializeAction(block.action) : null
+            }
+            if (block.audio) serialized.audio = normalizeBlockAudio(block.audio)
+            return serialized
+        })
+        .filter(block => block.caption || block.action || block.audio), null, 2)
 
     return [
         frontmatter.join('\n'),

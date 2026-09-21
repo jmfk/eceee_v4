@@ -189,11 +189,17 @@ const recorderInitScript = () => {
 const main = async () => {
   const args = parseArgs(process.argv.slice(2))
   const events = []
+  const microphoneChunks = []
   const rawVideoDir = join(args.outputDir, 'raw-video')
+  const microphonePath = join(args.outputDir, 'microphone.webm')
   const eventsPath = join(args.outputDir, 'events.json')
   const metadataPath = join(args.outputDir, 'metadata.json')
+  let microphoneStartedAt = 0
+  let microphoneStoppedAt = 0
   let browser = null
   let context = null
+  let micContext = null
+  let micPage = null
   let stopped = false
 
   const writeEvents = () => {
@@ -205,6 +211,9 @@ const main = async () => {
       baseUrl: args.baseUrl,
       status: metadata.status || 'running',
       rawVideos: metadata.rawVideos || [],
+      microphonePath: metadata.microphonePath || (microphoneChunks.length ? microphonePath : ''),
+      microphoneStartedAt: metadata.microphoneStartedAt || microphoneStartedAt || 0,
+      microphoneStoppedAt: metadata.microphoneStoppedAt || microphoneStoppedAt || 0,
       stoppedAt: metadata.stoppedAt || '',
       eventCount: events.length
     }, null, 2), 'utf8')
@@ -214,13 +223,72 @@ const main = async () => {
     writeEvents()
     writeMetadata({ status: 'running' })
   }
+  const startMicrophoneRecorder = async page => {
+    await page.evaluate(async () => {
+      if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+        console.warn('Microphone recording is not available in this browser context.')
+        return
+      }
+      if (window.__eceeeMicRecorder) return
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg;codecs=opus'
+      ].find(candidate => MediaRecorder.isTypeSupported(candidate)) || ''
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+      window.__eceeeMicRecorder = recorder
+      window.__eceeeMicStream = stream
+      window.__eceeeStopMicRecorder = () => new Promise(resolve => {
+        if (recorder.state === 'inactive') {
+          stream.getTracks().forEach(track => track.stop())
+          resolve()
+          return
+        }
+
+        recorder.addEventListener('stop', () => {
+          window.__eceeeRecordMicrophoneState?.({ type: 'stopped', timestamp: Date.now() }).catch(() => {})
+          stream.getTracks().forEach(track => track.stop())
+          resolve()
+        }, { once: true })
+        recorder.stop()
+      })
+      recorder.addEventListener('dataavailable', async event => {
+        if (!event.data || event.data.size === 0) return
+        const bytes = new Uint8Array(await event.data.arrayBuffer())
+        let binary = ''
+        const chunkSize = 0x8000
+        for (let index = 0; index < bytes.length; index += chunkSize) {
+          binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize))
+        }
+        await window.__eceeeRecordMicrophoneChunk?.({
+          base64: btoa(binary),
+          type: event.data.type,
+          timestamp: Date.now()
+        })
+      })
+      recorder.start(1000)
+      await window.__eceeeRecordMicrophoneState?.({ type: 'started', timestamp: Date.now() })
+      console.log(`Microphone recording started${mimeType ? ` (${mimeType})` : ''}.`)
+    }).catch(error => {
+      console.warn(`Microphone recording unavailable: ${error.message}`)
+    })
+  }
   const shutdown = async (status = 'stopped') => {
     if (stopped) return
     stopped = true
     console.log(`Stopping recording session ${args.sessionId || process.pid}...`)
     const pages = context ? context.pages() : []
+    await micPage?.evaluate(() => window.__eceeeStopMicRecorder?.()).catch(() => {})
+    if (microphoneChunks.length > 0) {
+      writeFileSync(microphonePath, Buffer.concat(microphoneChunks))
+      console.log(`Microphone audio: ${microphonePath}`)
+    } else {
+      console.warn('No microphone audio was captured for this recording.')
+    }
     await context?.close().catch(() => {})
-    await browser?.close().catch(() => {})
     const rawVideos = []
 
     for (const page of pages) {
@@ -230,8 +298,18 @@ const main = async () => {
       if (videoPath) rawVideos.push(videoPath)
     }
 
+    await micContext?.close().catch(() => {})
+    await browser?.close().catch(() => {})
+
     writeEvents()
-    writeMetadata({ status, rawVideos, stoppedAt: new Date().toISOString() })
+    writeMetadata({
+      status,
+      rawVideos,
+      microphonePath: microphoneChunks.length ? microphonePath : '',
+      microphoneStartedAt,
+      microphoneStoppedAt,
+      stoppedAt: new Date().toISOString()
+    })
     console.log(`Recorded ${events.length} browser event${events.length === 1 ? '' : 's'}.`)
     if (rawVideos[0]) console.log(`Raw reference video: ${rawVideos[0]}`)
   }
@@ -249,6 +327,20 @@ const main = async () => {
   })
 
   browser = await chromium.launch({ headless: false })
+  micContext = await browser.newContext({ viewport: { width: 640, height: 480 } })
+  await micContext.grantPermissions(['microphone'], { origin: new URL(args.baseUrl).origin }).catch(() => {})
+  await micContext.exposeBinding('__eceeeRecordMicrophoneChunk', (_source, chunk) => {
+    if (chunk?.base64) microphoneChunks.push(Buffer.from(chunk.base64, 'base64'))
+  })
+  await micContext.exposeBinding('__eceeeRecordMicrophoneState', (_source, state) => {
+    if (state?.type === 'started') microphoneStartedAt = state.timestamp || Date.now()
+    if (state?.type === 'stopped') microphoneStoppedAt = state.timestamp || Date.now()
+    writeMetadata({ status: 'running' })
+  })
+  micPage = await micContext.newPage()
+  await micPage.goto(args.baseUrl, { waitUntil: 'domcontentloaded' }).catch(() => {})
+  await startMicrophoneRecorder(micPage)
+
   context = await browser.newContext({
     viewport: { width: args.width, height: args.height },
     storageState: args.storageState && existsSync(args.storageState) ? args.storageState : undefined,
@@ -275,6 +367,7 @@ const main = async () => {
   console.log(`Recording browser actions against ${args.baseUrl}`)
   console.log('Use the opened browser window to perform the demo, then stop recording from the editor.')
   await page.goto(args.baseUrl, { waitUntil: 'domcontentloaded' })
+  await page.bringToFront().catch(() => {})
   writeMetadata({ status: 'running' })
   console.log(`READY ${args.sessionId}`)
 
