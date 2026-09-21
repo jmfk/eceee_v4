@@ -440,6 +440,23 @@ const PageEditor = () => {
     // Feature flag for new self-contained widget editor
     const contentEditorRef = useRef(null)
     const settingsEditorRef = useRef(null)
+    const pendingCutSourceFinalizersRef = useRef(new Map())
+
+    const queueCutSourceRemoval = useCallback((key, finalize, destinationVersionId) => {
+        pendingCutSourceFinalizersRef.current.set(key, { finalize, destinationVersionId })
+    }, [])
+
+    const finalizePendingCutSources = useCallback(async (savedDestinationVersionId) => {
+        for (const [key, pendingCut] of pendingCutSourceFinalizersRef.current.entries()) {
+            if (String(pendingCut.destinationVersionId) !== String(savedDestinationVersionId)) {
+                continue
+            }
+
+            const { finalize } = pendingCut
+            await finalize()
+            pendingCutSourceFinalizersRef.current.delete(key)
+        }
+    }, [])
 
     // Note: pageData has been completely removed - use webpageData and pageVersionData directly
 
@@ -1347,6 +1364,24 @@ const PageEditor = () => {
                 }
             }
 
+            // Cross-page/version cut operations are finalized only after the
+            // destination version has been saved. If cleanup fails, keep the
+            // durable destination copy and retry on the next save rather than
+            // risking data loss by deleting the source first.
+            if (pendingCutSourceFinalizersRef.current.size > 0) {
+                try {
+                    await finalizePendingCutSources(
+                        currentVersionDataForSave.versionId || currentVersionDataForSave.id
+                    );
+                } catch (error) {
+                    console.error('Destination saved, but cut source cleanup failed', error);
+                    addNotification(
+                        `Page saved, but the cut source was not removed: ${error?.message || 'The source version could not be updated.'}`,
+                        'warning'
+                    );
+                }
+            }
+
             // Handle resolved data from conflict resolution
             let updatedWebpageData = saveOptions.resolvedData?.webpage || currentWebpageDataForSave;
             let updatedVersionData = saveOptions.resolvedData?.version || currentVersionDataForSave;
@@ -1418,7 +1453,7 @@ const PageEditor = () => {
             }
             throw error;
         }
-    }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, queryClient, currentVersion]); // Removed loadVersionsPreserveCurrent to break circular dependency
+    }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, queryClient, currentVersion, finalizePendingCutSources]); // Removed loadVersionsPreserveCurrent to break circular dependency
 
 
     // Smart save - analyze changes first, then show modal only if needed
@@ -2094,6 +2129,7 @@ const PageEditor = () => {
                                                     onLocalWidgetUpdate={updateLocalWidgets}
                                                     sharedComponentId={componentId}
                                                     publishWidgetOperation={publishWidgetOperation}
+                                                    onQueueCutSourceRemoval={queueCutSourceRemoval}
                                                     // Widget inheritance
                                                     inheritedWidgets={inheritedWidgets}
                                                     slotInheritanceRules={slotInheritanceRules}
