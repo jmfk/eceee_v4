@@ -1,5 +1,4 @@
 -- Initialize database for AI development environment
-CREATE DATABASE eceee_v4;
 CREATE DATABASE eceee_v4_test;
 
 -- Create additional users if needed
