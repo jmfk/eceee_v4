@@ -8,10 +8,9 @@ class EventRaw(models.Model):
     """
     Stores raw events received from clients or server-side logging.
     """
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(
-        "core.Tenant", on_delete=models.CASCADE, related_name="raw_events"
-    )
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.CASCADE, related_name="raw_events")
     user_id = models.CharField(max_length=255, db_index=True)  # Anonymized hash
     event_time = models.DateTimeField(default=timezone.now, db_index=True)
     event_type = models.CharField(max_length=50, db_index=True)
@@ -33,17 +32,16 @@ class PageStats(models.Model):
     """
     Aggregated daily statistics per page.
     """
+
     date = models.DateField(db_index=True)
-    tenant = models.ForeignKey(
-        "core.Tenant", on_delete=models.CASCADE, related_name="page_stats"
-    )
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.CASCADE, related_name="page_stats")
     url = models.URLField(max_length=2000, db_index=True)
     pageviews = models.IntegerField(default=0)
     unique_visitors = models.IntegerField(default=0)
     avg_time_on_page = models.FloatField(default=0.0)  # In seconds
     actions_per_visit = models.FloatField(default=0.0)
     bounce_rate = models.FloatField(default=0.0)  # Percentage
-    exit_rate = models.FloatField(default=0.0)    # Percentage
+    exit_rate = models.FloatField(default=0.0)  # Percentage
 
     class Meta:
         unique_together = ("date", "tenant", "url")
@@ -57,10 +55,9 @@ class ConversionStats(models.Model):
     """
     Aggregated daily statistics for conversion goals.
     """
+
     date = models.DateField(db_index=True)
-    tenant = models.ForeignKey(
-        "core.Tenant", on_delete=models.CASCADE, related_name="conversion_stats"
-    )
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.CASCADE, related_name="conversion_stats")
     goal_name = models.CharField(max_length=100, db_index=True)
     impressions = models.IntegerField(default=0)
     conversions = models.IntegerField(default=0)
@@ -78,6 +75,7 @@ class Experiment(models.Model):
     """
     Definition of an A/B testing experiment.
     """
+
     STATUS_CHOICES = [
         ("draft", "Draft"),
         ("running", "Running"),
@@ -87,9 +85,7 @@ class Experiment(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(
-        "core.Tenant", on_delete=models.CASCADE, related_name="experiments"
-    )
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.CASCADE, related_name="experiments")
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     start_date = models.DateTimeField(null=True, blank=True)
@@ -105,10 +101,9 @@ class Variant(models.Model):
     """
     A specific variation in an A/B test.
     """
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    experiment = models.ForeignKey(
-        Experiment, on_delete=models.CASCADE, related_name="variants"
-    )
+    experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="variants")
     name = models.CharField(max_length=255)
     allocation_percent = models.IntegerField(default=50)  # 0-100
     metadata = models.JSONField(default=dict, blank=True)  # Store variant configuration
@@ -121,6 +116,7 @@ class Assignment(models.Model):
     """
     Logs which user was assigned to which variant.
     """
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE)
     variant = models.ForeignKey(Variant, on_delete=models.CASCADE)
@@ -135,9 +131,8 @@ class ExperimentMetric(models.Model):
     """
     Cached or aggregated metrics for an experiment variant.
     """
-    variant = models.ForeignKey(
-        Variant, on_delete=models.CASCADE, related_name="metrics"
-    )
+
+    variant = models.ForeignKey(Variant, on_delete=models.CASCADE, related_name="metrics")
     metric_name = models.CharField(max_length=100)
     value = models.FloatField(default=0.0)
     last_updated = models.DateTimeField(auto_now=True)

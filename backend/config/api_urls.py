@@ -5,13 +5,11 @@ This file contains all API endpoint routing for the application.
 As you add new apps, include their API URLs here.
 """
 
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-    TokenVerifyView,
-)
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
+
+from content.views import CategoryViewSet, NamespaceViewSet, TagViewSet
 
 app_name = "api"
 
@@ -19,12 +17,6 @@ app_name = "api"
 router = DefaultRouter()
 
 # Register content ViewSets
-from content.views import (
-    CategoryViewSet,
-    TagViewSet,
-    NamespaceViewSet,
-)
-
 router.register(r"categories", CategoryViewSet)
 router.register(r"tags", TagViewSet)
 router.register(r"namespaces", NamespaceViewSet)

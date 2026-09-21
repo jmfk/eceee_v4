@@ -1,13 +1,14 @@
-from site_statistics.models import (
-    EventRaw,
-    PageStats,
-    ConversionStats,
-    Experiment,
-    Variant,
-    Assignment,
-    ExperimentMetric,
-)
 from rest_framework import serializers
+
+from site_statistics.models import (
+    Assignment,
+    ConversionStats,
+    EventRaw,
+    Experiment,
+    ExperimentMetric,
+    PageStats,
+    Variant,
+)
 
 
 class EventIngestionSerializer(serializers.Serializer):
