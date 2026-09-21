@@ -1,5 +1,7 @@
 import hashlib
-from site_statistics.models import Experiment, Variant, Assignment
+
+from site_statistics.models import Assignment, Experiment
+
 
 class ABTestingService:
     @staticmethod
@@ -31,7 +33,7 @@ class ABTestingService:
         bucket = hash_int % 100
 
         current_threshold = 0
-        assigned_variant = variants[0] # Default
+        assigned_variant = variants[0]  # Default
 
         for variant in variants:
             current_threshold += variant.allocation_percent
@@ -40,10 +42,6 @@ class ABTestingService:
                 break
 
         # Save assignment
-        Assignment.objects.create(
-            experiment=experiment,
-            variant=assigned_variant,
-            user_id=user_id
-        )
+        Assignment.objects.create(experiment=experiment, variant=assigned_variant, user_id=user_id)
 
         return assigned_variant

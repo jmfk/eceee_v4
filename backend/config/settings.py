@@ -18,9 +18,12 @@ This configuration supports:
 - AI-assisted development workflows
 """
 
+import logging
 import os
 import sys
+from datetime import timedelta
 from pathlib import Path
+
 from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -66,30 +69,25 @@ if not DEBUG and SECRET_KEY == "dev-secret-key-change-in-production-12345":
     raise ValueError(
         "SECURITY ERROR: Default development SECRET_KEY detected in production! "
         "Set a strong SECRET_KEY environment variable for production deployment. "
-        "Generate one with: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'"
+        "Generate one with: python -c 'from django.core.management.utils import "
+        "get_random_secret_key; print(get_random_secret_key())'"
     )
 
 # Additional security validation for secret key strength
 if len(SECRET_KEY) < 50:
-    import logging
-
     logger = logging.getLogger(__name__)
     logger.warning(
         f"SECRET_KEY is only {len(SECRET_KEY)} characters long. "
         "For better security, use a key of at least 50 characters."
     )
 # Dynamic hostname validation settings
-SKIP_HOST_VALIDATION_IN_DEBUG = config(
-    "SKIP_HOST_VALIDATION_IN_DEBUG", default=True, cast=bool
-)
+SKIP_HOST_VALIDATION_IN_DEBUG = config("SKIP_HOST_VALIDATION_IN_DEBUG", default=True, cast=bool)
 
 # ALLOWED_HOSTS configuration
 # We use a two-tier approach:
 # 1. Django's ALLOWED_HOSTS is set to allow all hosts (for performance)
 # 2. DynamicHostValidationMiddleware does the actual validation
-_static_hosts = config(
-    "ALLOWED_HOSTS", default="localhost,127.0.0.1,backend,frontend,testserver"
-).split(",")
+_static_hosts = config("ALLOWED_HOSTS", default="localhost,127.0.0.1,backend,frontend,testserver").split(",")
 
 # Add common ports for backend and frontend services
 _extended_hosts = []
@@ -353,17 +351,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SITE_ID = 1
 
 # CORS Configuration for React frontend
-CORS_ALLOWED_ORIGINS = config(
-    "CORS_ALLOWED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000"
-).split(",")
+CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000").split(",")
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only in development
 
 # CSRF Configuration
-CSRF_TRUSTED_ORIGINS = config(
-    "CSRF_TRUSTED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000"
-).split(",")
+CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000").split(",")
 
 # CSRF Cookie settings for React frontend
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to CSRF cookie
@@ -444,8 +438,6 @@ SPECTACULAR_SETTINGS = {
 }
 
 # JWT Configuration
-from datetime import timedelta
-
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -632,9 +624,7 @@ AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID", default="minioadmin")
 AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY", default="minioadmin")
 AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME", default="eceee-media")
 AWS_S3_ENDPOINT_URL = config("AWS_S3_ENDPOINT_URL", default="http://minio:9000")
-AWS_S3_INTERNAL_ENDPOINT_URL = config(
-    "AWS_S3_INTERNAL_ENDPOINT_URL", default=AWS_S3_ENDPOINT_URL
-)
+AWS_S3_INTERNAL_ENDPOINT_URL = config("AWS_S3_INTERNAL_ENDPOINT_URL", default=AWS_S3_ENDPOINT_URL)
 AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="us-east-1")
 AWS_S3_USE_SSL = config("AWS_S3_USE_SSL", default=False, cast=bool)
 AWS_DEFAULT_ACL = config("AWS_DEFAULT_ACL", default="private")
@@ -650,9 +640,7 @@ AWS_S3_OBJECT_PARAMETERS = {
 # including STORAGES configuration, public-read ACL, and s3:// URL protocol
 
 # Playwright Service Configuration for Content Import
-PLAYWRIGHT_SERVICE_URL = config(
-    "PLAYWRIGHT_SERVICE_URL", default="http://localhost:5000"
-)
+PLAYWRIGHT_SERVICE_URL = config("PLAYWRIGHT_SERVICE_URL", default="http://localhost:5000")
 
 # Media File Handling Configuration
 MEDIA_FILE_MAX_SIZE = 100 * 1024 * 1024  # 100MB
@@ -676,12 +664,8 @@ AI_TAGGING_ENABLED = config("AI_TAGGING_ENABLED", default=True, cast=bool)
 
 # AI Tracking Configuration
 AI_TRACKING = {
-    "STORE_PROMPTS_BY_DEFAULT": config(
-        "AI_STORE_PROMPTS_BY_DEFAULT", default=False, cast=bool
-    ),
-    "STORE_RESPONSES_BY_DEFAULT": config(
-        "AI_STORE_RESPONSES_BY_DEFAULT", default=False, cast=bool
-    ),
+    "STORE_PROMPTS_BY_DEFAULT": config("AI_STORE_PROMPTS_BY_DEFAULT", default=False, cast=bool),
+    "STORE_RESPONSES_BY_DEFAULT": config("AI_STORE_RESPONSES_BY_DEFAULT", default=False, cast=bool),
     "PRICE_STALE_DAYS": config("AI_PRICE_STALE_DAYS", default=30, cast=int),
     "ADMIN_EMAIL": config(
         "AI_TRACKING_ADMIN_EMAIL",

@@ -6,8 +6,8 @@ from django.db.models import Count
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from site_statistics.models import EventRaw, PageStats, ConversionStats, Experiment, Assignment, ExperimentMetric
 from core.models import Tenant
+from site_statistics.models import Assignment, ConversionStats, EventRaw, Experiment, ExperimentMetric, PageStats
 
 logger = logging.getLogger(__name__)
 

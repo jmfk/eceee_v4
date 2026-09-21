@@ -1,7 +1,8 @@
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
+
+from site_statistics.views.analytics import ExperimentViewSet, PageStatsViewSet
 from site_statistics.views.ingestion import EventIngestionView
-from site_statistics.views.analytics import PageStatsViewSet, ExperimentViewSet
 
 router = DefaultRouter()
 router.register(r"page-stats", PageStatsViewSet)
