@@ -525,14 +525,7 @@ prepare-test-infra:
 	DB_NAME=$${DB_NAME:-eceee_v4}; \
 	case "$$DB_NAME" in -*|*[!A-Za-z0-9_-]*|"") echo "Error: Invalid POSTGRES_DB '$$DB_NAME'."; exit 1;; esac; \
 	echo "Starting test infrastructure..."; \
-	$(COMPOSE_INFRA) up -d db redis minio imgproxy; \
-	echo "Waiting for Postgres..."; \
-	i=0; \
-	until $(COMPOSE_INFRA) exec -T db pg_isready -U postgres >/dev/null 2>&1; do \
-		i=$$((i + 1)); \
-		if [ $$i -ge 30 ]; then echo "Error: Postgres did not become ready."; exit 1; fi; \
-		sleep 1; \
-	done; \
+	$(COMPOSE_INFRA) up -d --wait --wait-timeout 60 db redis minio imgproxy; \
 	if ! $(COMPOSE_INFRA) exec -T db psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$DB_NAME'" | grep -q 1; then \
 		echo "Creating local database '$$DB_NAME'..."; \
 		$(COMPOSE_INFRA) exec -T db createdb -U postgres "$$DB_NAME"; \
