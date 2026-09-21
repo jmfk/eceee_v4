@@ -26,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       COMPOSE_PROJECT_NAME: eceeev4ci-${{ github.run_id }}-${{ github.run_attempt }}-backendlint
+      PY_LINT_BASE: ${{ github.event_name == 'push' && github.event.before || 'origin/main' }}
     steps:
       - uses: actions/checkout@v4
         with:
