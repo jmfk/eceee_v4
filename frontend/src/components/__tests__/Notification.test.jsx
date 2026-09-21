@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Notification from '../Notification'
@@ -8,6 +8,10 @@ describe('Notification', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+    })
+
+    afterEach(() => {
+        vi.unstubAllEnvs()
     })
 
     it('renders notification with correct content', () => {
@@ -81,23 +85,16 @@ describe('Notification', () => {
     })
 
     it('shows technical details in development mode', () => {
-        const originalEnv = process.env.NODE_ENV
-        process.env.NODE_ENV = 'development'
-
         const error = new Error('Test error')
         error.stack = 'Error: Test error\n    at test.js:1:1'
 
         render(<Notification message={error} onClose={mockOnClose} />)
 
         expect(screen.getByText('Show technical details')).toBeInTheDocument()
-
-        // Restore original environment
-        process.env.NODE_ENV = originalEnv
     })
 
     it('does not show technical details in production mode', () => {
-        const originalEnv = process.env.NODE_ENV
-        process.env.NODE_ENV = 'production'
+        vi.stubEnv('DEV', false)
 
         const error = new Error('Test error')
         error.stack = 'Error: Test error\n    at test.js:1:1'
@@ -105,9 +102,6 @@ describe('Notification', () => {
         render(<Notification message={error} onClose={mockOnClose} />)
 
         expect(screen.queryByText('Show technical details')).not.toBeInTheDocument()
-
-        // Restore original environment
-        process.env.NODE_ENV = originalEnv
     })
 
     it('does not render when no message is provided', () => {
@@ -155,4 +149,4 @@ describe('Notification', () => {
 
         expect(screen.getByText('An error occurred')).toBeInTheDocument()
     })
-}) 
+})

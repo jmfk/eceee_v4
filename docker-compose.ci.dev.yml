@@ -1,0 +1,6 @@
+services:
+  # The development bind mount replaces the image-owned /app directory. Keep
+  # Django's debug log output writable for the non-root application user in CI.
+  backend:
+    tmpfs:
+      - /app/logs:mode=1777
