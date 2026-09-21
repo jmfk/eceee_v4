@@ -52,7 +52,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test backend-lint frontend-lint lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db configure-local-infra shared-infra-check use-external-infra change-ports prepare-test-infra test-infra-down refresh-db-collation replicate-db list-dbs switch-db prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel prepare-frontend-e2e frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test backend-lint frontend-lint lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db configure-local-infra shared-infra-check use-external-infra change-ports prepare-test-infra test-infra-down refresh-db-collation replicate-db list-dbs switch-db prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -597,8 +597,12 @@ test-build: test
 # Run the full suite with parallel backend tests.
 test-parallel: backend-test-parallel frontend-test
 
+# Populate the container-owned node_modules volume used by the Playwright runner.
+prepare-frontend-e2e:
+	$(COMPOSE_DEV) run --rm --no-deps -T frontend-e2e npm ci
+
 # Run admin browser regression tests
-frontend-admin-e2e-test:
+frontend-admin-e2e-test: prepare-frontend-e2e
 	$(COMPOSE_DEV) up -d frontend
 	@FP=$${FRONTEND_PORT:-10100}; \
 	echo "Waiting for frontend on http://127.0.0.1:$$FP..."; \
@@ -613,7 +617,7 @@ frontend-admin-e2e-test:
 		frontend-e2e npm run test:e2e:admin
 
 # Run public browser regression tests against the Django public renderer
-frontend-public-e2e-test: prepare-test-infra
+frontend-public-e2e-test: prepare-test-infra prepare-frontend-e2e
 	$(COMPOSE_DEV) up -d backend
 	@BP=$${BACKEND_PORT:-10101}; \
 	echo "Waiting for backend on http://127.0.0.1:$$BP..."; \
