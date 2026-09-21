@@ -8,8 +8,10 @@ DOCKER_COMPOSE ?= docker-compose
 DOCKER_COMPOSE_BIN := $(firstword $(DOCKER_COMPOSE))
 COMPOSE_DEV_FILES ?= -f docker-compose.dev.yml
 COMPOSE_INFRA_FILES ?= -f docker-compose.infra.yml
+COMPOSE_TEST_FILES ?= -f docker-compose.test-infra.yml
 COMPOSE_DEV = $(DOCKER_COMPOSE) $(COMPOSE_DEV_FILES)
 COMPOSE_INFRA = $(DOCKER_COMPOSE) $(COMPOSE_INFRA_FILES)
+COMPOSE_TEST = $(DOCKER_COMPOSE) $(COMPOSE_TEST_FILES)
 PY_LINT_BASE ?= origin/main
 
 # Global help request check
@@ -534,30 +536,32 @@ shell:
 # Start and validate the local services required by make test.
 prepare-test-infra:
 	@command -v docker >/dev/null 2>&1 || (echo "Error: Docker is required to run tests."; exit 1)
-	@python3 scripts/configure_orbstack.py --backend-port "$(BACKEND_PORT)" --frontend-port "$(FRONTEND_PORT)" --check-only >/dev/null
+	@if [ -z "$(CI)" ]; then \
+		python3 scripts/configure_orbstack.py --backend-port "$(BACKEND_PORT)" --frontend-port "$(FRONTEND_PORT)" --check-only >/dev/null; \
+	fi
 	@set -e; \
 	echo "Starting isolated ephemeral test infrastructure..."; \
-	docker compose -f docker-compose.test-infra.yml up -d test-db test-redis test-minio test-minio-init; \
-	docker compose -f docker-compose.infra.yml up -d imgproxy; \
+	$(COMPOSE_TEST) up -d test-db test-redis test-minio test-minio-init; \
+	$(COMPOSE_INFRA) up -d imgproxy; \
 	echo "Waiting for Postgres..."; \
 	i=0; \
-	until docker compose -f docker-compose.test-infra.yml exec -T test-db pg_isready -U postgres -d eceee_v4_test >/dev/null 2>&1; do \
+	until $(COMPOSE_TEST) exec -T test-db pg_isready -U postgres -d eceee_v4_test >/dev/null 2>&1; do \
 		i=$$((i + 1)); \
 		if [ $$i -ge 30 ]; then echo "Error: Postgres did not become ready."; exit 1; fi; \
 		sleep 1; \
 	done
 
 test-infra-down: ## Stop and remove only ECEEE's disposable test services and data.
-	docker compose -f docker-compose.test-infra.yml down -v
+	$(COMPOSE_TEST) down -v
 
 # Clear stale local Postgres collation metadata before creating Django test databases.
 refresh-db-collation: prepare-test-infra
-	docker compose -f docker-compose.test-infra.yml exec -T test-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+	$(COMPOSE_TEST) exec -T test-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
 		-c "UPDATE pg_database SET datcollversion = NULL WHERE datname IN ('template1', 'postgres', 'test_eceee_v4_test');" >/dev/null
 
 # Run backend tests
 backend-test: prepare-test-infra refresh-db-collation
-	docker compose -f docker-compose.dev.yml run --rm --no-deps -T \
+	$(COMPOSE_DEV) run --rm --no-deps -T \
 		-e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres \
 		-e POSTGRES_DB=eceee_v4_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=test-only \
 		-e POSTGRES_HOST=test-db -e POSTGRES_PORT=5432 \
@@ -569,7 +573,7 @@ backend-test: prepare-test-infra refresh-db-collation
 
 # Run backend tests in parallel once the suite is stable.
 backend-test-parallel: prepare-test-infra refresh-db-collation
-	docker compose -f docker-compose.dev.yml run --rm --no-deps -T \
+	$(COMPOSE_DEV) run --rm --no-deps -T \
 		-e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres \
 		-e POSTGRES_DB=eceee_v4_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=test-only \
 		-e POSTGRES_HOST=test-db -e POSTGRES_PORT=5432 \
@@ -595,7 +599,7 @@ test-parallel: backend-test-parallel frontend-test
 
 # Run admin browser regression tests
 frontend-admin-e2e-test:
-	docker compose -f docker-compose.dev.yml up -d frontend
+	$(COMPOSE_DEV) up -d frontend
 	@FP=$${FRONTEND_PORT:-10100}; \
 	echo "Waiting for frontend on http://127.0.0.1:$$FP..."; \
 	i=0; \
@@ -604,7 +608,7 @@ frontend-admin-e2e-test:
 		if [ $$i -ge 60 ]; then echo "Error: frontend did not become ready."; exit 1; fi; \
 		sleep 1; \
 	done
-	docker compose -f docker-compose.dev.yml run --rm --no-deps -T \
+	$(COMPOSE_DEV) run --rm --no-deps -T \
 		-e PLAYWRIGHT_BASE_URL=http://frontend:3000 \
 		frontend-e2e npm run test:e2e:admin
 
@@ -619,8 +623,8 @@ frontend-public-e2e-test: prepare-test-infra
 		if [ $$i -ge 60 ]; then echo "Error: backend did not become ready."; exit 1; fi; \
 		sleep 1; \
 	done; \
-	docker-compose -f docker-compose.dev.yml exec -T backend python manage.py seed_public_regression_site --hostname public-regression.test; \
-	docker compose -f docker-compose.dev.yml run --rm --no-deps -T \
+	$(COMPOSE_DEV) exec -T backend python manage.py seed_public_regression_site --hostname public-regression.test; \
+	$(COMPOSE_DEV) run --rm --no-deps -T \
 		-e PLAYWRIGHT_PUBLIC_BASE_URL=http://public-regression.test:8000 \
 		frontend-e2e npm run test:e2e:public
 
