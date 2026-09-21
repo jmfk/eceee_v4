@@ -17,7 +17,7 @@ concurrency:
 
 env:
   DOCKER_COMPOSE: docker compose
-  COMPOSE_DEV_FILES: -f docker-compose.dev.yml
+  COMPOSE_DEV_FILES: -f docker-compose.dev.yml -f docker-compose.ci.dev.yml
   COMPOSE_INFRA_FILES: -f docker-compose.infra.yml -f docker-compose.ci.yml
 
 jobs:
