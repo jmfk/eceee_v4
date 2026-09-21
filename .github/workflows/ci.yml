@@ -45,8 +45,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY=test-eceee-secret
           IMGPROXY_URL=http://imgproxy:8080
           IMGPROXY_PUBLIC_URL=http://localhost:8080
-          IMGPROXY_KEY=ci-only-imgproxy-key
-          IMGPROXY_SALT=ci-only-imgproxy-salt
+          IMGPROXY_KEY=0000000000000000000000000000000000000000000000000000000000000000
+          IMGPROXY_SALT=1111111111111111111111111111111111111111111111111111111111111111
           EOF
 
       - name: Run backend lint
@@ -97,8 +97,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY=test-eceee-secret
           IMGPROXY_URL=http://imgproxy:8080
           IMGPROXY_PUBLIC_URL=http://localhost:8080
-          IMGPROXY_KEY=ci-only-imgproxy-key
-          IMGPROXY_SALT=ci-only-imgproxy-salt
+          IMGPROXY_KEY=0000000000000000000000000000000000000000000000000000000000000000
+          IMGPROXY_SALT=1111111111111111111111111111111111111111111111111111111111111111
           EOF
 
       - name: Run backend tests
@@ -132,8 +132,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY=test-eceee-secret
           IMGPROXY_URL=http://imgproxy:8080
           IMGPROXY_PUBLIC_URL=http://localhost:8080
-          IMGPROXY_KEY=ci-only-imgproxy-key
-          IMGPROXY_SALT=ci-only-imgproxy-salt
+          IMGPROXY_KEY=0000000000000000000000000000000000000000000000000000000000000000
+          IMGPROXY_SALT=1111111111111111111111111111111111111111111111111111111111111111
           EOF
 
       - name: Run frontend unit tests
@@ -173,8 +173,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY=test-eceee-secret
           IMGPROXY_URL=http://imgproxy:8080
           IMGPROXY_PUBLIC_URL=http://localhost:8080
-          IMGPROXY_KEY=ci-only-imgproxy-key
-          IMGPROXY_SALT=ci-only-imgproxy-salt
+          IMGPROXY_KEY=0000000000000000000000000000000000000000000000000000000000000000
+          IMGPROXY_SALT=1111111111111111111111111111111111111111111111111111111111111111
           EOF
 
       - name: Install frontend dependencies
