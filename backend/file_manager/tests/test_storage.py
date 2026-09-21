@@ -10,28 +10,17 @@ Tests cover:
 - Storage configuration
 """
 
-from django.test import TestCase, override_settings
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.contrib.auth.models import User
-from unittest.mock import patch, MagicMock, Mock
-import boto3
-import uuid
-from botocore.exceptions import ClientError
-try:
-    from moto import mock_aws
-    MOTO_INSTALLED = True
-except ImportError:
-    MOTO_INSTALLED = False
-    # Define a dummy decorator if moto is not installed
-    def mock_aws(func):
-        return func
-
 import io
+from unittest.mock import MagicMock, patch
+
+from botocore.exceptions import ClientError
+from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from PIL import Image
 
-from file_manager.storage import S3MediaStorage
-from file_manager.models import MediaFile
 from content.models import Namespace
+from file_manager.storage import S3MediaStorage
 
 
 class S3MediaStorageTest(TestCase):
@@ -39,37 +28,19 @@ class S3MediaStorageTest(TestCase):
 
     def setUp(self):
         from core.models import Tenant
+
         self.user = User.objects.create_user(
             username="testuser_storage", email="test@example.com", password="testpass123"
         )
-        self.tenant = Tenant.objects.create(
-            name="Test Tenant",
-            identifier="test-tenant-storage",
-            created_by=self.user
-        )
+        self.tenant = Tenant.objects.create(name="Test Tenant", identifier="test-tenant-storage", created_by=self.user)
         self.namespace = Namespace.objects.create(
-            name="Test Namespace",
-            slug="test-namespace",
-            is_active=True,
-            created_by=self.user,
-            tenant=self.tenant
+            name="Test Namespace", slug="test-namespace", is_active=True, created_by=self.user, tenant=self.tenant
         )
 
-    @mock_aws
-    def test_s3_storage_initialization(self):
+    @patch("boto3.client")
+    def test_s3_storage_initialization(self, mock_boto_client):
         """Test S3MediaStorage initialization"""
-        if not MOTO_INSTALLED:
-            self.skipTest("moto not installed")
-        # Create mock S3 bucket
-        conn = boto3.resource(
-            "s3",
-            region_name="us-east-1",
-            endpoint_url="http://minio:9000",
-            aws_access_key_id="minioadmin",
-            aws_secret_access_key="minioadmin",
-        )
-        bucket_name = f"test-bucket-{uuid.uuid4().hex}"
-        conn.create_bucket(Bucket=bucket_name)
+        bucket_name = "test-bucket"
 
         with override_settings(
             AWS_STORAGE_BUCKET_NAME=bucket_name,
@@ -82,6 +53,7 @@ class S3MediaStorageTest(TestCase):
             self.assertIsNotNone(storage.bucket_name)
             self.assertEqual(storage.bucket_name, bucket_name)
             self.assertEqual(storage.endpoint_url, "http://minio:9000")
+            self.assertTrue(mock_boto_client.called)
 
     @patch("boto3.client")
     def test_upload_file_to_s3(self, mock_boto_client):
@@ -109,20 +81,13 @@ class ThumbnailGenerationTest(TestCase):
 
     def setUp(self):
         from core.models import Tenant
+
         self.user = User.objects.create_user(
             username="testuser_thumb", email="test@example.com", password="testpass123"
         )
-        self.tenant = Tenant.objects.create(
-            name="Test Tenant",
-            identifier="test-tenant-thumb",
-            created_by=self.user
-        )
+        self.tenant = Tenant.objects.create(name="Test Tenant", identifier="test-tenant-thumb", created_by=self.user)
         self.namespace = Namespace.objects.create(
-            name="Test Namespace",
-            slug="test-namespace",
-            is_active=True,
-            created_by=self.user,
-            tenant=self.tenant
+            name="Test Namespace", slug="test-namespace", is_active=True, created_by=self.user, tenant=self.tenant
         )
 
     def create_test_image(self, width=800, height=600, format="JPEG"):
@@ -154,9 +119,7 @@ class MetadataExtractionTest(TestCase):
         image.save(image_io, format="JPEG")
         image_io.seek(0)
 
-        return SimpleUploadedFile(
-            "test_with_exif.jpg", image_io.getvalue(), content_type="image/jpeg"
-        )
+        return SimpleUploadedFile("test_with_exif.jpg", image_io.getvalue(), content_type="image/jpeg")
 
     @patch("PIL.Image.open")
     def test_extract_image_metadata(self, mock_image_open):
@@ -178,9 +141,7 @@ class MetadataExtractionTest(TestCase):
         test_file = self.create_test_image_with_exif()
 
         # Test metadata extraction
-        metadata = self.storage.extract_metadata(
-            test_file.read(), test_file.content_type
-        )
+        metadata = self.storage.extract_metadata(test_file.read(), test_file.content_type)
 
         self.assertEqual(metadata["width"], 1920)
         self.assertEqual(metadata["height"], 1080)
@@ -190,14 +151,10 @@ class MetadataExtractionTest(TestCase):
     def test_extract_metadata_no_exif(self):
         """Test metadata extraction for files without EXIF"""
         # Create simple test file
-        test_file = SimpleUploadedFile(
-            "simple.txt", b"simple text content", content_type="text/plain"
-        )
+        test_file = SimpleUploadedFile("simple.txt", b"simple text content", content_type="text/plain")
 
         # Test metadata extraction
-        metadata = self.storage.extract_metadata(
-            test_file.read(), test_file.content_type
-        )
+        metadata = self.storage.extract_metadata(test_file.read(), test_file.content_type)
 
         self.assertIn("file_size", metadata)
         self.assertIn("content_type", metadata)
@@ -206,14 +163,10 @@ class MetadataExtractionTest(TestCase):
     def test_extract_metadata_corrupted_file(self):
         """Test metadata extraction for corrupted files"""
         # Create corrupted image file
-        corrupted_file = SimpleUploadedFile(
-            "corrupted.jpg", b"not a real image", content_type="image/jpeg"
-        )
+        corrupted_file = SimpleUploadedFile("corrupted.jpg", b"not a real image", content_type="image/jpeg")
 
         # Test metadata extraction (should not crash)
-        metadata = self.storage.extract_metadata(
-            corrupted_file.read(), corrupted_file.content_type
-        )
+        metadata = self.storage.extract_metadata(corrupted_file.read(), corrupted_file.content_type)
 
         # Should still return basic metadata
         self.assertIn("file_size", metadata)
@@ -236,9 +189,7 @@ class StorageErrorHandlingTest(TestCase):
         # Test that storage handles connection errors gracefully
         with self.assertRaises(Exception):
             storage = S3MediaStorage()
-            test_file = SimpleUploadedFile(
-                "test.jpg", b"fake content", content_type="image/jpeg"
-            )
+            test_file = SimpleUploadedFile("test.jpg", b"fake content", content_type="image/jpeg")
             storage.save("test.jpg", test_file)
 
     @patch("boto3.client")
@@ -255,11 +206,9 @@ class StorageErrorHandlingTest(TestCase):
 
         # Initialize storage AFTER patching boto3.client
         storage = S3MediaStorage()
-        
+
         # Test upload error handling
-        test_file = SimpleUploadedFile(
-            "test.jpg", b"fake content", content_type="image/jpeg"
-        )
+        test_file = SimpleUploadedFile("test.jpg", b"fake content", content_type="image/jpeg")
 
         with self.assertRaises(Exception):
             storage.save("test.jpg", test_file)
@@ -274,7 +223,7 @@ class StorageErrorHandlingTest(TestCase):
 
         # Initialize storage AFTER patching boto3.client
         storage = S3MediaStorage()
-        
+
         # Test delete error handling
         with self.assertRaises(Exception):
             storage.delete("test.jpg")
@@ -282,9 +231,7 @@ class StorageErrorHandlingTest(TestCase):
     def test_invalid_file_type(self):
         """Test handling invalid file types"""
         # Create file with invalid type
-        invalid_file = SimpleUploadedFile(
-            "test.exe", b"executable content", content_type="application/x-executable"
-        )
+        invalid_file = SimpleUploadedFile("test.exe", b"executable content", content_type="application/x-executable")
 
         # Test validation (returns False, doesn't raise ValueError)
         self.assertFalse(self.storage.validate_file_type(invalid_file))
@@ -293,12 +240,10 @@ class StorageErrorHandlingTest(TestCase):
         """Test file size limit validation"""
         # Set a small limit for testing
         self.storage.max_file_size = 1000
-        
+
         # Create oversized file
         large_content = b"x" * 1001
-        large_file = SimpleUploadedFile(
-            "large.jpg", large_content, content_type="image/jpeg"
-        )
+        large_file = SimpleUploadedFile("large.jpg", large_content, content_type="image/jpeg")
 
         # Test size validation (returns False, doesn't raise ValueError)
         self.assertFalse(self.storage.validate_file_size(large_file))

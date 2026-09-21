@@ -5,8 +5,8 @@ These tests verify that the widget system works correctly when
 different widget apps are enabled or disabled.
 """
 
-from django.test import TestCase, override_settings
-from django.test.utils import isolate_apps
+from django.test import TestCase
+
 from webpages.widget_registry import widget_type_registry
 
 
@@ -18,6 +18,7 @@ class ModularWidgetArchitectureTest(TestCase):
         # Don't clear the registry as this removes registered decorators
         # Just ensure autodiscovery has run
         from webpages.widget_autodiscovery import autodiscover_widgets
+
         autodiscover_widgets()
 
     def test_widget_registry_with_all_apps_enabled(self):
@@ -35,10 +36,6 @@ class ModularWidgetArchitectureTest(TestCase):
             "Forms",
             "Section",
         ]
-
-        # Should have custom widgets
-        # custom_widgets = ["Testimonial", "Call to Action"]
-        custom_widgets = []
 
         for widget_name in default_widgets:
             self.assertIn(
@@ -58,9 +55,7 @@ class ModularWidgetArchitectureTest(TestCase):
         # Each registered widget should be retrievable
         for widget_name in registered_names[:3]:  # Test first 3 to avoid too many
             widget = widget_type_registry.get_widget_type(widget_name)
-            self.assertIsNotNone(
-                widget, f"Widget '{widget_name}' should be retrievable"
-            )
+            self.assertIsNotNone(widget, f"Widget '{widget_name}' should be retrievable")
 
     def test_widget_autodiscovery_handles_missing_modules(self):
         """Test that widget autodiscovery handles missing modules gracefully"""
@@ -76,8 +71,8 @@ class ModularWidgetArchitectureTest(TestCase):
     def test_widget_validation_summary_with_mixed_apps(self):
         """Test widget validation summary with different app configurations"""
         from webpages.widget_autodiscovery import (
-            validate_widget_types,
             get_widget_type_summary,
+            validate_widget_types,
         )
 
         # Should be able to validate widgets from different apps
@@ -91,6 +86,15 @@ class ModularWidgetArchitectureTest(TestCase):
         self.assertIsInstance(summary, dict)
         self.assertIn("total_count", summary)
         self.assertIn("widget_types", summary)
+
+    def test_widget_validation_accepts_mustache_only_widgets(self):
+        """Mustache-backed widgets should not require a Django template too."""
+        from webpages.widget_autodiscovery import validate_single_widget_type
+
+        header_widget = widget_type_registry.get_widget_type("Header")
+
+        self.assertIsNotNone(header_widget)
+        self.assertEqual(validate_single_widget_type(header_widget), [])
 
     def test_widget_registry_persistence_across_requests(self):
         """Test that widget registry persists properly across different operations"""
@@ -114,9 +118,7 @@ class ModularWidgetArchitectureTest(TestCase):
         # Test core widget configuration validation
         text_widget = widget_type_registry.get_widget_type("Content")
         if text_widget:
-            is_valid, errors = text_widget.validate_configuration(
-                {"content": "Test content"}
-            )
+            is_valid, errors = text_widget.validate_configuration({"content": "Test content"})
             self.assertTrue(is_valid)
             self.assertEqual(errors, [])
 
@@ -156,6 +158,7 @@ class WidgetAppDependencyTest(TestCase):
         # Don't clear the registry as this removes registered decorators
         # Just ensure autodiscovery has run
         from webpages.widget_autodiscovery import autodiscover_widgets
+
         autodiscover_widgets()
 
     def test_custom_widgets_app_independence(self):
@@ -163,8 +166,8 @@ class WidgetAppDependencyTest(TestCase):
         # Import custom widgets directly
         try:
             from example_custom_widgets.widgets import (
-                TestimonialWidget,
                 CallToActionWidget,
+                TestimonialWidget,
             )
 
             # Should be able to create instances

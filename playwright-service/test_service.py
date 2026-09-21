@@ -11,7 +11,7 @@ import json
 import sys
 
 # Service configuration
-BASE_URL = "http://localhost:5001"
+BASE_URL = "http://localhost:10107"
 
 
 def test_health_check():

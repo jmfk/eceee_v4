@@ -352,7 +352,7 @@ const VersionTimelinePage = () => {
         }
 
         // Fallback if no hostname found anywhere in the hierarchy
-        return 'localhost:8000';
+        return 'localhost:10101';
     };
 
     // Build full slug path including parent slugs (excluding root page slug)

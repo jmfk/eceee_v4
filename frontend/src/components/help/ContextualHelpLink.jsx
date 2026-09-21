@@ -1,5 +1,6 @@
 import { Info } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { howToDocs } from '../../data/howToDocs'
 import { getHelpGuidePath, getHelpIndexPath, getHelpSectionPath } from '../../utils/howToHelp'
 
@@ -112,7 +113,10 @@ const ContextualHelpLink = ({
     size = 'md'
 }) => {
     const [isOpen, setIsOpen] = useState(false)
+    const [menuPosition, setMenuPosition] = useState(null)
+    const buttonRef = useRef(null)
     const containerRef = useRef(null)
+    const menuRef = useRef(null)
     const contextDocs = useMemo(() => getContextDocs(topicId), [topicId])
     const buttonClassName = size === 'sm'
         ? 'h-6 w-6'
@@ -125,7 +129,9 @@ const ContextualHelpLink = ({
         if (!isOpen) return
 
         const handlePointerDown = (event) => {
-            if (!containerRef.current?.contains(event.target)) {
+            const isInsideButton = containerRef.current?.contains(event.target)
+            const isInsideMenu = menuRef.current?.contains(event.target)
+            if (!isInsideButton && !isInsideMenu) {
                 setIsOpen(false)
             }
         }
@@ -134,9 +140,44 @@ const ContextualHelpLink = ({
         return () => document.removeEventListener('mousedown', handlePointerDown)
     }, [isOpen])
 
+    useLayoutEffect(() => {
+        if (!isOpen) return undefined
+
+        const positionMenu = () => {
+            const buttonRect = buttonRef.current?.getBoundingClientRect()
+            if (!buttonRect) return
+
+            const viewportPadding = 8
+            const menuGap = 8
+            const width = Math.min(320, window.innerWidth - viewportPadding * 2)
+            const left = Math.min(
+                Math.max(viewportPadding, buttonRect.right - width),
+                window.innerWidth - width - viewportPadding
+            )
+            const top = buttonRect.bottom + menuGap
+
+            setMenuPosition({
+                left,
+                top,
+                width,
+                maxHeight: Math.max(160, window.innerHeight - top - viewportPadding)
+            })
+        }
+
+        positionMenu()
+        window.addEventListener('resize', positionMenu)
+        window.addEventListener('scroll', positionMenu, true)
+
+        return () => {
+            window.removeEventListener('resize', positionMenu)
+            window.removeEventListener('scroll', positionMenu, true)
+        }
+    }, [isOpen])
+
     return (
         <div ref={containerRef} className={`relative inline-flex ${className}`}>
             <button
+                ref={buttonRef}
                 type="button"
                 onClick={() => setIsOpen(prev => !prev)}
                 aria-label={label}
@@ -148,10 +189,13 @@ const ContextualHelpLink = ({
                 <Info className={iconClassName} aria-hidden="true" />
             </button>
 
-            {isOpen && (
+            {isOpen && menuPosition && createPortal(
                 <div
+                    ref={menuRef}
                     role="menu"
-                    className="absolute right-0 top-9 z-50 max-h-[min(34rem,calc(100vh-6rem))] w-80 overflow-y-auto rounded border border-gray-200 bg-white p-2 text-left shadow-lg"
+                    data-testid="contextual-help-menu"
+                    className="fixed z-[10050] overflow-y-auto rounded border border-gray-200 bg-white p-2 text-left shadow-lg"
+                    style={menuPosition}
                 >
                     {contextDocs.contextGuides.length > 0 && (
                         <MenuSection title={contextDocs.title}>
@@ -206,7 +250,8 @@ const ContextualHelpLink = ({
                             Open context help page
                         </a>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     )

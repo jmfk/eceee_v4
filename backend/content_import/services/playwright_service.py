@@ -1,10 +1,10 @@
 """Playwright service integration for content import."""
 
-import requests
 import logging
-from typing import Dict, Any, Optional
-from django.conf import settings
+from typing import Any, Dict
 
+import requests
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +14,7 @@ class PlaywrightService:
 
     def __init__(self):
         """Initialize Playwright service with configured URL."""
-        self.base_url = getattr(
-            settings, "PLAYWRIGHT_SERVICE_URL", "http://localhost:5000"
-        )
+        self.base_url = getattr(settings, "PLAYWRIGHT_SERVICE_URL", "http://localhost:10107")
 
     def capture_screenshot(
         self,
@@ -60,9 +58,7 @@ class PlaywrightService:
             logger.error(f"Failed to capture screenshot for {url}: {e}")
             raise Exception(f"Screenshot capture failed: {str(e)}")
 
-    def extract_element(
-        self, url: str, x: int, y: int, timeout: int = 30000
-    ) -> Dict[str, Any]:
+    def extract_element(self, url: str, x: int, y: int, timeout: int = 30000) -> Dict[str, Any]:
         """
         Extract HTML element at coordinates.
 

@@ -1,11 +1,9 @@
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import SaveVersionControl from '../SaveVersionControl'
 
 describe('SaveVersionControl', () => {
-    it('keeps the primary save action enabled when there are no unsaved changes', async () => {
-        const user = userEvent.setup()
+    it('keeps the primary save action enabled when there are no unsaved changes', () => {
         const onSaveClick = vi.fn()
 
         render(
@@ -21,7 +19,7 @@ describe('SaveVersionControl', () => {
         expect(saveButton).toBeEnabled()
         expect(saveButton).toHaveClass('bg-green-600')
 
-        await user.click(saveButton)
+        fireEvent.click(saveButton)
 
         expect(onSaveClick).toHaveBeenCalledTimes(1)
     })

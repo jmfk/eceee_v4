@@ -20,7 +20,7 @@ A lightweight Flask microservice for rendering websites to PNG images using Play
 docker-compose up -d
 
 # Check if it's running
-curl http://localhost:5000/health
+curl http://localhost:10107/health
 ```
 
 ### Using Docker Build
@@ -30,7 +30,7 @@ curl http://localhost:5000/health
 docker build -t playwright-renderer .
 
 # Run the container
-docker run -d -p 5000:5000 --name playwright-renderer playwright-renderer
+docker run -d -p 127.0.0.1:10107:5000 --name playwright-renderer playwright-renderer
 ```
 
 ### Local Development
@@ -113,18 +113,18 @@ Returns API documentation and example requests.
 
 ```bash
 # Render a website
-curl -X POST http://localhost:5000/render \
+curl -X POST http://localhost:10107/render \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.github.com", "full_page": true}' \
   --output github.png
 
 # Validate a URL
-curl -X POST http://localhost:5000/validate \
+curl -X POST http://localhost:10107/validate \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.example.com"}'
 
 # Health check
-curl http://localhost:5000/health
+curl http://localhost:10107/health
 ```
 
 ### Python Example
@@ -133,7 +133,7 @@ curl http://localhost:5000/health
 import requests
 
 # Render website
-response = requests.post('http://localhost:5000/render',     json={
+response = requests.post('http://localhost:10107/render',     json={
         'url': 'https://www.github.com',
         'viewport_width': 1280,
         'viewport_height': 720,
@@ -154,7 +154,7 @@ else:
 ```javascript
 const renderWebsite = async (url, options = {}) => {
   try {
-    const response = await fetch('http://localhost:5000/render', {
+    const response = await fetch('http://localhost:10107/render', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -233,12 +233,12 @@ The service includes intelligent cookie consent handling that automatically:
 
 ```bash
 # Clean screenshots (default behavior)
-curl -X POST http://localhost:5001/render \
+curl -X POST http://localhost:10107/render \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com", "remove_cookie_warnings": true}'
 
 # Keep cookie banners visible
-curl -X POST http://localhost:5001/render \
+curl -X POST http://localhost:10107/render \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com", "remove_cookie_warnings": false}'
 ```
@@ -379,7 +379,7 @@ spec:
 
 ```bash
 # Check service health
-curl http://localhost:5000/health
+curl http://localhost:10107/health
 
 # Monitor container stats
 docker stats playwright-renderer

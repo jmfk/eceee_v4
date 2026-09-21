@@ -88,18 +88,16 @@ describe('Notification', () => {
         const error = new Error('Test error')
         error.stack = 'Error: Test error\n    at test.js:1:1'
 
-        render(<Notification message={error} onClose={mockOnClose} />)
+        render(<Notification message={error} onClose={mockOnClose} showTechnicalDetails />)
 
         expect(screen.getByText('Show technical details')).toBeInTheDocument()
     })
 
     it('does not show technical details in production mode', () => {
-        vi.stubEnv('DEV', false)
-
         const error = new Error('Test error')
         error.stack = 'Error: Test error\n    at test.js:1:1'
 
-        render(<Notification message={error} onClose={mockOnClose} />)
+        render(<Notification message={error} onClose={mockOnClose} showTechnicalDetails={false} />)
 
         expect(screen.queryByText('Show technical details')).not.toBeInTheDocument()
     })
