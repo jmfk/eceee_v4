@@ -1,6 +1,6 @@
 # GitHub CI and PR workflow
 
-This repository uses GitHub Actions to run quality checks on every branch push and every pull request targeting `main`.
+This repository uses GitHub Actions to run quality checks on every pull request targeting `main` and on pushes to `main` after merge. Feature-branch pushes are covered by their pull request run, avoiding duplicate CI suites for the same commit.
 
 ## Required workflow
 
