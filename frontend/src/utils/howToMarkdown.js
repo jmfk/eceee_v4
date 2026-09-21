@@ -118,11 +118,12 @@ const scriptAction = (item = {}) => {
     const caption = item.caption || action.caption || ''
 
     if (!action.type && caption) {
-        return { type: 'caption', caption }
+        return { type: 'caption', caption, ...(item.audio ? { audio: item.audio } : {}) }
     }
 
     return {
         ...action,
+        ...(item.audio ? { audio: item.audio } : {}),
         ...(caption ? { caption } : {})
     }
 }

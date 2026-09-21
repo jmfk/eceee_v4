@@ -110,6 +110,42 @@ const shouldCreateHoverClick = (hoverEvent, clickEvent) => {
     return true
 }
 
+const audioWindowForBlock = (timings = [], index, audio = {}) => {
+    const timestamp = Number(timings[index] || 0)
+    const startedAt = Number(audio.startedAt || 0)
+    if (!timestamp || !startedAt) return null
+
+    const actionMs = Math.max(0, timestamp - startedAt)
+    const previousMs = index > 0 ? Math.max(0, Number(timings[index - 1] || timestamp) - startedAt) : 0
+    const nextMs = index < timings.length - 1 ? Math.max(0, Number(timings[index + 1] || timestamp) - startedAt) : actionMs + 2800
+    const startMs = Math.max(0, Math.min(actionMs, index > 0 ? Math.max(previousMs + 150, actionMs - 900) : 0))
+    let endMs = Math.max(startMs + 500, nextMs - 150)
+
+    if (Number.isFinite(Number(audio.durationMs)) && Number(audio.durationMs) > 0) {
+        endMs = Math.min(endMs, Number(audio.durationMs))
+    }
+
+    if (endMs <= startMs) return null
+
+    const clipName = `block-${String(index + 1).padStart(3, '0')}.webm`
+    const clip = {
+        source: 'recorded',
+        url: `${audio.clipBaseUrl || ''}/${clipName}`,
+        fullUrl: audio.fullAudioUrl || '',
+        startMs: Math.round(startMs),
+        endMs: Math.round(endMs),
+        trimStartMs: 0,
+        trimEndMs: 0
+    }
+
+    return {
+        ...clip,
+        clips: {
+            recorded: clip
+        }
+    }
+}
+
 const block = (action) => ({ caption: '', action })
 
 export const convertRecordedEventsToScriptBlocks = (events = [], options = {}) => {
@@ -118,9 +154,15 @@ export const convertRecordedEventsToScriptBlocks = (events = [], options = {}) =
         .filter(event => event && event.kind)
         .sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0))
     const blocks = []
+    const blockTimings = []
     let lastPath = ''
     let pendingInput = null
     let lastHover = null
+
+    const pushBlock = (action, sourceEvent = null) => {
+        blocks.push(block(action))
+        blockTimings.push(Number(sourceEvent?.timestamp || 0))
+    }
 
     const flushInput = () => {
         if (!pendingInput) return
@@ -140,7 +182,7 @@ export const convertRecordedEventsToScriptBlocks = (events = [], options = {}) =
                 holdMs: 500
             }
 
-        blocks.push(block(action))
+        pushBlock(action, pendingInput)
         pendingInput = null
     }
 
@@ -149,7 +191,7 @@ export const convertRecordedEventsToScriptBlocks = (events = [], options = {}) =
             flushInput()
             const path = actionPathFromUrl(event.url, baseUrl)
             if (path && path !== lastPath && path !== 'about:blank') {
-                blocks.push(block({ type: 'goto', path, holdMs: 450 }))
+                pushBlock({ type: 'goto', path, holdMs: 450 }, event)
                 lastPath = path
             }
             return
@@ -177,26 +219,33 @@ export const convertRecordedEventsToScriptBlocks = (events = [], options = {}) =
                 : lastHover
 
             if (shouldCreateHoverClick(hoverCandidate, event)) {
-                blocks.push(block({
+                pushBlock({
                     type: 'hoverClick',
                     ...actionTargetFromRecordedTarget(hoverCandidate.target),
                     ...hoverClickTargetFromRecordedTarget(event.target),
                     hoverHoldMs: 300,
                     holdMs: 500
-                }))
+                }, event)
                 lastHover = null
                 return
             }
 
-            blocks.push(block({
+            pushBlock({
                 type: 'click',
                 ...actionTargetFromRecordedTarget(event.target),
                 holdMs: 500
-            }))
+            }, event)
         }
     })
 
     flushInput()
+
+    if (options.audio?.clipBaseUrl && options.audio?.startedAt) {
+        blocks.forEach((candidate, index) => {
+            const audio = audioWindowForBlock(blockTimings, index, options.audio)
+            if (audio) candidate.audio = audio
+        })
+    }
 
     return blocks
 }
