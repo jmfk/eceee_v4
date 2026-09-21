@@ -160,6 +160,8 @@ DJANGO_APPS = [
 ]
 
 THIRD_PARTY_APPS = [
+    # Database-backed scheduler used by the celery-beat production service.
+    "django_celery_beat",
     # API and serialization
     "rest_framework",
     "rest_framework.authtoken",  # Token authentication for API
