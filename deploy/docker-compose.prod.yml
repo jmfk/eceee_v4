@@ -119,6 +119,10 @@ services:
   celery-worker:
     image: eceee-backend:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    # The backend image probes its HTTP health endpoint, which a Celery worker
+    # does not serve. Avoid reporting a healthy worker as unhealthy.
+    healthcheck:
+      disable: true
     command: >
       celery -A config.celery worker
       --loglevel=info
@@ -139,6 +143,10 @@ services:
   celery-beat:
     image: eceee-backend:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    # Beat also does not serve the backend HTTP health endpoint. A failed Beat
+    # exits and is restarted by Docker, which is the relevant failure signal.
+    healthcheck:
+      disable: true
     command: >
       celery -A config.celery beat
       --loglevel=info
