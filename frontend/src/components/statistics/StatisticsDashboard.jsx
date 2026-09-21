@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart2, Users, Eye, Clock, ArrowUpRight, TrendingUp } from 'lucide-react';
+import { BarChart2, Users, Eye, Clock, TrendingUp } from 'lucide-react';
 import { statisticsApi } from '../../api/statistics';
 
 const StatisticsDashboard = ({ tenantId }) => {
@@ -30,6 +30,11 @@ const StatisticsDashboard = ({ tenantId }) => {
     fetchStats();
   }, [dateRange, tenantId]);
 
+  const trafficOverview = stats?.trafficOverview || [];
+  const topPages = stats?.topPages || [];
+  const maxTrafficViews = Math.max(...trafficOverview.map((item) => item.views), 1);
+  const maxPageViews = Math.max(...topPages.map((page) => page.views), 1);
+
   const StatCard = ({ title, value, icon, color }) => (
     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
       <div className="flex items-center justify-between mb-4">
@@ -37,16 +42,11 @@ const StatisticsDashboard = ({ tenantId }) => {
           {React.createElement(icon, { className: 'w-6 h-6 text-white' })}
         </div>
         <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
-          Last 7 days
+          Selected range
         </span>
       </div>
       <h3 className="text-slate-600 text-sm font-medium">{title}</h3>
-      <div className="flex items-baseline gap-2 mt-1">
-        <span className="text-2xl font-bold text-slate-900">{value || 0}</span>
-        <span className="text-green-600 text-xs font-medium flex items-center">
-          <ArrowUpRight className="w-3 h-3" /> +12%
-        </span>
-      </div>
+      <div className="mt-1 text-2xl font-bold text-slate-900">{value ?? 0}</div>
     </div>
   );
 
@@ -59,7 +59,7 @@ const StatisticsDashboard = ({ tenantId }) => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Site Analytics</h1>
-          <p className="text-slate-500">Real-time insights into your website performance.</p>
+          <p className="text-slate-500">Daily insights into your website performance.</p>
         </div>
         <div className="flex gap-4">
           <input
@@ -98,7 +98,7 @@ const StatisticsDashboard = ({ tenantId }) => {
         />
         <StatCard
           title="Conversion Rate"
-          value="3.2%"
+          value={`${(stats?.conversionRate || 0).toFixed(1)}%`}
           icon={TrendingUp}
           color="bg-amber-600"
         />
@@ -110,39 +110,50 @@ const StatisticsDashboard = ({ tenantId }) => {
             <h3 className="font-bold text-slate-900">Traffic Overview</h3>
             <BarChart2 className="w-5 h-5 text-slate-400" />
           </div>
-          <div className="h-64 flex items-end gap-4 px-2">
-            {/* Simple CSS placeholder for a chart */}
-            {[40, 70, 45, 90, 65, 80, 55].map((h, i) => (
-              <div key={i} className="flex-1 group relative">
-                <div
-                  className="bg-blue-100 group-hover:bg-blue-600 transition-all rounded-t-md"
-                  style={{ height: `${h}%` }}
-                ></div>
-                <div className="mt-2 text-[10px] text-slate-400 text-center">Day {i+1}</div>
-              </div>
-            ))}
-          </div>
+          {trafficOverview.length ? (
+            <div className="h-64 flex items-end gap-4 px-2">
+              {trafficOverview.map((item) => (
+                <div key={item.date} className="flex-1 group relative h-full flex flex-col justify-end">
+                  <div className="text-[10px] text-slate-500 text-center mb-1">{item.views}</div>
+                  <div
+                    className="bg-blue-100 group-hover:bg-blue-600 transition-all rounded-t-md"
+                    style={{ height: `${(item.views / maxTrafficViews) * 85}%` }}
+                  ></div>
+                  <div className="mt-2 text-[10px] text-slate-400 text-center">{item.date}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-sm text-slate-500">
+              No traffic recorded for this date range.
+            </div>
+          )}
         </div>
 
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <h3 className="font-bold text-slate-900 mb-6">Top Pages</h3>
           <div className="space-y-4">
-            {[
-              { path: '/', views: 1240 },
-              { path: '/blog/ai-future', views: 850 },
-              { path: '/services', views: 620 },
-              { path: '/contact', views: 430 }
-            ].map((page, i) => (
-              <div key={i} className="flex items-center justify-between">
-                <span className="text-sm text-slate-600 truncate max-w-[150px]">{page.path}</span>
+            {topPages.map((page) => (
+              <div key={page.url} className="flex items-center justify-between">
+                <span className="text-sm text-slate-600 truncate max-w-[150px]" title={page.url}>
+                  {page.url}
+                </span>
                 <div className="flex items-center gap-2">
                   <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-blue-600 h-full" style={{ width: `${(page.views/1240)*100}%` }}></div>
+                    <div
+                      className="bg-blue-600 h-full"
+                      style={{ width: `${(page.views / maxPageViews) * 100}%` }}
+                    ></div>
                   </div>
                   <span className="text-xs font-bold text-slate-900">{page.views}</span>
                 </div>
               </div>
             ))}
+            {!topPages.length && (
+              <div className="py-12 text-center text-sm text-slate-500">
+                No page views recorded for this date range.
+              </div>
+            )}
           </div>
         </div>
       </div>

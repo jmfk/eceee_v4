@@ -29,14 +29,10 @@ services:
       - AWS_S3_REGION_NAME=us-east-1
       - AWS_S3_USE_SSL=False
       - REDIS_URL=${REDIS_URL:-redis://eceee-v4-redis:6379/0}
-      - RABBITMQ_HOST=${RABBITMQ_HOST:-eceee-v4-rabbitmq}
-      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
-      - RABBITMQ_USER=${RABBITMQ_USER:-guest}
-      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
       - IMGPROXY_URL=${IMGPROXY_URL:-http://eceee-v4-imgproxy:8080}
       - IMGPROXY_PUBLIC_URL=${IMGPROXY_PUBLIC_URL:-http://localhost:8080}
-      - IMGPROXY_KEY=943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881
-      - IMGPROXY_SALT=520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5
+      - IMGPROXY_KEY=${IMGPROXY_KEY}
+      - IMGPROXY_SALT=${IMGPROXY_SALT}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - FM_PASSWORD=${FM_PASSWORD}
@@ -126,14 +122,10 @@ services:
       - AWS_S3_REGION_NAME=us-east-1
       - AWS_S3_USE_SSL=False
       - REDIS_URL=${REDIS_URL:-redis://eceee-v4-redis:6379/0}
-      - RABBITMQ_HOST=${RABBITMQ_HOST:-eceee-v4-rabbitmq}
-      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
-      - RABBITMQ_USER=${RABBITMQ_USER:-guest}
-      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
       - IMGPROXY_URL=${IMGPROXY_URL:-http://eceee-v4-imgproxy:8080}
       - IMGPROXY_PUBLIC_URL=${IMGPROXY_PUBLIC_URL:-http://localhost:8080}
-      - IMGPROXY_KEY=943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881
-      - IMGPROXY_SALT=520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5
+      - IMGPROXY_KEY=${IMGPROXY_KEY}
+      - IMGPROXY_SALT=${IMGPROXY_SALT}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - FM_PASSWORD=${FM_PASSWORD}
@@ -155,25 +147,6 @@ services:
       retries: 3
       start_period: 10s
 
-  # RabbitMQ for message buffering in statistics system
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: ${RABBITMQ_CONTAINER_NAME:-eceee-v4-rabbitmq}
-    restart: "no"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    ports:
-      - "5672:5672"   # AMQP
-      - "15672:15672" # Management UI
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # Theme Sync Service
   theme-sync:
     build:
@@ -191,7 +164,7 @@ services:
       - SYNC_INTERVAL=5
       - DEBOUNCE_DELAY=0.5
       - THEMES_DIR=/themes
-      - API_TOKEN=8222521226c191dbba22b26b03b6ac417bdab4fe      # JWT token from above
+      - API_TOKEN=${THEME_SYNC_API_TOKEN}
     volumes:
       - ./themes:/themes
       - ./theme-sync:/app
@@ -200,7 +173,6 @@ services:
 volumes:
   backend_static:
   frontend_node_modules:
-  rabbitmq_data:
   mcp_logs:
 
 # networks:

@@ -1,13 +1,35 @@
 from site_statistics.models import (
-    EventRaw, PageStats, ConversionStats,
-    Experiment, Variant, Assignment, ExperimentMetric
+    EventRaw,
+    PageStats,
+    ConversionStats,
+    Experiment,
+    Variant,
+    Assignment,
+    ExperimentMetric,
 )
 from rest_framework import serializers
+
+
+class EventIngestionSerializer(serializers.Serializer):
+    user_id = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    session_id = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    event_type = serializers.CharField(required=False, default="pageview", max_length=50)
+    event_time = serializers.DateTimeField(required=False)
+    url = serializers.URLField(required=False, allow_blank=True, allow_null=True, max_length=2000)
+    referrer = serializers.URLField(required=False, allow_blank=True, allow_null=True, max_length=2000)
+    metadata = serializers.JSONField(required=False, default=dict)
+
+    def validate_metadata(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Must be an object.")
+        return value
+
 
 class EventRawSerializer(serializers.ModelSerializer):
     class Meta:
         model = EventRaw
         fields = "__all__"
+
 
 class PageStatsSerializer(serializers.ModelSerializer):
     tenant_id = serializers.UUIDField(source="tenant.id", read_only=True)
@@ -16,6 +38,7 @@ class PageStatsSerializer(serializers.ModelSerializer):
         model = PageStats
         fields = "__all__"
 
+
 class ConversionStatsSerializer(serializers.ModelSerializer):
     tenant_id = serializers.UUIDField(source="tenant.id", read_only=True)
 
@@ -23,10 +46,12 @@ class ConversionStatsSerializer(serializers.ModelSerializer):
         model = ConversionStats
         fields = "__all__"
 
+
 class VariantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Variant
         fields = ["id", "name", "allocation_percent", "metadata"]
+
 
 class ExperimentSerializer(serializers.ModelSerializer):
     variants = VariantSerializer(many=True, required=False)
@@ -35,8 +60,15 @@ class ExperimentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Experiment
         fields = [
-            "id", "tenant_id", "name", "description",
-            "start_date", "end_date", "status", "goal_metric", "variants"
+            "id",
+            "tenant_id",
+            "name",
+            "description",
+            "start_date",
+            "end_date",
+            "status",
+            "goal_metric",
+            "variants",
         ]
         read_only_fields = ["tenant_id"]
 
@@ -47,10 +79,12 @@ class ExperimentSerializer(serializers.ModelSerializer):
             Variant.objects.create(experiment=experiment, **variant_data)
         return experiment
 
+
 class AssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Assignment
         fields = "__all__"
+
 
 class ExperimentMetricSerializer(serializers.ModelSerializer):
     class Meta:

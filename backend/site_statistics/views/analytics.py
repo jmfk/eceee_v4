@@ -1,15 +1,12 @@
-from rest_framework import serializers, viewsets, status
+from django.db.models import Avg, Sum
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Sum, Avg
-from site_statistics.models import (
-    PageStats, ConversionStats, Experiment, Variant
-)
-from site_statistics.serializers import (
-    PageStatsSerializer, ConversionStatsSerializer,
-    ExperimentSerializer, VariantSerializer
-)
+from rest_framework.response import Response
+
+from site_statistics.models import ConversionStats, Experiment, PageStats
+from site_statistics.serializers import ExperimentSerializer, PageStatsSerializer, VariantSerializer
 from site_statistics.services.ab_testing import ABTestingService
 
 
@@ -20,10 +17,16 @@ class TenantScopedQuerySetMixin:
         tenant = getattr(self.request, "tenant", None)
         if not tenant:
             raise serializers.ValidationError("Tenant is required. Provide X-Tenant-ID header.")
+
+        user = self.request.user
+        if not user.is_superuser and tenant.created_by_id != user.id:
+            raise PermissionDenied("You do not have access to this tenant.")
+
         return tenant
 
     def get_queryset(self):
         return super().get_queryset().filter(tenant=self.get_tenant())
+
 
 class PageStatsViewSet(TenantScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet):
     queryset = PageStats.objects.all()
@@ -38,16 +41,41 @@ class PageStatsViewSet(TenantScopedQuerySetMixin, viewsets.ReadOnlyModelViewSet)
         start_date = request.query_params.get("start")
         end_date = request.query_params.get("end")
 
-        queryset = self.get_queryset()
+        tenant = self.get_tenant()
+        queryset = PageStats.objects.filter(tenant=tenant)
+        conversion_queryset = ConversionStats.objects.filter(tenant=tenant)
         if start_date:
             queryset = queryset.filter(date__gte=start_date)
+            conversion_queryset = conversion_queryset.filter(date__gte=start_date)
         if end_date:
             queryset = queryset.filter(date__lte=end_date)
+            conversion_queryset = conversion_queryset.filter(date__lte=end_date)
 
         summary = queryset.aggregate(
             total_views=Sum("pageviews"),
             total_uniques=Sum("unique_visitors"),
-            avg_time=Avg("avg_time_on_page")
+            avg_time=Avg("avg_time_on_page"),
+        )
+
+        conversion_summary = conversion_queryset.aggregate(
+            total_impressions=Sum("impressions"),
+            total_conversions=Sum("conversions"),
+        )
+        total_impressions = conversion_summary["total_impressions"] or 0
+        total_conversions = conversion_summary["total_conversions"] or 0
+
+        traffic_overview = list(queryset.values("date").annotate(views=Sum("pageviews")).order_by("date"))
+        top_pages = list(queryset.values("url").annotate(views=Sum("pageviews")).order_by("-views", "url")[:5])
+
+        summary.update(
+            {
+                "total_views": summary["total_views"] or 0,
+                "total_uniques": summary["total_uniques"] or 0,
+                "avg_time": summary["avg_time"] or 0,
+                "conversion_rate": ((total_conversions / total_impressions) * 100 if total_impressions else 0),
+                "traffic_overview": traffic_overview,
+                "top_pages": top_pages,
+            }
         )
 
         return Response(summary)
@@ -74,16 +102,14 @@ class ExperimentViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
         results = []
         for variant in experiment.variants.all():
             metrics = variant.metrics.all()
-            results.append({
-                "variant_id": variant.id,
-                "variant_name": variant.name,
-                "metrics": {m.metric_name: m.value for m in metrics}
-            })
-        return Response({
-            "experiment_id": experiment.id,
-            "status": experiment.status,
-            "results": results
-        })
+            results.append(
+                {
+                    "variant_id": variant.id,
+                    "variant_name": variant.name,
+                    "metrics": {m.metric_name: m.value for m in metrics},
+                }
+            )
+        return Response({"experiment_id": experiment.id, "status": experiment.status, "results": results})
 
     @action(detail=True, methods=["post"])
     def assign(self, request, pk=None):
