@@ -29,16 +29,6 @@ SHARED_REDIS_PORT ?= 10301
 SHARED_MINIO_API_PORT ?= 10302
 SHARED_MINIO_CONSOLE_PORT ?= 10303
 
-# Port validation helper
-define check_port
-	@if [ -n "$(1)" ]; then \
-		if nc -z localhost $(1) 2>/dev/null; then \
-			echo "❌ Error: Port $(1) is already in use."; \
-			exit 1; \
-		fi \
-	fi
-endef
-
 # Help print helper
 define print_help
 	grep -hE '^$(1):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36mUsage:\033[0m make %s %s\n", $$1, $$2}'
@@ -52,7 +42,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel prepare-frontend-e2e frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test backend-lint frontend-lint lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db configure-local-infra shared-infra-check use-external-infra change-ports prepare-test-infra test-infra-down refresh-db-collation replicate-db list-dbs switch-db prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel prepare-frontend-e2e frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test backend-lint frontend-lint lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db configure-local-infra shared-infra-check use-external-infra prepare-test-infra test-infra-down refresh-db-collation prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -185,10 +175,6 @@ help: ## Show this help message (use: make help [target])
 		echo "  check-conf             Check database and server configuration"; \
 		echo "  configure-local-infra  Configure .env for shared OrbStack services"; \
 		echo "  shared-infra-check     Validate OrbStack and ECEEE service isolation"; \
-		echo "  change-ports           Change backend and frontend ports"; \
-		echo "  list-dbs               List all database clones"; \
-		echo "  switch-db DB=name      Switch current database in .env"; \
-		echo "  replicate-db           Clone current DB to branch-specific DB"; \
 		echo ""; \
 		echo "Usage:"; \
 		echo "  make <target>          Run a specific target"; \
@@ -1069,54 +1055,10 @@ check-servers: ## Check if backend and frontend servers are up
 
 use-external-infra: configure-local-infra ## Backwards-compatible alias for configure-local-infra.
 
-change-ports: ## Change backend and frontend ports (use: make change-ports BP=10101 FP=10100)
-	$(call check_help,change-ports)
-	@if [ -z "$(BP)" ] && [ -z "$(FP)" ]; then \
-		echo "❌ Error: Either BP (Backend Port) or FP (Frontend Port) is required."; \
-		$(call print_help,change-ports); \
-		exit 1; \
-	fi
-	$(call check_port,$(BP))
-	$(call check_port,$(FP))
-	python3 scripts/configure_orbstack.py --backend-port "$${BP:-$(BACKEND_PORT)}" --frontend-port "$${FP:-$(FRONTEND_PORT)}"
-
 check-conf: ## Check current database and server configuration
 	python3 scripts/configure_orbstack.py --backend-port "$(BACKEND_PORT)" --frontend-port "$(FRONTEND_PORT)" --check-only
 
 check-db: check-conf ## Alias for check-conf
-
-replicate-db: ## Clone current DB to branch-specific DB and update .env
-	$(call check_help,replicate-db)
-	@echo "🔄 Replicating database to branch-specific version..."
-	docker-compose -f docker-compose.dev.yml run --rm -e GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD) backend python manage.py replicate_db
-	@echo ""
-	@echo "✅ Database replicated. Please start the backend to apply changes:"
-	@echo "   make backend"
-	@	 echo ""
-
-list-dbs: ## List all database clones
-	$(call check_help,list-dbs)
-	docker-compose -f docker-compose.dev.yml run --rm -T backend python manage.py list_dbs
-
-switch-db: ## Switch current database in .env (use: make switch-db DB=dbname)
-	$(call check_help,switch-db)
-	@if [ -z "$(DB)" ]; then \
-		echo "❌ Error: DB name is required"; \
-		$(call print_help,switch-db); \
-		exit 1; \
-	fi
-	@# Check if DB exists first
-	@docker-compose -f docker-compose.dev.yml run --rm -T backend python manage.py shell -c "import psycopg2; from django.conf import settings; s=settings.DATABASES['default']; conn=psycopg2.connect(dbname='postgres', user=s['USER'], password=s['PASSWORD'], host=s['HOST'], port=s['PORT']); cur=conn.cursor(); cur.execute('SELECT 1 FROM pg_database WHERE datname = %s', ('$(DB)',)); exists=cur.fetchone(); conn.close(); exit(0 if exists else 1)" >/dev/null 2>&1 || (echo "❌ Error: Database '$(DB)' does not exist."; exit 1)
-	@echo "🔄 Switching database to '$(DB)' in .env..."
-	@if [ "$$(uname)" = "Darwin" ]; then \
-		sed -i '' "s/^POSTGRES_DB=.*/POSTGRES_DB=$(DB)/" .env; \
-		sed -i '' "s|DATABASE_URL=\(.*\)/[^/]*$$|DATABASE_URL=\1/$(DB)|" .env; \
-	else \
-		sed -i "s/^POSTGRES_DB=.*/POSTGRES_DB=$(DB)/" .env; \
-		sed -i "s|DATABASE_URL=\(.*\)/[^/]*$$|DATABASE_URL=\1/$(DB)|" .env; \
-	fi
-	@echo "✅ Successfully switched to database '$(DB)'."
-	@echo "Restart your docker containers to apply changes: make restart"
 
 # Tailwind CSS build commands
 tailwind-build: ## Build Tailwind CSS for backend templates

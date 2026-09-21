@@ -5,6 +5,33 @@ import { howToDocs } from '../../data/howToDocs'
 import { getHelpGuidePath, getHelpIndexPath, getHelpSectionPath } from '../../utils/howToHelp'
 
 const GENERAL_WIDGET_GUIDE_IDS = ['widgets-edit', 'widgets-toolbar', 'widgets-slots']
+const MENU_WIDTH = 320
+const VIEWPORT_PADDING = 8
+const MENU_GAP = 8
+
+export const calculateHelpMenuPosition = ({
+    buttonRect,
+    menuHeight,
+    viewportWidth,
+    viewportHeight
+}) => {
+    const width = Math.min(MENU_WIDTH, Math.max(0, viewportWidth - VIEWPORT_PADDING * 2))
+    const left = Math.min(
+        Math.max(VIEWPORT_PADDING, buttonRect.right - width),
+        viewportWidth - width - VIEWPORT_PADDING
+    )
+    const belowTop = buttonRect.bottom + MENU_GAP
+    const spaceBelow = Math.max(0, viewportHeight - belowTop - VIEWPORT_PADDING)
+    const spaceAbove = Math.max(0, buttonRect.top - MENU_GAP - VIEWPORT_PADDING)
+    const openAbove = menuHeight > spaceBelow && spaceAbove > spaceBelow
+    const maxHeight = openAbove ? spaceAbove : spaceBelow
+    const visibleHeight = Math.min(menuHeight, maxHeight)
+    const top = openAbove
+        ? Math.max(VIEWPORT_PADDING, buttonRect.top - MENU_GAP - visibleHeight)
+        : belowTop
+
+    return { left, top, width, maxHeight }
+}
 
 const getGlobalHelpLinks = () => [
     { id: 'help-home', title: 'Help home', href: getHelpIndexPath() },
@@ -145,23 +172,15 @@ const ContextualHelpLink = ({
 
         const positionMenu = () => {
             const buttonRect = buttonRef.current?.getBoundingClientRect()
-            if (!buttonRect) return
+            const menuHeight = menuRef.current?.scrollHeight
+            if (!buttonRect || !menuHeight) return
 
-            const viewportPadding = 8
-            const menuGap = 8
-            const width = Math.min(320, window.innerWidth - viewportPadding * 2)
-            const left = Math.min(
-                Math.max(viewportPadding, buttonRect.right - width),
-                window.innerWidth - width - viewportPadding
-            )
-            const top = buttonRect.bottom + menuGap
-
-            setMenuPosition({
-                left,
-                top,
-                width,
-                maxHeight: Math.max(160, window.innerHeight - top - viewportPadding)
-            })
+            setMenuPosition(calculateHelpMenuPosition({
+                buttonRect,
+                menuHeight,
+                viewportWidth: window.innerWidth,
+                viewportHeight: window.innerHeight
+            }))
         }
 
         positionMenu()
@@ -179,7 +198,10 @@ const ContextualHelpLink = ({
             <button
                 ref={buttonRef}
                 type="button"
-                onClick={() => setIsOpen(prev => !prev)}
+                onClick={() => {
+                    setMenuPosition(null)
+                    setIsOpen(prev => !prev)
+                }}
                 aria-label={label}
                 aria-haspopup="menu"
                 aria-expanded={isOpen}
@@ -189,13 +211,19 @@ const ContextualHelpLink = ({
                 <Info className={iconClassName} aria-hidden="true" />
             </button>
 
-            {isOpen && menuPosition && createPortal(
+            {isOpen && createPortal(
                 <div
                     ref={menuRef}
                     role="menu"
                     data-testid="contextual-help-menu"
                     className="fixed z-[10050] overflow-y-auto rounded border border-gray-200 bg-white p-2 text-left shadow-lg"
-                    style={menuPosition}
+                    style={menuPosition || {
+                        left: 0,
+                        top: 0,
+                        width: Math.min(MENU_WIDTH, window.innerWidth - VIEWPORT_PADDING * 2),
+                        opacity: 0,
+                        pointerEvents: 'none'
+                    }}
                 >
                     {contextDocs.contextGuides.length > 0 && (
                         <MenuSection title={contextDocs.title}>

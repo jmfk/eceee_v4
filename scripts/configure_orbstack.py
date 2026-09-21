@@ -26,6 +26,26 @@ DEFAULT_PROVIDER = Path(
 ).expanduser()
 ENV_FILE = ROOT / ".env"
 TEMPLATE = ROOT / ".env.template"
+REGISTERED_FRONTEND_PORT = 10100
+REGISTERED_BACKEND_PORT = 10101
+
+
+def validate_registered_ports(frontend_port: int, backend_port: int) -> None:
+    expected = {
+        "frontend": REGISTERED_FRONTEND_PORT,
+        "backend": REGISTERED_BACKEND_PORT,
+    }
+    actual = {"frontend": frontend_port, "backend": backend_port}
+    mismatches = [
+        f"{name}={actual[name]} (registered {expected[name]})"
+        for name in expected
+        if actual[name] != expected[name]
+    ]
+    if mismatches:
+        raise SystemExit(
+            "ECEEE host ports are fixed by the machine port registry: "
+            + ", ".join(mismatches)
+        )
 
 
 def read_secret(path: Path) -> str:
@@ -95,6 +115,8 @@ def main() -> int:
     parser.add_argument("--demo", action="store_true")
     args = parser.parse_args()
     provider = args.provider_root.resolve()
+
+    validate_registered_ports(args.frontend_port, args.backend_port)
 
     context = subprocess.run(
         ["docker", "context", "show"], text=True, capture_output=True, check=False

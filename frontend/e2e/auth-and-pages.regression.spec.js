@@ -84,6 +84,38 @@ test.describe('CMS auth and page management regressions', () => {
       )).toBe(false)
     })
   }
+  test('opens contextual help above a trigger at the bottom of the viewport', async ({ page }) => {
+    const viewport = { width: 375, height: 812 }
+    await page.setViewportSize(viewport)
+    await mockCmsApi(page, { authenticated: true })
+    await seedAuthenticatedSession(page)
+
+    await page.goto('/pages')
+
+    const helpButton = page.getByRole('button', { name: 'Open Pages help' })
+    await helpButton.evaluate(element => {
+      Object.assign(element.style, {
+        position: 'fixed',
+        right: '8px',
+        bottom: '8px',
+        zIndex: '10060',
+      })
+    })
+    await helpButton.click()
+
+    const helpMenu = page.getByTestId('contextual-help-menu')
+    await expect(helpMenu).toBeVisible()
+    const [buttonBox, menuBox] = await Promise.all([
+      helpButton.boundingBox(),
+      helpMenu.boundingBox(),
+    ])
+
+    expect(buttonBox).not.toBeNull()
+    expect(menuBox).not.toBeNull()
+    expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(buttonBox.y)
+    expect(menuBox.y).toBeGreaterThanOrEqual(0)
+    expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(viewport.height)
+  })
   for (const viewport of [
     { name: 'phone', width: 375, height: 812 },
     { name: 'tablet', width: 768, height: 1024 },
