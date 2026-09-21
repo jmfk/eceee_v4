@@ -29,6 +29,13 @@ class DotenvHelpersTests(unittest.TestCase):
             "# Shared OrbStack local development services\nIMGPROXY_SALT=salt\n",
         )
 
+    def test_registered_ports_accept_the_project_assignments(self):
+        configure_orbstack.validate_registered_ports(10100, 10101)
+
+    def test_registered_ports_reject_unregistered_overrides(self):
+        with self.assertRaisesRegex(SystemExit, "machine port registry"):
+            configure_orbstack.validate_registered_ports(10120, 10121)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,7 +2,35 @@ import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import ContextualHelpLink from '../ContextualHelpLink'
+import ContextualHelpLink, { calculateHelpMenuPosition } from '../ContextualHelpLink'
+
+describe('calculateHelpMenuPosition', () => {
+    it('opens above a trigger near the bottom of the viewport', () => {
+        const position = calculateHelpMenuPosition({
+            buttonRect: { top: 740, bottom: 772, right: 360 },
+            menuHeight: 400,
+            viewportWidth: 375,
+            viewportHeight: 812
+        })
+
+        expect(position.top).toBe(332)
+        expect(position.maxHeight).toBe(724)
+        expect(position.top + Math.min(400, position.maxHeight)).toBeLessThanOrEqual(812 - 8)
+    })
+
+    it('keeps a tall menu scrollable inside the larger side of the viewport', () => {
+        const position = calculateHelpMenuPosition({
+            buttonRect: { top: 300, bottom: 332, right: 360 },
+            menuHeight: 900,
+            viewportWidth: 375,
+            viewportHeight: 812
+        })
+
+        expect(position.top).toBe(340)
+        expect(position.maxHeight).toBe(464)
+        expect(position.top + position.maxHeight).toBe(812 - 8)
+    })
+})
 
 describe('ContextualHelpLink', () => {
     it('opens a contextual help menu with guide links', async () => {

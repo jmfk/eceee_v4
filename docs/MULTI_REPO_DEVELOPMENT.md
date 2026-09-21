@@ -26,7 +26,11 @@ The configuration helper reads provider-managed credentials without printing the
 
 Do not run provider `down`, reset, or volume deletion commands from this project. `make infra-down` stops only ECEEE's imgproxy. `make clean` likewise leaves shared service containers and volumes untouched.
 
+The application ports are fixed by the machine registry: frontend `10100` and backend `10101`. Change the registry and this consumer contract together rather than overriding ports from the project.
+
 `make demo-reset-site` is the only destructive shared-database workflow. It is hard-limited to the separately admitted disposable database `eceee_demo`; it cannot reset `eceee_v4` or any other consumer database.
+
+The runtime role cannot connect to the provider administration database or create, enumerate, clone, or switch databases. Any future branch-database workflow must be implemented as an explicitly admitted, provider-owned command.
 
 ## Tests
 
