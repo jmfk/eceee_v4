@@ -38,6 +38,18 @@ class PageVersionWorkflowTest(TestCase):
         version.save()
         return PageVersionWorkflowService(self.page, self.user).publish(version)
 
+    def make_page_child(self):
+        parent = WebPage.objects.create(
+            title="Parent",
+            slug="parent",
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        self.page.parent = parent
+        self.page.save()
+        return parent
+
     def test_working_copy_is_idempotent_and_does_not_change_live(self):
         live = self.publish_initial()
         service = PageVersionWorkflowService(self.page, self.user)
@@ -260,6 +272,102 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(self.page.description, "Draft description")
         self.assertEqual(self.page.slug, "draft-slug")
         self.assertIsNotNone(live.expiry_date)
+
+    def test_save_rejects_a_slug_used_by_a_sibling_page(self):
+        parent = self.make_page_child()
+        draft = self.page.create_version(self.user, "Conflicting slug")
+        WebPage.objects.create(
+            title="Sibling",
+            slug="occupied",
+            parent=parent,
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk}),
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "pageData": {
+                    **draft.page_data,
+                    "pageAttributes": {"slug": "occupied"},
+                },
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        draft.refresh_from_db()
+        self.assertNotEqual(draft.page_data.get("page_attributes", {}).get("slug"), "occupied")
+
+    def test_publish_rechecks_slug_conflicts_created_after_save(self):
+        parent = self.make_page_child()
+        draft = self.page.create_version(self.user, "Slug reviewed before conflict")
+        saved = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk}),
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "pageData": {
+                    **draft.page_data,
+                    "pageAttributes": {"slug": "claimed-later"},
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(saved.status_code, status.HTTP_200_OK)
+        draft.refresh_from_db()
+        WebPage.objects.create(
+            title="Sibling",
+            slug="claimed-later",
+            parent=parent,
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("api:pageversion-publish", kwargs={"pk": draft.pk}),
+            {"clientUpdatedAt": draft.updated_at.isoformat()},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["error"], "slug_conflict")
+        draft.refresh_from_db()
+        self.page.refresh_from_db()
+        self.assertIsNone(draft.effective_date)
+        self.assertEqual(self.page.slug, "workflow-page")
+
+    def test_scheduled_activation_rechecks_slug_conflicts(self):
+        parent = self.make_page_child()
+        live = self.publish_initial()
+        draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        draft.page_data = {
+            **draft.page_data,
+            "page_attributes": {"slug": "scheduled-conflict"},
+        }
+        draft.save(update_fields=["page_data", "updated_at"])
+        scheduled_at = timezone.now() + timedelta(hours=1)
+        PageVersionWorkflowService(self.page, self.user).schedule(draft, scheduled_at)
+        WebPage.objects.create(
+            title="Sibling",
+            slug="scheduled-conflict",
+            parent=parent,
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        with self.assertLogs("webpages.tasks", level="ERROR"):
+            updated_count = refresh_publication_caches(now=scheduled_at + timedelta(seconds=1))
+
+        self.page.refresh_from_db()
+        draft.refresh_from_db()
+        self.assertEqual(updated_count, 0)
+        self.assertEqual(self.page.current_published_version_id, live.id)
+        self.assertEqual(self.page.slug, "workflow-page")
+        self.assertEqual(draft.effective_date, scheduled_at)
 
     def test_publish_targets_only_the_explicit_canonical_working_copy(self):
         live = self.publish_initial()
