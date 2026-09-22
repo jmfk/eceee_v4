@@ -26,4 +26,8 @@ describe('versionsApi', () => {
             payload
         )
     })
+
+    it('does not expose direct version creation', () => {
+        expect(versionsApi.create).toBeUndefined()
+    })
 })

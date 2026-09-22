@@ -35,6 +35,7 @@ SECRET_KEY = config(
     default="django-insecure-2e2!o&yhu%_-v)&9rydo7&rt7f!^m$tr244w18lmk2p=r9(_kr",
 )
 DEBUG = config("DEBUG", default=True, cast=bool)
+APP_VERSION = config("APP_VERSION", default="")
 
 # Layout caching configuration
 if DEBUG:
@@ -211,6 +212,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "core.app_version_middleware.ApplicationVersionMiddleware",
     "webpages.middleware.DynamicHostValidationMiddleware",  # Must be before SecurityMiddleware
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",  # Serve static files (must be after SecurityMiddleware)

@@ -210,6 +210,7 @@ class PageVersionWorkflowTest(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["details"]["server_version"]["id"], draft.id)
         draft.refresh_from_db()
         self.assertEqual(draft.meta_title, "Other editor")
 

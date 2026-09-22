@@ -23,7 +23,6 @@ import { useNotificationContext } from './NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import {
     getVersion,
-    createVersion,
     updateVersion,
     deleteVersion,
     publishVersion,
@@ -460,4 +459,4 @@ const VersionManager = ({ pageId, onClose }) => {
     )
 }
 
-export default VersionManager 
+export default VersionManager

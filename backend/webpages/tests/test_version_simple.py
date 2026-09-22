@@ -140,6 +140,25 @@ class PageVersionAPISimpleTest(APITestCase):
             results = data
         self.assertGreater(len(results), 0)
 
+    def test_direct_version_creation_is_not_allowed(self):
+        """Working copies must be created through the page workflow endpoint."""
+        url = reverse("api:pageversion-list")
+        count_before = self.page.versions.count()
+
+        response = self.client.post(
+            url,
+            {
+                "page": self.page.pk,
+                "versionTitle": "Parallel draft",
+                "pageData": {},
+                "widgets": {},
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(self.page.versions.count(), count_before)
+
     def test_publish_version_api(self):
         """Test publishing a version via API"""
         # Create new draft to publish

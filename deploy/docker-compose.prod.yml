@@ -30,6 +30,7 @@ services:
     environment:
       # Override stale dev hostnames in deploy/.env (eceee-v4-db / eceee-v4-redis).
       DEBUG: "0"
+      APP_VERSION: ${IMAGE_TAG:-unknown}
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
     volumes:

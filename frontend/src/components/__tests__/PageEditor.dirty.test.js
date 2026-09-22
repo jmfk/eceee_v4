@@ -16,6 +16,7 @@ import {
     analyzeChanges,
     buildVersionedPageData,
     mergeVersionedPageAttributes,
+    smartSave,
 } from '../../utils/smartSaveUtils'
 import { applyWidgetUpdateToWidgetMap } from '../../utils/pageEditorWidgetState'
 import { saveWidgetEditorChanges } from '../../utils/pageEditorWidgetSave'
@@ -144,6 +145,69 @@ describe('working-copy page attributes', () => {
         )
 
         expect(page).toEqual({ title: 'Draft title', slug: 'draft-slug' })
+    })
+})
+
+describe('smartSave working-copy workflow', () => {
+    it('saves version changes through the canonical working-copy endpoint', async () => {
+        const editedVersion = {
+            ...baseVersion,
+            updatedAt: '2026-09-22T10:00:00Z',
+            widgets: {
+                main: [{ id: 'w1', type: 'easy_widgets.ContentWidget', config: { content: '<p>Updated</p>' } }]
+            }
+        }
+        const versionsApi = {
+            saveWorkingCopy: vi.fn().mockResolvedValue(editedVersion),
+        }
+
+        const result = await smartSave(
+            baseWebpage,
+            baseWebpage,
+            baseVersion,
+            editedVersion,
+            { pagesApi: {}, versionsApi },
+            { clientUpdatedAt: editedVersion.updatedAt },
+        )
+
+        expect(versionsApi.saveWorkingCopy).toHaveBeenCalledWith(
+            baseVersion.id,
+            expect.objectContaining({ widgets: editedVersion.widgets }),
+            editedVersion.updatedAt,
+        )
+        expect(result.versionResult).toBe(editedVersion)
+    })
+
+    it('preserves the server working copy in a save conflict', async () => {
+        const serverVersion = { ...baseVersion, updatedAt: '2026-09-22T10:01:00Z' }
+        const versionsApi = {
+            saveWorkingCopy: vi.fn().mockRejectedValue({
+                originalError: {
+                    response: {
+                        status: 409,
+                        data: {
+                            error: 'version_conflict',
+                            details: { serverVersion },
+                        },
+                    },
+                },
+            }),
+        }
+        const editedVersion = {
+            ...baseVersion,
+            widgets: { main: [] },
+        }
+
+        const result = await smartSave(
+            baseWebpage,
+            baseWebpage,
+            baseVersion,
+            editedVersion,
+            { pagesApi: {}, versionsApi },
+            { clientUpdatedAt: '2026-09-22T10:00:00Z' },
+        )
+
+        expect(result.conflict.serverVersion).toBe(serverVersion)
     })
 })
 

@@ -10,9 +10,15 @@
 import axios from 'axios'
 import { convertKeysToCamel } from '../utils/caseConversion'
 import { getSessionId } from '../utils/sessionId'
+import {
+    inspectAppVersionResponse,
+    startApplicationVersionMonitor,
+} from './appVersion'
 
 // API client configuration for Django backend with CSRF token handling
 const API_BASE_URL = ''
+
+startApplicationVersionMonitor()
 
 // Create axios instance with base configuration
 const apiClient = axios.create({
@@ -107,11 +113,13 @@ apiClient.interceptors.request.use(
 // Response interceptor for error handling and token refresh
 apiClient.interceptors.response.use(
     (response) => {
+        inspectAppVersionResponse(response)
         // Note: Case conversion is handled by djangorestframework-camel-case on the backend
         // Backend should send camelCase data directly
         return response
     },
     async (error) => {
+        inspectAppVersionResponse(error.response)
         const originalRequest = error.config;
 
         // If we get a 401 Unauthorized, try to refresh the token
@@ -219,4 +227,4 @@ export const api = {
 export const refreshCsrfToken = () => {
     csrfToken = null
     return getCsrfToken()
-} 
+}

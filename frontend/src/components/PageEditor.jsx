@@ -667,30 +667,31 @@ const PageEditor = () => {
 
             const newPage = await pagesApi.create(pageData);
 
-            // Create initial version with layout
-            // Note: versionsApi.create automatically adds 'page: pageId' to the request
+            // Initialize the canonical working copy through the workflow API.
             const versionData = {
-                pageData: {},
+                pageData: buildVersionedPageData({}, newPage),
                 widgets: {},
                 codeLayout: essentialFields.codeLayout || '',
                 theme: null,
                 versionTitle: 'Initial version',
-                effectiveDate: null,  // Draft version
-                expiryDate: null,
             };
 
-            let newVersion;
             try {
-                newVersion = await versionsApi.create(newPage.id, versionData);
+                const workingCopy = await versionsApi.getOrCreateWorkingCopy(newPage.id);
+                await versionsApi.saveWorkingCopy(
+                    workingCopy.version.id,
+                    versionData,
+                    workingCopy.version.updatedAt,
+                );
             } catch (versionError) {
                 console.error('Failed to create version:', versionError);
                 // Version creation failed, but page was created
                 // The backend will auto-create a version when we navigate to the page
             }
 
-            return { page: newPage, version: newVersion };
+            return { page: newPage };
         },
-        onSuccess: ({ page, version }) => {
+        onSuccess: ({ page }) => {
             addNotification(`Page "${page.title}" created successfully`, 'success', 'page-create');
             setShowEssentialFieldsModal(false);
 
@@ -1269,8 +1270,7 @@ const PageEditor = () => {
                 { pagesApi, versionsApi },      // API functions
                 {
                     description: saveOptions.description || 'Auto-save',
-                    forceNewVersion: saveOptions.option === 'new',
-                    clientUpdatedAt: saveOptions.resolvedData ? undefined : originalPageVersionData?.updatedAt
+                    clientUpdatedAt: saveOptions.resolvedData?.version?.updatedAt || originalPageVersionData?.updatedAt
                 }
             );
 
@@ -1279,7 +1279,7 @@ const PageEditor = () => {
                 console.log('🔀 Conflict detected, attempting auto-merge...');
 
                 // Fetch latest server version
-                const serverVersion = saveResult.conflict.server_version;
+                const serverVersion = saveResult.conflict.serverVersion || saveResult.conflict.server_version;
 
                 // Detect conflicts and try auto-merge
                 const conflictAnalysis = detectPageConflicts(
@@ -1349,7 +1349,7 @@ const PageEditor = () => {
             }
 
             if (saveResult.versionResult) {
-                // New version was created - use the version data
+                // The canonical working version was saved - use the returned data.
                 updatedVersionData = {
                     ...updatedVersionData,
                     ...saveResult.versionResult,
@@ -1372,7 +1372,7 @@ const PageEditor = () => {
 
             // Show success notification with smart summary
             const actionDescription = saveResult.strategy === 'page-only' ? 'Page updated' :
-                saveResult.strategy === 'version-only' ? 'New version created' :
+                saveResult.strategy === 'version-only' ? 'Working version saved' :
                     saveResult.strategy === 'both' ? 'Page and version updated' :
                         'No changes';
 
@@ -1514,8 +1514,7 @@ const PageEditor = () => {
                 );
                 setIsDirty(false); // Reset dirty state since no changes
             } else {
-                // Version changes detected - save as new version directly
-                await handleActualSave({ description: 'Version changes detected', option: 'new' });
+                await handleActualSave({ description: 'Version changes detected' });
             }
 
         } catch (error) {
@@ -1526,11 +1525,6 @@ const PageEditor = () => {
             );
         }
     }, [errorTodoItems, schemaValidationState, addNotification, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, contentEditorRef, settingsEditorRef, handleActualSave, publishUpdate, componentId, setIsDirty]);
-
-    // Handle save options from modal
-    const handleSaveOptions = useCallback(async (saveOptions) => {
-        await handleActualSave(saveOptions);
-    }, [handleActualSave]);
 
     // Simple save handlers - no modal confirmation
     const handleSave = useCallback(async () => {
@@ -1620,17 +1614,6 @@ const PageEditor = () => {
             addNotification(`Publishing failed: ${error.message}`, 'error');
         }
     }, [workflow, isDirty, handleSave, showConfirm, refetchWorkflow, queryClient, pageId, addNotification]);
-
-    const handleSaveNew = useCallback(async () => {
-        setIsSaving(true);
-        try {
-            await handleActualSave({ description: 'New version created', option: 'new' });
-        } catch (error) {
-            console.error('Save New failed:', error);
-        } finally {
-            setIsSaving(false);
-        }
-    }, [handleActualSave]);
 
     const handleUndoChanges = useCallback(async () => {
         if (!originalWebpageData || !originalPageVersionData) return;

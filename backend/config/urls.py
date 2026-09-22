@@ -36,6 +36,13 @@ def health_check(request):
     return JsonResponse({"status": "healthy", "service": "eceee-v4-backend", "version": "1.0.0"})
 
 
+def app_version(request):
+    """Return the deployed build identifier without allowing intermediary caching."""
+    response = JsonResponse({"version": getattr(settings, "APP_VERSION", "")})
+    response["Cache-Control"] = "no-store"
+    return response
+
+
 # CSRF token endpoint for React frontend
 @ensure_csrf_cookie
 def csrf_token_view(request):
@@ -52,6 +59,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # Health check
     path("health/", health_check, name="health_check"),
+    path("api/v1/app-version/", app_version, name="app-version"),
     # API Documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
