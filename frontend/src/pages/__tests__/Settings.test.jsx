@@ -232,10 +232,11 @@ describe('SettingsManager', () => {
         expect(screen.getByTestId('migration-manager')).toBeInTheDocument()
     })
 
-    it('renders version empty state from the versions route', () => {
+    it('redirects version management toward page-level history', () => {
         renderSettings('/settings/versions')
 
-        expect(screen.getByText('Select a page from the Pages tab to view its version history')).toBeInTheDocument()
+        expect(screen.getByText('Version history now belongs to each page editor.')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Open Pages' })).toBeInTheDocument()
     })
 
     it('renders publishing dashboard by default on the publishing route', () => {

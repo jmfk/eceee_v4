@@ -84,6 +84,13 @@ export const endpoints = {
         currentForPage: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/current/`,
         latestForPage: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/latest/`,
         pageVersionDetail: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/`,
+        workflow: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/workflow/`,
+        workingCopy: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/working-copy/`,
+        unpublishExplicit: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/unpublish-explicit/`,
+        saveWorkingCopy: (versionId) => `${BASE_PATH}/webpages/versions/${versionId}/save/`,
+        schedule: (versionId) => `${BASE_PATH}/webpages/versions/${versionId}/schedule/`,
+        cancelSchedule: (versionId) => `${BASE_PATH}/webpages/versions/${versionId}/cancel-schedule/`,
+        bulkPublishExplicit: `${BASE_PATH}/webpages/versions/bulk-publish-explicit/`,
         // DEPRECATED: Query string endpoints (will be removed)
         legacy: {
             forPage: (pageId) => `${BASE_PATH}/webpages/versions/?page=${pageId}`,

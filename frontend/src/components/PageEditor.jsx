@@ -148,6 +148,22 @@ function deriveTodoItemsFromError(errorString) {
     return items
 }
 
+function formatWorkflowState(state) {
+    const labels = {
+        notPublished: 'Not published',
+        not_published: 'Not published',
+        live: 'Live',
+        liveWithUnpublishedChanges: 'Live · unpublished changes',
+        live_with_unpublished_changes: 'Live · unpublished changes',
+        scheduled: 'Scheduled',
+        liveWithScheduledChanges: 'Live · scheduled changes',
+        live_with_scheduled_changes: 'Live · scheduled changes',
+        publicationEnded: 'Publication ended',
+        publication_ended: 'Publication ended',
+    }
+    return labels[state] || 'Not published'
+}
+
 
 /**
  * PageEditor - Unified Page State Architecture
@@ -179,7 +195,7 @@ const PageEditor = () => {
     const location = useLocation()
 
     // Use global isDirty from UnifiedDataContext
-    const { useExternalChanges, publishUpdate, saveCurrentVersion, getState } = useUnifiedData()
+    const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
 
     // Extract version from URL search parameters
     const urlParams = new URLSearchParams(location.search)
@@ -701,17 +717,37 @@ const PageEditor = () => {
         refetchOnWindowFocus: false // Don't refetch on window focus
     })
 
-    // Fetch page version data (PageVersion model data)
-    const { data: pageVersion, isLoading: isLoadingPageVersion } = useQuery({
-        queryKey: ['pageVersion', pageId],
-        queryFn: async () => {
-            const result = await pagesApi.versionCurrent(pageId)
-            return result
-        },
+    const {
+        data: workflow,
+        isLoading: isLoadingWorkflow,
+        refetch: refetchWorkflow,
+    } = useQuery({
+        queryKey: ['pageWorkflow', pageId],
+        queryFn: () => versionsApi.getWorkflow(pageId),
         enabled: !isNewPage,
-        staleTime: 30000, // Consider data fresh for 30 seconds
-        refetchOnMount: false, // Don't refetch on mount if data exists
-        refetchOnWindowFocus: false // Don't refetch on window focus
+        staleTime: 10000,
+        refetchOnWindowFocus: false,
+    })
+
+    // Load the canonical working version. A live-only page remains live-only
+    // until the first save, when getOrCreateWorkingCopy is called.
+    const { data: pageVersion, isLoading: isLoadingPageVersion } = useQuery({
+        queryKey: [
+            'pageVersion',
+            pageId,
+            workflow?.editableVersion?.id || workflow?.liveVersion?.id || null,
+        ],
+        queryFn: async () => {
+            const target = workflow?.editableVersion || workflow?.liveVersion || workflow?.scheduledVersion
+            if (target?.id) {
+                return versionsApi.get(target.id)
+            }
+            const result = await versionsApi.getOrCreateWorkingCopy(pageId)
+            return result.version
+        },
+        enabled: !isNewPage && Boolean(workflow),
+        staleTime: 10000,
+        refetchOnWindowFocus: false,
     })
 
     // Get unified inheritance data for this page (widgets, layout, theme)
@@ -732,7 +768,7 @@ const PageEditor = () => {
     const refetchInheritance = pageInheritance.refetch
 
     // Combined loading state
-    const isLoading = isLoadingWebpage || isLoadingPageVersion
+    const isLoading = isLoadingWebpage || isLoadingWorkflow || isLoadingPageVersion
 
     // Add loading notifications for page data
     useEffect(() => {
@@ -953,94 +989,18 @@ const PageEditor = () => {
         try {
             const versionsData = await versionsApi.getPageVersionsList(webpageData.id || pageId);
             setAvailableVersions(versionsData.results || []);
-            let targetVersion = null;
-
-            // FIRST PRIORITY: Check if we already have a current version in UDC for this page (tab switching)
-            const udcState = getState();
-            const currentPageId = udcState?.metadata?.currentPageId;
-            const currentVersionId = udcState?.metadata?.currentVersionId;
-
-            if (String(currentPageId) === String(webpageData.id) && currentVersionId && versionsData.results) {
-                targetVersion = versionsData.results.find(v => String(v.id) === String(currentVersionId));
-                if (targetVersion) {
-                    // Don't call SWITCH_VERSION again, it's already the current version
-                    setCurrentVersion(targetVersion);
-                    const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, targetVersion.id));
-                    const newPage = response.data || response;
-                    const processedDetail = processLoadedVersionData(newPage);
-                    setPageVersionData(processedDetail);
-                    setOriginalPageVersionData(processedDetail);
-                    return; // Early return, we're done
-                }
-            }
-
-            // SECOND PRIORITY: Use version from URL if specified and valid
-            if (!targetVersion && versionFromUrl && versionsData.results) {
-                targetVersion = versionsData.results.find(v => v.id.toString() === versionFromUrl);
-                if (!targetVersion) {
-                    // Version ID from URL is invalid, remove it from URL
-                    const currentPath = location.pathname;
-                    navigate(currentPath, { replace: true, state: { previousView } });
-                }
-            }
-
-            // THIRD PRIORITY: Use last viewed version from UDC (persists across page navigations)
-            if (!targetVersion && versionsData.results) {
-                const lastViewedVersionId = udcState?.metadata?.lastViewedVersions?.[webpageData.id];
-                if (lastViewedVersionId) {
-                    targetVersion = versionsData.results.find(v => v.id.toString() === lastViewedVersionId);
-                    if (targetVersion) {
-                        addNotification(`Restored your last viewed version ${targetVersion.versionNumber}`, 'info');
-                    }
-                }
-            }
-
-            // FOURTH PRIORITY: Use highest version number (last saved) as fallback
-            if (!targetVersion && versionsData.results && versionsData.results.length > 0) {
-                targetVersion = versionsData.results.reduce((latest, current) => {
-                    return (current.versionNumber > latest.versionNumber) ? current : latest;
-                });
-            }
+            const targetId = workflow?.editableVersion?.id || workflow?.liveVersion?.id;
+            const targetVersion = (versionsData.results || []).find(
+                version => String(version.id) === String(targetId)
+            );
             if (targetVersion) {
-                // Use a stable component ID for initialization (not dependent on versionId)
-                const initComponentId = `page-editor-${webpageData.id}-init`;
-
-                // First initialize the version data in UnifiedDataContext
-                await publishUpdate(initComponentId, OperationTypes.INIT_PAGE, {
-                    id: webpageData.id,
-                    data: webpageData
-                });
-                await publishUpdate(initComponentId, OperationTypes.INIT_VERSION, {
-                    id: targetVersion.id,
-                    data: targetVersion
-                });
-
-                // Call SWITCH_VERSION to save it to lastViewedVersions (for tab switching persistence)
-                await publishUpdate(initComponentId, OperationTypes.SWITCH_VERSION, {
-                    pageId: webpageData.id,
-                    versionId: targetVersion.id
-                });
                 setCurrentVersion(targetVersion);
-
-                const changes = analyzeChanges(
-                    originalWebpageData,
-                    webpageData,
-                    originalPageVersionData,
-                    pageVersionData
-                );
-                if (!changes.hasPageChanges && !changes.hasVersionChanges) {
-                    const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, targetVersion.id));
-                    const newPage = response.data || response;
-                    const processedDetail = processLoadedVersionData(newPage);
-                    setPageVersionData(processedDetail);
-                    setOriginalPageVersionData(processedDetail);
-                }
             }
         } catch (error) {
             console.error('PageEditor: Error loading versions', error);
             showError('Failed to load page versions');
         }
-    }, [webpageData?.id, isNewPage, versionFromUrl, location.pathname, previousView, showError, publishUpdate, getState, pageId]);
+    }, [webpageData?.id, isNewPage, showError, pageId, workflow]);
 
     // Load versions but preserve current version selection
     const loadVersionsPreserveCurrent = useCallback(async () => {
@@ -1064,32 +1024,16 @@ const PageEditor = () => {
             setAvailableVersions(versionsData.results || []);
 
 
-            // Only set current version if not already set
-            if (!currentVersion && versionsData.results && versionsData.results.length > 0) {
-                // Find the version with the highest version number (last saved)
-                const lastSavedVersion = versionsData.results.reduce((latest, current) => {
-                    return (current.versionNumber > latest.versionNumber) ? current : latest;
-                });
-                setCurrentVersion(lastSavedVersion);
-                // Load the complete version data including widgets using raw API
-                const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, lastSavedVersion.id));
-                const newPage = response.data || response;
-                const processedDetail = processLoadedVersionData(newPage);
-                setPageVersionData(processedDetail);
-                setOriginalPageVersionData(processedDetail);
-            } else if (currentVersion) {
-                // If we have a current version, reload the page data with that version using raw API
-                const response = await api.get(endpoints.versions.pageVersionDetail(webpageData.id || pageId, currentVersion.id));
-                const newPage = response.data || response;
-                const processedDetail = processLoadedVersionData(newPage);
-                setPageVersionData(processedDetail);
-                setOriginalPageVersionData(processedDetail);
-            }
+            const targetId = workflow?.editableVersion?.id || workflow?.liveVersion?.id;
+            const targetVersion = (versionsData.results || []).find(
+                version => String(version.id) === String(targetId)
+            );
+            if (targetVersion) setCurrentVersion(targetVersion);
         } catch (error) {
             console.error('PageEditor: Error loading versions', error);
             showError('Failed to load page versions');
         }
-    }, [webpageData?.id, isNewPage, currentVersion, showError]);
+    }, [webpageData?.id, isNewPage, showError, pageId, workflow]);
 
     // Define switchToVersion first since updatePageData depends on it
     const switchToVersion = useCallback(async (versionId) => {
@@ -1579,22 +1523,101 @@ const PageEditor = () => {
     const handleSave = useCallback(async () => {
         setIsSaving(true);
         try {
-            await saveCurrentVersion();
+            let targetVersion = pageVersionData;
+            let clientUpdatedAt = originalPageVersionData?.updatedAt || pageVersionData?.updatedAt;
+            const editableId = workflow?.editableVersion?.id;
+
+            if (!editableId || String(editableId) !== String(pageVersionData?.id)) {
+                const workingCopy = await versionsApi.getOrCreateWorkingCopy(pageId);
+                targetVersion = workingCopy.version;
+                clientUpdatedAt = workingCopy.version.updatedAt;
+            }
+
+            const versionPayload = {
+                pageData: pageVersionData?.pageData || {},
+                widgets: localWidgets || pageVersionData?.widgets || {},
+                codeLayout: pageVersionData?.codeLayout || '',
+                theme: pageVersionData?.theme?.id || pageVersionData?.theme || null,
+                metaTitle: pageVersionData?.metaTitle || '',
+                metaDescription: pageVersionData?.metaDescription || '',
+                pageCssVariables: pageVersionData?.pageCssVariables || {},
+                pageCustomCss: pageVersionData?.pageCustomCss || '',
+                enableCssInjection: pageVersionData?.enableCssInjection !== false,
+                tags: pageVersionData?.tags || [],
+            };
+            const saved = await versionsApi.saveWorkingCopy(
+                targetVersion.id,
+                versionPayload,
+                clientUpdatedAt,
+            );
+            const processed = processLoadedVersionData(saved);
+            setPageVersionData(processed);
+            setOriginalPageVersionData(processed);
+            setCurrentVersion(saved);
+            await publishUpdate(`page-editor-${pageId}-${saved.id}`, OperationTypes.INIT_VERSION, {
+                id: saved.id,
+                data: processed,
+            });
+
+            const pageChanges = analyzeChanges(
+                originalWebpageData || {},
+                webpageData || {},
+                {},
+                {},
+            );
+            if (pageChanges.hasPageChanges) {
+                const updatedPage = await pagesApi.update(pageId, pageChanges.pageFields);
+                setWebpageData(updatedPage);
+                setOriginalWebpageData(updatedPage);
+            }
+
+            await refetchWorkflow();
+            await loadVersionsPreserveCurrent();
             setIsDirty(false);
             addNotification(
-                'Current version saved',
+                'Working version saved',
                 'success'
             );
+            return saved;
         } catch (error) {
             console.error('Save failed:', error);
+            const isConflict = error?.originalError?.response?.status === 409;
             addNotification(
-                `Save failed: ${error?.message || 'Unknown error'}`,
+                isConflict
+                    ? 'Someone else changed this working version. Reload it before saving again.'
+                    : `Save failed: ${error?.message || 'Unknown error'}`,
                 'error'
             );
+            throw error;
         } finally {
             setIsSaving(false);
         }
-    }, [saveCurrentVersion, setIsDirty, addNotification]);
+    }, [pageVersionData, originalPageVersionData, workflow, pageId, localWidgets, publishUpdate, originalWebpageData, webpageData, refetchWorkflow, loadVersionsPreserveCurrent, setIsDirty, addNotification]);
+
+    const handlePublishWorkingCopy = useCallback(async () => {
+        try {
+            let targetId = workflow?.editableVersion?.id;
+            if (isDirty || !targetId) {
+                const saved = await handleSave();
+                targetId = saved?.id;
+            }
+            if (!targetId) return;
+            const confirmed = await showConfirm({
+                title: 'Publish changes',
+                message: 'Publish the saved working version now?',
+                confirmText: 'Publish changes',
+                confirmButtonStyle: 'primary',
+            });
+            if (!confirmed) return;
+            await versionsApi.publish(targetId);
+            await refetchWorkflow();
+            await queryClient.invalidateQueries({ queryKey: ['pageVersion', pageId] });
+            await queryClient.invalidateQueries({ queryKey: ['pages'] });
+            addNotification('Changes published', 'success');
+        } catch (error) {
+            addNotification(`Publishing failed: ${error.message}`, 'error');
+        }
+    }, [workflow, isDirty, handleSave, showConfirm, refetchWorkflow, queryClient, pageId, addNotification]);
 
     const handleSaveNew = useCallback(async () => {
         setIsSaving(true);
@@ -2201,11 +2224,8 @@ const PageEditor = () => {
                         {activeTab === 'publishing' && !isNewPage && (
                             <PublishingEditor
                                 key={`publishing-${pageVersionData?.versionId || 'current'}`}
-                                webpageData={webpageData}
-                                pageVersionData={pageVersionData}
                                 pageId={pageId}
-                                currentVersion={currentVersion}
-                                onVersionChange={switchToVersion}
+                                onWorkflowChange={refetchWorkflow}
                             />
                         )}
                         {activeTab === 'theme' && (
@@ -2276,8 +2296,10 @@ const PageEditor = () => {
                 availableVersions={availableVersions}
                 onVersionChange={switchToVersion}
                 onSaveClick={handleSave}
-                onSaveNewClick={handleSaveNew}
                 onUndoChanges={handleUndoChanges}
+                onPublishClick={handlePublishWorkingCopy}
+                onHistoryClick={() => navigate(`/pages/${pageId}/edit/publishing?panel=history`, { state: { previousView } })}
+                onScheduleClick={() => navigate(`/pages/${pageId}/edit/publishing`, { state: { previousView } })}
                 isSaving={isSaving}
                 isNewPage={isNewPage}
                 webpageData={webpageData}
@@ -2286,11 +2308,11 @@ const PageEditor = () => {
                 customStatusContent={
                     <div className="flex items-center space-x-4">
                         <span>
-                            Status: <span className={`font-medium ${pageVersionData?.publicationStatus === 'published' ? 'text-green-600' :
-                                pageVersionData?.publicationStatus === 'scheduled' ? 'text-blue-600' :
+                            Status: <span className={`font-medium ${workflow?.state === 'live' ? 'text-green-600' :
+                                workflow?.state?.includes('scheduled') ? 'text-blue-600' :
                                     'text-gray-600'
                                 }`}>
-                                {pageVersionData?.publicationStatus || 'unpublished'}
+                                {formatWorkflowState(workflow?.state)}
                             </span>
                         </span>
 

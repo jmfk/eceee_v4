@@ -164,20 +164,17 @@ class PageVersionAPISimpleTest(APITestCase):
         self.assertEqual(new_draft.get_publication_status(), "published")
 
     def test_create_draft_api(self):
-        """Test creating draft from published via API"""
+        """The legacy create-draft API reuses the canonical working copy."""
         url = reverse("api:pageversion-create-draft", kwargs={"pk": self.published.pk})
         data = {"description": "API created draft"}
 
+        count_before = self.page.versions.count()
+
         response = self.client.post(url, data, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        # Verify new draft exists
-        new_draft = PageVersion.objects.filter(
-            page=self.page,
-            effective_date__isnull=True,
-            version_title="API created draft",
-        ).first()
-        self.assertIsNotNone(new_draft)
+        self.assertFalse(response.data["created"])
+        self.assertEqual(response.data["version"]["id"], self.draft.id)
+        self.assertEqual(self.page.versions.count(), count_before)
 
     def test_compare_versions_api(self):
         """Test version comparison via API"""

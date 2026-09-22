@@ -10,7 +10,8 @@ Version-related serializers for the Web Page Publishing System
 """
 
 from rest_framework import serializers
-from ..models import PageVersion, PageTheme, WebPage, PageDataSchema
+
+from ..models import PageDataSchema, PageTheme, PageVersion, WebPage
 from .base import UserSerializer
 from .theme import PageThemeSerializer
 
@@ -83,6 +84,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
             # Metadata
             "change_summary",
             "created_at",
+            "updated_at",
             "created_by",
         ]
         read_only_fields = [
@@ -96,6 +98,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "effective_theme",
             "theme_inheritance_info",
             "created_at",
+            "updated_at",
             "created_by",
         ]
 
@@ -373,7 +376,7 @@ class PageDataUpdateSerializer(serializers.ModelSerializer):
         )
 
         if effective_schema:
-            from jsonschema import Draft202012Validator, Draft7Validator
+            from jsonschema import Draft7Validator, Draft202012Validator
 
             try:
                 try:
@@ -437,6 +440,7 @@ class PageVersionListSerializer(serializers.ModelSerializer):
             "publication_status",
             # Metadata
             "created_at",
+            "updated_at",
             "created_by",
         ]
 

@@ -26,6 +26,7 @@ const mockParentPage = {
     title: 'Parent Page',
     slug: 'parent-page',
     publicationStatus: 'published',
+    workflowState: 'live',
     childrenCount: 2,
     children: [
         {
@@ -136,10 +137,7 @@ describe('PageTreeNode - Child Page Refresh', () => {
         expect(mockOnRefreshChildren).not.toHaveBeenCalled()
     })
 
-    it('should NOT call onRefreshChildren when parent page publication status is toggled (using targeted updates)', async () => {
-        const mockResponse = { data: { ...mockParentPage, publicationStatus: 'unpublished' } }
-        mockAxiosInstance.post.mockResolvedValue(mockResponse)
-
+    it('keeps parent publication status informational without refreshing children', async () => {
         renderWithProviders(
             <PageTreeNode
                 page={mockCollapsedParentPage}
@@ -148,17 +146,10 @@ describe('PageTreeNode - Child Page Refresh', () => {
             />
         )
 
-        // Find and click the publication status icon (Globe for published)
-        const statusIcon = document.querySelector('svg.lucide-globe')
-        const clickableContainer = statusIcon.parentElement
-        await user.click(clickableContainer)
+        const statusIndicator = screen.getByLabelText(/Live\. Open the page editor to change publication/i)
+        await user.click(statusIndicator)
 
-        // Wait for the mutation to complete
-        await waitFor(() => {
-            expect(mockAxiosInstance.post).toHaveBeenCalledWith('/api/v1/webpages/pages/1/unpublish/', { mode: 'current' }, {})
-        })
-
-        // Should NOT call onRefreshChildren because we use targeted updates now
+        expect(mockAxiosInstance.post).not.toHaveBeenCalled()
         expect(mockOnRefreshChildren).not.toHaveBeenCalled()
     })
 

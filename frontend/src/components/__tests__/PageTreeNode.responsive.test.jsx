@@ -21,6 +21,7 @@ const responsivePage = {
     childrenCount: 12,
     hostnames: [],
     publicationStatus: 'published',
+    workflowState: 'liveWithUnpublishedChanges',
     latestVersionNumber: 8,
     publishedVersionNumber: 7,
     latestDraftVersionNumber: 8,
@@ -55,9 +56,9 @@ describe('PageTreeNode responsive actions and metadata', () => {
         expect(screen.getByTestId('page-tree-identity-long-published-page-title')).toBeInTheDocument()
         expect(screen.getByTestId('page-tree-metadata-long-published-page-title')).toBeInTheDocument()
         expect(screen.getByTitle(responsivePage.title)).toHaveAccessibleName(`Edit ${responsivePage.title}`)
-        expect(screen.getByText('Published')).toBeVisible()
-        expect(screen.getByText('📗 v7')).toBeVisible()
-        expect(screen.getByText('✏️ v8')).toBeVisible()
+        expect(screen.getByText('Live · unpublished changes')).toBeVisible()
+        expect(screen.queryByText('📗 v7')).not.toBeInTheDocument()
+        expect(screen.queryByText('✏️ v8')).not.toBeInTheDocument()
         expect(screen.getByLabelText('Missing hostname')).toBeVisible()
 
         const row = screen.getByTestId('page-tree-node-long-published-page-title')
@@ -82,7 +83,7 @@ describe('PageTreeNode responsive actions and metadata', () => {
 
         const menu = screen.getByRole('menu', { name: `Actions for ${responsivePage.title}` })
         expect(menu).toBeVisible()
-        expect(screen.getByRole('menuitem', { name: 'Move up' })).toHaveFocus()
+        expect(screen.getByRole('menuitem', { name: 'Publishing & history' })).toHaveFocus()
         expect(screen.getByRole('menuitem', { name: 'Import as child' })).toBeVisible()
         expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeVisible()
 

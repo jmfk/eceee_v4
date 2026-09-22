@@ -12,6 +12,40 @@ import { wrapApiCall, buildQueryParams } from './utils.js'
  * Version API operations
  */
 export const versionsApi = {
+    getWorkflow: wrapApiCall(async (pageId) => {
+        return api.get(endpoints.versions.workflow(pageId))
+    }, 'versions.getWorkflow'),
+
+    getOrCreateWorkingCopy: wrapApiCall(async (pageId) => {
+        return api.post(endpoints.versions.workingCopy(pageId))
+    }, 'versions.getOrCreateWorkingCopy'),
+
+    saveWorkingCopy: wrapApiCall(async (versionId, versionData, clientUpdatedAt) => {
+        return api.patch(endpoints.versions.saveWorkingCopy(versionId), {
+            ...versionData,
+            clientUpdatedAt,
+        })
+    }, 'versions.saveWorkingCopy'),
+
+    scheduleWorkingCopy: wrapApiCall(async (versionId, effectiveDate, expiryDate = null) => {
+        return api.post(endpoints.versions.schedule(versionId), {
+            effectiveDate,
+            expiryDate,
+        })
+    }, 'versions.scheduleWorkingCopy'),
+
+    cancelWorkingCopySchedule: wrapApiCall(async (versionId) => {
+        return api.post(endpoints.versions.cancelSchedule(versionId))
+    }, 'versions.cancelWorkingCopySchedule'),
+
+    unpublishExplicit: wrapApiCall(async (pageId, versionId) => {
+        return api.post(endpoints.versions.unpublishExplicit(pageId), { versionId })
+    }, 'versions.unpublishExplicit'),
+
+    bulkPublishExplicit: wrapApiCall(async (items) => {
+        return api.post(endpoints.versions.bulkPublishExplicit, { items })
+    }, 'versions.bulkPublishExplicit'),
+
     /**
      * Create a new version
      * @param {number} pageId - Page ID
