@@ -38,8 +38,8 @@ const setEditorHtml = async (page, widgetId, html) => {
 }
 
 const saveCurrentVersion = async page => {
-  await page.getByRole('button', { name: /Save v3/ }).click()
-  await expect(page.getByText('Current version saved')).toBeVisible()
+  await page.getByRole('button', { name: /^Save$/ }).click()
+  await expect(page.getByText('Working version saved')).toBeVisible()
 }
 
 const getSavedVersion = editorState => editorState.savedVersions.at(-1)

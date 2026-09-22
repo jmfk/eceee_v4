@@ -2225,6 +2225,8 @@ const PageEditor = () => {
                             <PublishingEditor
                                 key={`publishing-${pageVersionData?.versionId || 'current'}`}
                                 pageId={pageId}
+                                isDirty={isDirty}
+                                onSave={handleSave}
                                 onWorkflowChange={refetchWorkflow}
                             />
                         )}

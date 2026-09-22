@@ -7,7 +7,9 @@ AI agent tasks, scheduled tasks, and other async operations.
 
 import logging
 import os
+
 from celery import Celery
+from celery.schedules import crontab
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -37,6 +39,7 @@ app.conf.task_routes = {
     # Site package import/export tasks
     "webpages.tasks.export_site_package": {"queue": "default"},
     "webpages.tasks.import_site_package": {"queue": "default"},
+    "webpages.tasks.refresh_scheduled_publication_caches": {"queue": "maintenance"},
     # Default queue for other tasks
     "*": {"queue": "default"},
 }
@@ -67,8 +70,6 @@ def debug_task(self):
 
 
 # Periodic task configuration
-from celery.schedules import crontab
-
 app.conf.beat_schedule = {
     # Clean up old AI agent tasks daily at 2 AM
     "cleanup-old-ai-tasks": {

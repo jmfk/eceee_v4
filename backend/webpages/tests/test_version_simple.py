@@ -1,11 +1,10 @@
-from django.test import TestCase
 from django.contrib.auth.models import User
+from django.test import TestCase
 from django.urls import reverse
-from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
-from django.utils import timezone
+from rest_framework.test import APIClient, APITestCase
 
-from webpages.models import WebPage, PageTheme, PageVersion
+from webpages.models import PageVersion, WebPage
 
 
 class PageVersionCoreTest(TestCase):
@@ -13,18 +12,15 @@ class PageVersionCoreTest(TestCase):
 
     def setUp(self):
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         from core.models import Tenant
-        self.user = User.objects.create_superuser(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
-        self.user2 = User.objects.create_user(
-            username="testuser2", email="test2@example.com", password="testpass123"
-        )
+
+        self.user = User.objects.create_superuser(username="testuser", email="test@example.com", password="testpass123")
+        self.user2 = User.objects.create_user(username="testuser2", email="test2@example.com", password="testpass123")
         self.tenant, _ = Tenant.objects.get_or_create(
-            identifier="default",
-            defaults={"name": "Default Tenant", "created_by": self.user}
+            identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
 
         self.page = WebPage.objects.create(
@@ -52,9 +48,7 @@ class PageVersionCoreTest(TestCase):
     def test_create_draft_from_published(self):
         """Test creating draft from published version"""
         # Create and publish version
-        published = self.page.create_version(
-            self.user, "Published version", auto_publish=True
-        )
+        published = self.page.create_version(self.user, "Published version", auto_publish=True)
 
         # Create draft from it
         draft = published.create_draft_from_published(self.user2, "New draft")
@@ -108,17 +102,16 @@ class PageVersionAPISimpleTest(APITestCase):
 
     def setUp(self):
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         from core.models import Tenant
-        self.user = User.objects.create_user(
-            username="testuser_api", email="test@example.com", password="testpass123"
-        )
+
+        self.user = User.objects.create_user(username="testuser_api", email="test@example.com", password="testpass123")
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
         self.tenant, _ = Tenant.objects.get_or_create(
-            identifier="default",
-            defaults={"name": "Default Tenant", "created_by": self.user}
+            identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
 
         self.page = WebPage.objects.create(
@@ -131,9 +124,7 @@ class PageVersionAPISimpleTest(APITestCase):
 
         # Create test versions
         self.draft = self.page.create_version(self.user, "Draft version")
-        self.published = self.page.create_version(
-            self.user, "Published version", auto_publish=True
-        )
+        self.published = self.page.create_version(self.user, "Published version", auto_publish=True)
 
     def test_list_versions_api(self):
         """Test listing versions via API"""
@@ -244,17 +235,16 @@ class PageVersionIntegrationSimpleTest(APITestCase):
 
     def setUp(self):
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         from core.models import Tenant
-        self.user = User.objects.create_user(
-            username="testuser_int", email="test@example.com", password="testpass123"
-        )
+
+        self.user = User.objects.create_user(username="testuser_int", email="test@example.com", password="testpass123")
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
         self.tenant, _ = Tenant.objects.get_or_create(
-            identifier="default",
-            defaults={"name": "Default Tenant", "created_by": self.user}
+            identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
 
         self.page = WebPage.objects.create(

@@ -597,6 +597,10 @@ CELERY_TIMEZONE = TIME_ZONE
 
 # Celery Beat Schedule for periodic tasks
 CELERY_BEAT_SCHEDULE = {
+    "refresh-scheduled-publication-caches": {
+        "task": "webpages.tasks.refresh_scheduled_publication_caches",
+        "schedule": 60.0,  # Every minute
+    },
     "check-ai-prices-weekly": {
         "task": "ai_tracking.tasks.check_ai_prices",
         "schedule": 604800.0,  # Every 7 days (in seconds)

@@ -5,10 +5,58 @@ This module contains background tasks for page management and maintenance.
 """
 
 import logging
+
 from celery import shared_task
 from django.core.management import call_command
+from django.db.models import F, IntegerField, OuterRef, Q, Subquery
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+def refresh_publication_caches(now=None):
+    """Refresh pages whose time-based publication boundary has changed."""
+    from webpages.models import PageVersion, WebPage
+    from webpages.signals import update_page_publication_cache
+
+    now = now or timezone.now()
+    expected_current_version = (
+        PageVersion.objects.filter(page_id=OuterRef("pk"), effective_date__lte=now)
+        .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+        .order_by("-effective_date", "-version_number")
+        .values("pk")[:1]
+    )
+    stale_pages = WebPage.objects.annotate(
+        _expected_current_version_id=Subquery(
+            expected_current_version,
+            output_field=IntegerField(),
+        )
+    ).filter(
+        Q(
+            _expected_current_version_id__isnull=True,
+            current_published_version_id__isnull=False,
+        )
+        | Q(
+            _expected_current_version_id__isnull=True,
+            is_currently_published=True,
+        )
+        | (
+            Q(_expected_current_version_id__isnull=False)
+            & (~Q(current_published_version_id=F("_expected_current_version_id")) | Q(is_currently_published=False))
+        )
+    )
+
+    updated_count = 0
+    for page in stale_pages.iterator():
+        update_page_publication_cache(page, now=now)
+        updated_count += 1
+    return updated_count
+
+
+@shared_task
+def refresh_scheduled_publication_caches():
+    """Apply scheduled publications and expirations to the public cache."""
+    return refresh_publication_caches()
 
 
 @shared_task(bind=True, max_retries=1)

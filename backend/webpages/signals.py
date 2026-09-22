@@ -4,10 +4,11 @@ Widget Inheritance Cache Invalidation Signals
 Automatically invalidates inheritance tree caches when pages or widgets change.
 """
 
-from django.db.models.signals import post_save, post_delete, pre_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
-from .models import WebPage, PageVersion
+
 from .inheritance_cache import InheritanceTreeCache
+from .models import PageVersion, WebPage
 
 
 @receiver(post_save, sender=WebPage)
@@ -15,7 +16,7 @@ def invalidate_page_tree_on_save(sender, instance, created, **kwargs):
     """Invalidate inheritance tree cache when page is saved and update children paths"""
 
     # Always invalidate the page and its descendants
-    invalidated = InheritanceTreeCache.invalidate_page(instance.id)
+    InheritanceTreeCache.invalidate_page(instance.id)
 
     # If parent changed, invalidate old and new hierarchies
     if hasattr(instance, "_old_parent_id"):
@@ -40,9 +41,7 @@ def invalidate_page_tree_on_save(sender, instance, created, **kwargs):
         # Path changed - update all children recursively
         for child in instance.children.all():
             child._skip_children_path_update = True
-            child.save(
-                update_fields=["cached_path", "cached_root_id", "cached_root_hostnames"]
-            )
+            child.save(update_fields=["cached_path", "cached_root_id", "cached_root_hostnames"])
             delattr(child, "_skip_children_path_update")
 
 
@@ -81,7 +80,8 @@ def track_parent_changes(sender, instance, **kwargs):
     if root_page:
         instance.cached_root_id = root_page.id if root_page.pk else None
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             # Avoid ArrayField issues on SQLite during pre_save
             instance.cached_root_hostnames = []
         else:
@@ -90,7 +90,8 @@ def track_parent_changes(sender, instance, **kwargs):
         # This is a new root page being created
         instance.cached_root_id = None  # Will be set after save
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             instance.cached_root_hostnames = []
         else:
             instance.cached_root_hostnames = instance.hostnames or []
@@ -104,7 +105,7 @@ def invalidate_version_tree_on_save(sender, instance, created, **kwargs):
     """Invalidate inheritance tree cache when page version is saved"""
 
     # Invalidate page and all descendants (they inherit from this page)
-    invalidated = InheritanceTreeCache.invalidate_page(instance.page_id)
+    InheritanceTreeCache.invalidate_page(instance.page_id)
 
     # Update publication cache for the page
     update_page_publication_cache(instance.page)
@@ -115,7 +116,7 @@ def invalidate_tree_on_page_delete(sender, instance, **kwargs):
     """Invalidate inheritance tree cache when page is deleted"""
 
     # Invalidate entire hierarchy (parent and all descendants)
-    invalidated = InheritanceTreeCache.invalidate_hierarchy(instance.id)
+    InheritanceTreeCache.invalidate_hierarchy(instance.id)
 
 
 @receiver(post_delete, sender=PageVersion)
@@ -123,7 +124,7 @@ def invalidate_tree_on_version_delete(sender, instance, **kwargs):
     """Invalidate inheritance tree cache when page version is deleted"""
 
     # Invalidate page and descendants
-    invalidated = InheritanceTreeCache.invalidate_page(instance.page_id)
+    InheritanceTreeCache.invalidate_page(instance.page_id)
 
     # Update publication cache for the page
     try:
@@ -133,15 +134,15 @@ def invalidate_tree_on_version_delete(sender, instance, **kwargs):
         pass  # Page was deleted, nothing to update
 
 
-def update_page_publication_cache(page):
+def update_page_publication_cache(page, now=None):
     """
     Update all cached publication fields for a page.
     Called whenever versions change.
     """
-    from django.utils import timezone
     from django.db.models import Q
+    from django.utils import timezone
 
-    now = timezone.now()
+    now = now or timezone.now()
 
     # Find current published version
     published_version = (
