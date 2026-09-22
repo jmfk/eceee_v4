@@ -1,4 +1,8 @@
+import json
+
 from django.contrib.auth.models import User
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -8,13 +12,19 @@ from content.models import Namespace
 from content_import.models import ImportLog
 from core.models import Tenant
 from webpages.models import PageVersion, WebPage
+from webpages.views.page_debug_views import MAX_EXPORT_PAYLOAD_BYTES
 
 
 class PageDebugExportTests(APITestCase):
     def setUp(self):
         self.editor = User.objects.create_user(username="debug-editor", password="test-password")
-        self.other_editor = User.objects.create_user(username="other-editor", password="test-password")
-        self.admin = User.objects.create_user(username="debug-admin", password="test-password", is_staff=True)
+        self.staff_user = User.objects.create_user(username="debug-staff", password="test-password", is_staff=True)
+        self.admin = User.objects.create_user(
+            username="debug-admin",
+            password="test-password",
+            is_staff=True,
+            is_superuser=True,
+        )
         self.tenant = Tenant.objects.create(
             name="Debug Tenant",
             identifier="debug-tenant",
@@ -80,6 +90,13 @@ class PageDebugExportTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_debug_export_rejects_non_superuser_staff(self):
+        self.client.force_authenticate(user=self.staff_user)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_debug_export_allows_authenticated_admins(self):
         self.client.force_authenticate(user=self.admin)
 
@@ -110,8 +127,14 @@ class PageDebugExportTests(APITestCase):
             1,
         )
 
-    def test_debug_export_rejects_unrelated_user_selecting_victim_tenant(self):
-        self.client.force_authenticate(user=self.other_editor)
+    def test_debug_export_rejects_staff_user_selecting_victim_tenant(self):
+        staff_tenant = Tenant.objects.create(
+            name="Staff Tenant",
+            identifier="staff-tenant",
+            created_by=self.staff_user,
+        )
+        self.assertNotEqual(staff_tenant.id, self.tenant.id)
+        self.client.force_authenticate(user=self.staff_user)
 
         response = self.client.get(self.url, HTTP_X_TENANT_ID=str(self.tenant.id))
 
@@ -193,9 +216,9 @@ class PageDebugExportTests(APITestCase):
         self.assertNotIn("html_content", log)
         self.assertNotIn("ip_address", log)
         self.assertNotIn("errors", log)
-        self.assertEqual(log["error_count"], 1)
-        self.assertTrue(log["has_html_content"])
-        self.assertGreater(log["html_content_length"], 0)
+        self.assertNotIn("error_count", log)
+        self.assertNotIn("has_html_content", log)
+        self.assertNotIn("html_content_length", log)
         rendered_response = response.render().content.decode("utf-8")
         self.assertNotIn("secret-token", rendered_response)
         self.assertNotIn("source-user", rendered_response)
@@ -265,19 +288,108 @@ class PageDebugExportTests(APITestCase):
     def test_debug_export_can_be_downloaded(self):
         self.client.force_authenticate(user=self.admin)
 
-        response = self.client.get(self.url, {"download": "true"})
+        response = self.client.get(
+            self.url,
+            {"download": "true"},
+            HTTP_ACCEPT="text/html,application/xhtml+xml",
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "application/json")
         self.assertEqual(
             response["Content-Disposition"],
             f'attachment; filename="page-{self.page.id}-debug.json"',
         )
+        self.assertEqual(json.loads(response.content)["schemaVersion"], 2)
+
+    def test_debug_export_rejects_oversized_page_payload(self):
+        self.page.page_custom_css = "x" * (MAX_EXPORT_PAYLOAD_BYTES + 1)
+        self.page.save(update_fields=["page_custom_css"])
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+        self.assertEqual(response.data["max_bytes"], MAX_EXPORT_PAYLOAD_BYTES)
+
+    def test_debug_export_rejects_oversized_selected_version_before_export(self):
+        oversized_version = PageVersion.objects.create(
+            page=self.page,
+            version_number=2,
+            version_title="Oversized version",
+            page_custom_css="x" * (MAX_EXPORT_PAYLOAD_BYTES + 1),
+            created_by=self.editor,
+        )
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.get(self.url, {"version_id": oversized_version.id})
+
+        self.assertEqual(response.status_code, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+        self.assertEqual(response.data["max_bytes"], MAX_EXPORT_PAYLOAD_BYTES)
+
+    def test_debug_export_does_not_select_excluded_large_related_fields(self):
+        self.namespace.description = "n" * 1000
+        self.namespace.save(update_fields=["description"])
+        self.page.deletion_metadata = {"private": "p" * 1000}
+        self.page.save(update_fields=["deletion_metadata"])
+        self.client.force_authenticate(user=self.admin)
+
+        with CaptureQueriesContext(connection) as captured_queries:
+            response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        executed_sql = "\n".join(query["sql"] for query in captured_queries.captured_queries)
+        self.assertNotIn('"webpages_webpage"."deletion_metadata"', executed_sql)
+        self.assertNotIn('"content_namespace"."description"', executed_sql)
+        self.assertNotIn('"password"', executed_sql)
+        self.assertNotIn('"email"', executed_sql)
+        self.assertNotIn('"first_name"', executed_sql)
+        self.assertNotIn('"last_name"', executed_sql)
+        self.assertNotIn('LENGTH("webpages_pageversion"."version_title")', executed_sql)
+        self.assertNotIn('LENGTH("webpages_pageversion"."meta_title")', executed_sql)
+        self.assertNotIn('LENGTH("webpages_pageversion"."meta_description")', executed_sql)
+        self.assertNotIn("jsonb_array_length", executed_sql)
+        self.assertNotIn('LENGTH("content_import_importlog"."html_content")', executed_sql)
+
+    def test_debug_export_preserves_keys_inside_stored_json(self):
+        self.page.page_css_variables = {"snake_key": "page value"}
+        self.page.save(update_fields=["page_css_variables"])
+        self.version.page_data = {"snake_key": "page data value"}
+        self.version.change_summary = {"snake_key": "change value"}
+        self.version.page_css_variables = {"snake_key": "version value"}
+        self.version.widgets = {"main": [{"config": {"snake_key": "widget value"}}]}
+        self.version.save(
+            update_fields=[
+                "page_data",
+                "change_summary",
+                "page_css_variables",
+                "widgets",
+            ]
+        )
+        self.import_log.stats = {"snake_key": 1}
+        self.import_log.save(update_fields=["stats"])
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.get(self.url, {"version_id": self.version.id})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        rendered = json.loads(response.content)
+        self.assertEqual(rendered["page"]["pageCssVariables"]["snake_key"], "page value")
+        self.assertEqual(rendered["selectedVersion"]["pageData"]["snake_key"], "page data value")
+        self.assertEqual(rendered["selectedVersion"]["changeSummary"]["snake_key"], "change value")
+        self.assertEqual(rendered["selectedVersion"]["pageCssVariables"]["snake_key"], "version value")
+        self.assertEqual(
+            rendered["selectedVersion"]["widgets"]["main"][0]["config"]["snake_key"],
+            "widget value",
+        )
+        self.assertEqual(rendered["importLogs"]["items"][0]["stats"]["snake_key"], 1)
 
     def test_debug_export_is_rate_limited(self):
         rate_limited_admin = User.objects.create_user(
             username="rate-limited-admin",
             password="test-password",
             is_staff=True,
+            is_superuser=True,
         )
         self.client.force_authenticate(user=rate_limited_admin)
 
