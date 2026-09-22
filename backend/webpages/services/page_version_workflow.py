@@ -333,10 +333,14 @@ class PageVersionWorkflowService:
         for field, value in self._copied_fields(source).items():
             setattr(editable, field, value)
         editable.version_title = f"Restored from version {source.version_number}"
-        editable.change_summary = {
+        summary = {
             "action": "restored",
             "source_version_id": source.id,
         }
+        predecessor = (editable.change_summary or {}).get(self.SCHEDULE_PREDECESSOR_KEY)
+        if predecessor:
+            summary[self.SCHEDULE_PREDECESSOR_KEY] = deepcopy(predecessor)
+        editable.change_summary = summary
         editable.save()
         return editable
 

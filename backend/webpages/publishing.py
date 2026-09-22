@@ -228,8 +228,8 @@ class PublishingService:
         Returns:
             Tuple of (count_published, error_messages)
         """
-        # Import here to avoid circular imports
-        from .models import WebPage, PageVersion
+        from .models import WebPage
+        from .services.page_version_workflow import PageVersionWorkflowService
 
         pages = WebPage.objects.filter(id__in=page_ids)
         published_count = 0
@@ -237,20 +237,9 @@ class PublishingService:
 
         for page in pages:
             try:
-                # Get or create the latest version for this page
-                latest_version = page.versions.order_by("-version_number").first()
-
-                if not latest_version:
-                    # Create a new version if none exists
-                    latest_version = page.create_version(
-                        self.user, change_summary, status="draft"  # Legacy field
-                    )
-
-                # Set effective_date to now to publish immediately
-                latest_version.effective_date = timezone.now()
-                # Don't set expiry_date - let it remain null for indefinite publishing
-                latest_version.save(update_fields=["effective_date"])
-
+                workflow = PageVersionWorkflowService(page, self.user)
+                working_version, _ = workflow.get_or_create_working_copy()
+                workflow.publish(working_version)
                 published_count += 1
 
             except Exception as e:
@@ -261,7 +250,10 @@ class PublishingService:
         return published_count, errors
 
     def publish_page_with_subpages(
-        self, page_id: int, change_summary: str = "Publish with subpages"
+        self,
+        page_id: int,
+        change_summary: str = "Publish with subpages",
+        root_version_id: Optional[int] = None,
     ) -> Tuple[int, List[str]]:
         """
         Publish a page and all its descendant pages recursively.
@@ -275,8 +267,8 @@ class PublishingService:
         Returns:
             Tuple of (count_published, error_messages)
         """
-        # Import here to avoid circular imports
-        from .models import WebPage, PageVersion
+        from .models import PageVersion, WebPage
+        from .services.page_version_workflow import PageVersionWorkflowService
 
         try:
             page = WebPage.objects.get(id=page_id)
@@ -293,20 +285,12 @@ class PublishingService:
 
         for page_item in pages_to_publish:
             try:
-                # Get the latest version for this page
-                latest_version = page_item.versions.order_by("-version_number").first()
-
-                if not latest_version:
-                    # Create a new version if none exists
-                    latest_version = page_item.create_version(
-                        self.user, change_summary, status="draft"  # Legacy field
-                    )
-
-                # Set effective_date to now to publish immediately
-                latest_version.effective_date = timezone.now()
-                # Don't set expiry_date - let it remain null for indefinite publishing
-                latest_version.save(update_fields=["effective_date"])
-
+                workflow = PageVersionWorkflowService(page_item, self.user)
+                if page_item.id == page.id and root_version_id is not None:
+                    working_version = PageVersion.objects.get(pk=root_version_id, page=page_item)
+                else:
+                    working_version, _ = workflow.get_or_create_working_copy()
+                workflow.publish(working_version)
                 published_count += 1
 
             except Exception as e:
@@ -354,8 +338,8 @@ class PublishingService:
         Returns:
             Tuple of (count_scheduled, error_messages)
         """
-        # Import here to avoid circular imports
-        from .models import WebPage, PageVersion
+        from .models import WebPage
+        from .services.page_version_workflow import PageVersionWorkflowService
 
         if not schedule.is_valid():
             return 0, ["Invalid schedule: effective date must be before expiry date"]
@@ -366,20 +350,9 @@ class PublishingService:
 
         for page in pages:
             try:
-                # Get or create the latest version for this page
-                latest_version = page.versions.order_by("-version_number").first()
-
-                if not latest_version:
-                    # Create a new version if none exists
-                    latest_version = page.create_version(
-                        self.user, change_summary, status="draft"  # Legacy field
-                    )
-
-                # Set the schedule dates
-                latest_version.effective_date = schedule.effective_date
-                latest_version.expiry_date = schedule.expiry_date
-                latest_version.save(update_fields=["effective_date", "expiry_date"])
-
+                workflow = PageVersionWorkflowService(page, self.user)
+                working_version, _ = workflow.get_or_create_working_copy()
+                workflow.schedule(working_version, schedule.effective_date, schedule.expiry_date)
                 scheduled_count += 1
 
             except Exception as e:

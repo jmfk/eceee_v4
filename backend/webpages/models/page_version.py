@@ -309,9 +309,31 @@ class PageVersion(models.Model):
             if value != other_value:
                 changes["fields_changed"].append({"field": field, "old_value": other_value, "new_value": value})
 
-        # Compare widgets
-        self_widgets = {(w["slot_name"], w["sort_order"]): w for w in self.widgets}
-        other_widgets = {(w["slot_name"], w["sort_order"]): w for w in other_version.widgets}
+        def indexed_widgets(value):
+            """Index current slot-mapped widgets and the legacy flat-list format."""
+            indexed = {}
+            if isinstance(value, dict):
+                slot_items = value.items()
+            elif isinstance(value, list):
+                slot_items = ((None, value),)
+            else:
+                return indexed
+
+            for slot_name, widgets in slot_items:
+                if not isinstance(widgets, list):
+                    continue
+                for position, widget in enumerate(widgets):
+                    if not isinstance(widget, dict):
+                        continue
+                    widget_slot = widget.get("slot_name", slot_name)
+                    identity = widget.get("id", widget.get("widget_id"))
+                    if identity is None:
+                        identity = widget.get("sort_order", position)
+                    indexed[(widget_slot, identity)] = widget
+            return indexed
+
+        self_widgets = indexed_widgets(self.widgets)
+        other_widgets = indexed_widgets(other_version.widgets)
 
         # Find added widgets
         for key, widget in self_widgets.items():

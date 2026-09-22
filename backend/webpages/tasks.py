@@ -8,6 +8,7 @@ import logging
 
 from celery import shared_task
 from django.core.management import call_command
+from django.db import transaction
 from django.db.models import F, IntegerField, OuterRef, Q, Subquery
 from django.utils import timezone
 
@@ -48,13 +49,18 @@ def refresh_publication_caches(now=None):
 
     updated_count = 0
     for page in stale_pages.iterator():
-        previous_version_id = page.current_published_version_id
-        update_page_publication_cache(page, now=now)
-        if page.current_published_version_id and page.current_published_version_id != previous_version_id:
-            published_version = page.current_published_version
-            published_version.page = page
-            published_version._apply_version_data()
-            page.save()
+        with transaction.atomic():
+            locked_page = WebPage.objects.select_for_update().get(pk=page.pk)
+            previous_version_id = locked_page.current_published_version_id
+            update_page_publication_cache(locked_page, now=now)
+            if (
+                locked_page.current_published_version_id
+                and locked_page.current_published_version_id != previous_version_id
+            ):
+                published_version = locked_page.current_published_version
+                published_version.page = locked_page
+                published_version._apply_version_data()
+                locked_page.save()
         updated_count += 1
     return updated_count
 

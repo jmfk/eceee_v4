@@ -9,11 +9,49 @@
 Version-related serializers for the Web Page Publishing System
 """
 
+from copy import copy, deepcopy
+
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from ..models import PageDataSchema, PageTheme, PageVersion, WebPage
 from .base import UserSerializer
 from .theme import PageThemeSerializer
+
+SCHEDULE_PREDECESSOR_KEY = "scheduled_predecessor"
+PAGE_ATTRIBUTE_FIELDS = {
+    "title": "title",
+    "description": "description",
+    "slug": "slug",
+    "path_pattern_key": "path_pattern_key",
+    "pathPatternKey": "path_pattern_key",
+    "hostnames": "hostnames",
+}
+
+
+def validate_reserved_page_attributes(version, page_data):
+    """Validate delayed WebPage mutations before accepting a working-copy save."""
+    if not isinstance(page_data, dict):
+        raise serializers.ValidationError("Page data must be a dictionary")
+
+    attributes = page_data.get("page_attributes", page_data.get("pageAttributes", {}))
+    if not isinstance(attributes, dict):
+        raise serializers.ValidationError({"page_attributes": "Page attributes must be a dictionary."})
+    if not attributes or version is None:
+        return
+
+    candidate = copy(version.page)
+    try:
+        for source_field, target_field in PAGE_ATTRIBUTE_FIELDS.items():
+            if source_field not in attributes:
+                continue
+            model_field = WebPage._meta.get_field(target_field)
+            value = model_field.clean(attributes[source_field], candidate)
+            setattr(candidate, target_field, value)
+        candidate.clean()
+    except DjangoValidationError as error:
+        details = getattr(error, "message_dict", None) or error.messages
+        raise serializers.ValidationError({"page_attributes": details}) from error
 
 
 class PageVersionSerializer(serializers.ModelSerializer):
@@ -97,6 +135,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "publication_status",
             "effective_theme",
             "theme_inheritance_info",
+            "effective_date",
+            "expiry_date",
             "created_at",
             "updated_at",
             "created_by",
@@ -158,7 +198,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
         return {"source": "default", "inherited_from": None}
 
     def validate(self, attrs):
-        # Strip forbidden keys from page_data on write
+        if "page_data" in attrs:
+            validate_reserved_page_attributes(self.instance, attrs["page_data"])
         return super().validate(attrs)
 
     def to_representation(self, instance):
@@ -193,6 +234,12 @@ class PageVersionSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         """Update with timestamp-based conflict detection"""
+        incoming_summary = validated_data.get("change_summary")
+        predecessor = (instance.change_summary or {}).get(SCHEDULE_PREDECESSOR_KEY)
+        if predecessor and "change_summary" in validated_data:
+            summary = incoming_summary if isinstance(incoming_summary, dict) else {}
+            validated_data["change_summary"] = {**summary, SCHEDULE_PREDECESSOR_KEY: deepcopy(predecessor)}
+
         # Check if client provided the timestamp they last saw
         request = self.context.get("request")
         if request and hasattr(request, "data"):
@@ -344,6 +391,8 @@ class PageDataUpdateSerializer(serializers.ModelSerializer):
         if not version:
             # For creation, we can't validate schema yet
             return value
+
+        validate_reserved_page_attributes(version, value)
 
         # Filter out forbidden keys
         forbidden = {
