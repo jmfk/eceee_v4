@@ -296,17 +296,15 @@ class PageVersionIntegrationSimpleTest(APITestCase):
         new_count = PageVersion.objects.filter(page=self.page).count()
         self.assertEqual(new_count, initial_count)
 
-    def test_page_publish_action(self):
-        """Test page publish action creates published version"""
+    def test_legacy_page_publish_action_is_gone(self):
         url = reverse("api:webpage-publish", kwargs={"pk": self.page.pk})
 
         response = self.client.post(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
         # Check published version was created
         published = PageVersion.objects.filter(
             page=self.page,
             effective_date__isnull=False,
         ).first()
-        self.assertIsNotNone(published)
-        self.assertTrue(published.is_current_published())
+        self.assertIsNone(published)

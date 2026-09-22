@@ -359,6 +359,22 @@ class PageVersionWorkflowService:
         return version
 
     @transaction.atomic
+    def fail_scheduled_activation(self, version, *, reason):
+        """Return a rejected scheduled publication to a safe working copy."""
+        self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
+        version = PageVersion.objects.select_for_update().get(pk=version.pk, page=self.page)
+        summary = self._restore_scheduled_predecessor(version)
+        summary["scheduled_activation_failure"] = {
+            "reason": str(reason),
+            "failed_at": timezone.now().isoformat(),
+        }
+        version.change_summary = summary
+        version.effective_date = None
+        version.expiry_date = None
+        version.save(update_fields=["effective_date", "expiry_date", "change_summary", "updated_at"])
+        return version
+
+    @transaction.atomic
     def unpublish(self, version):
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
         version = PageVersion.objects.select_for_update().get(pk=version.pk)

@@ -11,19 +11,19 @@ Tests cover:
 - PublishingService business logic
 """
 
-from django.test import TestCase, TransactionTestCase
-from django.contrib.auth.models import User
-from django.utils import timezone
-from django.core.management import call_command
-from django.urls import reverse
-from rest_framework.test import APITestCase
-from rest_framework import status
 from datetime import timedelta
-import json
 from io import StringIO
 
-from webpages.models import WebPage, PageVersion, PageTheme
-from webpages.publishing import PublishingService, PublicationSchedule
+from django.contrib.auth.models import User
+from django.core.management import call_command
+from django.test import TestCase, TransactionTestCase
+from django.urls import reverse
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APITestCase
+
+from webpages.models import PageTheme, PageVersion, WebPage
+from webpages.publishing import PublicationSchedule, PublishingService
 
 
 class PublishingServiceTests(TestCase):
@@ -54,7 +54,6 @@ class PublishingServiceTests(TestCase):
         """Test PublicationSchedule value object functionality"""
         now = timezone.now()
         future = now + timedelta(hours=1)
-        past = now - timedelta(hours=1)
 
         # Test valid schedule
         schedule = PublicationSchedule(now, future)
@@ -72,8 +71,8 @@ class PublishingServiceTests(TestCase):
 
     def test_webpage_tell_dont_ask_methods(self):
         """Test new 'Tell, Don't Ask' methods on WebPage model"""
-        from webpages.models import PageVersion
         from core.models import Tenant
+        from webpages.models import PageVersion
 
         # Get or create tenant
         tenant, _ = Tenant.objects.get_or_create(
@@ -89,7 +88,7 @@ class PublishingServiceTests(TestCase):
         )
 
         # Create a version with the publishing info
-        version = PageVersion.objects.create(
+        PageVersion.objects.create(
             page=page,
             version_number=1,
             code_layout="single_column",
@@ -105,8 +104,8 @@ class PublishingServiceTests(TestCase):
 
     def test_publishing_service_process_scheduled_publications(self):
         """Test service object processing scheduled publications"""
-        from webpages.models import PageVersion
         from core.models import Tenant
+        from webpages.models import PageVersion
 
         # Get or create tenant
         tenant, _ = Tenant.objects.get_or_create(
@@ -139,8 +138,8 @@ class PublishingServiceTests(TestCase):
 
     def test_publishing_service_process_expired_pages(self):
         """Test service object processing expired pages"""
-        from webpages.models import PageVersion
         from core.models import Tenant
+        from webpages.models import PageVersion
 
         # Get or create tenant
         tenant, _ = Tenant.objects.get_or_create(
@@ -185,6 +184,7 @@ class PublishingWorkflowAPITests(APITestCase):
         self.tenant, _ = Tenant.objects.get_or_create(
             identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
+        self.tenant.members.add(self.user)
         self.theme = PageTheme.objects.create(
             name="Test Theme", css_variables={}, created_by=self.user, tenant=self.tenant
         )
@@ -214,8 +214,7 @@ class PublishingWorkflowAPITests(APITestCase):
 
         self.client.force_authenticate(user=self.user)
 
-    def test_schedule_endpoint_success(self):
-        """Test scheduling a page for future publication"""
+    def test_legacy_schedule_endpoint_is_gone(self):
         future_date = timezone.now() + timedelta(hours=2)
         expiry_date = timezone.now() + timedelta(days=7)
 
@@ -227,13 +226,13 @@ class PublishingWorkflowAPITests(APITestCase):
 
         response = self.client.post(url, data, format="json")
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
         # Refresh page from database
         self.page1.refresh_from_db()
         latest_version = self.page1.get_latest_version()
-        self.assertAlmostEqual(latest_version.effective_date, future_date, delta=timedelta(seconds=1))
-        self.assertAlmostEqual(latest_version.expiry_date, expiry_date, delta=timedelta(seconds=1))
+        self.assertIsNone(latest_version.effective_date)
+        self.assertIsNone(latest_version.expiry_date)
 
     def test_schedule_endpoint_past_date_error(self):
         """Test scheduling with past date returns error"""
@@ -244,8 +243,7 @@ class PublishingWorkflowAPITests(APITestCase):
 
         response = self.client.post(url, data, format="json")
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("effective_date must be in the future", response.data["error"])
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
     def test_schedule_endpoint_invalid_expiry_date(self):
         """Test scheduling with expiry before effective date returns error"""
@@ -260,24 +258,21 @@ class PublishingWorkflowAPITests(APITestCase):
 
         response = self.client.post(url, data, format="json")
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("expiry_date must be after effective_date", response.data["error"])
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
-    def test_bulk_publish_success(self):
-        """Test bulk publishing multiple pages"""
+    def test_legacy_bulk_publish_is_gone(self):
         url = reverse("api:webpage-bulk-publish")
         data = {"page_ids": [self.page1.pk, self.page2.pk]}
 
         response = self.client.post(url, data, format="json")
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("Successfully published 2 page(s)", response.data["message"])
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
         # Check pages are published
         self.page1.refresh_from_db()
         self.page2.refresh_from_db()
-        self.assertTrue(self.page1.is_published())
-        self.assertTrue(self.page2.is_published())
+        self.assertFalse(self.page1.is_published())
+        self.assertFalse(self.page2.is_published())
 
     def test_bulk_publish_empty_list_error(self):
         """Test bulk publish with empty page list returns error"""
@@ -286,11 +281,9 @@ class PublishingWorkflowAPITests(APITestCase):
 
         response = self.client.post(url, data, format="json")
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("page_ids is required", response.data["error"])
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
-    def test_bulk_schedule_success(self):
-        """Test bulk scheduling multiple pages"""
+    def test_legacy_bulk_schedule_is_gone(self):
         future_date = timezone.now() + timedelta(hours=2)
 
         url = reverse("api:webpage-bulk-schedule")
@@ -301,22 +294,13 @@ class PublishingWorkflowAPITests(APITestCase):
 
         response = self.client.post(url, data, format="json")
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("Successfully scheduled 2 page(s)", response.data["message"])
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
         # Check pages are scheduled
         self.page1.refresh_from_db()
         self.page2.refresh_from_db()
-        self.assertAlmostEqual(
-            self.page1.get_latest_version().effective_date,
-            future_date,
-            delta=timedelta(seconds=1),
-        )
-        self.assertAlmostEqual(
-            self.page2.get_latest_version().effective_date,
-            future_date,
-            delta=timedelta(seconds=1),
-        )
+        self.assertIsNone(self.page1.get_latest_version().effective_date)
+        self.assertIsNone(self.page2.get_latest_version().effective_date)
 
     def test_publication_status_endpoint(self):
         """Test publication status overview endpoint"""
@@ -360,6 +344,7 @@ class PublishingManagementCommandTests(TransactionTestCase):
         self.tenant, _ = Tenant.objects.get_or_create(
             identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
+        self.tenant.members.add(self.user)
 
     def test_process_scheduled_publications(self):
         """Test processing pages scheduled for publication"""
@@ -486,6 +471,7 @@ class PublishingLogicTests(APITestCase):
         self.tenant, _ = Tenant.objects.get_or_create(
             identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
+        self.tenant.members.add(self.user)
         self.tenant.created_by = self.user
         self.tenant.save(update_fields=["created_by"])
         self.client.force_authenticate(user=self.user)
@@ -612,7 +598,7 @@ class PublishingLogicTests(APITestCase):
         publish_url = reverse("api:webpage-publish", kwargs={"pk": page.pk})
         response = self.client.post(publish_url)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
         page.refresh_from_db()
         self.assertTrue(page.is_published())
@@ -641,10 +627,10 @@ class PublishingLogicTests(APITestCase):
         publish_url = reverse("api:webpage-publish", kwargs={"pk": page.pk})
         response = self.client.post(publish_url)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
         page.refresh_from_db()
-        self.assertTrue(page.is_published())
+        self.assertFalse(page.is_published())
 
     def test_publish_without_effective_date_publishes_immediately(self):
         """Test that publishing a page without effective_date publishes it immediately"""
@@ -664,10 +650,10 @@ class PublishingLogicTests(APITestCase):
         publish_url = reverse("api:webpage-publish", kwargs={"pk": page.pk})
         response = self.client.post(publish_url)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
         page.refresh_from_db()
-        self.assertTrue(page.is_published())
+        self.assertFalse(page.is_published())
 
     def test_unpublish_sets_expiry_date_to_now_if_not_set(self):
         """Test that unpublishing a page sets expiry_date to now if not already set"""
@@ -693,10 +679,10 @@ class PublishingLogicTests(APITestCase):
         unpublish_url = reverse("api:webpage-unpublish", kwargs={"pk": page.pk})
         response = self.client.post(unpublish_url)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
         page.refresh_from_db()
-        self.assertFalse(page.is_published())
+        self.assertTrue(page.is_published())
 
     def test_unpublish_preserves_existing_expiry_date(self):
         """Test that unpublishing a page preserves existing expiry_date"""
@@ -723,10 +709,10 @@ class PublishingLogicTests(APITestCase):
         unpublish_url = reverse("api:webpage-unpublish", kwargs={"pk": page.pk})
         response = self.client.post(unpublish_url)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
         page.refresh_from_db()
-        self.assertFalse(page.is_published())
+        self.assertTrue(page.is_published())
 
     def test_bulk_publish_with_mixed_dates(self):
         """Test bulk publish with pages having different effective_date scenarios"""
@@ -798,9 +784,7 @@ class PublishingLogicTests(APITestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.assertEqual(response.data["published_count"], 3)
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
         # Verify individual page states
         past_page.refresh_from_db()
@@ -808,8 +792,8 @@ class PublishingLogicTests(APITestCase):
         no_date_page.refresh_from_db()
 
         self.assertTrue(past_page.is_published())
-        self.assertTrue(future_page.is_published())
-        self.assertTrue(no_date_page.is_published())
+        self.assertFalse(future_page.is_published())
+        self.assertFalse(no_date_page.is_published())
 
 
 class PublishingWorkflowIntegrationTests(APITestCase):
@@ -826,6 +810,7 @@ class PublishingWorkflowIntegrationTests(APITestCase):
         self.tenant, _ = Tenant.objects.get_or_create(
             identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
+        self.tenant.members.add(self.user)
         self.client.force_authenticate(user=self.user)
 
     def test_complete_publishing_workflow(self):
@@ -848,10 +833,12 @@ class PublishingWorkflowIntegrationTests(APITestCase):
         future_date = timezone.now() + timedelta(minutes=5)
         expiry_date = timezone.now() + timedelta(hours=1)
 
-        schedule_url = reverse("api:webpage-schedule", kwargs={"pk": page.pk})
+        version = page.get_latest_version()
+        schedule_url = reverse("api:pageversion-schedule", kwargs={"pk": version.pk})
         schedule_data = {
-            "effective_date": future_date.isoformat(),
-            "expiry_date": expiry_date.isoformat(),
+            "effectiveDate": future_date.isoformat(),
+            "expiryDate": expiry_date.isoformat(),
+            "clientUpdatedAt": version.updated_at.isoformat(),
         }
 
         response = self.client.post(schedule_url, schedule_data, format="json")
@@ -863,7 +850,6 @@ class PublishingWorkflowIntegrationTests(APITestCase):
 
         # 3. Simulate time passing and run publishing command
         # Update the effective date to the past on the version
-        version = page.get_latest_version()
         version.effective_date = timezone.now() - timedelta(minutes=5)
         version.save()
 
@@ -906,9 +892,18 @@ class PublishingWorkflowIntegrationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         initial_counts = response.data["status_counts"]
 
-        # Bulk publish
-        bulk_url = reverse("api:webpage-bulk-publish")
-        bulk_data = {"page_ids": [p.pk for p in pages]}
+        # Bulk publish explicit reviewed versions
+        bulk_url = reverse("api:pageversion-bulk-publish-explicit")
+        bulk_data = {
+            "items": [
+                {
+                    "pageId": page.pk,
+                    "versionId": page.get_latest_version().pk,
+                    "clientUpdatedAt": page.get_latest_version().updated_at.isoformat(),
+                }
+                for page in pages
+            ]
+        }
 
         response = self.client.post(bulk_url, bulk_data, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)

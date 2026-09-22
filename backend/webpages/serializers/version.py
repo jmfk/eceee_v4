@@ -59,6 +59,57 @@ def validate_reserved_page_attributes(version, page_data):
         raise serializers.ValidationError({"page_attributes": details}) from error
 
 
+def validate_page_data_for_version(version, value, *, code_layout=None):
+    """Validate complete page data for every working-copy write path."""
+    if not isinstance(value, dict):
+        raise serializers.ValidationError("Page data must be a dictionary")
+
+    validate_reserved_page_attributes(version, value)
+    forbidden = {
+        "meta_title",
+        "meta_description",
+        "slug",
+        "code_layout",
+        "page_data",
+        "widgets",
+        "page_css_variables",
+        "theme",
+        "is_published",
+        "version_title",
+        "page_custom_css",
+        "enable_css_injection",
+    }
+    filtered_data = {key: item for key, item in value.items() if key not in forbidden}
+    if version is None:
+        return filtered_data
+
+    effective_schema = PageDataSchema.get_effective_schema_for_layout(code_layout or version.code_layout)
+    if not effective_schema:
+        return filtered_data
+
+    groups = effective_schema.get("groups", {})
+    validation_schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "required": [],
+    }
+    for group in groups.values():
+        validation_schema["properties"].update(group.get("properties", {}))
+        validation_schema["required"].extend(group.get("required", []))
+
+    from jsonschema import Draft202012Validator
+    from jsonschema.exceptions import SchemaError, ValidationError
+
+    try:
+        Draft202012Validator.check_schema(validation_schema)
+        Draft202012Validator(validation_schema).validate(filtered_data)
+    except (SchemaError, ValidationError) as error:
+        raise serializers.ValidationError(f"Schema validation failed: {str(error)}") from error
+
+    return filtered_data
+
+
 class PageVersionSerializer(serializers.ModelSerializer):
     """Serializer for page versions with enhanced workflow support"""
 
@@ -71,13 +122,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
     effective_theme = serializers.SerializerMethodField()
     theme_inheritance_info = serializers.SerializerMethodField()
 
-    # Writable page field for creation
-    page = serializers.PrimaryKeyRelatedField(
-        queryset=WebPage.objects.all(),
-        write_only=True,
-        required=False,
-        help_text="Page ID for creating new version",
-    )
+    page = serializers.PrimaryKeyRelatedField(read_only=True)
 
     # Writable theme field
     theme = serializers.PrimaryKeyRelatedField(
@@ -101,7 +146,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "version_id",
-            "page",  # Writable field for creation
+            "page",  # Read-only owning page
             "page_id",
             "version_number",
             "version_title",
@@ -204,7 +249,11 @@ class PageVersionSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if "page_data" in attrs:
-            validate_reserved_page_attributes(self.instance, attrs["page_data"])
+            attrs["page_data"] = validate_page_data_for_version(
+                self.instance,
+                attrs["page_data"],
+                code_layout=attrs.get("code_layout"),
+            )
         return super().validate(attrs)
 
     def to_representation(self, instance):
@@ -388,53 +437,7 @@ class PageDataUpdateSerializer(serializers.ModelSerializer):
 
     def validate_page_data(self, value):
         """Validate page_data against effective schema"""
-        if not isinstance(value, dict):
-            raise serializers.ValidationError("Page data must be a dictionary")
-
-        # Get the version instance to determine layout
-        version = self.instance
-        if not version:
-            # For creation, we can't validate schema yet
-            return value
-
-        validate_reserved_page_attributes(version, value)
-
-        # Filter out forbidden keys
-        forbidden = {
-            "meta_title",
-            "meta_description",
-            "slug",
-            "code_layout",
-            "page_data",
-            "widgets",
-            "page_css_variables",
-            "theme",
-            "is_published",
-            "version_title",
-            "page_custom_css",
-            "page_css_variables",
-            "enable_css_injection",
-        }
-
-        filtered_data = {k: v for k, v in value.items() if k not in forbidden}
-
-        # Validate against schema
-        effective_schema = PageDataSchema.get_effective_schema_for_layout(version.code_layout)
-
-        if effective_schema:
-            from jsonschema import Draft7Validator, Draft202012Validator
-
-            try:
-                try:
-                    Draft202012Validator.check_schema(effective_schema)
-                    Draft202012Validator(effective_schema).validate(filtered_data)
-                except Exception:
-                    Draft7Validator.check_schema(effective_schema)
-                    Draft7Validator(effective_schema).validate(filtered_data)
-            except Exception as e:
-                raise serializers.ValidationError(f"Schema validation failed: {str(e)}")
-
-        return filtered_data
+        return validate_page_data_for_version(self.instance, value)
 
 
 class MetadataUpdateSerializer(serializers.ModelSerializer):

@@ -19,7 +19,7 @@ vi.mock('../../../contexts/unified-data/context/UnifiedDataContext', () => ({
 vi.mock('../../../api/versions', () => ({
     versionsApi: {
         getPageVersion: getPageVersionMock,
-        updateWidgets: updateWidgetsMock
+        saveWorkingCopy: (versionId, versionData) => updateWidgetsMock(versionId, { widgets: versionData.widgets })
     }
 }))
 

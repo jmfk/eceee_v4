@@ -19,7 +19,7 @@ class TenantScopedQuerySetMixin:
             raise serializers.ValidationError("Tenant is required. Provide X-Tenant-ID header.")
 
         user = self.request.user
-        if not user.is_superuser and tenant.created_by_id != user.id:
+        if not tenant.user_has_access(user):
             raise PermissionDenied("You do not have access to this tenant.")
 
         return tenant

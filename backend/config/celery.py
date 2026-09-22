@@ -69,8 +69,10 @@ def debug_task(self):
     return "Debug task completed"
 
 
-# Periodic task configuration
+# Periodic task configuration. Keep settings.py as the shared schedule source and
+# extend it here with tasks that use richer crontab expressions.
 app.conf.beat_schedule = {
+    **dict(settings.CELERY_BEAT_SCHEDULE),
     # Clean up old AI agent tasks daily at 2 AM
     "cleanup-old-ai-tasks": {
         "task": "utils.tasks.cleanup_old_tasks",

@@ -3,6 +3,7 @@ Admin interface for core models.
 """
 
 from django.contrib import admin
+
 from .models import Tenant
 
 
@@ -14,6 +15,7 @@ class TenantAdmin(admin.ModelAdmin):
     list_filter = ["is_active", "created_at"]
     search_fields = ["name", "identifier"]
     readonly_fields = ["id", "created_at", "updated_at", "created_by"]
+    filter_horizontal = ["members"]
     fieldsets = (
         (
             None,
@@ -23,6 +25,7 @@ class TenantAdmin(admin.ModelAdmin):
                     "name",
                     "identifier",
                     "is_active",
+                    "members",
                 )
             },
         ),

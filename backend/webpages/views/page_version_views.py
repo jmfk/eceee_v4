@@ -16,15 +16,7 @@ from rest_framework.response import Response
 
 from ..filters import PageVersionFilter
 from ..models import PageVersion, WebPage
-from ..serializers import (
-    MetadataUpdateSerializer,
-    PageDataUpdateSerializer,
-    PageVersionComparisonSerializer,
-    PageVersionListSerializer,
-    PageVersionSerializer,
-    PublishingUpdateSerializer,
-    WidgetUpdateSerializer,
-)
+from ..serializers import PageVersionComparisonSerializer, PageVersionListSerializer, PageVersionSerializer
 from ..services.page_version_workflow import (
     PageVersionWorkflowService,
     ScheduleConflictError,
@@ -86,6 +78,24 @@ class PageVersionViewSet(
             )
         return client_timestamp, None
 
+    @staticmethod
+    def _legacy_mutation_response():
+        return Response(
+            {
+                "error": "working_copy_save_required",
+                "message": (
+                    "This mutation endpoint was removed. " "Save the complete reviewed working copy through /save/."
+                ),
+            },
+            status=status.HTTP_410_GONE,
+        )
+
+    def update(self, request, *args, **kwargs):
+        return self._legacy_mutation_response()
+
+    def partial_update(self, request, *args, **kwargs):
+        return self._legacy_mutation_response()
+
     def get_queryset(self):
         """Enhanced queryset with special filtering for current and latest versions"""
         queryset = super().get_queryset()
@@ -93,7 +103,7 @@ class PageVersionViewSet(
         tenant = getattr(self.request, "tenant", None)
         if tenant:
             queryset = queryset.filter(page__tenant=tenant)
-            if not self.request.user.is_staff and tenant.created_by_id != self.request.user.id:
+            if not tenant.user_has_access(self.request.user):
                 return queryset.none()
 
         if not self.request.user.is_staff and not tenant:
@@ -146,7 +156,7 @@ class PageVersionViewSet(
         if self.request.user.is_staff:
             return queryset.filter(tenant=tenant) if tenant else queryset
         if tenant:
-            if tenant.created_by_id != self.request.user.id:
+            if not tenant.user_has_access(self.request.user):
                 return queryset.none()
             return queryset.filter(tenant=tenant)
         return queryset.filter(created_by=self.request.user)
@@ -220,126 +230,26 @@ class PageVersionViewSet(
     @action(detail=True, methods=["patch"], url_path="widgets")
     @transaction.atomic
     def update_widgets(self, request, pk=None):
-        """Update only widget data - no page_data validation"""
-        version = self.get_object()
-        try:
-            PageVersionWorkflowService(version.page, request.user).assert_canonical_editable(version)
-        except WorkflowError as error:
-            return self._workflow_error_response(error)
-        serializer = WidgetUpdateSerializer(version, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        # Return full version data for consistency
-        full_serializer = PageVersionSerializer(version)
-        return Response(full_serializer.data)
+        """Reject the removed partial working-copy mutation contract."""
+        return self._legacy_mutation_response()
 
     @action(detail=True, methods=["patch"], url_path="page-data")
     @transaction.atomic
     def update_page_data(self, request, pk=None):
-        """Update only page_data with schema validation"""
-        version = self.get_object()
-        try:
-            PageVersionWorkflowService(version.page, request.user).assert_canonical_editable(version)
-        except WorkflowError as error:
-            return self._workflow_error_response(error)
-
-        serializer = PageDataUpdateSerializer(version, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        # Return full version data for consistency
-        full_serializer = PageVersionSerializer(version)
-        return Response(full_serializer.data)
+        """Reject the removed partial working-copy mutation contract."""
+        return self._legacy_mutation_response()
 
     @action(detail=True, methods=["patch"], url_path="metadata")
     @transaction.atomic
     def update_metadata(self, request, pk=None):
-        """Update version metadata (title, layout, theme, etc.)"""
-        version = self.get_object()
-        try:
-            PageVersionWorkflowService(version.page, request.user).assert_canonical_editable(version)
-        except WorkflowError as error:
-            return self._workflow_error_response(error)
-
-        serializer = MetadataUpdateSerializer(version, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        # Return full version data for consistency
-        full_serializer = PageVersionSerializer(version)
-        return Response(full_serializer.data)
+        """Reject the removed partial working-copy mutation contract."""
+        return self._legacy_mutation_response()
 
     @action(detail=True, methods=["patch"], url_path="publishing")
     @transaction.atomic
     def update_publishing(self, request, pk=None):
-        """Compatibility endpoint routed through the canonical workflow."""
-        version = self.get_object()
-
-        try:
-            PageVersionWorkflowService(version.page, request.user).assert_canonical_editable(version)
-        except WorkflowError as error:
-            return self._workflow_error_response(error)
-
-        include_subpages = request.query_params.get("include_subpages", "false").lower() == "true"
-        serializer = PublishingUpdateSerializer(version, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        client_timestamp, error_response = self._parse_required_client_updated_at(request)
-        if error_response:
-            return error_response
-        effective_date = serializer.validated_data.get("effective_date", version.effective_date)
-        expiry_date = serializer.validated_data.get("expiry_date", version.expiry_date)
-        now = timezone.now()
-
-        if include_subpages:
-            if effective_date is None or effective_date > now:
-                return Response(
-                    {"error": "invalid_tree_publication", "message": "Page trees can only be published immediately."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            from ..publishing import PublishingService
-
-            user = request.user if request.user.is_authenticated else None
-            service = PublishingService(user)
-            try:
-                count, errors = service.publish_page_with_subpages(
-                    version.page.id,
-                    change_summary="Published with subpages via API",
-                    root_version_id=version.id,
-                    root_expected_updated_at=client_timestamp,
-                )
-            except WorkflowError as error:
-                return self._workflow_error_response(error)
-            version.refresh_from_db()
-            full_serializer = PageVersionSerializer(version)
-            response_data = full_serializer.data
-            response_data["subpages_published_count"] = max(count - 1, 0)
-            response_data["total_published_count"] = count
-            if errors:
-                response_data["errors"] = errors
-            return Response(response_data)
-
-        service = PageVersionWorkflowService(version.page, request.user)
-        try:
-            if effective_date is None:
-                if expiry_date is not None:
-                    raise WorkflowError("An expiry date requires a publication date.")
-                if version.effective_date and version.effective_date > now:
-                    version = service.cancel_schedule(version)
-            elif effective_date <= now:
-                version = service.publish(version, expected_updated_at=client_timestamp)
-            else:
-                version = service.schedule(
-                    version,
-                    effective_date,
-                    expiry_date,
-                    expected_updated_at=client_timestamp,
-                )
-        except WorkflowError as error:
-            return self._workflow_error_response(error)
-
-        full_serializer = PageVersionSerializer(version)
-        return Response(full_serializer.data)
+        """Reject the removed combined publishing mutation contract."""
+        return self._legacy_mutation_response()
 
     @action(detail=True, methods=["post"])
     def restore(self, request, pk=None):
@@ -362,6 +272,11 @@ class PageVersionViewSet(
     def save_working_copy(self, request, pk=None):
         """Atomically save all editable version fields with conflict detection."""
         version = self.get_object()
+        if "page" in request.data or "page_id" in request.data:
+            return Response(
+                {"error": "immutable_field", "message": "A working version cannot be moved to another page."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         client_updated_at = request.data.get("client_updated_at")
         if not client_updated_at:
             return Response(
@@ -421,6 +336,10 @@ class PageVersionViewSet(
                 {"error": "invalid_effective_date", "message": "A valid future effectiveDate is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if timezone.is_naive(effective_date):
+            effective_date = timezone.make_aware(effective_date, timezone.get_current_timezone())
+        if expiry_date and timezone.is_naive(expiry_date):
+            expiry_date = timezone.make_aware(expiry_date, timezone.get_current_timezone())
         try:
             scheduled = PageVersionWorkflowService(version.page, request.user).schedule(
                 version,
@@ -496,9 +415,9 @@ class PageVersionViewSet(
         results = []
         has_errors = False
         for item in items:
-            page_id = item.get("page_id")
-            version_id = item.get("version_id")
-            client_updated_at = parse_datetime(item.get("client_updated_at", ""))
+            page_id = item.get("page_id") if isinstance(item, dict) else None
+            version_id = item.get("version_id") if isinstance(item, dict) else None
+            client_updated_at = parse_datetime(item.get("client_updated_at", "")) if isinstance(item, dict) else None
             try:
                 if not page_id or not version_id or client_updated_at is None:
                     raise WorkflowError("Each item requires pageId, versionId, and clientUpdatedAt.")
@@ -514,6 +433,74 @@ class PageVersionViewSet(
                         "status": "published",
                     }
                 )
+            except (WebPage.DoesNotExist, PageVersion.DoesNotExist):
+                has_errors = True
+                results.append(
+                    {
+                        "page_id": page_id,
+                        "version_id": version_id,
+                        "status": "error",
+                        "error": "not_found",
+                        "message": "The reviewed page or version no longer exists.",
+                    }
+                )
+            except WorkflowError as error:
+                has_errors = True
+                results.append(
+                    {
+                        "page_id": page_id,
+                        "version_id": version_id,
+                        "status": "error",
+                        "error": error.code,
+                        "message": str(error),
+                        "details": error.details,
+                    }
+                )
+
+        return Response(
+            {"atomic": False, "results": results},
+            status=status.HTTP_207_MULTI_STATUS if has_errors else status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"], url_path="bulk-schedule-explicit")
+    def bulk_schedule_explicit(self, request):
+        """Schedule reviewed page/version/timestamp tuples independently."""
+        items = request.data.get("items")
+        effective_date = parse_datetime(request.data.get("effective_date", ""))
+        expiry_date = parse_datetime(request.data.get("expiry_date", "")) if request.data.get("expiry_date") else None
+        if not isinstance(items, list) or not items:
+            return Response(
+                {"error": "items_required", "message": "At least one reviewed item is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if effective_date is None:
+            return Response(
+                {"error": "invalid_effective_date", "message": "A valid future effectiveDate is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if timezone.is_naive(effective_date):
+            effective_date = timezone.make_aware(effective_date, timezone.get_current_timezone())
+        if expiry_date and timezone.is_naive(expiry_date):
+            expiry_date = timezone.make_aware(expiry_date, timezone.get_current_timezone())
+
+        results = []
+        has_errors = False
+        for item in items:
+            page_id = item.get("page_id") if isinstance(item, dict) else None
+            version_id = item.get("version_id") if isinstance(item, dict) else None
+            client_updated_at = parse_datetime(item.get("client_updated_at", "")) if isinstance(item, dict) else None
+            try:
+                if not page_id or not version_id or client_updated_at is None:
+                    raise WorkflowError("Each item requires pageId, versionId, and clientUpdatedAt.")
+                page = self._page_queryset().get(pk=page_id)
+                version = self.get_queryset().get(pk=version_id, page=page)
+                scheduled = PageVersionWorkflowService(page, request.user).schedule(
+                    version,
+                    effective_date,
+                    expiry_date,
+                    expected_updated_at=client_updated_at,
+                )
+                results.append({"page_id": page.id, "version_id": scheduled.id, "status": "scheduled"})
             except (WebPage.DoesNotExist, PageVersion.DoesNotExist):
                 has_errors = True
                 results.append(
@@ -683,9 +670,9 @@ class PageVersionViewSet(
         url_path="pages/(?P<page_id>[^/.]+)/versions/current",
     )
     def current_for_page(self, request, page_id=None):
-        """Get current published version for a specific page, creating one if none exists"""
+        """Get the current published version without creating workflow state."""
         try:
-            page = get_object_or_404(WebPage, id=page_id)
+            page = get_object_or_404(self._page_queryset(), id=page_id)
         except ValueError:
             return Response(
                 {"error": "Invalid page ID"},
@@ -694,13 +681,7 @@ class PageVersionViewSet(
 
         current_version = page.get_current_published_version()
         if not current_version:
-            # Fallback to latest version for staff users
-            if request.user.is_staff:
-                current_version = page.get_latest_version()
-
-        if not current_version:
-            # Auto-create initial version if none exists
-            current_version = page.create_version(user=request.user, version_title="Auto-generated initial version")
+            return Response(None, status=status.HTTP_204_NO_CONTENT)
 
         serializer = self.get_serializer(current_version)
         return Response(serializer.data)
@@ -708,7 +689,7 @@ class PageVersionViewSet(
     def latest_for_page(self, request, page_id=None):
         """Get the latest version for a page without creating one as a side effect."""
         try:
-            page = get_object_or_404(WebPage, id=page_id)
+            page = get_object_or_404(self._page_queryset(), id=page_id)
         except ValueError:
             return Response(
                 {"error": "Invalid page ID"},

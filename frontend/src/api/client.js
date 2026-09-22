@@ -10,6 +10,7 @@
 import axios from 'axios'
 import { convertKeysToCamel } from '../utils/caseConversion'
 import { getSessionId } from '../utils/sessionId'
+import { getCurrentTenantId } from '../utils/tenant'
 import {
     inspectAppVersionResponse,
     startApplicationVersionMonitor,
@@ -73,6 +74,7 @@ apiClient.interceptors.request.use(
     async (config) => {
         // Add session ID to all requests
         config.headers['X-Session-ID'] = getSessionId();
+        config.headers['X-Tenant-ID'] = getCurrentTenantId();
         
         // Add JWT token to requests
         const accessToken = localStorage.getItem('access_token');

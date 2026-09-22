@@ -311,8 +311,7 @@ export function generateChangeSummary(changes) {
  * @returns {Promise<Object>} Save result
  */
 export async function smartSave(originalWebpageData, currentWebpageData, originalPageVersionData, currentPageVersionData, apis, options = {}) {
-    const { pagesApi, versionsApi } = apis;
-    const pageId = currentWebpageData.id || originalWebpageData.id;
+    const { versionsApi } = apis;
     const versionId = currentPageVersionData.id || originalPageVersionData.id;
 
     // Analyze what changed
@@ -336,37 +335,22 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
             updateOptions.clientUpdatedAt = options.clientUpdatedAt;
         }
 
-        // Execute saves based on strategy
-        if (strategy.strategy === 'page-only') {
-
-            results.pageResult = await pagesApi.update(pageId, currentWebpageData);
-
-        } else if (strategy.strategy === 'version-only') {
-            // Prepare version data with meta fields properly nested in pageData
-            const versionDataForSave = prepareVersionDataForSave(currentPageVersionData);
-
+        // Public page attributes are versioned too. Every editor save therefore goes
+        // through the one optimistic-locking working-copy endpoint; WebPage itself is
+        // only changed by the publish workflow.
+        if (strategy.strategy !== 'none') {
+            const versionDataForSave = prepareVersionDataForSave({
+                ...currentPageVersionData,
+                pageData: buildVersionedPageData(
+                    currentPageVersionData.pageData || currentPageVersionData.page_data,
+                    currentWebpageData,
+                ),
+            });
             results.versionResult = await versionsApi.saveWorkingCopy(
                 versionId,
                 versionDataForSave,
                 updateOptions.clientUpdatedAt,
             );
-
-        } else if (strategy.strategy === 'both') {
-
-            // Save page first
-            results.pageResult = await pagesApi.update(pageId, currentWebpageData);
-
-            // Prepare version data with meta fields properly nested in pageData
-            const versionDataForSave = prepareVersionDataForSave(currentPageVersionData);
-
-            results.versionResult = await versionsApi.saveWorkingCopy(
-                versionId,
-                versionDataForSave,
-                updateOptions.clientUpdatedAt,
-            );
-
-        } else {
-            // No version changes to save
         }
 
         return results;

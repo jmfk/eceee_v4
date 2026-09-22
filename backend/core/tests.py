@@ -1,5 +1,7 @@
 from django.test import TestCase, override_settings
 
+from config.celery import app
+
 
 @override_settings(APP_VERSION="build-123")
 class ApplicationVersionTest(TestCase):
@@ -10,3 +12,10 @@ class ApplicationVersionTest(TestCase):
         self.assertEqual(response.json(), {"version": "build-123"})
         self.assertEqual(response["X-App-Version"], "build-123")
         self.assertEqual(response["Cache-Control"], "no-store")
+
+
+class CeleryScheduleTest(TestCase):
+    def test_scheduled_publication_refresh_is_in_effective_beat_schedule(self):
+        task = app.conf.beat_schedule["refresh-scheduled-publication-caches"]
+
+        self.assertEqual(task["task"], "webpages.tasks.refresh_scheduled_publication_caches")

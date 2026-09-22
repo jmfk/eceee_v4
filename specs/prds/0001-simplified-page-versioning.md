@@ -6,6 +6,7 @@ locked: true
 created: 2026-09-22
 related_adrs:
   - ADR-0001
+  - ADR-0002
 ---
 
 # PRD-0001: Simplified Page Versioning
@@ -88,10 +89,12 @@ Page authors currently encounter version numbers, overlapping status badges, dir
 - 2026-09-22: Automated backend, frontend, lint, and production-build verification is complete. PRD remains `started` until the browser-level acceptance walkthrough is recorded.
 - 2026-09-22: Review follow-up keeps public page attributes inside the working version until publication, makes scheduled takeover reversible on cancellation without reviving superseded content, restores tenant-wide History comparison, and runs legacy mutations inside explicit database transactions.
 - 2026-09-22: Delayed slug changes now reject existing sibling collisions on Save and recheck the shared sibling namespace under lock before immediate, scheduled, bulk, or descendant publication.
+- 2026-09-22: The follow-up hardening contract is tracked in PRD-0002 and ADR-0002; legacy mutations and implicit descendant publication are removed in favor of one reviewed working-copy boundary.
 
 ## Linked ADRs
 
 - [ADR-0001: Canonical page version workflow](../adrs/active/0001-canonical-page-version-workflow.md)
+- [ADR-0002: Single page workflow mutation boundary](../adrs/active/0002-single-page-workflow-mutation-boundary.md)
 
 ## Completion Evidence
 

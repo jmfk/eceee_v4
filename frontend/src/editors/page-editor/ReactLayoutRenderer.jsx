@@ -282,15 +282,21 @@ const ReactLayoutRenderer = forwardRef(({
         return {
             sourceVersionId,
             loadedSourceVersion,
+            authoritativeSourceVersion,
             updatedSourceWidgets
         };
     }, [getState]);
 
     const persistCutSourceWidgets = useCallback(async (cutMetadata, preparedSource = null) => {
         const sourceUpdate = preparedSource || await prepareCutSourceWidgets(cutMetadata);
-        await versionsApi.updateWidgets(sourceUpdate.sourceVersionId, {
-            widgets: sourceUpdate.updatedSourceWidgets
-        });
+        await versionsApi.saveWorkingCopy(
+            sourceUpdate.sourceVersionId,
+            {
+                ...sourceUpdate.authoritativeSourceVersion,
+                widgets: sourceUpdate.updatedSourceWidgets,
+            },
+            sourceUpdate.authoritativeSourceVersion?.updatedAt || sourceUpdate.authoritativeSourceVersion?.updated_at,
+        );
 
         if (sourceUpdate.loadedSourceVersion) {
             await publishCutSourceRemovals(cutMetadata);

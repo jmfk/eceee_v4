@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { AlertTriangle, Calendar, Clock, Globe, Radio, Upload } from 'lucide-react'
+import { Calendar, Clock, Globe, Radio, Upload } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { versionsApi } from '../api/versions'
 import { useNotificationContext } from './NotificationManager'
@@ -47,7 +47,6 @@ type PublishingEditorProps = {
 const PublishingEditor = ({ pageId, isDirty = false, onSave, onWorkflowChange }: PublishingEditorProps) => {
     const [scheduleDate, setScheduleDate] = useState('')
     const [busyAction, setBusyAction] = useState<string | null>(null)
-    const [advancedOpen, setAdvancedOpen] = useState(false)
     const queryClient = useQueryClient()
     const { showConfirm } = useNotificationContext()
     const { addNotification } = useGlobalNotifications()
@@ -159,27 +158,6 @@ const PublishingEditor = ({ pageId, isDirty = false, onSave, onWorkflowChange }:
         }
     }
 
-    const publishDescendants = async () => {
-        const confirmed = await showConfirm({
-            title: 'Publish page and subpages',
-            message: 'This legacy operation is not atomic. It publishes each page independently using its latest eligible version, and partial completion is possible.',
-            confirmText: 'Publish non-atomically',
-            confirmButtonStyle: 'danger',
-        })
-        if (!confirmed) return
-        setBusyAction('descendants')
-        try {
-            const version = await workingVersion()
-            await versionsApi.publishVersionNowWithSubpages(version.id, true, version.updatedAt)
-            addNotification('Page structure publishing finished. Review results and page states.', 'success')
-            await refresh()
-        } catch (error: any) {
-            addNotification(error.message || 'Page structure publishing failed', 'error')
-        } finally {
-            setBusyAction(null)
-        }
-    }
-
     return (
         <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-6">
             <section className="rounded-lg border border-gray-200 bg-white p-5">
@@ -220,18 +198,6 @@ const PublishingEditor = ({ pageId, isDirty = false, onSave, onWorkflowChange }:
 
             <PageVersionHistoryPanel pageId={pageId} workflow={workflow} onRestored={refresh} />
 
-            <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <button type="button" onClick={() => setAdvancedOpen(value => !value)} className="flex w-full items-center justify-between text-left font-medium text-amber-950">
-                    <span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Advanced structure publishing</span>
-                    <span>{advancedOpen ? 'Hide' : 'Show'}</span>
-                </button>
-                {advancedOpen && (
-                    <div className="mt-3 border-t border-amber-200 pt-3 text-sm text-amber-950">
-                        <p>This is not a release packet and is not atomic. Each page may succeed or fail independently.</p>
-                        <button type="button" onClick={publishDescendants} disabled={Boolean(busyAction)} className="mt-3 rounded border border-amber-400 bg-white px-3 py-2 font-medium hover:bg-amber-100 disabled:opacity-50">Publish page and subpages</button>
-                    </div>
-                )}
-            </section>
         </div>
     )
 }
