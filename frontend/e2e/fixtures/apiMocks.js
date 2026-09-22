@@ -399,6 +399,14 @@ export async function mockCmsApi(page, { authenticated = false, pageEditor = fal
       return json(route, clone(editorState.page))
     }
 
+    if (pageEditor && url.pathname === '/api/v1/webpages/path-patterns/' && method === 'GET') {
+      return json(route, { count: 0, next: null, previous: null, results: [] })
+    }
+
+    if (pageEditor && url.pathname === '/api/v1/tags/' && method === 'GET') {
+      return json(route, { count: 0, next: null, previous: null, results: [] })
+    }
+
     if (pageEditor && url.pathname === '/api/v1/webpages/pages/101/' && method === 'PATCH') {
       const body = request.postDataJSON()
       editorState.page = {

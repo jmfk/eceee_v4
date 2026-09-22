@@ -48,7 +48,13 @@ def refresh_publication_caches(now=None):
 
     updated_count = 0
     for page in stale_pages.iterator():
+        previous_version_id = page.current_published_version_id
         update_page_publication_cache(page, now=now)
+        if page.current_published_version_id and page.current_published_version_id != previous_version_id:
+            published_version = page.current_published_version
+            published_version.page = page
+            published_version._apply_version_data()
+            page.save()
         updated_count += 1
     return updated_count
 

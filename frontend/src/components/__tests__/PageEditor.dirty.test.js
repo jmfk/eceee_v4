@@ -12,7 +12,11 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { analyzeChanges } from '../../utils/smartSaveUtils'
+import {
+    analyzeChanges,
+    buildVersionedPageData,
+    mergeVersionedPageAttributes,
+} from '../../utils/smartSaveUtils'
 import { applyWidgetUpdateToWidgetMap } from '../../utils/pageEditorWidgetState'
 import { saveWidgetEditorChanges } from '../../utils/pageEditorWidgetSave'
 
@@ -105,6 +109,41 @@ describe('analyzeChanges — widget dirty detection', () => {
         expect(result.hasVersionChanges).toBe(true)
         expect(result.versionFields.tags).toEqual(['energy', 'policy'])
         expect(result.changedFieldNames).toContain('tags')
+    })
+})
+
+describe('working-copy page attributes', () => {
+    it('stores public page settings inside version page data', () => {
+        const pageData = buildVersionedPageData(
+            { body: 'content' },
+            {
+                title: 'Draft title',
+                description: 'Draft description',
+                slug: 'draft-slug',
+                pathPatternKey: 'article_slug',
+                hostnames: ['example.test'],
+            },
+        )
+
+        expect(pageData).toEqual({
+            body: 'content',
+            pageAttributes: {
+                title: 'Draft title',
+                description: 'Draft description',
+                slug: 'draft-slug',
+                pathPatternKey: 'article_slug',
+                hostnames: ['example.test'],
+            },
+        })
+    })
+
+    it('hydrates the editor from saved working-copy attributes', () => {
+        const page = mergeVersionedPageAttributes(
+            { title: 'Live title', slug: 'live-slug' },
+            { pageData: { pageAttributes: { title: 'Draft title', slug: 'draft-slug' } } },
+        )
+
+        expect(page).toEqual({ title: 'Draft title', slug: 'draft-slug' })
     })
 })
 

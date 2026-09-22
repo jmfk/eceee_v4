@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.db import connection
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -64,6 +64,11 @@ class PageVersionWorkflowTest(TestCase):
     def test_scheduled_version_refreshes_the_publication_cache_when_due(self):
         live = self.publish_initial()
         draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        draft.page_data = {
+            **draft.page_data,
+            "page_attributes": {"title": "Scheduled title", "slug": "scheduled-page"},
+        }
+        draft.save(update_fields=["page_data", "updated_at"])
         scheduled_at = timezone.now() + timedelta(hours=1)
         PageVersionWorkflowService(self.page, self.user).schedule(draft, scheduled_at)
 
@@ -75,6 +80,39 @@ class PageVersionWorkflowTest(TestCase):
         self.page.refresh_from_db()
         self.assertEqual(updated_count, 1)
         self.assertEqual(self.page.current_published_version_id, draft.id)
+        self.assertEqual(self.page.title, "Scheduled title")
+        self.assertEqual(self.page.slug, "scheduled-page")
+
+    def test_scheduled_expiry_does_not_restore_the_previous_live_version(self):
+        live = self.publish_initial()
+        draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        scheduled_at = timezone.now() + timedelta(hours=1)
+        expires_at = scheduled_at + timedelta(hours=1)
+
+        PageVersionWorkflowService(self.page, self.user).schedule(draft, scheduled_at, expires_at)
+
+        live.refresh_from_db()
+        self.assertEqual(live.expiry_date, scheduled_at)
+        refresh_publication_caches(now=scheduled_at + timedelta(seconds=1))
+        refresh_publication_caches(now=expires_at + timedelta(seconds=1))
+        self.page.refresh_from_db()
+        self.assertIsNone(self.page.current_published_version_id)
+        self.assertFalse(self.page.is_currently_published)
+
+    def test_cancel_schedule_restores_the_previous_live_expiry(self):
+        live = self.publish_initial()
+        draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        scheduled_at = timezone.now() + timedelta(hours=1)
+        service = PageVersionWorkflowService(self.page, self.user)
+        service.schedule(draft, scheduled_at)
+
+        service.cancel_schedule(draft)
+
+        live.refresh_from_db()
+        draft.refresh_from_db()
+        self.assertIsNone(live.expiry_date)
+        self.assertIsNone(draft.effective_date)
+        self.assertNotIn(service.SCHEDULE_PREDECESSOR_KEY, draft.change_summary)
 
     def test_expired_version_is_removed_from_the_publication_cache(self):
         live = self.publish_initial()
@@ -133,6 +171,45 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         draft.refresh_from_db()
         self.assertEqual(draft.meta_title, "Other editor")
+
+    def test_page_attributes_change_only_when_working_copy_is_published(self):
+        live = self.publish_initial()
+        draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        save_url = reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk})
+
+        saved = self.client.patch(
+            save_url,
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "pageData": {
+                    **draft.page_data,
+                    "pageAttributes": {
+                        "title": "Draft title",
+                        "description": "Draft description",
+                        "slug": "draft-slug",
+                    },
+                },
+            },
+            format="json",
+        )
+
+        self.assertEqual(saved.status_code, status.HTTP_200_OK)
+        draft.refresh_from_db()
+        self.assertTrue(
+            "page_attributes" in draft.page_data or "pageAttributes" in draft.page_data,
+            repr(draft.page_data),
+        )
+        self.page.refresh_from_db()
+        self.assertEqual(self.page.title, "Live title")
+        self.assertEqual(self.page.slug, "workflow-page")
+        published = self.client.post(reverse("api:pageversion-publish", kwargs={"pk": draft.pk}), format="json")
+        self.assertEqual(published.status_code, status.HTTP_200_OK)
+        self.page.refresh_from_db()
+        live.refresh_from_db()
+        self.assertEqual(self.page.title, "Draft title")
+        self.assertEqual(self.page.description, "Draft description")
+        self.assertEqual(self.page.slug, "draft-slug")
+        self.assertIsNotNone(live.expiry_date)
 
     def test_publish_targets_only_the_explicit_canonical_working_copy(self):
         live = self.publish_initial()
@@ -292,6 +369,37 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(response.data["legacy_conflicts"]["additional_scheduled_count"], 1)
         self.assertGreaterEqual(response.data["legacy_conflicts"]["older_draft_count"], 2)
 
+    def test_tenant_collaborator_can_compare_shared_history(self):
+        first = self.page.create_version(self.user, "First shared version")
+        second = self.page.create_version(self.user, "Second shared version")
+        collaborator = User.objects.create_user("history-collaborator", password="test")
+        self.client.force_authenticate(collaborator)
+
+        response = self.client.get(
+            reverse("api:pageversion-compare"),
+            {"version1": first.id, "version2": second.id},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_compare_rejects_versions_from_different_pages(self):
+        first = self.page.create_version(self.user, "First page version")
+        other_page = WebPage.objects.create(
+            title="Other page",
+            slug="other-page",
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        second = other_page.create_version(self.user, "Other page version")
+
+        response = self.client.get(
+            reverse("api:pageversion-compare"),
+            {"version1": first.id, "version2": second.id},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_pages_list_and_editor_workflow_use_the_same_aggregate_state(self):
         self.publish_initial()
         self.page.create_version(self.user, "Unpublished changes")
@@ -306,3 +414,35 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(workflow_response.status_code, status.HTTP_200_OK)
         self.assertEqual(pages_response.status_code, status.HTTP_200_OK)
         self.assertEqual(listed_page["workflow_state"], workflow_response.data["state"])
+
+
+class PageVersionMutationTransactionTest(TransactionTestCase):
+    """Exercise row-locking mutations without TestCase's implicit transaction."""
+
+    reset_sequences = True
+
+    def setUp(self):
+        self.user = User.objects.create_user("transaction-user", password="test")
+        self.tenant = Tenant.objects.create(name="Transaction tenant", identifier="transaction", created_by=self.user)
+        self.page = WebPage.objects.create(
+            title="Transaction page",
+            slug="transaction-page",
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        self.version = self.page.create_version(self.user, "Working copy")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
+
+    def test_legacy_detail_patch_runs_inside_a_transaction(self):
+        response = self.client.patch(
+            reverse("api:pageversion-detail", kwargs={"pk": self.version.pk}),
+            {"metaTitle": "Updated safely"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.version.refresh_from_db()
+        self.assertEqual(self.version.meta_title, "Updated safely")

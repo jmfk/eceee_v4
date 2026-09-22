@@ -5,7 +5,10 @@ const editorPath = '/pages/101/edit/content'
 
 const installErrorGuards = page => {
   page.on('console', message => {
-    if (message.type() === 'error') {
+    const isExpectedUnloadTelemetryError = message.text().startsWith(
+      'ECEEE Analytics: Failed to flush events TypeError: Failed to fetch'
+    )
+    if (message.type() === 'error' && !isExpectedUnloadTelemetryError) {
       throw new Error(`Console error: ${message.text()}`)
     }
   })
@@ -66,6 +69,22 @@ test.describe('page editor regressions', () => {
     await page.reload()
     await expect(page.getByTestId('page-editor-surface')).toBeVisible()
     await expect(contentEditor(page)).toContainText('Saved rich text copy')
+  })
+
+  test('page settings stay in the working version until publish', async ({ page }) => {
+    const editorState = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    await openEditor(page, editorState)
+
+    await page.getByRole('button', { name: 'Settings & SEO' }).click()
+    await page.getByPlaceholder('Page Title').fill('Unpublished draft title')
+    await page.getByPlaceholder('page-url-slug').fill('unpublished-draft-slug')
+    await saveCurrentVersion(page)
+
+    expect(editorState.savedPages).toHaveLength(0)
+    expect(getSavedVersion(editorState).pageData.pageAttributes).toMatchObject({
+      title: 'Unpublished draft title',
+      slug: 'unpublished-draft-slug',
+    })
   })
 
   test('external widget config update reaches the rendered content', async ({ page }) => {

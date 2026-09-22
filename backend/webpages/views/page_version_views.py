@@ -149,11 +149,13 @@ class PageVersionViewSet(viewsets.ModelViewSet):
 
         serializer.save(created_by=self.request.user)
 
+    @transaction.atomic
     def perform_update(self, serializer):
         service = PageVersionWorkflowService(serializer.instance.page, self.request.user)
         service.assert_canonical_editable(serializer.instance)
         serializer.save()
 
+    @transaction.atomic
     def perform_destroy(self, instance):
         """Override destroy to cleanup media references"""
         service = PageVersionWorkflowService(instance.page, self.request.user)
@@ -200,6 +202,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
             return self._workflow_error_response(error)
 
     @action(detail=True, methods=["patch"], url_path="widgets")
+    @transaction.atomic
     def update_widgets(self, request, pk=None):
         """Update only widget data - no page_data validation"""
         version = self.get_object()
@@ -216,6 +219,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         return Response(full_serializer.data)
 
     @action(detail=True, methods=["patch"], url_path="page-data")
+    @transaction.atomic
     def update_page_data(self, request, pk=None):
         """Update only page_data with schema validation"""
         version = self.get_object()
@@ -233,6 +237,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         return Response(full_serializer.data)
 
     @action(detail=True, methods=["patch"], url_path="metadata")
+    @transaction.atomic
     def update_metadata(self, request, pk=None):
         """Update version metadata (title, layout, theme, etc.)"""
         version = self.get_object()
@@ -250,6 +255,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         return Response(full_serializer.data)
 
     @action(detail=True, methods=["patch"], url_path="publishing")
+    @transaction.atomic
     def update_publishing(self, request, pk=None):
         """Update publishing dates and settings"""
         version = self.get_object()
@@ -519,16 +525,9 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        accessible_versions = PageVersion.objects.select_related("page", "created_by")
-        if not request.user.is_staff:
-            now = timezone.now()
-            accessible_versions = accessible_versions.filter(
-                Q(created_by=request.user)
-                | (Q(effective_date__lte=now) & (Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)))
-            )
-
+        accessible_versions = self.get_queryset()
         version1 = get_object_or_404(accessible_versions, pk=version1_id)
-        version2 = get_object_or_404(accessible_versions, pk=version2_id)
+        version2 = get_object_or_404(accessible_versions, pk=version2_id, page=version1.page)
 
         serializer = self.get_serializer(
             {
