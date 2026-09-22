@@ -365,7 +365,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 locked = PageVersion.objects.select_for_update().get(pk=version.pk)
                 service = PageVersionWorkflowService(locked.page, request.user)
                 service.assert_canonical_editable(locked)
-                if locked.updated_at > client_timestamp:
+                if locked.updated_at != client_timestamp:
                     raise VersionConflictError(
                         "This working version has been changed by another user.",
                         details={

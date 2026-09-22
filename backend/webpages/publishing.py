@@ -5,11 +5,11 @@ This module contains value objects and service classes that handle the business
 logic for page publication workflows, following object-oriented design principles.
 """
 
-from django.utils import timezone
-from django.db import transaction
-from django.core.exceptions import ValidationError
-from typing import Optional, List, Tuple
 import logging
+from typing import List, Optional, Tuple
+
+from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +32,7 @@ class PublicationSchedule:
 
     def _validate(self):
         """Validate that the schedule dates are logical."""
-        if (
-            self.effective_date
-            and self.expiry_date
-            and self.effective_date >= self.expiry_date
-        ):
+        if self.effective_date and self.expiry_date and self.effective_date >= self.expiry_date:
             raise ValidationError("Effective date must be before expiry date.")
 
     def is_valid(self) -> bool:
@@ -72,9 +68,7 @@ class PublicationSchedule:
             return True
         return False
 
-    def time_until_effective(
-        self, now: Optional[timezone.datetime] = None
-    ) -> Optional[timezone.timedelta]:
+    def time_until_effective(self, now: Optional[timezone.datetime] = None) -> Optional[timezone.timedelta]:
         """Get time remaining until the schedule becomes effective."""
         if not self.effective_date:
             return None
@@ -87,9 +81,7 @@ class PublicationSchedule:
 
         return self.effective_date - now
 
-    def time_until_expiry(
-        self, now: Optional[timezone.datetime] = None
-    ) -> Optional[timezone.timedelta]:
+    def time_until_expiry(self, now: Optional[timezone.datetime] = None) -> Optional[timezone.timedelta]:
         """Get time remaining until the schedule expires."""
         if not self.expiry_date:
             return None
@@ -125,9 +117,7 @@ class PublishingService:
         self.user = user
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
-    def process_scheduled_publications(
-        self, now: Optional[timezone.datetime] = None
-    ) -> Tuple[int, List[str]]:
+    def process_scheduled_publications(self, now: Optional[timezone.datetime] = None) -> Tuple[int, List[str]]:
         """
         Process versions that should be published now using date-based logic.
 
@@ -174,9 +164,7 @@ class PublishingService:
 
         return published_count, errors
 
-    def process_expired_pages(
-        self, now: Optional[timezone.datetime] = None
-    ) -> Tuple[int, List[str]]:
+    def process_expired_pages(self, now: Optional[timezone.datetime] = None) -> Tuple[int, List[str]]:
         """
         Process versions that should be expired now using date-based logic.
 
@@ -192,9 +180,9 @@ class PublishingService:
         from .models import PageVersion
 
         # Find versions that should be expired
-        versions_to_expire = PageVersion.objects.filter(
-            expiry_date__lte=now, expiry_date__isnull=False
-        ).select_related("page", "created_by")
+        versions_to_expire = PageVersion.objects.filter(expiry_date__lte=now, expiry_date__isnull=False).select_related(
+            "page", "created_by"
+        )
 
         expired_count = 0
         errors = []
@@ -211,7 +199,9 @@ class PublishingService:
                     # based on their dates - no manual state changes needed
 
             except Exception as e:
-                error_msg = f"Failed to process expired version {version.version_number} of {version.page.title}: {str(e)}"
+                error_msg = (
+                    f"Failed to process expired version {version.version_number} of {version.page.title}: {str(e)}"
+                )
                 errors.append(error_msg)
                 self.logger.error(error_msg)
 

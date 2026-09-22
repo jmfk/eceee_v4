@@ -149,12 +149,12 @@ class WebPageFilter(django_filters.FilterSet):
                 "_workflow_has_draft": False,
                 "_workflow_has_expired": True,
             },
-            "not_published": {
-                "_workflow_has_live": False,
-                "_workflow_has_scheduled": False,
-                "_workflow_has_expired": False,
-            },
         }
+        if value == "not_published":
+            return annotated.filter(
+                _workflow_has_live=False,
+                _workflow_has_scheduled=False,
+            ).filter(Q(_workflow_has_draft=True) | Q(_workflow_has_expired=False))
         return annotated.filter(**filters[value]) if value in filters else queryset
 
     def filter_has_meta_title(self, queryset, name, value):
