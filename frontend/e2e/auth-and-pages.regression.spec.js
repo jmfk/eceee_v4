@@ -39,7 +39,7 @@ test.describe('CMS auth and page management regressions', () => {
     await expect(page.getByRole('link', { name: 'Pages' })).toBeVisible()
     await expect(page.getByPlaceholder('Search pages...')).toBeVisible()
     await expect(page.getByText('Summer Study')).toBeVisible()
-    await expect(page.getByText('Published')).toBeVisible()
+    await expect(page.getByText('Live', { exact: true })).toBeVisible()
     await expect(page.getByText('1 root page')).toBeVisible()
   })
   for (const viewport of [
@@ -134,8 +134,12 @@ test.describe('CMS auth and page management regressions', () => {
 
       await expect(page.getByTestId(`page-tree-node-${rootId}`)).toBeVisible()
       await expect(page.getByTestId(`page-tree-node-${childId}`)).toBeVisible()
-      await expect(page.getByText('Draft', { exact: true })).toBeVisible()
-      await expect(page.getByText('Scheduled', { exact: true })).toBeVisible()
+      await expect(
+        page.getByTestId('page-tree-node-draft-registration-details').getByText('Not published', { exact: true })
+      ).toBeVisible()
+      await expect(
+        page.getByTestId('page-tree-node-scheduled-venue-travel').getByText(/^Scheduled ·/)
+      ).toBeVisible()
       await expect(page.getByLabel('Missing hostname')).toBeVisible()
       await page.getByTestId(`page-tree-expand-${childId}`).click()
       await expect(page.getByTestId(`page-tree-node-${nestedId}`)).toBeVisible()

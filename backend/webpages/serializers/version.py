@@ -206,9 +206,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
                 try:
                     client_timestamp = parse_datetime(client_updated_at)
                 except (ValueError, TypeError):
-                    raise ValidationError(
-                        {"client_updated_at": "Invalid timestamp format"}
-                    )
+                    raise ValidationError({"client_updated_at": "Invalid timestamp format"})
 
                 # Compare with server's current updated_at
                 # Refresh from DB to get latest timestamp
@@ -281,17 +279,13 @@ class WidgetUpdateSerializer(serializers.ModelSerializer):
 
         for slot_name, widgets in value.items():
             if not isinstance(widgets, list):
-                raise serializers.ValidationError(
-                    f"Widgets in slot '{slot_name}' must be a list"
-                )
+                raise serializers.ValidationError(f"Widgets in slot '{slot_name}' must be a list")
 
             converted_widgets[slot_name] = []
 
             for i, widget in enumerate(widgets):
                 if not isinstance(widget, dict):
-                    raise serializers.ValidationError(
-                        f"Widget {i} in slot '{slot_name}' must be a dictionary"
-                    )
+                    raise serializers.ValidationError(f"Widget {i} in slot '{slot_name}' must be a dictionary")
 
                 # Basic required fields check - accept either 'type' or 'widget_type'
                 if "type" not in widget and "widget_type" not in widget:
@@ -371,9 +365,7 @@ class PageDataUpdateSerializer(serializers.ModelSerializer):
         filtered_data = {k: v for k, v in value.items() if k not in forbidden}
 
         # Validate against schema
-        effective_schema = PageDataSchema.get_effective_schema_for_layout(
-            version.code_layout
-        )
+        effective_schema = PageDataSchema.get_effective_schema_for_layout(version.code_layout)
 
         if effective_schema:
             from jsonschema import Draft7Validator, Draft202012Validator

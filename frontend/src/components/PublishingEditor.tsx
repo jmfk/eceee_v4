@@ -37,7 +37,14 @@ const stateLabels: Record<string, string> = {
     publication_ended: 'Publication ended',
 }
 
-const PublishingEditor = ({ pageId, onWorkflowChange }: { pageId: number | string, onWorkflowChange?: () => Promise<unknown> }) => {
+type PublishingEditorProps = {
+    pageId: number | string
+    isDirty?: boolean
+    onSave?: () => Promise<WorkflowVersion | undefined>
+    onWorkflowChange?: () => Promise<unknown>
+}
+
+const PublishingEditor = ({ pageId, isDirty = false, onSave, onWorkflowChange }: PublishingEditorProps) => {
     const [scheduleDate, setScheduleDate] = useState('')
     const [busyAction, setBusyAction] = useState<string | null>(null)
     const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -64,13 +71,22 @@ const PublishingEditor = ({ pageId, onWorkflowChange }: { pageId: number | strin
     }
 
     const workingVersion = async () => {
+        if (isDirty) {
+            if (!onSave) {
+                throw new Error('Save the current changes before publishing.')
+            }
+            const saved = await onSave()
+            if (!saved) {
+                throw new Error('The current changes could not be saved.')
+            }
+            return saved
+        }
         if (workflow?.editableVersion) return workflow.editableVersion
         const result = await versionsApi.getOrCreateWorkingCopy(pageId)
         return result.version
     }
 
     const publish = async () => {
-        const version = await workingVersion()
         const confirmed = await showConfirm({
             title: 'Publish changes',
             message: 'Publish this saved working version now?',
@@ -80,9 +96,12 @@ const PublishingEditor = ({ pageId, onWorkflowChange }: { pageId: number | strin
         if (!confirmed) return
         setBusyAction('publish')
         try {
+            const version = await workingVersion()
             await versionsApi.publish(version.id)
             addNotification('Changes published', 'success')
             await refresh()
+        } catch (error: any) {
+            addNotification(error.message || 'Publishing failed', 'error')
         } finally {
             setBusyAction(null)
         }
@@ -136,7 +155,6 @@ const PublishingEditor = ({ pageId, onWorkflowChange }: { pageId: number | strin
     }
 
     const publishDescendants = async () => {
-        const version = await workingVersion()
         const confirmed = await showConfirm({
             title: 'Publish page and subpages',
             message: 'This legacy operation is not atomic. It publishes each page independently using its latest eligible version, and partial completion is possible.',
@@ -146,9 +164,12 @@ const PublishingEditor = ({ pageId, onWorkflowChange }: { pageId: number | strin
         if (!confirmed) return
         setBusyAction('descendants')
         try {
+            const version = await workingVersion()
             await versionsApi.publishVersionNowWithSubpages(version.id, true)
             addNotification('Page structure publishing finished. Review results and page states.', 'success')
             await refresh()
+        } catch (error: any) {
+            addNotification(error.message || 'Page structure publishing failed', 'error')
         } finally {
             setBusyAction(null)
         }

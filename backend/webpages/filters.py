@@ -22,9 +22,7 @@ class WebPageFilter(django_filters.FilterSet):
 
     # Hierarchy filters
     parent = django_filters.ModelChoiceFilter(queryset=WebPage.objects.all())
-    parent_isnull = django_filters.BooleanFilter(
-        field_name="parent", lookup_expr="isnull"
-    )
+    parent_isnull = django_filters.BooleanFilter(field_name="parent", lookup_expr="isnull")
     has_children = django_filters.BooleanFilter(method="filter_has_children")
     depth_level = django_filters.NumberFilter(method="filter_depth_level")
 
@@ -36,37 +34,21 @@ class WebPageFilter(django_filters.FilterSet):
     # Layout and theme filters (layout removed - now using code-based layouts)
     code_layout = django_filters.CharFilter(lookup_expr="icontains")
     theme = django_filters.ModelChoiceFilter(queryset=PageTheme.objects.all())
-    theme_isnull = django_filters.BooleanFilter(
-        field_name="theme", lookup_expr="isnull"
-    )
+    theme_isnull = django_filters.BooleanFilter(field_name="theme", lookup_expr="isnull")
 
     # Date filters
-    created_after = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="gte"
-    )
-    created_before = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="lte"
-    )
-    updated_after = django_filters.DateTimeFilter(
-        field_name="updated_at", lookup_expr="gte"
-    )
-    updated_before = django_filters.DateTimeFilter(
-        field_name="updated_at", lookup_expr="lte"
-    )
+    created_after = django_filters.DateTimeFilter(field_name="created_at", lookup_expr="gte")
+    created_before = django_filters.DateTimeFilter(field_name="created_at", lookup_expr="lte")
+    updated_after = django_filters.DateTimeFilter(field_name="updated_at", lookup_expr="gte")
+    updated_before = django_filters.DateTimeFilter(field_name="updated_at", lookup_expr="lte")
 
     # User filters
-    created_by = django_filters.CharFilter(
-        field_name="created_by__username", lookup_expr="icontains"
-    )
-    modified_by = django_filters.CharFilter(
-        field_name="last_modified_by__username", lookup_expr="icontains"
-    )
+    created_by = django_filters.CharFilter(field_name="created_by__username", lookup_expr="icontains")
+    modified_by = django_filters.CharFilter(field_name="last_modified_by__username", lookup_expr="icontains")
 
     # SEO filters
     has_meta_title = django_filters.BooleanFilter(method="filter_has_meta_title")
-    has_meta_description = django_filters.BooleanFilter(
-        method="filter_has_meta_description"
-    )
+    has_meta_description = django_filters.BooleanFilter(method="filter_has_meta_description")
 
     class Meta:
         model = WebPage
@@ -104,9 +86,9 @@ class WebPageFilter(django_filters.FilterSet):
         now = timezone.now()
 
         # Subquery to check if page has published versions
-        published_version_exists = PageVersion.objects.filter(
-            page=OuterRef("pk"), effective_date__lte=now
-        ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+        published_version_exists = PageVersion.objects.filter(page=OuterRef("pk"), effective_date__lte=now).filter(
+            Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
+        )
 
         if value:
             return queryset.filter(Exists(published_version_exists))
@@ -118,9 +100,9 @@ class WebPageFilter(django_filters.FilterSet):
         from django.db.models import Exists, OuterRef
 
         # Subquery to check if page has versions active on the specified date
-        active_version_exists = PageVersion.objects.filter(
-            page=OuterRef("pk"), effective_date__lte=value
-        ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=value))
+        active_version_exists = PageVersion.objects.filter(page=OuterRef("pk"), effective_date__lte=value).filter(
+            Q(expiry_date__isnull=True) | Q(expiry_date__gt=value)
+        )
 
         return queryset.filter(Exists(active_version_exists))
 
@@ -227,62 +209,40 @@ class PageVersionFilter(django_filters.FilterSet):
 
     # Page filters
     page = django_filters.ModelChoiceFilter(queryset=WebPage.objects.all())
-    page_title = django_filters.CharFilter(
-        field_name="page__title", lookup_expr="icontains"
-    )
-    page_slug = django_filters.CharFilter(
-        field_name="page__slug", lookup_expr="icontains"
-    )
+    page_title = django_filters.CharFilter(field_name="page__title", lookup_expr="icontains")
+    page_slug = django_filters.CharFilter(field_name="page__slug", lookup_expr="icontains")
 
     # Version filters
     version_number = django_filters.NumberFilter()
-    version_number_gte = django_filters.NumberFilter(
-        field_name="version_number", lookup_expr="gte"
-    )
-    version_number_lte = django_filters.NumberFilter(
-        field_name="version_number", lookup_expr="lte"
-    )
+    version_number_gte = django_filters.NumberFilter(field_name="version_number", lookup_expr="gte")
+    version_number_lte = django_filters.NumberFilter(field_name="version_number", lookup_expr="lte")
 
     # Publication filters (removed - effective_date and expiry_date are on PageVersion, not WebPage)
 
     # Date filters
-    created_after = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="gte"
-    )
-    created_before = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="lte"
-    )
-    created_on_date = django_filters.DateFilter(
-        field_name="created_at", lookup_expr="date"
-    )
+    created_after = django_filters.DateTimeFilter(field_name="created_at", lookup_expr="gte")
+    created_before = django_filters.DateTimeFilter(field_name="created_at", lookup_expr="lte")
+    created_on_date = django_filters.DateFilter(field_name="created_at", lookup_expr="date")
 
     is_published = django_filters.BooleanFilter(method="filter_is_published")
 
     # User filters
-    created_by = django_filters.CharFilter(
-        field_name="created_by__username", lookup_expr="icontains"
-    )
+    created_by = django_filters.CharFilter(field_name="created_by__username", lookup_expr="icontains")
 
     # Content filters
     description = django_filters.CharFilter(lookup_expr="icontains")
     has_description = django_filters.BooleanFilter(method="filter_has_description")
-    has_change_summary = django_filters.BooleanFilter(
-        method="filter_has_change_summary"
-    )
+    has_change_summary = django_filters.BooleanFilter(method="filter_has_change_summary")
 
     # Time range filters
     created_this_week = django_filters.BooleanFilter(method="filter_created_this_week")
-    created_this_month = django_filters.BooleanFilter(
-        method="filter_created_this_month"
-    )
+    created_this_month = django_filters.BooleanFilter(method="filter_created_this_month")
     created_today = django_filters.BooleanFilter(method="filter_created_today")
 
     # Workflow filters
     drafts_only = django_filters.BooleanFilter(method="filter_drafts_only")
     published_only = django_filters.BooleanFilter(method="filter_published_only")
-    current_versions_only = django_filters.BooleanFilter(
-        method="filter_current_versions_only"
-    )
+    current_versions_only = django_filters.BooleanFilter(method="filter_current_versions_only")
 
     class Meta:
         model = PageVersion
@@ -331,9 +291,7 @@ class PageVersionFilter(django_filters.FilterSet):
         now = timezone.now()
 
         if value:
-            return queryset.filter(effective_date__lte=now).filter(
-                Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
-            )
+            return queryset.filter(effective_date__lte=now).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
         else:
             return queryset.exclude(effective_date__lte=now).exclude(
                 Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
@@ -342,13 +300,9 @@ class PageVersionFilter(django_filters.FilterSet):
     def filter_has_change_summary(self, queryset, name, value):
         """Filter versions that have or don't have change summaries"""
         if value:
-            return queryset.exclude(change_summary={}).exclude(
-                change_summary__isnull=True
-            )
+            return queryset.exclude(change_summary={}).exclude(change_summary__isnull=True)
         else:
-            return queryset.filter(
-                Q(change_summary={}) | Q(change_summary__isnull=True)
-            )
+            return queryset.filter(Q(change_summary={}) | Q(change_summary__isnull=True))
 
     def filter_drafts_only(self, queryset, name, value):
         """Filter to show only draft versions (no effective_date)"""
@@ -360,9 +314,7 @@ class PageVersionFilter(django_filters.FilterSet):
         """Filter to show only published versions using date-based logic"""
         if value:
             now = timezone.now()
-            return queryset.filter(effective_date__lte=now).filter(
-                Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
-            )
+            return queryset.filter(effective_date__lte=now).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
         return queryset
 
     def filter_current_versions_only(self, queryset, name, value):
@@ -395,17 +347,11 @@ class PageThemeFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr="icontains")
     description = django_filters.CharFilter(lookup_expr="icontains")
     is_active = django_filters.BooleanFilter()
-    created_by = django_filters.CharFilter(
-        field_name="created_by__username", lookup_expr="icontains"
-    )
+    created_by = django_filters.CharFilter(field_name="created_by__username", lookup_expr="icontains")
 
     # Date filters
-    created_after = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="gte"
-    )
-    created_before = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="lte"
-    )
+    created_after = django_filters.DateTimeFilter(field_name="created_at", lookup_expr="gte")
+    created_before = django_filters.DateTimeFilter(field_name="created_at", lookup_expr="lte")
 
     # Usage filters
     in_use = django_filters.BooleanFilter(method="filter_in_use")

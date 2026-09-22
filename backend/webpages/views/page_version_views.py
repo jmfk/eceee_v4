@@ -4,6 +4,7 @@ PageVersion ViewSet for managing page versions with workflow support.
 
 from django.db import transaction
 from django.db.models import Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -68,15 +69,13 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         if tenant:
             queryset = queryset.filter(page__tenant=tenant)
 
-        # SECURITY: For non-staff users, allow their own versions plus published versions
-        if not self.request.user.is_staff:
+        # A tenant has one shared canonical working copy per page. Once tenant
+        # scoping has been applied above, collaborators must be able to use a
+        # working copy regardless of which user originally created it.
+        if not self.request.user.is_staff and not tenant:
             now = timezone.now()
-            published_versions = Q(effective_date__lte=now) & (
-                Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
-            )
-            queryset = queryset.filter(
-                Q(created_by=self.request.user) | published_versions
-            )
+            published_versions = Q(effective_date__lte=now) & (Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+            queryset = queryset.filter(Q(created_by=self.request.user) | published_versions)
 
         # Handle special query parameters
         page_id = self.request.query_params.get("page")
@@ -96,7 +95,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                     queryset = queryset.filter(id=current_version.id)
                 else:
                     queryset = queryset.none()  # No current published version
-            except:
+            except Http404:
                 queryset = queryset.none()
 
         # Special handling for latest version
@@ -112,7 +111,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                     queryset = queryset.filter(id=latest_version.id)
                 else:
                     queryset = queryset.none()  # No versions
-            except:
+            except Http404:
                 queryset = queryset.none()
 
         return queryset
@@ -132,35 +131,20 @@ class PageVersionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # Auto-generate version number if not provided
-        if (
-            "version_number" not in serializer.validated_data
-            or serializer.validated_data["version_number"] is None
-        ):
+        if "version_number" not in serializer.validated_data or serializer.validated_data["version_number"] is None:
             page = serializer.validated_data["page"]
             with transaction.atomic():
                 # Get the latest version number with row-level locking to prevent race conditions
-                latest_version = (
-                    page.versions.select_for_update()
-                    .order_by("-version_number")
-                    .first()
-                )
-                version_number = (
-                    (latest_version.version_number + 1) if latest_version else 1
-                )
+                latest_version = page.versions.select_for_update().order_by("-version_number").first()
+                version_number = (latest_version.version_number + 1) if latest_version else 1
                 serializer.validated_data["version_number"] = version_number
 
         # Ensure page_data has a default value if not provided
-        if (
-            "page_data" not in serializer.validated_data
-            or serializer.validated_data["page_data"] is None
-        ):
+        if "page_data" not in serializer.validated_data or serializer.validated_data["page_data"] is None:
             serializer.validated_data["page_data"] = {}
 
         # Ensure widgets has a default value if not provided
-        if (
-            "widgets" not in serializer.validated_data
-            or serializer.validated_data["widgets"] is None
-        ):
+        if "widgets" not in serializer.validated_data or serializer.validated_data["widgets"] is None:
             serializer.validated_data["widgets"] = {}
 
         serializer.save(created_by=self.request.user)
@@ -187,9 +171,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         """Publish this exact canonical working version."""
         version = self.get_object()
         try:
-            version = PageVersionWorkflowService(
-                version.page, request.user
-            ).publish(version)
+            version = PageVersionWorkflowService(version.page, request.user).publish(version)
             serializer = self.get_serializer(version)
             return Response(
                 {
@@ -205,9 +187,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         """Compatibility alias for the idempotent working-copy operation."""
         version = self.get_object()
         try:
-            draft, created = PageVersionWorkflowService(
-                version.page, request.user
-            ).get_or_create_working_copy()
+            draft, created = PageVersionWorkflowService(version.page, request.user).get_or_create_working_copy()
             serializer = self.get_serializer(draft)
             return Response(
                 {
@@ -275,16 +255,12 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         version = self.get_object()
 
         try:
-            PageVersionWorkflowService(
-                version.page, request.user
-            ).assert_canonical_editable(version)
+            PageVersionWorkflowService(version.page, request.user).assert_canonical_editable(version)
         except WorkflowError as error:
             return self._workflow_error_response(error)
 
         # Check if this is a "publish with subpages" request
-        include_subpages = (
-            request.query_params.get("include_subpages", "false").lower() == "true"
-        )
+        include_subpages = request.query_params.get("include_subpages", "false").lower() == "true"
 
         # Check if this is a publish-now action (effective_date set to now or near-now)
         effective_date_str = request.data.get("effective_date")
@@ -320,9 +296,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
             # Return full version data with additional info
             full_serializer = PageVersionSerializer(version)
             response_data = full_serializer.data
-            response_data["subpages_published_count"] = (
-                count - 1
-            )  # Subtract 1 for the main page
+            response_data["subpages_published_count"] = count - 1  # Subtract 1 for the main page
             response_data["total_published_count"] = count
             if errors:
                 response_data["errors"] = errors
@@ -330,9 +304,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
             return Response(response_data)
 
         # Standard single-page publishing update
-        serializer = PublishingUpdateSerializer(
-            version, data=request.data, partial=True
-        )
+        serializer = PublishingUpdateSerializer(version, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
@@ -346,9 +318,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         version = self.get_object()
 
         try:
-            restored = PageVersionWorkflowService(
-                version.page, request.user
-            ).restore_as_working_copy(version)
+            restored = PageVersionWorkflowService(version.page, request.user).restore_as_working_copy(version)
             serializer = self.get_serializer(restored)
             return Response(
                 {
@@ -419,9 +389,9 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            scheduled = PageVersionWorkflowService(
-                version.page, request.user
-            ).schedule(version, effective_date, expiry_date)
+            scheduled = PageVersionWorkflowService(version.page, request.user).schedule(
+                version, effective_date, expiry_date
+            )
             return Response(PageVersionSerializer(scheduled).data)
         except WorkflowError as error:
             return self._workflow_error_response(error)
@@ -430,9 +400,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
     def cancel_schedule(self, request, pk=None):
         version = self.get_object()
         try:
-            draft = PageVersionWorkflowService(
-                version.page, request.user
-            ).cancel_schedule(version)
+            draft = PageVersionWorkflowService(version.page, request.user).cancel_schedule(version)
             return Response(PageVersionSerializer(draft).data)
         except WorkflowError as error:
             return self._workflow_error_response(error)
@@ -446,9 +414,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         """Idempotently return or create the page's canonical working copy."""
         page = get_object_or_404(self._page_queryset(), pk=page_id)
         try:
-            version, created = PageVersionWorkflowService(
-                page, request.user
-            ).get_or_create_working_copy()
+            version, created = PageVersionWorkflowService(page, request.user).get_or_create_working_copy()
             return Response(
                 {
                     "created": created,
@@ -471,9 +437,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
             )
         version = get_object_or_404(self.get_queryset(), pk=version_id, page=page)
         try:
-            unpublished = PageVersionWorkflowService(
-                page, request.user
-            ).unpublish(version)
+            unpublished = PageVersionWorkflowService(page, request.user).unpublish(version)
             return Response(
                 {
                     "version": PageVersionSerializer(unpublished).data,
@@ -501,14 +465,12 @@ class PageVersionViewSet(viewsets.ModelViewSet):
             client_updated_at = parse_datetime(item.get("client_updated_at", ""))
             try:
                 if not page_id or not version_id or client_updated_at is None:
-                    raise WorkflowError(
-                        "Each item requires pageId, versionId, and clientUpdatedAt."
-                    )
+                    raise WorkflowError("Each item requires pageId, versionId, and clientUpdatedAt.")
                 page = self._page_queryset().get(pk=page_id)
                 version = self.get_queryset().get(pk=version_id, page=page)
-                published = PageVersionWorkflowService(
-                    page, request.user
-                ).publish(version, expected_updated_at=client_updated_at)
+                published = PageVersionWorkflowService(page, request.user).publish(
+                    version, expected_updated_at=client_updated_at
+                )
                 results.append(
                     {
                         "page_id": page.id,
@@ -557,17 +519,12 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        accessible_versions = PageVersion.objects.select_related(
-            "page", "created_by"
-        )
+        accessible_versions = PageVersion.objects.select_related("page", "created_by")
         if not request.user.is_staff:
             now = timezone.now()
             accessible_versions = accessible_versions.filter(
                 Q(created_by=request.user)
-                | (
-                    Q(effective_date__lte=now)
-                    & (Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
-                )
+                | (Q(effective_date__lte=now) & (Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)))
             )
 
         version1 = get_object_or_404(accessible_versions, pk=version1_id)
@@ -614,9 +571,9 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 )
 
             # Find versions to delete (superseded and drafts older than current published)
-            versions_to_delete = page.versions.filter(
-                version_number__lt=current_published.version_number
-            ).exclude(id=current_published.id)
+            versions_to_delete = page.versions.filter(version_number__lt=current_published.version_number).exclude(
+                id=current_published.id
+            )
 
             # Count for response
             deleted_count = versions_to_delete.count()
@@ -714,13 +671,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
 
         if not current_version:
             # Auto-create initial version if none exists
-            current_version = page.create_version(
-                user=request.user, version_title="Auto-generated initial version"
-            )
-            # Log the auto-creation
-            import logging
-
-            logger = logging.getLogger(__name__)
+            current_version = page.create_version(user=request.user, version_title="Auto-generated initial version")
 
         serializer = self.get_serializer(current_version)
         return Response(serializer.data)

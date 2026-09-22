@@ -9,8 +9,6 @@
 Page-related serializers for the Web Page Publishing System
 """
 
-from typing import TYPE_CHECKING
-
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -18,16 +16,11 @@ from ..models import WebPage
 from .base import UserSerializer
 from .theme import PageThemeSerializer
 
-if TYPE_CHECKING:
-    from .version import PageVersionSerializer
-
 
 class WebPageSimpleSerializer(serializers.ModelSerializer):
     """Page serializer with version management support"""
 
-    parent_id = serializers.IntegerField(
-        write_only=True, required=False, allow_null=True
-    )
+    parent_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
     created_by = UserSerializer(read_only=True)
     last_modified_by = UserSerializer(read_only=True)
@@ -155,9 +148,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         if include_version_info:
             # Add fields dynamically so the Meta.fields list remains unchanged
             self.fields["is_published"] = serializers.SerializerMethodField()
-            self.fields["current_published_version"] = (
-                serializers.SerializerMethodField()
-            )
+            self.fields["current_published_version"] = serializers.SerializerMethodField()
 
     def get_absolute_url(self, obj):
         return obj.get_absolute_url()
@@ -176,10 +167,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
 
     def get_breadcrumbs(self, obj):
         breadcrumbs = obj.get_breadcrumbs()
-        return [
-            {"id": page.id, "title": page.title, "slug": page.slug}
-            for page in breadcrumbs
-        ]
+        return [{"id": page.id, "title": page.title, "slug": page.slug} for page in breadcrumbs]
 
     def get_effective_layout(self, obj):
         """Get the effective layout as a unified dictionary regardless of type"""
@@ -212,9 +200,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
 
         serialized_inheritance_info = {
             "effective_layout": (
-                inheritance_info["effective_layout"].to_dict()
-                if inheritance_info["effective_layout"]
-                else None
+                inheritance_info["effective_layout"].to_dict() if inheritance_info["effective_layout"] else None
             ),
             "effective_layout_dict": inheritance_info["effective_layout_dict"],
             "inherited_from": (
@@ -227,10 +213,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             ),
             "inheritance_chain": serialized_chain,
             "override_options": {
-                "code_layouts": [
-                    layout.to_dict()
-                    for layout in inheritance_info["override_options"]["code_layouts"]
-                ]
+                "code_layouts": [layout.to_dict() for layout in inheritance_info["override_options"]["code_layouts"]]
             },
         }
 
@@ -301,10 +284,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         """Get list of available code layouts"""
         from ..layout_registry import layout_registry
 
-        return [
-            layout.to_dict()
-            for layout in layout_registry.list_layouts(active_only=True)
-        ]
+        return [layout.to_dict() for layout in layout_registry.list_layouts(active_only=True)]
 
     def get_children_count(self, obj):
         return obj.children.filter(is_deleted=False).count()
@@ -503,11 +483,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         now = timezone.now()
 
         # Find the next version that will be published
-        scheduled = (
-            obj.versions.filter(effective_date__gt=now)
-            .order_by("effective_date")
-            .first()
-        )
+        scheduled = obj.versions.filter(effective_date__gt=now).order_by("effective_date").first()
 
         return scheduled
 
@@ -535,7 +511,10 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         if slug_info["modified"]:
             self.context["slug_warning"] = {
                 "field": "slug",
-                "message": f"Slug '{slug_info['original_slug']}' was modified to '{slug_info['new_slug']}' to ensure uniqueness",
+                "message": (
+                    f"Slug '{slug_info['original_slug']}' was modified to "
+                    f"'{slug_info['new_slug']}' to ensure uniqueness"
+                ),
                 "original_value": slug_info["original_slug"],
             }
 
@@ -546,9 +525,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         # Extract parent_id and set parent if provided
         parent_id = validated_data.pop("parent_id", None)
         if parent_id is not None:
-            validated_data["parent"] = (
-                WebPage.objects.get(pk=parent_id) if parent_id else None
-            )
+            validated_data["parent"] = WebPage.objects.get(pk=parent_id) if parent_id else None
 
         # Update instance fields
         for attr, value in validated_data.items():
@@ -562,7 +539,10 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             if slug_info["modified"]:
                 self.context["slug_warning"] = {
                     "field": "slug",
-                    "message": f"Slug '{slug_info['original_slug']}' was modified to '{slug_info['new_slug']}' to ensure uniqueness",
+                    "message": (
+                        f"Slug '{slug_info['original_slug']}' was modified to "
+                        f"'{slug_info['new_slug']}' to ensure uniqueness"
+                    ),
                     "original_value": slug_info["original_slug"],
                 }
 
@@ -818,9 +798,7 @@ class PageHierarchySerializer(serializers.ModelSerializer):
         for child in obj.children.order_by("sort_order"):
             if child.is_published():
                 published_children.append(child)
-        return PageHierarchySerializer(
-            published_children, many=True, context=self.context
-        ).data
+        return PageHierarchySerializer(published_children, many=True, context=self.context).data
 
     def get_publication_status(self, obj):
         """DEPRECATED: Get publication status from PageVersionSerializer instead"""
@@ -842,9 +820,7 @@ class PageHierarchySerializer(serializers.ModelSerializer):
 class DeletedPageSerializer(serializers.ModelSerializer):
     """Serializer for deleted pages with restoration metadata"""
 
-    deleted_by_username = serializers.CharField(
-        source="deleted_by.username", read_only=True
-    )
+    deleted_by_username = serializers.CharField(source="deleted_by.username", read_only=True)
     parent_path = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
     can_restore = serializers.SerializerMethodField()
@@ -911,9 +887,7 @@ class DeletedPageSerializer(serializers.ModelSerializer):
 
         # Check parent status
         if original_parent_id:
-            if not WebPage.objects.filter(
-                id=original_parent_id, is_deleted=False
-            ).exists():
+            if not WebPage.objects.filter(id=original_parent_id, is_deleted=False).exists():
                 # Find if alternative parent exists
                 parent_chain = obj.deletion_metadata.get("parent_id_chain", [])
                 alternative_found = False
@@ -922,7 +896,8 @@ class DeletedPageSerializer(serializers.ModelSerializer):
                     try:
                         ancestor = WebPage.objects.get(id=ancestor_id, is_deleted=False)
                         warnings.append(
-                            f"Original parent no longer exists. Will be restored under '{ancestor.title or ancestor.slug}'"
+                            "Original parent no longer exists. Will be restored under "
+                            f"'{ancestor.title or ancestor.slug}'"
                         )
                         alternative_found = True
                         break
@@ -930,18 +905,11 @@ class DeletedPageSerializer(serializers.ModelSerializer):
                         continue
 
                 if not alternative_found:
-                    warnings.append(
-                        "Original parent no longer exists. Will be restored as root page"
-                    )
+                    warnings.append("Original parent no longer exists. Will be restored as root page")
 
         # Check for slug conflicts
         target_parent_id = original_parent_id
-        if (
-            original_parent_id
-            and not WebPage.objects.filter(
-                id=original_parent_id, is_deleted=False
-            ).exists()
-        ):
+        if original_parent_id and not WebPage.objects.filter(id=original_parent_id, is_deleted=False).exists():
             # Need to find alternative parent for slug check
             parent_chain = obj.deletion_metadata.get("parent_id_chain", [])
             for ancestor_id in parent_chain:
@@ -953,13 +921,11 @@ class DeletedPageSerializer(serializers.ModelSerializer):
 
         # Check if slug conflicts with existing pages under target parent
         if obj.slug:
-            conflicts = WebPage.objects.filter(
-                parent_id=target_parent_id, slug=obj.slug, is_deleted=False
-            ).exclude(id=obj.id)
+            conflicts = WebPage.objects.filter(parent_id=target_parent_id, slug=obj.slug, is_deleted=False).exclude(
+                id=obj.id
+            )
 
             if conflicts.exists():
-                warnings.append(
-                    f"Slug '{obj.slug}' conflicts with existing page. Will be auto-renamed"
-                )
+                warnings.append(f"Slug '{obj.slug}' conflicts with existing page. Will be auto-renamed")
 
         return warnings

@@ -11,6 +11,7 @@ from rest_framework.test import APIClient
 from core.models import Tenant
 from webpages.models import PageVersion, WebPage
 from webpages.services.page_version_workflow import PageVersionWorkflowService
+from webpages.tasks import refresh_publication_caches
 
 
 class PageVersionWorkflowTest(TestCase):
@@ -28,6 +29,7 @@ class PageVersionWorkflowTest(TestCase):
         )
         self.client = APIClient()
         self.client.force_authenticate(self.user)
+        self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
 
     def publish_initial(self):
         version = self.page.create_version(self.user, "Initial")
@@ -48,6 +50,47 @@ class PageVersionWorkflowTest(TestCase):
         self.assertIsNone(first.effective_date)
         self.page.refresh_from_db()
         self.assertEqual(self.page.current_published_version_id, live.id)
+
+    def test_tenant_collaborator_can_open_the_shared_working_copy(self):
+        draft = self.page.create_version(self.user, "Shared draft")
+        collaborator = User.objects.create_user("workflow-collaborator", password="test")
+        self.client.force_authenticate(collaborator)
+
+        response = self.client.get(reverse("api:pageversion-detail", kwargs={"pk": draft.pk}))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], draft.id)
+
+    def test_scheduled_version_refreshes_the_publication_cache_when_due(self):
+        live = self.publish_initial()
+        draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        scheduled_at = timezone.now() + timedelta(hours=1)
+        PageVersionWorkflowService(self.page, self.user).schedule(draft, scheduled_at)
+
+        self.page.refresh_from_db()
+        self.assertEqual(self.page.current_published_version_id, live.id)
+
+        updated_count = refresh_publication_caches(now=scheduled_at + timedelta(seconds=1))
+
+        self.page.refresh_from_db()
+        self.assertEqual(updated_count, 1)
+        self.assertEqual(self.page.current_published_version_id, draft.id)
+
+    def test_expired_version_is_removed_from_the_publication_cache(self):
+        live = self.publish_initial()
+        expires_at = timezone.now() + timedelta(hours=1)
+        live.expiry_date = expires_at
+        live.save(update_fields=["expiry_date"])
+
+        self.page.refresh_from_db()
+        self.assertEqual(self.page.current_published_version_id, live.id)
+
+        updated_count = refresh_publication_caches(now=expires_at + timedelta(seconds=1))
+
+        self.page.refresh_from_db()
+        self.assertEqual(updated_count, 1)
+        self.assertIsNone(self.page.current_published_version_id)
+        self.assertFalse(self.page.is_currently_published)
 
     def test_published_and_older_drafts_are_not_editable(self):
         live = self.publish_initial()

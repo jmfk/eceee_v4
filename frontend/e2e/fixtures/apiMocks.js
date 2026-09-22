@@ -18,6 +18,7 @@ const rootPages = [
     childrenCount: 0,
     hostnames: ['summerstudy.local'],
     publicationStatus: 'published',
+    workflowState: 'live',
     latestVersionNumber: 3,
     publishedVersionNumber: 3,
   },
@@ -34,6 +35,7 @@ const responsiveRootPages = [
     childrenCount: 3,
     hostnames: [],
     publicationStatus: 'published',
+    workflowState: 'live_with_unpublished_changes',
     latestVersionNumber: 12,
     publishedVersionNumber: 11,
     hasUnpublishedChanges: true,
@@ -52,6 +54,7 @@ const responsiveChildren = {
       children: [],
       childrenCount: 1,
       publicationStatus: 'published',
+      workflowState: 'live',
       latestVersionNumber: 4,
       publishedVersionNumber: 4,
     },
@@ -64,6 +67,7 @@ const responsiveChildren = {
       children: [],
       childrenCount: 0,
       publicationStatus: 'draft',
+      workflowState: 'not_published',
       latestVersionNumber: 9,
       hasUnpublishedChanges: true,
       latestDraftVersionNumber: 9,
@@ -77,6 +81,7 @@ const responsiveChildren = {
       children: [],
       childrenCount: 0,
       publicationStatus: 'scheduled',
+      workflowState: 'scheduled',
       latestVersionNumber: 3,
       scheduledVersionNumber: 3,
       scheduledEffectiveDate: '2026-09-15T08:00:00.000Z',
@@ -92,6 +97,7 @@ const responsiveChildren = {
       children: [],
       childrenCount: 1,
       publicationStatus: 'unpublished',
+      workflowState: 'not_published',
       latestVersionNumber: 2,
     },
   ],
@@ -105,6 +111,7 @@ const responsiveChildren = {
       children: [],
       childrenCount: 0,
       publicationStatus: 'published',
+      workflowState: 'live',
       latestVersionNumber: 7,
       publishedVersionNumber: 7,
     },
@@ -416,6 +423,25 @@ export async function mockCmsApi(page, { authenticated = false, pageEditor = fal
       })
     }
 
+    if (pageEditor && url.pathname === '/api/v1/webpages/pages/101/workflow/' && method === 'GET') {
+      return json(route, {
+        pageId: 101,
+        state: 'notPublished',
+        editableVersion: {
+          id: editorState.version.id,
+          updatedAt: editorState.version.updatedAt,
+        },
+        liveVersion: null,
+        scheduledVersion: null,
+        hasUnpublishedChanges: true,
+        scheduledAt: null,
+        legacyConflicts: {
+          olderDraftCount: 0,
+          additionalScheduledCount: 0,
+        },
+      })
+    }
+
     if (pageEditor && url.pathname === '/api/v1/webpages/pages/101/versions/201/' && method === 'GET') {
       return json(route, clone(editorState.version))
     }
@@ -434,6 +460,23 @@ export async function mockCmsApi(page, { authenticated = false, pageEditor = fal
 
     if (pageEditor && url.pathname === '/api/v1/webpages/versions/201/' && method === 'PATCH') {
       const body = request.postDataJSON()
+      editorState.version = {
+        ...editorState.version,
+        ...body,
+        widgets: body.widgets || editorState.version.widgets,
+        updatedAt: new Date().toISOString(),
+      }
+      editorState.savedVersions.push(clone(body))
+      return json(route, clone(editorState.version))
+    }
+
+    if (pageEditor && url.pathname === '/api/v1/webpages/versions/201/' && method === 'GET') {
+      return json(route, clone(editorState.version))
+    }
+
+    if (pageEditor && url.pathname === '/api/v1/webpages/versions/201/save/' && method === 'PATCH') {
+      const body = request.postDataJSON()
+      delete body.clientUpdatedAt
       editorState.version = {
         ...editorState.version,
         ...body,
