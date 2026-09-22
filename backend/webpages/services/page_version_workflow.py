@@ -11,6 +11,20 @@ from django.utils.dateparse import parse_datetime
 from ..models import PageVersion, WebPage
 
 
+def find_page_slug_conflict(page, slug):
+    """Return the first active sibling that already owns the proposed slug."""
+    if not slug:
+        return None
+    queryset = WebPage.objects.filter(
+        parent_id=page.parent_id,
+        slug=slug,
+        is_deleted=False,
+    )
+    if page.pk:
+        queryset = queryset.exclude(pk=page.pk)
+    return queryset.order_by("pk").first()
+
+
 class WorkflowError(ValueError):
     """A workflow invariant prevented the requested operation."""
 
@@ -31,6 +45,10 @@ class ScheduleConflictError(WorkflowError):
 
 class VersionConflictError(WorkflowError):
     code = "version_conflict"
+
+
+class SlugConflictError(VersionConflictError):
+    code = "slug_conflict"
 
 
 @dataclass(frozen=True)
@@ -221,6 +239,32 @@ class PageVersionWorkflowService:
         source = self.live_version(lock=True) or self._versions(lock=True).order_by("-version_number").first()
         return self._create_version_from(source), True
 
+    @staticmethod
+    def _page_attributes(version):
+        page_data = version.page_data if isinstance(version.page_data, dict) else {}
+        attributes = page_data.get("page_attributes", page_data.get("pageAttributes", {}))
+        return attributes if isinstance(attributes, dict) else {}
+
+    def assert_page_attributes_publishable(self, version, *, lock_slug_namespace=False):
+        """Reject a delayed slug that would collide when made public."""
+        attributes = self._page_attributes(version)
+        if "slug" not in attributes:
+            return
+
+        if lock_slug_namespace:
+            if self.page.parent_id:
+                WebPage.objects.select_for_update().only("pk").get(pk=self.page.parent_id)
+            else:
+                tenant_model = self.page._meta.get_field("tenant").remote_field.model
+                tenant_model.objects.select_for_update().only("pk").get(pk=self.page.tenant_id)
+
+        conflict = find_page_slug_conflict(self.page, attributes["slug"])
+        if conflict:
+            raise SlugConflictError(
+                "The requested public slug is already used by a sibling page.",
+                details={"slug": attributes["slug"]},
+            )
+
     @transaction.atomic
     def publish(self, version, *, expected_updated_at=None):
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
@@ -231,6 +275,7 @@ class PageVersionWorkflowService:
                 "The reviewed working version has changed.",
                 details={"server_updated_at": version.updated_at.isoformat()},
             )
+        self.assert_page_attributes_publishable(version, lock_slug_namespace=True)
         now = timezone.now()
         previous_live = self.live_version(lock=True)
         if previous_live and previous_live.id != version.id:
@@ -269,6 +314,7 @@ class PageVersionWorkflowService:
                 "The reviewed working version has changed.",
                 details={"server_updated_at": version.updated_at.isoformat()},
             )
+        self.assert_page_attributes_publishable(version, lock_slug_namespace=True)
         now = timezone.now()
         if effective_date <= now:
             raise WorkflowError("Scheduled publication must be in the future.")

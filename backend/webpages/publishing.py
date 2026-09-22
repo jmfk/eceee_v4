@@ -288,7 +288,10 @@ class PublishingService:
                 published_count += 1
 
             except VersionConflictError:
-                raise
+                if page_item.id == page.id:
+                    raise
+                error_msg = f"Failed to publish {page_item.title}: the working version changed or conflicts"
+                errors.append(error_msg)
             except Exception as e:
                 error_msg = f"Failed to publish {page_item.title}: {str(e)}"
                 errors.append(error_msg)

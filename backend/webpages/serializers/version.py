@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from ..models import PageDataSchema, PageTheme, PageVersion, WebPage
+from ..services.page_version_workflow import find_page_slug_conflict
 from .base import UserSerializer
 from .theme import PageThemeSerializer
 
@@ -49,6 +50,10 @@ def validate_reserved_page_attributes(version, page_data):
             value = model_field.clean(attributes[source_field], candidate)
             setattr(candidate, target_field, value)
         candidate.clean()
+        if "slug" in attributes:
+            conflict = find_page_slug_conflict(candidate, candidate.slug)
+            if conflict:
+                raise DjangoValidationError({"slug": "This slug is already used by a sibling page."})
     except DjangoValidationError as error:
         details = getattr(error, "message_dict", None) or error.messages
         raise serializers.ValidationError({"page_attributes": details}) from error

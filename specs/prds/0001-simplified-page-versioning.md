@@ -87,6 +87,7 @@ Page authors currently encounter version numbers, overlapping status badges, dir
 - 2026-09-22: Updated the version manual and UX documents. Packet, Sites, and atomic structure releases remain explicitly out of scope.
 - 2026-09-22: Automated backend, frontend, lint, and production-build verification is complete. PRD remains `started` until the browser-level acceptance walkthrough is recorded.
 - 2026-09-22: Review follow-up keeps public page attributes inside the working version until publication, makes scheduled takeover reversible on cancellation without reviving superseded content, restores tenant-wide History comparison, and runs legacy mutations inside explicit database transactions.
+- 2026-09-22: Delayed slug changes now reject existing sibling collisions on Save and recheck the shared sibling namespace under lock before immediate, scheduled, bulk, or descendant publication.
 
 ## Linked ADRs
 
