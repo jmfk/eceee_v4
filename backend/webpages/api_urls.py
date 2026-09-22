@@ -5,39 +5,47 @@ Provides RESTful endpoints for managing pages, layouts, themes, widgets, and ver
 This file contains only the API endpoints (DRF ViewSets) for inclusion in the main API.
 """
 
-from django.urls import path, include, re_path
+from django.urls import include, path, re_path
 from rest_framework.routers import DefaultRouter
-from rest_framework.urlpatterns import format_suffix_patterns
+
+from .api_structure_views import (
+    page_ancestors_view,
+    page_breadcrumbs_view,
+    page_by_path_view,
+    page_children_view,
+    page_current_version_view,
+    page_metadata_view,
+    page_root_view,
+    page_structure_summary_view,
+    page_tree_view,
+    page_versions_view,
+    page_with_versions_view,
+    pages_search_view,
+    version_metadata_view,
+)
 from .views import (
-    WebPageViewSet,
-    PageVersionViewSet,
     CodeLayoutViewSet,
-    PageThemeViewSet,
-    WidgetTypeViewSet,
     PageDataSchemaViewSet,
+    PageThemeViewSet,
+    PageVersionViewSet,
+    WebPageViewSet,
+    WidgetTypeViewSet,
     layout_json,
+    link_display_info,
+    page_lookup,
     render_page_backend,
     render_page_preview,
     resolve_links,
-    link_display_info,
-    page_lookup,
 )
-from .views.theme_sync_views import ThemeSyncViewSet
-from .views.theme_css_views import ThemeCSSView
+from .views.page_debug_views import PageDebugExportView
+from .views.page_import_views import ImportSinglePageView, ImportStatusView, ImportTreeView
 from .views.path_pattern_views import PathPatternViewSet
-from .views.widget_type_views import pydantic_model_schema
 from .views.preview_views import PreviewSizeViewSet, render_version_preview
 from .views.simplified_layout_views import (
     simplified_layout_json,
-    simplified_layouts_list,
     simplified_layout_schema,
+    simplified_layouts_list,
     validate_simplified_layout,
-)
-from .views.page_debug_views import PageDebugExportView
-from .views.page_import_views import (
-    ImportTreeView,
-    ImportStatusView,
-    ImportSinglePageView,
 )
 from .views.site_package_views import (
     SitePackageExportDetailView,
@@ -46,34 +54,17 @@ from .views.site_package_views import (
     SitePackageImportDetailView,
     SitePackageImportListView,
 )
-from .views.widget_quick_reference_views import (
-    widget_quick_reference_list,
-    widget_quick_reference_detail,
-)
-from .api_structure_views import (
-    page_metadata_view,
-    page_by_path_view,
-    page_children_view,
-    page_tree_view,
-    page_ancestors_view,
-    page_breadcrumbs_view,
-    page_root_view,
-    version_metadata_view,
-    page_versions_view,
-    page_current_version_view,
-    page_with_versions_view,
-    page_structure_summary_view,
-    pages_search_view,
-)
+from .views.theme_css_views import ThemeCSSView
+from .views.theme_sync_views import ThemeSyncViewSet
+from .views.widget_quick_reference_views import widget_quick_reference_detail, widget_quick_reference_list
+from .views.widget_type_views import pydantic_model_schema
 
 # Create router and register viewsets
 router = DefaultRouter()
 router.register(r"pages", WebPageViewSet, basename="webpage")
 router.register(r"versions", PageVersionViewSet, basename="pageversion")
 # Phase 1.3: Enhanced layout endpoints with template data support
-router.register(
-    r"layouts", CodeLayoutViewSet, basename="layout"
-)  # Unified endpoint for all layout operations
+router.register(r"layouts", CodeLayoutViewSet, basename="layout")  # Unified endpoint for all layout operations
 router.register(r"themes", PageThemeViewSet, basename="pagetheme")
 router.register(r"themes/sync", ThemeSyncViewSet, basename="theme-sync")
 # Widget-types will be handled with custom patterns to allow dots in widget type names
@@ -135,9 +126,7 @@ urlpatterns = [
     # Legacy layout JSON (Django template-based)
     path("layouts/<str:layout_name>/json/", layout_json, name="layout-json"),
     # New simplified layout JSON (React-optimized)
-    path(
-        "layouts/simplified/", simplified_layouts_list, name="simplified-layouts-list"
-    ),
+    path("layouts/simplified/", simplified_layouts_list, name="simplified-layouts-list"),
     path(
         "layouts/simplified/<str:layout_name>/",
         simplified_layout_json,
@@ -236,9 +225,7 @@ urlpatterns = [
         ImportStatusView.as_view(),
         name="import-status",
     ),
-    path(
-        "pages/import-page/", ImportSinglePageView.as_view(), name="import-single-page"
-    ),
+    path("pages/import-page/", ImportSinglePageView.as_view(), name="import-single-page"),
     # Site package ZIP export/import endpoints
     path(
         "site-packages/exports/",
