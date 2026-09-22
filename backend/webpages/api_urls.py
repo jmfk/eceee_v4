@@ -33,6 +33,7 @@ from .views.simplified_layout_views import (
     simplified_layout_schema,
     validate_simplified_layout,
 )
+from .views.page_debug_views import PageDebugExportView
 from .views.page_import_views import (
     ImportTreeView,
     ImportStatusView,
@@ -124,6 +125,11 @@ widget_type_patterns = [
 
 # API URLs without app_name to avoid namespace conflicts when included in main API
 urlpatterns = [
+    path(
+        "pages/<int:page_id>/debug/",
+        PageDebugExportView.as_view(),
+        name="page-debug-export",
+    ),
     # Theme CSS endpoint
     path("themes/<int:theme_id>/styles.css", ThemeCSSView.as_view(), name="theme-css"),
     # Legacy layout JSON (Django template-based)
