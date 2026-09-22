@@ -419,8 +419,6 @@ class PageVersionWorkflowTest(TestCase):
 class PageVersionMutationTransactionTest(TransactionTestCase):
     """Exercise row-locking mutations without TestCase's implicit transaction."""
 
-    reset_sequences = True
-
     def setUp(self):
         self.user = User.objects.create_user("transaction-user", password="test")
         self.tenant = Tenant.objects.create(name="Transaction tenant", identifier="transaction", created_by=self.user)
