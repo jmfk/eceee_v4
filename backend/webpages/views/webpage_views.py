@@ -71,6 +71,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
         tenant = getattr(self.request, 'tenant', None)
         if tenant:
             queryset = queryset.filter(tenant=tenant)
+            if not self.request.user.is_staff and tenant.created_by_id != self.request.user.id:
+                return queryset.none()
 
         # Exclude deleted pages by default (unless specifically accessing deleted endpoint)
         # Check if is_deleted field exists (migration might not be run yet)
@@ -141,6 +143,10 @@ class WebPageViewSet(viewsets.ModelViewSet):
         if not tenant:
             from rest_framework.exceptions import ValidationError
             raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
+        if not self.request.user.is_staff and tenant.created_by_id != self.request.user.id:
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("You do not have access to this tenant.")
         
         serializer.save(
             created_by=self.request.user,
@@ -954,14 +960,11 @@ class WebPageViewSet(viewsets.ModelViewSet):
         return effective_date, expiry_date, None
 
     def _schedule_page_version(self, page, effective_date, expiry_date, user):
-        latest_version = page.versions.order_by("-version_number").first()
-        if latest_version is None:
-            latest_version = page.create_version(user, "Scheduled via API")
+        from ..services.page_version_workflow import PageVersionWorkflowService
 
-        latest_version.effective_date = effective_date
-        latest_version.expiry_date = expiry_date
-        latest_version.save(update_fields=["effective_date", "expiry_date"])
-        return latest_version
+        workflow = PageVersionWorkflowService(page, user)
+        working_version, _ = workflow.get_or_create_working_copy()
+        return workflow.schedule(working_version, effective_date, expiry_date)
 
     @action(detail=True, methods=["post"], url_path="schedule")
     def schedule(self, request, pk=None):
@@ -996,7 +999,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         user = request.user if request.user.is_authenticated else None
         scheduled_count = 0
-        for page in WebPage.objects.filter(id__in=page_ids):
+        for page in self.get_queryset().filter(id__in=page_ids):
             self._schedule_page_version(page, effective_date, expiry_date, user)
             scheduled_count += 1
 
@@ -1067,8 +1070,11 @@ class WebPageViewSet(viewsets.ModelViewSet):
         from ..publishing import PublishingService
 
         publishing_service = PublishingService(request.user)
+        accessible_page_ids = list(
+            self.get_queryset().filter(id__in=page_ids).values_list("id", flat=True)
+        )
         published_count, errors = publishing_service.bulk_publish_pages(
-            page_ids, change_summary
+            accessible_page_ids, change_summary
         )
 
         response_data = {

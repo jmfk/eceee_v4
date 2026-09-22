@@ -11,6 +11,7 @@ from django.utils.dateparse import parse_datetime
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
@@ -68,10 +69,9 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         tenant = getattr(self.request, "tenant", None)
         if tenant:
             queryset = queryset.filter(page__tenant=tenant)
+            if not self.request.user.is_staff and tenant.created_by_id != self.request.user.id:
+                return queryset.none()
 
-        # A tenant has one shared canonical working copy per page. Once tenant
-        # scoping has been applied above, collaborators must be able to use a
-        # working copy regardless of which user originally created it.
         if not self.request.user.is_staff and not tenant:
             now = timezone.now()
             published_versions = Q(effective_date__lte=now) & (Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
@@ -89,7 +89,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         # Special handling for current published version
         if current and page_id:
             try:
-                page = get_object_or_404(WebPage, id=page_id)
+                page = get_object_or_404(self._page_queryset(), id=page_id)
                 current_version = page.get_current_published_version()
                 if current_version:
                     queryset = queryset.filter(id=current_version.id)
@@ -101,7 +101,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         # Special handling for latest version
         elif latest and page_id:
             try:
-                page = get_object_or_404(WebPage, id=page_id)
+                page = get_object_or_404(self._page_queryset(), id=page_id)
                 # For non-staff users requesting latest, only return latest if it's published
                 if not self.request.user.is_staff:
                     latest_version = page.get_current_published_version()
@@ -119,7 +119,13 @@ class PageVersionViewSet(viewsets.ModelViewSet):
     def _page_queryset(self):
         queryset = WebPage.objects.all()
         tenant = getattr(self.request, "tenant", None)
-        return queryset.filter(tenant=tenant) if tenant else queryset
+        if self.request.user.is_staff:
+            return queryset.filter(tenant=tenant) if tenant else queryset
+        if tenant:
+            if tenant.created_by_id != self.request.user.id:
+                return queryset.none()
+            return queryset.filter(tenant=tenant)
+        return queryset.filter(created_by=self.request.user)
 
     def get_serializer_class(self):
         """Use different serializers based on action"""
@@ -146,6 +152,10 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         # Ensure widgets has a default value if not provided
         if "widgets" not in serializer.validated_data or serializer.validated_data["widgets"] is None:
             serializer.validated_data["widgets"] = {}
+
+        page = serializer.validated_data.get("page")
+        if page and not self._page_queryset().filter(pk=page.pk).exists():
+            raise PermissionDenied("You do not have access to this page's tenant.")
 
         serializer.save(created_by=self.request.user)
 
@@ -257,7 +267,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["patch"], url_path="publishing")
     @transaction.atomic
     def update_publishing(self, request, pk=None):
-        """Update publishing dates and settings"""
+        """Compatibility endpoint routed through the canonical workflow."""
         version = self.get_object()
 
         try:
@@ -265,56 +275,51 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         except WorkflowError as error:
             return self._workflow_error_response(error)
 
-        # Check if this is a "publish with subpages" request
         include_subpages = request.query_params.get("include_subpages", "false").lower() == "true"
+        serializer = PublishingUpdateSerializer(version, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        effective_date = serializer.validated_data.get("effective_date", version.effective_date)
+        expiry_date = serializer.validated_data.get("expiry_date", version.expiry_date)
+        now = timezone.now()
 
-        # Check if this is a publish-now action (effective_date set to now or near-now)
-        effective_date_str = request.data.get("effective_date")
-        is_publish_now = False
-        if effective_date_str:
-            from django.utils import timezone
-            from django.utils.dateparse import parse_datetime
-
-            try:
-                effective_date = parse_datetime(effective_date_str)
-                now = timezone.now()
-                # Consider it "publish now" if the effective date is within 1 minute of now
-                if effective_date and abs((effective_date - now).total_seconds()) < 60:
-                    is_publish_now = True
-            except (ValueError, TypeError):
-                pass
-
-        # If publishing with subpages, use the PublishingService
-        if include_subpages and is_publish_now:
+        if include_subpages:
+            if effective_date is None or effective_date > now:
+                return Response(
+                    {"error": "invalid_tree_publication", "message": "Page trees can only be published immediately."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             from ..publishing import PublishingService
 
             user = request.user if request.user.is_authenticated else None
             service = PublishingService(user)
-
-            # Publish the page with all subpages
             count, errors = service.publish_page_with_subpages(
-                version.page.id, change_summary="Published with subpages via API"
+                version.page.id,
+                change_summary="Published with subpages via API",
+                root_version_id=version.id,
             )
-
-            # Refresh the version from database to get updated data
             version.refresh_from_db()
-
-            # Return full version data with additional info
             full_serializer = PageVersionSerializer(version)
             response_data = full_serializer.data
-            response_data["subpages_published_count"] = count - 1  # Subtract 1 for the main page
+            response_data["subpages_published_count"] = max(count - 1, 0)
             response_data["total_published_count"] = count
             if errors:
                 response_data["errors"] = errors
-
             return Response(response_data)
 
-        # Standard single-page publishing update
-        serializer = PublishingUpdateSerializer(version, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        service = PageVersionWorkflowService(version.page, request.user)
+        try:
+            if effective_date is None:
+                if expiry_date is not None:
+                    raise WorkflowError("An expiry date requires a publication date.")
+                if version.effective_date and version.effective_date > now:
+                    version = service.cancel_schedule(version)
+            elif effective_date <= now:
+                version = service.publish(version)
+            else:
+                version = service.schedule(version, effective_date, expiry_date)
+        except WorkflowError as error:
+            return self._workflow_error_response(error)
 
-        # Return full version data for consistency
         full_serializer = PageVersionSerializer(version)
         return Response(full_serializer.data)
 

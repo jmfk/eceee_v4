@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.db import connection
@@ -51,15 +52,26 @@ class PageVersionWorkflowTest(TestCase):
         self.page.refresh_from_db()
         self.assertEqual(self.page.current_published_version_id, live.id)
 
-    def test_tenant_collaborator_can_open_the_shared_working_copy(self):
+    def test_unrelated_user_cannot_open_tenant_working_copy(self):
         draft = self.page.create_version(self.user, "Shared draft")
-        collaborator = User.objects.create_user("workflow-collaborator", password="test")
-        self.client.force_authenticate(collaborator)
+        unrelated_user = User.objects.create_user("workflow-unrelated", password="test")
+        self.client.force_authenticate(unrelated_user)
 
         response = self.client.get(reverse("api:pageversion-detail", kwargs={"pk": draft.pk}))
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["id"], draft.id)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_unrelated_user_cannot_schedule_tenant_page_through_legacy_api(self):
+        unrelated_user = User.objects.create_user("page-workflow-unrelated", password="test")
+        self.client.force_authenticate(unrelated_user)
+
+        response = self.client.post(
+            reverse("api:webpage-schedule", kwargs={"pk": self.page.pk}),
+            {"effectiveDate": (timezone.now() + timedelta(days=1)).isoformat()},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_scheduled_version_refreshes_the_publication_cache_when_due(self):
         live = self.publish_initial()
@@ -113,6 +125,23 @@ class PageVersionWorkflowTest(TestCase):
         self.assertIsNone(live.expiry_date)
         self.assertIsNone(draft.effective_date)
         self.assertNotIn(service.SCHEDULE_PREDECESSOR_KEY, draft.change_summary)
+
+    def test_restore_into_scheduled_copy_preserves_cancel_metadata(self):
+        live = self.publish_initial()
+        draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        historical = self.page.create_version(self.user, "Historical content")
+        scheduled_at = timezone.now() + timedelta(hours=1)
+        service = PageVersionWorkflowService(self.page, self.user)
+        service.schedule(historical, scheduled_at)
+
+        restored = service.restore_as_working_copy(live)
+        service.cancel_schedule(restored)
+
+        live.refresh_from_db()
+        restored.refresh_from_db()
+        self.assertIsNone(live.expiry_date)
+        self.assertIsNone(restored.effective_date)
+        self.assertNotIn(service.SCHEDULE_PREDECESSOR_KEY, restored.change_summary)
 
     def test_expired_version_is_removed_from_the_publication_cache(self):
         live = self.publish_initial()
@@ -245,6 +274,41 @@ class PageVersionWorkflowTest(TestCase):
         live.refresh_from_db()
         self.assertIsNone(live.expiry_date)
 
+    def test_generic_version_patch_cannot_change_publication_dates(self):
+        draft = self.page.create_version(self.user, "Generic patch draft")
+
+        response = self.client.patch(
+            reverse("api:pageversion-detail", kwargs={"pk": draft.pk}),
+            {"effectiveDate": timezone.now().isoformat()},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        draft.refresh_from_db()
+        self.assertIsNone(draft.effective_date)
+
+    def test_legacy_publishing_update_uses_canonical_publish_side_effects(self):
+        live = self.publish_initial()
+        draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        draft.page_data = {
+            **draft.page_data,
+            "page_attributes": {"title": "Legacy endpoint title", "slug": "legacy-endpoint"},
+        }
+        draft.save(update_fields=["page_data", "updated_at"])
+
+        response = self.client.patch(
+            reverse("api:pageversion-update-publishing", kwargs={"pk": draft.pk}),
+            {"effectiveDate": timezone.now().isoformat(), "expiryDate": None},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.page.refresh_from_db()
+        live.refresh_from_db()
+        self.assertEqual(self.page.title, "Legacy endpoint title")
+        self.assertEqual(self.page.slug, "legacy-endpoint")
+        self.assertIsNotNone(live.expiry_date)
+
     def test_schedule_is_editable_and_second_schedule_is_rejected(self):
         draft = self.page.create_version(self.user, "Scheduled working copy")
         schedule_url = reverse("api:pageversion-schedule", kwargs={"pk": draft.pk})
@@ -369,11 +433,31 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(response.data["legacy_conflicts"]["additional_scheduled_count"], 1)
         self.assertGreaterEqual(response.data["legacy_conflicts"]["older_draft_count"], 2)
 
-    def test_tenant_collaborator_can_compare_shared_history(self):
+    def test_unrelated_user_cannot_compare_tenant_history(self):
         first = self.page.create_version(self.user, "First shared version")
         second = self.page.create_version(self.user, "Second shared version")
-        collaborator = User.objects.create_user("history-collaborator", password="test")
-        self.client.force_authenticate(collaborator)
+        unrelated_user = User.objects.create_user("history-unrelated", password="test")
+        self.client.force_authenticate(unrelated_user)
+
+        response = self.client.get(
+            reverse("api:pageversion-compare"),
+            {"version1": first.id, "version2": second.id},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_compare_handles_slot_mapped_widgets(self):
+        first = self.page.create_version(self.user, "First widget version")
+        first.widgets = {"main": [{"id": "hero", "type": "Content", "config": {"text": "Before"}}]}
+        first.save(update_fields=["widgets", "updated_at"])
+        second = self.page.create_version(self.user, "Second widget version")
+        second.widgets = {
+            "main": [
+                {"id": "hero", "type": "Content", "config": {"text": "After"}},
+                {"id": "cta", "type": "Button", "config": {"label": "Read more"}},
+            ]
+        }
+        second.save(update_fields=["widgets", "updated_at"])
 
         response = self.client.get(
             reverse("api:pageversion-compare"),
@@ -381,6 +465,40 @@ class PageVersionWorkflowTest(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        changes = response.data["changes"]
+        self.assertEqual([widget["id"] for widget in changes["widgets_added"]], ["cta"])
+        self.assertEqual(changes["widgets_modified"][0]["new"]["config"]["text"], "After")
+
+    def test_invalid_delayed_page_attributes_are_rejected_on_save(self):
+        draft = self.page.create_version(self.user, "Invalid delayed attributes")
+
+        response = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk}),
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "pageData": {"pageAttributes": {"title": "x" * 256}},
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_scheduled_transition_rolls_back_cache_when_page_apply_fails(self):
+        live = self.publish_initial()
+        draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        scheduled_at = timezone.now() + timedelta(hours=1)
+        PageVersionWorkflowService(self.page, self.user).schedule(draft, scheduled_at)
+
+        with patch.object(PageVersion, "_apply_version_data", side_effect=RuntimeError("apply failed")):
+            with self.assertRaisesRegex(RuntimeError, "apply failed"):
+                refresh_publication_caches(now=scheduled_at + timedelta(seconds=1))
+
+        self.page.refresh_from_db()
+        self.assertEqual(self.page.current_published_version_id, live.id)
+
+        refresh_publication_caches(now=scheduled_at + timedelta(seconds=1))
+        self.page.refresh_from_db()
+        self.assertEqual(self.page.current_published_version_id, draft.id)
 
     def test_compare_rejects_versions_from_different_pages(self):
         first = self.page.create_version(self.user, "First page version")
