@@ -149,6 +149,36 @@ describe('working-copy page attributes', () => {
 })
 
 describe('smartSave working-copy workflow', () => {
+    it('stores edited page attributes in the working copy instead of updating WebPage', async () => {
+        const pagesApi = { update: vi.fn() }
+        const versionsApi = {
+            saveWorkingCopy: vi.fn().mockResolvedValue(baseVersion),
+        }
+
+        await smartSave(
+            baseWebpage,
+            { ...baseWebpage, title: 'Reviewed draft title', slug: 'reviewed-draft' },
+            baseVersion,
+            baseVersion,
+            { pagesApi, versionsApi },
+            { clientUpdatedAt: baseVersion.updatedAt },
+        )
+
+        expect(pagesApi.update).not.toHaveBeenCalled()
+        expect(versionsApi.saveWorkingCopy).toHaveBeenCalledWith(
+            baseVersion.id,
+            expect.objectContaining({
+                pageData: expect.objectContaining({
+                    pageAttributes: expect.objectContaining({
+                        title: 'Reviewed draft title',
+                        slug: 'reviewed-draft',
+                    }),
+                }),
+            }),
+            baseVersion.updatedAt,
+        )
+    })
+
     it('saves version changes through the canonical working-copy endpoint', async () => {
         const editedVersion = {
             ...baseVersion,

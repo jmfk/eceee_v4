@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { shouldReloadForAppVersion } from '../appVersion.js'
+import {
+    APP_VERSION_MISMATCH_EVENT,
+    shouldReloadForAppVersion,
+} from '../appVersion.js'
 
 describe('application version reload guard', () => {
     it('reloads when the server and loaded frontend builds differ', () => {
@@ -18,5 +21,19 @@ describe('application version reload guard', () => {
     it('ignores unavailable development build identifiers', () => {
         expect(shouldReloadForAppVersion('', 'build-a')).toBe(false)
         expect(shouldReloadForAppVersion('unknown', 'build-a')).toBe(false)
+    })
+
+    it('allows a dirty editor to cancel a deployment reload', () => {
+        const preventReload = vi.fn(event => event.preventDefault())
+        window.addEventListener(APP_VERSION_MISMATCH_EVENT, preventReload)
+
+        const allowed = window.dispatchEvent(new CustomEvent(
+            APP_VERSION_MISMATCH_EVENT,
+            { cancelable: true, detail: { serverVersion: 'build-b' } },
+        ))
+
+        expect(allowed).toBe(false)
+        expect(preventReload).toHaveBeenCalledOnce()
+        window.removeEventListener(APP_VERSION_MISMATCH_EVENT, preventReload)
     })
 })

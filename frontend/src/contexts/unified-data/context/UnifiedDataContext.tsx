@@ -2,12 +2,12 @@ import React, { createContext, useContext, useRef, useCallback, useEffect } from
 import { DataManager } from '../core/DataManager';
 import { UnifiedDataContextValue, UnifiedDataProviderProps } from '../types/context';
 import { Operation, OperationTypes } from '../types/operations';
-import { pagesApi } from '../../../api/pages';
 import { versionsApi } from '../../../api/versions';
 import { objectInstancesApi } from '../../../api/objectStorage';
 import { StateChangeCallback, VersionData, PageData } from '../types/state';
 import { defaultEqualityFn } from '../utils/equality';
 import { normalizeThemeData } from '../../../utils/themeDataNormalizer';
+import { buildVersionedPageData } from '../../../utils/smartSaveUtils';
 
 // Create the context
 const UnifiedDataContext = createContext<UnifiedDataContextValue | null>(null);
@@ -251,14 +251,14 @@ export function UnifiedDataProvider({
                 throw new Error(`Version ${currentVersionId} not found in UDC state`);
             }
 
-            // Save WebPage data first (title, slug, pathPattern, hostnames, etc.)
-            let pageResult;
-            if (pageData) {
-                pageResult = await pagesApi.update(currentPageId, pageData);
-            }
-
-            // Save PageVersion data (widgets, codeLayout, metaTitle, metaDescription, etc.)
-            const versionResult = await versionsApi.update(currentVersionId, versionData);
+            const versionResult = await versionsApi.saveWorkingCopy(
+                currentVersionId,
+                {
+                    ...versionData,
+                    pageData: buildVersionedPageData((versionData as any).pageData, pageData),
+                },
+                versionData.updatedAt,
+            );
 
             // Update page dirty state
             if (versionResult) {

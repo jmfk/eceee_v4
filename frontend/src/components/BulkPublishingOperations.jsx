@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { pagesApi, publishingApi } from '../api';
+import { pagesApi, versionsApi } from '../api';
 import { extractErrorMessage } from '../utils/errorHandling.js';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 import SearchAndFilter from './bulk-publishing/SearchAndFilter';
@@ -87,19 +87,31 @@ const BulkPublishingOperations = () => {
             setSuccess(null);
 
             const pageIds = Array.from(selectedPages);
-            const requestData = {
-                pageIds: pageIds,
-                ...(operation === 'schedule' && {
-                    effectiveDate: scheduledDate,
-                    ...(expiryDate && { expiryDate: expiryDate })
-                })
-            };
+            const workflows = await Promise.all(
+                pageIds.map(async pageId => await versionsApi.getWorkflow(pageId))
+            );
+            const items = workflows.map((workflow, index) => {
+                if (!workflow.editableVersion) {
+                    throw new Error(`Page ${pageIds[index]} has no saved working version to ${operation}`);
+                }
+                return {
+                    pageId: pageIds[index],
+                    versionId: workflow.editableVersion.id,
+                    clientUpdatedAt: workflow.editableVersion.updatedAt,
+                };
+            });
 
             const result = operation === 'publish'
-                ? await publishingApi.bulkPublish(requestData)
-                : await publishingApi.bulkSchedule(requestData);
-
-            setSuccess(result.message);
+                ? await versionsApi.bulkPublishExplicit(items)
+                : await versionsApi.bulkScheduleExplicit(
+                    items,
+                    new Date(scheduledDate).toISOString(),
+                    expiryDate ? new Date(expiryDate).toISOString() : null,
+                );
+            const completedStatus = operation === 'publish' ? 'published' : 'scheduled';
+            const completed = result.results?.filter(item => item.status === completedStatus).length || 0;
+            const failed = result.results?.length - completed || 0;
+            setSuccess(`${completed} page(s) ${operation === 'publish' ? 'published' : 'scheduled'}${failed ? `, ${failed} failed` : ''}`);
             setSelectedPages(new Set());
 
             // Refresh pages list

@@ -10,7 +10,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from core.models import Tenant
-from webpages.models import PageVersion, WebPage
+from webpages.models import PageDataSchema, PageVersion, WebPage
 from webpages.services.page_version_workflow import PageVersionWorkflowService
 from webpages.tasks import refresh_publication_caches
 
@@ -73,6 +73,61 @@ class PageVersionWorkflowTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_tenant_member_can_open_working_copy_without_being_creator(self):
+        member = User.objects.create_user("workflow-member", password="test")
+        self.tenant.members.add(member)
+        draft = self.page.create_version(self.user, "Shared draft")
+        self.client.force_authenticate(member)
+
+        response = self.client.get(reverse("api:pageversion-detail", kwargs={"pk": draft.pk}))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_current_version_read_does_not_create_a_draft(self):
+        before = self.page.versions.count()
+
+        response = self.client.get(reverse("api:page-current-version", kwargs={"page_id": self.page.pk}))
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(self.page.versions.count(), before)
+
+    def test_save_rejects_moving_a_working_copy_to_another_page(self):
+        draft = self.page.create_version(self.user, "Draft")
+        other_page = WebPage.objects.create(
+            title="Other",
+            slug="other",
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk}),
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "page": other_page.pk,
+                "versionTitle": "Moved",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "immutable_field")
+        draft.refresh_from_db()
+        self.assertEqual(draft.page_id, self.page.pk)
+
+    def test_legacy_version_mutation_endpoint_is_gone(self):
+        draft = self.page.create_version(self.user, "Draft")
+
+        response = self.client.patch(
+            reverse("api:pageversion-detail", kwargs={"pk": draft.pk}),
+            {"versionTitle": "Bypass"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
+        self.assertEqual(response.data["error"], "working_copy_save_required")
+
     def test_unrelated_user_cannot_schedule_tenant_page_through_legacy_api(self):
         unrelated_user = User.objects.create_user("page-workflow-unrelated", password="test")
         self.client.force_authenticate(unrelated_user)
@@ -83,7 +138,7 @@ class PageVersionWorkflowTest(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
 
     def test_scheduled_version_refreshes_the_publication_cache_when_due(self):
         live = self.publish_initial()
@@ -368,7 +423,11 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(updated_count, 0)
         self.assertEqual(self.page.current_published_version_id, live.id)
         self.assertEqual(self.page.slug, "workflow-page")
-        self.assertEqual(draft.effective_date, scheduled_at)
+        self.assertIsNone(draft.effective_date)
+        self.assertIsNone(draft.expiry_date)
+        self.assertIn("scheduled_activation_failure", draft.change_summary)
+        live.refresh_from_db()
+        self.assertIsNone(live.expiry_date)
 
     def test_publish_targets_only_the_explicit_canonical_working_copy(self):
         live = self.publish_initial()
@@ -430,7 +489,7 @@ class PageVersionWorkflowTest(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
         live.refresh_from_db()
         self.assertIsNone(live.expiry_date)
 
@@ -443,11 +502,11 @@ class PageVersionWorkflowTest(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
         draft.refresh_from_db()
         self.assertIsNone(draft.effective_date)
 
-    def test_legacy_publishing_update_uses_canonical_publish_side_effects(self):
+    def test_legacy_publishing_update_is_gone_without_side_effects(self):
         live = self.publish_initial()
         draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
         draft.page_data = {
@@ -466,14 +525,14 @@ class PageVersionWorkflowTest(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
         self.page.refresh_from_db()
         live.refresh_from_db()
-        self.assertEqual(self.page.title, "Legacy endpoint title")
-        self.assertEqual(self.page.slug, "legacy-endpoint")
-        self.assertIsNotNone(live.expiry_date)
+        self.assertEqual(self.page.title, "Live title")
+        self.assertEqual(self.page.slug, "workflow-page")
+        self.assertIsNone(live.expiry_date)
 
-    def test_descendant_publish_rejects_a_root_changed_after_review(self):
+    def test_descendant_publish_requires_explicit_reviewed_items(self):
         draft = self.page.create_version(self.user, "Reviewed root")
         reviewed_at = draft.updated_at
         draft.meta_title = "Changed after review"
@@ -489,8 +548,8 @@ class PageVersionWorkflowTest(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
-        self.assertEqual(response.data["error"], "version_conflict")
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
+        self.assertEqual(response.data["error"], "working_copy_save_required")
         draft.refresh_from_db()
         self.assertIsNone(draft.effective_date)
 
@@ -638,6 +697,32 @@ class PageVersionWorkflowTest(TestCase):
         draft.refresh_from_db()
         self.assertIsNone(draft.effective_date)
 
+    def test_bulk_schedule_stops_a_working_copy_changed_after_review(self):
+        draft = self.page.create_version(self.user, "Reviewed draft")
+        observed_at = draft.updated_at
+        draft.meta_title = "Changed after review"
+        draft.save()
+
+        response = self.client.post(
+            reverse("api:pageversion-bulk-schedule-explicit"),
+            {
+                "effectiveDate": (timezone.now() + timedelta(days=1)).isoformat(),
+                "items": [
+                    {
+                        "pageId": self.page.id,
+                        "versionId": draft.id,
+                        "clientUpdatedAt": observed_at.isoformat(),
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_207_MULTI_STATUS)
+        self.assertEqual(response.data["results"][0]["error"], "version_conflict")
+        draft.refresh_from_db()
+        self.assertIsNone(draft.effective_date)
+
     def test_workflow_reports_legacy_conflicts(self):
         self.page.create_version(self.user, "Old draft")
         latest = self.page.create_version(self.user, "Working draft")
@@ -710,6 +795,29 @@ class PageVersionWorkflowTest(TestCase):
             {
                 "clientUpdatedAt": draft.updated_at.isoformat(),
                 "pageData": {"pageAttributes": {"title": "x" * 256}},
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_atomic_save_enforces_the_effective_page_data_schema(self):
+        PageDataSchema.objects.create(
+            scope=PageDataSchema.SCOPE_SYSTEM,
+            schema={
+                "type": "object",
+                "properties": {"headline": {"type": "string"}},
+                "required": ["headline"],
+            },
+            created_by=self.user,
+        )
+        draft = self.page.create_version(self.user, "Schema checked")
+
+        response = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk}),
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "pageData": {"headline": 42},
             },
             format="json",
         )
@@ -810,13 +918,13 @@ class PageVersionMutationTransactionTest(TransactionTestCase):
         self.client.force_authenticate(self.user)
         self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
 
-    def test_legacy_detail_patch_runs_inside_a_transaction(self):
+    def test_legacy_detail_patch_is_gone(self):
         response = self.client.patch(
             reverse("api:pageversion-detail", kwargs={"pk": self.version.pk}),
             {"metaTitle": "Updated safely"},
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
         self.version.refresh_from_db()
-        self.assertEqual(self.version.meta_title, "Updated safely")
+        self.assertEqual(self.version.meta_title, "")

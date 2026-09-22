@@ -5,7 +5,6 @@ WebPage ViewSet for managing web pages.
 from django.db import models
 from django.db.models import Count, Exists, F, OuterRef, Q
 from django.utils import timezone
-from django.utils.dateparse import parse_datetime
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -15,11 +14,7 @@ from rest_framework.throttling import UserRateThrottle
 
 from ..filters import WebPageFilter
 from ..models import PageVersion, WebPage
-from ..serializers import (
-    PageHierarchySerializer,
-    WebPageListSerializer,
-    WebPageSimpleSerializer,
-)
+from ..serializers import PageHierarchySerializer, WebPageListSerializer, WebPageSimpleSerializer
 
 
 class WebPageViewSet(viewsets.ModelViewSet):
@@ -57,6 +52,16 @@ class WebPageViewSet(viewsets.ModelViewSet):
         "id",
     ]
 
+    @staticmethod
+    def _legacy_publication_response():
+        return Response(
+            {
+                "error": "version_workflow_required",
+                "message": "Page-level publication mutations were removed. Reload and use the version workflow.",
+            },
+            status=status.HTTP_410_GONE,
+        )
+
     def get_serializer_class(self):
         """Use a lean serializer for list views and full page data elsewhere."""
         if self.action == "list":
@@ -71,7 +76,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         tenant = getattr(self.request, "tenant", None)
         if tenant:
             queryset = queryset.filter(tenant=tenant)
-            if not self.request.user.is_staff and tenant.created_by_id != self.request.user.id:
+            if not tenant.user_has_access(self.request.user):
                 return queryset.none()
 
         # Exclude deleted pages by default (unless specifically accessing deleted endpoint)
@@ -142,7 +147,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
             from rest_framework.exceptions import ValidationError
 
             raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
-        if not self.request.user.is_staff and tenant.created_by_id != self.request.user.id:
+        if not tenant.user_has_access(self.request.user):
             from rest_framework.exceptions import PermissionDenied
 
             raise PermissionDenied("You do not have access to this tenant.")
@@ -235,55 +240,11 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
-        page = self.get_object()
-        now = timezone.now()
-
-        # Handle anonymous user for development
-        user = request.user if request.user.is_authenticated else None
-        if user:
-            page.last_modified_by = user
-        page.save()
-
-        # Create published version
-        version = page.create_version(user, "Published via API")
-        # Set effective_date to publish immediately
-        version.effective_date = now
-        version.save()
-
-        return Response(
-            {
-                "message": "Page published successfully",
-                "effective_date": version.effective_date,
-                "expiry_date": version.expiry_date,
-            },
-            status=status.HTTP_200_OK,
-        )
+        return self._legacy_publication_response()
 
     @action(detail=True, methods=["post"])
     def unpublish(self, request, pk=None):
-        page = self.get_object()
-        now = timezone.now()
-
-        # Handle anonymous user for development
-        user = request.user if request.user.is_authenticated else None
-        if user:
-            page.last_modified_by = user
-        page.save()
-
-        # Expire any currently published versions, then create a draft version.
-        page.versions.filter(effective_date__lte=now).filter(
-            Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
-        ).update(expiry_date=now)
-        version = page.create_version(user, "Unpublished via API")
-
-        return Response(
-            {
-                "message": "Page unpublished successfully",
-                "effective_date": version.effective_date,
-                "expiry_date": version.expiry_date,
-            },
-            status=status.HTTP_200_OK,
-        )
+        return self._legacy_publication_response()
 
     @action(detail=True, methods=["get"], url_path="widget-inheritance")
     def widget_inheritance(self, request, pk=None):
@@ -884,99 +845,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    def _parse_schedule_dates(self, request):
-        effective_date = parse_datetime(request.data.get("effective_date", ""))
-        expiry_value = request.data.get("expiry_date")
-        expiry_date = parse_datetime(expiry_value) if expiry_value else None
-
-        if not effective_date:
-            return (
-                None,
-                None,
-                Response(
-                    {"error": "effective_date is required"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                ),
-            )
-
-        if timezone.is_naive(effective_date):
-            effective_date = timezone.make_aware(effective_date, timezone.get_current_timezone())
-
-        if expiry_date and timezone.is_naive(expiry_date):
-            expiry_date = timezone.make_aware(expiry_date, timezone.get_current_timezone())
-
-        now = timezone.now()
-        if effective_date <= now:
-            return (
-                None,
-                None,
-                Response(
-                    {"error": "effective_date must be in the future"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                ),
-            )
-
-        if expiry_date and expiry_date <= effective_date:
-            return (
-                None,
-                None,
-                Response(
-                    {"error": "expiry_date must be after effective_date"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                ),
-            )
-
-        return effective_date, expiry_date, None
-
-    def _schedule_page_version(self, page, effective_date, expiry_date, user):
-        from ..services.page_version_workflow import PageVersionWorkflowService
-
-        workflow = PageVersionWorkflowService(page, user)
-        working_version, _ = workflow.get_or_create_working_copy()
-        return workflow.schedule(working_version, effective_date, expiry_date)
-
     @action(detail=True, methods=["post"], url_path="schedule")
     def schedule(self, request, pk=None):
-        effective_date, expiry_date, error_response = self._parse_schedule_dates(request)
-        if error_response:
-            return error_response
-
-        page = self.get_object()
-        user = request.user if request.user.is_authenticated else None
-        version = self._schedule_page_version(page, effective_date, expiry_date, user)
-
-        return Response(
-            {
-                "message": "Page scheduled successfully",
-                "effective_date": version.effective_date,
-                "expiry_date": version.expiry_date,
-            },
-            status=status.HTTP_200_OK,
-        )
+        return self._legacy_publication_response()
 
     @action(detail=False, methods=["post"], url_path="bulk-schedule")
     def bulk_schedule(self, request):
-        page_ids = request.data.get("page_ids", [])
-        if not page_ids:
-            return Response({"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        effective_date, expiry_date, error_response = self._parse_schedule_dates(request)
-        if error_response:
-            return error_response
-
-        user = request.user if request.user.is_authenticated else None
-        scheduled_count = 0
-        for page in self.get_queryset().filter(id__in=page_ids):
-            self._schedule_page_version(page, effective_date, expiry_date, user)
-            scheduled_count += 1
-
-        return Response(
-            {
-                "message": f"Successfully scheduled {scheduled_count} page(s)",
-                "scheduled_count": scheduled_count,
-            },
-            status=status.HTTP_200_OK,
-        )
+        return self._legacy_publication_response()
 
     @action(detail=False, methods=["get"], url_path="publication-status")
     def publication_status(self, request):
@@ -1016,98 +891,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="bulk-publish")
     def bulk_publish(self, request):
-        """
-        Bulk publish multiple pages.
-
-        Request body:
-        {
-            "page_ids": [1, 2, 3],
-            "change_summary": "Bulk publish operation"  // optional
-        }
-        """
-        page_ids = request.data.get("page_ids", [])
-        change_summary = request.data.get("change_summary", "Bulk publish operation")
-
-        if not page_ids:
-            return Response({"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Use publishing service
-        from ..publishing import PublishingService
-
-        publishing_service = PublishingService(request.user)
-        accessible_page_ids = list(self.get_queryset().filter(id__in=page_ids).values_list("id", flat=True))
-        published_count, errors = publishing_service.bulk_publish_pages(accessible_page_ids, change_summary)
-
-        response_data = {
-            "message": f"Successfully published {published_count} page(s)",
-            "published_count": published_count,
-        }
-
-        if errors:
-            response_data["errors"] = errors
-            response_data["message"] += f" with {len(errors)} error(s)"
-
-        return Response(response_data, status=status.HTTP_200_OK)
+        """Reject page-id-only publication without reviewed versions."""
+        return self._legacy_publication_response()
 
     @action(detail=False, methods=["post"], url_path="bulk-unpublish")
     def bulk_unpublish(self, request):
-        """
-        Bulk unpublish multiple pages.
-
-        Request body:
-        {
-            "page_ids": [1, 2, 3],
-            "change_summary": "Bulk unpublish operation"  // optional
-        }
-        """
-        page_ids = request.data.get("page_ids", [])
-        change_summary = request.data.get("change_summary", "Bulk unpublish operation")
-
-        if not page_ids:
-            return Response({"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Fetch pages
-        pages = WebPage.objects.filter(id__in=page_ids, is_deleted=False)
-
-        if not pages.exists():
-            return Response(
-                {"error": "No valid pages found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        # Unpublish each page
-        unpublished_count = 0
-        errors = []
-
-        for page in pages:
-            try:
-                # Get latest version
-                latest_version = page.versions.order_by("-version_number").first()
-
-                if not latest_version:
-                    # Create a new version if none exists
-                    latest_version = page.create_version(request.user, change_summary)
-
-                # Clear effective_date to unpublish
-                latest_version.effective_date = None
-                latest_version.save(update_fields=["effective_date"])
-
-                unpublished_count += 1
-
-            except Exception as e:
-                error_msg = f"Failed to unpublish {page.title}: {str(e)}"
-                errors.append(error_msg)
-
-        response_data = {
-            "message": f"Successfully unpublished {unpublished_count} page(s)",
-            "unpublished_count": unpublished_count,
-        }
-
-        if errors:
-            response_data["errors"] = errors
-            response_data["message"] += f" with {len(errors)} error(s)"
-
-        return Response(response_data, status=status.HTTP_200_OK)
+        """Reject page-id-only unpublication without explicit versions."""
+        return self._legacy_publication_response()
 
     @action(detail=True, methods=["post"], url_path="duplicate")
     def duplicate(self, request, pk=None):
@@ -1197,157 +987,18 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="publish-latest")
     def publish_latest_version(self, request, pk=None):
-        """
-        Publish the latest version of this page.
-
-        Sets the effective_date to now, making the latest version live.
-
-        POST /api/pages/{id}/publish-latest/
-        """
-        page = self.get_object()
-
-        # Get latest version
-        latest_version = page.get_latest_version()
-
-        if not latest_version:
-            return Response(
-                {"error": "Page has no versions to publish"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Check if it's already published
-        if latest_version.is_published():
-            return Response(
-                {
-                    "message": "Latest version is already published",
-                    "version_id": latest_version.id,
-                    "version_number": latest_version.version_number,
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        try:
-            # Publish the version
-            latest_version.publish(request.user)
-
-            # Return updated page data
-            serializer = self.get_serializer(page)
-            return Response(
-                {
-                    "message": f"Published version {latest_version.version_number}",
-                    "version_id": latest_version.id,
-                    "version_number": latest_version.version_number,
-                    "effective_date": latest_version.effective_date,
-                    "page": serializer.data,
-                },
-                status=status.HTTP_200_OK,
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to publish version: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        """Reject inferred latest-version publication."""
+        return self._legacy_publication_response()
 
     @action(detail=True, methods=["post"], url_path="unpublish")
     def unpublish_version(self, request, pk=None):
-        """
-        Unpublish a version with options.
-
-        POST /api/pages/{id}/unpublish/
-
-        Request body:
-        {
-            "mode": "current" | "all"  // "current" = unpublish current and restore previous, "all" = unpublish all
-        }
-        """
-        page = self.get_object()
-        mode = request.data.get("mode", "current")
-
-        if mode == "all":
-            # Unpublish all versions
-            return self.unpublish_all_versions(request, pk)
-
-        # Unpublish current version and restore previous
-        current_published = page.get_current_published_version()
-
-        if not current_published:
-            return Response(
-                {"error": "Page has no published version"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            # Clear the effective date of current published version
-            current_published.effective_date = None
-            current_published.save(update_fields=["effective_date"])
-
-            # Get the new current published version (if any)
-            new_published = page.get_current_published_version()
-
-            # Return updated page data
-            serializer = self.get_serializer(page)
-            response_data = {
-                "message": f"Unpublished version {current_published.version_number}",
-                "unpublished_version_id": current_published.id,
-                "unpublished_version_number": current_published.version_number,
-                "page": serializer.data,
-            }
-
-            if new_published:
-                response_data["message"] += f", restored version {new_published.version_number}"
-                response_data["restored_version_id"] = new_published.id
-                response_data["restored_version_number"] = new_published.version_number
-            else:
-                response_data["message"] += ", no previous version to restore"
-
-            return Response(response_data, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to unpublish version: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        """Reject unpublication without an explicit live version."""
+        return self._legacy_publication_response()
 
     @action(detail=True, methods=["post"], url_path="unpublish-all")
     def unpublish_all_versions(self, request, pk=None):
-        """
-        Unpublish all versions of this page.
-
-        Sets effective_date to None for all versions.
-
-        POST /api/pages/{id}/unpublish-all/
-        """
-        page = self.get_object()
-
-        # Get all published versions
-        published_versions = page.versions.filter(effective_date__isnull=False)
-
-        if not published_versions.exists():
-            return Response(
-                {"error": "Page has no published versions"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            # Unpublish all versions
-            unpublished_count = published_versions.update(effective_date=None)
-
-            # Return updated page data
-            serializer = self.get_serializer(page)
-            return Response(
-                {
-                    "message": f"Unpublished all {unpublished_count} version(s)",
-                    "unpublished_count": unpublished_count,
-                    "page": serializer.data,
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to unpublish all versions: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        """Reject broad unpublication without explicit live versions."""
+        return self._legacy_publication_response()
 
     @action(detail=False, methods=["post"], url_path="bulk-move")
     def bulk_move(self, request):

@@ -47,6 +47,14 @@ export const versionsApi = {
         return api.post(endpoints.versions.bulkPublishExplicit, { items })
     }, 'versions.bulkPublishExplicit'),
 
+    bulkScheduleExplicit: wrapApiCall(async (items, effectiveDate, expiryDate = null) => {
+        return api.post(endpoints.versions.bulkScheduleExplicit, {
+            items,
+            effectiveDate,
+            expiryDate,
+        })
+    }, 'versions.bulkScheduleExplicit'),
+
     /**
      * Get a specific version
      * @param {number} versionId - Version ID
@@ -128,102 +136,11 @@ export const versionsApi = {
      * @returns {Promise<Object>} Updated version (from the last successful update)
      */
     smartSave: wrapApiCall(async (versionId, changes, originalVersion = null) => {
-        const updatePromises = []
-        let lastResult = null
         const clientUpdatedAt = originalVersion?.updatedAt ?? originalVersion?.updated_at
-
-        // Detect what components are being updated
-        const hasWidgetChanges = 'widgets' in changes
-        const hasPageDataChanges = 'page_data' in changes
-        const hasMetadataChanges = ['version_title', 'code_layout', 'theme', 'meta_title', 'meta_description', 'page_css_variables', 'page_custom_css', 'enable_css_injection'].some(field => field in changes)
-        const hasPublishingChanges = ['effective_date', 'expiry_date'].some(field => field in changes)
-
-        // Use granular endpoints for single-component updates
-        if (hasWidgetChanges && !hasPageDataChanges && !hasMetadataChanges && !hasPublishingChanges) {
-            // Widget-only update
-            return versionsApi.updateWidgets(versionId, { widgets: changes.widgets })
+        if (!clientUpdatedAt) {
+            throw new Error('A reviewed working-copy timestamp is required.')
         }
-
-        if (hasPageDataChanges && !hasWidgetChanges && !hasMetadataChanges && !hasPublishingChanges) {
-            // Page data-only update
-            return versionsApi.updatePageData(versionId, { page_data: changes.page_data })
-        }
-
-        if (hasMetadataChanges && !hasWidgetChanges && !hasPageDataChanges && !hasPublishingChanges) {
-            // Metadata-only update
-            const metadataFields = ['version_title', 'code_layout', 'theme', 'meta_title', 'meta_description', 'page_css_variables', 'page_custom_css', 'enable_css_injection']
-            const metadata = {}
-            metadataFields.forEach(field => {
-                if (field in changes) {
-                    metadata[field] = changes[field]
-                }
-            })
-            return versionsApi.updateMetadata(versionId, metadata)
-        }
-
-        if (hasPublishingChanges && !hasWidgetChanges && !hasPageDataChanges && !hasMetadataChanges) {
-            // Publishing-only update
-            const publishingFields = ['effective_date', 'expiry_date']
-            const publishing = {}
-            publishingFields.forEach(field => {
-                if (field in changes) {
-                    publishing[field] = changes[field]
-                }
-            })
-            return versionsApi.updatePublishing(versionId, publishing, clientUpdatedAt)
-        }
-
-        // Multi-component updates - execute in parallel for better performance
-        if (hasWidgetChanges) {
-            updatePromises.push(
-                versionsApi.updateWidgets(versionId, { widgets: changes.widgets })
-                    .then(result => { lastResult = result; return result })
-            )
-        }
-
-        if (hasPageDataChanges) {
-            updatePromises.push(
-                versionsApi.updatePageData(versionId, { page_data: changes.page_data })
-                    .then(result => { lastResult = result; return result })
-            )
-        }
-
-        if (hasMetadataChanges) {
-            const metadataFields = ['version_title', 'code_layout', 'theme', 'meta_title', 'meta_description', 'page_css_variables', 'page_custom_css', 'enable_css_injection']
-            const metadata = {}
-            metadataFields.forEach(field => {
-                if (field in changes) {
-                    metadata[field] = changes[field]
-                }
-            })
-            updatePromises.push(
-                versionsApi.updateMetadata(versionId, metadata)
-                    .then(result => { lastResult = result; return result })
-            )
-        }
-
-        if (hasPublishingChanges) {
-            const publishingFields = ['effective_date', 'expiry_date']
-            const publishing = {}
-            publishingFields.forEach(field => {
-                if (field in changes) {
-                    publishing[field] = changes[field]
-                }
-            })
-            updatePromises.push(
-                versionsApi.updatePublishing(versionId, publishing, clientUpdatedAt)
-                    .then(result => { lastResult = result; return result })
-            )
-        }
-
-        // Execute all updates in parallel
-        if (updatePromises.length > 0) {
-            await Promise.all(updatePromises)
-            return lastResult
-        }
-
-        // Fallback to full update if no specific changes detected
-        return versionsApi.update(versionId, changes)
+        return versionsApi.saveWorkingCopy(versionId, changes, clientUpdatedAt)
     }, 'versions.smartSave'),
 
     /**

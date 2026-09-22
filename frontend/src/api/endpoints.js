@@ -91,6 +91,7 @@ export const endpoints = {
         schedule: (versionId) => `${BASE_PATH}/webpages/versions/${versionId}/schedule/`,
         cancelSchedule: (versionId) => `${BASE_PATH}/webpages/versions/${versionId}/cancel-schedule/`,
         bulkPublishExplicit: `${BASE_PATH}/webpages/versions/bulk-publish-explicit/`,
+        bulkScheduleExplicit: `${BASE_PATH}/webpages/versions/bulk-schedule-explicit/`,
         // DEPRECATED: Query string endpoints (will be removed)
         legacy: {
             forPage: (pageId) => `${BASE_PATH}/webpages/versions/?page=${pageId}`,

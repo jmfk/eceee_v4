@@ -32,6 +32,10 @@ import {
 } from 'lucide-react'
 import { pagesApi, layoutsApi, versionsApi, themesApi, namespacesApi } from '../api'
 import { api } from '../api/client'
+import {
+    APP_VERSION_MISMATCH_EVENT,
+    resumePendingAppVersionReload,
+} from '../api/appVersion'
 import { endpoints } from '../api/endpoints'
 import {
     smartSave,
@@ -1250,15 +1254,15 @@ const PageEditor = () => {
 
             // Prepare data for smart save
             const currentWebpageDataForSave = {
-                ...webpageData,
+                ...(saveOptions.resolvedData?.webpage || webpageData),
                 ...collectedData.settings,
                 ...collectedData.metadata
             };
 
             const currentVersionDataForSave = {
-                ...pageVersionData,
+                ...(saveOptions.resolvedData?.version || pageVersionData),
                 ...versionDataOverrides,
-                widgets: collectedData.widgets
+                widgets: versionDataOverrides.widgets || saveOptions.resolvedData?.version?.widgets || collectedData.widgets
             };
 
             // Use smart save with separated data (include timestamp for conflict detection)
@@ -1656,6 +1660,19 @@ const PageEditor = () => {
         const handler = (e) => { e.preventDefault(); e.returnValue = ''; };
         window.addEventListener('beforeunload', handler);
         return () => window.removeEventListener('beforeunload', handler);
+    }, [isDirty]);
+
+    // A deployment must never discard unsaved editor state. Defer the reload
+    // until the current changes have been saved or undone.
+    useEffect(() => {
+        const deferReloadWhileDirty = (event) => {
+            if (isDirtyRef.current) event.preventDefault();
+        };
+        window.addEventListener(APP_VERSION_MISMATCH_EVENT, deferReloadWhileDirty);
+
+        if (!isDirty) resumePendingAppVersionReload();
+
+        return () => window.removeEventListener(APP_VERSION_MISMATCH_EVENT, deferReloadWhileDirty);
     }, [isDirty]);
 
     // Conflict resolution handlers

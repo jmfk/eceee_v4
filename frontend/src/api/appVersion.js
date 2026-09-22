@@ -1,5 +1,8 @@
 const CLIENT_APP_VERSION = import.meta.env.VITE_GIT_COMMIT_HASH || ''
 const RELOAD_MARKER = 'eceee:last-app-version-reload'
+export const APP_VERSION_MISMATCH_EVENT = 'eceee:app-version-mismatch'
+
+let pendingServerVersion = null
 
 export const shouldReloadForAppVersion = (
     serverVersion,
@@ -26,9 +29,24 @@ export const reloadForAppVersion = (serverVersion) => {
         return false
     }
 
+    const mismatchEvent = new CustomEvent(APP_VERSION_MISMATCH_EVENT, {
+        cancelable: true,
+        detail: { serverVersion },
+    })
+    if (!window.dispatchEvent(mismatchEvent)) {
+        pendingServerVersion = serverVersion
+        return false
+    }
+
+    pendingServerVersion = null
     window.sessionStorage.setItem(RELOAD_MARKER, serverVersion)
     window.location.reload()
     return true
+}
+
+export const resumePendingAppVersionReload = () => {
+    if (!pendingServerVersion) return false
+    return reloadForAppVersion(pendingServerVersion)
 }
 
 export const inspectAppVersionResponse = (response) => {
