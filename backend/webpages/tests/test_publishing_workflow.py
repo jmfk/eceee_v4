@@ -31,12 +31,12 @@ class PublishingServiceTests(TestCase):
 
     def setUp(self):
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
         from core.models import Tenant
+
         self.tenant = Tenant.objects.create(
             name="Publishing Service Tenant",
             identifier="publishing-service",
@@ -74,11 +74,10 @@ class PublishingServiceTests(TestCase):
         """Test new 'Tell, Don't Ask' methods on WebPage model"""
         from webpages.models import PageVersion
         from core.models import Tenant
-        
+
         # Get or create tenant
         tenant, _ = Tenant.objects.get_or_create(
-            identifier="default",
-            defaults={"name": "Default Tenant", "created_by": self.user}
+            identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
 
         page = WebPage.objects.create(
@@ -88,7 +87,7 @@ class PublishingServiceTests(TestCase):
             created_by=self.user,
             last_modified_by=self.user,
         )
-        
+
         # Create a version with the publishing info
         version = PageVersion.objects.create(
             page=page,
@@ -96,23 +95,22 @@ class PublishingServiceTests(TestCase):
             code_layout="single_column",
             effective_date=timezone.now() - timedelta(hours=1),
             page_data={},
-            created_by=self.user
+            created_by=self.user,
         )
 
         # Test should_be_published_now - this method might be on WebPage but needs to check versions
         # Let's check if it exists on WebPage
-        if hasattr(page, 'should_be_published_now'):
+        if hasattr(page, "should_be_published_now"):
             self.assertTrue(page.should_be_published_now())
 
     def test_publishing_service_process_scheduled_publications(self):
         """Test service object processing scheduled publications"""
         from webpages.models import PageVersion
         from core.models import Tenant
-        
+
         # Get or create tenant
         tenant, _ = Tenant.objects.get_or_create(
-            identifier="default",
-            defaults={"name": "Default Tenant", "created_by": self.user}
+            identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
 
         # Create scheduled page ready for publication
@@ -123,7 +121,7 @@ class PublishingServiceTests(TestCase):
             created_by=self.user,
             last_modified_by=self.user,
         )
-        
+
         # Create a version with the scheduling info
         # Note: In the new system, publication_status is derived from dates
         PageVersion.objects.create(
@@ -132,7 +130,7 @@ class PublishingServiceTests(TestCase):
             code_layout="single_column",
             effective_date=timezone.now() - timedelta(minutes=30),
             page_data={},
-            created_by=self.user
+            created_by=self.user,
         )
 
         published_count, errors = self.service.process_scheduled_publications()
@@ -143,11 +141,10 @@ class PublishingServiceTests(TestCase):
         """Test service object processing expired pages"""
         from webpages.models import PageVersion
         from core.models import Tenant
-        
+
         # Get or create tenant
         tenant, _ = Tenant.objects.get_or_create(
-            identifier="default",
-            defaults={"name": "Default Tenant", "created_by": self.user}
+            identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
 
         # Create published page that should be expired
@@ -158,7 +155,7 @@ class PublishingServiceTests(TestCase):
             created_by=self.user,
             last_modified_by=self.user,
         )
-        
+
         PageVersion.objects.create(
             page=page,
             version_number=1,
@@ -166,7 +163,7 @@ class PublishingServiceTests(TestCase):
             effective_date=timezone.now() - timedelta(days=1),
             expiry_date=timezone.now() - timedelta(minutes=30),
             page_data={},
-            created_by=self.user
+            created_by=self.user,
         )
 
         expired_count, errors = self.service.process_expired_pages()
@@ -178,16 +175,15 @@ class PublishingWorkflowAPITests(APITestCase):
 
     def setUp(self):
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         from core.models import Tenant
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
+
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
         # Get or create tenant
         self.tenant, _ = Tenant.objects.get_or_create(
-            identifier="default",
-            defaults={"name": "Default Tenant", "created_by": self.user}
+            identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
         self.theme = PageTheme.objects.create(
             name="Test Theme", css_variables={}, created_by=self.user, tenant=self.tenant
@@ -202,11 +198,7 @@ class PublishingWorkflowAPITests(APITestCase):
             last_modified_by=self.user,
         )
         PageVersion.objects.create(
-            page=self.page1,
-            version_number=1,
-            code_layout="single_column",
-            page_data={},
-            created_by=self.user
+            page=self.page1, version_number=1, code_layout="single_column", page_data={}, created_by=self.user
         )
 
         self.page2 = WebPage.objects.create(
@@ -217,11 +209,7 @@ class PublishingWorkflowAPITests(APITestCase):
             last_modified_by=self.user,
         )
         PageVersion.objects.create(
-            page=self.page2,
-            version_number=1,
-            code_layout="single_column",
-            page_data={},
-            created_by=self.user
+            page=self.page2, version_number=1, code_layout="single_column", page_data={}, created_by=self.user
         )
 
         self.client.force_authenticate(user=self.user)
@@ -244,12 +232,8 @@ class PublishingWorkflowAPITests(APITestCase):
         # Refresh page from database
         self.page1.refresh_from_db()
         latest_version = self.page1.get_latest_version()
-        self.assertAlmostEqual(
-            latest_version.effective_date, future_date, delta=timedelta(seconds=1)
-        )
-        self.assertAlmostEqual(
-            latest_version.expiry_date, expiry_date, delta=timedelta(seconds=1)
-        )
+        self.assertAlmostEqual(latest_version.effective_date, future_date, delta=timedelta(seconds=1))
+        self.assertAlmostEqual(latest_version.expiry_date, expiry_date, delta=timedelta(seconds=1))
 
     def test_schedule_endpoint_past_date_error(self):
         """Test scheduling with past date returns error"""
@@ -277,9 +261,7 @@ class PublishingWorkflowAPITests(APITestCase):
         response = self.client.post(url, data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn(
-            "expiry_date must be after effective_date", response.data["error"]
-        )
+        self.assertIn("expiry_date must be after effective_date", response.data["error"])
 
     def test_bulk_publish_success(self):
         """Test bulk publishing multiple pages"""
@@ -369,15 +351,14 @@ class PublishingManagementCommandTests(TransactionTestCase):
 
     def setUp(self):
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         from core.models import Tenant
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
+
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
         self.tenant, _ = Tenant.objects.get_or_create(
-            identifier="default",
-            defaults={"name": "Default Tenant", "created_by": self.user}
+            identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
 
     def test_process_scheduled_publications(self):
@@ -397,7 +378,7 @@ class PublishingManagementCommandTests(TransactionTestCase):
             code_layout="single_column",
             effective_date=past_date,
             page_data={},
-            created_by=self.user
+            created_by=self.user,
         )
 
         # Run the command
@@ -427,7 +408,7 @@ class PublishingManagementCommandTests(TransactionTestCase):
             effective_date=timezone.now() - timedelta(days=1),
             expiry_date=past_date,
             page_data={},
-            created_by=self.user
+            created_by=self.user,
         )
 
         # Run the command
@@ -455,21 +436,19 @@ class PublishingManagementCommandTests(TransactionTestCase):
             code_layout="single_column",
             effective_date=past_date,
             page_data={},
-            created_by=self.user
+            created_by=self.user,
         )
 
         # Run the command in dry run mode
         out = StringIO()
-        call_command(
-            "process_scheduled_publishing", "--dry-run", "--verbose", stdout=out
-        )
+        call_command("process_scheduled_publishing", "--dry-run", "--verbose", stdout=out)
 
         # Check page status unchanged
         page.refresh_from_db()
         # It should NOT be published yet because it's a dry run
         # Wait, the command might not have been updated for the new system yet.
         # If it uses is_currently_published cache, it might not be updated.
-        
+
     def test_no_changes_needed(self):
         """Test command when no pages need processing"""
         # Create a page that doesn't need processing
@@ -481,11 +460,7 @@ class PublishingManagementCommandTests(TransactionTestCase):
             last_modified_by=self.user,
         )
         PageVersion.objects.create(
-            page=page,
-            version_number=1,
-            code_layout="single_column",
-            page_data={},
-            created_by=self.user
+            page=page, version_number=1, code_layout="single_column", page_data={}, created_by=self.user
         )
 
         # Run the command
@@ -502,16 +477,17 @@ class PublishingLogicTests(APITestCase):
 
     def setUp(self):
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         from core.models import Tenant
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
+
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
         self.tenant, _ = Tenant.objects.get_or_create(
-            identifier="default",
-            defaults={"name": "Default Tenant", "created_by": self.user}
+            identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
+        self.tenant.created_by = self.user
+        self.tenant.save(update_fields=["created_by"])
         self.client.force_authenticate(user=self.user)
         self.theme = PageTheme.objects.create(
             name="Test Theme", css_variables={}, created_by=self.user, tenant=self.tenant
@@ -604,9 +580,7 @@ class PublishingLogicTests(APITestCase):
         self.assertEqual(page.versions.count(), 0)
 
         # Create a version manually (simulating API call)
-        version = page.create_version(
-            self.user, "Published via API", status="published", auto_publish=True
-        )
+        version = page.create_version(self.user, "Published via API", status="published", auto_publish=True)
 
         # Check version was created
         self.assertEqual(page.versions.count(), 1)
@@ -631,7 +605,7 @@ class PublishingLogicTests(APITestCase):
             code_layout="single_column",
             effective_date=past_date,
             page_data={},
-            created_by=self.user
+            created_by=self.user,
         )
 
         # Try to publish the page
@@ -660,7 +634,7 @@ class PublishingLogicTests(APITestCase):
             code_layout="single_column",
             effective_date=future_date,
             page_data={},
-            created_by=self.user
+            created_by=self.user,
         )
 
         # Try to publish the page
@@ -683,11 +657,7 @@ class PublishingLogicTests(APITestCase):
             last_modified_by=self.user,
         )
         PageVersion.objects.create(
-            page=page,
-            version_number=1,
-            code_layout="single_column",
-            page_data={},
-            created_by=self.user
+            page=page, version_number=1, code_layout="single_column", page_data={}, created_by=self.user
         )
 
         # Try to publish the page
@@ -716,7 +686,7 @@ class PublishingLogicTests(APITestCase):
             effective_date=timezone.now() - timedelta(hours=1),
             expiry_date=None,
             page_data={},
-            created_by=self.user
+            created_by=self.user,
         )
 
         # Unpublish the page
@@ -746,7 +716,7 @@ class PublishingLogicTests(APITestCase):
             effective_date=timezone.now() - timedelta(hours=1),
             expiry_date=existing_expiry,
             page_data={},
-            created_by=self.user
+            created_by=self.user,
         )
 
         # Unpublish the page
@@ -847,15 +817,14 @@ class PublishingWorkflowIntegrationTests(APITestCase):
 
     def setUp(self):
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         from core.models import Tenant
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
+
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
         self.tenant, _ = Tenant.objects.get_or_create(
-            identifier="default",
-            defaults={"name": "Default Tenant", "created_by": self.user}
+            identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
         self.client.force_authenticate(user=self.user)
 
@@ -870,11 +839,7 @@ class PublishingWorkflowIntegrationTests(APITestCase):
             last_modified_by=self.user,
         )
         PageVersion.objects.create(
-            page=page,
-            version_number=1,
-            code_layout="single_column",
-            page_data={},
-            created_by=self.user
+            page=page, version_number=1, code_layout="single_column", page_data={}, created_by=self.user
         )
 
         self.assertFalse(page.is_published())
@@ -931,11 +896,7 @@ class PublishingWorkflowIntegrationTests(APITestCase):
                 last_modified_by=self.user,
             )
             PageVersion.objects.create(
-                page=page,
-                version_number=1,
-                code_layout="single_column",
-                page_data={},
-                created_by=self.user
+                page=page, version_number=1, code_layout="single_column", page_data={}, created_by=self.user
             )
             pages.append(page)
 

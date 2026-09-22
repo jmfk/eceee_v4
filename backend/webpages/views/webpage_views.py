@@ -2,24 +2,24 @@
 WebPage ViewSet for managing web pages.
 """
 
-from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.filters import SearchFilter, OrderingFilter
-from rest_framework.throttling import UserRateThrottle
-from django_filters.rest_framework import DjangoFilterBackend
 from django.db import models
-from django.db.models import Q, Exists, OuterRef, F, Count
+from django.db.models import Count, Exists, F, OuterRef, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 
-from ..models import WebPage, PageVersion
+from ..filters import WebPageFilter
+from ..models import PageVersion, WebPage
 from ..serializers import (
+    PageHierarchySerializer,
     WebPageListSerializer,
     WebPageSimpleSerializer,
-    PageHierarchySerializer,
 )
-from ..filters import WebPageFilter
 
 
 class WebPageViewSet(viewsets.ModelViewSet):
@@ -68,7 +68,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
 
         # Filter by tenant from middleware
-        tenant = getattr(self.request, 'tenant', None)
+        tenant = getattr(self.request, "tenant", None)
         if tenant:
             queryset = queryset.filter(tenant=tenant)
             if not self.request.user.is_staff and tenant.created_by_id != self.request.user.id:
@@ -114,9 +114,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 ),
                 Prefetch(
                     "versions",
-                    queryset=PageVersion.objects.filter(
-                        effective_date__gt=now
-                    ).order_by("effective_date"),
+                    queryset=PageVersion.objects.filter(effective_date__gt=now).order_by("effective_date"),
                     to_attr="_scheduled_versions_list",
                 ),
             )
@@ -139,15 +137,16 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # Get tenant from request (set by middleware)
-        tenant = getattr(self.request, 'tenant', None)
+        tenant = getattr(self.request, "tenant", None)
         if not tenant:
             from rest_framework.exceptions import ValidationError
+
             raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
         if not self.request.user.is_staff and tenant.created_by_id != self.request.user.id:
             from rest_framework.exceptions import PermissionDenied
 
             raise PermissionDenied("You do not have access to this tenant.")
-        
+
         serializer.save(
             created_by=self.request.user,
             last_modified_by=self.request.user,
@@ -169,9 +168,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         """Get full page data including version content (LEGACY ENDPOINT)"""
         # This maintains backward compatibility with the old combined API
         page = self.get_object()
-        serializer = WebPageSimpleSerializer(
-            page, context={"request": request, "include_version_info": True}
-        )
+        serializer = WebPageSimpleSerializer(page, context={"request": request, "include_version_info": True})
         return Response(serializer.data)
 
     def perform_update(self, serializer):
@@ -211,9 +208,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
     def tree(self, request):
         """Get page hierarchy as a tree structure"""
         root_pages = self.get_queryset().filter(parent__isnull=True)
-        serializer = PageHierarchySerializer(
-            root_pages, many=True, context={"request": request}
-        )
+        serializer = PageHierarchySerializer(root_pages, many=True, context={"request": request})
         return Response(serializer.data)
 
     @action(detail=False, methods=["get"])
@@ -255,7 +250,6 @@ class WebPageViewSet(viewsets.ModelViewSet):
         version.effective_date = now
         version.save()
 
-        serializer = self.get_serializer(page)
         return Response(
             {
                 "message": "Page published successfully",
@@ -282,7 +276,6 @@ class WebPageViewSet(viewsets.ModelViewSet):
         ).update(expiry_date=now)
         version = page.create_version(user, "Unpublished via API")
 
-        serializer = self.get_serializer(page)
         return Response(
             {
                 "message": "Page unpublished successfully",
@@ -304,8 +297,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         try:
             # NEW: Build inheritance tree
-            from .inheritance_tree import InheritanceTreeBuilder
             from .inheritance_helpers import InheritanceTreeHelpers
+            from .inheritance_tree import InheritanceTreeBuilder
 
             builder = InheritanceTreeBuilder()
             tree = builder.build_tree(page)
@@ -333,7 +326,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
             return Response(response_data)
 
-        except Exception as e:
+        except Exception:
             # Fallback to old system
             return self._widget_inheritance_legacy(page)
 
@@ -368,9 +361,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
             # Check which fields are explicitly set (priority: allow_merge > allows_replacement_only > requires_local)
             has_allow_merge = "allow_merge" in slot_config
             has_allows_replacement_only = "allows_replacement_only" in slot_config
-            has_requires_local = (
-                "requires_local" in slot_config
-            )  # Backward compatibility
+            has_requires_local = "requires_local" in slot_config  # Backward compatibility
             has_allows_inheritance = "allows_inheritance" in slot_config
 
             # Get values with priority order
@@ -386,16 +377,12 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 )
                 allow_merge = not allows_replacement_only
 
-            allows_inheritance = slot_config.get(
-                "allows_inheritance", default_allows_inheritance
-            )
+            allows_inheritance = slot_config.get("allows_inheritance", default_allows_inheritance)
 
             # Apply mutual exclusivity: allow_merge takes highest precedence
             if has_allow_merge:
                 # allow_merge is explicitly set - use it and derive others
-                allows_inheritance = (
-                    allows_inheritance if allow_merge else allows_inheritance
-                )
+                allows_inheritance = allows_inheritance if allow_merge else allows_inheritance
                 allows_replacement_only = not allow_merge
             elif has_allows_replacement_only or has_requires_local:
                 # Old replacement-only field is set - use it and invert for merge
@@ -446,9 +433,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 "allows_replacement_only": allows_replacement_only,  # Backward compatibility
                 "requires_local": allows_replacement_only,  # Backward compatibility - deprecated
                 "merge_mode": allows_inheritance and allow_merge,
-                "inheritable_types": slot_info.get(
-                    "inheritable_types", []
-                ),  # Type-based inheritance
+                "inheritable_types": slot_info.get("inheritable_types", []),  # Type-based inheritance
                 "collapse_behavior": slot_config.get(
                     "collapse_behavior", "any"
                 ),  # Collapse behavior: "never", "any", "all"
@@ -534,21 +519,11 @@ class WebPageViewSet(viewsets.ModelViewSet):
                         "type": widget.type,
                         "config": widget.config,
                         "inherited_from": {
-                            "id": (
-                                depth_to_node[widget.depth].page_id
-                                if widget.depth in depth_to_node
-                                else None
-                            ),
+                            "id": (depth_to_node[widget.depth].page_id if widget.depth in depth_to_node else None),
                             "title": (
-                                depth_to_node[widget.depth].page.title
-                                if widget.depth in depth_to_node
-                                else None
+                                depth_to_node[widget.depth].page.title if widget.depth in depth_to_node else None
                             ),
-                            "slug": (
-                                depth_to_node[widget.depth].page.slug
-                                if widget.depth in depth_to_node
-                                else None
-                            ),
+                            "slug": (depth_to_node[widget.depth].page.slug if widget.depth in depth_to_node else None),
                         },
                         "is_inherited": True,
                         "can_override": widget.can_be_overridden,
@@ -581,9 +556,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         recursive = True
 
         if not page_ids:
-            return Response(
-                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Fetch pages
         pages = WebPage.objects.filter(id__in=page_ids, is_deleted=False)
@@ -634,9 +607,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         # Search functionality
         search = request.query_params.get("search", "").strip()
         if search:
-            queryset = queryset.filter(
-                models.Q(title__icontains=search) | models.Q(slug__icontains=search)
-            )
+            queryset = queryset.filter(models.Q(title__icontains=search) | models.Q(slug__icontains=search))
 
         # Ordering
         ordering = request.query_params.get("ordering", "-deleted_at")
@@ -670,17 +641,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
         page = self.get_object()
 
         if not page.is_deleted:
-            return Response(
-                {"error": "Page is not deleted"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Page is not deleted"}, status=status.HTTP_400_BAD_REQUEST)
 
         recursive = request.data.get("recursive", False)
         child_ids = request.data.get("child_ids", None)
 
         # Perform restore with new signature
-        result = page.restore(
-            user=request.user, recursive=recursive, child_ids=child_ids
-        )
+        result = page.restore(user=request.user, recursive=recursive, child_ids=child_ids)
 
         return Response(
             {
@@ -710,9 +677,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         recursive = request.data.get("recursive", False)
 
         if not page_ids:
-            return Response(
-                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Fetch deleted pages
         pages = WebPage.objects.filter(id__in=page_ids, is_deleted=True)
@@ -774,9 +739,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         if not page.is_deleted:
             return Response(
-                {
-                    "error": "Page is not soft-deleted. Only soft-deleted pages can be permanently deleted."
-                },
+                {"error": "Page is not soft-deleted. Only soft-deleted pages can be permanently deleted."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -821,9 +784,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         recursive = request.data.get("recursive", False)
 
         if not page_ids:
-            return Response(
-                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Fetch soft-deleted pages
         pages = WebPage.objects.filter(id__in=page_ids, is_deleted=True)
@@ -884,9 +845,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         if not confirm:
             return Response(
-                {
-                    "error": "confirm must be set to true to permanently delete all pages"
-                },
+                {"error": "confirm must be set to true to permanently delete all pages"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -931,30 +890,40 @@ class WebPageViewSet(viewsets.ModelViewSet):
         expiry_date = parse_datetime(expiry_value) if expiry_value else None
 
         if not effective_date:
-            return None, None, Response(
-                {"error": "effective_date is required"},
-                status=status.HTTP_400_BAD_REQUEST,
+            return (
+                None,
+                None,
+                Response(
+                    {"error": "effective_date is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                ),
             )
 
         if timezone.is_naive(effective_date):
-            effective_date = timezone.make_aware(
-                effective_date, timezone.get_current_timezone()
-            )
+            effective_date = timezone.make_aware(effective_date, timezone.get_current_timezone())
 
         if expiry_date and timezone.is_naive(expiry_date):
             expiry_date = timezone.make_aware(expiry_date, timezone.get_current_timezone())
 
         now = timezone.now()
         if effective_date <= now:
-            return None, None, Response(
-                {"error": "effective_date must be in the future"},
-                status=status.HTTP_400_BAD_REQUEST,
+            return (
+                None,
+                None,
+                Response(
+                    {"error": "effective_date must be in the future"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                ),
             )
 
         if expiry_date and expiry_date <= effective_date:
-            return None, None, Response(
-                {"error": "expiry_date must be after effective_date"},
-                status=status.HTTP_400_BAD_REQUEST,
+            return (
+                None,
+                None,
+                Response(
+                    {"error": "expiry_date must be after effective_date"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                ),
             )
 
         return effective_date, expiry_date, None
@@ -989,9 +958,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
     def bulk_schedule(self, request):
         page_ids = request.data.get("page_ids", [])
         if not page_ids:
-            return Response(
-                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         effective_date, expiry_date, error_response = self._parse_schedule_dates(request)
         if error_response:
@@ -1062,20 +1029,14 @@ class WebPageViewSet(viewsets.ModelViewSet):
         change_summary = request.data.get("change_summary", "Bulk publish operation")
 
         if not page_ids:
-            return Response(
-                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Use publishing service
         from ..publishing import PublishingService
 
         publishing_service = PublishingService(request.user)
-        accessible_page_ids = list(
-            self.get_queryset().filter(id__in=page_ids).values_list("id", flat=True)
-        )
-        published_count, errors = publishing_service.bulk_publish_pages(
-            accessible_page_ids, change_summary
-        )
+        accessible_page_ids = list(self.get_queryset().filter(id__in=page_ids).values_list("id", flat=True))
+        published_count, errors = publishing_service.bulk_publish_pages(accessible_page_ids, change_summary)
 
         response_data = {
             "message": f"Successfully published {published_count} page(s)",
@@ -1103,9 +1064,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         change_summary = request.data.get("change_summary", "Bulk unpublish operation")
 
         if not page_ids:
-            return Response(
-                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Fetch pages
         pages = WebPage.objects.filter(id__in=page_ids, is_deleted=False)
@@ -1171,9 +1130,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         # Find unique slug
         new_slug = base_slug
         counter = 1
-        while WebPage.objects.filter(
-            parent=page.parent, slug=new_slug, is_deleted=False
-        ).exists():
+        while WebPage.objects.filter(parent=page.parent, slug=new_slug, is_deleted=False).exists():
             new_slug = f"{base_slug}-{counter}"
             counter += 1
 
@@ -1193,7 +1150,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
             # Create version with copied data
             if latest_version:
-                new_version = PageVersion.objects.create(
+                PageVersion.objects.create(
                     page=new_page,
                     version_number=1,
                     created_by=request.user,
@@ -1216,14 +1173,12 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 )
             else:
                 # No version exists, create basic version
-                new_version = new_page.create_version(
-                    request.user, "Initial version (duplicated)"
-                )
+                new_page.create_version(request.user, "Initial version (duplicated)")
 
             # Shift sort orders of pages after this one
-            WebPage.objects.filter(
-                parent=page.parent, sort_order__gt=page.sort_order, is_deleted=False
-            ).update(sort_order=F("sort_order") + 1)
+            WebPage.objects.filter(parent=page.parent, sort_order__gt=page.sort_order, is_deleted=False).update(
+                sort_order=F("sort_order") + 1
+            )
 
             serializer = self.get_serializer(new_page)
             return Response(
@@ -1339,9 +1294,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
             }
 
             if new_published:
-                response_data[
-                    "message"
-                ] += f", restored version {new_published.version_number}"
+                response_data["message"] += f", restored version {new_published.version_number}"
                 response_data["restored_version_id"] = new_published.id
                 response_data["restored_version_number"] = new_published.version_number
             else:
@@ -1413,9 +1366,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         sort_order = request.data.get("sort_order", 0)
 
         if not page_ids:
-            return Response(
-                {"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get parent page if specified
         parent_page = None
@@ -1445,9 +1396,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 while ancestor:
                     if ancestor.id == page.id:
                         return Response(
-                            {
-                                "error": f"Cannot move page '{page.title}' into its own descendant"
-                            },
+                            {"error": f"Cannot move page '{page.title}' into its own descendant"},
                             status=status.HTTP_400_BAD_REQUEST,
                         )
                     ancestor = ancestor.parent
@@ -1535,25 +1484,10 @@ class WebPageViewSet(viewsets.ModelViewSet):
                     anchors.append(
                         {
                             "anchor": anchor,
-                            "title": config.get("anchor_title")
-                            or config.get("anchorTitle")
-                            or anchor,
+                            "title": config.get("anchor_title") or config.get("anchorTitle") or anchor,
                             "widgetType": widget_type,
                             "slotName": slot_name,
                         }
                     )
 
         return Response(anchors, status=status.HTTP_200_OK)
-
-    @action(detail=False, methods=["get"], url_path="deleted")
-    def list_deleted(self, request):
-        """Get list of soft-deleted pages"""
-        deleted_pages = self.get_queryset().filter(is_deleted=True)
-
-        page = self.paginate_queryset(deleted_pages)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(deleted_pages, many=True)
-        return Response(serializer.data)

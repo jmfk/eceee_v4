@@ -226,7 +226,7 @@ class PageVersionWorkflowService:
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
         version = PageVersion.objects.select_for_update().get(pk=version.pk)
         self.assert_canonical_editable(version)
-        if expected_updated_at and version.updated_at > expected_updated_at:
+        if expected_updated_at and version.updated_at != expected_updated_at:
             raise VersionConflictError(
                 "The reviewed working version has changed.",
                 details={"server_updated_at": version.updated_at.isoformat()},

@@ -201,6 +201,23 @@ class PageVersionWorkflowTest(TestCase):
         draft.refresh_from_db()
         self.assertEqual(draft.meta_title, "Other editor")
 
+    def test_future_timestamp_does_not_bypass_save_conflict(self):
+        draft = self.page.create_version(self.user, "Draft")
+        url = reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk})
+
+        response = self.client.patch(
+            url,
+            {
+                "clientUpdatedAt": (draft.updated_at + timedelta(days=1)).isoformat(),
+                "metaTitle": "Unreviewed overwrite",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        draft.refresh_from_db()
+        self.assertNotEqual(draft.meta_title, "Unreviewed overwrite")
+
     def test_page_attributes_change_only_when_working_copy_is_published(self):
         live = self.publish_initial()
         draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
@@ -405,6 +422,28 @@ class PageVersionWorkflowTest(TestCase):
         draft.refresh_from_db()
         self.assertIsNone(draft.effective_date)
 
+    def test_bulk_publish_rejects_a_future_review_timestamp(self):
+        draft = self.page.create_version(self.user, "Reviewed draft")
+
+        response = self.client.post(
+            reverse("api:pageversion-bulk-publish-explicit"),
+            {
+                "items": [
+                    {
+                        "pageId": self.page.id,
+                        "versionId": draft.id,
+                        "clientUpdatedAt": (draft.updated_at + timedelta(days=1)).isoformat(),
+                    }
+                ]
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_207_MULTI_STATUS)
+        self.assertEqual(response.data["results"][0]["error"], "version_conflict")
+        draft.refresh_from_db()
+        self.assertIsNone(draft.effective_date)
+
     def test_workflow_reports_legacy_conflicts(self):
         self.page.create_version(self.user, "Old draft")
         latest = self.page.create_version(self.user, "Working draft")
@@ -532,6 +571,31 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(workflow_response.status_code, status.HTTP_200_OK)
         self.assertEqual(pages_response.status_code, status.HTTP_200_OK)
         self.assertEqual(listed_page["workflow_state"], workflow_response.data["state"])
+
+    def test_not_published_filter_includes_a_new_draft_after_expiry(self):
+        from webpages.filters import WebPageFilter
+
+        live = self.publish_initial()
+        live.expiry_date = timezone.now() - timedelta(minutes=1)
+        live.save(update_fields=["expiry_date", "updated_at"])
+        self.page.create_version(self.user, "New draft after expiry")
+
+        filtered = WebPageFilter(
+            {"workflow_state": "not_published"},
+            queryset=WebPage.objects.filter(pk=self.page.pk),
+        ).qs
+        self.assertTrue(filtered.exists(), str(filtered.query))
+
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        response = self.client.get(reverse("api:webpage-list"), {"workflow_state": "not_published"})
+        pages = response.data.get("results", response.data)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        page_ids = [page["id"] for page in pages]
+        self.assertIn(self.page.id, page_ids, response.data)
+        listed_page = next(page for page in pages if page["id"] == self.page.id)
+        self.assertEqual(listed_page["workflow_state"], "not_published")
 
 
 class PageVersionMutationTransactionTest(TransactionTestCase):
