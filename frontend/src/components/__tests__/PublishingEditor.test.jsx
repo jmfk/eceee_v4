@@ -55,12 +55,12 @@ describe('PublishingEditor', () => {
     })
 
     it('saves dirty editor state before publishing the returned version', async () => {
-        const onSave = vi.fn().mockResolvedValue({ id: 12 })
+        const onSave = vi.fn().mockResolvedValue({ id: 12, updatedAt: '2030-01-01T10:05:00Z' })
         renderEditor({ isDirty: true, onSave })
 
         fireEvent.click(await screen.findByRole('button', { name: /publish changes/i }))
 
         await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
-        expect(versionsApi.publish).toHaveBeenCalledWith(12)
+        expect(versionsApi.publish).toHaveBeenCalledWith(12, '2030-01-01T10:05:00Z')
     })
 })

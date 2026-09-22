@@ -146,7 +146,11 @@ class PageVersionAPISimpleTest(APITestCase):
         new_draft = self.page.create_version(self.user, "New draft to publish")
         url = reverse("api:pageversion-publish", kwargs={"pk": new_draft.pk})
 
-        response = self.client.post(url)
+        response = self.client.post(
+            url,
+            {"clientUpdatedAt": new_draft.updated_at.isoformat()},
+            format="json",
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("message", response.data)
 

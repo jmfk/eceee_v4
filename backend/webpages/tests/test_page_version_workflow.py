@@ -248,7 +248,11 @@ class PageVersionWorkflowTest(TestCase):
         self.page.refresh_from_db()
         self.assertEqual(self.page.title, "Live title")
         self.assertEqual(self.page.slug, "workflow-page")
-        published = self.client.post(reverse("api:pageversion-publish", kwargs={"pk": draft.pk}), format="json")
+        published = self.client.post(
+            reverse("api:pageversion-publish", kwargs={"pk": draft.pk}),
+            {"clientUpdatedAt": draft.updated_at.isoformat()},
+            format="json",
+        )
         self.assertEqual(published.status_code, status.HTTP_200_OK)
         self.page.refresh_from_db()
         live.refresh_from_db()
@@ -264,10 +268,12 @@ class PageVersionWorkflowTest(TestCase):
 
         rejected = self.client.post(
             reverse("api:pageversion-publish", kwargs={"pk": older_draft.pk}),
+            {"clientUpdatedAt": older_draft.updated_at.isoformat()},
             format="json",
         )
         published = self.client.post(
             reverse("api:pageversion-publish", kwargs={"pk": working_draft.pk}),
+            {"clientUpdatedAt": working_draft.updated_at.isoformat()},
             format="json",
         )
 
@@ -277,6 +283,34 @@ class PageVersionWorkflowTest(TestCase):
         working_draft.refresh_from_db()
         self.assertIsNotNone(live.expiry_date)
         self.assertTrue(working_draft.is_current_published())
+
+    def test_publish_rejects_a_working_copy_changed_after_review(self):
+        draft = self.page.create_version(self.user, "Reviewed draft")
+        reviewed_at = draft.updated_at
+        draft.meta_title = "Changed after review"
+        draft.save(update_fields=["meta_title", "updated_at"])
+
+        response = self.client.post(
+            reverse("api:pageversion-publish", kwargs={"pk": draft.pk}),
+            {"clientUpdatedAt": reviewed_at.isoformat()},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["error"], "version_conflict")
+        draft.refresh_from_db()
+        self.assertIsNone(draft.effective_date)
+
+    def test_publish_requires_the_reviewed_timestamp(self):
+        draft = self.page.create_version(self.user, "Unreviewed draft")
+
+        response = self.client.post(
+            reverse("api:pageversion-publish", kwargs={"pk": draft.pk}),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "client_updated_at_required")
 
     def test_legacy_publishing_update_cannot_mutate_live_history(self):
         live = self.publish_initial()
@@ -315,7 +349,11 @@ class PageVersionWorkflowTest(TestCase):
 
         response = self.client.patch(
             reverse("api:pageversion-update-publishing", kwargs={"pk": draft.pk}),
-            {"effectiveDate": timezone.now().isoformat(), "expiryDate": None},
+            {
+                "effectiveDate": timezone.now().isoformat(),
+                "expiryDate": None,
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+            },
             format="json",
         )
 
@@ -326,12 +364,36 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(self.page.slug, "legacy-endpoint")
         self.assertIsNotNone(live.expiry_date)
 
+    def test_descendant_publish_rejects_a_root_changed_after_review(self):
+        draft = self.page.create_version(self.user, "Reviewed root")
+        reviewed_at = draft.updated_at
+        draft.meta_title = "Changed after review"
+        draft.save(update_fields=["meta_title", "updated_at"])
+
+        response = self.client.patch(
+            f'{reverse("api:pageversion-update-publishing", kwargs={"pk": draft.pk})}?include_subpages=true',
+            {
+                "effectiveDate": timezone.now().isoformat(),
+                "expiryDate": None,
+                "clientUpdatedAt": reviewed_at.isoformat(),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["error"], "version_conflict")
+        draft.refresh_from_db()
+        self.assertIsNone(draft.effective_date)
+
     def test_schedule_is_editable_and_second_schedule_is_rejected(self):
         draft = self.page.create_version(self.user, "Scheduled working copy")
         schedule_url = reverse("api:pageversion-schedule", kwargs={"pk": draft.pk})
         response = self.client.post(
             schedule_url,
-            {"effectiveDate": (timezone.now() + timedelta(days=1)).isoformat()},
+            {
+                "effectiveDate": (timezone.now() + timedelta(days=1)).isoformat(),
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+            },
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -359,11 +421,34 @@ class PageVersionWorkflowTest(TestCase):
         )
         response = self.client.post(
             reverse("api:pageversion-schedule", kwargs={"pk": legacy_schedule.pk}),
-            {"effectiveDate": (timezone.now() + timedelta(days=3)).isoformat()},
+            {
+                "effectiveDate": (timezone.now() + timedelta(days=3)).isoformat(),
+                "clientUpdatedAt": legacy_schedule.updated_at.isoformat(),
+            },
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(response.data["error"], "schedule_conflict")
+
+    def test_schedule_rejects_a_working_copy_changed_after_review(self):
+        draft = self.page.create_version(self.user, "Reviewed schedule")
+        reviewed_at = draft.updated_at
+        draft.meta_title = "Changed after review"
+        draft.save(update_fields=["meta_title", "updated_at"])
+
+        response = self.client.post(
+            reverse("api:pageversion-schedule", kwargs={"pk": draft.pk}),
+            {
+                "effectiveDate": (timezone.now() + timedelta(days=1)).isoformat(),
+                "clientUpdatedAt": reviewed_at.isoformat(),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["error"], "version_conflict")
+        draft.refresh_from_db()
+        self.assertIsNone(draft.effective_date)
 
     def test_restore_copies_history_into_working_copy_only(self):
         live = self.publish_initial()

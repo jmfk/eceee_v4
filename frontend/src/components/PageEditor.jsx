@@ -1599,12 +1599,11 @@ const PageEditor = () => {
 
     const handlePublishWorkingCopy = useCallback(async () => {
         try {
-            let targetId = workflow?.editableVersion?.id;
-            if (isDirty || !targetId) {
-                const saved = await handleSave();
-                targetId = saved?.id;
+            let targetVersion = workflow?.editableVersion;
+            if (isDirty || !targetVersion?.id) {
+                targetVersion = await handleSave();
             }
-            if (!targetId) return;
+            if (!targetVersion?.id) return;
             const confirmed = await showConfirm({
                 title: 'Publish changes',
                 message: 'Publish the saved working version now?',
@@ -1612,7 +1611,7 @@ const PageEditor = () => {
                 confirmButtonStyle: 'primary',
             });
             if (!confirmed) return;
-            await versionsApi.publish(targetId);
+            await versionsApi.publish(targetVersion.id, targetVersion.updatedAt);
             await refetchWorkflow();
             await queryClient.invalidateQueries({ queryKey: ['pageVersion', pageId] });
             await queryClient.invalidateQueries({ queryKey: ['pages'] });

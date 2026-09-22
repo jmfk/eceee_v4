@@ -102,7 +102,7 @@ const version = await versionsApi.create({
 })
 
 // 2. Then publish the version
-await versionsApi.publish(version.id)
+await versionsApi.publish(version.id, version.updatedAt)
 ```
 
 ### 3. Update Version Creation
@@ -132,7 +132,7 @@ const version = await versionsApi.create({
 
 // 3. Publish if needed
 if (shouldPublish) {
-    await versionsApi.publish(version.id)
+    await versionsApi.publish(version.id, version.updatedAt)
 }
 ```
 

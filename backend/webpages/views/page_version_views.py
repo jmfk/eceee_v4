@@ -62,6 +62,25 @@ class PageVersionViewSet(viewsets.ModelViewSet):
             ),
         )
 
+    @staticmethod
+    def _parse_required_client_updated_at(request):
+        client_updated_at = request.data.get("client_updated_at")
+        if not client_updated_at:
+            return None, Response(
+                {
+                    "error": "client_updated_at_required",
+                    "message": "clientUpdatedAt is required for reviewed publication actions.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        client_timestamp = parse_datetime(client_updated_at)
+        if client_timestamp is None:
+            return None, Response(
+                {"error": "invalid_timestamp", "message": "clientUpdatedAt is invalid."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return client_timestamp, None
+
     def get_queryset(self):
         """Enhanced queryset with special filtering for current and latest versions"""
         queryset = super().get_queryset()
@@ -182,8 +201,14 @@ class PageVersionViewSet(viewsets.ModelViewSet):
     def publish(self, request, pk=None):
         """Publish this exact canonical working version."""
         version = self.get_object()
+        client_timestamp, error_response = self._parse_required_client_updated_at(request)
+        if error_response:
+            return error_response
         try:
-            version = PageVersionWorkflowService(version.page, request.user).publish(version)
+            version = PageVersionWorkflowService(version.page, request.user).publish(
+                version,
+                expected_updated_at=client_timestamp,
+            )
             serializer = self.get_serializer(version)
             return Response(
                 {
@@ -278,6 +303,9 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         include_subpages = request.query_params.get("include_subpages", "false").lower() == "true"
         serializer = PublishingUpdateSerializer(version, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        client_timestamp, error_response = self._parse_required_client_updated_at(request)
+        if error_response:
+            return error_response
         effective_date = serializer.validated_data.get("effective_date", version.effective_date)
         expiry_date = serializer.validated_data.get("expiry_date", version.expiry_date)
         now = timezone.now()
@@ -292,11 +320,15 @@ class PageVersionViewSet(viewsets.ModelViewSet):
 
             user = request.user if request.user.is_authenticated else None
             service = PublishingService(user)
-            count, errors = service.publish_page_with_subpages(
-                version.page.id,
-                change_summary="Published with subpages via API",
-                root_version_id=version.id,
-            )
+            try:
+                count, errors = service.publish_page_with_subpages(
+                    version.page.id,
+                    change_summary="Published with subpages via API",
+                    root_version_id=version.id,
+                    root_expected_updated_at=client_timestamp,
+                )
+            except WorkflowError as error:
+                return self._workflow_error_response(error)
             version.refresh_from_db()
             full_serializer = PageVersionSerializer(version)
             response_data = full_serializer.data
@@ -314,9 +346,14 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                 if version.effective_date and version.effective_date > now:
                     version = service.cancel_schedule(version)
             elif effective_date <= now:
-                version = service.publish(version)
+                version = service.publish(version, expected_updated_at=client_timestamp)
             else:
-                version = service.schedule(version, effective_date, expiry_date)
+                version = service.schedule(
+                    version,
+                    effective_date,
+                    expiry_date,
+                    expected_updated_at=client_timestamp,
+                )
         except WorkflowError as error:
             return self._workflow_error_response(error)
 
@@ -392,6 +429,9 @@ class PageVersionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="schedule")
     def schedule(self, request, pk=None):
         version = self.get_object()
+        client_timestamp, error_response = self._parse_required_client_updated_at(request)
+        if error_response:
+            return error_response
         effective_date = parse_datetime(request.data.get("effective_date", ""))
         expiry_date = parse_datetime(request.data.get("expiry_date", "")) if request.data.get("expiry_date") else None
         if effective_date is None:
@@ -401,7 +441,10 @@ class PageVersionViewSet(viewsets.ModelViewSet):
             )
         try:
             scheduled = PageVersionWorkflowService(version.page, request.user).schedule(
-                version, effective_date, expiry_date
+                version,
+                effective_date,
+                expiry_date,
+                expected_updated_at=client_timestamp,
             )
             return Response(PageVersionSerializer(scheduled).data)
         except WorkflowError as error:

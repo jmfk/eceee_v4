@@ -27,10 +27,11 @@ export const versionsApi = {
         })
     }, 'versions.saveWorkingCopy'),
 
-    scheduleWorkingCopy: wrapApiCall(async (versionId, effectiveDate, expiryDate = null) => {
+    scheduleWorkingCopy: wrapApiCall(async (versionId, effectiveDate, expiryDate = null, clientUpdatedAt) => {
         return api.post(endpoints.versions.schedule(versionId), {
             effectiveDate,
             expiryDate,
+            clientUpdatedAt,
         })
     }, 'versions.scheduleWorkingCopy'),
 
@@ -122,10 +123,14 @@ export const versionsApi = {
      * Update publishing dates and settings
      * @param {number} versionId - Version ID
      * @param {Object} publishingData - Publishing data only
+     * @param {string} clientUpdatedAt - Timestamp of the reviewed working version
      * @returns {Promise<Object>} Updated version
      */
-    updatePublishing: wrapApiCall(async (versionId, publishingData) => {
-        return api.patch(`${endpoints.versions.detail(versionId)}/publishing/`, publishingData)
+    updatePublishing: wrapApiCall(async (versionId, publishingData, clientUpdatedAt) => {
+        return api.patch(`${endpoints.versions.detail(versionId)}/publishing/`, {
+            ...publishingData,
+            clientUpdatedAt,
+        })
     }, 'versions.updatePublishing'),
 
     /**
@@ -138,6 +143,7 @@ export const versionsApi = {
     smartSave: wrapApiCall(async (versionId, changes, originalVersion = null) => {
         const updatePromises = []
         let lastResult = null
+        const clientUpdatedAt = originalVersion?.updatedAt ?? originalVersion?.updated_at
 
         // Detect what components are being updated
         const hasWidgetChanges = 'widgets' in changes
@@ -177,7 +183,7 @@ export const versionsApi = {
                     publishing[field] = changes[field]
                 }
             })
-            return versionsApi.updatePublishing(versionId, publishing)
+            return versionsApi.updatePublishing(versionId, publishing, clientUpdatedAt)
         }
 
         // Multi-component updates - execute in parallel for better performance
@@ -218,7 +224,7 @@ export const versionsApi = {
                 }
             })
             updatePromises.push(
-                versionsApi.updatePublishing(versionId, publishing)
+                versionsApi.updatePublishing(versionId, publishing, clientUpdatedAt)
                     .then(result => { lastResult = result; return result })
             )
         }
@@ -245,10 +251,11 @@ export const versionsApi = {
     /**
      * Publish a version
      * @param {number} versionId - Version ID
+     * @param {string} clientUpdatedAt - Timestamp of the reviewed working version
      * @returns {Promise<Object>} Publish result
      */
-    publish: wrapApiCall(async (versionId) => {
-        return api.post(endpoints.versions.publish(versionId))
+    publish: wrapApiCall(async (versionId, clientUpdatedAt) => {
+        return api.post(endpoints.versions.publish(versionId), { clientUpdatedAt })
     }, 'versions.publish'),
 
     /**
@@ -349,21 +356,27 @@ export const versionsApi = {
      * Update version publishing dates
      * @param {number} versionId - Version ID
      * @param {Object} publishingData - { effective_date, expiry_date }
+     * @param {string} clientUpdatedAt - Timestamp of the reviewed working version
      * @returns {Promise<Object>} Updated version
      */
-    updateVersionPublishing: wrapApiCall(async (versionId, publishingData) => {
-        return api.patch(endpoints.versions.updatePublishing(versionId), publishingData)
+    updateVersionPublishing: wrapApiCall(async (versionId, publishingData, clientUpdatedAt) => {
+        return api.patch(endpoints.versions.updatePublishing(versionId), {
+            ...publishingData,
+            clientUpdatedAt,
+        })
     }, 'versions.updateVersionPublishing'),
 
     /**
      * Publish a version immediately
      * @param {number} versionId - Version ID
+     * @param {string} clientUpdatedAt - Timestamp of the reviewed working version
      * @returns {Promise<Object>} Published version
      */
-    publishVersionNow: wrapApiCall(async (versionId) => {
+    publishVersionNow: wrapApiCall(async (versionId, clientUpdatedAt) => {
         return api.patch(endpoints.versions.updatePublishing(versionId), {
             effective_date: new Date().toISOString(),
-            expiry_date: null
+            expiry_date: null,
+            clientUpdatedAt,
         })
     }, 'versions.publishVersionNow'),
 
@@ -371,25 +384,29 @@ export const versionsApi = {
      * Publish a version immediately with all subpages
      * @param {number} versionId - Version ID
      * @param {boolean} includeSubpages - Whether to include subpages (default: true)
+     * @param {string} clientUpdatedAt - Timestamp of the reviewed root version
      * @returns {Promise<Object>} Published version with subpage count
      */
-    publishVersionNowWithSubpages: wrapApiCall(async (versionId, includeSubpages = true) => {
+    publishVersionNowWithSubpages: wrapApiCall(async (versionId, includeSubpages = true, clientUpdatedAt) => {
         const url = `${endpoints.versions.updatePublishing(versionId)}?include_subpages=${includeSubpages}`
         return api.patch(url, {
             effective_date: new Date().toISOString(),
-            expiry_date: null
+            expiry_date: null,
+            clientUpdatedAt,
         })
     }, 'versions.publishVersionNowWithSubpages'),
 
     /**
      * Unpublish a version (clear dates)
      * @param {number} versionId - Version ID
+     * @param {string} clientUpdatedAt - Timestamp of the reviewed working version
      * @returns {Promise<Object>} Unpublished version
      */
-    unpublishVersion: wrapApiCall(async (versionId) => {
+    unpublishVersion: wrapApiCall(async (versionId, clientUpdatedAt) => {
         return api.patch(endpoints.versions.updatePublishing(versionId), {
             effective_date: null,
-            expiry_date: null
+            expiry_date: null,
+            clientUpdatedAt,
         })
     }, 'versions.unpublishVersion'),
 
@@ -398,12 +415,14 @@ export const versionsApi = {
      * @param {number} versionId - Version ID
      * @param {string} effectiveDate - ISO date string for when to publish
      * @param {string|null} expiryDate - Optional ISO date string for when to expire
+     * @param {string} clientUpdatedAt - Timestamp of the reviewed working version
      * @returns {Promise<Object>} Scheduled version
      */
-    scheduleVersion: wrapApiCall(async (versionId, effectiveDate, expiryDate = null) => {
+    scheduleVersion: wrapApiCall(async (versionId, effectiveDate, expiryDate = null, clientUpdatedAt) => {
         return api.patch(endpoints.versions.updatePublishing(versionId), {
             effective_date: effectiveDate,
-            expiry_date: expiryDate
+            expiry_date: expiryDate,
+            clientUpdatedAt,
         })
     }, 'versions.scheduleVersion'),
 
