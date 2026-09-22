@@ -69,7 +69,7 @@ await mediaCollectionsApi.list();
 await mediaCollectionsApi.create(data);
 await mediaTagsApi.getOrCreate(tagName);
 await pagesApi.get(pageId);
-await versionsApi.publish(versionId);
+await versionsApi.publish(versionId, reviewedUpdatedAt);
 ```
 
 ### 2. Raw API Client Methods

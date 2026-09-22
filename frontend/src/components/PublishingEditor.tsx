@@ -97,7 +97,7 @@ const PublishingEditor = ({ pageId, isDirty = false, onSave, onWorkflowChange }:
         setBusyAction('publish')
         try {
             const version = await workingVersion()
-            await versionsApi.publish(version.id)
+            await versionsApi.publish(version.id, version.updatedAt)
             addNotification('Changes published', 'success')
             await refresh()
         } catch (error: any) {
@@ -112,7 +112,12 @@ const PublishingEditor = ({ pageId, isDirty = false, onSave, onWorkflowChange }:
         setBusyAction('schedule')
         try {
             const version = await workingVersion()
-            await versionsApi.scheduleWorkingCopy(version.id, new Date(scheduleDate).toISOString())
+            await versionsApi.scheduleWorkingCopy(
+                version.id,
+                new Date(scheduleDate).toISOString(),
+                null,
+                version.updatedAt,
+            )
             addNotification('Working version scheduled', 'success')
             await refresh()
         } catch (error: any) {
@@ -165,7 +170,7 @@ const PublishingEditor = ({ pageId, isDirty = false, onSave, onWorkflowChange }:
         setBusyAction('descendants')
         try {
             const version = await workingVersion()
-            await versionsApi.publishVersionNowWithSubpages(version.id, true)
+            await versionsApi.publishVersionNowWithSubpages(version.id, true, version.updatedAt)
             addNotification('Page structure publishing finished. Review results and page states.', 'success')
             await refresh()
         } catch (error: any) {

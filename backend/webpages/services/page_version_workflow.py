@@ -260,10 +260,15 @@ class PageVersionWorkflowService:
         return summary
 
     @transaction.atomic
-    def schedule(self, version, effective_date, expiry_date=None):
+    def schedule(self, version, effective_date, expiry_date=None, *, expected_updated_at=None):
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
         version = PageVersion.objects.select_for_update().get(pk=version.pk)
         self.assert_canonical_editable(version)
+        if expected_updated_at and version.updated_at != expected_updated_at:
+            raise VersionConflictError(
+                "The reviewed working version has changed.",
+                details={"server_updated_at": version.updated_at.isoformat()},
+            )
         now = timezone.now()
         if effective_date <= now:
             raise WorkflowError("Scheduled publication must be in the future.")

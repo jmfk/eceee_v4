@@ -244,6 +244,7 @@ class PublishingService:
         page_id: int,
         change_summary: str = "Publish with subpages",
         root_version_id: Optional[int] = None,
+        root_expected_updated_at: Optional[timezone.datetime] = None,
     ) -> Tuple[int, List[str]]:
         """
         Publish a page and all its descendant pages recursively.
@@ -258,7 +259,7 @@ class PublishingService:
             Tuple of (count_published, error_messages)
         """
         from .models import PageVersion, WebPage
-        from .services.page_version_workflow import PageVersionWorkflowService
+        from .services.page_version_workflow import PageVersionWorkflowService, VersionConflictError
 
         try:
             page = WebPage.objects.get(id=page_id)
@@ -280,9 +281,14 @@ class PublishingService:
                     working_version = PageVersion.objects.get(pk=root_version_id, page=page_item)
                 else:
                     working_version, _ = workflow.get_or_create_working_copy()
-                workflow.publish(working_version)
+                workflow.publish(
+                    working_version,
+                    expected_updated_at=(root_expected_updated_at if page_item.id == page.id else None),
+                )
                 published_count += 1
 
+            except VersionConflictError:
+                raise
             except Exception as e:
                 error_msg = f"Failed to publish {page_item.title}: {str(e)}"
                 errors.append(error_msg)
