@@ -48,19 +48,6 @@ export const versionsApi = {
     }, 'versions.bulkPublishExplicit'),
 
     /**
-     * Create a new version
-     * @param {number} pageId - Page ID
-     * @param {Object} versionData - Version data
-     * @returns {Promise<Object>} Created version
-     */
-    create: wrapApiCall(async (pageId, versionData) => {
-        return api.post(endpoints.versions.list, {
-            page: pageId,
-            ...versionData
-        })
-    }, 'versions.create'),
-
-    /**
      * Get a specific version
      * @param {number} versionId - Version ID
      * @returns {Promise<Object>} Version data
@@ -450,7 +437,6 @@ export const versionsApi = {
 }
 
 // Legacy exports for backward compatibility
-export const createVersion = versionsApi.create
 export const getVersion = versionsApi.get
 export const updateVersion = versionsApi.update
 export const deleteVersion = versionsApi.delete

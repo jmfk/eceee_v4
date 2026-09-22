@@ -307,7 +307,7 @@ export function generateChangeSummary(changes) {
  * @param {Object} originalPageVersionData - Original page version data
  * @param {Object} currentPageVersionData - Current page version data
  * @param {Object} apis - API functions { pagesApi, versionsApi }
- * @param {Object} options - Save options (forceNewVersion, clientUpdatedAt, etc.)
+ * @param {Object} options - Save options (clientUpdatedAt, etc.)
  * @returns {Promise<Object>} Save result
  */
 export async function smartSave(originalWebpageData, currentWebpageData, originalPageVersionData, currentPageVersionData, apis, options = {}) {
@@ -320,19 +320,6 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
     const strategy = determineSaveStrategy(changes);
 
 
-
-    // Force strategy override if user explicitly requests new version
-    if (options.forceNewVersion) {
-        if (changes.hasPageChanges) {
-            strategy.strategy = 'both';
-            strategy.needsPageSave = true;
-            strategy.needsVersionSave = true;
-        } else {
-            strategy.strategy = 'version-only';
-            strategy.needsPageSave = false;
-            strategy.needsVersionSave = true;
-        }
-    }
 
     const results = {
         strategy: strategy.strategy,
@@ -358,11 +345,11 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
             // Prepare version data with meta fields properly nested in pageData
             const versionDataForSave = prepareVersionDataForSave(currentPageVersionData);
 
-            if (options.forceNewVersion) {
-                results.versionResult = await versionsApi.create(versionId, versionDataForSave);
-            } else {
-                results.versionResult = await versionsApi.update(versionId, versionDataForSave, updateOptions);
-            }
+            results.versionResult = await versionsApi.saveWorkingCopy(
+                versionId,
+                versionDataForSave,
+                updateOptions.clientUpdatedAt,
+            );
 
         } else if (strategy.strategy === 'both') {
 
@@ -372,11 +359,11 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
             // Prepare version data with meta fields properly nested in pageData
             const versionDataForSave = prepareVersionDataForSave(currentPageVersionData);
 
-            if (options.forceNewVersion) {
-                results.versionResult = await versionsApi.create(versionId, versionDataForSave);
-            } else {
-                results.versionResult = await versionsApi.update(versionId, versionDataForSave, updateOptions);
-            }
+            results.versionResult = await versionsApi.saveWorkingCopy(
+                versionId,
+                versionDataForSave,
+                updateOptions.clientUpdatedAt,
+            );
 
         } else {
             // No version changes to save
@@ -386,9 +373,13 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
 
     } catch (error) {
         // Check if this is a conflict error
-        if (error.response?.data?.error === 'conflict') {
-            console.log('🔀 Conflict detected:', error.response.data);
-            results.conflict = error.response.data;
+        const responseData = error.response?.data || error.originalError?.response?.data;
+        if (error.response?.status === 409 || error.originalError?.response?.status === 409) {
+            console.log('🔀 Conflict detected:', responseData);
+            results.conflict = {
+                ...responseData,
+                ...responseData?.details,
+            };
             return results;
         }
 

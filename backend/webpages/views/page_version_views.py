@@ -9,9 +9,8 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import permissions, status, viewsets
+from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
@@ -35,7 +34,13 @@ from ..services.page_version_workflow import (
 )
 
 
-class PageVersionViewSet(viewsets.ModelViewSet):
+class PageVersionViewSet(
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet,
+):
     """ViewSet for page versions with workflow support."""
 
     queryset = PageVersion.objects.select_related("page", "created_by").all()
@@ -153,30 +158,6 @@ class PageVersionViewSet(viewsets.ModelViewSet):
         elif self.action == "compare":
             return PageVersionComparisonSerializer
         return PageVersionSerializer
-
-    def perform_create(self, serializer):
-        # Auto-generate version number if not provided
-        if "version_number" not in serializer.validated_data or serializer.validated_data["version_number"] is None:
-            page = serializer.validated_data["page"]
-            with transaction.atomic():
-                # Get the latest version number with row-level locking to prevent race conditions
-                latest_version = page.versions.select_for_update().order_by("-version_number").first()
-                version_number = (latest_version.version_number + 1) if latest_version else 1
-                serializer.validated_data["version_number"] = version_number
-
-        # Ensure page_data has a default value if not provided
-        if "page_data" not in serializer.validated_data or serializer.validated_data["page_data"] is None:
-            serializer.validated_data["page_data"] = {}
-
-        # Ensure widgets has a default value if not provided
-        if "widgets" not in serializer.validated_data or serializer.validated_data["widgets"] is None:
-            serializer.validated_data["widgets"] = {}
-
-        page = serializer.validated_data.get("page")
-        if page and not self._page_queryset().filter(pk=page.pk).exists():
-            raise PermissionDenied("You do not have access to this page's tenant.")
-
-        serializer.save(created_by=self.request.user)
 
     @transaction.atomic
     def perform_update(self, serializer):
@@ -408,6 +389,7 @@ class PageVersionViewSet(viewsets.ModelViewSet):
                         details={
                             "server_updated_at": locked.updated_at.isoformat(),
                             "client_updated_at": client_updated_at,
+                            "server_version": PageVersionSerializer(locked).data,
                         },
                     )
                 payload = request.data.copy()

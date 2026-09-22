@@ -33,7 +33,7 @@ GET /api/v1/webpages/pages/{id}/versions/latest/           // Latest version
 GET /api/v1/webpages/pages/{id}/versions/{version_id}/     // Get specific version
 GET /api/v1/webpages/versions/{version_id}/                // Direct version access
 POST /api/v1/webpages/versions/{version_id}/publish/       // Publish version
-POST /api/v1/webpages/versions/                            // Create new version
+POST /api/v1/webpages/pages/{page_id}/working-copy/        // Get or create the working copy
 ```
 
 ## Frontend API Changes
@@ -94,20 +94,17 @@ The publishing workflow has changed:
 await pagesApi.publish(pageId)
 
 // NEW: Version-level publishing
-// 1. Create a version first
-const version = await versionsApi.create({
-    page: pageId,
-    version_title: "Ready for publish",
-    // ... other version data
-})
+// 1. Get the page's canonical working copy and save it
+const { version } = await versionsApi.getOrCreateWorkingCopy(pageId)
+const saved = await versionsApi.saveWorkingCopy(version.id, changes, version.updatedAt)
 
 // 2. Then publish the version
-await versionsApi.publish(version.id, version.updatedAt)
+await versionsApi.publish(saved.id, saved.updatedAt)
 ```
 
-### 3. Update Version Creation
+### 3. Update Working Copies
 
-Version creation is now explicit rather than automatic:
+Direct version creation has been removed. All edits use the page's canonical working copy:
 
 ```javascript
 // OLD: Automatic version creation on page update
@@ -117,37 +114,24 @@ await pagesApi.update(pageId, {
     version_description: "Updated title"
 })
 
-// NEW: Explicit version creation
-// 1. Update page metadata
-await pagesApi.update(pageId, {
-    title: "New Title"
-})
+// NEW: Get and save the canonical working copy
+const { version } = await versionsApi.getOrCreateWorkingCopy(pageId)
+const saved = await versionsApi.saveWorkingCopy(
+    version.id,
+    { pageData: { pageAttributes: { title: "New Title" } } },
+    version.updatedAt,
+)
 
-// 2. Create version with content explicitly
-const version = await versionsApi.create({
-    page: pageId,
-    version_title: "Updated title",
-    // ... content data
-})
-
-// 3. Publish if needed
+// 2. Publish if needed
 if (shouldPublish) {
-    await versionsApi.publish(version.id, version.updatedAt)
+    await versionsApi.publish(saved.id, saved.updatedAt)
 }
 ```
 
 ## Backward Compatibility
 
-- All old endpoints still work but emit deprecation warnings
-- Frontend API methods have been updated to use new endpoints internally
-- Existing component code should continue to work without changes
-- Deprecation warnings will be visible in browser console
-
-## Timeline
-
-- **Phase 1-3**: New endpoints available, old endpoints deprecated
-- **Phase 4-6**: Frontend migration and testing
-- **6 months**: Old endpoints will be removed (sunset date TBD)
+`POST /api/v1/webpages/versions/` now returns `405 Method Not Allowed`. Reload an
+open editor after deployment so it uses the working-copy workflow.
 
 ## Benefits
 
@@ -157,17 +141,15 @@ if (shouldPublish) {
 4. **Cleaner Code**: Reduced coupling and clearer responsibilities
 5. **Better Testing**: Each viewset can be tested in isolation
 
-## Breaking Changes (Future)
+## Breaking Changes
 
-When legacy endpoints are removed (6+ months), these changes will be breaking:
-
-1. Direct calls to deprecated endpoints will return 404
-2. Any hardcoded URLs in components will need updating
-3. Custom API clients outside our wrapper functions will need updating
+1. Direct version-creation requests now return `405 Method Not Allowed`.
+2. External clients must use `working-copy/` followed by the conflict-checked `save/` action.
+3. Editor tabs opened before the application-version monitor was deployed need one manual reload.
 
 ## Getting Help
 
-- Check the browser console for deprecation warnings
+- Check the API error response and the browser console
 - Refer to the new endpoint documentation in `endpoints.js`
 - Ask the development team for migration assistance
-- Test thoroughly using the new endpoints before legacy removal
+- Test creation, saving, and publishing through the working-copy endpoints
