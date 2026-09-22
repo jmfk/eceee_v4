@@ -1,13 +1,14 @@
-"""Read-only page diagnostics for staff users."""
+"""Read-only page diagnostics for superusers."""
 
 from urllib.parse import urlsplit, urlunsplit
 
-from django.db.models import Func, IntegerField
-from django.db.models.functions import Length, Substr
+from django.db.models import Func, IntegerField, TextField, Value
+from django.db.models.functions import Cast, Coalesce, Substr
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from djangorestframework_camel_case.render import CamelCaseJSONRenderer
 from rest_framework import status
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
@@ -21,12 +22,131 @@ MAX_EXPORT_LIMIT = 250
 VERSION_TITLE_SUMMARY_LENGTH = 500
 META_TITLE_SUMMARY_LENGTH = 500
 META_DESCRIPTION_SUMMARY_LENGTH = 1000
+MAX_EXPORT_PAYLOAD_BYTES = 5 * 1024 * 1024
+SUMMARY_TEXT_LIMITS = {
+    "version_title": VERSION_TITLE_SUMMARY_LENGTH,
+    "meta_title": META_TITLE_SUMMARY_LENGTH,
+    "meta_description": META_DESCRIPTION_SUMMARY_LENGTH,
+}
+PAGE_EXPORT_FIELDS = (
+    "id",
+    "tenant",
+    "parent",
+    "title",
+    "description",
+    "slug",
+    "sort_order",
+    "cached_path",
+    "hostnames",
+    "cached_root_id",
+    "cached_root_hostnames",
+    "path_pattern_key",
+    "is_currently_published",
+    "current_published_version",
+    "latest_version",
+    "cached_effective_date",
+    "cached_expiry_date",
+    "cache_updated_at",
+    "enable_css_injection",
+    "page_css_variables",
+    "page_custom_css",
+    "is_deleted",
+    "deleted_at",
+    "created_at",
+    "updated_at",
+    "created_by",
+    "created_by__id",
+    "created_by__username",
+    "last_modified_by",
+    "last_modified_by__id",
+    "last_modified_by__username",
+)
+VERSION_SUMMARY_FIELDS = (
+    "id",
+    "version_number",
+    "effective_date",
+    "expiry_date",
+    "created_at",
+    "updated_at",
+    "created_by",
+    "created_by__id",
+    "created_by__username",
+    "code_layout",
+    "theme",
+    "tags",
+    "enable_css_injection",
+)
+VERSION_DETAIL_FIELDS = VERSION_SUMMARY_FIELDS + (
+    "version_title",
+    "meta_title",
+    "meta_description",
+    "change_summary",
+    "page_data",
+    "widgets",
+    "page_css_variables",
+    "page_custom_css",
+)
+IMPORT_LOG_EXPORT_FIELDS = (
+    "id",
+    "source_url",
+    "slot_name",
+    "page_id",
+    "namespace",
+    "namespace__id",
+    "namespace__slug",
+    "mode",
+    "status",
+    "widgets_created",
+    "media_files_imported",
+    "stats",
+    "created_at",
+    "updated_at",
+    "completed_at",
+    "created_by",
+    "created_by__id",
+    "created_by__username",
+)
 
 
-class JsonArrayLength(Func):
+class OctetLength(Func):
+    function = "OCTET_LENGTH"
     output_field = IntegerField()
-    template = (
-        "CASE WHEN jsonb_typeof(%(expressions)s) = 'array' " "THEN jsonb_array_length(%(expressions)s) ELSE 0 END"
+
+
+class IsSuperUser(BasePermission):
+    message = "Only superusers can export page diagnostics."
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.is_superuser)
+
+
+class PageDebugJSONRenderer(CamelCaseJSONRenderer):
+    json_underscoreize = {
+        **CamelCaseJSONRenderer.json_underscoreize,
+        "ignore_fields": (
+            "change_summary",
+            "page_data",
+            "widgets",
+            "page_css_variables",
+            "stats",
+        ),
+    }
+
+
+def _stored_fields_size(*field_names):
+    total = Value(0, output_field=IntegerField())
+    for field_name in field_names:
+        total += Coalesce(OctetLength(Cast(field_name, TextField())), Value(0))
+    return total
+
+
+def _payload_too_large_response():
+    return Response(
+        {
+            "detail": "Debug export exceeds the maximum payload size.",
+            "max_bytes": MAX_EXPORT_PAYLOAD_BYTES,
+        },
+        status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
     )
 
 
@@ -88,11 +208,10 @@ def _widget_summary(widgets):
 
 def _summary_text(version, field_name):
     summary_name = f"{field_name}_summary"
-    length_name = f"{field_name}_length"
     if hasattr(version, summary_name):
         value = getattr(version, summary_name)
-        original_length = getattr(version, length_name)
-        return value, original_length > len(value)
+        limit = SUMMARY_TEXT_LIMITS[field_name]
+        return value[:limit], len(value) > limit
     return getattr(version, field_name), False
 
 
@@ -143,35 +262,48 @@ class PageDebugExportThrottle(UserRateThrottle):
 class PageDebugExportView(APIView):
     """Export page, version, and import diagnostics without modifying data."""
 
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsSuperUser]
     throttle_classes = [PageDebugExportThrottle]
+    renderer_classes = [PageDebugJSONRenderer]
+
+    def perform_content_negotiation(self, request, force=False):
+        renderer = self.get_renderers()[0]
+        return renderer, renderer.media_type
 
     def get(self, request, page_id):
-        page_queryset = WebPage.objects.select_related("created_by", "last_modified_by").filter(is_deleted=False)
+        page_queryset = WebPage.objects.filter(is_deleted=False)
         tenant = getattr(request, "tenant", None)
         if tenant:
             page_queryset = page_queryset.filter(tenant=tenant)
-        page = get_object_or_404(page_queryset, id=page_id)
+
+        page_size_probe = get_object_or_404(
+            page_queryset.annotate(
+                debug_payload_bytes=_stored_fields_size(
+                    "description",
+                    "hostnames",
+                    "cached_root_hostnames",
+                    "page_css_variables",
+                    "page_custom_css",
+                )
+            ).only("id"),
+            id=page_id,
+        )
+        estimated_payload_bytes = page_size_probe.debug_payload_bytes
+        if estimated_payload_bytes > MAX_EXPORT_PAYLOAD_BYTES:
+            return _payload_too_large_response()
+
+        page = get_object_or_404(
+            page_queryset.select_related("created_by", "last_modified_by").only(*PAGE_EXPORT_FIELDS),
+            id=page_id,
+        )
 
         versions = (
             page.versions.select_related("created_by")
-            .defer(
-                "change_summary",
-                "page_data",
-                "widgets",
-                "page_css_variables",
-                "page_custom_css",
-                "version_title",
-                "meta_title",
-                "meta_description",
-            )
+            .only(*VERSION_SUMMARY_FIELDS)
             .annotate(
-                version_title_summary=Substr("version_title", 1, VERSION_TITLE_SUMMARY_LENGTH),
-                version_title_length=Length("version_title"),
-                meta_title_summary=Substr("meta_title", 1, META_TITLE_SUMMARY_LENGTH),
-                meta_title_length=Length("meta_title"),
-                meta_description_summary=Substr("meta_description", 1, META_DESCRIPTION_SUMMARY_LENGTH),
-                meta_description_length=Length("meta_description"),
+                version_title_summary=Substr("version_title", 1, VERSION_TITLE_SUMMARY_LENGTH + 1),
+                meta_title_summary=Substr("meta_title", 1, META_TITLE_SUMMARY_LENGTH + 1),
+                meta_description_summary=Substr("meta_description", 1, META_DESCRIPTION_SUMMARY_LENGTH + 1),
             )
             .order_by("-version_number")
         )
@@ -188,26 +320,52 @@ class PageDebugExportView(APIView):
                     {"detail": "version_id must be an integer."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            selected_version_size_probe = get_object_or_404(
+                page.versions.annotate(
+                    debug_payload_bytes=_stored_fields_size(
+                        "version_title",
+                        "meta_title",
+                        "meta_description",
+                        "change_summary",
+                        "page_data",
+                        "widgets",
+                        "tags",
+                        "page_css_variables",
+                        "page_custom_css",
+                    )
+                ).only("id"),
+                id=selected_version_id,
+            )
+            estimated_payload_bytes += selected_version_size_probe.debug_payload_bytes
+            if estimated_payload_bytes > MAX_EXPORT_PAYLOAD_BYTES:
+                return _payload_too_large_response()
             selected_version = get_object_or_404(
-                page.versions.select_related("created_by"),
+                page.versions.select_related("created_by").only(*VERSION_DETAIL_FIELDS),
                 id=selected_version_id,
             )
 
         import_limit = _bounded_limit(request.query_params, "import_limit")
 
-        import_logs = (
-            ImportLog.objects.filter(
-                page_id=page.id,
-                namespace__tenant_id=page.tenant_id,
-            )
-            .select_related("created_by", "namespace")
-            .defer("html_content", "errors", "extracted_element_info")
-            .annotate(
-                error_count_value=JsonArrayLength("errors"),
-                html_content_length_value=Length("html_content"),
-            )
+        import_log_queryset = ImportLog.objects.filter(
+            page_id=page.id,
+            namespace__tenant_id=page.tenant_id,
         )
+        import_logs = import_log_queryset.select_related("created_by", "namespace").only(*IMPORT_LOG_EXPORT_FIELDS)
         import_log_count = import_logs.count()
+
+        version_tag_sizes = (
+            page.versions.annotate(debug_payload_bytes=_stored_fields_size("tags"))
+            .order_by("-version_number")
+            .values_list("debug_payload_bytes", flat=True)[:version_limit]
+        )
+        import_stats_sizes = (
+            import_log_queryset.annotate(debug_payload_bytes=_stored_fields_size("stats"))
+            .order_by("-created_at")
+            .values_list("debug_payload_bytes", flat=True)[:import_limit]
+        )
+        estimated_payload_bytes += sum(version_tag_sizes) + sum(import_stats_sizes)
+        if estimated_payload_bytes > MAX_EXPORT_PAYLOAD_BYTES:
+            return _payload_too_large_response()
 
         payload = {
             "schema_version": 2,
@@ -285,10 +443,7 @@ class PageDebugExportView(APIView):
                         "status": log.status,
                         "widgets_created": log.widgets_created,
                         "media_files_imported": log.media_files_imported,
-                        "error_count": log.error_count_value,
                         "stats": log.stats,
-                        "has_html_content": log.html_content_length_value > 0,
-                        "html_content_length": log.html_content_length_value,
                         "created_at": log.created_at,
                         "updated_at": log.updated_at,
                         "completed_at": log.completed_at,
@@ -298,6 +453,10 @@ class PageDebugExportView(APIView):
                 ],
             },
         }
+
+        rendered_payload = PageDebugJSONRenderer().render(payload)
+        if len(rendered_payload) > MAX_EXPORT_PAYLOAD_BYTES:
+            return _payload_too_large_response()
 
         response = Response(payload)
         response["Cache-Control"] = "no-store"
