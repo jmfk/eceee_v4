@@ -8,7 +8,8 @@ hierarchical filtering, date ranges, and publication status filtering.
 import django_filters
 from django.db.models import Q
 from django.utils import timezone
-from .models import WebPage, PageVersion, PageTheme
+
+from .models import PageTheme, PageVersion, WebPage
 
 
 class WebPageFilter(django_filters.FilterSet):
@@ -30,6 +31,7 @@ class WebPageFilter(django_filters.FilterSet):
     # Publication filters (date-based)
     is_published = django_filters.BooleanFilter(method="filter_is_published")
     active_on_date = django_filters.DateFilter(method="filter_active_on_date")
+    workflow_state = django_filters.CharFilter(method="filter_workflow_state")
 
     # Layout and theme filters (layout removed - now using code-based layouts)
     code_layout = django_filters.CharFilter(lookup_expr="icontains")
@@ -121,6 +123,57 @@ class WebPageFilter(django_filters.FilterSet):
         ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=value))
 
         return queryset.filter(Exists(active_version_exists))
+
+    def filter_workflow_state(self, queryset, name, value):
+        """Filter by the aggregate author-facing workflow state."""
+        from django.db.models import Exists, OuterRef
+
+        now = timezone.now()
+        live = PageVersion.objects.filter(page=OuterRef("pk"), effective_date__lte=now).filter(
+            Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
+        )
+        scheduled = PageVersion.objects.filter(page=OuterRef("pk"), effective_date__gt=now)
+        draft = PageVersion.objects.filter(page=OuterRef("pk"), effective_date__isnull=True)
+        expired = PageVersion.objects.filter(page=OuterRef("pk"), expiry_date__lte=now)
+        annotated = queryset.annotate(
+            _workflow_has_live=Exists(live),
+            _workflow_has_scheduled=Exists(scheduled),
+            _workflow_has_draft=Exists(draft),
+            _workflow_has_expired=Exists(expired),
+        )
+
+        filters = {
+            "live": {
+                "_workflow_has_live": True,
+                "_workflow_has_scheduled": False,
+                "_workflow_has_draft": False,
+            },
+            "live_with_unpublished_changes": {
+                "_workflow_has_live": True,
+                "_workflow_has_scheduled": False,
+                "_workflow_has_draft": True,
+            },
+            "live_with_scheduled_changes": {
+                "_workflow_has_live": True,
+                "_workflow_has_scheduled": True,
+            },
+            "scheduled": {
+                "_workflow_has_live": False,
+                "_workflow_has_scheduled": True,
+            },
+            "publication_ended": {
+                "_workflow_has_live": False,
+                "_workflow_has_scheduled": False,
+                "_workflow_has_draft": False,
+                "_workflow_has_expired": True,
+            },
+            "not_published": {
+                "_workflow_has_live": False,
+                "_workflow_has_scheduled": False,
+                "_workflow_has_expired": False,
+            },
+        }
+        return annotated.filter(**filters[value]) if value in filters else queryset
 
     def filter_has_meta_title(self, queryset, name, value):
         """Filter pages that have or don't have meta titles"""

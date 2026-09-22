@@ -10,7 +10,10 @@ Page-related serializers for the Web Page Publishing System
 """
 
 from typing import TYPE_CHECKING
+
+from django.utils import timezone
 from rest_framework import serializers
+
 from ..models import WebPage
 from .base import UserSerializer
 from .theme import PageThemeSerializer
@@ -61,6 +64,9 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
     scheduled_version_id = serializers.SerializerMethodField()
     scheduled_version_number = serializers.SerializerMethodField()
     scheduled_effective_date = serializers.SerializerMethodField()
+    workflow_state = serializers.SerializerMethodField()
+    editable_version_id = serializers.SerializerMethodField()
+    workflow_legacy_conflicts = serializers.SerializerMethodField()
 
     # Short title from page_data
     short_title = serializers.SerializerMethodField()
@@ -115,6 +121,9 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
             "scheduled_version_id",
             "scheduled_version_number",
             "scheduled_effective_date",
+            "workflow_state",
+            "editable_version_id",
+            "workflow_legacy_conflicts",
             # Short title
             "short_title",
         ]
@@ -447,6 +456,24 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
 
         return None
 
+    def _workflow(self, obj):
+        cache = self.context.setdefault("_page_workflow_cache", {})
+        if obj.id not in cache:
+            from ..services.page_version_workflow import workflow_payload
+
+            cache[obj.id] = workflow_payload(obj)
+        return cache[obj.id]
+
+    def get_workflow_state(self, obj):
+        return self._workflow(obj)["state"]
+
+    def get_editable_version_id(self, obj):
+        version = self._workflow(obj)["editable_version"]
+        return version["id"] if version else None
+
+    def get_workflow_legacy_conflicts(self, obj):
+        return self._workflow(obj)["legacy_conflicts"]
+
     # Scheduled version methods
     def get_scheduled_version_id(self, obj):
         """Get the ID of next scheduled version"""
@@ -576,6 +603,9 @@ class WebPageListSerializer(serializers.ModelSerializer):
     scheduled_version_id = serializers.SerializerMethodField()
     scheduled_version_number = serializers.SerializerMethodField()
     scheduled_effective_date = serializers.SerializerMethodField()
+    workflow_state = serializers.SerializerMethodField()
+    editable_version_id = serializers.SerializerMethodField()
+    workflow_legacy_conflicts = serializers.SerializerMethodField()
     short_title = serializers.SerializerMethodField()
     is_deleted = serializers.SerializerMethodField()
 
@@ -615,6 +645,9 @@ class WebPageListSerializer(serializers.ModelSerializer):
             "scheduled_version_id",
             "scheduled_version_number",
             "scheduled_effective_date",
+            "workflow_state",
+            "editable_version_id",
+            "workflow_legacy_conflicts",
             "short_title",
         ]
 
@@ -714,6 +747,39 @@ class WebPageListSerializer(serializers.ModelSerializer):
 
         short_title = version.page_data.get("shortTitle") or version.page_data.get("short_title")
         return short_title if isinstance(short_title, str) else None
+
+    def _workflow_parts(self, obj):
+        cache = self.context.setdefault("_page_workflow_list_cache", {})
+        if obj.id in cache:
+            return cache[obj.id]
+
+        from ..services.page_version_workflow import PageVersionWorkflowService
+
+        snapshot = PageVersionWorkflowService.snapshot_from_versions(
+            obj,
+            getattr(obj, "_all_versions_list", []),
+            now=timezone.now(),
+        )
+
+        cache[obj.id] = {
+            "state": snapshot.state,
+            "editable": snapshot.editable_version,
+            "legacy_conflicts": {
+                "older_draft_count": snapshot.legacy_draft_count,
+                "additional_scheduled_count": snapshot.additional_scheduled_count,
+            },
+        }
+        return cache[obj.id]
+
+    def get_workflow_state(self, obj):
+        return self._workflow_parts(obj)["state"]
+
+    def get_editable_version_id(self, obj):
+        editable = self._workflow_parts(obj)["editable"]
+        return editable.id if editable else None
+
+    def get_workflow_legacy_conflicts(self, obj):
+        return self._workflow_parts(obj)["legacy_conflicts"]
 
 
 class PageHierarchySerializer(serializers.ModelSerializer):

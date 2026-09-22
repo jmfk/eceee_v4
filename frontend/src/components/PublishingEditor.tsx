@@ -1,569 +1,213 @@
-
 import React, { useEffect, useState } from 'react'
-import { Calendar, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
-import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { AlertTriangle, Calendar, Clock, Globe, Radio, Upload } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { versionsApi } from '../api/versions'
+import { useNotificationContext } from './NotificationManager'
+import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
+import PageVersionHistoryPanel from './PageVersionHistoryPanel'
 
-// Publishing Editor Tab - Version Timeline & Publishing Management
-type PageVersionSummary = {
+type WorkflowVersion = {
     id: number
-    versionNumber: number
-    changeSummary?: string | { summaryText?: string;[key: string]: any }
-    createdAt: string
     effectiveDate?: string | null
-    expiryDate?: string | null
-    isPublished?: boolean
-    publicationStatus?: 'draft' | 'scheduled' | 'published' | 'expired'
+    updatedAt?: string
 }
 
-const PublishingEditor = ({ webpageData, pageVersionData, pageId, currentVersion, onVersionChange }) => {
-    const [versions, setVersions] = useState<PageVersionSummary[]>([])
-    const [isLoading, setIsLoading] = useState(true)
-    const { addNotification } = useGlobalNotifications()
+type Workflow = {
+    state: string
+    editableVersion?: WorkflowVersion | null
+    liveVersion?: WorkflowVersion | null
+    scheduledVersion?: WorkflowVersion | null
+    scheduledAt?: string | null
+    legacyConflicts?: {
+        olderDraftCount?: number
+        additionalScheduledCount?: number
+    }
+}
+
+const stateLabels: Record<string, string> = {
+    notPublished: 'Not published',
+    not_published: 'Not published',
+    live: 'Live',
+    liveWithUnpublishedChanges: 'Live · unpublished changes',
+    live_with_unpublished_changes: 'Live · unpublished changes',
+    scheduled: 'Scheduled',
+    liveWithScheduledChanges: 'Live · scheduled changes',
+    live_with_scheduled_changes: 'Live · scheduled changes',
+    publicationEnded: 'Publication ended',
+    publication_ended: 'Publication ended',
+}
+
+const PublishingEditor = ({ pageId, onWorkflowChange }: { pageId: number | string, onWorkflowChange?: () => Promise<unknown> }) => {
+    const [scheduleDate, setScheduleDate] = useState('')
+    const [busyAction, setBusyAction] = useState<string | null>(null)
+    const [advancedOpen, setAdvancedOpen] = useState(false)
     const queryClient = useQueryClient()
+    const { showConfirm } = useNotificationContext()
+    const { addNotification } = useGlobalNotifications()
+    const { data: workflow, refetch } = useQuery<Workflow>({
+        queryKey: ['pageWorkflow', pageId],
+        queryFn: () => versionsApi.getWorkflow(pageId),
+    })
 
-    // Schedule modal state
-    const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
-    const [selectedVersion, setSelectedVersion] = useState<PageVersionSummary | null>(null)
-    const [effectiveDate, setEffectiveDate] = useState('')
-    const [expiryDate, setExpiryDate] = useState('')
-
-    // Publish with subpages state
-    const [includeSubpagesMap, setIncludeSubpagesMap] = useState<Record<number, boolean>>({})
-    const [showConfirmPublishAll, setShowConfirmPublishAll] = useState(false)
-
-    // Load versions when component mounts
     useEffect(() => {
-        loadVersions()
-    }, [pageId])
-
-    const loadVersions = async () => {
-        if (!pageId) return
-        setIsLoading(true)
-        try {
-            const response = await versionsApi.getPageVersionsList(pageId)
-            setVersions(response.results || [])
-        } catch (error) {
-            console.error('Failed to load versions:', error)
-            addNotification('Failed to load versions', 'error')
-        } finally {
-            setIsLoading(false)
+        if (workflow?.scheduledAt) {
+            const date = new Date(workflow.scheduledAt)
+            const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+            setScheduleDate(local.toISOString().slice(0, 16))
         }
+    }, [workflow?.scheduledAt])
+
+    const refresh = async () => {
+        await refetch()
+        await onWorkflowChange?.()
+        await queryClient.invalidateQueries({ queryKey: ['pages'] })
     }
 
-    // Publishing mutations
-    const publishMutation = useMutation({
-        mutationFn: ({ versionId, includeSubpages }: { versionId: number, includeSubpages?: boolean }) => {
-            if (includeSubpages) {
-                return versionsApi.publishVersionNowWithSubpages(versionId, true)
-            }
-            return versionsApi.publishVersionNow(versionId)
-        },
-        onSuccess: (data) => {
-            // Check if we got subpage publishing results
-            if (data.subpagesPublishedCount !== undefined) {
-                const totalCount = data.totalPublishedCount || 0
-                const subpageCount = data.subpagesPublishedCount || 0
-                if (subpageCount > 0) {
-                    addNotification(
-                        `Page and ${subpageCount} subpage${subpageCount !== 1 ? 's' : ''} published successfully (${totalCount} total)`,
-                        'success'
-                    )
-                } else {
-                    addNotification('Page published successfully (no subpages found)', 'success')
-                }
-            } else {
-                addNotification('Version published successfully', 'success')
-            }
-            loadVersions()
-            // Invalidate to update the current version if needed
-            queryClient.invalidateQueries({ queryKey: ['pageVersion', pageId] })
-        },
-        onError: (error) => {
-            console.error('Failed to publish version:', error)
-            addNotification('Failed to publish version', 'error')
-        }
-    })
-
-    const unpublishMutation = useMutation({
-        mutationFn: (versionId: number) => versionsApi.unpublishVersion(versionId),
-        onSuccess: () => {
-            addNotification('Version unpublished successfully', 'success')
-            loadVersions()
-            // Don't invalidate the pageVersion query to prevent switching to a different version
-            // The user is likely still editing the version they just unpublished
-            // queryClient.invalidateQueries({ queryKey: ['pageVersion', pageId] })
-        },
-        onError: (error) => {
-            console.error('Failed to unpublish version:', error)
-            addNotification('Failed to unpublish version', 'error')
-        }
-    })
-
-    const scheduleMutation = useMutation({
-        mutationFn: ({ versionId, effectiveDate, expiryDate }: { versionId: number, effectiveDate: string, expiryDate?: string | null }) =>
-            versionsApi.scheduleVersion(versionId, effectiveDate, expiryDate),
-        onSuccess: () => {
-            addNotification('Version scheduled successfully', 'success')
-            setScheduleModalOpen(false)
-            loadVersions()
-            // Invalidate to update the current version if the schedule makes this version current
-            queryClient.invalidateQueries({ queryKey: ['pageVersion', pageId] })
-        },
-        onError: (error) => {
-            console.error('Failed to schedule version:', error)
-            addNotification('Failed to schedule version', 'error')
-        }
-    })
-
-    // Handler functions
-    const handlePublishNow = (version: PageVersionSummary) => {
-        const includeSubpages = includeSubpagesMap[version.id] || false
-        publishMutation.mutate({ versionId: version.id, includeSubpages })
+    const workingVersion = async () => {
+        if (workflow?.editableVersion) return workflow.editableVersion
+        const result = await versionsApi.getOrCreateWorkingCopy(pageId)
+        return result.version
     }
 
-    const handlePublishAllNow = () => {
-        // Get the latest version
-        const latestVersion = versions[0]
-        if (latestVersion) {
-            publishMutation.mutate({ versionId: latestVersion.id, includeSubpages: true })
-            setShowConfirmPublishAll(false)
-        }
-    }
-
-    const toggleIncludeSubpages = (versionId: number) => {
-        setIncludeSubpagesMap(prev => ({
-            ...prev,
-            [versionId]: !prev[versionId]
-        }))
-    }
-
-    const handleUnpublish = (version: PageVersionSummary) => {
-        unpublishMutation.mutate(version.id)
-    }
-
-    const handleSchedule = (version: PageVersionSummary) => {
-        setSelectedVersion(version)
-        setEffectiveDate(version.effectiveDate || '')
-        setExpiryDate(version.expiryDate || '')
-        setScheduleModalOpen(true)
-    }
-
-    const handleScheduleSubmit = () => {
-        if (!selectedVersion || !effectiveDate) return
-        scheduleMutation.mutate({
-            versionId: selectedVersion.id,
-            effectiveDate,
-            expiryDate: expiryDate || null
+    const publish = async () => {
+        const version = await workingVersion()
+        const confirmed = await showConfirm({
+            title: 'Publish changes',
+            message: 'Publish this saved working version now?',
+            confirmText: 'Publish changes',
+            confirmButtonStyle: 'primary',
         })
-    }
-
-    const getStatusInfo = (version: PageVersionSummary) => {
-        const status = version.publicationStatus || 'draft'
-        const isCurrentPublished = currentVersion?.id === version.id && status === 'published'
-
-        const statusConfig = {
-            draft: { label: 'Draft', color: 'bg-gray-100 text-gray-800', icon: AlertCircle },
-            scheduled: { label: 'Scheduled', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-            published: { label: isCurrentPublished ? 'Current' : 'Published', color: isCurrentPublished ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800', icon: CheckCircle },
-            expired: { label: 'Expired', color: 'bg-red-100 text-red-800', icon: XCircle }
+        if (!confirmed) return
+        setBusyAction('publish')
+        try {
+            await versionsApi.publish(version.id)
+            addNotification('Changes published', 'success')
+            await refresh()
+        } finally {
+            setBusyAction(null)
         }
-
-        return statusConfig[status] || statusConfig.draft
     }
 
-    if (isLoading) {
-        return (
-            <div className="h-full flex items-center justify-center bg-gray-50">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                    <div className="text-gray-600">Loading versions...</div>
-                </div>
-            </div>
-        )
+    const schedule = async () => {
+        if (!scheduleDate) return
+        setBusyAction('schedule')
+        try {
+            const version = await workingVersion()
+            await versionsApi.scheduleWorkingCopy(version.id, new Date(scheduleDate).toISOString())
+            addNotification('Working version scheduled', 'success')
+            await refresh()
+        } catch (error: any) {
+            addNotification(error.message || 'Scheduling failed', 'error')
+        } finally {
+            setBusyAction(null)
+        }
+    }
+
+    const cancelSchedule = async () => {
+        if (!workflow?.editableVersion) return
+        setBusyAction('cancel')
+        try {
+            await versionsApi.cancelWorkingCopySchedule(workflow.editableVersion.id)
+            setScheduleDate('')
+            addNotification('Schedule cancelled; the content is a working version again', 'success')
+            await refresh()
+        } finally {
+            setBusyAction(null)
+        }
+    }
+
+    const unpublish = async () => {
+        if (!workflow?.liveVersion) return
+        const confirmed = await showConfirm({
+            title: 'Unpublish page',
+            message: 'Take this page offline? Content and history will be kept.',
+            confirmText: 'Unpublish',
+            confirmButtonStyle: 'danger',
+        })
+        if (!confirmed) return
+        setBusyAction('unpublish')
+        try {
+            await versionsApi.unpublishExplicit(pageId, workflow.liveVersion.id)
+            addNotification('Page unpublished; history was kept', 'success')
+            await refresh()
+        } finally {
+            setBusyAction(null)
+        }
+    }
+
+    const publishDescendants = async () => {
+        const version = await workingVersion()
+        const confirmed = await showConfirm({
+            title: 'Publish page and subpages',
+            message: 'This legacy operation is not atomic. It publishes each page independently using its latest eligible version, and partial completion is possible.',
+            confirmText: 'Publish non-atomically',
+            confirmButtonStyle: 'danger',
+        })
+        if (!confirmed) return
+        setBusyAction('descendants')
+        try {
+            await versionsApi.publishVersionNowWithSubpages(version.id, true)
+            addNotification('Page structure publishing finished. Review results and page states.', 'success')
+            await refresh()
+        } finally {
+            setBusyAction(null)
+        }
     }
 
     return (
-        <>
-            <div className="h-full p-6 overflow-y-auto">
-                <div className="max-w-4xl mx-auto space-y-6">
-                    {/* Header */}
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                                <div className="text-lg font-semibold text-gray-900 mb-2" role="heading" aria-level="2">Version Timeline & Publishing</div>
-                                <div className="text-gray-600">
-                                    Manage page versions, scheduling, and publishing workflow
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => setShowConfirmPublishAll(true)}
-                                className="ml-4 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors flex items-center space-x-2 whitespace-nowrap"
-                                disabled={versions.length === 0}
-                            >
-                                <CheckCircle className="w-4 h-4" />
-                                <span>Publish Page + All Subpages</span>
-                            </button>
+        <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-6">
+            <section className="rounded-lg border border-gray-200 bg-white p-5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                            <Radio className="h-5 w-5 text-blue-600" /> Publishing
                         </div>
-
-                        {/* Cached Publication Status */}
-                        {webpageData && (
-                            <div className="mt-4 pt-4 border-t border-gray-200">
-                                <div className="text-sm font-semibold text-gray-700 mb-3" role="heading" aria-level="3">Current Publication Status (Cached)</div>
-                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                        <span className="text-gray-600">Status:</span>
-                                        <span className={`ml-2 font-medium ${webpageData.isCurrentlyPublished
-                                                ? 'text-green-600'
-                                                : 'text-gray-500'
-                                            }`}>
-                                            {webpageData.isCurrentlyPublished ? '✓ Published' : '○ Not Published'}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span className="text-gray-600">Cached Path:</span>
-                                        <span className="ml-2 font-mono text-xs text-gray-700">
-                                            {webpageData.cachedPath || '/'}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span className="text-gray-600">Root Page ID:</span>
-                                        <span className="ml-2 text-gray-700">
-                                            {webpageData.cachedRootId || 'N/A'}
-                                        </span>
-                                    </div>
-                                    {webpageData.cachedRootHostnames && webpageData.cachedRootHostnames.length > 0 && (
-                                        <div className="col-span-2">
-                                            <span className="text-gray-600">Root Hostnames:</span>
-                                            <span className="ml-2 text-gray-700">
-                                                {webpageData.cachedRootHostnames.join(', ')}
-                                            </span>
-                                        </div>
-                                    )}
-                                    <div>
-                                        <span className="text-gray-600">Current Version:</span>
-                                        <span className="ml-2 text-gray-700">
-                                            {webpageData.currentPublishedVersion
-                                                ? `v${webpageData.publishedVersionNumber || '?'}`
-                                                : 'None'}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span className="text-gray-600">Latest Version:</span>
-                                        <span className="ml-2 text-gray-700">
-                                            {webpageData.latestVersion
-                                                ? `v${webpageData.latestVersionNumber || '?'}`
-                                                : 'None'}
-                                        </span>
-                                    </div>
-                                    {webpageData.cachedEffectiveDate && (
-                                        <div>
-                                            <span className="text-gray-600">Effective:</span>
-                                            <span className="ml-2 text-gray-700">
-                                                {new Date(webpageData.cachedEffectiveDate).toLocaleString()}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {webpageData.cachedExpiryDate && (
-                                        <div>
-                                            <span className="text-gray-600">Expires:</span>
-                                            <span className="ml-2 text-gray-700">
-                                                {new Date(webpageData.cachedExpiryDate).toLocaleString()}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {webpageData.cacheUpdatedAt && (
-                                        <div className="col-span-2 text-xs text-gray-500">
-                                            Cache updated: {new Date(webpageData.cacheUpdatedAt).toLocaleString()}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                        <p className="mt-1 text-sm text-gray-600">Current state: <span className="font-medium text-gray-900">{stateLabels[workflow?.state || ''] || 'Not published'}</span></p>
+                        {workflow?.scheduledAt && <p className="mt-1 text-sm text-blue-700">Scheduled for {new Date(workflow.scheduledAt).toLocaleString()}</p>}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {workflow?.editableVersion && (
+                            <button type="button" onClick={publish} disabled={Boolean(busyAction)} className="flex items-center gap-1.5 rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50">
+                                <Upload className="h-4 w-4" /> Publish changes
+                            </button>
+                        )}
+                        {workflow?.liveVersion && (
+                            <button type="button" onClick={unpublish} disabled={Boolean(busyAction)} className="flex items-center gap-1.5 rounded border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">
+                                <Globe className="h-4 w-4" /> Unpublish
+                            </button>
                         )}
                     </div>
-
-                    {/* Version List */}
-                    <div className="bg-white rounded-lg shadow">
-                        <div className="p-6">
-                            <div className="text-md font-semibold text-gray-900 mb-4" role="heading" aria-level="3">Page Versions</div>
-
-                            {versions.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                                    <div>No versions found for this page</div>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {versions.map((version) => {
-                                        const statusInfo = getStatusInfo(version)
-                                        const StatusIcon = statusInfo.icon
-                                        const status = version.publicationStatus || 'draft'
-
-                                        return (
-                                            <div
-                                                key={version.id}
-                                                className="border rounded-lg p-4 bg-white hover:shadow-md transition-shadow"
-                                            >
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center space-x-2 mb-2">
-                                                            <span className="font-medium text-gray-900">
-                                                                Version {version.versionNumber}
-                                                            </span>
-                                                            <span className={`px-2 py-1 text-xs rounded-full flex items-center space-x-1 ${statusInfo.color}`}>
-                                                                <StatusIcon className="w-3 h-3" />
-                                                                <span>{statusInfo.label}</span>
-                                                            </span>
-                                                        </div>
-
-                                                        <div className="text-sm text-gray-600 mb-2">
-                                                            {typeof version.changeSummary === 'string'
-                                                                ? version.changeSummary
-                                                                : version.changeSummary?.summaryText || 'No description'}
-                                                        </div>
-
-                                                        <div className="space-y-1 text-xs text-gray-500">
-                                                            <div>Created: {new Date(version.createdAt).toLocaleString()}</div>
-                                                            {version.effectiveDate && (
-                                                                <div>Effective: {new Date(version.effectiveDate).toLocaleString()}</div>
-                                                            )}
-                                                            {version.expiryDate && (
-                                                                <div>Expires: {new Date(version.expiryDate).toLocaleString()}</div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex flex-col space-y-2 ml-4">
-                                                        {status === 'draft' && (
-                                                            <>
-                                                                <div className="flex flex-col space-y-1">
-                                                                    <button
-                                                                        onClick={() => handlePublishNow(version)}
-                                                                        className="px-3 py-1 text-sm bg-green-600 text-white hover:bg-green-700 rounded transition-colors whitespace-nowrap"
-                                                                    >
-                                                                        Publish Now
-                                                                    </button>
-                                                                    <label className="flex items-center space-x-1 text-xs text-gray-600 cursor-pointer">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={includeSubpagesMap[version.id] || false}
-                                                                            onChange={() => toggleIncludeSubpages(version.id)}
-                                                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                                        />
-                                                                        <span>Include subpages</span>
-                                                                    </label>
-                                                                </div>
-                                                                <button
-                                                                    onClick={() => handleSchedule(version)}
-                                                                    className="px-3 py-1 text-sm bg-yellow-600 text-white hover:bg-yellow-700 rounded transition-colors whitespace-nowrap"
-                                                                >
-                                                                    Schedule
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                        {status === 'scheduled' && (
-                                                            <>
-                                                                <div className="flex flex-col space-y-1">
-                                                                    <button
-                                                                        onClick={() => handlePublishNow(version)}
-                                                                        className="px-3 py-1 text-sm bg-green-600 text-white hover:bg-green-700 rounded transition-colors whitespace-nowrap"
-                                                                    >
-                                                                        Publish Now
-                                                                    </button>
-                                                                    <label className="flex items-center space-x-1 text-xs text-gray-600 cursor-pointer">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={includeSubpagesMap[version.id] || false}
-                                                                            onChange={() => toggleIncludeSubpages(version.id)}
-                                                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                                        />
-                                                                        <span>Include subpages</span>
-                                                                    </label>
-                                                                </div>
-                                                                <button
-                                                                    onClick={() => handleSchedule(version)}
-                                                                    className="px-3 py-1 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded transition-colors whitespace-nowrap"
-                                                                >
-                                                                    Edit Schedule
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleUnpublish(version)}
-                                                                    className="px-3 py-1 text-sm bg-gray-600 text-white hover:bg-gray-700 rounded transition-colors whitespace-nowrap"
-                                                                >
-                                                                    Unpublish
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                        {status === 'published' && (
-                                                            <>
-                                                                <button
-                                                                    onClick={() => handleSchedule(version)}
-                                                                    className="px-3 py-1 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded transition-colors whitespace-nowrap"
-                                                                >
-                                                                    Set Expiry
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleUnpublish(version)}
-                                                                    className="px-3 py-1 text-sm bg-gray-600 text-white hover:bg-gray-700 rounded transition-colors whitespace-nowrap"
-                                                                >
-                                                                    Unpublish
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                        {status === 'expired' && (
-                                                            <div className="flex flex-col space-y-1">
-                                                                <button
-                                                                    onClick={() => handlePublishNow(version)}
-                                                                    className="px-3 py-1 text-sm bg-green-600 text-white hover:bg-green-700 rounded transition-colors whitespace-nowrap"
-                                                                >
-                                                                    Re-publish
-                                                                </button>
-                                                                <label className="flex items-center space-x-1 text-xs text-gray-600 cursor-pointer">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={includeSubpagesMap[version.id] || false}
-                                                                        onChange={() => toggleIncludeSubpages(version.id)}
-                                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                                    />
-                                                                    <span>Include subpages</span>
-                                                                </label>
-                                                            </div>
-                                                        )}
-                                                        <button
-                                                            onClick={() => onVersionChange(version.id)}
-                                                            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors whitespace-nowrap"
-                                                        >
-                                                            Switch to
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
                 </div>
-            </div>
 
-            {/* Schedule Modal */}
-            {scheduleModalOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-                        <div className="px-6 py-4 border-b border-gray-200">
-                            <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Schedule Version</div>
-                            <div className="text-sm text-gray-500 mt-1">
-                                Version {selectedVersion?.versionNumber}
-                            </div>
-                        </div>
-
-                        <div className="px-6 py-4 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Effective Date <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="datetime-local"
-                                    value={effectiveDate ? new Date(effectiveDate).toISOString().slice(0, 16) : ''}
-                                    onChange={(e) => setEffectiveDate(e.target.value ? new Date(e.target.value).toISOString() : '')}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    required
-                                />
-                                <div className="mt-1 text-xs text-gray-500">
-                                    When this version should become live
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Expiry Date (Optional)
-                                </label>
-                                <input
-                                    type="datetime-local"
-                                    value={expiryDate ? new Date(expiryDate).toISOString().slice(0, 16) : ''}
-                                    onChange={(e) => setExpiryDate(e.target.value ? new Date(e.target.value).toISOString() : '')}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <div className="mt-1 text-xs text-gray-500">
-                                    When this version should stop being live
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-                            <button
-                                type="button"
-                                onClick={() => setScheduleModalOpen(false)}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleScheduleSubmit}
-                                disabled={!effectiveDate || scheduleMutation.isPending}
-                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {scheduleMutation.isPending ? 'Saving...' : 'Save Schedule'}
-                            </button>
-                        </div>
+                <div className="mt-5 rounded border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex items-center gap-2 font-medium text-gray-900"><Calendar className="h-4 w-4" /> Schedule working version</div>
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                        <input type="datetime-local" value={scheduleDate} onChange={event => setScheduleDate(event.target.value)} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
+                        <button type="button" onClick={schedule} disabled={!scheduleDate || Boolean(busyAction)} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                            {workflow?.scheduledVersion ? 'Update schedule' : 'Schedule'}
+                        </button>
+                        {workflow?.scheduledVersion && <button type="button" onClick={cancelSchedule} disabled={Boolean(busyAction)} className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">Cancel schedule</button>}
                     </div>
+                    <p className="mt-2 flex items-center gap-1 text-xs text-gray-500"><Clock className="h-3.5 w-3.5" /> Scheduled content remains editable until it goes live.</p>
                 </div>
-            )}
+            </section>
 
-            {/* Confirm Publish All Modal */}
-            {showConfirmPublishAll && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-                        <div className="px-6 py-4 border-b border-gray-200">
-                            <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Publish Page + All Subpages</div>
-                            <div className="text-sm text-gray-500 mt-1">
-                                {webpageData?.title || 'Current Page'}
-                            </div>
-                        </div>
+            <PageVersionHistoryPanel pageId={pageId} workflow={workflow} onRestored={refresh} />
 
-                        <div className="px-6 py-4">
-                            <div className="flex items-start space-x-3">
-                                <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-                                <div>
-                                    <div className="text-sm text-gray-700">
-                                        This will publish the latest version of this page and <span className="font-bold">all of its subpages</span> immediately.
-                                    </div>
-                                    <div className="text-sm text-gray-500 mt-2">
-                                        Are you sure you want to continue?
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-                            <button
-                                type="button"
-                                onClick={() => setShowConfirmPublishAll(false)}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handlePublishAllNow}
-                                disabled={publishMutation.isPending}
-                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {publishMutation.isPending ? 'Publishing...' : 'Publish All'}
-                            </button>
-                        </div>
+            <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <button type="button" onClick={() => setAdvancedOpen(value => !value)} className="flex w-full items-center justify-between text-left font-medium text-amber-950">
+                    <span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Advanced structure publishing</span>
+                    <span>{advancedOpen ? 'Hide' : 'Show'}</span>
+                </button>
+                {advancedOpen && (
+                    <div className="mt-3 border-t border-amber-200 pt-3 text-sm text-amber-950">
+                        <p>This is not a release packet and is not atomic. Each page may succeed or fail independently.</p>
+                        <button type="button" onClick={publishDescendants} disabled={Boolean(busyAction)} className="mt-3 rounded border border-amber-400 bg-white px-3 py-2 font-medium hover:bg-amber-100 disabled:opacity-50">Publish page and subpages</button>
                     </div>
-                </div>
-            )}
-        </>
+                )}
+            </section>
+        </div>
     )
 }
 
-// Add display name for debugging
-PublishingEditor.displayName = 'PublishingEditor';
-
 export default PublishingEditor
-

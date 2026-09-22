@@ -170,6 +170,21 @@ urlpatterns = [
         ),
         name="page-version-detail",
     ),
+    path(
+        "pages/<int:page_id>/workflow/",
+        PageVersionViewSet.as_view({"get": "workflow"}),
+        name="page-version-workflow",
+    ),
+    path(
+        "pages/<int:page_id>/working-copy/",
+        PageVersionViewSet.as_view({"post": "working_copy"}),
+        name="page-working-copy",
+    ),
+    path(
+        "pages/<int:page_id>/unpublish-explicit/",
+        PageVersionViewSet.as_view({"post": "unpublish_page"}),
+        name="page-unpublish-explicit",
+    ),
     # Backend rendering endpoints
     path("pages/<int:page_id>/render/", render_page_backend, name="page-render"),
     path(

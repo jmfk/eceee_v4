@@ -34,8 +34,6 @@ import LayoutEditor from '../components/LayoutEditor'
 import ThemeEditor from '../components/ThemeEditor'
 import StatusBar from '../components/StatusBar'
 
-import VersionManager from '../components/VersionManager'
-
 import PublicationStatusDashboard from '../components/PublicationStatusDashboard'
 import PublicationTimeline from '../components/PublicationTimeline'
 import BulkPublishingOperations from '../components/BulkPublishingOperations'
@@ -91,7 +89,6 @@ const SettingsManager = () => {
     useDocumentTitle(tabTitles[activeTab] || 'Settings')
     const [selectedPage, setSelectedPage] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
-    const [showVersionManager, setShowVersionManager] = useState(false)
     // Get publishing sub-tab from URL search params, default to 'dashboard'
     const publishingView = searchParams.get('publishingView') || 'dashboard'
     const [isCreating, setIsCreating] = useState(false)
@@ -282,7 +279,8 @@ const SettingsManager = () => {
                 <div className="bg-white rounded-lg shadow p-8">
                     <div className="text-center text-gray-500">
                         <History className="w-8 h-8 mx-auto mb-2" />
-                        <div>Select a page from the Pages tab to view its version history</div>
+                        <div>Version history now belongs to each page editor.</div>
+                        <button onClick={() => navigate('/pages')} className="mt-4 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">Open Pages</button>
                     </div>
                 </div>
             )
@@ -298,16 +296,16 @@ const SettingsManager = () => {
                         </div>
                     </div>
                     <button
-                        onClick={() => setShowVersionManager(true)}
+                        onClick={() => navigate(`/pages/${selectedPage.id}/edit/publishing?panel=history`)}
                         className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                     >
-                        Open Version Manager
+                        Open Page History
                     </button>
                 </div>
 
                 <div className="text-center text-gray-500 py-8">
                     <History className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                    <div>Click "Open Version Manager" to view and manage page versions</div>
+                    <div>History, comparison, and restore are managed in the page editor.</div>
                 </div>
             </div>
         )
@@ -441,14 +439,6 @@ const SettingsManager = () => {
                     {renderTabContent()}
                 </div>
             </div>
-
-            {/* Version Manager Modal */}
-            {showVersionManager && selectedPage && (
-                <VersionManager
-                    pageId={selectedPage.id}
-                    onClose={() => setShowVersionManager(false)}
-                />
-            )}
 
             {/* StatusBar for theme editing */}
             {activeTab === 'themes' && (

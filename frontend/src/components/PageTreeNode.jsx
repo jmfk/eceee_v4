@@ -32,117 +32,73 @@ import pageTreeUtils from '../utils/pageTreeUtils'
 
 // Separate component for publication status icon that only re-renders when status changes
 const PublicationStatusIcon = memo(({
-    publicationStatus,
-    canToggle,
-    isToggling,
-    onToggle,
-    latestVersionNumber,
-    publishedVersionNumber
+    workflowState,
+    scheduledEffectiveDate,
 }) => {
+    const normalizedState = ({
+        not_published: 'notPublished',
+        live_with_unpublished_changes: 'liveWithUnpublishedChanges',
+        live_with_scheduled_changes: 'liveWithScheduledChanges',
+        publication_ended: 'publicationEnded',
+    })[workflowState] || workflowState || 'notPublished'
     const getStatusIcon = () => {
-        switch (publicationStatus) {
-            case 'published':
+        switch (normalizedState) {
+            case 'live':
+            case 'liveWithUnpublishedChanges':
+            case 'liveWithScheduledChanges':
                 return <Globe className="w-3 h-3 text-green-500" />
             case 'scheduled':
                 return <Clock className="w-3 h-3 text-blue-500" />
-            case 'expired':
+            case 'publicationEnded':
                 return <AlertCircle className="w-3 h-3 text-orange-500" />
-            case 'draft':
-                return <AlertCircle className="w-3 h-3 text-yellow-500" />
-            case 'unpublished':
-                return <AlertCircle className="w-3 h-3 text-gray-400" />
             default:
                 return <AlertCircle className="w-3 h-3 text-gray-400" />
         }
     }
 
     const getStatusText = () => {
-        switch (publicationStatus) {
-            case 'published':
-                return 'Published'
+        switch (normalizedState) {
+            case 'live':
+                return 'Live'
+            case 'liveWithUnpublishedChanges':
+                return 'Live · unpublished changes'
+            case 'liveWithScheduledChanges':
+                return 'Live · scheduled changes'
             case 'scheduled':
-                return 'Scheduled'
-            case 'expired':
-                return 'Expired'
-            case 'draft':
-                return 'Draft'
-            case 'unpublished':
-                return 'Unpublished'
+                return scheduledEffectiveDate ? `Scheduled · ${new Date(scheduledEffectiveDate).toLocaleDateString()}` : 'Scheduled'
+            case 'publicationEnded':
+                return 'Publication ended'
             default:
-                return 'Unknown'
+                return 'Not published'
         }
     }
 
     const getStatusTextColor = () => {
-        switch (publicationStatus) {
-            case 'published':
+        switch (normalizedState) {
+            case 'live':
+            case 'liveWithUnpublishedChanges':
+            case 'liveWithScheduledChanges':
                 return 'text-green-600'
             case 'scheduled':
                 return 'text-blue-600'
-            case 'expired':
+            case 'publicationEnded':
                 return 'text-orange-600'
-            case 'draft':
-                return 'text-yellow-600'
-            case 'unpublished':
-                return 'text-gray-500'
             default:
                 return 'text-gray-500'
         }
     }
 
-    const getVersionDisplay = () => {
-        if (!latestVersionNumber) {
-            return null
-        }
-        if (publishedVersionNumber && publishedVersionNumber !== latestVersionNumber) {
-            return `v${latestVersionNumber} / v${publishedVersionNumber}`
-        }
-        return `v${latestVersionNumber}`
-    }
-
-    const getTooltipText = () => {
-        let tooltip = getStatusText()
-        const versionDisplay = getVersionDisplay()
-        if (versionDisplay) {
-            tooltip += ` (${versionDisplay})`
-        }
-        if (canToggle) {
-            tooltip += publicationStatus === 'published' ?
-                ' - Click to unpublish' :
-                ' - Click to publish'
-        }
-        return tooltip
-    }
+    const tooltipText = `${getStatusText()}. Open the page editor to change publication.`
 
     return (
-        <Tooltip text={getTooltipText()} position="top">
+        <Tooltip text={tooltipText} position="top">
             <div className="flex items-center gap-1.5">
-                {canToggle ? (
-                    <button
-                        type="button"
-                        disabled={isToggling}
-                        aria-label={getTooltipText()}
-                        className={`flex min-h-8 min-w-8 shrink-0 cursor-pointer items-center justify-center rounded transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${isToggling ? 'opacity-50' : ''}`}
-                        onClick={(event) => {
-                            event.stopPropagation()
-                            onToggle()
-                        }}
-                    >
-                        {isToggling ? <Loader2 className="h-3 w-3 animate-spin text-blue-500" /> : getStatusIcon()}
-                    </button>
-                ) : (
-                    <span className="flex min-h-8 min-w-8 shrink-0 cursor-help items-center justify-center" aria-label={getTooltipText()}>
-                        {getStatusIcon()}
-                    </span>
-                )}
+                <span className="flex min-h-8 min-w-8 shrink-0 cursor-help items-center justify-center" aria-label={tooltipText}>
+                    {getStatusIcon()}
+                </span>
                 <span className={`text-xs font-medium ${getStatusTextColor()}`}>
                     {getStatusText()}
                 </span>
-                {getVersionDisplay() && (
-                    <span className="text-xs text-gray-500 font-mono">
-                        {getVersionDisplay()}
-                    </span>
-                )}
             </div>
         </Tooltip>
     )
@@ -295,14 +251,13 @@ const PageTreeNode = memo(({
     const [showHostnameModal, setShowHostnameModal] = useState(false)
     const [isEditingSlug, setIsEditingSlug] = useState(false)
     const [editingSlug, setEditingSlug] = useState('')
-    const [isTogglingPublication, setIsTogglingPublication] = useState(false)
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
 
     // Update local state when prop changes (for updates from parent)
     useEffect(() => {
         setPage(initialPage)
-    }, [initialPage.id, initialPage.title, initialPage.slug, initialPage.publicationStatus])
+    }, [initialPage.id, initialPage.title, initialPage.slug, initialPage.workflowState])
 
     // Sync local expansion state with page prop changes
     useEffect(() => {
@@ -406,6 +361,10 @@ const PageTreeNode = memo(({
     // Context menu or button handlers
     const handleEdit = () => {
         onEdit?.(page)
+    }
+
+    const handlePublishing = () => {
+        onEdit?.({ ...page, editorTab: 'publishing' })
     }
 
     const handleCut = () => {
@@ -688,24 +647,6 @@ const PageTreeNode = memo(({
         }
     }
 
-    // Publication status handlers
-    const handlePublicationToggle = () => {
-        if (isTogglingPublication) return // Prevent double-clicks
-
-        setIsTogglingPublication(true)
-
-        if (page.publicationStatus === 'published') {
-            unpublishPageMutation.mutate()
-        } else {
-            publishPageMutation.mutate()
-        }
-    }
-
-    const canTogglePublication = () => {
-        // Only allow toggling between published and unpublished for simplicity
-        return page.publicationStatus === 'published' || page.publicationStatus === 'unpublished'
-    }
-
     // Update page hostnames mutation
     const updateHostnamesMutation = useMutation({
         mutationFn: async (hostnamesData) => {
@@ -739,42 +680,6 @@ const PageTreeNode = memo(({
         }
     })
 
-    // Publish page mutation - uses new version-aware endpoint
-    const publishPageMutation = useMutation({
-        mutationFn: async () => {
-            return await pagesApi.publishLatestVersion(page.id)
-        },
-        onSuccess: (response) => {
-            setIsTogglingPublication(false)
-            // Invalidate queries to refresh tree with new version data
-            queryClient.invalidateQueries(['pages'])
-            queryClient.invalidateQueries(['page-children'])
-        },
-        onError: (error) => {
-            console.error('Failed to publish page:', error.response?.data?.detail || error.message)
-            showError(error, 'error')
-            setIsTogglingPublication(false)
-        }
-    })
-
-    // Unpublish page mutation - uses new version-aware endpoint
-    const unpublishPageMutation = useMutation({
-        mutationFn: async () => {
-            return await pagesApi.unpublishVersion(page.id, { mode: 'current' })
-        },
-        onSuccess: (response) => {
-            setIsTogglingPublication(false)
-            // Invalidate queries to refresh tree with new version data
-            queryClient.invalidateQueries(['pages'])
-            queryClient.invalidateQueries(['page-children'])
-        },
-        onError: (error) => {
-            console.error('Failed to unpublish page:', error.response?.data?.detail || error.message)
-            showError(error, 'error')
-            setIsTogglingPublication(false)
-        }
-    })
-
     // Folder icon based on state
     const getFolderIcon = () => {
         if (!hasChildren) {
@@ -786,6 +691,12 @@ const PageTreeNode = memo(({
     }
 
     const secondaryActions = [
+        {
+            label: 'Publishing & history',
+            icon: Globe,
+            onClick: handlePublishing,
+            testId: `page-tree-publishing-menu-${pageTestId}`,
+        },
         {
             label: 'Move up',
             icon: ChevronUp,
@@ -956,52 +867,9 @@ const PageTreeNode = memo(({
                     {/* Publication and version metadata */}
                     <div data-testid={`page-tree-metadata-${pageTestId}`} className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 pl-10 xl:mt-0 xl:shrink-0 xl:pl-0">
                         <PublicationStatusIcon
-                            publicationStatus={page.publicationStatus}
-                            canToggle={canTogglePublication()}
-                            isToggling={isTogglingPublication}
-                            onToggle={handlePublicationToggle}
-                            latestVersionNumber={page.latestVersionNumber}
-                            publishedVersionNumber={page.publishedVersionNumber}
+                            workflowState={page.workflowState}
+                            scheduledEffectiveDate={page.scheduledEffectiveDate}
                         />
-
-                        {/* Version badges */}
-                        <div className="flex flex-wrap items-center gap-1">
-                            {/* Published version badge */}
-                            {page.publishedVersionNumber && (
-                                <Tooltip
-                                    text={`Published version ${page.publishedVersionNumber}${page.publishedEffectiveDate ? ` on ${new Date(page.publishedEffectiveDate).toLocaleDateString()}` : ''}`}
-                                    position="top"
-                                >
-                                    <span className="flex items-center gap-0.5 whitespace-nowrap rounded border border-green-200 bg-green-50 px-1 py-0.5 text-[10px] font-medium text-green-600 transition-colors hover:border-green-300 hover:bg-green-100 hover:text-green-700">
-                                        📗 v{page.publishedVersionNumber}
-                                    </span>
-                                </Tooltip>
-                            )}
-
-                            {/* Draft version badge (if has unpublished changes) */}
-                            {page.hasUnpublishedChanges && page.latestDraftVersionNumber && (
-                                <Tooltip
-                                    text={`Draft version ${page.latestDraftVersionNumber} (unpublished changes)`}
-                                    position="top"
-                                >
-                                    <span className="flex items-center gap-0.5 whitespace-nowrap rounded border border-yellow-200 bg-yellow-50 px-1 py-0.5 text-[10px] font-medium text-yellow-600 transition-colors hover:border-yellow-300 hover:bg-yellow-100 hover:text-yellow-700">
-                                        ✏️ v{page.latestDraftVersionNumber}
-                                    </span>
-                                </Tooltip>
-                            )}
-
-                            {/* Scheduled version badge */}
-                            {page.scheduledVersionNumber && page.scheduledEffectiveDate && (
-                                <Tooltip
-                                    text={`Version ${page.scheduledVersionNumber} scheduled for ${new Date(page.scheduledEffectiveDate).toLocaleString()}`}
-                                    position="top"
-                                >
-                                    <span className="flex items-center gap-0.5 whitespace-nowrap rounded border border-blue-200 bg-blue-50 px-1 py-0.5 text-[10px] font-medium text-blue-600 transition-colors hover:border-blue-300 hover:bg-blue-100 hover:text-blue-700">
-                                        📅 v{page.scheduledVersionNumber} → {new Date(page.scheduledEffectiveDate).toLocaleDateString()}
-                                    </span>
-                                </Tooltip>
-                            )}
-                        </div>
 
                         {/* Error page badge */}
                         {(() => {

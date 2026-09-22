@@ -28,7 +28,7 @@ import {
     CheckCircle,
     Trash2
 } from 'lucide-react'
-import { pagesApi, sitePackagesApi } from '../api'
+import { pagesApi, sitePackagesApi, versionsApi } from '../api'
 import { deletePage } from '../api/pages'
 import PageTreeNode from './PageTreeNode'
 import TreeImporterModalV2 from './TreeImporterModalV2'
@@ -227,7 +227,7 @@ const TreePageManager = () => {
         queryFn: async () => {
             const filters = {}
             if (debouncedSearchTerm) filters.search = debouncedSearchTerm
-            if (statusFilter !== 'all') filters.publicationStatus = statusFilter
+            if (statusFilter !== 'all') filters.workflow_state = statusFilter
             return pagesApi.getRootPages(filters)
         },
         enabled: !debouncedSearchTerm, // Only fetch root pages when not searching
@@ -244,7 +244,7 @@ const TreePageManager = () => {
         queryKey: ['pages', 'search', { search: debouncedSearchTerm, status: statusFilter }],
         queryFn: async () => {
             const filters = {}
-            if (statusFilter !== 'all') filters.publicationStatus = statusFilter
+            if (statusFilter !== 'all') filters.workflow_state = statusFilter
             return searchAllPages(debouncedSearchTerm, filters)
         },
         enabled: !!debouncedSearchTerm && debouncedSearchTerm.length >= 2, // Only search when term is 2+ characters
@@ -553,7 +553,7 @@ const TreePageManager = () => {
 
     // Edit handler
     const handleEdit = useCallback((page) => {
-        navigate(`/pages/${page.id}/edit/content`, {
+        navigate(`/pages/${page.id}/edit/${page.editorTab || 'content'}`, {
             state: { previousView: '/pages' }
         })
     }, [navigate])
@@ -1007,47 +1007,109 @@ const TreePageManager = () => {
 
     const handleBulkPublish = useCallback(async () => {
         const idsArray = Array.from(selectedPageIds)
-        setIsBulkProcessing(true)
-        addNotification(`Publishing ${idsArray.length} page(s)...`, 'info', 'bulk-publish')
-
         try {
-            const result = await pagesApi.bulkPublish(idsArray)
+            const reviewed = await Promise.all(idsArray.map(async pageId => {
+                const [page, workflow] = await Promise.all([
+                    pagesApi.get(pageId),
+                    versionsApi.getWorkflow(pageId),
+                ])
+                return { page, workflow }
+            }))
+            const publishable = reviewed.filter(item => item.workflow.editableVersion)
+            if (publishable.length === 0) {
+                addNotification('None of the selected pages has a working version to publish', 'warning', 'bulk-publish')
+                return
+            }
+            const summary = publishable
+                .map(item => `• ${item.page.title || `Page ${item.page.id}`} — saved ${new Date(item.workflow.editableVersion.updatedAt).toLocaleString()}`)
+                .join('\n')
+            const confirmed = await showConfirm({
+                title: 'Publish reviewed working versions',
+                message: `${summary}\n\nThis operation is not atomic. Pages publish independently and partial completion is possible.`,
+                confirmText: `Publish ${publishable.length} page${publishable.length === 1 ? '' : 's'}`,
+                confirmButtonStyle: 'primary',
+            })
+            if (!confirmed) return
+
+            setIsBulkProcessing(true)
+            addNotification(`Publishing ${publishable.length} reviewed page(s)...`, 'info', 'bulk-publish')
+            const result = await versionsApi.bulkPublishExplicit(
+                publishable.map(item => ({
+                    pageId: item.page.id,
+                    versionId: item.workflow.editableVersion.id,
+                    clientUpdatedAt: item.workflow.editableVersion.updatedAt,
+                }))
+            )
             setIsBulkProcessing(false)
             setSelectedPageIds(new Set())
 
             queryClient.removeQueries({ queryKey: ['pages'] })
             await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
 
-            addNotification(result.message || 'Pages published successfully', 'success', 'bulk-publish')
+            const failures = (result.results || []).filter(item => item.status === 'error')
+            addNotification(
+                failures.length
+                    ? `${publishable.length - failures.length} page(s) published; ${failures.length} failed or changed after review`
+                    : `${publishable.length} page(s) published`,
+                failures.length ? 'warning' : 'success',
+                'bulk-publish'
+            )
         } catch (error) {
             setIsBulkProcessing(false)
             console.error('Failed to bulk publish:', error)
             showError(error, 'error')
             addNotification('Failed to publish pages', 'error', 'bulk-publish')
         }
-    }, [selectedPageIds, addNotification, queryClient, showError])
+    }, [selectedPageIds, addNotification, queryClient, showError, showConfirm])
 
     const handleBulkUnpublish = useCallback(async () => {
         const idsArray = Array.from(selectedPageIds)
-        setIsBulkProcessing(true)
-        addNotification(`Unpublishing ${idsArray.length} page(s)...`, 'info', 'bulk-unpublish')
-
         try {
-            const result = await pagesApi.bulkUnpublish(idsArray)
+            const reviewed = await Promise.all(idsArray.map(async pageId => {
+                const [page, workflow] = await Promise.all([
+                    pagesApi.get(pageId),
+                    versionsApi.getWorkflow(pageId),
+                ])
+                return { page, workflow }
+            }))
+            const liveItems = reviewed.filter(item => item.workflow.liveVersion)
+            if (liveItems.length === 0) {
+                addNotification('None of the selected pages is live', 'warning', 'bulk-unpublish')
+                return
+            }
+            const confirmed = await showConfirm({
+                title: 'Unpublish selected pages',
+                message: `${liveItems.map(item => `• ${item.page.title || `Page ${item.page.id}`}`).join('\n')}\n\nContent and history will be kept. Pages are unpublished independently.`,
+                confirmText: `Unpublish ${liveItems.length} page${liveItems.length === 1 ? '' : 's'}`,
+                confirmButtonStyle: 'danger',
+            })
+            if (!confirmed) return
+            setIsBulkProcessing(true)
+            addNotification(`Unpublishing ${liveItems.length} page(s)...`, 'info', 'bulk-unpublish')
+            const results = await Promise.allSettled(
+                liveItems.map(item => versionsApi.unpublishExplicit(item.page.id, item.workflow.liveVersion.id))
+            )
             setIsBulkProcessing(false)
             setSelectedPageIds(new Set())
 
             queryClient.removeQueries({ queryKey: ['pages'] })
             await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
 
-            addNotification(result.message || 'Pages unpublished successfully', 'success', 'bulk-unpublish')
+            const failures = results.filter(result => result.status === 'rejected').length
+            addNotification(
+                failures
+                    ? `${liveItems.length - failures} page(s) unpublished; ${failures} failed`
+                    : `${liveItems.length} page(s) unpublished`,
+                failures ? 'warning' : 'success',
+                'bulk-unpublish'
+            )
         } catch (error) {
             setIsBulkProcessing(false)
             console.error('Failed to bulk unpublish:', error)
             showError(error, 'error')
             addNotification('Failed to unpublish pages', 'error', 'bulk-unpublish')
         }
-    }, [selectedPageIds, addNotification, queryClient, showError])
+    }, [selectedPageIds, addNotification, queryClient, showError, showConfirm])
 
     const handleBulkDelete = useCallback(async () => {
         const idsArray = Array.from(selectedPageIds)
@@ -1472,9 +1534,12 @@ const TreePageManager = () => {
                                         className="px-2 sm:px-3 py-1 border border-gray-300 rounded text-xs sm:text-sm"
                                     >
                                         <option value="all">All</option>
-                                        <option value="published">Published</option>
-                                        <option value="unpublished">Unpublished</option>
+                                        <option value="live">Live</option>
+                                        <option value="live_with_unpublished_changes">Live · unpublished changes</option>
                                         <option value="scheduled">Scheduled</option>
+                                        <option value="live_with_scheduled_changes">Live · scheduled changes</option>
+                                        <option value="not_published">Not published</option>
+                                        <option value="publication_ended">Publication ended</option>
                                     </select>
                                 </label>
                             </div>
