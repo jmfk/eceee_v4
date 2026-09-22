@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from ..models import PageVersion, WebPage
 
@@ -59,6 +60,7 @@ class PageVersionWorkflowService:
         "enable_css_injection",
         "tags",
     )
+    SCHEDULE_PREDECESSOR_KEY = "scheduled_predecessor"
 
     def __init__(self, page, user=None, now=None):
         self.page = page
@@ -237,11 +239,25 @@ class PageVersionWorkflowService:
         version.effective_date = now
         version.expiry_date = None
         version.save(update_fields=["effective_date", "expiry_date", "updated_at"])
-        version._apply_version_data()
         self.page.refresh_from_db()
+        version.page = self.page
+        version._apply_version_data()
         self.page.last_modified_by = self.user
-        self.page.save(update_fields=["last_modified_by", "updated_at"])
+        self.page.save()
         return version
+
+    def _restore_scheduled_predecessor(self, version):
+        summary = dict(version.change_summary or {})
+        predecessor = summary.pop(self.SCHEDULE_PREDECESSOR_KEY, None)
+        if not predecessor:
+            return summary
+
+        previous = self._versions(lock=True).filter(pk=predecessor.get("version_id")).first()
+        if previous and previous.expiry_date == version.effective_date:
+            original_expiry = predecessor.get("original_expiry_date")
+            previous.expiry_date = parse_datetime(original_expiry) if original_expiry else None
+            previous.save(update_fields=["expiry_date", "updated_at"])
+        return summary
 
     @transaction.atomic
     def schedule(self, version, effective_date, expiry_date=None):
@@ -259,9 +275,23 @@ class PageVersionWorkflowService:
             )
         if expiry_date and expiry_date <= effective_date:
             raise WorkflowError("Expiry must be later than the scheduled publication.")
+        summary = self._restore_scheduled_predecessor(version)
+        previous_live = self.live_version(lock=True)
+        if (
+            previous_live
+            and previous_live.id != version.id
+            and (previous_live.expiry_date is None or previous_live.expiry_date > effective_date)
+        ):
+            summary[self.SCHEDULE_PREDECESSOR_KEY] = {
+                "version_id": previous_live.id,
+                "original_expiry_date": (previous_live.expiry_date.isoformat() if previous_live.expiry_date else None),
+            }
+            previous_live.expiry_date = effective_date
+            previous_live.save(update_fields=["expiry_date", "updated_at"])
         version.effective_date = effective_date
         version.expiry_date = expiry_date
-        version.save(update_fields=["effective_date", "expiry_date", "updated_at"])
+        version.change_summary = summary
+        version.save(update_fields=["effective_date", "expiry_date", "change_summary", "updated_at"])
         return version
 
     @transaction.atomic
@@ -271,9 +301,10 @@ class PageVersionWorkflowService:
         self.assert_canonical_editable(version)
         if not version.effective_date or version.effective_date <= timezone.now():
             raise WorkflowError("The requested version is not scheduled.")
+        version.change_summary = self._restore_scheduled_predecessor(version)
         version.effective_date = None
         version.expiry_date = None
-        version.save(update_fields=["effective_date", "expiry_date", "updated_at"])
+        version.save(update_fields=["effective_date", "expiry_date", "change_summary", "updated_at"])
         return version
 
     @transaction.atomic

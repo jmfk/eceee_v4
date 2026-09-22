@@ -86,6 +86,7 @@ Page authors currently encounter version numbers, overlapping status badges, dir
 - 2026-09-22: Replaced the normal version selector with Save, Publish changes, Schedule, and History. Pages now uses aggregate states and informational status indicators. Version Timeline and Settings version management lead to the page-level History workflow.
 - 2026-09-22: Updated the version manual and UX documents. Packet, Sites, and atomic structure releases remain explicitly out of scope.
 - 2026-09-22: Automated backend, frontend, lint, and production-build verification is complete. PRD remains `started` until the browser-level acceptance walkthrough is recorded.
+- 2026-09-22: Review follow-up keeps public page attributes inside the working version until publication, makes scheduled takeover reversible on cancellation without reviving superseded content, restores tenant-wide History comparison, and runs legacy mutations inside explicit database transactions.
 
 ## Linked ADRs
 
@@ -95,7 +96,7 @@ Page authors currently encounter version numbers, overlapping status badges, dir
 
 - Backend workflow implementation: `backend/webpages/services/page_version_workflow.py`, workflow endpoints in `backend/webpages/views/page_version_views.py`, shared list/detail state, aggregate filters, and tenant-scoped access.
 - Frontend workflow implementation: `PageEditor`, `PublishingEditor`, `PageVersionHistoryPanel`, `PageTreeNode`, `TreePageManager`, legacy redirects, and updated Settings navigation.
-- Backend verification: 64 focused workflow and publishing tests passed against PostgreSQL.
-- Frontend verification: full Vitest suite passed (84 files, 996 tests); focused workflow tests passed (40 tests); Vite production build passed.
+- Backend verification: full Django suite passed (660 tests, 18 skipped) against PostgreSQL; focused workflow tests passed (20 tests).
+- Frontend verification: full Vitest suite passed (85 files, 999 tests); focused editor tests passed (25 tests); Vite production build passed; affected Playwright editor suite passed (9 tests).
 - Static verification: changed frontend files produced no ESLint errors; new backend workflow files passed Black, isort, and Flake8; specification validation passed.
 - Remaining acceptance evidence: record a browser walkthrough of new page creation, live-page editing, scheduling, restore, and advanced descendant publishing before changing status to `completed`.

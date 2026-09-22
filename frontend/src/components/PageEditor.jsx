@@ -33,7 +33,15 @@ import {
 import { pagesApi, layoutsApi, versionsApi, themesApi, namespacesApi } from '../api'
 import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
-import { smartSave, analyzeChanges, determineSaveStrategy, generateChangeSummary, processLoadedVersionData } from '../utils/smartSaveUtils'
+import {
+    smartSave,
+    analyzeChanges,
+    determineSaveStrategy,
+    generateChangeSummary,
+    processLoadedVersionData,
+    buildVersionedPageData,
+    mergeVersionedPageAttributes,
+} from '../utils/smartSaveUtils'
 import { applyWidgetUpdateToWidgetMap } from '../utils/pageEditorWidgetState'
 import { saveWidgetEditorChanges } from '../utils/pageEditorWidgetSave'
 import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
@@ -813,9 +821,10 @@ const PageEditor = () => {
 
         // Priority 1: Use DataManager data if available (preserves websocket updates during hot-reload)
         if (existingPage && existingVersion) {
-            setWebpageData(existingPage);
+            const mergedPage = mergeVersionedPageAttributes(existingPage, existingVersion);
+            setWebpageData(mergedPage);
             setPageVersionData(existingVersion);
-            setOriginalWebpageData(existingPage);
+            setOriginalWebpageData(mergedPage);
             setOriginalPageVersionData(existingVersion);
 
             // Update local widgets
@@ -829,10 +838,11 @@ const PageEditor = () => {
         // Priority 2: Initialize from React Query data (first load)
         if (webpage && pageVersion) {
             const processedVersionData = processLoadedVersionData({ ...pageVersion });
+            const mergedPage = mergeVersionedPageAttributes(webpage, processedVersionData);
 
-            setWebpageData(webpage);
+            setWebpageData(mergedPage);
             setPageVersionData(processedVersionData);
-            setOriginalWebpageData(webpage);
+            setOriginalWebpageData(mergedPage);
             setOriginalPageVersionData(processedVersionData);
 
             // Publish to UDC for future hot-reloads
@@ -842,7 +852,7 @@ const PageEditor = () => {
                     const webpageComponentId = `page-editor-${webpage.id}-webpage`;
                     await publishUpdate(webpageComponentId, OperationTypes.INIT_PAGE, {
                         id: webpage.id,
-                        data: webpage
+                        data: mergedPage
                     });
 
                     // Then initialize version
@@ -1046,13 +1056,14 @@ const PageEditor = () => {
 
             // Process the version data
             const processedVersionData = processLoadedVersionData(versionPageData);
+            const mergedPage = mergeVersionedPageAttributes(webpageData, processedVersionData);
 
             // First, ensure the page exists in DataManager state
             if (webpageData) {
                 const webpageComponentId = `page-editor-${webpageData.id}-webpage`;
                 await publishUpdate(webpageComponentId, OperationTypes.INIT_PAGE, {
                     id: webpageData.id,
-                    data: webpageData
+                    data: mergedPage
                 });
             }
 
@@ -1076,6 +1087,8 @@ const PageEditor = () => {
             });
 
             setCurrentVersion(versionData);
+            setWebpageData(mergedPage);
+            setOriginalWebpageData(mergedPage);
             setPageVersionData(processedVersionData);
             setOriginalPageVersionData(processedVersionData);
 
@@ -1534,7 +1547,7 @@ const PageEditor = () => {
             }
 
             const versionPayload = {
-                pageData: pageVersionData?.pageData || {},
+                pageData: buildVersionedPageData(pageVersionData?.pageData || {}, webpageData || {}),
                 widgets: localWidgets || pageVersionData?.widgets || {},
                 codeLayout: pageVersionData?.codeLayout || '',
                 theme: pageVersionData?.theme?.id || pageVersionData?.theme || null,
@@ -1559,17 +1572,7 @@ const PageEditor = () => {
                 data: processed,
             });
 
-            const pageChanges = analyzeChanges(
-                originalWebpageData || {},
-                webpageData || {},
-                {},
-                {},
-            );
-            if (pageChanges.hasPageChanges) {
-                const updatedPage = await pagesApi.update(pageId, pageChanges.pageFields);
-                setWebpageData(updatedPage);
-                setOriginalWebpageData(updatedPage);
-            }
+            setOriginalWebpageData(webpageData);
 
             await refetchWorkflow();
             await loadVersionsPreserveCurrent();
@@ -1592,7 +1595,7 @@ const PageEditor = () => {
         } finally {
             setIsSaving(false);
         }
-    }, [pageVersionData, originalPageVersionData, workflow, pageId, localWidgets, publishUpdate, originalWebpageData, webpageData, refetchWorkflow, loadVersionsPreserveCurrent, setIsDirty, addNotification]);
+    }, [pageVersionData, originalPageVersionData, workflow, pageId, localWidgets, publishUpdate, webpageData, refetchWorkflow, loadVersionsPreserveCurrent, setIsDirty, addNotification]);
 
     const handlePublishWorkingCopy = useCallback(async () => {
         try {

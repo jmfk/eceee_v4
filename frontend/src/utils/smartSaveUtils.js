@@ -101,6 +101,40 @@ export function processLoadedVersionData(versionData) {
     return processed;
 }
 
+const VERSIONED_PAGE_ATTRIBUTE_FIELDS = [
+    'title',
+    'description',
+    'slug',
+    'pathPatternKey',
+    'hostnames',
+]
+
+/** Store public page attributes inside the working version until publish. */
+export function buildVersionedPageData(pageData = {}, webpageData = {}) {
+    const {
+        pageAttributes: camelCaseAttributes,
+        page_attributes: snakeCaseAttributes,
+        ...contentData
+    } = pageData
+    const pageAttributes = { ...(camelCaseAttributes || snakeCaseAttributes || {}) }
+    for (const field of VERSIONED_PAGE_ATTRIBUTE_FIELDS) {
+        if (webpageData[field] !== undefined) {
+            pageAttributes[field] = webpageData[field]
+        }
+    }
+    return {
+        ...contentData,
+        pageAttributes,
+    }
+}
+
+/** Show saved working-copy attributes in the editor without mutating WebPage. */
+export function mergeVersionedPageAttributes(webpageData = {}, versionData = {}) {
+    const pageData = versionData?.pageData || versionData?.page_data || {}
+    const pageAttributes = pageData.pageAttributes || pageData.page_attributes
+    return pageAttributes ? { ...webpageData, ...pageAttributes } : webpageData
+}
+
 /**
  * Analyze what has changed between original and current data
  * @param {Object} originalWebpageData - Original webpage data

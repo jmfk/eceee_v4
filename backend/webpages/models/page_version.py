@@ -4,10 +4,10 @@ PageVersion Model
 Version control system for pages. Stores complete page state snapshots.
 """
 
-from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
+from django.db import models
 
 
 class PageVersion(models.Model):
@@ -16,13 +16,9 @@ class PageVersion(models.Model):
     Enables rollback, comparison, and change tracking with draft/published workflow.
     """
 
-    page = models.ForeignKey(
-        "WebPage", on_delete=models.CASCADE, related_name="versions"
-    )
+    page = models.ForeignKey("WebPage", on_delete=models.CASCADE, related_name="versions")
     version_number = models.PositiveIntegerField()
-    version_title = models.TextField(
-        blank=True, help_text="Description of changes in this version"
-    )
+    version_title = models.TextField(blank=True, help_text="Description of changes in this version")
 
     change_summary = models.JSONField(
         default=dict,
@@ -31,9 +27,7 @@ class PageVersion(models.Model):
     )
 
     meta_title = models.TextField(blank=True, help_text="Meta Title")
-    meta_description = models.TextField(
-        blank=True, default="", help_text="Meta Description"
-    )
+    meta_description = models.TextField(blank=True, default="", help_text="Meta Description")
     code_layout = models.CharField(
         max_length=255,
         blank=True,
@@ -41,11 +35,7 @@ class PageVersion(models.Model):
     )
 
     # Snapshot of page data at this version
-    page_data = models.JSONField(
-        blank=True,
-        default=dict,
-        help_text="Serialized page data (excluding widgets)"
-    )
+    page_data = models.JSONField(blank=True, default=dict, help_text="Serialized page data (excluding widgets)")
 
     # Widget data for this version
     widgets = models.JSONField(
@@ -68,9 +58,7 @@ class PageVersion(models.Model):
         blank=True,
         help_text="Page-specific CSS variables that override theme variables",
     )
-    page_custom_css = models.TextField(
-        blank=True, help_text="Page-specific custom CSS injected after theme CSS"
-    )
+    page_custom_css = models.TextField(blank=True, help_text="Page-specific custom CSS injected after theme CSS")
     enable_css_injection = models.BooleanField(
         default=True, help_text="Whether to enable dynamic CSS injection for this page"
     )
@@ -174,11 +162,7 @@ class PageVersion(models.Model):
         super().clean()
 
         # Validate effective and expiry dates
-        if (
-            self.effective_date
-            and self.expiry_date
-            and self.effective_date >= self.expiry_date
-        ):
+        if self.effective_date and self.expiry_date and self.effective_date >= self.expiry_date:
             raise ValidationError("Effective date must be before expiry date.")
 
     # New date-based publishing methods
@@ -261,6 +245,10 @@ class PageVersion(models.Model):
         """Apply the stored page data to the actual page instance"""
         page_data = self.page_data.copy()
 
+        # Page attributes edited as part of a working copy live in a reserved
+        # namespace until the version is published. This keeps Save from
+        # mutating the public WebPage record directly.
+        page_attributes = page_data.pop("page_attributes", page_data.pop("pageAttributes", {}))
         # Apply page fields
         for field, value in page_data.items():
             if hasattr(self.page, field) and field not in [
@@ -274,15 +262,27 @@ class PageVersion(models.Model):
                     value = parse_datetime(value)
                 setattr(self.page, field, value)
 
+        # Reserved working-copy attributes take precedence over legacy
+        # top-level title/description snapshots.
+        attribute_map = {
+            "title": "title",
+            "description": "description",
+            "slug": "slug",
+            "path_pattern_key": "path_pattern_key",
+            "pathPatternKey": "path_pattern_key",
+            "hostnames": "hostnames",
+        }
+        for source_field, target_field in attribute_map.items():
+            if source_field in page_attributes:
+                setattr(self.page, target_field, page_attributes[source_field])
+
         # Note: Widgets are no longer stored as separate model objects
         # They exist only in PageVersion.widgets as JSON data
 
     def restore(self, user):
         """Restore this version as the current version of the page"""
         # Create a new version from current state first
-        self.page.create_version(
-            user, "Restored from version {}".format(self.version_number)
-        )
+        self.page.create_version(user, "Restored from version {}".format(self.version_number))
 
         # Apply the stored page data
         self._apply_version_data()
@@ -307,24 +307,18 @@ class PageVersion(models.Model):
                 continue
             other_value = other_version.page_data.get(field)
             if value != other_value:
-                changes["fields_changed"].append(
-                    {"field": field, "old_value": other_value, "new_value": value}
-                )
+                changes["fields_changed"].append({"field": field, "old_value": other_value, "new_value": value})
 
         # Compare widgets
         self_widgets = {(w["slot_name"], w["sort_order"]): w for w in self.widgets}
-        other_widgets = {
-            (w["slot_name"], w["sort_order"]): w for w in other_version.widgets
-        }
+        other_widgets = {(w["slot_name"], w["sort_order"]): w for w in other_version.widgets}
 
         # Find added widgets
         for key, widget in self_widgets.items():
             if key not in other_widgets:
                 changes["widgets_added"].append(widget)
             elif widget != other_widgets[key]:
-                changes["widgets_modified"].append(
-                    {"old": other_widgets[key], "new": widget}
-                )
+                changes["widgets_modified"].append({"old": other_widgets[key], "new": widget})
 
         # Find removed widgets
         for key, widget in other_widgets.items():
@@ -346,8 +340,7 @@ class PageVersion(models.Model):
         draft = PageVersion.objects.create(
             page=self.page,
             version_number=version_number,
-            version_title=version_title
-            or f"Draft based on version {self.version_number}",
+            version_title=version_title or f"Draft based on version {self.version_number}",
             page_data=self.page_data.copy(),
             widgets=self.widgets.copy() if self.widgets else {},
             created_by=user,
