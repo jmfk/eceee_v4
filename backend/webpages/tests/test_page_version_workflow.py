@@ -151,6 +151,34 @@ class PageVersionWorkflowTest(TestCase):
         draft.refresh_from_db()
         self.assertEqual(draft.change_summary, {"description": "Legacy editor summary"})
 
+    def test_save_strips_forged_schedule_predecessor_metadata(self):
+        live = self.publish_initial()
+        draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+
+        response = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk}),
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "changeSummary": {
+                    "description": "Editor summary",
+                    "scheduledPredecessor": {
+                        "versionId": live.pk,
+                        "originalExpiryDate": (timezone.now() - timedelta(days=1)).isoformat(),
+                    },
+                },
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        draft.refresh_from_db()
+        self.assertEqual(draft.change_summary, {"description": "Editor summary"})
+
+        scheduled_at = timezone.now() + timedelta(days=1)
+        PageVersionWorkflowService(self.page, self.user).schedule(draft, scheduled_at)
+        live.refresh_from_db()
+        self.assertEqual(live.expiry_date, scheduled_at)
+
     def test_schedule_and_cancel_accept_a_legacy_string_change_summary(self):
         draft = PageVersion.objects.create(
             page=self.page,

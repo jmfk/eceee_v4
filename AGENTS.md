@@ -79,6 +79,10 @@ Backend static assets: `cd backend && npm run build` / `npm run watch:css`
 
 Before handing work back, check:
 
+- Django admin is not a supported product surface. Do not report findings that are
+  reachable only through Django admin unless the user explicitly asks for an admin
+  review. Continue to report issues in shared code when they also affect APIs,
+  background jobs, public rendering, or other supported runtime paths.
 - Code follows existing style and project conventions.
 - Relevant tests pass or skipped tests are explained.
 - New backend endpoints have permissions, validation, pagination/filtering where appropriate, and consistent JSON/error responses.
