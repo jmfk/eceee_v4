@@ -4,6 +4,7 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.db import connection
 from django.test import TestCase, TransactionTestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -163,6 +164,218 @@ class PageVersionWorkflowTest(TestCase):
         self.assertIn("theme", response.data)
         draft.refresh_from_db()
         self.assertIsNone(draft.theme_id)
+
+    def test_bulk_delete_cannot_mutate_another_tenant(self):
+        other_user = User.objects.create_user("bulk-delete-other", password="test")
+        other_tenant = Tenant.objects.create(
+            name="Bulk delete other tenant",
+            identifier="bulk-delete-other",
+            created_by=other_user,
+        )
+        other_page = WebPage.objects.create(
+            title="Other tenant page",
+            slug="other-tenant-page",
+            tenant=other_tenant,
+            created_by=other_user,
+            last_modified_by=other_user,
+        )
+
+        response = self.client.post(
+            reverse("api:webpage-bulk-delete"),
+            {"pageIds": [other_page.pk]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        other_page.refresh_from_db()
+        self.assertFalse(other_page.is_deleted)
+
+    def test_bulk_move_cannot_use_pages_or_parents_from_another_tenant(self):
+        own_parent = WebPage.objects.create(
+            title="Own parent",
+            slug="own-parent",
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        other_user = User.objects.create_user("bulk-move-other", password="test")
+        other_tenant = Tenant.objects.create(
+            name="Bulk move other tenant",
+            identifier="bulk-move-other",
+            created_by=other_user,
+        )
+        other_page = WebPage.objects.create(
+            title="Other movable page",
+            slug="other-movable-page",
+            tenant=other_tenant,
+            created_by=other_user,
+            last_modified_by=other_user,
+        )
+
+        foreign_page_response = self.client.post(
+            reverse("api:webpage-bulk-move"),
+            {"pageIds": [other_page.pk], "parentId": own_parent.pk},
+            format="json",
+        )
+        foreign_parent_response = self.client.post(
+            reverse("api:webpage-bulk-move"),
+            {"pageIds": [self.page.pk], "parentId": other_page.pk},
+            format="json",
+        )
+
+        self.assertEqual(foreign_page_response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(foreign_parent_response.status_code, status.HTTP_404_NOT_FOUND)
+        self.page.refresh_from_db()
+        other_page.refresh_from_db()
+        self.assertIsNone(self.page.parent_id)
+        self.assertIsNone(other_page.parent_id)
+
+    def test_page_parent_cannot_cross_the_selected_tenant(self):
+        other_user = User.objects.create_user("parent-other", password="test")
+        other_tenant = Tenant.objects.create(
+            name="Parent other tenant",
+            identifier="parent-other",
+            created_by=other_user,
+        )
+        other_parent = WebPage.objects.create(
+            title="Other parent",
+            slug="other-parent",
+            tenant=other_tenant,
+            created_by=other_user,
+            last_modified_by=other_user,
+        )
+
+        create_response = self.client.post(
+            reverse("api:webpage-list"),
+            {"title": "Cross-tenant child", "slug": "cross-tenant-child", "parentId": other_parent.pk},
+            format="json",
+        )
+        update_response = self.client.patch(
+            reverse("api:webpage-detail", kwargs={"pk": self.page.pk}),
+            {"parentId": other_parent.pk},
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(update_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.page.refresh_from_db()
+        self.assertIsNone(self.page.parent_id)
+
+    def test_theme_api_is_scoped_to_the_selected_tenant(self):
+        own_theme = PageTheme.objects.create(
+            name="Own theme",
+            tenant=self.tenant,
+            created_by=self.user,
+        )
+        other_user = User.objects.create_user("theme-api-other", password="test")
+        other_tenant = Tenant.objects.create(
+            name="Theme API other tenant",
+            identifier="theme-api-other",
+            created_by=other_user,
+        )
+        other_theme = PageTheme.objects.create(
+            name="Other theme",
+            tenant=other_tenant,
+            created_by=other_user,
+        )
+
+        list_response = self.client.get(reverse("api:pagetheme-list"))
+        themes = (
+            list_response.data.get("results", list_response.data)
+            if isinstance(list_response.data, dict)
+            else list_response.data
+        )
+        retrieve_response = self.client.get(reverse("api:pagetheme-detail", kwargs={"pk": other_theme.pk}))
+        update_response = self.client.patch(
+            reverse("api:pagetheme-detail", kwargs={"pk": other_theme.pk}),
+            {"name": "Changed across tenant"},
+            format="json",
+        )
+        delete_response = self.client.delete(reverse("api:pagetheme-detail", kwargs={"pk": other_theme.pk}))
+
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual([theme["id"] for theme in themes], [own_theme.pk])
+        self.assertEqual(retrieve_response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(update_response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(delete_response.status_code, status.HTTP_404_NOT_FOUND)
+        other_theme.refresh_from_db()
+        self.assertEqual(other_theme.name, "Other theme")
+
+    def test_theme_create_assigns_the_selected_tenant(self):
+        response = self.client.post(
+            reverse("api:pagetheme-list"),
+            {"name": "Created theme"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        theme = PageTheme.objects.get(pk=response.data["id"])
+        self.assertEqual(theme.tenant_id, self.tenant.id)
+
+    def test_theme_import_rejects_an_unrelated_tenant(self):
+        other_user = User.objects.create_user("theme-import-other", password="test")
+        other_tenant = Tenant.objects.create(
+            name="Theme import other tenant",
+            identifier="theme-import-other",
+            created_by=other_user,
+        )
+        self.client.credentials(HTTP_X_TENANT_ID=other_tenant.identifier)
+
+        response = self.client.post(reverse("api:pagetheme-import-theme"), {}, format="multipart")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_page_status_and_hostnames_are_scoped_to_the_selected_tenant(self):
+        self.page.hostnames = ["own.example"]
+        self.page.save(update_fields=["hostnames", "updated_at"])
+        other_user = User.objects.create_user("page-summary-other", password="test")
+        other_tenant = Tenant.objects.create(
+            name="Page summary other tenant",
+            identifier="page-summary-other",
+            created_by=other_user,
+        )
+        WebPage.objects.create(
+            title="Other root",
+            slug="other-root",
+            hostnames=["other.example"],
+            tenant=other_tenant,
+            created_by=other_user,
+            last_modified_by=other_user,
+        )
+
+        hostnames_response = self.client.get(reverse("api:webpage-hostnames"))
+        status_response = self.client.get(reverse("api:webpage-publication-status"))
+
+        self.assertEqual(hostnames_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(hostnames_response.data, ["own.example"])
+        self.assertEqual(status_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(status_response.data["total_pages"], 1)
+
+    def test_duplicate_keeps_the_source_tenant(self):
+        response = self.client.post(reverse("api:webpage-duplicate", kwargs={"pk": self.page.pk}), {}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        duplicate = WebPage.objects.get(pk=response.data["page"]["id"])
+        self.assertEqual(duplicate.tenant_id, self.tenant.id)
+
+    def test_model_restore_creates_a_working_copy_without_changing_live_page(self):
+        historical = self.page.create_version(self.user, "Historical")
+        historical.page_data = {"title": "Historical title", "description": "Old"}
+        historical.save()
+        PageVersionWorkflowService(self.page, self.user).publish(historical)
+        current, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        current.page_data = {"title": "Current title", "description": "Current"}
+        current.save()
+        PageVersionWorkflowService(self.page, self.user).publish(current)
+
+        restored = historical.restore(self.user)
+
+        self.page.refresh_from_db()
+        restored.refresh_from_db()
+        self.assertEqual(self.page.current_published_version_id, current.id)
+        self.assertEqual(self.page.title, "Current title")
+        self.assertIsNone(restored.effective_date)
+        self.assertEqual(restored.page_data["title"], "Historical title")
 
     def test_legacy_version_mutation_endpoint_is_gone(self):
         draft = self.page.create_version(self.user, "Draft")
@@ -976,3 +1189,30 @@ class PageVersionMutationTransactionTest(TransactionTestCase):
         self.assertEqual(response.status_code, status.HTTP_410_GONE)
         self.version.refresh_from_db()
         self.assertEqual(self.version.meta_title, "")
+
+    def test_working_copy_save_locks_page_before_version(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.patch(
+                reverse("api:pageversion-save-working-copy", kwargs={"pk": self.version.pk}),
+                {
+                    "clientUpdatedAt": self.version.updated_at.isoformat(),
+                    "metaTitle": "Lock order",
+                },
+                format="json",
+            )
+
+        lock_queries = [query["sql"] for query in queries.captured_queries if "FOR UPDATE" in query["sql"].upper()]
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(lock_queries), 2)
+        self.assertIn("webpages_webpage", lock_queries[0])
+        self.assertIn("webpages_pageversion", lock_queries[1])
+
+    def test_working_copy_delete_locks_page_before_version(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.delete(reverse("api:pageversion-detail", kwargs={"pk": self.version.pk}))
+
+        lock_queries = [query["sql"] for query in queries.captured_queries if "FOR UPDATE" in query["sql"].upper()]
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertGreaterEqual(len(lock_queries), 2)
+        self.assertIn("webpages_webpage", lock_queries[0])
+        self.assertIn("webpages_pageversion", lock_queries[1])

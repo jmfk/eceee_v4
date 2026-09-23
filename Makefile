@@ -42,7 +42,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel prepare-frontend-e2e frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test backend-lint frontend-lint lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db configure-local-infra shared-infra-check use-external-infra prepare-test-infra test-infra-down refresh-db-collation prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel prepare-frontend-e2e frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test backend-lint frontend-lint lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db configure-local-infra shared-infra-check use-external-infra prepare-test-infra test-infra-down refresh-db-collation prod-preflight prod-deploy prod-rollback prod-backup prod-logs prod-status prod-audit-tenant-access prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -160,6 +160,7 @@ help: ## Show this help message (use: make help [target])
 		echo "  prod-backup       Run ad-hoc production DB backup"; \
 		echo "  prod-logs         Tail production logs (SERVICE=backend optional)"; \
 		echo "  prod-status       Show production container status"; \
+		echo "  prod-audit-tenant-access  Read-only tenant migration risk audit"; \
 		echo "  prod-ssh          SSH into production server"; \
 		echo "  prod-shell        Open Django shell in production"; \
 		echo "  prod-fix-image-permissions  Fix permissions on all MinIO assets"; \
@@ -1105,6 +1106,9 @@ prod-logs: ## Tail production logs (use: make prod-logs [SERVICE=backend])
 
 prod-status: ## Show production container status
 	ssh $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env ps"
+
+prod-audit-tenant-access: ## Audit tenant migration lockout risk without writing production data
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -T db sh -lc 'psql -v ON_ERROR_STOP=1 -U \"\$$POSTGRES_USER\" -d \"\$$POSTGRES_DB\"'" < deploy/scripts/audit-tenant-access.sql
 
 prod-logs-caddy: ## Tail production Caddy logs
 	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env logs -f --tail=100 caddy"

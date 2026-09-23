@@ -206,8 +206,10 @@ class WebPageViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def hostnames(self, request):
         """Get all unique hostnames across all root pages"""
-        hostnames = WebPage.get_all_hostnames()
-        return Response(hostnames)
+        hostnames = set()
+        for page_hostnames in self.get_queryset().filter(parent__isnull=True).values_list("hostnames", flat=True):
+            hostnames.update(page_hostnames or [])
+        return Response(sorted(hostnames))
 
     @action(detail=False, methods=["get"])
     def tree(self, request):
@@ -520,7 +522,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
             return Response({"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Fetch pages
-        pages = WebPage.objects.filter(id__in=page_ids, is_deleted=False)
+        pages = self.get_queryset().filter(id__in=page_ids, is_deleted=False)
 
         if not pages.exists():
             return Response(
@@ -860,7 +862,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         upcoming_scheduled = []
         recently_expired = []
 
-        for page in WebPage.objects.prefetch_related("versions"):
+        for page in self.get_queryset().prefetch_related("versions"):
             current_version = page.get_current_published_version(now)
             if current_version:
                 status_counts["published"] += 1
@@ -934,6 +936,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 title=new_title,
                 slug=new_slug,
                 sort_order=page.sort_order + 1,
+                tenant=page.tenant,
                 created_by=request.user,
                 last_modified_by=request.user,
             )
@@ -1023,7 +1026,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         parent_page = None
         if parent_id:
             try:
-                parent_page = WebPage.objects.get(id=parent_id, is_deleted=False)
+                parent_page = self.get_queryset().get(id=parent_id, is_deleted=False)
             except WebPage.DoesNotExist:
                 return Response(
                     {"error": f"Parent page {parent_id} not found"},
@@ -1031,7 +1034,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 )
 
         # Fetch pages to move
-        pages = WebPage.objects.filter(id__in=page_ids, is_deleted=False)
+        pages = self.get_queryset().filter(id__in=page_ids, is_deleted=False)
 
         if not pages.exists():
             return Response(

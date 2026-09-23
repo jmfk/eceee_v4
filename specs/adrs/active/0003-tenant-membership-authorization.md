@@ -19,6 +19,8 @@ Several API querysets use the content creator as a proxy for tenant access. This
 
 Tenant access is granted to staff, the tenant creator, or users in an explicit tenant-members relation. Page and version querysets first scope to the selected tenant and then check tenant access. Content ownership does not grant cross-tenant access.
 
+Page hierarchy mutations and theme CRUD use the same selected-tenant boundary. Caller-supplied page, parent, and theme IDs never widen the active tenant scope.
+
 Writable page-version relationships are also tenant-scoped. An explicit theme must belong to the owning page's tenant; caller-supplied related-object IDs never widen that boundary.
 
 Clients send the selected tenant identifier on every API request. If the header is absent, middleware may infer a tenant only when the authenticated user has exactly one accessible tenant before applying the configured development fallback.

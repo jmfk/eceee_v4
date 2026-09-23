@@ -124,6 +124,19 @@ make prod-logs SERVICE=backend  # specific service
 make prod-status
 ```
 
+### Audit tenant access before migration
+
+Run the aggregate read-only audit from the local checkout. It sends a SQL
+transaction declared `READ ONLY` to the running PostgreSQL container, so the
+audit does not need to be deployed first and does not start the Django app.
+
+```bash
+make prod-audit-tenant-access
+```
+
+The result is `NO_RISK`, `REVIEW_REQUIRED`, or `RISK`. The audit prints counts
+only, never usernames or email addresses, and does not modify production data.
+
 ### Open a shell
 
 ```bash

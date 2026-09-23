@@ -74,6 +74,7 @@ The simplified version workflow still has compatibility paths that can mutate pa
 - 2026-09-23: Deployment reload protection was extended to observe the shared page, theme, and object dirty metadata. A pending reload resumes only after every editor signal is clean.
 - 2026-09-23: Working-copy theme selection is scoped to the page tenant and rejects cross-tenant theme relations.
 - 2026-09-23: Direct page updates now reject version-controlled page attributes; tree links route slug and hostname editing through the working-copy editor.
+- 2026-09-23: Tenant scoping now covers page hierarchy bulk mutations and theme CRUD, working-copy saves follow the page-then-version lock order, and admin restores create working copies instead of changing public page data.
 
 ## Linked ADRs
 

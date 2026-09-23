@@ -280,14 +280,10 @@ class PageVersion(models.Model):
         # They exist only in PageVersion.widgets as JSON data
 
     def restore(self, user):
-        """Restore this version as the current version of the page"""
-        # Create a new version from current state first
-        self.page.create_version(user, "Restored from version {}".format(self.version_number))
+        """Restore this version into the canonical working copy."""
+        from ..services.page_version_workflow import PageVersionWorkflowService
 
-        # Apply the stored page data
-        self._apply_version_data()
-        self.page.last_modified_by = user
-        self.page.save()
+        return PageVersionWorkflowService(self.page, user).restore_as_working_copy(self)
 
     def compare_with(self, other_version):
         """Compare this version with another version"""

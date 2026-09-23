@@ -2,24 +2,29 @@
 PageTheme ViewSet for managing page themes.
 """
 
-from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.filters import SearchFilter, OrderingFilter
-from django_filters.rest_framework import DjangoFilterBackend
-from django.http import HttpResponse
-from django.core.files.base import ContentFile
-from file_manager.storage import system_storage
-import json
-import zipfile
 import io
+import json
+import logging
+import zipfile
 from datetime import datetime
+
+from django.core.files.base import ContentFile
+from django.http import HttpResponse
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.response import Response
+
+from file_manager.storage import system_storage
 
 from ..models import PageTheme
 from ..serializers import PageThemeSerializer
-from ..theme_service import ThemeService
 from ..services import ThemeCSSGenerator
 from ..services.style_ai_helper import StyleAIHelper
+from ..theme_service import ThemeService
+
+logger = logging.getLogger(__name__)
 
 
 class PageThemeViewSet(viewsets.ModelViewSet):
@@ -33,6 +38,13 @@ class PageThemeViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "description"]
     ordering_fields = ["name", "created_at", "updated_at"]
     ordering = ["created_at"]  # Oldest first
+
+    def get_queryset(self):
+        """Keep all theme reads and mutations inside the selected tenant."""
+        tenant = getattr(self.request, "tenant", None)
+        if tenant is None or not tenant.user_has_access(self.request.user):
+            return super().get_queryset().none()
+        return super().get_queryset().filter(tenant=tenant)
 
     def create(self, request, *args, **kwargs):
         """Handle theme creation with image upload and JSON field parsing"""
@@ -63,9 +75,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         self.perform_create(serializer)
 
         headers = self.get_success_headers(serializer.data)
-        return Response(
-            serializer.data, status=status.HTTP_201_CREATED, headers=headers
-        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     def update(self, request, *args, **kwargs):
         """Handle theme update with image upload and JSON field parsing"""
@@ -105,12 +115,21 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        tenant = getattr(self.request, "tenant", None)
+        if tenant is None:
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
+        if not tenant.user_has_access(self.request.user):
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("You do not have access to this tenant.")
+        serializer.save(created_by=self.request.user, tenant=tenant)
 
     @action(detail=False, methods=["get"])
     def active(self, request):
         """Get only active themes"""
-        active_themes = self.queryset.filter(is_active=True)
+        active_themes = self.get_queryset().filter(is_active=True)
         serializer = self.get_serializer(active_themes, many=True)
         return Response(serializer.data)
 
@@ -132,7 +151,8 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             <h1>Sample Heading 1</h1>
             <h2>Sample Heading 2</h2>
             <h3>Sample Heading 3</h3>
-            <p>This is a sample paragraph with some <a href="#">linked text</a> to show how the theme styles different HTML elements.</p>
+            <p>This is a sample paragraph with some <a href="#">linked text</a>
+            to show how the theme styles different HTML elements.</p>
             <ul>
                 <li>First list item</li>
                 <li>Second list item with more content</li>
@@ -274,14 +294,12 @@ class PageThemeViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def default(self, request):
         """Get the current default theme for object content editors"""
-        default_theme = PageTheme.get_default_theme()
+        default_theme = self.get_queryset().filter(is_default=True, is_active=True).first()
         if default_theme:
             serializer = PageThemeSerializer(default_theme)
             return Response(serializer.data)
         else:
-            return Response(
-                {"message": "No default theme set"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"message": "No default theme set"}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=["post"])
     def set_default(self, request, pk=None):
@@ -295,7 +313,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             )
 
         # Clear any existing default themes and set this one
-        PageTheme.objects.filter(is_default=True).update(is_default=False)
+        self.get_queryset().filter(is_default=True).update(is_default=False)
         theme.is_default = True
         theme.save()
 
@@ -310,13 +328,19 @@ class PageThemeViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"])
     def clear_default(self, request):
         """Clear the default theme setting"""
-        PageTheme.objects.filter(is_default=True).update(is_default=False)
+        self.get_queryset().filter(is_default=True).update(is_default=False)
         return Response({"message": "Default theme cleared"})
 
     @action(detail=False, methods=["post"])
     def ensure_default(self, request):
         """Ensure a default theme exists, create one if necessary"""
-        default_theme = PageTheme.get_default_theme()
+        default_theme = self.get_queryset().filter(is_default=True, is_active=True).first()
+
+        if default_theme is None:
+            default_theme = self.get_queryset().filter(is_active=True).first()
+            if default_theme:
+                default_theme.is_default = True
+                default_theme.save(update_fields=["is_default", "updated_at"])
 
         if default_theme:
             serializer = PageThemeSerializer(default_theme)
@@ -376,11 +400,12 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         Stores in: theme_images/{theme_id}/design_groups/{filename}
         Returns: { "url": "s3://bucket/path", "public_url": "https://...", "width": int, "height": int }
         """
-        from PIL import Image
+        import logging
         import os
         import uuid
-        import logging
         from io import BytesIO
+
+        from PIL import Image
 
         logger = logging.getLogger(__name__)
         theme = self.get_object()
@@ -403,9 +428,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         ]
         if image_file.content_type not in allowed_types:
             return Response(
-                {
-                    "error": f'Invalid file type. Allowed types: {", ".join(allowed_types)}'
-                },
+                {"error": f'Invalid file type. Allowed types: {", ".join(allowed_types)}'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -420,7 +443,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         try:
             # Read file content once
             file_content = image_file.read()
-            
+
             # Extract image dimensions (skip for SVG)
             width = None
             height = None
@@ -431,7 +454,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     logger.info(f"Extracted image dimensions: {width}x{height}")
                 except Exception as e:
                     logger.warning(f"Could not extract image dimensions: {e}")
-            
+
             # Generate unique filename
             file_extension = os.path.splitext(image_file.name)[1].lower()
             unique_filename = f"{uuid.uuid4()}{file_extension}"
@@ -453,7 +476,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 "filename": image_file.name,
                 "size": image_file.size,
             }
-            
+
             # Add dimensions if available
             if width is not None and height is not None:
                 response_data["width"] = width
@@ -475,31 +498,26 @@ class PageThemeViewSet(viewsets.ModelViewSet):
     def validate_images(self, request, pk=None):
         """
         Validate all design group images against breakpoint requirements.
-        
+
         Returns warnings for images that are too small for optimal retina display.
         """
-        from ..services.theme_image_validator import ThemeImageValidator
         import logging
-        
+
+        from ..services.theme_image_validator import ThemeImageValidator
+
         logger = logging.getLogger(__name__)
         theme = self.get_object()
-        
+
         try:
             # Get breakpoints from theme or use defaults
             breakpoints = theme.breakpoints if theme.breakpoints else None
-            
+
             # Create validator and run validation
             validator = ThemeImageValidator(breakpoints=breakpoints)
-            warnings = validator.validate_design_group_images(
-                theme.design_groups,
-                breakpoints
-            )
-            
-            return Response({
-                "warnings": warnings,
-                "count": len(warnings)
-            })
-            
+            warnings = validator.validate_design_group_images(theme.design_groups, breakpoints)
+
+            return Response({"warnings": warnings, "count": len(warnings)})
+
         except Exception as e:
             logger.error(f"Failed to validate images: {str(e)}")
             return Response(
@@ -513,9 +531,9 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         GET: List all images in theme library with metadata
         POST: Upload single or multiple images to library
         """
+        import logging
         import os
         import uuid
-        import logging
         from datetime import datetime
 
         logger = logging.getLogger(__name__)
@@ -530,9 +548,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 images = []
 
                 # List files with metadata directly from S3
-                response = storage.client.list_objects_v2(
-                    Bucket=storage.bucket_name, Prefix=library_path
-                )
+                response = storage.client.list_objects_v2(Bucket=storage.bucket_name, Prefix=library_path)
 
                 logger.info(f"Listing library path: {library_path}")
 
@@ -552,28 +568,21 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     try:
                         # Get URLs
                         url = storage.url(full_path)
-                        public_url = (
-                            storage.get_public_url(full_path)
-                            if hasattr(storage, "get_public_url")
-                            else url
-                        )
+                        public_url = storage.get_public_url(full_path) if hasattr(storage, "get_public_url") else url
 
                         # Get metadata from the list response
                         size = obj.get("Size", 0)
                         modified = obj.get("LastModified", datetime.now())
-                        
+
                         # Try to get dimensions from S3 object metadata
                         width = None
                         height = None
                         try:
-                            head_response = storage.client.head_object(
-                                Bucket=storage.bucket_name,
-                                Key=full_path
-                            )
-                            metadata = head_response.get('Metadata', {})
-                            if 'width' in metadata and 'height' in metadata:
-                                width = int(metadata['width'])
-                                height = int(metadata['height'])
+                            head_response = storage.client.head_object(Bucket=storage.bucket_name, Key=full_path)
+                            metadata = head_response.get("Metadata", {})
+                            if "width" in metadata and "height" in metadata:
+                                width = int(metadata["width"])
+                                height = int(metadata["height"])
                                 logger.debug(f"Retrieved dimensions from metadata: {width}x{height}")
                         except Exception as e:
                             logger.debug(f"No dimensions in metadata for {filename}: {e}")
@@ -584,7 +593,6 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                         # Generate imgproxy base URL for the image
                         imgproxy_base_url = None
                         try:
-                            from file_manager.imgproxy import imgproxy_service
                             # Use the S3 URL (s3:// protocol) for imgproxy
                             s3_url = storage.url(full_path)
                             if s3_url:
@@ -598,19 +606,15 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                             "publicUrl": public_url,
                             "imgproxyBaseUrl": imgproxy_base_url or public_url or url,
                             "size": size,
-                            "uploadedAt": (
-                                modified.isoformat()
-                                if hasattr(modified, "isoformat")
-                                else str(modified)
-                            ),
+                            "uploadedAt": (modified.isoformat() if hasattr(modified, "isoformat") else str(modified)),
                             "usedIn": used_in,
                         }
-                        
+
                         # Add dimensions if available
                         if width and height:
                             image_data["width"] = width
                             image_data["height"] = height
-                        
+
                         images.append(image_data)
                         logger.info(f"Added image to list: {filename}")
                     except Exception as e:
@@ -667,17 +671,19 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                             }
                         )
                         continue
-                    
+
                     # Read file content once
                     file_content = image_file.read()
-                    
+
                     # Extract image dimensions (skip for SVG)
                     width = None
                     height = None
                     if image_file.content_type != "image/svg+xml":
                         try:
-                            from PIL import Image
                             from io import BytesIO
+
+                            from PIL import Image
+
                             img = Image.open(BytesIO(file_content))
                             width, height = img.size
                             logger.info(f"Extracted dimensions: {width}x{height}")
@@ -687,32 +693,25 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     # Generate unique filename
                     file_extension = os.path.splitext(image_file.name)[1].lower()
                     base_name = os.path.splitext(image_file.name)[0]
-                    unique_filename = (
-                        f"{base_name}_{uuid.uuid4().hex[:8]}{file_extension}"
-                    )
+                    unique_filename = f"{base_name}_{uuid.uuid4().hex[:8]}{file_extension}"
 
                     # Upload to library
                     file_path = f"theme_images/{theme.id}/library/{unique_filename}"
                     logger.info(f"Uploading to path: {file_path}")
-                    
+
                     # Save file with metadata including dimensions
-                    saved_path = storage._save(
-                        file_path, ContentFile(file_content)
-                    )
-                    
+                    saved_path = storage._save(file_path, ContentFile(file_content))
+
                     # Store dimensions in S3 object metadata if available
                     if width and height:
                         try:
                             storage.client.copy_object(
                                 Bucket=storage.bucket_name,
-                                CopySource={'Bucket': storage.bucket_name, 'Key': file_path},
+                                CopySource={"Bucket": storage.bucket_name, "Key": file_path},
                                 Key=file_path,
-                                Metadata={
-                                    'width': str(width),
-                                    'height': str(height)
-                                },
-                                MetadataDirective='REPLACE',
-                                ACL='public-read'  # Ensure file remains publicly readable
+                                Metadata={"width": str(width), "height": str(height)},
+                                MetadataDirective="REPLACE",
+                                ACL="public-read",  # Ensure file remains publicly readable
                             )
                             logger.info(f"Stored dimensions in S3 metadata: {width}x{height}")
                         except Exception as e:
@@ -725,11 +724,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 
                     # Get URLs
                     url = storage.url(file_path)
-                    public_url = (
-                        storage.get_public_url(file_path)
-                        if hasattr(storage, "get_public_url")
-                        else url
-                    )
+                    public_url = storage.get_public_url(file_path) if hasattr(storage, "get_public_url") else url
                     logger.info(f"Generated URL: {url}")
 
                     # Build response data
@@ -740,13 +735,13 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                         "publicUrl": public_url,
                         "size": image_file.size,
                     }
-                    
+
                     # Include dimensions if they were extracted
                     if width and height:
                         image_data["width"] = width
                         image_data["height"] = height
                         logger.info(f"Including dimensions in response: {width}x{height}")
-                    
+
                     uploaded_images.append(image_data)
 
                 except Exception as e:
@@ -760,16 +755,10 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     "success": len(uploaded_images),
                     "failed": len(errors),
                 },
-                status=(
-                    status.HTTP_201_CREATED
-                    if uploaded_images
-                    else status.HTTP_400_BAD_REQUEST
-                ),
+                status=(status.HTTP_201_CREATED if uploaded_images else status.HTTP_400_BAD_REQUEST),
             )
 
-    @action(
-        detail=True, methods=["delete"], url_path="library_images/(?P<filename>[^/]+)"
-    )
+    @action(detail=True, methods=["delete"], url_path="library_images/(?P<filename>[^/]+)")
     def delete_library_image(self, request, pk=None, filename=None):
         """
         Delete a specific image from theme library
@@ -907,9 +896,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 
         try:
             used_in = theme.get_image_usage(filename)
-            return Response(
-                {"filename": filename, "usedIn": used_in, "isUsed": len(used_in) > 0}
-            )
+            return Response({"filename": filename, "usedIn": used_in, "isUsed": len(used_in) > 0})
         except Exception as e:
             return Response(
                 {"error": f"Failed to get usage: {str(e)}"},
@@ -925,9 +912,9 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         """
         Rename a library image and update all references
         """
-        from file_manager.storage import S3MediaStorage
         import logging
-        import os
+
+        from file_manager.storage import S3MediaStorage
 
         logger = logging.getLogger(__name__)
         theme = self.get_object()
@@ -1019,9 +1006,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             # Update theme preview image if it matches
             if theme.image and filename in theme.image.name:
                 # Note: This might need manual handling as it's an ImageField
-                logger.warning(
-                    f"Theme preview image contains old filename: {theme.image.name}"
-                )
+                logger.warning(f"Theme preview image contains old filename: {theme.image.name}")
 
             return Response(
                 {
@@ -1049,9 +1034,9 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         """
         Replace a library image with a new file (keeping the same filename)
         """
-        from file_manager.storage import S3MediaStorage
         import logging
-        import uuid
+
+        from file_manager.storage import S3MediaStorage
 
         logger = logging.getLogger(__name__)
         theme = self.get_object()
@@ -1176,9 +1161,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 
         if style_type not in StyleAIHelper.STYLE_TYPES:
             return Response(
-                {
-                    "error": f"Invalid style_type. Must be one of: {StyleAIHelper.STYLE_TYPES}"
-                },
+                {"error": f"Invalid style_type. Must be one of: {StyleAIHelper.STYLE_TYPES}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -1241,9 +1224,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             }
 
             # Write theme data
-            zip_file.writestr(
-                "theme.json", json.dumps(theme_data, indent=2, ensure_ascii=False)
-            )
+            zip_file.writestr("theme.json", json.dumps(theme_data, indent=2, ensure_ascii=False))
 
             # Prepare metadata
             metadata = {
@@ -1257,9 +1238,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             }
 
             # Write metadata
-            zip_file.writestr(
-                "metadata.json", json.dumps(metadata, indent=2, ensure_ascii=False)
-            )
+            zip_file.writestr("metadata.json", json.dumps(metadata, indent=2, ensure_ascii=False))
 
             # Add image if exists
             if theme.image:
@@ -1274,9 +1253,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             library_images = theme.list_library_images()
             if library_images:
                 from file_manager.storage import S3MediaStorage
-                import logging
 
-                logger = logging.getLogger(__name__)
                 storage = S3MediaStorage()
 
                 for filename in library_images:
@@ -1290,23 +1267,17 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                             file_obj.close()
 
                             # Add to zip at: library_images/{filename}
-                            zip_file.writestr(
-                                f"library_images/{filename}", file_content
-                            )
+                            zip_file.writestr(f"library_images/{filename}", file_content)
                         else:
                             logger.warning(f"Library image not found: {path}")
 
                     except Exception as e:
-                        logger.warning(
-                            f"Failed to add library image to export: {str(e)}"
-                        )
+                        logger.warning(f"Failed to add library image to export: {str(e)}")
 
             # Also include legacy design_group_images for backward compatibility
             design_group_images = theme.get_design_group_image_urls()
             if design_group_images:
-                logger.info(
-                    f"Found {len(design_group_images)} design group images (legacy)"
-                )
+                logger.info(f"Found {len(design_group_images)} design group images (legacy)")
                 for url, metadata in design_group_images:
                     try:
                         # Extract path from URL
@@ -1328,23 +1299,17 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                             file_obj.close()
 
                             # Add to zip at: library_images/{filename} (migrate to library)
-                            zip_file.writestr(
-                                f"library_images/{filename}", file_content
-                            )
+                            zip_file.writestr(f"library_images/{filename}", file_content)
                         else:
                             logger.warning(f"Design group image not found: {path}")
 
                     except Exception as e:
-                        logger.warning(
-                            f"Failed to add design group image to export: {str(e)}"
-                        )
+                        logger.warning(f"Failed to add design group image to export: {str(e)}")
 
         # Prepare response
         zip_buffer.seek(0)
         response = HttpResponse(zip_buffer.read(), content_type="application/zip")
-        response["Content-Disposition"] = (
-            f'attachment; filename="theme_{theme.name.replace(" ", "_")}.zip"'
-        )
+        response["Content-Disposition"] = f'attachment; filename="theme_{theme.name.replace(" ", "_")}.zip"'
 
         return response
 
@@ -1354,6 +1319,12 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         Import a theme from a zip file.
         Expects multipart/form-data with 'theme_zip' file.
         """
+        tenant = getattr(request, "tenant", None)
+        if tenant is None or not tenant.user_has_access(request.user):
+            return Response(
+                {"error": "You do not have access to this tenant."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if "theme_zip" not in request.FILES:
             return Response(
                 {"error": "No theme_zip file provided"},
@@ -1383,7 +1354,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 base_name = metadata.get("name", "Imported Theme")
                 name = base_name
                 counter = 1
-                while PageTheme.objects.filter(name=name).exists():
+                while self.get_queryset().filter(name=name).exists():
                     counter += 1
                     name = f"{base_name} ({counter})"
 
@@ -1391,9 +1362,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 new_theme = PageTheme.objects.create(
                     tenant=request.tenant,
                     name=name,
-                    description=metadata.get(
-                        "description", "Imported from theme package"
-                    ),
+                    description=metadata.get("description", "Imported from theme package"),
                     fonts=theme_data.get("fonts", {}),
                     colors=theme_data.get("colors", {}),
                     design_groups=theme_data.get("design_groups", {}),
@@ -1418,26 +1387,21 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     image_file = image_files[0]
                     image_name = image_file.split("/")[-1]
                     image_content = zf.read(image_file)
-                    new_theme.image.save(
-                        image_name, ContentFile(image_content), save=True
-                    )
+                    new_theme.image.save(image_name, ContentFile(image_content), save=True)
 
                 # Handle library images (new format)
-                library_images = [
-                    f for f in zf.namelist() if f.startswith("library_images/")
-                ]
+                library_images = [f for f in zf.namelist() if f.startswith("library_images/")]
 
                 # Also check for legacy design_group_images
-                legacy_images = [
-                    f for f in zf.namelist() if f.startswith("design_group_images/")
-                ]
+                legacy_images = [f for f in zf.namelist() if f.startswith("design_group_images/")]
 
                 # Combine both lists
                 all_images = library_images + legacy_images
 
                 if all_images:
-                    from file_manager.storage import S3MediaStorage
                     import logging
+
+                    from file_manager.storage import S3MediaStorage
 
                     logger = logging.getLogger(__name__)
                     storage = S3MediaStorage()
@@ -1449,9 +1413,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                             image_content = zf.read(image_file)
 
                             # Upload to new theme's library directory
-                            new_path = (
-                                f"theme_images/{new_theme.id}/library/{image_name}"
-                            )
+                            new_path = f"theme_images/{new_theme.id}/library/{image_name}"
                             storage._save(new_path, ContentFile(image_content))
                             new_url = storage.url(new_path)
 
@@ -1459,9 +1421,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                             url_mapping[image_name] = new_url
 
                         except Exception as e:
-                            logger.warning(
-                                f"Failed to import image {image_file}: {str(e)}"
-                            )
+                            logger.warning(f"Failed to import image {image_file}: {str(e)}")
 
                     # Update image URLs in design_groups JSON
                     if url_mapping and new_theme.design_groups:
@@ -1469,44 +1429,24 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                         if "groups" in updated_groups:
                             for group in updated_groups["groups"]:
                                 if "layoutProperties" in group:
-                                    for part, breakpoints in group[
-                                        "layoutProperties"
-                                    ].items():
+                                    for part, breakpoints in group["layoutProperties"].items():
                                         for bp, props in breakpoints.items():
-                                            if "images" in props and isinstance(
-                                                props["images"], dict
-                                            ):
+                                            if "images" in props and isinstance(props["images"], dict):
                                                 for (
                                                     image_key,
                                                     image_data,
                                                 ) in props["images"].items():
                                                     if isinstance(image_data, dict):
                                                         # Try to match by filename
-                                                        old_url = image_data.get(
-                                                            "url"
-                                                        ) or image_data.get("fileUrl")
+                                                        old_url = image_data.get("url") or image_data.get("fileUrl")
                                                         if old_url:
                                                             # Extract filename from old URL
-                                                            old_filename = (
-                                                                old_url.split("/")[-1]
-                                                            )
-                                                            if (
-                                                                old_filename
-                                                                in url_mapping
-                                                            ):
-                                                                image_data["url"] = (
-                                                                    url_mapping[
-                                                                        old_filename
-                                                                    ]
-                                                                )
+                                                            old_filename = old_url.split("/")[-1]
+                                                            if old_filename in url_mapping:
+                                                                image_data["url"] = url_mapping[old_filename]
                                                                 # Remove fileUrl if present
-                                                                if (
-                                                                    "fileUrl"
-                                                                    in image_data
-                                                                ):
-                                                                    del image_data[
-                                                                        "fileUrl"
-                                                                    ]
+                                                                if "fileUrl" in image_data:
+                                                                    del image_data["fileUrl"]
 
                         new_theme.design_groups = updated_groups
                         new_theme.save()
@@ -1521,9 +1461,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             )
 
         except zipfile.BadZipFile:
-            return Response(
-                {"error": "Invalid zip file"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Invalid zip file"}, status=status.HTTP_400_BAD_REQUEST)
         except json.JSONDecodeError as e:
             return Response(
                 {"error": f"Invalid JSON in theme package: {str(e)}"},
