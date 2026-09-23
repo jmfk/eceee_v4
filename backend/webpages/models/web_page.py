@@ -11,12 +11,11 @@ WebPage Model
 Core page entity supporting hierarchical organization and inheritance.
 """
 
-from django.db import models, transaction
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
-from file_manager.storage import system_storage
+from django.db import models, transaction
 
 
 class WebPage(models.Model):
@@ -27,9 +26,7 @@ class WebPage(models.Model):
     """
 
     # Hierarchy support
-    parent = models.ForeignKey(
-        "self", null=True, blank=True, on_delete=models.CASCADE, related_name="children"
-    )
+    parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.CASCADE, related_name="children")
     sort_order = models.IntegerField(default=0)
 
     # Basic page information
@@ -118,9 +115,7 @@ class WebPage(models.Model):
         blank=True,
         help_text="Page-specific CSS variables that override theme variables",
     )
-    page_custom_css = models.TextField(
-        blank=True, help_text="Page-specific custom CSS injected after theme CSS"
-    )
+    page_custom_css = models.TextField(blank=True, help_text="Page-specific custom CSS injected after theme CSS")
 
     # Multi-site support for root pages
     hostnames = ArrayField(
@@ -141,12 +136,8 @@ class WebPage(models.Model):
     # Timestamps and ownership
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="created_pages"
-    )
-    last_modified_by = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="modified_pages"
-    )
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_pages")
+    last_modified_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="modified_pages")
 
     # Soft delete support
     is_deleted = models.BooleanField(
@@ -154,9 +145,7 @@ class WebPage(models.Model):
         db_index=True,
         help_text="Whether this page is marked as deleted (soft delete for reversibility)",
     )
-    deleted_at = models.DateTimeField(
-        null=True, blank=True, help_text="When this page was marked as deleted"
-    )
+    deleted_at = models.DateTimeField(null=True, blank=True, help_text="When this page was marked as deleted")
     deleted_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -179,9 +168,7 @@ class WebPage(models.Model):
         indexes = [
             models.Index(fields=["slug"], name="webpages_slug_idx"),
             models.Index(fields=["cached_path"], name="webpages_cached_path_idx"),
-            models.Index(
-                fields=["is_currently_published"], name="webpages_is_published_idx"
-            ),
+            models.Index(fields=["is_currently_published"], name="webpages_is_published_idx"),
             models.Index(fields=["cached_root_id"], name="webpages_cached_root_idx"),
             models.Index(fields=["tenant_id"], name="webpages_tenant_idx"),
             GinIndex(fields=["hostnames"], name="webpages_hostnames_gin_idx"),
@@ -239,7 +226,7 @@ class WebPage(models.Model):
         Normalize hostname with support for IPv6, IDN, and proper port handling.
 
         Security: Validates input length and format to prevent ReDoS attacks.
-        
+
         Ports are stripped by default so a registered hostname allows the same
         host across development and preview ports.
         """
@@ -255,7 +242,8 @@ class WebPage(models.Model):
         # Security: Basic character validation to prevent injection
         import re
 
-        # Allow protocol prefixes, alphanumeric chars, dots, dashes, brackets, colons, slashes, query params, and wildcards
+        # Allow protocol prefixes, alphanumeric characters, URL punctuation,
+        # query parameters, and wildcards.
         if not re.match(r"^[a-zA-Z0-9\[\]:._\-/\?#%\*]+$", hostname):
             return ""
 
@@ -411,9 +399,7 @@ class WebPage(models.Model):
                         return None  # Valid IPv6 address, no port
                     except ValueError:
                         # Not a valid IPv6, might be malformed
-                        raise ValidationError(
-                            f"Invalid hostname format (possible IPv6 without brackets): {hostname}"
-                        )
+                        raise ValidationError(f"Invalid hostname format (possible IPv6 without brackets): {hostname}")
 
                 # Standard host:port format
                 host_part, port_str = parts
@@ -423,9 +409,7 @@ class WebPage(models.Model):
             return None
 
         except ValueError as e:
-            raise ValidationError(
-                f"Invalid port format in hostname: {hostname} - {str(e)}"
-            )
+            raise ValidationError(f"Invalid port format in hostname: {hostname} - {str(e)}")
 
     def get_hostname_display(self):
         """Get a readable display of associated hostnames"""
@@ -463,13 +447,9 @@ class WebPage(models.Model):
                 import logging
 
                 logger = logging.getLogger(__name__)
-                logger.warning(
-                    f"Hostname array corruption detected for page {self.id}: {e}"
-                )
+                logger.warning(f"Hostname array corruption detected for page {self.id}: {e}")
                 # Clean and rebuild the hostnames array
-                self.hostnames = [
-                    h for h in self.hostnames if h and h != normalized_hostname
-                ]
+                self.hostnames = [h for h in self.hostnames if h and h != normalized_hostname]
                 self.save()
         return True
 
@@ -480,9 +460,7 @@ class WebPage(models.Model):
 
         # Normalize for comparison
         normalized_hostname = self.normalize_hostname(hostname)
-        return normalized_hostname in [
-            self.normalize_hostname(h) for h in self.hostnames
-        ]
+        return normalized_hostname in [self.normalize_hostname(h) for h in self.hostnames]
 
     @classmethod
     def get_root_page_for_hostname(cls, hostname):
@@ -545,9 +523,7 @@ class WebPage(models.Model):
             current_version = self.get_latest_version()
 
         if current_version and current_version.code_layout:
-            code_layout_instance = layout_registry.get_layout(
-                current_version.code_layout
-            )
+            code_layout_instance = layout_registry.get_layout(current_version.code_layout)
             if code_layout_instance:
                 return code_layout_instance
             # If code layout is specified but not found, log warning
@@ -556,20 +532,14 @@ class WebPage(models.Model):
             logger = logging.getLogger(__name__)
             # Get title for logging (fallback to slug if no version data)
             title = "Unknown"
-            if (
-                current_version
-                and current_version.page_data
-                and current_version.page_data.get("title")
-            ):
+            if current_version and current_version.page_data and current_version.page_data.get("title"):
                 title = current_version.page_data["title"]
             elif hasattr(current_version, "meta_title") and current_version.meta_title:
                 title = current_version.meta_title
             elif self.slug:
                 title = self.slug
 
-            logger.warning(
-                f"Code layout '{current_version.code_layout}' not found for page '{title}'."
-            )
+            logger.warning(f"Code layout '{current_version.code_layout}' not found for page '{title}'.")
 
         # Inherit from parent
         if self.parent:
@@ -627,6 +597,7 @@ class WebPage(models.Model):
                 return default_theme
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Error getting default theme: {e}")
 
@@ -717,7 +688,8 @@ class WebPage(models.Model):
     def clean(self):
         """Validate the page data"""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             # Skip complex validation on SQLite to avoid as_sql errors with ArrayField/GinIndex
             return
         super().clean()
@@ -732,15 +704,11 @@ class WebPage(models.Model):
 
         # Validate hostname assignment
         if self.hostnames and self.parent is not None:
-            raise ValidationError(
-                "Only root pages (pages without a parent) can have hostnames."
-            )
+            raise ValidationError("Only root pages (pages without a parent) can have hostnames.")
 
         # Validate site_icon assignment
         if getattr(self, "site_icon", None) and self.parent is not None:
-            raise ValidationError(
-                "Only root pages (pages without a parent) can have a site icon."
-            )
+            raise ValidationError("Only root pages (pages without a parent) can have a site icon.")
 
         # Validate hostname format
         if self.hostnames:
@@ -771,9 +739,7 @@ class WebPage(models.Model):
                     # Pattern allows:
                     # - Domain names: example.com, localhost:8000, sub.domain.com:3000
                     # - IPv6 addresses: [::1], [::1]:8080, [2001:db8::1]:443
-                    ipv6_pattern = (
-                        r"\[[0-9a-fA-F:]+\](:[0-9]{1,5})?"  # IPv6 with optional port
-                    )
+                    ipv6_pattern = r"\[[0-9a-fA-F:]+\](:[0-9]{1,5})?"  # IPv6 with optional port
                     domain_pattern = (
                         r"[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?"  # First part
                         r"(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*"  # Domain parts
@@ -791,9 +757,7 @@ class WebPage(models.Model):
                     port = self._extract_port_from_hostname(normalized_hostname)
                     if port is not None:
                         if not (1 <= port <= 65535):
-                            raise ValidationError(
-                                f"Port number must be between 1-65535: {hostname}"
-                            )
+                            raise ValidationError(f"Port number must be between 1-65535: {hostname}")
 
         # Validate path_pattern_key against registry
         if self.path_pattern_key:
@@ -827,9 +791,7 @@ class WebPage(models.Model):
                 ).exclude(pk=self.pk)
 
                 if conflicting_error_pages.exists():
-                    raise ValidationError(
-                        f"An error page with code '{self.slug}' already exists for this site."
-                    )
+                    raise ValidationError(f"An error page with code '{self.slug}' already exists for this site.")
 
         # Check for hostname conflicts with other root pages
         if self.hostnames and self.parent is None:
@@ -842,9 +804,7 @@ class WebPage(models.Model):
 
                 if conflicting_pages.exists():
                     conflicting_page = conflicting_pages.first()
-                    raise ValidationError(
-                        f"Hostname '{hostname}' is already used by page: {conflicting_page.title}"
-                    )
+                    raise ValidationError(f"Hostname '{hostname}' is already used by page: {conflicting_page.title}")
 
     def get_inheritance_chain(self):
         """Get the complete inheritance chain from root to this page"""
@@ -902,22 +862,16 @@ class WebPage(models.Model):
             if effective_layout:
                 inheritance_info["effective_layout"] = effective_layout
                 inheritance_info["effective_layout_dict"] = (
-                    effective_layout.to_dict()
-                    if hasattr(effective_layout, "to_dict")
-                    else None
+                    effective_layout.to_dict() if hasattr(effective_layout, "to_dict") else None
                 )
                 inheritance_info["layout_type"] = layout_type
-                inheritance_info["inherited_from"] = (
-                    current if current != self else None
-                )
+                inheritance_info["inherited_from"] = current if current != self else None
                 break
 
             current = current.parent
 
         # Get available code layouts for override
-        inheritance_info["override_options"]["code_layouts"] = (
-            layout_registry.list_layouts(active_only=True)
-        )
+        inheritance_info["override_options"]["code_layouts"] = layout_registry.list_layouts(active_only=True)
 
         return inheritance_info
 
@@ -948,9 +902,7 @@ class WebPage(models.Model):
 
             if current_theme:
                 inheritance_info["effective_theme"] = current_theme
-                inheritance_info["inherited_from"] = (
-                    current if current != self else None
-                )
+                inheritance_info["inherited_from"] = current if current != self else None
                 break
 
             current = current.parent
@@ -981,8 +933,6 @@ class WebPage(models.Model):
         - inheritance_level: How many levels deep widget inherits (-1 = infinite, 0 = page only)
         - inherit_from_parent: Master on/off for inheritance
         """
-        from django.utils import timezone
-
         inheritance_info = {}
 
         # Get all slots from effective layout
@@ -996,15 +946,11 @@ class WebPage(models.Model):
             slot_name = slot["name"]
 
             # Get slot configuration for inheritance rules
-            slot_allows_inheritance = slot.get(
-                "allows_inheritance", slot_name in ["header", "footer", "sidebar"]
-            )
+            slot_allows_inheritance = slot.get("allows_inheritance", slot_name in ["header", "footer", "sidebar"])
             # Support new allow_merge field (preferred) and fallback to old naming for compatibility
             slot_allow_merge = slot.get(
                 "allow_merge",
-                not slot.get(
-                    "allows_replacement_only", slot.get("requires_local", False)
-                ),
+                not slot.get("allows_replacement_only", slot.get("requires_local", False)),
             )
             # Get inheritable widget types (empty list means inherit all types)
             slot_inheritable_types = slot.get("inheritable_types", [])
@@ -1019,13 +965,9 @@ class WebPage(models.Model):
 
             # If slot doesn't allow inheritance at all, only get local widgets
             if not slot_allows_inheritance:
-                current_version = (
-                    self.get_current_published_version() or self.get_latest_version()
-                )
+                current_version = self.get_current_published_version() or self.get_latest_version()
                 if current_version and current_version.widgets:
-                    local_widgets = self._filter_published_widgets(
-                        current_version.widgets.get(slot_name, [])
-                    )
+                    local_widgets = self._filter_published_widgets(current_version.widgets.get(slot_name, []))
                     # Use array position as order - no need to sort
                     for widget_data in local_widgets:
                         inheritance_info[slot_name]["widgets"].append(
@@ -1033,12 +975,8 @@ class WebPage(models.Model):
                                 "widget": widget_data,
                                 "page": self,
                                 "inherited_from": None,
-                                "is_override": widget_data.get(
-                                    "override_parent", False
-                                ),
-                                "allows_inheritance": widget_data.get(
-                                    "inherit_from_parent", True
-                                ),
+                                "is_override": widget_data.get("override_parent", False),
+                                "allows_inheritance": widget_data.get("inherit_from_parent", True),
                             }
                         )
                 continue
@@ -1050,9 +988,7 @@ class WebPage(models.Model):
             inherited_widgets_found = False
             local_widgets = []
             inherited_widgets = []
-            all_inherited_widgets = (
-                []
-            )  # Collect ALL inherited for API (not filtered by logic)
+            all_inherited_widgets = []  # Collect ALL inherited for API (not filtered by logic)
 
             while current:
                 # Get current published version, or fallback to latest version for editor
@@ -1072,11 +1008,7 @@ class WebPage(models.Model):
                     published_widgets = self._filter_published_widgets(raw_widgets)
 
                     # Filter by inheritance level
-                    page_widgets = [
-                        w
-                        for w in published_widgets
-                        if self._widget_inheritable_at_depth(w, depth)
-                    ]
+                    page_widgets = [w for w in published_widgets if self._widget_inheritable_at_depth(w, depth)]
 
                     # Use array position as order - no need to sort
 
@@ -1088,20 +1020,12 @@ class WebPage(models.Model):
                     # Process widgets from this level
                     for widget_data in page_widgets:
                         # Check if widget type is allowed for inheritance (if inheritable_types is specified)
-                        inheritable_types = inheritance_info[slot_name].get(
-                            "inheritable_types", []
-                        )
-                        widget_type = widget_data.get("widget_type") or widget_data.get(
-                            "type"
-                        )
+                        inheritable_types = inheritance_info[slot_name].get("inheritable_types", [])
+                        widget_type = widget_data.get("widget_type") or widget_data.get("type")
 
                         # If inheritable_types is specified and widget is from parent, filter by type
                         is_from_parent = current != self
-                        if (
-                            is_from_parent
-                            and inheritable_types
-                            and widget_type not in inheritable_types
-                        ):
+                        if is_from_parent and inheritable_types and widget_type not in inheritable_types:
                             # Skip this widget - type not in inheritable list
                             continue
 
@@ -1110,12 +1034,8 @@ class WebPage(models.Model):
                             "page": current,
                             "inherited_from": current if current != self else None,
                             "is_override": widget_data.get("override_parent", False),
-                            "allows_inheritance": widget_data.get(
-                                "inherit_from_parent", True
-                            ),
-                            "inheritance_level": widget_data.get(
-                                "inheritance_level", 0
-                            ),
+                            "allows_inheritance": widget_data.get("inherit_from_parent", True),
+                            "inheritance_level": widget_data.get("inheritance_level", 0),
                             "depth": depth,
                         }
 
@@ -1130,9 +1050,7 @@ class WebPage(models.Model):
                             if is_from_current:
                                 # Will add local widgets at the end
                                 pass
-                            elif not inherited_widgets_found and widget_data.get(
-                                "inherit_from_parent", True
-                            ):
+                            elif not inherited_widgets_found and widget_data.get("inherit_from_parent", True):
                                 # First parent level with inheritable widgets
                                 inherited_widgets.append(widget_info)
                         else:
@@ -1143,26 +1061,16 @@ class WebPage(models.Model):
                                 and widget_data.get("inherit_from_parent", True)
                             )
 
-                            should_include = (
-                                is_from_current or is_from_parent_and_inheritable
-                            )
+                            should_include = is_from_current or is_from_parent_and_inheritable
 
                             if should_include:
-                                inheritance_info[slot_name]["widgets"].append(
-                                    widget_info
-                                )
+                                inheritance_info[slot_name]["widgets"].append(widget_info)
 
                     # Check for overrides in this page's widgets
-                    has_overrides = any(
-                        w.get("override_parent", False) for w in page_widgets
-                    )
+                    has_overrides = any(w.get("override_parent", False) for w in page_widgets)
 
                     # Mark that we found inheritable widgets at this level
-                    if (
-                        current != self
-                        and len(page_widgets) > 0
-                        and not inherited_widgets_found
-                    ):
+                    if current != self and len(page_widgets) > 0 and not inherited_widgets_found:
                         inherited_widgets_found = True
 
                 inheritance_info[slot_name]["inheritance_chain"].append(
@@ -1175,18 +1083,11 @@ class WebPage(models.Model):
                 )
 
                 # REPLACE MODE: If current page has widgets, stop walking up the chain
-                if (
-                    not inheritance_info[slot_name]["merge_mode"]
-                    and slot_has_local_widgets
-                ):
+                if not inheritance_info[slot_name]["merge_mode"] and slot_has_local_widgets:
                     break
 
                 # MERGE MODE: Stop after finding first inheritable parent widgets
-                if (
-                    inheritance_info[slot_name]["merge_mode"]
-                    and inherited_widgets_found
-                    and slot_has_local_widgets
-                ):
+                if inheritance_info[slot_name]["merge_mode"] and inherited_widgets_found and slot_has_local_widgets:
                     break
 
                 current = current.parent
@@ -1194,9 +1095,7 @@ class WebPage(models.Model):
 
             # TYPE-BASED REPLACEMENT: If local widgets match inheritable_types, skip all inherited
             if slot_inheritable_types and local_widgets:
-                local_types = {
-                    w.get("widget_type") or w.get("type") for w in local_widgets
-                }
+                local_types = {w.get("widget_type") or w.get("type") for w in local_widgets}
                 # If any local widget type matches inheritable_types, clear inherited widgets
                 if local_types & set(slot_inheritable_types):
                     inherited_widgets = []
@@ -1216,9 +1115,7 @@ class WebPage(models.Model):
                         "page": self,
                         "inherited_from": None,
                         "is_override": widget_data.get("override_parent", False),
-                        "allows_inheritance": widget_data.get(
-                            "inherit_from_parent", True
-                        ),
+                        "allows_inheritance": widget_data.get("inherit_from_parent", True),
                         "inheritance_level": widget_data.get("inheritance_level", 0),
                         "depth": 0,
                     }
@@ -1248,14 +1145,10 @@ class WebPage(models.Model):
 
                 # CRITICAL: Store ALL inherited widgets separately for API access
                 # The API needs to always return inherited widgets, even when overridden
-                inheritance_info[slot_name][
-                    "inherited_widgets_raw"
-                ] = all_inherited_widgets
+                inheritance_info[slot_name]["inherited_widgets_raw"] = all_inherited_widgets
             else:
                 # REPLACE MODE: Store inherited widgets for API (even though they won't render)
-                inheritance_info[slot_name][
-                    "inherited_widgets_raw"
-                ] = all_inherited_widgets
+                inheritance_info[slot_name]["inherited_widgets_raw"] = all_inherited_widgets
 
         return inheritance_info
 
@@ -1273,7 +1166,7 @@ class WebPage(models.Model):
                 is_visible = widget.get("isVisible", True)
             if not is_visible:
                 continue  # Skip hidden widgets
-            
+
             # Check is_published flag (check both snake_case and camelCase, default to True for backward compatibility)
             is_published = widget.get("is_published")
             if is_published is None:
@@ -1282,30 +1175,22 @@ class WebPage(models.Model):
                 continue
 
             # Check effective date (check both snake_case and camelCase)
-            effective_date = widget.get("publish_effective_date") or widget.get(
-                "publishEffectiveDate"
-            )
+            effective_date = widget.get("publish_effective_date") or widget.get("publishEffectiveDate")
             if effective_date:
                 from datetime import datetime
 
                 if isinstance(effective_date, str):
-                    effective_date = datetime.fromisoformat(
-                        effective_date.replace("Z", "+00:00")
-                    )
+                    effective_date = datetime.fromisoformat(effective_date.replace("Z", "+00:00"))
                 if effective_date > now:
                     continue
 
             # Check expire date (check both snake_case and camelCase)
-            expire_date = widget.get("publish_expire_date") or widget.get(
-                "publishExpireDate"
-            )
+            expire_date = widget.get("publish_expire_date") or widget.get("publishExpireDate")
             if expire_date:
                 from datetime import datetime
 
                 if isinstance(expire_date, str):
-                    expire_date = datetime.fromisoformat(
-                        expire_date.replace("Z", "+00:00")
-                    )
+                    expire_date = datetime.fromisoformat(expire_date.replace("Z", "+00:00"))
                 if expire_date < now:
                     continue
 
@@ -1318,19 +1203,13 @@ class WebPage(models.Model):
         from ..json_models import WidgetInheritanceBehavior
 
         # Get inheritance behavior (with backward compatibility)
-        inheritance_behavior = widget.get("inheritance_behavior") or widget.get(
-            "inheritanceBehavior"
-        )
+        inheritance_behavior = widget.get("inheritance_behavior") or widget.get("inheritanceBehavior")
         if not inheritance_behavior:
             # Backward compatibility: convert old boolean fields (check both snake_case and camelCase)
-            inherit_from_parent = widget.get("inherit_from_parent") or widget.get(
-                "inheritFromParent"
-            )
+            inherit_from_parent = widget.get("inherit_from_parent") or widget.get("inheritFromParent")
             if inherit_from_parent is None:
                 inherit_from_parent = True
-            override_parent = widget.get("override_parent") or widget.get(
-                "overrideParent", False
-            )
+            override_parent = widget.get("override_parent") or widget.get("overrideParent", False)
 
             if not inherit_from_parent:
                 return depth == 0  # Only on its own page
@@ -1376,7 +1255,7 @@ class WebPage(models.Model):
         # Check for circular references (should be prevented by clean())
         try:
             self.get_inheritance_chain()
-        except Exception as e:
+        except Exception:
             conflicts.append(
                 {
                     "type": "circular_reference",
@@ -1415,9 +1294,7 @@ class WebPage(models.Model):
         # Since theme and code_layout are now stored in PageVersion,
         # this method needs to create a new version with the override
         # For now, disable functionality to prevent errors
-        raise NotImplementedError(
-            "apply_inheritance_override needs to be updated to work with PageVersion model"
-        )
+        raise NotImplementedError("apply_inheritance_override needs to be updated to work with PageVersion model")
 
     def get_canonical_url(self):
         """Get the canonical URL for this page"""
@@ -1439,12 +1316,8 @@ class WebPage(models.Model):
         # Use atomic transaction to prevent race conditions
         with transaction.atomic():
             # Get the latest version number with row-level locking
-            latest_version = (
-                self.versions.select_for_update().order_by("-version_number").first()
-            )
-            version_number = (
-                (latest_version.version_number + 1) if latest_version else 1
-            )
+            latest_version = self.versions.select_for_update().order_by("-version_number").first()
+            version_number = (latest_version.version_number + 1) if latest_version else 1
 
             # Serialize current page state (excluding widgets and publishing dates)
             page_data = {
@@ -1486,17 +1359,9 @@ class WebPage(models.Model):
                 version_title=version_title,
                 page_data=page_data,
                 widgets=widgets_data,
-                effective_date=(
-                    effective_date
-                    or (
-                        timezone.now()
-                        if auto_publish or status == "published"
-                        else None
-                    )
-                ),
+                effective_date=(effective_date or (timezone.now() if auto_publish or status == "published" else None)),
                 expiry_date=expiry_date,
-                change_summary=kwargs.get("description")
-                or kwargs.get("change_summary", ""),
+                change_summary=kwargs.get("description") or kwargs.get("change_summary", ""),
                 created_by=user,
             )
             return version
@@ -1520,10 +1385,6 @@ class WebPage(models.Model):
             .order_by("-effective_date", "-version_number")
             .first()
         )
-
-    def get_latest_version(self):
-        """Get the latest version of this page (uses cache)"""
-        return self.latest_version
 
     def has_newer_versions(self):
         """Check if there are versions newer than the current published version"""
@@ -1556,9 +1417,7 @@ class WebPage(models.Model):
             parent_id: ID of parent page, or None for root pages
         """
         if parent_id:
-            siblings = cls.objects.filter(parent_id=parent_id).order_by(
-                "sort_order", "title"
-            )
+            siblings = cls.objects.filter(parent_id=parent_id).order_by("sort_order", "title")
         else:
             siblings = cls.objects.filter(parent__isnull=True, tenant_id=tenant_id).order_by("sort_order", "title")
 
@@ -1585,38 +1444,24 @@ class WebPage(models.Model):
         if not current_version:
             current_version = self.get_latest_version()
 
-        version_page_css_variables = (
-            getattr(current_version, "page_css_variables", None) or {}
-        )
+        version_page_css_variables = getattr(current_version, "page_css_variables", None) or {}
         version_page_custom_css = getattr(current_version, "page_custom_css", None)
         version_enable_css_injection = (
-            getattr(current_version, "enable_css_injection", None)
-            if current_version is not None
-            else None
+            getattr(current_version, "enable_css_injection", None) if current_version is not None else None
         )
 
         css_data = {
             "theme_css_variables": {},
             "theme_custom_css": "",
             "page_css_variables": (
-                version_page_css_variables
-                if version_page_css_variables
-                else (self.page_css_variables or {})
+                version_page_css_variables if version_page_css_variables else (self.page_css_variables or {})
             ),
-            "page_custom_css": (
-                version_page_custom_css
-                if version_page_custom_css
-                else (self.page_custom_css or "")
-            ),
+            "page_custom_css": (version_page_custom_css if version_page_custom_css else (self.page_custom_css or "")),
             # CSS injection priority: version-level setting > page-level setting
             "enable_css_injection": (
                 version_enable_css_injection
                 if version_enable_css_injection is not None
-                else (
-                    self.enable_css_injection
-                    if self.enable_css_injection is not None
-                    else True
-                )
+                else (self.enable_css_injection if self.enable_css_injection is not None else True)
             ),
             "layout_css": "",
             "widgets_css": {},
@@ -1741,12 +1586,7 @@ class WebPage(models.Model):
                         context=f"Widget: {widget_info['widget_type']}",
                     )
                     if not is_valid:
-                        all_errors.extend(
-                            [
-                                f"Widget {widget_info['widget_type']}: {error}"
-                                for error in errors
-                            ]
-                        )
+                        all_errors.extend([f"Widget {widget_info['widget_type']}: {error}" for error in errors])
 
         return len(all_errors) == 0, all_errors, all_warnings
 
@@ -1786,12 +1626,8 @@ class WebPage(models.Model):
         # Add page custom CSS
         if css_data["page_custom_css"]:
             if include_scoping:
-                scope_id = css_injection_manager.generate_css_scope_id(
-                    page_id=str(self.id)
-                )
-                scoped_css = css_injection_manager.scope_css(
-                    css_data["page_custom_css"], scope_id, "page"
-                )
+                scope_id = css_injection_manager.generate_css_scope_id(page_id=str(self.id))
+                scoped_css = css_injection_manager.scope_css(css_data["page_custom_css"], scope_id, "page")
                 css_parts.append(f"/* Page CSS */\n{scoped_css}")
             else:
                 css_parts.append(f"/* Page CSS */\n{css_data['page_custom_css']}")
@@ -1814,13 +1650,9 @@ class WebPage(models.Model):
                             f"Widget: {widget_info['widget_type']}",
                         )
                         if is_valid:
-                            css_parts.append(
-                                f"/* Widget: {widget_info['widget_type']} */\n{scoped_css}"
-                            )
+                            css_parts.append(f"/* Widget: {widget_info['widget_type']} */\n{scoped_css}")
                     else:
-                        css_parts.append(
-                            f"/* Widget: {widget_info['widget_type']} */\n{css_data['widget_css']}"
-                        )
+                        css_parts.append(f"/* Widget: {widget_info['widget_type']} */\n{css_data['widget_css']}")
 
         return "\n\n".join(css_parts)
 
@@ -1853,15 +1685,11 @@ class WebPage(models.Model):
         current = self.parent
         while current:
             parent_chain.append(current.id)
-            parent_path_display.append(
-                current.title or current.slug or f"Page {current.id}"
-            )
+            parent_path_display.append(current.title or current.slug or f"Page {current.id}")
             current = current.parent
 
         metadata["parent_id_chain"] = parent_chain
-        metadata["parent_path_display"] = (
-            " > ".join(reversed(parent_path_display)) if parent_path_display else "Root"
-        )
+        metadata["parent_path_display"] = " > ".join(reversed(parent_path_display)) if parent_path_display else "Root"
 
         # Count children for display
         children_count = self.children.filter(is_deleted=False).count()
@@ -2024,7 +1852,9 @@ class WebPage(models.Model):
                         child_slug_result = descendant.ensure_unique_slug()
                         if child_slug_result["modified"]:
                             result["warnings"].append(
-                                f"Child page slug renamed: '{child_slug_result['original_slug']}' → '{child_slug_result['new_slug']}'"
+                                f"Child page slug renamed: "
+                                f"'{child_slug_result['original_slug']}' → "
+                                f"'{child_slug_result['new_slug']}'"
                             )
 
                         descendant.save(
@@ -2050,7 +1880,9 @@ class WebPage(models.Model):
                 child_slug_result = child.ensure_unique_slug()
                 if child_slug_result["modified"]:
                     result["warnings"].append(
-                        f"Child page slug renamed: '{child_slug_result['original_slug']}' → '{child_slug_result['new_slug']}'"
+                        f"Child page slug renamed: "
+                        f"'{child_slug_result['original_slug']}' → "
+                        f"'{child_slug_result['new_slug']}'"
                     )
 
                 child.save(
@@ -2095,9 +1927,7 @@ class WebPage(models.Model):
         # Check if original parent still exists and is not deleted
         if original_parent_id:
             try:
-                original_parent = WebPage.objects.get(
-                    id=original_parent_id, is_deleted=False
-                )
+                WebPage.objects.get(id=original_parent_id, is_deleted=False)
                 result["new_parent_id"] = original_parent_id
                 return result
             except WebPage.DoesNotExist:
@@ -2111,7 +1941,8 @@ class WebPage(models.Model):
                         result["new_parent_id"] = ancestor_id
                         result["relocated"] = True
                         result["warning"] = (
-                            f"Original parent no longer exists. Page restored under '{ancestor.title or ancestor.slug}' instead."
+                            "Original parent no longer exists. Page restored under "
+                            f"'{ancestor.title or ancestor.slug}' instead."
                         )
                         return result
                     except WebPage.DoesNotExist:
@@ -2120,9 +1951,7 @@ class WebPage(models.Model):
                 # No ancestors found, restore as root page
                 result["new_parent_id"] = None
                 result["relocated"] = True
-                result["warning"] = (
-                    "Original parent no longer exists. Page restored as root page."
-                )
+                result["warning"] = "Original parent no longer exists. Page restored as root page."
                 return result
         else:
             # Was originally a root page
@@ -2154,8 +1983,7 @@ class WebPage(models.Model):
         """
         if not self.is_deleted:
             raise ValidationError(
-                "Cannot permanently delete a page that is not soft-deleted. "
-                "Use soft_delete() first."
+                "Cannot permanently delete a page that is not soft-deleted. " "Use soft_delete() first."
             )
 
         deleted_pages = []
@@ -2184,9 +2012,6 @@ class WebPage(models.Model):
                 "slug": self.slug,
             }
         )
-
-        # Store info before deletion
-        page_id = self.id
 
         # Actually delete from database
         super().delete()

@@ -249,7 +249,11 @@ class PageVersionAPISimpleTest(APITestCase):
         """Test restoring a version via API"""
         url = reverse("api:pageversion-restore", kwargs={"pk": self.draft.pk})
 
-        response = self.client.post(url)
+        response = self.client.post(
+            url,
+            {"clientUpdatedAt": self.draft.updated_at.isoformat()},
+            format="json",
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("message", response.data)
 

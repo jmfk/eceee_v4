@@ -4,8 +4,10 @@ PageTheme Model
 Theme configurations for page styling including colors, fonts, and CSS.
 """
 
-from django.db import models
 from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
+from django.db import models
+
 from file_manager.storage import system_storage
 
 
@@ -35,12 +37,16 @@ class PageTheme(models.Model):
         blank=True,
         help_text=(
             "Grouped HTML element styles with optional widget_type/slot targeting. "
-            "Each group can have an 'isDefault' boolean field to mark it as the base/default group for style inheritance. "
+            "Each group can have an 'isDefault' boolean field to mark it as the "
+            "base/default group for style inheritance. "
             "Groups can also include 'layoutProperties' to define responsive layout and styling settings "
             "(width, height, padding, margin, gap, background-color, color, border properties, etc.) "
-            "for widget layout parts (e.g., container, header, image, content) across mobile-first breakpoints (sm, md, lg, xl). "
-            "Supports two targeting modes via 'targetingMode' field: 'widget-slot' (default) for widget_types/slots arrays, "
-            "or 'css-classes' for custom CSS selectors defined in 'targetCssClasses' field (string with comma or newline-separated selectors)."
+            "for widget layout parts (e.g., container, header, image, content) across "
+            "mobile-first breakpoints (sm, md, lg, xl). "
+            "Supports two targeting modes via 'targetingMode' field: 'widget-slot' "
+            "(default) for widget_types/slots arrays, or 'css-classes' for custom CSS "
+            "selectors defined in 'targetCssClasses' field (string with comma or "
+            "newline-separated selectors)."
         ),
     )
     component_styles = models.JSONField(
@@ -1554,8 +1560,8 @@ class PageTheme(models.Model):
             slot: Optional slot name for filtering
             frontend_scoped: If True, prepend .cms-content to all selectors
         """
-        import re
         import logging
+        import re
 
         logger = logging.getLogger(__name__)
 
@@ -1653,7 +1659,6 @@ class PageTheme(models.Model):
                 base_selectors = [f".cms-content {sel}".strip() if sel else ".cms-content" for sel in base_selectors]
 
             # Calculate selectors for each HTML element
-            element_selectors_map = {}
             elements = group.get("elements", {})
             for element, styles in elements.items():
                 if not styles:
@@ -1897,7 +1902,8 @@ class PageTheme(models.Model):
                         css_rules = []
                         for prop_name, prop_value in bp_props.items():
                             # Handle 'background_image' field (composite property with url and CSS options)
-                            # Format: {url, size, filename, width, height, dpr, backgroundSize, backgroundPosition, backgroundRepeat, useAspectRatio, aspectRatio}
+                            # Composite format includes URL, dimensions, DPR,
+                            # background options, and aspect-ratio settings.
                             # dpr: device pixel ratio, defaults to 2 (means image is @2x)
                             if prop_name in ["background_image", "backgroundImage"]:
                                 if isinstance(prop_value, dict):
@@ -2027,8 +2033,9 @@ class PageTheme(models.Model):
         Returns:
             List of CSS rule strings
         """
-        from file_manager.imgproxy import imgproxy_service
         import logging
+
+        from file_manager.imgproxy import imgproxy_service
 
         logger = logging.getLogger(__name__)
         css_rules = []
@@ -2089,7 +2096,7 @@ class PageTheme(models.Model):
         else:
             # No dimensions available or dpr=1 - route through imgproxy for caching
             if not width or not height:
-                logger.debug(f"No dimensions available for image, routing through imgproxy for caching")
+                logger.debug("No dimensions available for image, routing through imgproxy for caching")
             try:
                 # Generate imgproxy URL without resize (original size for caching)
                 imgproxy_url = imgproxy_service.generate_url(
@@ -2232,8 +2239,6 @@ class PageTheme(models.Model):
         for font in self.fonts.get("google_fonts", []):
             family = font.get("family", "")
             variants = font.get("variants", ["regular"])
-            display = font.get("display", "swap")
-
             if family:
                 # Format: Family:variant1,variant2&display=swap
                 variant_str = ":".join([",".join(str(v) for v in variants)])
@@ -2318,8 +2323,9 @@ class PageTheme(models.Model):
         List all images in the theme's library folder.
         Returns list of filenames.
         """
-        from file_manager.storage import system_storage
         import logging
+
+        from file_manager.storage import system_storage
 
         logger = logging.getLogger(__name__)
         storage = system_storage
@@ -2526,6 +2532,7 @@ class PageTheme(models.Model):
     def delete(self, *args, **kwargs):
         """Delete theme and cleanup design group images from object storage"""
         import logging
+
         from file_manager.storage import system_storage
 
         logger = logging.getLogger(__name__)
@@ -2587,6 +2594,7 @@ class PageTheme(models.Model):
         library_images = self.list_library_images()
         if library_images:
             import logging
+
             from file_manager.storage import system_storage
 
             logger = logging.getLogger(__name__)
@@ -2652,7 +2660,7 @@ class PageTheme(models.Model):
                                 file_content = old_file.read()
                                 old_file.close()
                                 storage._save(new_path, ContentFile(file_content))
-                except:
+                except Exception:
                     pass  # Directory might not exist
         except Exception as e:
             logger.warning(f"Failed to check legacy design_groups during clone: {str(e)}")

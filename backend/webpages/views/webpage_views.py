@@ -125,8 +125,10 @@ class WebPageViewSet(viewsets.ModelViewSet):
             )
 
         if self.action in ["list", "retrieve"]:
-            # For public endpoints, only show published pages to non-staff users
-            if not self.request.user.is_staff:
+            # A selected tenant is an administrative context that has already
+            # passed membership authorization above. Only tenant-less readers
+            # are restricted to currently published pages.
+            if not self.request.user.is_staff and tenant is None:
                 # Use database-level filtering to avoid N+1 queries
                 # This uses the same logic as WebPageFilter.filter_is_published
                 now = timezone.now()

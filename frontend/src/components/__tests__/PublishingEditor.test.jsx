@@ -95,4 +95,60 @@ describe('PublishingEditor', () => {
         expect(versionsApi.restore).toHaveBeenCalledWith(10, '2030-01-01T10:00:00Z')
         await waitFor(() => expect(onVersionRestored).toHaveBeenCalledWith(restored))
     })
+
+    it('shows restore conflicts and refreshes the workflow', async () => {
+        versionsApi.getPageVersionsList.mockResolvedValue([
+            {
+                id: 11,
+                versionNumber: 2,
+                versionTitle: 'Working',
+                publicationStatus: 'draft',
+                createdAt: '2030-01-01T10:00:00Z',
+            },
+            {
+                id: 10,
+                versionNumber: 1,
+                versionTitle: 'Historical',
+                publicationStatus: 'published',
+                createdAt: '2029-12-01T10:00:00Z',
+            },
+        ])
+        versionsApi.restore.mockRejectedValue(new Error('The working version changed. Refresh and try again.'))
+
+        renderEditor()
+        fireEvent.click(await screen.findByRole('button', { name: /restore as working/i }))
+
+        await waitFor(() => expect(addNotification).toHaveBeenCalledWith(
+            'The working version changed. Refresh and try again.',
+            'error',
+        ))
+        expect(versionsApi.getWorkflow).toHaveBeenCalledTimes(2)
+    })
+
+    it('shows cancel-schedule failures and refreshes the workflow', async () => {
+        versionsApi.getWorkflow.mockResolvedValue({
+            state: 'live_with_scheduled_changes',
+            editableVersion: { id: 11, updatedAt: '2030-01-01T10:00:00Z' },
+            liveVersion: { id: 10 },
+            scheduledVersion: { id: 11 },
+            scheduledAt: '2030-01-02T10:00:00Z',
+        })
+        versionsApi.cancelWorkingCopySchedule.mockRejectedValue(new Error('The schedule changed.'))
+
+        renderEditor()
+        fireEvent.click(await screen.findByRole('button', { name: /cancel schedule/i }))
+
+        await waitFor(() => expect(addNotification).toHaveBeenCalledWith('The schedule changed.', 'error'))
+        expect(versionsApi.getWorkflow).toHaveBeenCalledTimes(2)
+    })
+
+    it('shows unpublish failures and refreshes the workflow', async () => {
+        versionsApi.unpublishExplicit.mockRejectedValue(new Error('The live version changed.'))
+
+        renderEditor()
+        fireEvent.click(await screen.findByRole('button', { name: /^unpublish$/i }))
+
+        await waitFor(() => expect(addNotification).toHaveBeenCalledWith('The live version changed.', 'error'))
+        expect(versionsApi.getWorkflow).toHaveBeenCalledTimes(2)
+    })
 })

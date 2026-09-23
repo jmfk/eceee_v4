@@ -10,7 +10,7 @@ const statusStyles = {
     draft: 'bg-amber-50 text-amber-700 border-amber-200',
 }
 
-const PageVersionHistoryPanel = ({ pageId, workflow, onRestored, confirmRestore }) => {
+const PageVersionHistoryPanel = ({ pageId, workflow, onRestored, onRestoreError, confirmRestore }) => {
     const [versions, setVersions] = useState([])
     const [loading, setLoading] = useState(true)
     const [restoringId, setRestoringId] = useState(null)
@@ -54,6 +54,11 @@ const PageVersionHistoryPanel = ({ pageId, workflow, onRestored, confirmRestore 
             const result = await versionsApi.restore(id, workflow?.editableVersion?.updatedAt || null)
             await load()
             await onRestored?.(result.version)
+        } catch (error) {
+            await Promise.allSettled([
+                load(),
+                onRestoreError?.(error),
+            ])
         } finally {
             setRestoringId(null)
         }
