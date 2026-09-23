@@ -1468,3 +1468,24 @@ class PageVersionMutationTransactionTest(TransactionTestCase):
         self.assertGreaterEqual(len(lock_queries), 2)
         self.assertIn("webpages_webpage", lock_queries[0])
         self.assertIn("webpages_pageversion", lock_queries[1])
+
+    def test_scheduled_working_copy_must_be_cancelled_before_delete(self):
+        now = timezone.now()
+        self.version.effective_date = now
+        self.version.save(update_fields=["effective_date", "updated_at"])
+        scheduled, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        PageVersionWorkflowService(self.page, self.user).schedule(
+            scheduled,
+            now + timedelta(days=1),
+            expected_updated_at=scheduled.updated_at,
+        )
+        self.version.refresh_from_db()
+        scheduled_expiry = self.version.expiry_date
+
+        response = self.client.delete(reverse("api:pageversion-detail", kwargs={"pk": scheduled.pk}))
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["error"], "schedule_conflict")
+        self.assertTrue(PageVersion.objects.filter(pk=scheduled.pk).exists())
+        self.version.refresh_from_db()
+        self.assertEqual(self.version.expiry_date, scheduled_expiry)

@@ -182,6 +182,8 @@ class PageVersionViewSet(
         locked = PageVersion.objects.select_for_update().get(pk=instance.pk, page=locked_page)
         service = PageVersionWorkflowService(locked_page, self.request.user)
         service.assert_canonical_editable(locked)
+        if locked.effective_date and locked.effective_date > timezone.now():
+            raise ScheduleConflictError("Cancel the schedule before deleting this working version.")
         from file_manager.utils import cleanup_content_references
 
         # Clean up media references before deleting
@@ -189,6 +191,14 @@ class PageVersionViewSet(
 
         # Perform the actual deletion
         super().perform_destroy(locked)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        try:
+            self.perform_destroy(instance)
+        except WorkflowError as error:
+            return self._workflow_error_response(error)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
