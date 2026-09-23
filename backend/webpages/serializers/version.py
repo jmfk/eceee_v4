@@ -203,7 +203,9 @@ class PageVersionSerializer(serializers.ModelSerializer):
 
     def validate_change_summary(self, value):
         """Keep workflow metadata object-shaped while accepting legacy strings."""
-        return normalize_change_summary(value)
+        summary = normalize_change_summary(value)
+        summary.pop(SCHEDULE_PREDECESSOR_KEY, None)
+        return summary
 
     def get_version_id(self, obj):
         return obj.id
