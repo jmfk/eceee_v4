@@ -192,6 +192,24 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "created_by",
         ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        page = getattr(self.instance, "page", None)
+        tenant_id = getattr(page, "tenant_id", None)
+        if tenant_id is None:
+            tenant_id = getattr(getattr(self.context.get("request"), "tenant", None), "pk", None)
+        self.fields["theme"].queryset = (
+            PageTheme.objects.filter(tenant_id=tenant_id) if tenant_id is not None else PageTheme.objects.none()
+        )
+
+    def validate_theme(self, theme):
+        """Keep a version's explicit theme inside its page tenant."""
+        if theme is None or self.instance is None:
+            return theme
+        if theme.tenant_id != self.instance.page.tenant_id:
+            raise serializers.ValidationError("Theme must belong to the page tenant.")
+        return theme
+
     def get_version_id(self, obj):
         return obj.id
 

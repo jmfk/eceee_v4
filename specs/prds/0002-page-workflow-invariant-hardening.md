@@ -72,6 +72,7 @@ The simplified version workflow still has compatibility paths that can mutate pa
 - 2026-09-22: Scheduled slug activation failures now restore the predecessor and retain the rejected content as a draft with failure metadata.
 - 2026-09-22: The effective Beat schedule now retains the scheduled-publication task, and deployment reloads wait until the page editor is clean.
 - 2026-09-23: Deployment reload protection was extended to observe the shared page, theme, and object dirty metadata. A pending reload resumes only after every editor signal is clean.
+- 2026-09-23: Working-copy theme selection is scoped to the page tenant and rejects cross-tenant theme relations.
 
 ## Linked ADRs
 
