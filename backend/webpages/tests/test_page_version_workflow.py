@@ -10,7 +10,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from core.models import Tenant
-from webpages.models import PageDataSchema, PageVersion, WebPage
+from webpages.models import PageDataSchema, PageTheme, PageVersion, WebPage
 from webpages.services.page_version_workflow import PageVersionWorkflowService
 from webpages.tasks import refresh_publication_caches
 
@@ -115,6 +115,54 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(response.data["error"], "immutable_field")
         draft.refresh_from_db()
         self.assertEqual(draft.page_id, self.page.pk)
+
+    def test_save_accepts_theme_from_the_page_tenant(self):
+        draft = self.page.create_version(self.user, "Draft")
+        theme = PageTheme.objects.create(
+            name="Workflow theme",
+            tenant=self.tenant,
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk}),
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "theme": theme.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        draft.refresh_from_db()
+        self.assertEqual(draft.theme_id, theme.pk)
+
+    def test_save_rejects_theme_from_another_tenant(self):
+        draft = self.page.create_version(self.user, "Draft")
+        other_tenant = Tenant.objects.create(
+            name="Other workflow tenant",
+            identifier="other-workflow",
+            created_by=self.user,
+        )
+        other_theme = PageTheme.objects.create(
+            name="Private theme",
+            tenant=other_tenant,
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk}),
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "theme": other_theme.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("theme", response.data)
+        draft.refresh_from_db()
+        self.assertIsNone(draft.theme_id)
 
     def test_legacy_version_mutation_endpoint_is_gone(self):
         draft = self.page.create_version(self.user, "Draft")
