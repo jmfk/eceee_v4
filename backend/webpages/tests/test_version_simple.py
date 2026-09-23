@@ -113,6 +113,7 @@ class PageVersionAPISimpleTest(APITestCase):
         self.tenant, _ = Tenant.objects.get_or_create(
             identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
+        self.tenant.members.add(self.user)
 
         self.page = WebPage.objects.create(
             title="Test Page",
@@ -269,6 +270,7 @@ class PageVersionIntegrationSimpleTest(APITestCase):
         self.tenant, _ = Tenant.objects.get_or_create(
             identifier="default", defaults={"name": "Default Tenant", "created_by": self.user}
         )
+        self.tenant.members.add(self.user)
 
         self.page = WebPage.objects.create(
             title="Test Page",

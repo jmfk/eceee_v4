@@ -178,15 +178,17 @@ class PageVersionViewSet(
     @transaction.atomic
     def perform_destroy(self, instance):
         """Override destroy to cleanup media references"""
-        service = PageVersionWorkflowService(instance.page, self.request.user)
-        service.assert_canonical_editable(instance)
+        locked_page = WebPage.objects.select_for_update().get(pk=instance.page_id)
+        locked = PageVersion.objects.select_for_update().get(pk=instance.pk, page=locked_page)
+        service = PageVersionWorkflowService(locked_page, self.request.user)
+        service.assert_canonical_editable(locked)
         from file_manager.utils import cleanup_content_references
 
         # Clean up media references before deleting
-        cleanup_content_references("webpage", str(instance.page.id))
+        cleanup_content_references("webpage", str(locked_page.id))
 
         # Perform the actual deletion
-        super().perform_destroy(instance)
+        super().perform_destroy(locked)
 
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
@@ -295,8 +297,9 @@ class PageVersionViewSet(
 
         try:
             with transaction.atomic():
-                locked = PageVersion.objects.select_for_update().get(pk=version.pk)
-                service = PageVersionWorkflowService(locked.page, request.user)
+                locked_page = WebPage.objects.select_for_update().get(pk=version.page_id)
+                locked = PageVersion.objects.select_for_update().get(pk=version.pk, page=locked_page)
+                service = PageVersionWorkflowService(locked_page, request.user)
                 service.assert_canonical_editable(locked)
                 if locked.updated_at != client_timestamp:
                     raise VersionConflictError(

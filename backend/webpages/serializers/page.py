@@ -505,12 +505,25 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
                 )
         return super().validate(attrs)
 
+    def _get_parent(self, parent_id):
+        """Resolve a parent only inside the selected tenant."""
+        request = self.context.get("request")
+        tenant = getattr(request, "tenant", None)
+        if tenant is None:
+            raise serializers.ValidationError({"parent_id": "A tenant is required to select a parent page."})
+        try:
+            return WebPage.objects.get(pk=parent_id, tenant=tenant, is_deleted=False)
+        except WebPage.DoesNotExist as error:
+            raise serializers.ValidationError(
+                {"parent_id": "The selected parent page does not exist in this tenant."}
+            ) from error
+
     def create(self, validated_data):
         """Create a new WebPage with auto-slug uniqueness"""
         # Extract parent_id and set parent
         parent_id = validated_data.pop("parent_id", None)
         if parent_id:
-            validated_data["parent"] = WebPage.objects.get(pk=parent_id)
+            validated_data["parent"] = self._get_parent(parent_id)
 
         # Create the page instance (don't save yet)
         page = WebPage(**validated_data)
@@ -539,7 +552,7 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         # Extract parent_id and set parent if provided
         parent_id = validated_data.pop("parent_id", None)
         if parent_id is not None:
-            validated_data["parent"] = WebPage.objects.get(pk=parent_id) if parent_id else None
+            validated_data["parent"] = self._get_parent(parent_id) if parent_id else None
 
         # Update instance fields
         for attr, value in validated_data.items():
