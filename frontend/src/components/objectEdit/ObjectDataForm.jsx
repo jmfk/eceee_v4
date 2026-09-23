@@ -24,7 +24,7 @@ const ObjectDataForm = forwardRef(({
     const [namespace, setNamespace] = useState(null)
 
     // ODC Integration
-    const { useExternalChanges, publishUpdate } = useUnifiedData()
+    const { useExternalChanges, publishUpdate, setIsDirty: setUDCDirty } = useUnifiedData()
     const componentId = useMemo(() => `object-data-form-${instance?.id || 'new'}`, [instance?.id])
     const contextType = useEditorContext()
 
@@ -290,6 +290,8 @@ const ObjectDataForm = forwardRef(({
 
     // Update form field and mark as dirty
     const handleInputChange = useCallback(async (field, value) => {
+        setUDCDirty(true)
+
         // Update local state immediately for UI responsiveness
         setFormData(prev => {
             const newData = { ...prev, [field]: value }
@@ -309,10 +311,12 @@ const ObjectDataForm = forwardRef(({
                 updates: { [field]: value }
             });
         }
-    }, [errors, onFormChange, instance?.id, componentId, publishUpdate])
+    }, [errors, onFormChange, instance?.id, componentId, publishUpdate, setUDCDirty])
 
     // Update nested data field with debouncing
     const handleDataFieldChange = useCallback((fieldName, value) => {
+        setUDCDirty(true)
+
         // Update local state immediately for instant UI feedback
         setFormData(prev => {
             const updated = {
@@ -349,7 +353,7 @@ const ObjectDataForm = forwardRef(({
                 });
             }, 300); // 300ms delay - responsive for typing
         }
-    }, [errors, onFormChange, instance?.id, componentId, publishUpdate])
+    }, [errors, onFormChange, instance?.id, componentId, publishUpdate, setUDCDirty])
 
 
 

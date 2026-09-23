@@ -50,6 +50,7 @@ import PrivateRoute from './components/PrivateRoute'
 import LoginPage from './pages/LoginPage'
 import StatusBar from './components/StatusBar'
 import SessionExpiredOverlay from './components/SessionExpiredOverlay'
+import AppVersionReloadGuard from './components/AppVersionReloadGuard'
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -605,6 +606,7 @@ function App() {
       <NotificationProvider>
         <GlobalNotificationProvider>
           <UnifiedDataProvider enableDevTools={true}>
+            <AppVersionReloadGuard />
             <ClipboardProvider>
               <AuthProvider>
                 <SessionExpiredOverlay />

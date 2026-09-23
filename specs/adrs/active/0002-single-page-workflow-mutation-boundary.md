@@ -22,6 +22,8 @@ The complete working-copy save endpoint is the only page-editor write boundary. 
 
 When a scheduled version cannot activate because its slug has become unavailable, the workflow restores the previous live version's expiry and converts the rejected schedule back into a working draft with failure metadata.
 
+Frontend deployment reloads are gated by the existing Unified Data Context dirty metadata for page, theme, and object editing. The reload guard is read-only: editors remain responsible for setting and clearing their own dirty state, while the guard defers a detected-version reload until every dirty signal is clean.
+
 ## Rationale
 
 One boundary makes optimistic locking, schema validation, authorization, and public-state transitions consistent and testable. A clean breaking change is safer than preserving endpoints whose semantics cannot satisfy the invariant.
@@ -32,6 +34,7 @@ One boundary makes optimistic locking, schema validation, authorization, and pub
 - External legacy mutation clients must migrate to workflow endpoints.
 - Descendant publication is temporarily unavailable rather than operating on unreviewed inferred versions.
 - Scheduled activation failures remain recoverable and do not leave contradictory dates.
+- A newly deployed frontend does not automatically discard unsaved page, theme, or object edits; the pending reload resumes after save or undo makes the shared editor state clean.
 
 ## Alternatives Considered
 
