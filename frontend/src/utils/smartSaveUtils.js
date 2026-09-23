@@ -135,6 +135,16 @@ export function mergeVersionedPageAttributes(webpageData = {}, versionData = {})
     return pageAttributes ? { ...webpageData, ...pageAttributes } : webpageData
 }
 
+/** Return the current editable version, creating a working copy when needed. */
+export async function getCanonicalSaveVersion(pageId, currentVersion, editableVersion, versionsApi) {
+    if (editableVersion?.id && String(editableVersion.id) === String(currentVersion?.id)) {
+        return currentVersion
+    }
+
+    const workingCopy = await versionsApi.getOrCreateWorkingCopy(pageId)
+    return workingCopy.version
+}
+
 /**
  * Analyze what has changed between original and current data
  * @param {Object} originalWebpageData - Original webpage data

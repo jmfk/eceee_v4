@@ -15,6 +15,7 @@ import { describe, it, expect, vi } from 'vitest'
 import {
     analyzeChanges,
     buildVersionedPageData,
+    getCanonicalSaveVersion,
     mergeVersionedPageAttributes,
     smartSave,
 } from '../../utils/smartSaveUtils'
@@ -145,6 +146,29 @@ describe('working-copy page attributes', () => {
         )
 
         expect(page).toEqual({ title: 'Draft title', slug: 'draft-slug' })
+    })
+})
+
+describe('canonical save version', () => {
+    it('reuses the loaded canonical working copy', async () => {
+        const versionsApi = { getOrCreateWorkingCopy: vi.fn() }
+
+        const version = await getCanonicalSaveVersion(1, baseVersion, { id: baseVersion.id }, versionsApi)
+
+        expect(version).toBe(baseVersion)
+        expect(versionsApi.getOrCreateWorkingCopy).not.toHaveBeenCalled()
+    })
+
+    it('creates a working copy when the editor loaded the live version', async () => {
+        const workingVersion = { ...baseVersion, id: 11, updatedAt: '2026-09-23T12:00:00Z' }
+        const versionsApi = {
+            getOrCreateWorkingCopy: vi.fn().mockResolvedValue({ version: workingVersion }),
+        }
+
+        const version = await getCanonicalSaveVersion(1, baseVersion, null, versionsApi)
+
+        expect(versionsApi.getOrCreateWorkingCopy).toHaveBeenCalledWith(1)
+        expect(version).toBe(workingVersion)
     })
 })
 
