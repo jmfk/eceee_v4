@@ -15,6 +15,7 @@ from rest_framework.throttling import UserRateThrottle
 from ..filters import WebPageFilter
 from ..models import PageVersion, WebPage
 from ..serializers import PageHierarchySerializer, WebPageListSerializer, WebPageSimpleSerializer
+from ..services.page_version_workflow import normalize_change_summary
 
 
 class WebPageViewSet(viewsets.ModelViewSet):
@@ -954,7 +955,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                     page=new_page,
                     version_number=1,
                     created_by=request.user,
-                    change_summary="Duplicated from original page",
+                    change_summary=normalize_change_summary("Duplicated from original page"),
                     version_title="Initial version",
                     # Copy version data
                     code_layout=latest_version.code_layout,

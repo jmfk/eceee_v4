@@ -1,6 +1,7 @@
 """API views for site package ZIP export/import jobs."""
 
 from datetime import timedelta
+
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -9,6 +10,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.permissions import HasTenantAccess
 from file_manager.storage import S3MediaStorage
 from webpages.models import SitePackageJob, WebPage
 from webpages.serializers import (
@@ -24,16 +26,14 @@ from webpages.tasks import export_site_package, import_site_package
 
 
 class SitePackageExportListView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
 
     def get(self, request):
         jobs = _get_job_queryset(request, SitePackageJob.KIND_EXPORT)
         return Response(SitePackageJobSerializer(jobs[:10], many=True).data)
 
     def post(self, request):
-        serializer = SitePackageExportCreateSerializer(
-            data=request.data, context={"request": request}
-        )
+        serializer = SitePackageExportCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         root_page = WebPage.objects.get(id=serializer.validated_data["root_page_id"])
         job = SitePackageJob.objects.create(
@@ -53,7 +53,7 @@ class SitePackageExportListView(APIView):
 
 
 class SitePackageExportDetailView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
 
     def get(self, request, job_id):
         job = _get_job(request, job_id, SitePackageJob.KIND_EXPORT)
@@ -61,7 +61,7 @@ class SitePackageExportDetailView(APIView):
 
 
 class SitePackageExportDownloadView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
 
     def get(self, request, job_id):
         job = _get_job(request, job_id, SitePackageJob.KIND_EXPORT)
@@ -76,13 +76,11 @@ class SitePackageExportDownloadView(APIView):
             expires=3600,
             response_filename=filename,
         )
-        return Response(
-            {"download_url": signed_url, "filename": filename, "expires_in": 3600}
-        )
+        return Response({"download_url": signed_url, "filename": filename, "expires_in": 3600})
 
 
 class SitePackageImportListView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
     parser_classes = [MultiPartParser, FormParser]
 
     def get(self, request):
@@ -94,9 +92,7 @@ class SitePackageImportListView(APIView):
         serializer.is_valid(raise_exception=True)
         tenant = getattr(request, "tenant", None)
         options = {
-            "preserve_publication_status": serializer.validated_data[
-                "preserve_publication_status"
-            ],
+            "preserve_publication_status": serializer.validated_data["preserve_publication_status"],
         }
         if tenant:
             options["tenant_id"] = str(tenant.id)
@@ -116,7 +112,7 @@ class SitePackageImportListView(APIView):
 
 
 class SitePackageImportDetailView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
 
     def get(self, request, job_id):
         job = _get_job(request, job_id, SitePackageJob.KIND_IMPORT)
@@ -129,13 +125,9 @@ def _get_job(request, job_id, kind):
 
 
 def _get_job_queryset(request, kind):
-    queryset = SitePackageJob.objects.filter(kind=kind).select_related(
-        "root_page", "imported_root_page"
-    )
+    queryset = SitePackageJob.objects.filter(kind=kind).select_related("root_page", "imported_root_page")
     if not request.user.is_staff:
         queryset = queryset.filter(created_by=request.user)
 
     now = timezone.now()
-    return queryset.filter(Q(expires_at__isnull=True) | Q(expires_at__gte=now)).order_by(
-        "-created_at"
-    )
+    return queryset.filter(Q(expires_at__isnull=True) | Q(expires_at__gte=now)).order_by("-created_at")

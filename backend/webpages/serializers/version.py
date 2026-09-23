@@ -15,7 +15,11 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from ..models import PageDataSchema, PageTheme, PageVersion
-from ..services.page_version_workflow import find_page_slug_conflict, page_with_attributes
+from ..services.page_version_workflow import (
+    find_page_slug_conflict,
+    normalize_change_summary,
+    page_with_attributes,
+)
 from .base import UserSerializer
 from .theme import PageThemeSerializer
 
@@ -196,6 +200,10 @@ class PageVersionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Theme must belong to the page tenant.")
         return theme
 
+    def validate_change_summary(self, value):
+        """Keep workflow metadata object-shaped while accepting legacy strings."""
+        return normalize_change_summary(value)
+
     def get_version_id(self, obj):
         return obj.id
 
@@ -293,10 +301,13 @@ class PageVersionSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         """Update with timestamp-based conflict detection"""
         incoming_summary = validated_data.get("change_summary")
-        predecessor = (instance.change_summary or {}).get(SCHEDULE_PREDECESSOR_KEY)
+        existing_summary = normalize_change_summary(instance.change_summary)
+        predecessor = existing_summary.get(SCHEDULE_PREDECESSOR_KEY)
         if predecessor and "change_summary" in validated_data:
             summary = incoming_summary if isinstance(incoming_summary, dict) else {}
             validated_data["change_summary"] = {**summary, SCHEDULE_PREDECESSOR_KEY: deepcopy(predecessor)}
+        elif "change_summary" not in validated_data:
+            validated_data["change_summary"] = existing_summary
 
         # Check if client provided the timestamp they last saw
         request = self.context.get("request")

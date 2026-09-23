@@ -4,21 +4,21 @@ Theme Sync ViewSet for file-based theme synchronization.
 Provides endpoints for bidirectional sync between local Python files and server JSON storage.
 """
 
-from rest_framework import viewsets, permissions, status, authentication
+from django.conf import settings
+from django.db import models
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework import authentication, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.conf import settings
-from django.utils import timezone
-from django.db import models
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
+
+from core.permissions import HasTenantAccess
 
 from ..models import PageTheme
 from ..serializers.theme_sync import (
-    ThemeSyncSerializer,
     ThemeSyncPushSerializer,
-    ThemeSyncStatusSerializer,
-    ThemeSyncConflictCheckSerializer,
+    ThemeSyncSerializer,
 )
 
 
@@ -26,7 +26,7 @@ from ..serializers.theme_sync import (
 class ThemeSyncViewSet(viewsets.ViewSet):
     """ViewSet for theme synchronization operations"""
 
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
     authentication_classes = [
         authentication.TokenAuthentication,
         authentication.SessionAuthentication,
@@ -36,9 +36,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
         """Check if theme sync is enabled"""
         if not getattr(settings, "THEME_SYNC_ENABLED", False):
             return Response(
-                {
-                    "error": "Theme sync is disabled. Set THEME_SYNC_ENABLED=True to enable."
-                },
+                {"error": "Theme sync is disabled. Set THEME_SYNC_ENABLED=True to enable."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         return None
@@ -65,20 +63,14 @@ class ThemeSyncViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        themes = PageTheme.objects.filter(
-            tenant=tenant, sync_version__gt=since_version
-        ).order_by("sync_version")
+        themes = PageTheme.objects.filter(tenant=tenant, sync_version__gt=since_version).order_by("sync_version")
 
         max_version = (
-            PageTheme.objects.filter(tenant=tenant).aggregate(
-                max_version=models.Max("sync_version")
-            )["max_version"]
+            PageTheme.objects.filter(tenant=tenant).aggregate(max_version=models.Max("sync_version"))["max_version"]
             or 0
         )
 
-        serializer = ThemeSyncSerializer(
-            themes, many=True, context={"request": request}
-        )
+        serializer = ThemeSyncSerializer(themes, many=True, context={"request": request})
 
         # For output serialization, pass data directly
         return Response(
@@ -107,14 +99,10 @@ class ThemeSyncViewSet(viewsets.ViewSet):
             )
 
         themes = PageTheme.objects.filter(tenant=tenant).order_by("name")
-        serializer = ThemeSyncSerializer(
-            themes, many=True, context={"request": request}
-        )
+        serializer = ThemeSyncSerializer(themes, many=True, context={"request": request})
 
         max_version = (
-            PageTheme.objects.filter(tenant=tenant).aggregate(
-                max_version=models.Max("sync_version")
-            )["max_version"]
+            PageTheme.objects.filter(tenant=tenant).aggregate(max_version=models.Max("sync_version"))["max_version"]
             or 0
         )
 
@@ -188,15 +176,11 @@ class ThemeSyncViewSet(viewsets.ViewSet):
                 )
 
             # Update existing theme
-            serializer = ThemeSyncSerializer(
-                theme, data=theme_data, partial=True, context={"request": request}
-            )
+            serializer = ThemeSyncSerializer(theme, data=theme_data, partial=True, context={"request": request})
         except PageTheme.DoesNotExist:
             # Create new theme - set tenant from request
             theme_data["tenant"] = tenant.id
-            serializer = ThemeSyncSerializer(
-                data=theme_data, context={"request": request}
-            )
+            serializer = ThemeSyncSerializer(data=theme_data, context={"request": request})
 
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -319,13 +303,9 @@ class ThemeSyncViewSet(viewsets.ViewSet):
 
         try:
             theme = PageTheme.objects.get(name=theme_name, tenant=tenant)
-            serializer = ThemeSyncSerializer(
-                theme, data=theme_data, partial=True, context={"request": request}
-            )
+            serializer = ThemeSyncSerializer(theme, data=theme_data, partial=True, context={"request": request})
         except PageTheme.DoesNotExist:
-            serializer = ThemeSyncSerializer(
-                data=theme_data, context={"request": request}
-            )
+            serializer = ThemeSyncSerializer(data=theme_data, context={"request": request})
 
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
