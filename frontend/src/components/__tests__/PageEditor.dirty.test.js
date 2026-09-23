@@ -162,13 +162,30 @@ describe('canonical save version', () => {
     it('creates a working copy when the editor loaded the live version', async () => {
         const workingVersion = { ...baseVersion, id: 11, updatedAt: '2026-09-23T12:00:00Z' }
         const versionsApi = {
-            getOrCreateWorkingCopy: vi.fn().mockResolvedValue({ version: workingVersion }),
+            getOrCreateWorkingCopy: vi.fn().mockResolvedValue({ created: true, version: workingVersion }),
         }
 
         const version = await getCanonicalSaveVersion(1, baseVersion, null, versionsApi)
 
         expect(versionsApi.getOrCreateWorkingCopy).toHaveBeenCalledWith(1)
         expect(version).toBe(workingVersion)
+    })
+
+    it('refuses to overwrite a working copy created after the editor loaded', async () => {
+        const newerWorkingVersion = { ...baseVersion, id: 11, updatedAt: '2026-09-23T12:00:00Z' }
+        const versionsApi = {
+            getOrCreateWorkingCopy: vi.fn().mockResolvedValue({
+                created: false,
+                version: newerWorkingVersion,
+            }),
+        }
+
+        await expect(
+            getCanonicalSaveVersion(1, baseVersion, null, versionsApi),
+        ).rejects.toMatchObject({
+            code: 'working_copy_changed',
+            serverVersion: newerWorkingVersion,
+        })
     })
 })
 

@@ -28,12 +28,19 @@ class TenantContextMiddleware:
 
     EXEMPT_PATHS = ("/health/",)
 
+    class InvalidTenantSelection(ValueError):
+        pass
+
     def __call__(self, request):
         if any(request.path.startswith(p) for p in self.EXEMPT_PATHS):
             request.tenant = None
             return self.get_response(request)
 
-        tenant = self.get_tenant(request)
+        try:
+            tenant = self.get_tenant(request)
+        except self.InvalidTenantSelection:
+            clear_tenant_context()
+            return HttpResponseForbidden("The selected tenant does not exist or is inactive.")
 
         if tenant is None:
             default_tenant_id = getattr(settings, "DEFAULT_TENANT_ID", None)
@@ -89,7 +96,7 @@ class TenantContextMiddleware:
                     tenant = Tenant.objects.get(identifier=tenant_id_header, is_active=True)
                     return tenant
                 except Tenant.DoesNotExist:
-                    pass
+                    raise self.InvalidTenantSelection from None
 
         # 2. An omitted header is only unambiguous when the user can access one tenant.
         if request.user.is_authenticated:

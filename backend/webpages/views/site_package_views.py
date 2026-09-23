@@ -126,6 +126,11 @@ def _get_job(request, job_id, kind):
 
 def _get_job_queryset(request, kind):
     queryset = SitePackageJob.objects.filter(kind=kind).select_related("root_page", "imported_root_page")
+    tenant = request.tenant
+    if kind == SitePackageJob.KIND_EXPORT:
+        queryset = queryset.filter(root_page__tenant=tenant)
+    else:
+        queryset = queryset.filter(options__tenant_id=str(tenant.id))
     if not request.user.is_staff:
         queryset = queryset.filter(created_by=request.user)
 

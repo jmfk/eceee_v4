@@ -142,6 +142,22 @@ describe('PublishingEditor', () => {
         expect(versionsApi.getWorkflow).toHaveBeenCalledTimes(2)
     })
 
+    it('cancels the scheduled version instead of a newer working draft', async () => {
+        versionsApi.getWorkflow.mockResolvedValue({
+            state: 'live_with_scheduled_changes',
+            editableVersion: { id: 12, updatedAt: '2030-01-01T11:00:00Z' },
+            liveVersion: { id: 10 },
+            scheduledVersion: { id: 11 },
+            scheduledAt: '2030-01-02T10:00:00Z',
+        })
+        versionsApi.cancelWorkingCopySchedule.mockResolvedValue({})
+
+        renderEditor()
+        fireEvent.click(await screen.findByRole('button', { name: /cancel schedule/i }))
+
+        await waitFor(() => expect(versionsApi.cancelWorkingCopySchedule).toHaveBeenCalledWith(11))
+    })
+
     it('shows unpublish failures and refreshes the workflow', async () => {
         versionsApi.unpublishExplicit.mockRejectedValue(new Error('The live version changed.'))
 

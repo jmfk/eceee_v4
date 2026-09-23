@@ -337,28 +337,23 @@ class PageThemeViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"])
     def ensure_default(self, request):
         """Ensure a default theme exists, create one if necessary"""
-        default_theme = self.get_queryset().filter(is_default=True, is_active=True).first()
-
-        if default_theme is None:
-            default_theme = self.get_queryset().filter(is_active=True).first()
-            if default_theme:
-                default_theme.is_default = True
-                default_theme.save(update_fields=["is_default", "updated_at"])
-
-        if default_theme:
-            serializer = PageThemeSerializer(default_theme)
+        tenant = getattr(request, "tenant", None)
+        if tenant is None or not tenant.user_has_access(request.user):
             return Response(
-                {
-                    "message": f"Default theme ensured: '{default_theme.name}'",
-                    "theme": serializer.data,
-                    "created": False,
-                }
+                {"error": "You do not have access to the selected tenant"},
+                status=status.HTTP_403_FORBIDDEN,
             )
-        else:
-            return Response(
-                {"error": "Failed to create default theme"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+
+        created = not self.get_queryset().filter(is_active=True).exists()
+        default_theme = PageTheme.get_default_theme(tenant)
+        serializer = PageThemeSerializer(default_theme)
+        return Response(
+            {
+                "message": f"Default theme ensured: '{default_theme.name}'",
+                "theme": serializer.data,
+                "created": created,
+            }
+        )
 
     @action(detail=True, methods=["post"])
     def clone(self, request, pk=None):

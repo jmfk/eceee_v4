@@ -134,12 +134,12 @@ const PublishingEditor = ({
     }
 
     const cancelSchedule = async () => {
-        if (!workflow?.editableVersion) return
+        if (!workflow?.scheduledVersion) return
         setBusyAction('cancel')
         try {
-            await versionsApi.cancelWorkingCopySchedule(workflow.editableVersion.id)
+            await versionsApi.cancelWorkingCopySchedule(workflow.scheduledVersion.id)
             setScheduleDate('')
-            addNotification('Schedule cancelled; the content is a working version again', 'success')
+            addNotification('Schedule cancelled', 'success')
             await refresh()
         } catch (error: any) {
             addNotification(error.message || 'Cancelling the schedule failed', 'error')

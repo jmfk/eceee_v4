@@ -249,18 +249,7 @@ class PageVersion(models.Model):
         # namespace until the version is published. This keeps Save from
         # mutating the public WebPage record directly.
         page_attributes = page_data.pop("page_attributes", page_data.pop("pageAttributes", {}))
-        # Apply page fields
-        for field, value in page_data.items():
-            if hasattr(self.page, field) and field not in [
-                "id",
-                "created_at",
-                "updated_at",
-            ]:
-                if field in ["effective_date", "expiry_date"] and value:
-                    from django.utils.dateparse import parse_datetime
-
-                    value = parse_datetime(value)
-                setattr(self.page, field, value)
+        page_attributes = page_attributes.copy() if isinstance(page_attributes, dict) else {}
 
         # Reserved working-copy attributes take precedence over legacy
         # top-level title/description snapshots.
@@ -272,6 +261,9 @@ class PageVersion(models.Model):
             "pathPatternKey": "path_pattern_key",
             "hostnames": "hostnames",
         }
+        for field in attribute_map:
+            if field in page_data and field not in page_attributes:
+                page_attributes[field] = page_data[field]
         for source_field, target_field in attribute_map.items():
             if source_field in page_attributes:
                 setattr(self.page, target_field, page_attributes[source_field])
@@ -302,11 +294,22 @@ class PageVersion(models.Model):
             "widgets_modified": [],
         }
 
-        # Compare page fields
-        for field, value in self.page_data.items():
+        def comparable_page_data(value):
+            data = value.copy() if isinstance(value, dict) else {}
+            attributes = data.pop("page_attributes", data.pop("pageAttributes", {}))
+            if isinstance(attributes, dict):
+                data.update(attributes)
+            return data
+
+        # Compare page fields, flattening the canonical page-attribute namespace
+        # so history remains compatible with legacy top-level snapshots.
+        current_page_data = comparable_page_data(self.page_data)
+        other_page_data = comparable_page_data(other_version.page_data)
+        for field in sorted(current_page_data.keys() | other_page_data.keys()):
             if field == "widgets":
                 continue
-            other_value = other_version.page_data.get(field)
+            value = current_page_data.get(field)
+            other_value = other_page_data.get(field)
             if value != other_value:
                 changes["fields_changed"].append({"field": field, "old_value": other_value, "new_value": value})
 
