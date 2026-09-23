@@ -351,7 +351,7 @@ const ObjectInstanceEditPage = () => {
         if (!instance) return;
         
         // Re-initialize with original data from React Query
-        publishUpdate(componentId, OperationTypes.INIT_OBJECT, {
+        await publishUpdate(componentId, OperationTypes.INIT_OBJECT, {
             id: String(instance.id),
             data: {
                 ...instance,
@@ -367,7 +367,6 @@ const ObjectInstanceEditPage = () => {
             }
         });
         
-        setHasUnsavedChanges(false);
         addNotification('Changes undone', 'success');
     }, [instance, currentVersion, availableVersions, publishUpdate, componentId, addNotification]);
 

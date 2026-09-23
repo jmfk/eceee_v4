@@ -71,6 +71,7 @@ The simplified version workflow still has compatibility paths that can mutate pa
 - 2026-09-22: Consolidated editor saves behind the optimistic-locking working-copy endpoint, removed legacy mutation behavior, added explicit bulk scheduling, and introduced tenant membership authorization.
 - 2026-09-22: Scheduled slug activation failures now restore the predecessor and retain the rejected content as a draft with failure metadata.
 - 2026-09-22: The effective Beat schedule now retains the scheduled-publication task, and deployment reloads wait until the page editor is clean.
+- 2026-09-23: Deployment reload protection was extended to observe the shared page, theme, and object dirty metadata. A pending reload resumes only after every editor signal is clean.
 
 ## Linked ADRs
 
@@ -80,6 +81,7 @@ The simplified version workflow still has compatibility paths that can mutate pa
 ## Completion Evidence
 
 - Backend: 686 tests passed with 18 skipped; changed Python files pass Black, isort, and Flake8; migration drift check reports no changes.
-- Frontend: 1,008 tests passed; ESLint reports no errors; production build passes.
+- Frontend: 1,020 tests passed; ESLint reports no errors; production build passes.
 - Governance: `/specs` validation passes.
 - Remaining acceptance evidence: browser walkthrough after the updated web client is loaded.
+- Frontend reload-guard tests cover clean reloads, all shared dirty signals, deferred resume, duplicate mismatch events, fresh synchronous state reads, and cleanup.

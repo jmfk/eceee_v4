@@ -61,7 +61,7 @@ const ThemeEditor = ({ onSave }) => {
 
     // Use UDC for theme data management
     const {
-        state,
+        getState,
         initTheme,
         updateTheme,
         updateThemeField,
@@ -72,16 +72,17 @@ const ThemeEditor = ({ onSave }) => {
 
     // Track theme data from UDC using subscription
     const [currentThemeData, setCurrentThemeData] = useState(null);
+    const [isThemeDirty, setIsThemeDirtyState] = useState(
+        () => Boolean(getState().metadata.isThemeDirty)
+    );
 
     // Subscribe to UDC changes
     useExternalChanges('theme-editor', (udcState) => {
         const currentThemeId = udcState.metadata.currentThemeId;
         const themeData = currentThemeId ? udcState.themes[currentThemeId] : null;
         setCurrentThemeData(themeData);
+        setIsThemeDirtyState(Boolean(udcState.metadata.isThemeDirty));
     });
-
-    // Also get current state for dirty flag
-    const isThemeDirty = state.metadata.isThemeDirty;
     const themeData = currentThemeData;
 
     // Refs for style tab components to flush pending changes before save

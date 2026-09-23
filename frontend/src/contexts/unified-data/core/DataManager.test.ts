@@ -64,6 +64,61 @@ describe('DataManager state operations', () => {
         expect(manager.getState().metadata.isDirty).toBe(false)
     })
 
+    it('tracks theme edits and clears them when the theme is reinitialized', () => {
+        const manager = new DataManager(createAppState())
+        const theme = { id: 'theme-1', name: 'Original theme', colors: {} }
+
+        manager.dispatch({
+            type: OperationTypes.INIT_THEME,
+            payload: { id: theme.id, data: theme }
+        })
+        manager.dispatch({
+            type: OperationTypes.UPDATE_THEME_FIELD,
+            payload: { id: theme.id, field: 'name', value: 'Updated theme' }
+        })
+
+        expect(manager.getState().metadata.isThemeDirty).toBe(true)
+
+        manager.dispatch({
+            type: OperationTypes.INIT_THEME,
+            payload: { id: theme.id, data: theme }
+        })
+        expect(manager.getState().metadata.isThemeDirty).toBe(false)
+    })
+
+    it('does not mark server-persisted object updates dirty', () => {
+        const manager = new DataManager(createAppState({
+            pages: {},
+            versions: {},
+            objects: {
+                'object-1': {
+                    id: 'object-1',
+                    title: 'Object title',
+                    data: {},
+                    widgets: {},
+                    metadata: {}
+                }
+            },
+            metadata: {
+                currentPageId: undefined,
+                currentVersionId: undefined,
+                currentObjectId: 'object-1'
+            }
+        }))
+
+        manager.dispatch({
+            type: OperationTypes.UPDATE_OBJECT,
+            payload: {
+                id: 'object-1',
+                skipDirty: true,
+                updates: { isPublished: true }
+            }
+        })
+
+        expect(manager.getState().objects['object-1']).toMatchObject({ isPublished: true })
+        expect(manager.getState().metadata.isDirty).toBe(false)
+    })
+
     it('switches versions, resets dirty state, and tracks last viewed version', () => {
         const secondVersion = createVersion({
             id: 'version-2',

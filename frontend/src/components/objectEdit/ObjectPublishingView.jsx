@@ -68,6 +68,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
             if (instance?.id) {
                 publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
                     id: String(instance.id),
+                    skipDirty: true,
                     updates: {
                         isPublished: true,
                         metadata: { ...instance.metadata, lastPublishAction: 'published' }
@@ -95,6 +96,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
             if (instance?.id) {
                 publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
                     id: String(instance.id),
+                    skipDirty: true,
                     updates: {
                         isPublished: false,
                         metadata: { ...instance.metadata, lastPublishAction: 'unpublished' }
@@ -126,6 +128,7 @@ const ObjectPublishingView = ({ objectType, instance, isNewInstance, onSave, onC
             if (instance?.id) {
                 publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
                     id: String(instance.id),
+                    skipDirty: true,
                     updates: {
                         metadata: { ...instance.metadata, lastPublishAction: 'scheduled' }
                     }
