@@ -51,3 +51,16 @@ class TenantAccessPermissionTest(TestCase):
         response = self.client.get("/api/v1/content-migration/plans/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_invalid_explicit_tenant_does_not_fall_back(self):
+        self.client.force_authenticate(self.owner)
+        self.client.credentials(HTTP_X_TENANT_ID="missing-tenant")
+
+        response = self.client.get("/api/v1/content-migration/plans/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertContains(
+            response,
+            "The selected tenant does not exist or is inactive.",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )

@@ -1,5 +1,6 @@
 const CLIENT_APP_VERSION = import.meta.env.VITE_GIT_COMMIT_HASH || ''
 const RELOAD_MARKER = 'eceee:last-app-version-reload'
+export const APP_VERSION_RELOAD_RETRY_MS = 60_000
 export const APP_VERSION_MISMATCH_EVENT = 'eceee:app-version-mismatch'
 
 let pendingServerVersion = null
@@ -7,21 +8,35 @@ let pendingServerVersion = null
 export const shouldReloadForAppVersion = (
     serverVersion,
     clientVersion = CLIENT_APP_VERSION,
-    lastReloadedVersion = null,
+    lastReloadAttempt = null,
+    now = Date.now(),
 ) => Boolean(
     serverVersion
     && clientVersion
     && serverVersion !== 'unknown'
     && clientVersion !== 'unknown'
     && serverVersion !== clientVersion
-    && serverVersion !== lastReloadedVersion
+    && !(
+        serverVersion === lastReloadAttempt?.version
+        && now - lastReloadAttempt.attemptedAt < APP_VERSION_RELOAD_RETRY_MS
+    )
 )
+
+const readReloadAttempt = () => {
+    const stored = window.sessionStorage.getItem(RELOAD_MARKER)
+    if (!stored) return null
+    try {
+        return JSON.parse(stored)
+    } catch {
+        return { version: stored, attemptedAt: 0 }
+    }
+}
 
 export const reloadForAppVersion = (serverVersion) => {
     if (!shouldReloadForAppVersion(
         serverVersion,
         CLIENT_APP_VERSION,
-        window.sessionStorage.getItem(RELOAD_MARKER),
+        readReloadAttempt(),
     )) {
         if (serverVersion && serverVersion === CLIENT_APP_VERSION) {
             window.sessionStorage.removeItem(RELOAD_MARKER)
@@ -39,7 +54,10 @@ export const reloadForAppVersion = (serverVersion) => {
     }
 
     pendingServerVersion = null
-    window.sessionStorage.setItem(RELOAD_MARKER, serverVersion)
+    window.sessionStorage.setItem(RELOAD_MARKER, JSON.stringify({
+        version: serverVersion,
+        attemptedAt: Date.now(),
+    }))
     window.location.reload()
     return true
 }

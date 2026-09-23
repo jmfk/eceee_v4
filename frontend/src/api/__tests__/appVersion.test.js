@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+    APP_VERSION_RELOAD_RETRY_MS,
     APP_VERSION_MISMATCH_EVENT,
     shouldReloadForAppVersion,
 } from '../appVersion.js'
@@ -15,7 +16,21 @@ describe('application version reload guard', () => {
     })
 
     it('does not loop after already reloading for the server build', () => {
-        expect(shouldReloadForAppVersion('build-b', 'build-a', 'build-b')).toBe(false)
+        expect(shouldReloadForAppVersion(
+            'build-b',
+            'build-a',
+            { version: 'build-b', attemptedAt: 1_000 },
+            1_000 + APP_VERSION_RELOAD_RETRY_MS - 1,
+        )).toBe(false)
+    })
+
+    it('allows another reload after the deployment retry window', () => {
+        expect(shouldReloadForAppVersion(
+            'build-b',
+            'build-a',
+            { version: 'build-b', attemptedAt: 1_000 },
+            1_000 + APP_VERSION_RELOAD_RETRY_MS,
+        )).toBe(true)
     })
 
     it('ignores unavailable development build identifiers', () => {

@@ -236,12 +236,37 @@ class PageVersionWorkflowService:
             )
         return editable
 
+    @staticmethod
+    def lock_hostname_namespace():
+        """Lock the global root-page namespace before locking a publication target."""
+        list(
+            WebPage.objects.select_for_update()
+            .filter(parent__isnull=True, is_deleted=False)
+            .order_by("pk")
+            .values_list("pk", flat=True)
+        )
+
+    @staticmethod
+    def _normalized_page_data(page_data):
+        """Move legacy delayed page attributes into the canonical namespace."""
+        normalized = deepcopy(page_data) if isinstance(page_data, dict) else {}
+        legacy_attributes = normalized.pop("pageAttributes", {})
+        attributes = normalized.pop("page_attributes", legacy_attributes)
+        attributes = deepcopy(attributes) if isinstance(attributes, dict) else {}
+        for field in ("title", "description"):
+            if field in normalized:
+                attributes.setdefault(field, normalized.pop(field))
+        if attributes:
+            normalized["page_attributes"] = attributes
+        return normalized
+
     @classmethod
     def _copied_fields(cls, source):
         values = {}
         for field in cls.COPY_FIELDS:
             value = getattr(source, field)
             values[field] = value if field == "theme" else deepcopy(value)
+        values["page_data"] = cls._normalized_page_data(values["page_data"])
         return values
 
     def _create_version_from(self, source=None, *, title="Working copy"):
@@ -251,8 +276,10 @@ class PageVersionWorkflowService:
             if source
             else {
                 "page_data": {
-                    "title": self.page.title,
-                    "description": self.page.description or "",
+                    "page_attributes": {
+                        "title": self.page.title,
+                        "description": self.page.description or "",
+                    },
                 },
                 "widgets": {},
             }
@@ -322,6 +349,7 @@ class PageVersionWorkflowService:
 
     @transaction.atomic
     def publish(self, version, *, expected_updated_at=None):
+        self.lock_hostname_namespace()
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
         version = PageVersion.objects.select_for_update().get(pk=version.pk)
         self.assert_canonical_editable(version)
@@ -361,6 +389,7 @@ class PageVersionWorkflowService:
 
     @transaction.atomic
     def schedule(self, version, effective_date, expiry_date=None, *, expected_updated_at=None):
+        self.lock_hostname_namespace()
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
         version = PageVersion.objects.select_for_update().get(pk=version.pk)
         self.assert_canonical_editable(version)
@@ -404,7 +433,6 @@ class PageVersionWorkflowService:
     def cancel_schedule(self, version):
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
         version = PageVersion.objects.select_for_update().get(pk=version.pk)
-        self.assert_canonical_editable(version)
         if not version.effective_date or version.effective_date <= timezone.now():
             raise WorkflowError("The requested version is not scheduled.")
         version.change_summary = self._restore_scheduled_predecessor(version)

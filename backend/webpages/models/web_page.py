@@ -1323,8 +1323,10 @@ class WebPage(models.Model):
 
             # Serialize current page state (excluding widgets and publishing dates)
             page_data = {
-                "title": self.title,
-                "description": self.description or "",
+                "page_attributes": {
+                    "title": self.title,
+                    "description": self.description or "",
+                }
             }
 
             # Get widgets from the most recent version with widgets (preserve widgets by default)

@@ -1,13 +1,13 @@
 import io
 import json
 import zipfile
-from datetime import datetime, timedelta, timezone as datetime_timezone
+from datetime import datetime, timedelta
+from datetime import timezone as datetime_timezone
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.test import TestCase
-from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -403,6 +403,35 @@ class SitePackageAPITests(APITestCase):
         self.assertEqual(response.data[0]["status"], SitePackageJob.STATUS_PENDING)
         self.assertEqual(response.data[0]["root_page_title"], self.root.title)
 
+    def test_export_jobs_are_scoped_to_the_selected_tenant(self):
+        other_tenant = Tenant.objects.create(
+            name="Other site package tenant",
+            identifier="other-site-package",
+            created_by=self.user,
+        )
+        other_root = WebPage.objects.create(
+            title="Other root",
+            slug="other-root",
+            tenant=other_tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        other_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_EXPORT,
+            status=SitePackageJob.STATUS_COMPLETED,
+            root_page=other_root,
+            object_key="site-packages/exports/other.zip",
+            created_by=self.user,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        list_response = self.client.get("/api/v1/webpages/site-packages/exports/")
+        download_response = self.client.get(f"/api/v1/webpages/site-packages/exports/{other_job.id}/download/")
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertNotIn(str(other_job.id), [str(job["id"]) for job in list_response.data])
+        self.assertEqual(download_response.status_code, 404)
+
     def test_download_requires_completed_export(self):
         job = SitePackageJob.objects.create(
             kind=SitePackageJob.KIND_EXPORT,
@@ -455,6 +484,7 @@ class SitePackageAPITests(APITestCase):
             kind=SitePackageJob.KIND_IMPORT,
             status=SitePackageJob.STATUS_RUNNING,
             created_by=self.user,
+            options={"tenant_id": str(self.tenant.id)},
             expires_at=timezone.now() + timedelta(hours=1),
         )
 
@@ -463,3 +493,22 @@ class SitePackageAPITests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["kind"], SitePackageJob.KIND_IMPORT)
+
+    def test_import_jobs_are_scoped_to_the_selected_tenant(self):
+        other_tenant = Tenant.objects.create(
+            name="Other import tenant",
+            identifier="other-import-tenant",
+            created_by=self.user,
+        )
+        other_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            status=SitePackageJob.STATUS_RUNNING,
+            created_by=self.user,
+            options={"tenant_id": str(other_tenant.id)},
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        response = self.client.get("/api/v1/webpages/site-packages/imports/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(str(other_job.id), [str(job["id"]) for job in response.data])

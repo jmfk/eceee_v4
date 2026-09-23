@@ -511,7 +511,7 @@ const PageEditor = () => {
                 try {
                     // Fetch latest server version
                     const serverWebpage = await pagesApi.get(pageId);
-                    const serverVersion = await pagesApi.versionCurrent(pageId);
+                    const serverVersion = await versionsApi.get(updateInfo.versionId);
 
                     // Detect conflicts using deep diff analysis
                     const conflictResult = detectPageConflicts(
@@ -767,6 +767,35 @@ const PageEditor = () => {
         staleTime: 10000,
         refetchOnWindowFocus: false,
     })
+
+    useEffect(() => {
+        if (!workflow?.scheduledAt) return undefined
+        const activationTime = new Date(workflow.scheduledAt).getTime()
+        if (!Number.isFinite(activationTime)) return undefined
+        // The activation worker runs once per minute, so refresh just after its
+        // worst-case processing window. Keep checking once per minute only while
+        // the workflow still reports the same schedule, in case the worker is late.
+        const refreshAt = activationTime + 65_000
+        const maxTimeout = 2_147_483_647
+        let interval
+        let timer
+        const scheduleRefresh = () => {
+            const remaining = refreshAt - Date.now()
+            if (remaining > maxTimeout) {
+                timer = window.setTimeout(scheduleRefresh, maxTimeout)
+                return
+            }
+            timer = window.setTimeout(() => {
+                refetchWorkflow()
+                interval = window.setInterval(() => refetchWorkflow(), 60_000)
+            }, Math.max(remaining, 1_000))
+        }
+        scheduleRefresh()
+        return () => {
+            window.clearTimeout(timer)
+            if (interval) window.clearInterval(interval)
+        }
+    }, [workflow?.scheduledAt, refetchWorkflow])
 
     // Get unified inheritance data for this page (widgets, layout, theme)
     const pageInheritance = usePageInheritance(pageId, {

@@ -73,7 +73,8 @@ def validate_page_data_for_version(version, value, *, code_layout=None):
     if version is None:
         return filtered_data
 
-    effective_schema = PageDataSchema.get_effective_schema_for_layout(code_layout or version.code_layout)
+    effective_layout = version.code_layout if code_layout is None else code_layout
+    effective_schema = PageDataSchema.get_effective_schema_for_layout(effective_layout)
     if not effective_schema:
         return filtered_data
 

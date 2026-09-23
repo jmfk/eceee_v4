@@ -142,6 +142,15 @@ export async function getCanonicalSaveVersion(pageId, currentVersion, editableVe
     }
 
     const workingCopy = await versionsApi.getOrCreateWorkingCopy(pageId)
+    if (
+        workingCopy.created === false
+        && String(workingCopy.version?.id) !== String(currentVersion?.id)
+    ) {
+        const error = new Error('A newer working version already exists. Reload it before saving.')
+        error.code = 'working_copy_changed'
+        error.serverVersion = workingCopy.version
+        throw error
+    }
     return workingCopy.version
 }
 

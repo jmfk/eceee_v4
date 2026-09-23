@@ -362,6 +362,15 @@ class PageVersionWorkflowTest(TestCase):
         theme = PageTheme.objects.get(pk=response.data["id"])
         self.assertEqual(theme.tenant_id, self.tenant.id)
 
+    def test_ensure_default_theme_creates_one_for_an_empty_tenant(self):
+        response = self.client.post(reverse("api:pagetheme-ensure-default"), {}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["created"])
+        theme = PageTheme.objects.get(pk=response.data["theme"]["id"])
+        self.assertEqual(theme.tenant_id, self.tenant.id)
+        self.assertTrue(theme.is_default)
+
     def test_default_theme_resolution_stays_inside_the_page_tenant(self):
         own_theme = PageTheme.objects.create(
             name="Own default",
@@ -493,7 +502,7 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(self.page.current_published_version_id, current.id)
         self.assertEqual(self.page.title, "Current title")
         self.assertIsNone(restored.effective_date)
-        self.assertEqual(restored.page_data["title"], "Historical title")
+        self.assertEqual(restored.page_data["page_attributes"]["title"], "Historical title")
 
     def test_legacy_version_mutation_endpoint_is_gone(self):
         draft = self.page.create_version(self.user, "Draft")
@@ -571,6 +580,21 @@ class PageVersionWorkflowTest(TestCase):
         self.assertIsNone(live.expiry_date)
         self.assertIsNone(draft.effective_date)
         self.assertNotIn(service.SCHEDULE_PREDECESSOR_KEY, draft.change_summary)
+
+    def test_cancel_schedule_accepts_an_older_noncanonical_schedule(self):
+        scheduled = self.page.create_version(self.user, "Older schedule")
+        scheduled.effective_date = timezone.now() + timedelta(hours=1)
+        scheduled.save(update_fields=["effective_date", "updated_at"])
+        newer_draft = self.page.create_version(self.user, "Newer draft")
+
+        PageVersionWorkflowService(self.page, self.user).cancel_schedule(scheduled)
+
+        scheduled.refresh_from_db()
+        self.assertIsNone(scheduled.effective_date)
+        self.assertEqual(
+            PageVersionWorkflowService(self.page, self.user).canonical_editable_version().id,
+            newer_draft.id,
+        )
 
     def test_restore_into_scheduled_copy_preserves_cancel_metadata(self):
         live = self.publish_initial()
@@ -1124,7 +1148,7 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         draft.refresh_from_db()
         self.page.refresh_from_db()
-        self.assertEqual(draft.page_data["title"], "Live title")
+        self.assertEqual(draft.page_data["page_attributes"]["title"], "Live title")
         self.assertEqual(self.page.current_published_version_id, live.id)
 
     def test_restore_rejects_a_working_copy_changed_after_review(self):
@@ -1264,6 +1288,33 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(response.data["legacy_conflicts"]["additional_scheduled_count"], 1)
         self.assertGreaterEqual(response.data["legacy_conflicts"]["older_draft_count"], 2)
 
+    def test_restore_normalizes_legacy_page_attributes(self):
+        historical = self.page.create_version(self.user, "Historical")
+        historical.page_data = {
+            "title": "Historical title",
+            "description": "Historical description",
+            "body": "Historical body",
+        }
+        historical.save(update_fields=["page_data", "updated_at"])
+        working = self.page.create_version(self.user, "Working")
+        service = PageVersionWorkflowService(self.page, self.user)
+
+        restored = service.restore_as_working_copy(
+            historical,
+            expected_updated_at=working.updated_at,
+        )
+
+        self.assertNotIn("title", restored.page_data)
+        self.assertNotIn("description", restored.page_data)
+        self.assertEqual(restored.page_data["page_attributes"]["title"], "Historical title")
+        self.assertEqual(restored.page_data["page_attributes"]["description"], "Historical description")
+        self.assertEqual(restored.page_data["body"], "Historical body")
+
+        service.publish(restored, expected_updated_at=restored.updated_at)
+        self.page.refresh_from_db()
+        self.assertEqual(self.page.title, "Historical title")
+        self.assertEqual(self.page.description, "Historical description")
+
     def test_unrelated_user_cannot_compare_tenant_history(self):
         first = self.page.create_version(self.user, "First shared version")
         second = self.page.create_version(self.user, "Second shared version")
@@ -1337,22 +1388,91 @@ class PageVersionWorkflowTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_clearing_layout_does_not_validate_against_the_old_layout_schema(self):
+        PageDataSchema.objects.create(
+            name="Legacy layout schema",
+            scope=PageDataSchema.SCOPE_LAYOUT,
+            layout_name="legacy_layout",
+            schema={
+                "type": "object",
+                "properties": {"legacyField": {"type": "string"}},
+                "required": ["legacyField"],
+            },
+            created_by=self.user,
+        )
+        draft = self.page.create_version(self.user, "Clear layout")
+        draft.code_layout = "legacy_layout"
+        draft.save(update_fields=["code_layout", "updated_at"])
+
+        response = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk}),
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "codeLayout": "",
+                "pageData": {},
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        draft.refresh_from_db()
+        self.assertEqual(draft.code_layout, "")
+
     def test_scheduled_transition_rolls_back_cache_when_page_apply_fails(self):
         live = self.publish_initial()
         draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
         scheduled_at = timezone.now() + timedelta(hours=1)
         PageVersionWorkflowService(self.page, self.user).schedule(draft, scheduled_at)
 
-        with patch.object(PageVersion, "_apply_version_data", side_effect=RuntimeError("apply failed")):
-            with self.assertRaisesRegex(RuntimeError, "apply failed"):
-                refresh_publication_caches(now=scheduled_at + timedelta(seconds=1))
+        other_page = WebPage.objects.create(
+            title="Other scheduled page",
+            slug="other-scheduled-page",
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        other_live = other_page.create_version(self.user, "Other live")
+        PageVersionWorkflowService(other_page, self.user).publish(other_live)
+        other_draft, _ = PageVersionWorkflowService(other_page, self.user).get_or_create_working_copy()
+        other_draft.page_data = {"page_attributes": {"title": "Other activated title"}}
+        other_draft.save(update_fields=["page_data", "updated_at"])
+        PageVersionWorkflowService(other_page, self.user).schedule(other_draft, scheduled_at)
+
+        original_apply = PageVersion._apply_version_data
+
+        def apply_unless_broken(version):
+            if version.pk == draft.pk:
+                raise RuntimeError("apply failed")
+            return original_apply(version)
+
+        with patch.object(PageVersion, "_apply_version_data", autospec=True, side_effect=apply_unless_broken):
+            updated_count = refresh_publication_caches(now=scheduled_at + timedelta(seconds=1))
 
         self.page.refresh_from_db()
+        other_page.refresh_from_db()
+        draft.refresh_from_db()
+        live.refresh_from_db()
+        self.assertEqual(updated_count, 1)
         self.assertEqual(self.page.current_published_version_id, live.id)
+        self.assertIsNone(live.expiry_date)
+        self.assertIsNone(draft.effective_date)
+        self.assertIn("scheduled_activation_failure", draft.change_summary)
+        self.assertEqual(other_page.current_published_version_id, other_draft.id)
+        self.assertEqual(other_page.title, "Other activated title")
 
-        refresh_publication_caches(now=scheduled_at + timedelta(seconds=1))
+    def test_publish_ignores_unrecognized_top_level_page_data(self):
+        draft = self.page.create_version(self.user, "Unexpected page data")
+        draft.page_data = {
+            "parent": 123,
+            "page_attributes": {"title": "Safe title"},
+        }
+        draft.save(update_fields=["page_data", "updated_at"])
+
+        PageVersionWorkflowService(self.page, self.user).publish(draft)
+
         self.page.refresh_from_db()
-        self.assertEqual(self.page.current_published_version_id, draft.id)
+        self.assertIsNone(self.page.parent_id)
+        self.assertEqual(self.page.title, "Safe title")
 
     def test_compare_rejects_versions_from_different_pages(self):
         first = self.page.create_version(self.user, "First page version")
@@ -1468,6 +1588,20 @@ class PageVersionMutationTransactionTest(TransactionTestCase):
         self.assertGreaterEqual(len(lock_queries), 2)
         self.assertIn("webpages_webpage", lock_queries[0])
         self.assertIn("webpages_pageversion", lock_queries[1])
+
+    def test_publish_locks_the_root_namespace_before_the_target_version(self):
+        with CaptureQueriesContext(connection) as queries:
+            PageVersionWorkflowService(self.page, self.user).publish(
+                self.version,
+                expected_updated_at=self.version.updated_at,
+            )
+
+        lock_queries = [query["sql"] for query in queries.captured_queries if "FOR UPDATE" in query["sql"].upper()]
+        self.assertGreaterEqual(len(lock_queries), 3)
+        self.assertIn("webpages_webpage", lock_queries[0])
+        self.assertIn("parent_id", lock_queries[0])
+        self.assertIn("webpages_webpage", lock_queries[1])
+        self.assertIn("webpages_pageversion", lock_queries[2])
 
     def test_scheduled_working_copy_must_be_cancelled_before_delete(self):
         now = timezone.now()

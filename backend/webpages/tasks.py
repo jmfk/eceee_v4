@@ -48,10 +48,28 @@ def refresh_publication_caches(now=None):
         )
     )
 
+    def reject_scheduled_activation(page, error):
+        expected_version_id = page._expected_current_version_id
+        if not expected_version_id:
+            return
+        with transaction.atomic():
+            PageVersionWorkflowService.lock_hostname_namespace()
+            locked_page = WebPage.objects.select_for_update().get(pk=page.pk)
+            blocked_version = PageVersion.objects.select_for_update().get(
+                pk=expected_version_id,
+                page=locked_page,
+            )
+            PageVersionWorkflowService(locked_page, now=now).fail_scheduled_activation(
+                blocked_version,
+                reason=error,
+            )
+            update_page_publication_cache(locked_page, now=now)
+
     updated_count = 0
     for page in stale_pages.iterator():
         try:
             with transaction.atomic():
+                PageVersionWorkflowService.lock_hostname_namespace()
                 locked_page = WebPage.objects.select_for_update().get(pk=page.pk)
                 previous_version_id = locked_page.current_published_version_id
                 expected_version_id = page._expected_current_version_id
@@ -72,14 +90,11 @@ def refresh_publication_caches(now=None):
                     locked_page.save()
         except PageAttributeConflictError as error:
             logger.error("Scheduled publication blocked for page %s: %s", page.pk, error)
-            with transaction.atomic():
-                locked_page = WebPage.objects.select_for_update().get(pk=page.pk)
-                blocked_version = PageVersion.objects.select_for_update().get(pk=page._expected_current_version_id)
-                PageVersionWorkflowService(locked_page, now=now).fail_scheduled_activation(
-                    blocked_version,
-                    reason=error,
-                )
-                update_page_publication_cache(locked_page, now=now)
+            reject_scheduled_activation(page, error)
+            continue
+        except Exception as error:
+            logger.exception("Scheduled publication failed for page %s", page.pk)
+            reject_scheduled_activation(page, error)
             continue
         updated_count += 1
     return updated_count
