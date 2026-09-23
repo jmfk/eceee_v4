@@ -21,6 +21,8 @@ Tenant access is granted to staff, the tenant creator, or users in an explicit t
 
 Page hierarchy mutations and theme CRUD use the same selected-tenant boundary. Caller-supplied page, parent, and theme IDs never widen the active tenant scope.
 
+Theme fallback resolution, default-theme creation, and root-page sibling ordering are tenant-scoped as well. A tenant-specific default may never clear, render, or return another tenant's theme, and root-page maintenance may never reorder another tenant's pages.
+
 Writable page-version relationships are also tenant-scoped. An explicit theme must belong to the owning page's tenant; caller-supplied related-object IDs never widen that boundary.
 
 Clients send the selected tenant identifier on every API request. If the header is absent, middleware may infer a tenant only when the authenticated user has exactly one accessible tenant before applying the configured development fallback.

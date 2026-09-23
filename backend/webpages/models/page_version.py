@@ -283,7 +283,12 @@ class PageVersion(models.Model):
         """Restore this version into the canonical working copy."""
         from ..services.page_version_workflow import PageVersionWorkflowService
 
-        return PageVersionWorkflowService(self.page, user).restore_as_working_copy(self)
+        service = PageVersionWorkflowService(self.page, user)
+        editable = service.canonical_editable_version()
+        return service.restore_as_working_copy(
+            self,
+            expected_updated_at=editable.updated_at if editable else None,
+        )
 
     def compare_with(self, other_version):
         """Compare this version with another version"""

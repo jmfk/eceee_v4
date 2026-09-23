@@ -252,8 +252,8 @@ export const versionsApi = {
      * @param {number} versionId - Version ID
      * @returns {Promise<Object>} Restore result
      */
-    restore: wrapApiCall(async (versionId) => {
-        return api.post(endpoints.versions.restore(versionId))
+    restore: wrapApiCall(async (versionId, clientUpdatedAt = null) => {
+        return api.post(endpoints.versions.restore(versionId), { clientUpdatedAt })
     }, 'versions.restore'),
 
     /**

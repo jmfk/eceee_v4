@@ -622,7 +622,7 @@ class WebPage(models.Model):
 
         # Fall back to default theme
         try:
-            default_theme = PageTheme.get_default_theme()
+            default_theme = PageTheme.get_default_theme(tenant=self.tenant)
             if default_theme:
                 return default_theme
         except Exception as e:
@@ -957,13 +957,13 @@ class WebPage(models.Model):
 
         # Fall back to default theme if no theme found in chain
         if not inheritance_info["effective_theme"]:
-            default_theme = PageTheme.get_default_theme()
+            default_theme = PageTheme.get_default_theme(tenant=self.tenant)
             if default_theme:
                 inheritance_info["effective_theme"] = default_theme
                 # Default theme has no inherited_from since it's system-level
 
         # Get available themes for override
-        inheritance_info["override_options"] = PageTheme.objects.filter(is_active=True)
+        inheritance_info["override_options"] = PageTheme.objects.filter(tenant=self.tenant, is_active=True)
 
         return inheritance_info
 
@@ -1547,7 +1547,7 @@ class WebPage(models.Model):
         )
 
     @classmethod
-    def normalize_sort_orders(cls, parent_id=None):
+    def normalize_sort_orders(cls, parent_id=None, tenant_id=None):
         """
         Normalize sort orders for all siblings under the same parent.
         Assigns sort orders starting from 10, incrementing by 10 (10, 20, 30, etc.)
@@ -1560,9 +1560,7 @@ class WebPage(models.Model):
                 "sort_order", "title"
             )
         else:
-            siblings = cls.objects.filter(parent__isnull=True).order_by(
-                "sort_order", "title"
-            )
+            siblings = cls.objects.filter(parent__isnull=True, tenant_id=tenant_id).order_by("sort_order", "title")
 
         # Update sort orders with proper spacing
         for index, page in enumerate(siblings):
@@ -1573,7 +1571,7 @@ class WebPage(models.Model):
 
     def normalize_siblings_sort_orders(self):
         """Normalize sort orders for this page's siblings"""
-        self.__class__.normalize_sort_orders(self.parent_id)
+        self.__class__.normalize_sort_orders(self.parent_id, tenant_id=self.tenant_id)
 
     def get_effective_css_data(self):
         """

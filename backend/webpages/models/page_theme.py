@@ -429,8 +429,10 @@ class PageTheme(models.Model):
     def save(self, *args, **kwargs):
         """Override save to ensure only one default theme exists, increment sync version, and invalidate CSS cache"""
         if self.is_default:
-            # Clear any existing default themes
-            PageTheme.objects.filter(is_default=True).exclude(id=self.id).update(is_default=False)
+            # A default is unique within its tenant, not across the whole installation.
+            PageTheme.objects.filter(tenant_id=self.tenant_id, is_default=True).exclude(id=self.id).update(
+                is_default=False
+            )
 
         # Increment sync version on each save (unless explicitly skipped)
         skip_version = kwargs.pop("skip_version_increment", False)
@@ -454,36 +456,32 @@ class PageTheme(models.Model):
             generator.invalidate_cache(self.id)
 
     @classmethod
-    def get_default_theme(cls):
-        """Get the default theme for object content editors"""
+    def get_default_theme(cls, tenant):
+        """Get the default theme without crossing a tenant boundary."""
+        queryset = cls.objects.filter(is_default=True, is_active=True)
+        queryset = queryset.filter(tenant=tenant)
         try:
-            return cls.objects.get(is_default=True, is_active=True)
+            return queryset.get()
         except cls.DoesNotExist:
-            # No default theme exists, try to create one
-            return cls._ensure_default_theme_exists()
+            return cls._ensure_default_theme_exists(tenant=tenant)
         except cls.MultipleObjectsReturned:
-            # If somehow multiple defaults exist, return the first one and fix the data
-            default_theme = cls.objects.filter(is_default=True, is_active=True).first()
-            cls.objects.filter(is_default=True).exclude(id=default_theme.id).update(is_default=False)
+            default_theme = queryset.first()
+            queryset.exclude(id=default_theme.id).update(is_default=False)
             return default_theme
 
     @classmethod
-    def _ensure_default_theme_exists(cls):
-        """Ensure a default theme exists, create one if necessary"""
+    def _ensure_default_theme_exists(cls, tenant):
+        """Ensure a default theme exists inside the requested tenant."""
         from django.contrib.auth.models import User
-        from .web_page import WebPage
 
-        # Check if any active themes exist
-        active_themes = cls.objects.filter(is_active=True)
+        active_themes = cls.objects.filter(tenant=tenant, is_active=True)
 
         if active_themes.exists():
-            # Set the first active theme as default
             first_theme = active_themes.first()
             first_theme.is_default = True
             first_theme.save()
             return first_theme
         else:
-            # Create a basic default theme
             admin_user = User.objects.filter(is_superuser=True).first()
             if not admin_user:
                 admin_user = User.objects.filter(is_staff=True).first()
@@ -494,7 +492,7 @@ class PageTheme(models.Model):
             default_theme = cls.objects.create(
                 name="System Default",
                 description="Automatically created default theme for object content editors",
-                tenant=getattr(admin_user, "tenant", None) or getattr(WebPage.objects.first(), "tenant", None),
+                tenant=tenant,
                 fonts={
                     "google_fonts": [
                         {

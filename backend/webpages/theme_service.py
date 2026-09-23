@@ -156,18 +156,18 @@ class ThemeService:
                 return parent_theme
 
         # Fall back to default theme
-        default_theme = cls.get_default_theme()
+        default_theme = cls.get_default_theme(tenant=page.tenant)
         if default_theme:
             return default_theme
 
         return None
 
     @classmethod
-    def get_default_theme(cls) -> Optional[PageTheme]:
+    def get_default_theme(cls, tenant) -> Optional[PageTheme]:
         """
         Get the default theme for object content editors and widgets.
         """
-        return PageTheme.get_default_theme()
+        return PageTheme.get_default_theme(tenant=tenant)
 
     @classmethod
     def generate_css_for_page(
@@ -205,17 +205,17 @@ class ThemeService:
         return css
 
     @classmethod
-    def generate_default_theme_css(cls, scope: str = ".theme-content") -> str:
+    def generate_default_theme_css(cls, tenant, scope: str = ".theme-content") -> str:
         """
         Generate CSS for the default theme (used in object content editors).
         """
-        cache_key = f"{cls.CACHE_PREFIX}:css:default:{scope}"
+        cache_key = f"{cls.CACHE_PREFIX}:css:default:{tenant.pk}:{scope}"
         cached_css = cache.get(cache_key)
 
         if cached_css is not None:
             return cached_css
 
-        theme = cls.get_default_theme()
+        theme = cls.get_default_theme(tenant=tenant)
         css = theme.generate_css(scope) if theme else ""
 
         cache.set(cache_key, css, cls.CACHE_TIMEOUT)
@@ -301,7 +301,7 @@ class ThemeService:
             cache.delete_pattern(f"{cls.CACHE_PREFIX}:*")
 
     @classmethod
-    def create_default_themes(cls):
+    def create_default_themes(cls, *, tenant, created_by):
         """Create some default themes for demonstration"""
         default_themes = [
             {
@@ -404,12 +404,6 @@ class ThemeService:
 
         created_themes = []
         for theme_data in default_themes:
-            # Get the first tenant or a default one since this is for demonstration
-            from core.models import Tenant
-            tenant = Tenant.objects.first()
-            if not tenant:
-                continue
-
             theme, created = PageTheme.objects.get_or_create(
                 name=theme_data["name"],
                 tenant=tenant,
@@ -417,7 +411,7 @@ class ThemeService:
                     "description": theme_data["description"],
                     "css_variables": theme_data["css_variables"],
                     "html_elements": theme_data["html_elements"],
-                    "created_by_id": 1,  # Assumes admin user exists
+                    "created_by": created_by,
                 },
             )
             if created:

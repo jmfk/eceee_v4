@@ -185,7 +185,10 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        created_themes = ThemeService.create_default_themes()
+        created_themes = ThemeService.create_default_themes(
+            tenant=request.tenant,
+            created_by=request.user,
+        )
         serializer = PageThemeSerializer(created_themes, many=True)
         return Response(
             {
