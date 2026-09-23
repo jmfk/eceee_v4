@@ -129,6 +129,44 @@ class PageVersionWorkflowTest(TestCase):
         draft.refresh_from_db()
         self.assertEqual(draft.page_id, self.page.pk)
 
+    def test_save_normalizes_a_legacy_string_change_summary(self):
+        draft = PageVersion.objects.create(
+            page=self.page,
+            version_number=1,
+            version_title="Legacy draft",
+            change_summary="Legacy editor summary",
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk}),
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "versionTitle": "Saved legacy draft",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        draft.refresh_from_db()
+        self.assertEqual(draft.change_summary, {"description": "Legacy editor summary"})
+
+    def test_schedule_and_cancel_accept_a_legacy_string_change_summary(self):
+        draft = PageVersion.objects.create(
+            page=self.page,
+            version_number=1,
+            version_title="Legacy draft",
+            change_summary="Legacy schedule summary",
+            created_by=self.user,
+        )
+        service = PageVersionWorkflowService(self.page, self.user)
+
+        scheduled = service.schedule(draft, timezone.now() + timedelta(days=1))
+        restored = service.cancel_schedule(scheduled)
+
+        self.assertIsNone(restored.effective_date)
+        self.assertEqual(restored.change_summary, {"description": "Legacy schedule summary"})
+
     def test_save_accepts_theme_from_the_page_tenant(self):
         draft = self.page.create_version(self.user, "Draft")
         theme = PageTheme.objects.create(

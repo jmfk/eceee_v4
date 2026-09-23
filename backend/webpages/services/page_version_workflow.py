@@ -21,6 +21,15 @@ PAGE_ATTRIBUTE_FIELDS = {
 }
 
 
+def normalize_change_summary(value):
+    """Return the object form used by workflow metadata for legacy JSON values."""
+    if isinstance(value, dict):
+        return deepcopy(value)
+    if value:
+        return {"description": str(value)}
+    return {}
+
+
 def page_with_attributes(page, attributes):
     """Return an unsaved page copy with delayed working-copy attributes applied."""
     candidate = copy(page)
@@ -338,7 +347,7 @@ class PageVersionWorkflowService:
         return version
 
     def _restore_scheduled_predecessor(self, version):
-        summary = dict(version.change_summary or {})
+        summary = normalize_change_summary(version.change_summary)
         predecessor = summary.pop(self.SCHEDULE_PREDECESSOR_KEY, None)
         if not predecessor:
             return summary
@@ -455,7 +464,7 @@ class PageVersionWorkflowService:
             "action": "restored",
             "source_version_id": source.id,
         }
-        predecessor = (editable.change_summary or {}).get(self.SCHEDULE_PREDECESSOR_KEY)
+        predecessor = normalize_change_summary(editable.change_summary).get(self.SCHEDULE_PREDECESSOR_KEY)
         if predecessor:
             summary[self.SCHEDULE_PREDECESSOR_KEY] = deepcopy(predecessor)
         editable.change_summary = summary

@@ -1313,6 +1313,8 @@ class WebPage(models.Model):
         """Create a new version snapshot of the current page state"""
         from django.utils import timezone
 
+        from ..services.page_version_workflow import normalize_change_summary
+
         # Use atomic transaction to prevent race conditions
         with transaction.atomic():
             # Get the latest version number with row-level locking
@@ -1361,7 +1363,7 @@ class WebPage(models.Model):
                 widgets=widgets_data,
                 effective_date=(effective_date or (timezone.now() if auto_publish or status == "published" else None)),
                 expiry_date=expiry_date,
-                change_summary=kwargs.get("description") or kwargs.get("change_summary", ""),
+                change_summary=normalize_change_summary(kwargs.get("description") or kwargs.get("change_summary", "")),
                 created_by=user,
             )
             return version
