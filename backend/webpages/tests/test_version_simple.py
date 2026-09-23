@@ -278,23 +278,37 @@ class PageVersionIntegrationSimpleTest(APITestCase):
             last_modified_by=self.user,
         )
 
-    def test_page_update_does_not_create_version(self):
-        """Test that updating page fields does not implicitly create a version"""
+    def test_direct_page_update_rejects_version_controlled_fields(self):
+        """Version-controlled fields must be saved through the working copy."""
         initial_count = PageVersion.objects.filter(page=self.page).count()
-
-        # Update page
         url = reverse("api:webpage-detail", kwargs={"pk": self.page.pk})
-        data = {"title": "Updated Title"}
 
-        response = self.client.patch(url, data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        for field, value in {
+            "title": "Updated Title",
+            "description": "Updated description",
+            "slug": "updated-slug",
+            "path_pattern_key": "article_slug",
+            "hostnames": ["changed.example.test"],
+        }.items():
+            with self.subTest(field=field):
+                response = self.client.patch(url, {field: value}, format="json")
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn(field, response.data)
+                self.assertEqual(response.data[field][0], "Change this field through the page working copy.")
 
         self.page.refresh_from_db()
-        self.assertEqual(self.page.title, "Updated Title")
+        self.assertEqual(self.page.title, "Test Page")
+        self.assertEqual(self.page.slug, "test-page")
+        self.assertEqual(PageVersion.objects.filter(page=self.page).count(), initial_count)
 
-        # Version creation is handled explicitly through PageVersion endpoints
-        new_count = PageVersion.objects.filter(page=self.page).count()
-        self.assertEqual(new_count, initial_count)
+    def test_direct_page_update_allows_structural_fields(self):
+        url = reverse("api:webpage-detail", kwargs={"pk": self.page.pk})
+
+        response = self.client.patch(url, {"sort_order": 3}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.page.refresh_from_db()
+        self.assertEqual(self.page.sort_order, 3)
 
     def test_legacy_page_publish_action_is_gone(self):
         url = reverse("api:webpage-publish", kwargs={"pk": self.page.pk})

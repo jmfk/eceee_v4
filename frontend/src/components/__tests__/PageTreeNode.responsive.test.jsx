@@ -91,4 +91,15 @@ describe('PageTreeNode responsive actions and metadata', () => {
         expect(onCut).toHaveBeenCalledWith(42)
         expect(menu).not.toBeInTheDocument()
     })
+
+    it('opens page settings for root hostnames instead of editing public routing inline', async () => {
+        const user = userEvent.setup()
+        const onEdit = vi.fn()
+        renderNode({ onEdit })
+
+        await user.click(screen.getByTitle('Hostname missing — click to edit'))
+
+        expect(onEdit).toHaveBeenCalledWith({ ...responsivePage, editorTab: 'settings' })
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
 })

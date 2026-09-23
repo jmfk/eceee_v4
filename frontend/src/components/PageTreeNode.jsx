@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, memo, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import {
     ChevronRight,
     ChevronDown,
@@ -17,15 +17,13 @@ import {
     AlertTriangle,
     Loader2,
     Plus,
-    X,
-    Save,
     Search,
     Download,
     Upload,
     MoreHorizontal,
 } from 'lucide-react'
 import { pagesApi } from '../api'
-import { getPageDisplayUrl, isRootPage, sanitizePageData } from '../utils/apiValidation.js'
+import { isRootPage, sanitizePageData } from '../utils/apiValidation.js'
 import Tooltip from './Tooltip'
 import { useNotificationContext } from './NotificationManager'
 import pageTreeUtils from '../utils/pageTreeUtils'
@@ -248,9 +246,6 @@ const PageTreeNode = memo(({
     const [isExpanded, setIsExpanded] = useState(initialPage.isExpanded || false)
     const [childrenLoaded, setChildrenLoaded] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
-    const [showHostnameModal, setShowHostnameModal] = useState(false)
-    const [isEditingSlug, setIsEditingSlug] = useState(false)
-    const [editingSlug, setEditingSlug] = useState('')
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
 
@@ -499,7 +494,7 @@ const PageTreeNode = memo(({
 
     const handleHostnameClick = () => {
         if (isRootPageCheck) {
-            setShowHostnameModal(true)
+            onEdit?.({ ...page, editorTab: 'settings' })
         }
     }
 
@@ -596,89 +591,10 @@ const PageTreeNode = memo(({
         handleEdit()
     }
 
-    // Slug editing handlers
+    // Version-controlled page attributes are edited through the working copy.
     const handleSlugClick = () => {
-        setIsEditingSlug(true)
-        setEditingSlug(page.slug)
+        onEdit?.({ ...page, editorTab: 'settings' })
     }
-
-    const generateSlug = (text) => {
-        return text
-            .toLowerCase()
-            .replace(/[^a-z0-9\s-]/g, '')
-            .replace(/\s+/g, '-')
-            .replace(/-+/g, '-')
-            .replace(/^-+|-+$/g, '') // Remove leading and trailing dashes
-            .trim()
-    }
-
-    const handleSlugSave = () => {
-        const trimmedSlug = editingSlug.trim()
-        if (!trimmedSlug) {
-            return
-        }
-
-        // Auto-sanitize the slug
-        const sanitizedSlug = generateSlug(trimmedSlug)
-        if (sanitizedSlug !== trimmedSlug) {
-            setEditingSlug(sanitizedSlug)
-            return
-        }
-
-        if (sanitizedSlug === page.slug) {
-            setIsEditingSlug(false)
-            return
-        }
-        updateSlugMutation.mutate({ slug: sanitizedSlug })
-    }
-
-    const handleSlugCancel = () => {
-        setIsEditingSlug(false)
-        setEditingSlug('')
-    }
-
-    const handleSlugKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault()
-            handleSlugSave()
-        } else if (e.key === 'Escape') {
-            e.preventDefault()
-            handleSlugCancel()
-        }
-    }
-
-    // Update page hostnames mutation
-    const updateHostnamesMutation = useMutation({
-        mutationFn: async (hostnamesData) => {
-            return await pagesApi.update(page.id, hostnamesData)
-        },
-        onSuccess: (updatedPage) => {
-            setShowHostnameModal(false)
-            // Update local state
-            setPage(prev => ({ ...prev, hostnames: updatedPage.hostnames }))
-        },
-        onError: (error) => {
-            console.error('Failed to update hostnames:', error.response?.data?.detail || error.message)
-            showError(error, 'error')
-        }
-    })
-
-    // Update page slug mutation
-    const updateSlugMutation = useMutation({
-        mutationFn: async (slugData) => {
-            return await pagesApi.update(page.id, slugData)
-        },
-        onSuccess: (updatedPage) => {
-            setIsEditingSlug(false)
-            // Update local state
-            setPage(prev => ({ ...prev, slug: updatedPage.slug }))
-        },
-        onError: (error) => {
-            console.error('Failed to update slug:', error.response?.data?.detail || error.message)
-            showError(error, 'error')
-            setEditingSlug(page.slug) // Reset to original slug on error
-        }
-    })
 
     // Folder icon based on state
     const getFolderIcon = () => {
@@ -823,26 +739,6 @@ const PageTreeNode = memo(({
                                 >
                                     {sanitizedPage.hostnames?.[0] || '(hostname missing)'}
                                 </button>
-                            ) : isEditingSlug ? (
-                                <div className="flex min-w-0 items-center gap-1" onClick={(event) => event.stopPropagation()}>
-                                    <span className="text-xs text-gray-500">/</span>
-                                    <input
-                                        type="text"
-                                        value={editingSlug}
-                                        onChange={(event) => setEditingSlug(event.target.value)}
-                                        onKeyDown={handleSlugKeyDown}
-                                        className="min-w-0 flex-1 truncate rounded border border-blue-300 bg-white px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        autoFocus
-                                        disabled={updateSlugMutation.isPending}
-                                        aria-label={`Slug for ${page.title}`}
-                                    />
-                                    <button type="button" onClick={handleSlugSave} disabled={updateSlugMutation.isPending} className="rounded p-1 text-green-600 hover:bg-green-100 disabled:opacity-50" title="Save slug (Enter)" aria-label="Save slug">
-                                        <Save className="w-4 h-4" />
-                                    </button>
-                                    <button type="button" onClick={handleSlugCancel} disabled={updateSlugMutation.isPending} className="rounded p-1 text-red-600 hover:bg-red-100 disabled:opacity-50" title="Cancel (Escape)" aria-label="Cancel slug editing">
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
                             ) : (
                                 <button
                                     type="button"
@@ -851,7 +747,8 @@ const PageTreeNode = memo(({
                                         event.stopPropagation()
                                         handleSlugClick()
                                     }}
-                                    title={page.slug || 'Click to edit slug'}
+                                    title={page.slug ? `${page.slug} — edit in page settings` : 'Edit slug in page settings'}
+                                    aria-label={`Edit slug for ${page.title} in page settings`}
                                 >
                                     {highlightSearchTerm(page.slug || '', searchTerm)}
                                 </button>
@@ -988,18 +885,6 @@ const PageTreeNode = memo(({
                     ))}
                 </div>
             )}
-
-            {/* Hostname Editing Modal */}
-            {showHostnameModal && (
-                <HostnameEditModal
-                    page={page}
-                    onSave={(hostnamesData) => {
-                        updateHostnamesMutation.mutate(hostnamesData)
-                    }}
-                    onCancel={() => setShowHostnameModal(false)}
-                    isLoading={updateHostnamesMutation.isPending}
-                />
-            )}
         </div>
     )
 }, (prevProps, nextProps) => {
@@ -1045,90 +930,5 @@ const PageTreeNode = memo(({
 })
 
 PageTreeNode.displayName = 'PageTreeNode'
-
-// Hostname editing modal component
-const HostnameEditModal = ({ page, onSave, onCancel, isLoading }) => {
-    const [formData, setFormData] = useState({
-        hostnames: page.hostnames ? page.hostnames.join(', ') : ''
-    })
-
-    const handleSubmit = (e) => {
-        e.preventDefault()
-
-        // Parse hostnames from comma-separated string
-        const hostnamesArray = formData.hostnames
-            .split(',')
-            .map(h => h.trim())
-            .filter(h => h.length > 0)
-
-        const hostnamesData = {
-            hostnames: hostnamesArray
-        }
-
-        onSave(hostnamesData)
-    }
-
-    return (
-        <div className="fixed inset-0 bg-orange-50/10 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-                <div className="flex items-center justify-between mb-6">
-                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
-                        Edit Hostnames for "{page.title}"
-                    </div>
-                    <button
-                        onClick={onCancel}
-                        className="text-gray-400 hover:text-gray-500"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label htmlFor="hostnames" className="block text-sm font-medium text-gray-700 mb-1">
-                            Hostnames *
-                        </label>
-                        <input
-                            id="hostnames"
-                            type="text"
-                            value={formData.hostnames}
-                            onChange={(e) => setFormData(prev => ({ ...prev, hostnames: e.target.value }))}
-                            placeholder="example.com, www.example.com"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            required
-                        />
-                        <div className="text-xs text-gray-500 mt-1">
-                            Enter hostnames separated by commas. Root pages need at least one hostname.
-                        </div>
-                    </div>
-
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                        <div className="text-sm text-blue-800">
-                            Root pages are accessed directly via these hostnames. Each hostname should point to your server.
-                        </div>
-                    </div>
-
-                    <div className="flex items-center justify-end space-x-3 pt-4">
-                        <button
-                            type="button"
-                            onClick={onCancel}
-                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                        >
-                            <Save className="w-4 h-4 mr-2" />
-                            {isLoading ? 'Saving...' : 'Save Hostnames'}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    )
-}
 
 export default PageTreeNode
