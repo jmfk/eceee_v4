@@ -96,4 +96,22 @@ describe('PageVersionHistoryPanel', () => {
         await waitFor(() => expect(confirmRestore).toHaveBeenCalledTimes(1))
         expect(versionsApi.restore).not.toHaveBeenCalled()
     })
+
+    it('reports restore conflicts and refreshes history', async () => {
+        const onRestoreError = vi.fn()
+        const conflict = new Error('The working version changed. Refresh and try again.')
+        versionsApi.restore.mockRejectedValue(conflict)
+        render(
+            <PageVersionHistoryPanel
+                pageId={4}
+                workflow={{ editableVersion: { id: 11, updatedAt: '2030-01-02T10:00:00Z' } }}
+                onRestoreError={onRestoreError}
+            />
+        )
+
+        fireEvent.click(await screen.findByRole('button', { name: /restore as working/i }))
+
+        await waitFor(() => expect(onRestoreError).toHaveBeenCalledWith(conflict))
+        expect(versionsApi.getPageVersionsList).toHaveBeenCalledTimes(2)
+    })
 })

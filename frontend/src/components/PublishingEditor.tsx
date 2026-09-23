@@ -141,6 +141,9 @@ const PublishingEditor = ({
             setScheduleDate('')
             addNotification('Schedule cancelled; the content is a working version again', 'success')
             await refresh()
+        } catch (error: any) {
+            addNotification(error.message || 'Cancelling the schedule failed', 'error')
+            await Promise.allSettled([refresh()])
         } finally {
             setBusyAction(null)
         }
@@ -160,6 +163,9 @@ const PublishingEditor = ({
             await versionsApi.unpublishExplicit(pageId, workflow.liveVersion.id)
             addNotification('Page unpublished; history was kept', 'success')
             await refresh()
+        } catch (error: any) {
+            addNotification(error.message || 'Unpublishing failed', 'error')
+            await Promise.allSettled([refresh()])
         } finally {
             setBusyAction(null)
         }
@@ -176,6 +182,12 @@ const PublishingEditor = ({
 
     const versionRestored = async (version: WorkflowVersion) => {
         await onVersionRestored?.(version)
+        await refresh()
+    }
+
+    const restoreFailed = async (error: unknown) => {
+        const message = error instanceof Error ? error.message : 'The working version changed. Refresh and try again.'
+        addNotification(message, 'error')
         await refresh()
     }
 
@@ -222,6 +234,7 @@ const PublishingEditor = ({
                 workflow={workflow}
                 confirmRestore={confirmRestore}
                 onRestored={versionRestored}
+                onRestoreError={restoreFailed}
             />
 
         </div>

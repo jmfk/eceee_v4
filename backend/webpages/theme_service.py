@@ -7,17 +7,19 @@ This service handles theme inheritance, CSS generation, and application for:
 - Object types (default themes for object type definitions)
 """
 
-from typing import Optional, Dict, Any, List, Union
+from typing import Any, Dict, List, Optional
+
 from django.core.cache import cache
-from django.utils.html import format_html
+
 from .models import PageTheme, WebPage
-from webpages.layout_registry import layout_registry
 
 
 class ThemeFallbackService:
     """Service providing fallback values when theme elements are missing"""
 
-    DEFAULT_SYSTEM_FONTS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif"
+    DEFAULT_SYSTEM_FONTS = (
+        "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif"
+    )
 
     FALLBACK_COLORS = {
         "primary": "#3b82f6",
@@ -186,9 +188,7 @@ class ThemeService:
             widget_type: Optional widget type for targeted design groups
             slot: Optional slot name for targeted design groups
         """
-        cache_key = (
-            f"{cls.CACHE_PREFIX}:css:page:{page_id}:{scope}:{widget_type}:{slot}"
-        )
+        cache_key = f"{cls.CACHE_PREFIX}:css:page:{page_id}:{scope}:{widget_type}:{slot}"
         cached_css = cache.get(cache_key)
 
         if cached_css is not None:
@@ -258,9 +258,7 @@ class ThemeService:
             return None
 
     @classmethod
-    def get_component_style(
-        cls, theme_id: int, style_name: str
-    ) -> Optional[Dict[str, Any]]:
+    def get_component_style(cls, theme_id: int, style_name: str) -> Optional[Dict[str, Any]]:
         """Get a component style from a theme with fallback"""
         try:
             theme = PageTheme.objects.get(id=theme_id)
@@ -269,9 +267,7 @@ class ThemeService:
             return None
 
     @classmethod
-    def get_table_template(
-        cls, theme_id: int, template_name: str
-    ) -> Optional[Dict[str, Any]]:
+    def get_table_template(cls, theme_id: int, template_name: str) -> Optional[Dict[str, Any]]:
         """Get a table template from a theme"""
         try:
             theme = PageTheme.objects.get(id=theme_id)
@@ -293,9 +289,7 @@ class ThemeService:
         """Invalidate theme-related cache entries"""
         if theme_id:
             # Invalidate specific theme caches
-            cache.delete_many(
-                [f"{cls.CACHE_PREFIX}:css:*", f"{cls.CACHE_PREFIX}:available_themes:*"]
-            )
+            cache.delete_many([f"{cls.CACHE_PREFIX}:css:*", f"{cls.CACHE_PREFIX}:available_themes:*"])
         else:
             # Invalidate all theme caches
             cache.delete_pattern(f"{cls.CACHE_PREFIX}:*")

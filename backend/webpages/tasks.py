@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def refresh_publication_caches(now=None):
     """Refresh pages whose time-based publication boundary has changed."""
     from webpages.models import PageVersion, WebPage
-    from webpages.services.page_version_workflow import PageVersionWorkflowService, SlugConflictError
+    from webpages.services.page_version_workflow import PageAttributeConflictError, PageVersionWorkflowService
     from webpages.signals import update_page_publication_cache
 
     now = now or timezone.now()
@@ -59,7 +59,7 @@ def refresh_publication_caches(now=None):
                     published_version = PageVersion.objects.select_for_update().get(pk=expected_version_id)
                     PageVersionWorkflowService(locked_page).assert_page_attributes_publishable(
                         published_version,
-                        lock_slug_namespace=True,
+                        lock_namespace=True,
                     )
                 update_page_publication_cache(locked_page, now=now)
                 if (
@@ -70,7 +70,7 @@ def refresh_publication_caches(now=None):
                     published_version.page = locked_page
                     published_version._apply_version_data()
                     locked_page.save()
-        except SlugConflictError as error:
+        except PageAttributeConflictError as error:
             logger.error("Scheduled publication blocked for page %s: %s", page.pk, error)
             with transaction.atomic():
                 locked_page = WebPage.objects.select_for_update().get(pk=page.pk)

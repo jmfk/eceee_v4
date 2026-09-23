@@ -84,6 +84,18 @@ class PageVersionWorkflowTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_tenant_member_can_list_an_unpublished_page(self):
+        member = User.objects.create_user("workflow-list-member", password="test")
+        self.tenant.members.add(member)
+        self.page.create_version(self.user, "Shared draft")
+        self.client.force_authenticate(member)
+
+        response = self.client.get(reverse("api:webpage-list"))
+        pages = response.data.get("results", response.data)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(self.page.id, [page["id"] for page in pages])
+
     def test_current_version_read_does_not_create_a_draft(self):
         before = self.page.versions.count()
 
@@ -528,11 +540,11 @@ class PageVersionWorkflowTest(TestCase):
         historical = self.page.create_version(self.user, "Historical content")
         scheduled_at = timezone.now() + timedelta(hours=1)
         service = PageVersionWorkflowService(self.page, self.user)
-        service.schedule(historical, scheduled_at)
+        scheduled = service.schedule(historical, scheduled_at)
 
         restored = service.restore_as_working_copy(
             live,
-            expected_updated_at=historical.updated_at,
+            expected_updated_at=scheduled.updated_at,
         )
         service.cancel_schedule(restored)
 
@@ -689,6 +701,46 @@ class PageVersionWorkflowTest(TestCase):
         draft.refresh_from_db()
         self.assertNotEqual(draft.page_data.get("page_attributes", {}).get("slug"), "occupied")
 
+    def test_root_slug_conflicts_are_scoped_to_the_page_tenant(self):
+        other_user = User.objects.create_user("root-slug-other", password="test")
+        other_tenant = Tenant.objects.create(
+            name="Root slug other tenant",
+            identifier="root-slug-other",
+            created_by=other_user,
+        )
+        WebPage.objects.create(
+            title="Other tenant root",
+            slug="shared-root",
+            tenant=other_tenant,
+            created_by=other_user,
+            last_modified_by=other_user,
+        )
+        draft = self.page.create_version(self.user, "Tenant-scoped root slug")
+
+        saved = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk}),
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "pageData": {
+                    **draft.page_data,
+                    "pageAttributes": {"slug": "shared-root"},
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(saved.status_code, status.HTTP_200_OK, saved.data)
+        draft.refresh_from_db()
+
+        published = self.client.post(
+            reverse("api:pageversion-publish", kwargs={"pk": draft.pk}),
+            {"clientUpdatedAt": draft.updated_at.isoformat()},
+            format="json",
+        )
+
+        self.assertEqual(published.status_code, status.HTTP_200_OK, published.data)
+        self.page.refresh_from_db()
+        self.assertEqual(self.page.slug, "shared-root")
+
     def test_publish_rechecks_slug_conflicts_created_after_save(self):
         parent = self.make_page_child()
         draft = self.page.create_version(self.user, "Slug reviewed before conflict")
@@ -727,6 +779,43 @@ class PageVersionWorkflowTest(TestCase):
         self.assertIsNone(draft.effective_date)
         self.assertEqual(self.page.slug, "workflow-page")
 
+    def test_publish_rechecks_hostname_conflicts_created_after_save(self):
+        draft = self.page.create_version(self.user, "Hostname reviewed before conflict")
+        saved = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": draft.pk}),
+            {
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "pageData": {
+                    **draft.page_data,
+                    "pageAttributes": {"hostnames": ["claimed-later.example"]},
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(saved.status_code, status.HTTP_200_OK, saved.data)
+        draft.refresh_from_db()
+        WebPage.objects.create(
+            title="Hostname owner",
+            slug="hostname-owner",
+            hostnames=["claimed-later.example"],
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("api:pageversion-publish", kwargs={"pk": draft.pk}),
+            {"clientUpdatedAt": draft.updated_at.isoformat()},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["error"], "page_attribute_conflict")
+        draft.refresh_from_db()
+        self.page.refresh_from_db()
+        self.assertIsNone(draft.effective_date)
+        self.assertEqual(self.page.hostnames, [])
+
     def test_scheduled_activation_rechecks_slug_conflicts(self):
         parent = self.make_page_child()
         live = self.publish_initial()
@@ -759,6 +848,38 @@ class PageVersionWorkflowTest(TestCase):
         self.assertIsNone(draft.expiry_date)
         self.assertIn("scheduled_activation_failure", draft.change_summary)
         live.refresh_from_db()
+        self.assertIsNone(live.expiry_date)
+
+    def test_scheduled_activation_rechecks_hostname_conflicts(self):
+        live = self.publish_initial()
+        draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        draft.page_data = {
+            **draft.page_data,
+            "page_attributes": {"hostnames": ["scheduled-conflict.example"]},
+        }
+        draft.save(update_fields=["page_data", "updated_at"])
+        scheduled_at = timezone.now() + timedelta(hours=1)
+        PageVersionWorkflowService(self.page, self.user).schedule(draft, scheduled_at)
+        WebPage.objects.create(
+            title="Scheduled hostname owner",
+            slug="scheduled-hostname-owner",
+            hostnames=["scheduled-conflict.example"],
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        with self.assertLogs("webpages.tasks", level="ERROR"):
+            updated_count = refresh_publication_caches(now=scheduled_at + timedelta(seconds=1))
+
+        self.page.refresh_from_db()
+        draft.refresh_from_db()
+        live.refresh_from_db()
+        self.assertEqual(updated_count, 0)
+        self.assertEqual(self.page.current_published_version_id, live.id)
+        self.assertEqual(self.page.hostnames, [])
+        self.assertIsNone(draft.effective_date)
+        self.assertIn("scheduled_activation_failure", draft.change_summary)
         self.assertIsNone(live.expiry_date)
 
     def test_publish_targets_only_the_explicit_canonical_working_copy(self):

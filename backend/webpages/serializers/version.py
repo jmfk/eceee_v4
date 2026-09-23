@@ -9,25 +9,17 @@
 Version-related serializers for the Web Page Publishing System
 """
 
-from copy import copy, deepcopy
+from copy import deepcopy
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from ..models import PageDataSchema, PageTheme, PageVersion, WebPage
-from ..services.page_version_workflow import find_page_slug_conflict
+from ..models import PageDataSchema, PageTheme, PageVersion
+from ..services.page_version_workflow import find_page_slug_conflict, page_with_attributes
 from .base import UserSerializer
 from .theme import PageThemeSerializer
 
 SCHEDULE_PREDECESSOR_KEY = "scheduled_predecessor"
-PAGE_ATTRIBUTE_FIELDS = {
-    "title": "title",
-    "description": "description",
-    "slug": "slug",
-    "path_pattern_key": "path_pattern_key",
-    "pathPatternKey": "path_pattern_key",
-    "hostnames": "hostnames",
-}
 
 
 def validate_reserved_page_attributes(version, page_data):
@@ -41,14 +33,8 @@ def validate_reserved_page_attributes(version, page_data):
     if not attributes or version is None:
         return
 
-    candidate = copy(version.page)
     try:
-        for source_field, target_field in PAGE_ATTRIBUTE_FIELDS.items():
-            if source_field not in attributes:
-                continue
-            model_field = WebPage._meta.get_field(target_field)
-            value = model_field.clean(attributes[source_field], candidate)
-            setattr(candidate, target_field, value)
+        candidate = page_with_attributes(version.page, attributes)
         candidate.clean()
         if "slug" in attributes:
             conflict = find_page_slug_conflict(candidate, candidate.slug)
