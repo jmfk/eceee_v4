@@ -257,9 +257,21 @@ class PageVersionViewSet(
     def restore(self, request, pk=None):
         """Copy a historical version into the canonical working copy."""
         version = self.get_object()
+        client_updated_at = request.data.get("client_updated_at")
+        client_timestamp = None
+        if client_updated_at:
+            client_timestamp = parse_datetime(client_updated_at)
+            if client_timestamp is None:
+                return Response(
+                    {"error": "invalid_timestamp", "message": "clientUpdatedAt is invalid."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         try:
-            restored = PageVersionWorkflowService(version.page, request.user).restore_as_working_copy(version)
+            restored = PageVersionWorkflowService(version.page, request.user).restore_as_working_copy(
+                version,
+                expected_updated_at=client_timestamp,
+            )
             serializer = self.get_serializer(restored)
             return Response(
                 {

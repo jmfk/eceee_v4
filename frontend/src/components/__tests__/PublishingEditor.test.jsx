@@ -63,4 +63,36 @@ describe('PublishingEditor', () => {
         await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
         expect(versionsApi.publish).toHaveBeenCalledWith(12, '2030-01-01T10:05:00Z')
     })
+
+    it('confirms dirty replacement and reloads the restored working version', async () => {
+        const historical = {
+            id: 10,
+            versionNumber: 1,
+            versionTitle: 'Historical',
+            publicationStatus: 'published',
+            createdAt: '2029-12-01T10:00:00Z',
+        }
+        const restored = { id: 11, updatedAt: '2030-01-01T10:06:00Z' }
+        const onVersionRestored = vi.fn()
+        versionsApi.getPageVersionsList.mockResolvedValue([
+            {
+                id: 11,
+                versionNumber: 2,
+                versionTitle: 'Working',
+                publicationStatus: 'draft',
+                createdAt: '2030-01-01T10:00:00Z',
+            },
+            historical,
+        ])
+        versionsApi.restore.mockResolvedValue({ version: restored })
+
+        renderEditor({ isDirty: true, onVersionRestored })
+        fireEvent.click(await screen.findByRole('button', { name: /restore as working/i }))
+
+        await waitFor(() => expect(showConfirm).toHaveBeenCalledWith(expect.objectContaining({
+            message: expect.stringMatching(/discard the unsaved changes/i),
+        })))
+        expect(versionsApi.restore).toHaveBeenCalledWith(10, '2030-01-01T10:00:00Z')
+        await waitFor(() => expect(onVersionRestored).toHaveBeenCalledWith(restored))
+    })
 })

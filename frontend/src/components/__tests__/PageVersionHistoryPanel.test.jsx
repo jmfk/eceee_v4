@@ -69,15 +69,31 @@ describe('PageVersionHistoryPanel', () => {
         render(
             <PageVersionHistoryPanel
                 pageId={4}
-                workflow={{ editableVersion: { id: 11 } }}
+                workflow={{ editableVersion: { id: 11, updatedAt: '2030-01-02T10:00:00Z' } }}
                 onRestored={onRestored}
             />
         )
 
         fireEvent.click(await screen.findByRole('button', { name: /restore as working/i }))
 
-        await waitFor(() => expect(versionsApi.restore).toHaveBeenCalledWith(10))
+        await waitFor(() => expect(versionsApi.restore).toHaveBeenCalledWith(10, '2030-01-02T10:00:00Z'))
         expect(onRestored).toHaveBeenCalledWith(versions[0])
         expect(versionsApi).not.toHaveProperty('publish')
+    })
+
+    it('does not restore when replacement is not confirmed', async () => {
+        const confirmRestore = vi.fn().mockResolvedValue(false)
+        render(
+            <PageVersionHistoryPanel
+                pageId={4}
+                workflow={{ editableVersion: { id: 11, updatedAt: '2030-01-02T10:00:00Z' } }}
+                confirmRestore={confirmRestore}
+            />
+        )
+
+        fireEvent.click(await screen.findByRole('button', { name: /restore as working/i }))
+
+        await waitFor(() => expect(confirmRestore).toHaveBeenCalledTimes(1))
+        expect(versionsApi.restore).not.toHaveBeenCalled()
     })
 })

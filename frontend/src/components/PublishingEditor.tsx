@@ -42,9 +42,16 @@ type PublishingEditorProps = {
     isDirty?: boolean
     onSave?: () => Promise<WorkflowVersion | undefined>
     onWorkflowChange?: () => Promise<unknown>
+    onVersionRestored?: (version: WorkflowVersion) => Promise<unknown>
 }
 
-const PublishingEditor = ({ pageId, isDirty = false, onSave, onWorkflowChange }: PublishingEditorProps) => {
+const PublishingEditor = ({
+    pageId,
+    isDirty = false,
+    onSave,
+    onWorkflowChange,
+    onVersionRestored,
+}: PublishingEditorProps) => {
     const [scheduleDate, setScheduleDate] = useState('')
     const [busyAction, setBusyAction] = useState<string | null>(null)
     const queryClient = useQueryClient()
@@ -158,6 +165,20 @@ const PublishingEditor = ({ pageId, isDirty = false, onSave, onWorkflowChange }:
         }
     }
 
+    const confirmRestore = () => showConfirm({
+        title: 'Restore historical version',
+        message: isDirty
+            ? 'Restore this version and discard the unsaved changes currently shown in the editor?'
+            : 'Replace the current working version with this historical version?',
+        confirmText: 'Restore version',
+        confirmButtonStyle: 'primary',
+    })
+
+    const versionRestored = async (version: WorkflowVersion) => {
+        await onVersionRestored?.(version)
+        await refresh()
+    }
+
     return (
         <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-6">
             <section className="rounded-lg border border-gray-200 bg-white p-5">
@@ -196,7 +217,12 @@ const PublishingEditor = ({ pageId, isDirty = false, onSave, onWorkflowChange }:
                 </div>
             </section>
 
-            <PageVersionHistoryPanel pageId={pageId} workflow={workflow} onRestored={refresh} />
+            <PageVersionHistoryPanel
+                pageId={pageId}
+                workflow={workflow}
+                confirmRestore={confirmRestore}
+                onRestored={versionRestored}
+            />
 
         </div>
     )

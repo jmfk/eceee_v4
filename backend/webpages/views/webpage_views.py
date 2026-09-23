@@ -160,7 +160,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         # Normalize sort orders for the parent group
         page = serializer.instance
-        WebPage.normalize_sort_orders(page.parent_id)
+        WebPage.normalize_sort_orders(page.parent_id, tenant_id=page.tenant_id)
 
     def retrieve(self, request, pk=None):
         """Get WebPage data only - no version data included"""
@@ -922,7 +922,12 @@ class WebPageViewSet(viewsets.ModelViewSet):
         # Find unique slug
         new_slug = base_slug
         counter = 1
-        while WebPage.objects.filter(parent=page.parent, slug=new_slug, is_deleted=False).exists():
+        while WebPage.objects.filter(
+            parent=page.parent,
+            tenant=page.tenant,
+            slug=new_slug,
+            is_deleted=False,
+        ).exists():
             new_slug = f"{base_slug}-{counter}"
             counter += 1
 
@@ -969,9 +974,12 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 new_page.create_version(request.user, "Initial version (duplicated)")
 
             # Shift sort orders of pages after this one
-            WebPage.objects.filter(parent=page.parent, sort_order__gt=page.sort_order, is_deleted=False).update(
-                sort_order=F("sort_order") + 1
-            )
+            WebPage.objects.filter(
+                parent=page.parent,
+                tenant=page.tenant,
+                sort_order__gt=page.sort_order,
+                is_deleted=False,
+            ).exclude(pk=new_page.pk).update(sort_order=F("sort_order") + 1)
 
             serializer = self.get_serializer(new_page)
             return Response(

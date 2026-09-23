@@ -676,6 +676,7 @@ const PageEditor = () => {
                 versionTitle: 'Initial version',
             };
 
+            let initialVersionError = null;
             try {
                 const workingCopy = await versionsApi.getOrCreateWorkingCopy(newPage.id);
                 await versionsApi.saveWorkingCopy(
@@ -685,14 +686,21 @@ const PageEditor = () => {
                 );
             } catch (versionError) {
                 console.error('Failed to create version:', versionError);
-                // Version creation failed, but page was created
-                // The backend will auto-create a version when we navigate to the page
+                initialVersionError = versionError;
             }
 
-            return { page: newPage };
+            return { page: newPage, initialVersionError };
         },
-        onSuccess: ({ page }) => {
-            addNotification(`Page "${page.title}" created successfully`, 'success', 'page-create');
+        onSuccess: ({ page, initialVersionError }) => {
+            if (initialVersionError) {
+                addNotification(
+                    `Page "${page.title}" was created, but its initial working version could not be saved. Review and save it again.`,
+                    'warning',
+                    'page-create'
+                );
+            } else {
+                addNotification(`Page "${page.title}" created successfully`, 'success', 'page-create');
+            }
             setShowEssentialFieldsModal(false);
 
             // Navigate to the newly created page editor
@@ -1591,6 +1599,40 @@ const PageEditor = () => {
         }
     }, [pageVersionData, originalPageVersionData, workflow, pageId, localWidgets, publishUpdate, webpageData, refetchWorkflow, loadVersionsPreserveCurrent, setIsDirty, addNotification]);
 
+    const handleVersionRestored = useCallback(async (restoredVersion) => {
+        const processed = processLoadedVersionData(restoredVersion);
+        const restoredPage = mergeVersionedPageAttributes(webpage || webpageData || {}, processed);
+        const versionDataForUDC = {
+            ...processed,
+            pageId: String(pageId),
+            versionNumber: processed.versionNumber || 1,
+        };
+
+        setWebpageData(restoredPage);
+        setOriginalWebpageData(restoredPage);
+        setPageVersionData(processed);
+        setOriginalPageVersionData(processed);
+        setCurrentVersion(restoredVersion);
+        setLocalWidgets(processed.widgets || {});
+
+        await publishUpdate(`page-editor-${pageId}-webpage`, OperationTypes.INIT_PAGE, {
+            id: pageId,
+            data: restoredPage,
+        });
+        await publishUpdate(`page-editor-${pageId}-${restoredVersion.id}`, OperationTypes.INIT_VERSION, {
+            id: restoredVersion.id,
+            data: versionDataForUDC,
+        });
+
+        queryClient.setQueryData(
+            ['pageVersion', pageId, restoredVersion.id],
+            restoredVersion,
+        );
+        setIsDirty(false);
+        await loadVersionsPreserveCurrent();
+        addNotification('Historical version restored as the working version', 'success');
+    }, [webpage, webpageData, pageId, publishUpdate, queryClient, setIsDirty, loadVersionsPreserveCurrent, addNotification]);
+
     const handlePublishWorkingCopy = useCallback(async () => {
         try {
             let targetVersion = workflow?.editableVersion;
@@ -2213,6 +2255,7 @@ const PageEditor = () => {
                                 isDirty={isDirty}
                                 onSave={handleSave}
                                 onWorkflowChange={refetchWorkflow}
+                                onVersionRestored={handleVersionRestored}
                             />
                         )}
                         {activeTab === 'theme' && (

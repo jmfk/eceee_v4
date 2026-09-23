@@ -75,6 +75,7 @@ The simplified version workflow still has compatibility paths that can mutate pa
 - 2026-09-23: Working-copy theme selection is scoped to the page tenant and rejects cross-tenant theme relations.
 - 2026-09-23: Direct page updates now reject version-controlled page attributes; tree links route slug and hostname editing through the working-copy editor.
 - 2026-09-23: Tenant scoping now covers page hierarchy bulk mutations and theme CRUD, working-copy saves follow the page-then-version lock order, and admin restores create working copies instead of changing public page data.
+- 2026-09-23: Historical restore now rejects stale working-copy snapshots and refreshes the editor after confirmation. Tenant boundaries also cover default-theme fallback/creation and root-page ordering; partial new-page setup failures are surfaced to the editor.
 
 ## Linked ADRs
 

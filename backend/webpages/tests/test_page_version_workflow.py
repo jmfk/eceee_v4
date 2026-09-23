@@ -312,6 +312,43 @@ class PageVersionWorkflowTest(TestCase):
         theme = PageTheme.objects.get(pk=response.data["id"])
         self.assertEqual(theme.tenant_id, self.tenant.id)
 
+    def test_default_theme_resolution_stays_inside_the_page_tenant(self):
+        own_theme = PageTheme.objects.create(
+            name="Own default",
+            tenant=self.tenant,
+            created_by=self.user,
+            is_default=True,
+        )
+        other_tenant = Tenant.objects.create(
+            name="Other default tenant",
+            identifier="other-default-tenant",
+            created_by=self.user,
+        )
+        other_theme = PageTheme.objects.create(
+            name="Other default",
+            tenant=other_tenant,
+            created_by=self.user,
+            is_default=True,
+        )
+
+        resolved = self.page.get_effective_theme()
+
+        self.assertEqual(resolved, own_theme)
+        other_theme.refresh_from_db()
+        self.assertTrue(other_theme.is_default)
+
+    def test_create_default_themes_uses_the_selected_tenant_and_user(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+
+        response = self.client.post(reverse("api:pagetheme-create-defaults"), {}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        created_ids = [theme["id"] for theme in response.data["themes"]]
+        self.assertTrue(created_ids)
+        self.assertFalse(PageTheme.objects.filter(pk__in=created_ids).exclude(tenant=self.tenant).exists())
+        self.assertFalse(PageTheme.objects.filter(pk__in=created_ids).exclude(created_by=self.user).exists())
+
     def test_theme_import_rejects_an_unrelated_tenant(self):
         other_user = User.objects.create_user("theme-import-other", password="test")
         other_tenant = Tenant.objects.create(
@@ -357,6 +394,37 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         duplicate = WebPage.objects.get(pk=response.data["page"]["id"])
         self.assertEqual(duplicate.tenant_id, self.tenant.id)
+
+    def test_root_page_creation_and_duplication_do_not_reorder_another_tenant(self):
+        other_tenant = Tenant.objects.create(
+            name="Root ordering other tenant",
+            identifier="root-ordering-other",
+            created_by=self.user,
+        )
+        other_root = WebPage.objects.create(
+            title="Other ordered root",
+            slug="other-ordered-root",
+            sort_order=77,
+            tenant=other_tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        create_response = self.client.post(
+            reverse("api:webpage-list"),
+            {"title": "New own root", "slug": "new-own-root"},
+            format="json",
+        )
+        duplicate_response = self.client.post(
+            reverse("api:webpage-duplicate", kwargs={"pk": self.page.pk}),
+            {},
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(duplicate_response.status_code, status.HTTP_201_CREATED)
+        other_root.refresh_from_db()
+        self.assertEqual(other_root.sort_order, 77)
 
     def test_model_restore_creates_a_working_copy_without_changing_live_page(self):
         historical = self.page.create_version(self.user, "Historical")
@@ -462,7 +530,10 @@ class PageVersionWorkflowTest(TestCase):
         service = PageVersionWorkflowService(self.page, self.user)
         service.schedule(historical, scheduled_at)
 
-        restored = service.restore_as_working_copy(live)
+        restored = service.restore_as_working_copy(
+            live,
+            expected_updated_at=historical.updated_at,
+        )
         service.cancel_schedule(restored)
 
         live.refresh_from_db()
@@ -885,13 +956,35 @@ class PageVersionWorkflowTest(TestCase):
         draft.page_data = {"title": "Work", "description": "Work"}
         draft.save()
 
-        response = self.client.post(reverse("api:pageversion-restore", kwargs={"pk": live.pk}), format="json")
+        response = self.client.post(
+            reverse("api:pageversion-restore", kwargs={"pk": live.pk}),
+            {"clientUpdatedAt": draft.updated_at.isoformat()},
+            format="json",
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         draft.refresh_from_db()
         self.page.refresh_from_db()
         self.assertEqual(draft.page_data["title"], "Live title")
         self.assertEqual(self.page.current_published_version_id, live.id)
+
+    def test_restore_rejects_a_working_copy_changed_after_review(self):
+        live = self.publish_initial()
+        draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        reviewed_at = draft.updated_at
+        draft.meta_title = "Changed by another editor"
+        draft.save(update_fields=["meta_title", "updated_at"])
+
+        response = self.client.post(
+            reverse("api:pageversion-restore", kwargs={"pk": live.pk}),
+            {"clientUpdatedAt": reviewed_at.isoformat()},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["error"], "version_conflict")
+        draft.refresh_from_db()
+        self.assertEqual(draft.meta_title, "Changed by another editor")
 
     def test_unpublish_expires_live_without_creating_draft(self):
         live = self.publish_initial()

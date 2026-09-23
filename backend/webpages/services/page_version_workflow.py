@@ -389,12 +389,17 @@ class PageVersionWorkflowService:
         return version
 
     @transaction.atomic
-    def restore_as_working_copy(self, source):
+    def restore_as_working_copy(self, source, *, expected_updated_at=None):
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
         source = PageVersion.objects.select_for_update().get(pk=source.pk, page=self.page)
         editable = self.canonical_editable_version(lock=True)
         if not editable:
             return self._create_version_from(source, title=f"Restored from version {source.version_number}")
+        if expected_updated_at is None or editable.updated_at != expected_updated_at:
+            raise VersionConflictError(
+                "The working version has changed since it was reviewed.",
+                details={"server_updated_at": editable.updated_at.isoformat()},
+            )
         if editable.id == source.id:
             return editable
         for field, value in self._copied_fields(source).items():
