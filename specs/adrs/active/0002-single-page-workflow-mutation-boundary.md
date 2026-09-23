@@ -20,6 +20,8 @@ Direct page updates, granular version endpoints, implicit subtree publication, a
 
 The complete working-copy save endpoint is the only page-editor write boundary. It requires the last observed version timestamp, validates the whole submitted state, and cannot change the owning page. Publication and scheduling use the workflow service and an explicit reviewed version timestamp. Multi-page actions accept explicit page/version/timestamp items. Legacy mutation and implicit subtree endpoints return HTTP 410.
 
+Version-controlled `WebPage` attributes (`title`, `description`, `slug`, `path_pattern_key`, and `hostnames`) cannot be changed through the ordinary page update endpoint. Tree affordances for these attributes route to the page settings editor, while structural page-tree fields remain directly writable.
+
 When a scheduled version cannot activate because its slug has become unavailable, the workflow restores the previous live version's expiry and converts the rejected schedule back into a working draft with failure metadata.
 
 Frontend deployment reloads are gated by the existing Unified Data Context dirty metadata for page, theme, and object editing. The reload guard is read-only: editors remain responsible for setting and clearing their own dirty state, while the guard defers a detected-version reload until every dirty signal is clean.

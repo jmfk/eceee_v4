@@ -20,6 +20,14 @@ from .theme import PageThemeSerializer
 class WebPageSimpleSerializer(serializers.ModelSerializer):
     """Page serializer with version management support"""
 
+    VERSION_CONTROLLED_FIELDS = {
+        "title",
+        "description",
+        "slug",
+        "path_pattern_key",
+        "hostnames",
+    }
+
     parent_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
     created_by = UserSerializer(read_only=True)
@@ -489,6 +497,12 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """Validate WebPage data"""
+        if self.instance is not None:
+            direct_updates = self.VERSION_CONTROLLED_FIELDS.intersection(attrs)
+            if direct_updates:
+                raise serializers.ValidationError(
+                    {field: "Change this field through the page working copy." for field in sorted(direct_updates)}
+                )
         return super().validate(attrs)
 
     def create(self, validated_data):

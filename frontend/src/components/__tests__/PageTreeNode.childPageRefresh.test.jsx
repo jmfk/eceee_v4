@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import userEvent from '@testing-library/user-event'
@@ -107,33 +107,20 @@ describe('PageTreeNode - Child Page Refresh', () => {
         expect(mockOnRefreshChildren).not.toHaveBeenCalled()
     })
 
-    it('should NOT call onRefreshChildren when parent page slug is updated (using targeted updates)', async () => {
-        const mockResponse = { data: { ...mockParentPage, slug: 'updated-parent-page' } }
-        mockAxiosInstance.patch.mockResolvedValue(mockResponse)
-
+    it('should open page settings for a slug without refreshing children', async () => {
         renderWithProviders(
             <PageTreeNode
                 page={mockCollapsedParentPage}
                 level={1}
+                onEdit={mockOnEdit}
                 onRefreshChildren={mockOnRefreshChildren}
             />
         )
 
         await user.click(screen.getByText('parent-page'))
 
-        const slugInput = screen.getByDisplayValue('parent-page')
-        await user.clear(slugInput)
-        await user.type(slugInput, 'updated-parent-page')
-
-        const saveButton = screen.getByTitle('Save slug (Enter)')
-        await user.click(saveButton)
-
-        // Wait for the mutation to complete
-        await waitFor(() => {
-            expect(mockAxiosInstance.patch).toHaveBeenCalledWith('/api/v1/webpages/pages/1/', { slug: 'updated-parent-page' }, {})
-        })
-
-        // Should NOT call onRefreshChildren because we use targeted updates now
+        expect(mockOnEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 1, editorTab: 'settings' }))
+        expect(mockAxiosInstance.patch).not.toHaveBeenCalled()
         expect(mockOnRefreshChildren).not.toHaveBeenCalled()
     })
 
@@ -182,66 +169,4 @@ describe('PageTreeNode - Child Page Refresh', () => {
         expect(mockOnRefreshChildren).not.toHaveBeenCalled()
     })
 
-    it('should NOT call onRefreshChildren when page has no children loaded', async () => {
-        const mockParentWithoutChildren = {
-            ...mockParentPage,
-            children: [],
-            childrenLoaded: false,
-            isExpanded: false
-        }
-
-        const mockResponse = { data: { ...mockParentWithoutChildren, slug: 'updated-parent-page' } }
-        mockAxiosInstance.patch.mockResolvedValue(mockResponse)
-
-        renderWithProviders(
-            <PageTreeNode
-                page={mockParentWithoutChildren}
-                level={1}
-                onRefreshChildren={mockOnRefreshChildren}
-            />
-        )
-
-        await user.click(screen.getByText('parent-page'))
-
-        const slugInput = screen.getByDisplayValue('parent-page')
-        await user.clear(slugInput)
-        await user.type(slugInput, 'updated-parent-page')
-
-        const saveButton = screen.getByTitle('Save slug (Enter)')
-        await user.click(saveButton)
-
-        await waitFor(() => {
-            expect(mockAxiosInstance.patch).toHaveBeenCalledWith('/api/v1/webpages/pages/1/', { slug: 'updated-parent-page' }, {})
-        })
-
-        expect(mockOnRefreshChildren).not.toHaveBeenCalled()
-    })
-
-    it('should handle missing onRefreshChildren gracefully', async () => {
-        const mockResponse = { data: { ...mockParentPage, slug: 'updated-parent-page' } }
-        mockAxiosInstance.patch.mockResolvedValue(mockResponse)
-
-        renderWithProviders(
-            <PageTreeNode
-                page={mockCollapsedParentPage}
-                level={1}
-            // No onRefreshChildren prop
-            />
-        )
-
-        await user.click(screen.getByText('parent-page'))
-
-        const slugInput = screen.getByDisplayValue('parent-page')
-        await user.clear(slugInput)
-        await user.type(slugInput, 'updated-parent-page')
-
-        const saveButton = screen.getByTitle('Save slug (Enter)')
-        await user.click(saveButton)
-
-        await waitFor(() => {
-            expect(mockAxiosInstance.patch).toHaveBeenCalledWith('/api/v1/webpages/pages/1/', { slug: 'updated-parent-page' }, {})
-        })
-
-        expect(mockAxiosInstance.patch).toHaveBeenCalledTimes(1)
-    })
 })
