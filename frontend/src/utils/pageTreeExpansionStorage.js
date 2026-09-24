@@ -100,34 +100,34 @@ export const setPageTreeBranchExpanded = (records, pageId, parentId, isExpanded)
 
 export const reconcilePageTreeExpansionRecords = (records, parentId, pages) => {
     const normalizedParentId = normalizeParentId(parentId)
-    const currentBranches = new Set(
-        (Array.isArray(pages) ? pages : [])
-            .filter(page => (Number(page?.childrenCount) || 0) > 0 || (Array.isArray(page?.children) && page.children.length > 0))
-            .map(page => normalizeId(page?.id))
-            .filter(Boolean)
-    )
+    const currentPages = (Array.isArray(pages) ? pages : [])
+        .map(page => ({
+            id: normalizeId(page?.id),
+            isBranch: (Number(page?.childrenCount) || 0) > 0 || (Array.isArray(page?.children) && page.children.length > 0),
+        }))
+        .filter(page => page.id)
+    let nextRecords = records
     const removedIds = new Set()
 
-    for (const record of records.values()) {
-        if (record.parentId === normalizedParentId && !currentBranches.has(record.id)) {
-            removedIds.add(record.id)
+    for (const currentPage of currentPages) {
+        const record = records.get(currentPage.id)
+        if (!record) continue
+
+        if (!currentPage.isBranch) {
+            removedIds.add(currentPage.id)
+        } else if (record.parentId !== normalizedParentId) {
+            if (nextRecords === records) nextRecords = new Map(records)
+            nextRecords.set(currentPage.id, { id: currentPage.id, parentId: normalizedParentId })
         }
     }
 
-    if (removedIds.size === 0) return records
+    // Missing pages are not necessarily deleted: sibling responses may be filtered or
+    // paginated, and a page may have moved to another parent. Only prune pages that
+    // were observed and are confirmed to no longer be branches. Keep their unobserved
+    // descendants so a moved branch can be reparented when its destination is loaded.
+    if (removedIds.size === 0) return nextRecords
 
-    let foundDescendant = true
-    while (foundDescendant) {
-        foundDescendant = false
-        for (const record of records.values()) {
-            if (!removedIds.has(record.id) && record.parentId !== null && removedIds.has(record.parentId)) {
-                removedIds.add(record.id)
-                foundDescendant = true
-            }
-        }
-    }
-
-    const nextRecords = new Map(records)
+    if (nextRecords === records) nextRecords = new Map(records)
     removedIds.forEach(id => nextRecords.delete(id))
     return nextRecords
 }
