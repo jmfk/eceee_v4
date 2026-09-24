@@ -170,6 +170,7 @@ const MediaManager = ({
                         showUploader={true} // MediaBrowser handles its own upload
                         refreshTrigger={refreshTrigger} // Trigger refresh when files are processed
                         onPendingFilesCreated={handlePendingFilesCreated} // Switch to pending tab on upload
+                        defaultViewMode="list"
                     />
                 )}
 
