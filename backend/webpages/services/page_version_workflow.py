@@ -306,6 +306,10 @@ class PageVersionWorkflowService:
     def resolve_atomic_save_target(self, *, expected_version_id, expected_updated_at):
         """Lock and return the reviewed save target, creating it from live content when needed."""
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
+        # The page lock may have blocked across a scheduled activation boundary.
+        # Classify versions using the time observed after the lock is acquired so
+        # a version that became live while waiting is copied instead of mutated.
+        self.now = timezone.now()
         editable = self.canonical_editable_version(lock=True)
         if editable:
             if editable.id != expected_version_id or editable.updated_at != expected_updated_at:
