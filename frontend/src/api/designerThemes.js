@@ -10,6 +10,7 @@ export const designerThemesApi = {
     workspace: async (themeId) => unwrap(await api.get(`${base}/themes/${themeId}/workspace/`)),
     preview: async (themeId, patch) => unwrap(await api.post(`${base}/themes/${themeId}/preview/`, patch)),
     savePreviewContent: async (themeId, viewId, texts) => unwrap(await api.patch(`${base}/themes/${themeId}/preview-content/`, { viewId, texts })),
+    importPreviewFromSite: async (themeId, sourceSiteId) => unwrap(await api.post(`${base}/themes/${themeId}/preview-content/from-site/`, { sourceSiteId })),
     replacePreviewImage: async (themeId, viewId, targetId, image) => {
         const form = new FormData()
         form.append('view_id', viewId)

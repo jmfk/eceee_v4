@@ -13,7 +13,14 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
 from core.models import Tenant
-from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeDesignerExportJob, ThemeDesignerRevision
+from webpages.models import (
+    PageTheme,
+    PageVersion,
+    ThemeDesignerAssignment,
+    ThemeDesignerExportJob,
+    ThemeDesignerRevision,
+    WebPage,
+)
 from webpages.services.designer_export import ThemeDesignerExporter, cleanup_expired_designer_exports
 from webpages.services.designer_theme import generate_placeholder_png, validate_image_upload
 from webpages.views.designer_theme_views import DesignerExportThrottle, DesignerThemeExportView
@@ -144,6 +151,63 @@ class DesignerThemeApiTests(TestCase):
 
         self.assertEqual(navigation["slots"], ["sidebar"])
         self.assertEqual(navigation["parts"][0]["part"], "nav-container")
+
+    def test_preview_content_can_be_copied_from_a_site_using_the_theme(self):
+        root = WebPage.objects.create(
+            title="Conference site",
+            slug="conference",
+            hostnames=["conference.example"],
+            tenant=self.tenant,
+            created_by=self.owner,
+            last_modified_by=self.owner,
+        )
+        version = PageVersion.objects.create(
+            page=root,
+            version_number=1,
+            effective_date=timezone.now() - timedelta(days=1),
+            code_layout="main_layout",
+            theme=self.theme,
+            page_data={"title": "Real conference heading", "description": "Published conference introduction"},
+            widgets={
+                "main": [
+                    {
+                        "type": "easy_widgets.ContentWidget",
+                        "config": {
+                            "content": "<p>Real body content from the site.</p>",
+                            "image_url": "https://media.example/conference.jpg",
+                        },
+                    }
+                ]
+            },
+            created_by=self.owner,
+        )
+        root.current_published_version = version
+        root.latest_version = version
+        root.is_currently_published = True
+        root.cached_root_id = root.id
+        root.save(
+            update_fields=["current_published_version", "latest_version", "is_currently_published", "cached_root_id"]
+        )
+        self.authenticate(self.designer)
+
+        workspace = self.client.get(self.workspace_url).data
+        self.assertEqual(
+            workspace["contentSources"],
+            [{"id": root.id, "label": "conference.example", "hostname": "conference.example"}],
+        )
+
+        response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/from-site/",
+            {"sourceSiteId": root.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        views = response.data["previewContent"]["views"]
+        main_view = next(view for view in views if view["layout"] == "main_layout")
+        self.assertEqual(main_view["texts"]["group:0:element:h1"], "Conference site")
+        self.assertEqual(main_view["sourceSiteId"], root.id)
+        self.assertIn("https://media.example/conference.jpg", str(main_view["images"]))
 
     def test_preview_text_is_saved_separately_from_theme_draft_and_preserves_metadata(self):
         self.theme.designer_preview = {

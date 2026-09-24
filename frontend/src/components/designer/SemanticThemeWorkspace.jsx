@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Box, Check, FileText, Image as ImageIcon, MousePointer2, Save, X } from 'lucide-react'
+import { Box, Check, Copy, FileText, Image as ImageIcon, Loader2, MousePointer2, Save, X } from 'lucide-react'
 
 import { buildSemanticPreviewDocument } from './semanticPreview'
 
@@ -27,7 +27,7 @@ const ValueFields = ({ values, fields, labels, onChange }) => (
 const SemanticThemeWorkspace = ({
     workspace, preview, viewport, updateWorkspace, replaceAsset, createPlaceholder,
     placeholderDrafts, setPlaceholderDrafts, savePreviewContent, replacePreviewImage,
-    disabled, mobilePane,
+    importPreviewFromSite, disabled, mobilePane,
 }) => {
     const initialViews = workspace.previewContent?.views || workspace.catalog.previewViews || []
     const [previewContent, setPreviewContent] = useState({ views: initialViews })
@@ -36,6 +36,8 @@ const SemanticThemeWorkspace = ({
     const [previewDirty, setPreviewDirty] = useState(false)
     const [savingPreview, setSavingPreview] = useState(false)
     const [pendingImages, setPendingImages] = useState({})
+    const [sourceSiteId, setSourceSiteId] = useState(workspace.contentSources?.[0]?.id || '')
+    const [importingSite, setImportingSite] = useState(false)
     const iframeRef = useRef(null)
     const uploadRefs = useRef({})
     const previewImageInputRef = useRef(null)
@@ -45,6 +47,12 @@ const SemanticThemeWorkspace = ({
         setPreviewContent({ views })
         setViewId((current) => views.some((view) => view.id === current) ? current : views[0]?.id || '')
     }, [workspace.previewContent, workspace.catalog.previewViews])
+
+    useEffect(() => {
+        setSourceSiteId((current) => workspace.contentSources?.some((source) => String(source.id) === String(current))
+            ? current
+            : workspace.contentSources?.[0]?.id || '')
+    }, [workspace.contentSources])
 
     useEffect(() => {
         const receive = (event) => {
@@ -128,6 +136,23 @@ const SemanticThemeWorkspace = ({
         }
     }
 
+    const copySiteContent = async () => {
+        if (!sourceSiteId || !importPreviewFromSite) return
+        if (!window.confirm('Replace saved and unsaved preview content with published content from this site?')) return
+        setImportingSite(true)
+        try {
+            const result = await importPreviewFromSite(sourceSiteId)
+            const saved = result.previewContent || { views: [] }
+            setPreviewContent(saved)
+            setViewId(saved.views?.[0]?.id || '')
+            setSelectedTarget(null)
+            setPendingImages({})
+            setPreviewDirty(false)
+        } finally {
+            setImportingSite(false)
+        }
+    }
+
     const assetEditor = selectedAsset && (
         <section className="space-y-3 border-t border-gray-200 pt-4">
             <div><h3 className="font-medium text-gray-900">Theme image</h3><p className="text-xs text-gray-500">This image belongs to the theme and changes with the theme draft.</p></div>
@@ -166,6 +191,7 @@ const SemanticThemeWorkspace = ({
             <section className={`${mobilePane === 'edit' ? 'hidden' : 'flex'} min-h-0 flex-col bg-gray-100 p-3 lg:flex lg:p-5`}>
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                     <nav className="flex min-w-0 flex-1 gap-1 overflow-x-auto" aria-label="Preview views">{previewContent.views.map((view) => <button type="button" key={view.id} onClick={() => { setViewId(view.id); setSelectedTarget(null) }} className={`inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${view.id === viewId ? 'bg-white text-blue-700 shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:bg-white/70'}`}>{view.kind === 'object' ? <Box className="h-4 w-4" /> : <FileText className="h-4 w-4" />}{view.label}</button>)}</nav>
+                    {(workspace.contentSources || []).length > 0 && <div className="flex items-center gap-1 rounded-md border border-gray-300 bg-white p-1"><label htmlFor="preview-source-site" className="sr-only">Demo content from site</label><select id="preview-source-site" value={sourceSiteId} onChange={(event) => setSourceSiteId(event.target.value)} disabled={disabled || importingSite} className="max-w-44 rounded border-0 bg-transparent px-2 py-1 text-sm text-gray-700"><option value="">Choose site</option>{workspace.contentSources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}</select><button type="button" onClick={copySiteContent} disabled={!sourceSiteId || disabled || importingSite} className="inline-flex items-center gap-1.5 rounded bg-gray-100 px-2.5 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-200 disabled:opacity-50">{importingSite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}Use site content</button></div>}
                     {previewDirty && <button type="button" onClick={saveCurrentPreview} disabled={savingPreview} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{savingPreview ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}{savingPreview ? 'Saving…' : 'Save preview content'}</button>}
                     <span className="text-xs capitalize text-gray-500">{viewport}</span>
                 </div>

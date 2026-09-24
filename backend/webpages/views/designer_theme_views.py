@@ -27,6 +27,7 @@ from webpages.services.designer_theme import (
     discard_designer_draft,
     generate_placeholder_png,
     get_or_create_designer_draft,
+    import_designer_preview_from_site,
     publish_designer_draft,
     replace_designer_preview_image,
     replace_designer_asset,
@@ -80,6 +81,10 @@ class DesignerPreviewImageSerializer(serializers.Serializer):
     view_id = serializers.CharField(max_length=100)
     target_id = serializers.CharField(max_length=300)
     image = serializers.ImageField()
+
+
+class DesignerPreviewSiteSerializer(serializers.Serializer):
+    source_site_id = serializers.IntegerField(min_value=1)
 
 
 def _theme(request, theme_id):
@@ -316,6 +321,28 @@ class DesignerThemePreviewContentView(APIView):
             )
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
+        return Response({"previewContent": preview})
+
+
+class DesignerThemePreviewSiteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [DesignerJSONParser]
+    renderer_classes = [DesignerJSONRenderer]
+
+    def post(self, request, theme_id):
+        serializer = DesignerPreviewSiteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            preview = import_designer_preview_from_site(
+                theme_id,
+                request.tenant,
+                request.user,
+                serializer.validated_data["source_site_id"],
+            )
+        except PermissionError:
+            return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
+        except PageTheme.DoesNotExist:
+            return Response({"error": "Theme not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response({"previewContent": preview})
 
 

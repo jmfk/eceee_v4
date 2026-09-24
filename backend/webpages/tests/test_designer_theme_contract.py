@@ -1,8 +1,10 @@
 import io
 import json
+from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 
+from webpages.services.designer_theme import _page_preview_content
 from webpages.views.designer_theme_views import DesignerJSONParser, DesignerJSONRenderer, DesignerPlaceholderSerializer
 
 
@@ -40,3 +42,25 @@ class DesignerThemeContractTests(SimpleTestCase):
 
         self.assertFalse(serializer.is_valid())
         self.assertIn("Placeholder images cannot exceed 16 megapixels.", serializer.errors["non_field_errors"])
+
+    def test_site_preview_content_extracts_readable_text_and_images(self):
+        page = SimpleNamespace(title="Conference", description="Published introduction")
+        version = SimpleNamespace(
+            page_data={"title": "Programme"},
+            widgets={
+                "main": [
+                    {
+                        "type": "easy_widgets.ContentWidget",
+                        "config": {
+                            "content": "<p>Useful <strong>body</strong> copy.</p>",
+                            "image_url": "https://media.example/hero.jpg",
+                        },
+                    }
+                ]
+            },
+        )
+
+        texts, images = _page_preview_content(page, version)
+
+        self.assertEqual(texts, ["Conference", "Published introduction", "Programme", "Useful body copy."])
+        self.assertEqual(images, ["https://media.example/hero.jpg"])
