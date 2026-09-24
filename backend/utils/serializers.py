@@ -179,8 +179,25 @@ class UserListSerializer(serializers.ModelSerializer):
     is_designer_only = serializers.SerializerMethodField()
     has_tenant_admin_access = serializers.SerializerMethodField()
 
+    def _access_snapshot(self, user):
+        cache = getattr(self, "_access_snapshot_cache", {})
+        if user.pk not in cache:
+            assignments = getattr(user, "designer_assignments_for_access", None)
+            if assignments is None:
+                assignments = list(user.theme_designer_assignments.select_related("tenant").order_by("tenant__name"))
+            created_tenants = getattr(user, "created_tenants_for_access", None)
+            member_tenants = getattr(user, "member_tenants_for_access", None)
+            has_admin_access = (
+                user.is_staff
+                or (bool(created_tenants) if created_tenants is not None else user.created_tenants.exists())
+                or (bool(member_tenants) if member_tenants is not None else user.member_tenants.exists())
+            )
+            cache[user.pk] = (assignments, has_admin_access)
+            self._access_snapshot_cache = cache
+        return cache[user.pk]
+
     def get_designer_tenants(self, user):
-        assignments = user.theme_designer_assignments.select_related("tenant").order_by("tenant__name")
+        assignments, _ = self._access_snapshot(user)
         tenants = {}
         for assignment in assignments:
             tenants[str(assignment.tenant_id)] = {
@@ -191,12 +208,12 @@ class UserListSerializer(serializers.ModelSerializer):
         return list(tenants.values())
 
     def get_is_designer_only(self, user):
-        has_designer_access = user.theme_designer_assignments.exists()
-        has_admin_access = self.get_has_tenant_admin_access(user)
-        return has_designer_access and not has_admin_access
+        assignments, has_admin_access = self._access_snapshot(user)
+        return bool(assignments) and not has_admin_access
 
     def get_has_tenant_admin_access(self, user):
-        return user.is_staff or user.created_tenants.exists() or user.member_tenants.exists()
+        _, has_admin_access = self._access_snapshot(user)
+        return has_admin_access
 
     class Meta:
         model = User
