@@ -90,13 +90,13 @@ class DesignerThemeApiTests(TestCase):
         self.authenticate(self.other)
         self.assertEqual(self.client.get(self.workspace_url).status_code, 403)
 
-    def test_valid_patch_is_saved_and_can_be_undone(self):
+    def test_valid_patch_stays_in_draft_until_atomic_publish(self):
         self.authenticate(self.designer)
-        version = self.theme.sync_version
+        workspace = self.client.get(self.workspace_url).data
         response = self.client.patch(
             self.workspace_url,
             {
-                "syncVersion": version,
+                "draftVersion": workspace["draftVersion"],
                 "colors": {"brand": "#abcdef"},
                 "fonts": [{"family": "Inter", "variants": ["400", "700"], "display": "swap"}],
                 "typography": [{"groupIndex": 0, "element": "h1", "values": {"fontSize": "40px"}}],
@@ -114,39 +114,51 @@ class DesignerThemeApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 200, response.data)
         self.theme.refresh_from_db()
+        self.assertEqual(self.theme.colors["brand"], "#123456")
+        self.assertEqual(self.theme.design_groups["groups"][0]["elements"]["h1"]["fontSize"], "32px")
+        self.assertTrue(response.data["hasDraftChanges"])
+        self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 0)
+
+        published = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/publish/",
+            {"draftVersion": response.data["draftVersion"]},
+            format="json",
+        )
+        self.assertEqual(published.status_code, 200, published.data)
+        self.theme.refresh_from_db()
         self.assertEqual(self.theme.colors["brand"], "#abcdef")
         self.assertEqual(self.theme.design_groups["groups"][0]["elements"]["h1"]["fontSize"], "40px")
         self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 1)
-
-        undo = self.client.post(f"/api/v1/webpages/designer/themes/{self.theme.id}/undo/", {}, format="json")
-        self.assertEqual(undo.status_code, 200, undo.data)
-        self.theme.refresh_from_db()
-        self.assertEqual(self.theme.colors["brand"], "#123456")
-        self.assertEqual(self.theme.design_groups["groups"][0]["elements"]["h1"]["fontSize"], "32px")
+        self.assertFalse(published.data["hasDraftChanges"])
 
     def test_stale_or_unsupported_patch_is_rejected(self):
         self.authenticate(self.designer)
-        stale = self.client.patch(self.workspace_url, {"syncVersion": 0, "colors": {}}, format="json")
+        stale = self.client.patch(self.workspace_url, {"draftVersion": 0, "colors": {}}, format="json")
         self.assertEqual(stale.status_code, 409)
 
+        workspace = self.client.get(self.workspace_url).data
         unsupported = self.client.patch(
             self.workspace_url,
-            {"syncVersion": self.theme.sync_version, "name": "Hacked"},
+            {"draftVersion": workspace["draftVersion"], "name": "Hacked"},
             format="json",
         )
         self.assertEqual(unsupported.status_code, 400)
         unsafe = self.client.post(
             f"/api/v1/webpages/designer/themes/{self.theme.id}/preview/",
-            {"syncVersion": self.theme.sync_version, "colors": {"brand": "red; background:url(https://example.test)"}},
+            {
+                "draftVersion": workspace["draftVersion"],
+                "colors": {"brand": "red; background:url(https://example.test)"},
+            },
             format="json",
         )
         self.assertEqual(unsafe.status_code, 400)
 
     def test_preview_does_not_save(self):
         self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
         response = self.client.post(
             f"/api/v1/webpages/designer/themes/{self.theme.id}/preview/",
-            {"syncVersion": self.theme.sync_version, "colors": {"brand": "#ffffff"}},
+            {"draftVersion": workspace["draftVersion"], "colors": {"brand": "#ffffff"}},
             format="json",
         )
         self.assertEqual(response.status_code, 200, response.data)
@@ -176,16 +188,26 @@ class DesignerThemeApiTests(TestCase):
     )
     def test_placeholder_has_exact_dimensions_and_is_marked(self, _save, _url):
         self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
         asset_key = "design:0:hero:md:background"
         response = self.client.post(
             f"/api/v1/webpages/designer/themes/{self.theme.id}/placeholder/",
-            {"assetKey": asset_key, "displayName": "New hero", "width": 1600, "height": 900},
+            {
+                "assetKey": asset_key,
+                "displayName": "New hero",
+                "width": 1600,
+                "height": 900,
+                "draftVersion": workspace["draftVersion"],
+            },
             format="json",
         )
         self.assertEqual(response.status_code, 200, response.data)
         asset = next(item for item in response.data["assets"] if item["assetKey"] == asset_key)
         self.assertTrue(asset["isPlaceholder"])
         self.assertEqual((asset["requiredWidth"], asset["requiredHeight"]), (1600, 900))
+        self.theme.refresh_from_db()
+        live_asset = self.theme.design_groups["groups"][0]["layoutProperties"]["hero"]["md"]["images"]["background"]
+        self.assertNotIn("url", live_asset)
 
 
 class DesignerPlaceholderTests(TestCase):
@@ -231,7 +253,7 @@ class DesignerPlaceholderTests(TestCase):
                 captured["content"] = content.read()
 
         theme = SimpleNamespace(id=7, name="Editorial")
-        job = MagicMock(theme=theme, theme_id=7, object_key="exports/test.zip")
+        job = MagicMock(theme=theme, theme_id=7, object_key="exports/test.zip", snapshot={})
         ThemeDesignerExporter(job, storage=Storage()).run()
         with zipfile.ZipFile(io.BytesIO(captured["content"])) as archive:
             names = archive.namelist()

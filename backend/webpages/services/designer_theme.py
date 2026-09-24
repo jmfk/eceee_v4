@@ -14,9 +14,8 @@ from PIL import Image, ImageDraw, ImageFont
 from rest_framework.exceptions import ValidationError
 
 from file_manager.storage import system_storage
-from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeDesignerRevision
+from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeDesignerDraft, ThemeDesignerRevision
 from webpages.serializers.theme import PageThemeSerializer
-
 
 TYPE_PROPERTIES = {
     "fontFamily",
@@ -46,6 +45,10 @@ CSS_VALUE_FORBIDDEN = re.compile(r"[;{}<>]|url\s*\(|expression\s*\(|@import", re
 COLOR_VALUE = re.compile(r"^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\([0-9.%+,\-\s/]+\)|[a-zA-Z]+)$")
 
 
+class DesignerDraftConflict(Exception):
+    """Raised when a draft or its live base changed since the client loaded it."""
+
+
 def user_can_design_theme(user, theme: PageTheme) -> bool:
     if not user or not user.is_authenticated:
         return False
@@ -59,6 +62,58 @@ def designer_theme_queryset(user, tenant):
     if tenant.user_has_access(user):
         return queryset
     return queryset.filter(designer_assignments__user=user).distinct()
+
+
+def theme_designer_snapshot(theme):
+    return {
+        "colors": copy.deepcopy(theme.colors),
+        "fonts": copy.deepcopy(theme.fonts),
+        "design_groups": copy.deepcopy(theme.design_groups),
+        "image": theme.image.name if theme.image else None,
+        "site_icon": theme.site_icon.name if theme.site_icon else None,
+    }
+
+
+def apply_designer_snapshot(theme, snapshot):
+    theme.colors = copy.deepcopy(snapshot.get("colors", {}))
+    theme.fonts = copy.deepcopy(snapshot.get("fonts", {}))
+    theme.design_groups = copy.deepcopy(snapshot.get("design_groups", {}))
+    theme.image.name = snapshot.get("image") or ""
+    theme.site_icon.name = snapshot.get("site_icon") or ""
+    return theme
+
+
+def theme_from_designer_draft(theme, draft):
+    draft_theme = copy.deepcopy(theme)
+    return apply_designer_snapshot(draft_theme, draft.snapshot)
+
+
+def get_or_create_designer_draft(theme, user):
+    draft, _ = ThemeDesignerDraft.objects.get_or_create(
+        theme=theme,
+        defaults={
+            "created_by": user,
+            "updated_by": user,
+            "base_sync_version": theme.sync_version,
+            "snapshot": theme_designer_snapshot(theme),
+        },
+    )
+    return draft
+
+
+def build_draft_workspace(theme, draft):
+    workspace = build_workspace(theme_from_designer_draft(theme, draft))
+    workspace.update(
+        {
+            "liveSyncVersion": theme.sync_version,
+            "draftVersion": draft.version,
+            "hasDraftChanges": draft.has_changes,
+            "draftUpdatedAt": draft.updated_at,
+            "draftUpdatedBy": draft.updated_by.username,
+            "draftIsStale": draft.base_sync_version != theme.sync_version,
+        }
+    )
+    return workspace
 
 
 def _iter_layout_properties(group):
@@ -142,6 +197,7 @@ def collect_designer_assets(theme: PageTheme):
                 "url": theme.image.url,
                 "usage": ["Theme listing preview"],
                 "kind": "preview",
+                "replaceable": True,
                 "isPlaceholder": False,
                 "width": width,
                 "height": height,
@@ -157,6 +213,7 @@ def collect_designer_assets(theme: PageTheme):
                 "url": theme.site_icon.url,
                 "usage": ["Browser and application icon"],
                 "kind": "site-icon",
+                "replaceable": True,
                 "isPlaceholder": False,
                 "width": width,
                 "height": height,
@@ -204,6 +261,7 @@ def collect_designer_assets(theme: PageTheme):
                         "isPlaceholder": spec["isPlaceholder"],
                         "usage": [f"{group_name} / {part} / {breakpoint} / {property_name}"],
                         "kind": "design-group",
+                        "replaceable": True,
                         "groupIndex": group_index,
                         "part": part,
                         "breakpoint": breakpoint,
@@ -258,6 +316,7 @@ def collect_designer_assets(theme: PageTheme):
                 "url": system_storage.url(path),
                 "usage": ["Unused theme library asset"],
                 "kind": "library",
+                "replaceable": False,
                 "isPlaceholder": False,
                 "width": width,
                 "height": height,
@@ -394,6 +453,10 @@ def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=Tr
         if len(colors) > 200:
             raise ValidationError("The palette contains too many colors.")
         colors = {str(name): str(value).strip() for name, value in colors.items()}
+        if set(colors) != set(theme.colors or {}):
+            raise ValidationError(
+                "Designer access can change existing color values but cannot add, remove, or rename colors."
+            )
         if any(not name or len(name) > 100 or not COLOR_VALUE.fullmatch(value) for name, value in colors.items()):
             raise ValidationError(
                 "Designer colors must be CSS color values such as #123456, rgb(), hsl(), or a named color."
@@ -496,47 +559,101 @@ def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=Tr
     return theme
 
 
-def save_designer_patch(theme_id, tenant, user, payload):
+def save_designer_draft(theme_id, tenant, user, payload):
     with transaction.atomic():
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
         if not user_can_design_theme(user, theme):
             raise PermissionError
-        if _integer(payload.get("syncVersion", -1), "syncVersion") != theme.sync_version:
-            return None
-        create_revision(theme, user, "Designer workspace save")
-        apply_designer_patch(theme, payload)
+        draft = get_or_create_designer_draft(theme, user)
+        draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
+        if draft.base_sync_version != theme.sync_version:
+            raise DesignerDraftConflict("The live theme changed after this draft was started.")
+        if _integer(payload.get("draftVersion", -1), "draftVersion") != draft.version:
+            raise DesignerDraftConflict("The Designer draft changed after you opened it.")
+        patch = {key: value for key, value in payload.items() if key != "draftVersion"}
+        draft_theme = theme_from_designer_draft(theme, draft)
+        apply_designer_patch(draft_theme, patch, validate_version=False)
+        draft.snapshot = theme_designer_snapshot(draft_theme)
+        draft.version += 1
+        draft.has_changes = True
+        draft.updated_by = user
+        draft.save(update_fields=["snapshot", "version", "has_changes", "updated_by", "updated_at"])
+        return theme, draft
+
+
+def publish_designer_draft(theme_id, tenant, user, draft_version):
+    with transaction.atomic():
+        theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
+        if not user_can_design_theme(user, theme):
+            raise PermissionError
+        draft = ThemeDesignerDraft.objects.select_for_update().filter(theme=theme).first()
+        if not draft:
+            raise DesignerDraftConflict("There is no Designer draft to publish.")
+        if draft.version != _integer(draft_version, "draftVersion"):
+            raise DesignerDraftConflict("The Designer draft changed after you opened it.")
+        if draft.base_sync_version != theme.sync_version:
+            raise DesignerDraftConflict("The live theme changed after this draft was started.")
+        if not draft.has_changes:
+            raise DesignerDraftConflict("There are no draft changes to publish.")
+
+        create_revision(theme, user, "Publish Designer draft")
+        apply_designer_snapshot(theme, draft.snapshot)
         theme.sync_source = "web"
-        theme.save(update_fields=["colors", "fonts", "design_groups", "sync_source", "sync_version", "updated_at"])
-        return theme
+        theme.save(
+            update_fields=[
+                "colors",
+                "fonts",
+                "design_groups",
+                "image",
+                "site_icon",
+                "sync_source",
+                "sync_version",
+                "updated_at",
+            ]
+        )
+        draft.snapshot = theme_designer_snapshot(theme)
+        draft.base_sync_version = theme.sync_version
+        draft.version += 1
+        draft.has_changes = False
+        draft.updated_by = user
+        draft.save(
+            update_fields=[
+                "snapshot",
+                "base_sync_version",
+                "version",
+                "has_changes",
+                "updated_by",
+                "updated_at",
+            ]
+        )
+        return theme, draft
 
 
-def undo_designer_change(theme_id, tenant, user):
+def discard_designer_draft(theme_id, tenant, user, draft_version):
     with transaction.atomic():
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
         if not user_can_design_theme(user, theme):
             raise PermissionError
-        revision = theme.designer_revisions.first()
-        if not revision:
-            return None
-        snapshot = revision.snapshot
-        theme.colors = snapshot.get("colors", {})
-        theme.fonts = snapshot.get("fonts", {})
-        theme.design_groups = snapshot.get("design_groups", {})
-        theme.image.name = snapshot["image"] if snapshot.get("image") else ""
-        theme.site_icon.name = snapshot["site_icon"] if snapshot.get("site_icon") else ""
-        asset_restore = snapshot.get("asset_restore") or {}
-        backup_path = asset_restore.get("backup_path")
-        target_path = asset_restore.get("target_path")
-        if backup_path and target_path and system_storage.exists(backup_path):
-            with system_storage.open(backup_path, "rb") as source:
-                restored_content = source.read()
-            if system_storage.exists(target_path):
-                system_storage.delete(target_path)
-            system_storage.save(target_path, ContentFile(restored_content))
-            system_storage.delete(backup_path)
-        theme.save()
-        revision.delete()
-        return theme
+        draft = get_or_create_designer_draft(theme, user)
+        draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
+        if draft.version != _integer(draft_version, "draftVersion"):
+            raise DesignerDraftConflict("The Designer draft changed after you opened it.")
+        draft.snapshot = theme_designer_snapshot(theme)
+        draft.base_sync_version = theme.sync_version
+        draft.version += 1
+        draft.has_changes = False
+        draft.updated_by = user
+        draft.save(
+            update_fields=[
+                "snapshot",
+                "base_sync_version",
+                "version",
+                "has_changes",
+                "updated_by",
+                "updated_at",
+            ]
+        )
+        return theme, draft
 
 
 def validate_image_upload(upload):
@@ -602,7 +719,8 @@ def _replace_shared_image_references(value, old_url, old_filename, replacement):
     if isinstance(value, dict):
         current_url = _image_url(value)
         current_filename = value.get("filename")
-        if (old_url and current_url == old_url) or (old_filename and current_filename == old_filename):
+        same_source = current_url == old_url if old_url else bool(old_filename and current_filename == old_filename)
+        if same_source:
             value.update(replacement)
             value.pop("fileUrl", None)
             value.pop("file_url", None)
@@ -613,72 +731,52 @@ def _replace_shared_image_references(value, old_url, old_filename, replacement):
             _replace_shared_image_references(child, old_url, old_filename, replacement)
 
 
-def replace_designer_asset(theme_id, tenant, user, asset_key, upload):
+def replace_designer_asset(theme_id, tenant, user, asset_key, upload, draft_version, placeholder_metadata=None):
     content, (width, height) = validate_image_upload(upload)
     with transaction.atomic():
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
         if not user_can_design_theme(user, theme):
             raise PermissionError
-        asset = _find_asset(theme, asset_key)
+        draft = get_or_create_designer_draft(theme, user)
+        draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
+        if draft.base_sync_version != theme.sync_version:
+            raise DesignerDraftConflict("The live theme changed after this draft was started.")
+        if draft.version != _integer(draft_version, "draftVersion"):
+            raise DesignerDraftConflict("The Designer draft changed after you opened it.")
+
+        draft_theme = theme_from_designer_draft(theme, draft)
+        asset = _find_asset(draft_theme, asset_key)
         if not asset:
             raise ValidationError("Asset slot was not found.")
+        if asset_key.startswith("library:"):
+            raise ValidationError("Unused library assets cannot be replaced from the Designer draft.")
         required_width = asset.get("requiredWidth")
         required_height = asset.get("requiredHeight")
         if width and required_width and width < int(required_width):
             raise ValidationError(f"Image must be at least {required_width}px wide.")
         if height and required_height and height < int(required_height):
             raise ValidationError(f"Image must be at least {required_height}px high.")
-        revision = create_revision(theme, user, f"Replace {asset.get('displayName')}")
-        extension = os.path.splitext(upload.name)[1].lower() or ".png"
+        extension = {
+            "image/jpeg": ".jpg",
+            "image/png": ".png",
+            "image/gif": ".gif",
+            "image/webp": ".webp",
+            "image/svg+xml": ".svg",
+        }[upload.content_type]
         safe_name = slugify(os.path.splitext(asset.get("displayName") or upload.name)[0]) or "asset"
         filename = f"{safe_name}-{uuid.uuid4().hex[:10]}{extension}"
+        path = f"theme_images/{theme.id}/designer_drafts/{draft.id}/{filename}"
+        saved_path = system_storage.save(path, ContentFile(content))
 
         if asset_key == "preview":
-            theme.image.save(filename, ContentFile(content), save=False)
-            theme.save()
+            draft_theme.image.name = saved_path
         elif asset_key == "site-icon":
-            theme.site_icon.save(filename, ContentFile(content), save=False)
-            theme.save()
-        elif asset_key.startswith("library:"):
-            library_filename = asset_key.split(":", 1)[1]
-            expected_type = {
-                ".jpg": "image/jpeg",
-                ".jpeg": "image/jpeg",
-                ".png": "image/png",
-                ".gif": "image/gif",
-                ".webp": "image/webp",
-                ".svg": "image/svg+xml",
-            }.get(os.path.splitext(library_filename)[1].lower())
-            if expected_type and upload.content_type != expected_type:
-                raise ValidationError("An unused library replacement must keep the original file format.")
-            library_path = f"theme_images/{theme.id}/library/{library_filename}"
-            backup_path = f"theme_images/{theme.id}/designer_history/{uuid.uuid4().hex}/{library_filename}"
-            if system_storage.exists(library_path):
-                with system_storage.open(library_path, "rb") as source:
-                    previous_content = source.read()
-                system_storage.save(backup_path, ContentFile(previous_content))
-                revision.snapshot = {
-                    **revision.snapshot,
-                    "asset_restore": {"backup_path": backup_path, "target_path": library_path},
-                }
-                revision.save(update_fields=["snapshot"])
-                try:
-                    system_storage.delete(library_path)
-                    system_storage.save(library_path, ContentFile(content))
-                except Exception:
-                    if not system_storage.exists(library_path):
-                        system_storage.save(library_path, ContentFile(previous_content))
-                    raise
-            else:
-                system_storage.save(library_path, ContentFile(content))
-            theme.save(update_fields=["sync_version", "updated_at"])
+            draft_theme.site_icon.name = saved_path
         else:
-            path = f"theme_images/{theme.id}/designer_assets/{filename}"
-            saved_path = system_storage.save(path, ContentFile(content))
             url = system_storage.url(saved_path)
             if asset_key.startswith("design:"):
                 _, group_index, part, breakpoint, property_name = asset_key.split(":", 4)
-                groups = copy.deepcopy((theme.design_groups or {}).get("groups", []))
+                groups = copy.deepcopy((draft_theme.design_groups or {}).get("groups", []))
                 target = None
                 for candidate_part, candidate_breakpoint, values in _iter_layout_properties(groups[int(group_index)]):
                     if candidate_part == part and candidate_breakpoint == breakpoint:
@@ -694,8 +792,10 @@ def replace_designer_asset(theme_id, tenant, user, asset_key, upload):
                     "size": len(content),
                     "width": width,
                     "height": height,
-                    "isPlaceholder": False,
+                    "isPlaceholder": bool(placeholder_metadata),
                 }
+                if placeholder_metadata:
+                    replacement.update(placeholder_metadata)
                 _replace_shared_image_references(
                     groups,
                     _image_url(target),
@@ -703,9 +803,14 @@ def replace_designer_asset(theme_id, tenant, user, asset_key, upload):
                     replacement,
                 )
                 target.update(replacement)
-                theme.design_groups = {**(theme.design_groups or {}), "groups": groups}
-                theme.save(update_fields=["design_groups", "sync_version", "updated_at"])
-        return theme
+                draft_theme.design_groups = {**(draft_theme.design_groups or {}), "groups": groups}
+
+        draft.snapshot = theme_designer_snapshot(draft_theme)
+        draft.version += 1
+        draft.has_changes = True
+        draft.updated_by = user
+        draft.save(update_fields=["snapshot", "version", "has_changes", "updated_by", "updated_at"])
+        return theme, draft
 
 
 def generate_placeholder_png(display_name, usage, width, height):

@@ -2,10 +2,10 @@
 Common serializers used across the project.
 """
 
-from rest_framework import serializers
 from django.contrib.auth.models import User
-from typing import Any, Dict, List
-from .models import ValueList, ValueListItem, ClipboardEntry
+from rest_framework import serializers
+
+from .models import ClipboardEntry, ValueList, ValueListItem
 
 
 class ValueListItemSerializer(serializers.ModelSerializer):
@@ -226,13 +226,9 @@ class ChangePasswordSerializer(serializers.Serializer):
 
     def validate(self, data):
         if data["new_password"] != data["confirm_password"]:
-            raise serializers.ValidationError(
-                {"confirm_password": "Passwords do not match."}
-            )
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
         if len(data["new_password"]) < 8:
-            raise serializers.ValidationError(
-                {"new_password": "Password must be at least 8 characters long."}
-            )
+            raise serializers.ValidationError({"new_password": "Password must be at least 8 characters long."})
         return data
 
 
@@ -266,9 +262,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if data["password"] != data["confirm_password"]:
-            raise serializers.ValidationError(
-                {"confirm_password": "Passwords do not match."}
-            )
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
         return data
 
     def validate_username(self, value):
@@ -314,12 +308,8 @@ class UpdateUserSerializer(serializers.ModelSerializer):
 class ClipboardEntrySerializer(serializers.ModelSerializer):
     """Serializer for ClipboardEntry model."""
 
-    created_at = serializers.DateTimeField(
-        format="%Y-%m-%dT%H:%M:%SZ", read_only=True
-    )
-    expires_at = serializers.DateTimeField(
-        format="%Y-%m-%dT%H:%M:%SZ", required=False, allow_null=True
-    )
+    created_at = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%SZ", read_only=True)
+    expires_at = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%SZ", required=False, allow_null=True)
 
     class Meta:
         model = ClipboardEntry
@@ -352,18 +342,14 @@ class ClipboardEntryCreateSerializer(serializers.ModelSerializer):
         """Validate clipboard type is in allowed choices."""
         valid_types = [choice[0] for choice in ClipboardEntry.CLIPBOARD_TYPE_CHOICES]
         if value not in valid_types:
-            raise serializers.ValidationError(
-                f"Invalid clipboard type. Must be one of: {', '.join(valid_types)}"
-            )
+            raise serializers.ValidationError(f"Invalid clipboard type. Must be one of: {', '.join(valid_types)}")
         return value
 
     def validate_operation(self, value):
         """Validate operation is in allowed choices."""
         valid_operations = [choice[0] for choice in ClipboardEntry.OPERATION_CHOICES]
         if value not in valid_operations:
-            raise serializers.ValidationError(
-                f"Invalid operation. Must be one of: {', '.join(valid_operations)}"
-            )
+            raise serializers.ValidationError(f"Invalid operation. Must be one of: {', '.join(valid_operations)}")
         return value
 
 

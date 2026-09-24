@@ -10,11 +10,13 @@ export const designerThemesApi = {
     workspace: async (themeId) => unwrap(await api.get(`${base}/themes/${themeId}/workspace/`)),
     preview: async (themeId, patch) => unwrap(await api.post(`${base}/themes/${themeId}/preview/`, patch)),
     save: async (themeId, patch) => unwrap(await api.patch(`${base}/themes/${themeId}/workspace/`, patch)),
-    undo: async (themeId) => unwrap(await api.post(`${base}/themes/${themeId}/undo/`)),
-    replaceAsset: async (themeId, assetKey, image) => {
+    publish: async (themeId, draftVersion) => unwrap(await api.post(`${base}/themes/${themeId}/publish/`, { draftVersion })),
+    discard: async (themeId, draftVersion) => unwrap(await api.post(`${base}/themes/${themeId}/discard/`, { draftVersion })),
+    replaceAsset: async (themeId, assetKey, image, draftVersion) => {
         const form = new FormData()
         form.append('asset_key', assetKey)
         form.append('image', image)
+        form.append('draft_version', draftVersion)
         return unwrap(await api.post(`${base}/themes/${themeId}/replace-asset/`, form, {
             headers: { 'Content-Type': 'multipart/form-data' },
         }))

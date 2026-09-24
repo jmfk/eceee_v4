@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Download, Image as ImageIcon, Loader2, Monitor, Palette, Plus, Redo2, Save, Smartphone, Sparkles, Tablet, Trash2, Type } from 'lucide-react'
+import { Download, Image as ImageIcon, Loader2, Monitor, Palette, Plus, Redo2, RotateCcw, Save, Send, Smartphone, Sparkles, Tablet, Trash2, Type } from 'lucide-react'
 import DesignerNavbar from '../components/DesignerNavbar'
 import StatusBar from '../components/StatusBar'
 import { designerThemesApi } from '../api/designerThemes'
@@ -24,7 +24,7 @@ const defaultPreviewContent = {
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]))
 
-const buildPreviewDocument = (css, content, viewport) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>
+const buildPreviewDocument = (css, fontUrl, content, viewport) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">${fontUrl ? `<link rel="stylesheet" href="${escapeHtml(fontUrl)}">` : ''}<style>
 html,body{margin:0;min-height:100%;background:#fff}body{padding:24px}.preview-shell{max-width:${viewport === 'desktop' ? '1120px' : viewport === 'tablet' ? '720px' : '390px'};margin:auto}.preview-header,.preview-footer,.preview-card,.preview-table-wrap{border:1px solid #d1d5db;padding:20px;margin-bottom:20px}.preview-grid{display:grid;grid-template-columns:repeat(${viewport === 'mobile' ? 1 : 2},minmax(0,1fr));gap:20px}.preview-image{min-height:150px;background:linear-gradient(135deg,#e5e7eb,#f9fafb);display:flex;align-items:center;justify-content:center;border:1px dashed #9ca3af}.preview-table{width:100%;border-collapse:collapse}.preview-table th,.preview-table td{border:1px solid #d1d5db;padding:8px;text-align:left}${css || ''}</style></head><body><div class="designer-preview preview-shell cms-content">
 <header class="preview-header header-widget"><small>${escapeHtml(content.eyebrow)}</small><h1>${escapeHtml(content.title)}</h1><p>${escapeHtml(content.lead)}</p><button type="button">Primary action</button> <a href="#">Text link</a></header>
 <main><div class="preview-grid"><article class="preview-card content-card"><h2>${escapeHtml(content.cardTitle)}</h2><p>${escapeHtml(content.cardBody)}</p><ul>${(content.listItems || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></article><div class="preview-image image">Representative image</div></div>
@@ -49,18 +49,20 @@ const DesignerThemeWorkspacePage = () => {
     const [activeTab, setActiveTab] = useState('assets')
     const [viewport, setViewport] = useState('desktop')
     const [mobilePane, setMobilePane] = useState('edit')
-    const [preview, setPreview] = useState({ css: '', content: defaultPreviewContent })
+    const [preview, setPreview] = useState({ css: '', fontUrl: '', content: defaultPreviewContent })
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [publishing, setPublishing] = useState(false)
     const [dirty, setDirty] = useState(false)
     const [error, setError] = useState('')
     const [exporting, setExporting] = useState(false)
     const [exportProgress, setExportProgress] = useState(null)
     const [placeholderDrafts, setPlaceholderDrafts] = useState({})
     const uploadRefs = useRef({})
+    const previewRequestRef = useRef(0)
 
     const payload = useMemo(() => workspace ? ({
-        syncVersion: workspace.syncVersion,
+        draftVersion: workspace.draftVersion,
         colors: Object.fromEntries(workspace.colors.map((color) => [color.name, color.value])),
         fonts: workspace.fonts.filter((font) => font.family.trim()).map((font) => ({ family: font.family, variants: font.variants, display: font.display })),
         typography: workspace.typography.map((row) => ({ groupIndex: row.groupIndex, element: row.element, values: row.values })),
@@ -85,10 +87,13 @@ const DesignerThemeWorkspacePage = () => {
 
     useEffect(() => {
         if (!payload) return undefined
+        const requestId = previewRequestRef.current + 1
+        previewRequestRef.current = requestId
         const timer = window.setTimeout(async () => {
             try {
                 const result = await designerThemesApi.preview(themeId, payload)
-                setPreview((current) => ({ css: result.css || '', content: current.content.title ? current.content : result.content }))
+                if (requestId !== previewRequestRef.current) return
+                setPreview((current) => ({ css: result.css || '', fontUrl: result.fontUrl || '', content: current.content.title ? current.content : result.content }))
             } catch (err) {
                 addNotification({ type: 'error', message: err.message || 'Preview could not be updated' })
             }
@@ -101,34 +106,60 @@ const DesignerThemeWorkspacePage = () => {
         setDirty(true)
     }
 
-    const save = async () => {
-        if (!payload || !window.confirm('Save these changes to the live theme now?')) return
+    const saveDraft = async ({ silent = false } = {}) => {
+        if (!payload) return null
+        if (!dirty) return workspace
         setSaving(true)
         try {
             const result = await designerThemesApi.save(themeId, payload)
             setWorkspace(result)
             setDirty(false)
-            addNotification({ type: 'success', message: 'Live theme updated' })
+            if (!silent) addNotification({ type: 'success', message: 'Draft saved' })
+            return result
         } catch (err) {
-            if (err.response?.status === 409 || err.originalError?.response?.status === 409) await loadWorkspace()
-            addNotification({ type: 'error', message: err.message || 'Theme could not be saved' })
-        } finally { setSaving(false) }
+            addNotification({ type: 'error', message: err.message || 'Draft could not be saved' })
+            return null
+        } finally {
+            setSaving(false)
+        }
     }
 
-    const undo = async () => {
-        if (!window.confirm('Undo the latest Designer change on the live theme?')) return
+    const publish = async () => {
+        let current = workspace
+        if (dirty) current = await saveDraft({ silent: true })
+        if (!current || !current.hasDraftChanges) return
+        if (!window.confirm('Publish every saved Designer draft change to the live theme now?')) return
+        setPublishing(true)
         try {
-            const result = await designerThemesApi.undo(themeId)
+            const result = await designerThemesApi.publish(themeId, current.draftVersion)
             setWorkspace(result)
             setDirty(false)
-            addNotification({ type: 'success', message: 'Latest Designer change restored' })
-        } catch (err) { addNotification({ type: 'error', message: err.message || 'Nothing to undo' }) }
+            addNotification({ type: 'success', message: 'Designer draft published atomically' })
+        } catch (err) {
+            addNotification({ type: 'error', message: err.message || 'Draft could not be published' })
+        } finally {
+            setPublishing(false)
+        }
+    }
+
+    const discardDraft = async () => {
+        if (!window.confirm('Discard all saved and unsaved Designer draft changes?')) return
+        try {
+            const result = await designerThemesApi.discard(themeId, workspace.draftVersion)
+            setWorkspace(result)
+            setDirty(false)
+            addNotification({ type: 'success', message: 'Designer draft discarded' })
+        } catch (err) {
+            addNotification({ type: 'error', message: err.message || 'Draft could not be discarded' })
+        }
     }
 
     const replaceAsset = async (asset, file) => {
         if (!file) return
         try {
-            const result = await designerThemesApi.replaceAsset(themeId, asset.assetKey, file)
+            const current = dirty ? await saveDraft({ silent: true }) : workspace
+            if (!current) return
+            const result = await designerThemesApi.replaceAsset(themeId, asset.assetKey, file, current.draftVersion)
             setWorkspace(result)
             setDirty(false)
             addNotification({ type: 'success', message: `${asset.displayName} replaced` })
@@ -144,11 +175,14 @@ const DesignerThemeWorkspacePage = () => {
             return
         }
         try {
+            const current = dirty ? await saveDraft({ silent: true }) : workspace
+            if (!current) return
             const result = await designerThemesApi.createPlaceholder(themeId, {
                 assetKey: asset.assetKey,
                 displayName: draft.displayName || asset.displayName,
                 width,
                 height,
+                draftVersion: current.draftVersion,
             })
             setWorkspace(result)
             setDirty(false)
@@ -182,7 +216,8 @@ const DesignerThemeWorkspacePage = () => {
         finally { setExporting(false); setExportProgress(null) }
     }
 
-    const previewDocument = useMemo(() => buildPreviewDocument(preview.css, preview.content || {}, viewport), [preview, viewport])
+    const previewDocument = useMemo(() => buildPreviewDocument(preview.css, preview.fontUrl, preview.content || {}, viewport), [preview, viewport])
+    const hasDraftChanges = dirty || workspace?.hasDraftChanges
 
     if (loading) return <div className="fixed inset-0 flex items-center justify-center bg-gray-50"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /><span className="ml-3 text-gray-600">Loading Designer workspace…</span></div>
 
@@ -192,7 +227,7 @@ const DesignerThemeWorkspacePage = () => {
         <div className="fixed inset-0 flex flex-col bg-gray-50">
             <DesignerNavbar />
             <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
-                <div><h1 className="font-semibold text-gray-900">{workspace.name}</h1><p className="text-xs text-gray-500">Designer workspace · live theme version {workspace.syncVersion}</p></div>
+                <div><h1 className="font-semibold text-gray-900">{workspace.name}</h1><p className="text-xs text-gray-500">Designer draft · live theme version {workspace.liveSyncVersion}</p></div>
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="hidden rounded-md border border-gray-300 p-1 sm:flex" aria-label="Preview size">
                         {[['desktop', <Monitor className="h-4 w-4" />], ['tablet', <Tablet className="h-4 w-4" />], ['mobile', <Smartphone className="h-4 w-4" />]].map(([name, icon]) => <button key={name} onClick={() => setViewport(name)} aria-label={`${name} preview`} className={`rounded p-1.5 ${viewport === name ? 'bg-gray-200 text-gray-900' : 'text-gray-500'}`}>{icon}</button>)}
@@ -200,10 +235,12 @@ const DesignerThemeWorkspacePage = () => {
                     <button onClick={generateCopy} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"><Sparkles className="h-4 w-4" />AI sample</button>
                     <button onClick={() => setPreview((current) => ({ ...current, content: defaultPreviewContent }))} className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm">Refresh sample</button>
                     <button onClick={exportPackage} disabled={exporting} title={exportProgress?.message} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-50">{exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{exporting ? `Export ${exportProgress?.percent || 0}%` : 'Export'}</button>
-                    <button onClick={undo} disabled={!workspace.canUndo} className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-40">Undo</button>
-                    <button onClick={save} disabled={!dirty || saving} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save live changes</button>
+                    <button onClick={discardDraft} disabled={(!hasDraftChanges && !workspace.draftIsStale) || saving || publishing} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-40"><RotateCcw className="h-4 w-4" />Discard draft</button>
+                    <button onClick={() => saveDraft()} disabled={!dirty || workspace.draftIsStale || saving || publishing} className="inline-flex items-center gap-2 rounded-md border border-blue-600 bg-white px-3 py-2 text-sm font-medium text-blue-700 disabled:opacity-40">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save draft</button>
+                    <button onClick={publish} disabled={!hasDraftChanges || workspace.draftIsStale || saving || publishing} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Publish changes</button>
                 </div>
             </header>
+            {workspace.draftIsStale && <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:px-6">The live theme changed after this draft was started. Discard the draft to reload the current live version before making or publishing more changes.</div>}
             <div className="flex border-b border-gray-200 bg-white lg:hidden"><button onClick={() => setMobilePane('edit')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'edit' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Edit</button><button onClick={() => setMobilePane('preview')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'preview' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Preview</button></div>
             <main className="grid min-h-0 flex-1 lg:grid-cols-2">
                 <section className={`${mobilePane === 'preview' ? 'hidden' : 'flex'} min-h-0 flex-col border-r border-gray-200 bg-white lg:flex`}>
@@ -234,9 +271,9 @@ const DesignerThemeWorkspacePage = () => {
                                             </div>
                                         )}
                                         <div className="mt-3 flex flex-wrap justify-end gap-2">
-                                            {asset.kind === 'design-group' && <button onClick={() => createPlaceholder(asset)} className="rounded-md border border-gray-300 px-3 py-2 text-sm">Create placeholder</button>}
+                                            {asset.kind === 'design-group' && <button onClick={() => createPlaceholder(asset)} disabled={workspace.draftIsStale} className="rounded-md border border-gray-300 px-3 py-2 text-sm disabled:opacity-40">Create placeholder</button>}
                                             <input ref={(node) => { uploadRefs.current[asset.assetKey] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" />
-                                            <button onClick={() => uploadRefs.current[asset.assetKey]?.click()} className="rounded-md border border-gray-300 px-3 py-2 text-sm">Upload new version</button>
+                                            {asset.replaceable === false ? <span className="text-xs text-gray-500">Unused library assets are read-only in drafts.</span> : <button onClick={() => uploadRefs.current[asset.assetKey]?.click()} disabled={workspace.draftIsStale} className="rounded-md border border-gray-300 px-3 py-2 text-sm disabled:opacity-40">Upload to draft</button>}
                                         </div>
                                     </article>
                                 ))}
@@ -249,7 +286,7 @@ const DesignerThemeWorkspacePage = () => {
                 </section>
                 <section className={`${mobilePane === 'edit' ? 'hidden' : 'flex'} min-h-0 flex-col bg-gray-100 p-3 lg:flex lg:p-6`}><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold text-gray-800">Live preview</h2><span className="text-xs capitalize text-gray-500">{viewport}</span></div><iframe title="Live theme preview" sandbox="" srcDoc={previewDocument} className="min-h-0 flex-1 rounded-lg border border-gray-300 bg-white shadow-sm" /></section>
             </main>
-            <StatusBar customStatusContent={<span>{dirty ? 'Unsaved Designer changes' : 'Designer theme is up to date'}</span>} />
+            <StatusBar customStatusContent={<span>{workspace.draftIsStale ? 'Draft is stale · discard to reload' : dirty ? 'Unsaved local draft changes' : workspace.hasDraftChanges ? 'Draft saved · not published' : 'Draft matches the live theme'}</span>} />
         </div>
     )
 }

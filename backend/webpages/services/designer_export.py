@@ -1,6 +1,7 @@
 """Generate one-way designer theme packages with an indexed PDF asset book."""
 
 import base64
+import copy
 import html
 import io
 import os
@@ -18,8 +19,12 @@ from django.utils.text import slugify
 from PIL import Image
 
 from file_manager.storage import S3MediaStorage, system_storage
-from webpages.models import ThemeDesignerExportJob
-from webpages.services.designer_theme import build_workspace, collect_designer_assets, generate_placeholder_png
+from webpages.services.designer_theme import (
+    apply_designer_snapshot,
+    build_workspace,
+    collect_designer_assets,
+    generate_placeholder_png,
+)
 
 
 def designer_export_filename(theme):
@@ -136,28 +141,51 @@ def build_asset_book_html(theme, rows):
             if row.get("thumbnail")
             else '<div class="missing">No preview</div>'
         )
+        warning_html = (
+            "<p class='warning'>Placeholder or missing artwork</p>"
+            if asset.get("isPlaceholder") or not asset.get("url")
+            else ""
+        )
         asset_cards.append(
             f"""
           <article class="asset-card">{thumbnail}<div><h3>{html.escape(asset.get('displayName') or 'Asset')}</h3>
-          <p><b>File:</b> {html.escape(row['zipPath'])}</p><p><b>Usage:</b> {html.escape(', '.join(asset.get('usage') or []))}</p>
+          <p><b>File:</b> {html.escape(row['zipPath'])}</p>
+          <p><b>Usage:</b> {html.escape(', '.join(asset.get('usage') or []))}</p>
           <p><b>Actual:</b> {size} &nbsp; <b>Required:</b> {required}</p>
-          {'<p class="warning">Placeholder or missing artwork</p>' if asset.get('isPlaceholder') or not asset.get('url') else ''}</div></article>"""
+          {warning_html}
+          </div></article>"""
         )
-    color_rows = "".join(
-        f'<tr><td><span class="swatch" style="background:{html.escape(str(color["value"]))}"></span>{html.escape(color["name"])}</td><td>{html.escape(str(color["value"]))}</td><td>{html.escape(_contrast_label(color["value"]))}</td><td>{html.escape(", ".join(color["usage"]) or "Unused")}</td></tr>'
-        for color in workspace["colors"]
-    )
+    color_rows = []
+    for color in workspace["colors"]:
+        escaped_value = html.escape(str(color["value"]))
+        color_rows.append(
+            f'<tr><td><span class="swatch" style="background:{escaped_value}"></span>'
+            f'{html.escape(color["name"])}</td><td>{escaped_value}</td>'
+            f'<td>{html.escape(_contrast_label(color["value"]))}</td>'
+            f'<td>{html.escape(", ".join(color["usage"]) or "Unused")}</td></tr>'
+        )
+    color_rows = "".join(color_rows)
     font_cards = (
         "".join(
-            f'<article class="font-card" style="font-family:{html.escape(font.get("family", "sans-serif"))},sans-serif"><h3>{html.escape(font.get("family", "Font"))}</h3><p>Variants: {html.escape(", ".join(map(str, font.get("variants") or [])))}</p><p>Usage: {html.escape(", ".join(font.get("usage") or []) or "Not assigned")}</p><p><a href="https://fonts.google.com/specimen/{quote_plus(font.get("family", ""))}">Google Fonts reference</a></p><div class="font-sample">The quick brown fox jumps over the lazy dog.</div></article>'
+            f'<article class="font-card" style="font-family:{html.escape(font.get("family", "sans-serif"))},'
+            f'sans-serif"><h3>{html.escape(font.get("family", "Font"))}</h3>'
+            f'<p>Variants: {html.escape(", ".join(map(str, font.get("variants") or [])))}</p>'
+            f'<p>Usage: {html.escape(", ".join(font.get("usage") or []) or "Not assigned")}</p>'
+            f'<p><a href="https://fonts.google.com/specimen/{quote_plus(font.get("family", ""))}">'
+            'Google Fonts reference</a></p><div class="font-sample">'
+            "The quick brown fox jumps over the lazy dog.</div></article>"
             for font in workspace["fonts"]
         )
         or "<p>No external fonts configured.</p>"
     )
-    type_rows = "".join(
-        f'<tr><td>{html.escape(row["groupName"])}</td><td>{html.escape(row["element"])}</td><td>{html.escape(", ".join(f"{key}: {value}" for key, value in row["values"].items() if value) or "Defaults")}</td></tr>'
-        for row in workspace["typography"]
-    )
+    type_rows = []
+    for row in workspace["typography"]:
+        settings_text = ", ".join(f"{key}: {value}" for key, value in row["values"].items() if value) or "Defaults"
+        type_rows.append(
+            f'<tr><td>{html.escape(row["groupName"])}</td><td>{html.escape(row["element"])}</td>'
+            f"<td>{html.escape(settings_text)}</td></tr>"
+        )
+    type_rows = "".join(type_rows)
     type_samples = []
     css_names = {
         "fontFamily": "font-family",
@@ -177,35 +205,61 @@ def build_asset_book_html(theme, rows):
             f'<article class="font-card"><b>{html.escape(row["groupName"])} / {html.escape(row["element"])}</b>'
             f'<div style="{";".join(declarations)}">The quick brown fox jumps over the lazy dog.</div></article>'
         )
-    spacing_rows = "".join(
-        f'<tr><td>{html.escape(row["groupName"])}</td><td>{html.escape(row.get("element") or row.get("part") or "")}</td><td>{html.escape(row.get("breakpoint", ""))}</td><td>{html.escape(", ".join(f"{key}: {value}" for key, value in row["values"].items() if value) or "Defaults")}</td></tr>'
-        for row in workspace["spacing"]
-    )
+    spacing_rows = []
+    for row in workspace["spacing"]:
+        settings_text = ", ".join(f"{key}: {value}" for key, value in row["values"].items() if value) or "Defaults"
+        spacing_rows.append(
+            f'<tr><td>{html.escape(row["groupName"])}</td>'
+            f'<td>{html.escape(row.get("element") or row.get("part") or "")}</td>'
+            f'<td>{html.escape(row.get("breakpoint", ""))}</td><td>{html.escape(settings_text)}</td></tr>'
+        )
+    spacing_rows = "".join(spacing_rows)
     preview_css = theme.generate_css(".designer-preview")
     generated_at = timezone.localtime().strftime("%Y-%m-%d %H:%M %Z")
     return f"""<!doctype html><html><head><meta charset="utf-8"><style>
       {font_import}
       @page {{ size: A4; margin: 16mm 14mm; }}
-      * {{ box-sizing: border-box; }} body {{ color:#111827; font: 10pt Arial,sans-serif; line-height:1.4; }}
-      h1 {{ font-size:24pt; margin:0 0 4mm; }} h2 {{ border-bottom:1px solid #9ca3af; padding-bottom:2mm; margin-top:9mm; page-break-after:avoid; }}
-      h3 {{ margin:0 0 2mm; }} .meta {{ color:#4b5563; }} .asset-card {{ display:grid; grid-template-columns:48mm 1fr; gap:5mm; border-bottom:1px solid #d1d5db; padding:4mm 0; break-inside:avoid; }}
-      .asset-card img,.missing {{ width:48mm; height:31mm; object-fit:contain; background:#f3f4f6; border:1px solid #d1d5db; }} .missing {{ display:flex; align-items:center; justify-content:center; }}
-      p {{ margin:1mm 0; }} .warning {{ color:#92400e; font-weight:bold; }} table {{ width:100%; border-collapse:collapse; font-size:8.5pt; }} th,td {{ border:1px solid #d1d5db; padding:2mm; text-align:left; vertical-align:top; }}
-      th {{ background:#f3f4f6; }} .swatch {{ display:inline-block; width:7mm; height:7mm; border:1px solid #6b7280; vertical-align:middle; margin-right:2mm; }}
-      .font-card {{ border:1px solid #d1d5db; padding:4mm; margin:3mm 0; break-inside:avoid; }} .font-sample {{ font-size:18pt; margin-top:2mm; }}
-      .preview-grid {{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:3mm; }} .preview {{ border:1px solid #9ca3af; padding:3mm; overflow:hidden; }} .preview h3 {{ font-size:10pt; }} .preview.desktop {{ grid-column:span 2; }}
+      * {{ box-sizing: border-box; }}
+      body {{ color:#111827; font: 10pt Arial,sans-serif; line-height:1.4; }}
+      h1 {{ font-size:24pt; margin:0 0 4mm; }}
+      h2 {{ border-bottom:1px solid #9ca3af; padding-bottom:2mm; margin-top:9mm; page-break-after:avoid; }}
+      h3 {{ margin:0 0 2mm; }} .meta {{ color:#4b5563; }}
+      .asset-card {{ display:grid; grid-template-columns:48mm 1fr; gap:5mm; border-bottom:1px solid #d1d5db;
+        padding:4mm 0; break-inside:avoid; }}
+      .asset-card img,.missing {{ width:48mm; height:31mm; object-fit:contain; background:#f3f4f6;
+        border:1px solid #d1d5db; }}
+      .missing {{ display:flex; align-items:center; justify-content:center; }}
+      p {{ margin:1mm 0; }} .warning {{ color:#92400e; font-weight:bold; }}
+      table {{ width:100%; border-collapse:collapse; font-size:8.5pt; }}
+      th,td {{ border:1px solid #d1d5db; padding:2mm; text-align:left; vertical-align:top; }}
+      th {{ background:#f3f4f6; }}
+      .swatch {{ display:inline-block; width:7mm; height:7mm; border:1px solid #6b7280;
+        vertical-align:middle; margin-right:2mm; }}
+      .font-card {{ border:1px solid #d1d5db; padding:4mm; margin:3mm 0; break-inside:avoid; }}
+      .font-sample {{ font-size:18pt; margin-top:2mm; }}
+      .preview-grid {{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:3mm; }}
+      .preview {{ border:1px solid #9ca3af; padding:3mm; overflow:hidden; }}
+      .preview h3 {{ font-size:10pt; }} .preview.desktop {{ grid-column:span 2; }}
       {preview_css}
     </style></head><body><h1>{html.escape(theme.name)} - Designer Asset Book</h1>
     <p class="meta">Generated {generated_at} - Theme version {theme.sync_version}</p>
     <h2>Asset index</h2>{''.join(asset_cards) or '<p>No theme assets.</p>'}
-    <h2>Color map</h2><table><thead><tr><th>Color</th><th>Value</th><th>Contrast</th><th>Usage</th></tr></thead><tbody>{color_rows}</tbody></table>
+    <h2>Color map</h2><table><thead><tr>
+      <th>Color</th><th>Value</th><th>Contrast</th><th>Usage</th>
+    </tr></thead><tbody>{color_rows}</tbody></table>
     <h2>Fonts and usage</h2>{font_cards}
-    <h2>Typography</h2><table><thead><tr><th>Group</th><th>Element</th><th>Settings</th></tr></thead><tbody>{type_rows}</tbody></table>{''.join(type_samples)}
-    <h2>Margins and padding</h2><table><thead><tr><th>Group</th><th>Element/part</th><th>Breakpoint</th><th>Settings</th></tr></thead><tbody>{spacing_rows}</tbody></table>
+    <h2>Typography</h2><table><thead><tr><th>Group</th><th>Element</th><th>Settings</th></tr></thead>
+      <tbody>{type_rows}</tbody></table>{''.join(type_samples)}
+    <h2>Margins and padding</h2><table><thead><tr>
+      <th>Group</th><th>Element/part</th><th>Breakpoint</th><th>Settings</th>
+    </tr></thead><tbody>{spacing_rows}</tbody></table>
     <h2>Representative previews</h2><div class="preview-grid designer-preview">
-      <section class="preview desktop"><h3>Desktop</h3><h1>Heading one</h1><p>Representative paragraph with a <a href="#">link</a>.</p><button>Action</button></section>
-      <section class="preview"><h3>Tablet</h3><h2>Card heading</h2><p>Card and list preview.</p><ul><li>First item</li><li>Second item</li></ul></section>
-      <section class="preview"><h3>Mobile</h3><h3>Compact heading</h3><p>Compact content preview.</p></section>
+      <section class="preview desktop"><h3>Desktop</h3><h1>Heading one</h1>
+        <p>Representative paragraph with a <a href="#">link</a>.</p><button>Action</button></section>
+      <section class="preview"><h3>Tablet</h3><h2>Card heading</h2><p>Card and list preview.</p>
+        <ul><li>First item</li><li>Second item</li></ul></section>
+      <section class="preview"><h3>Mobile</h3><h3>Compact heading</h3>
+        <p>Compact content preview.</p></section>
     </div></body></html>"""
 
 
@@ -235,7 +289,9 @@ def _render_pdf_fallback(theme, rows):
             except Exception:
                 pass
         actual = f"{asset.get('width') or '?'} x {asset.get('height') or '?'} px"
-        required = f"{asset.get('requiredWidth') or asset.get('recommendedWidth') or '?'} x {asset.get('requiredHeight') or 'height not specified'} px @ {asset.get('dpr', 2)}x"
+        required_width = asset.get("requiredWidth") or asset.get("recommendedWidth") or "?"
+        required_height = asset.get("requiredHeight") or "height not specified"
+        required = f"{required_width} x {required_height} px @ {asset.get('dpr', 2)}x"
         warning = (
             "<br/><font color='#92400e'><b>Placeholder or missing artwork</b></font>"
             if asset.get("isPlaceholder") or not asset.get("url")
@@ -243,7 +299,8 @@ def _render_pdf_fallback(theme, rows):
         )
         details = Paragraph(
             f"<b>{html.escape(asset.get('displayName') or 'Asset')}</b><br/>{html.escape(row['zipPath'])}"
-            f"<br/>{html.escape(', '.join(asset.get('usage') or []))}<br/>Actual: {actual}<br/>Required: {required}{warning}",
+            f"<br/>{html.escape(', '.join(asset.get('usage') or []))}<br/>Actual: {actual}"
+            f"<br/>Required: {required}{warning}",
             styles["BodyText"],
         )
         table = Table([[image_flowable, details]], colWidths=[50 * mm, 120 * mm])
@@ -274,7 +331,11 @@ def _render_pdf_fallback(theme, rows):
         reference = "https://fonts.google.com/specimen/" + str(family).replace(" ", "+")
         story.append(
             Paragraph(
-                f"<b>{html.escape(family)}</b> - {html.escape(', '.join(map(str, font.get('variants') or [])))}<br/><link href='{html.escape(reference)}'>Google Fonts reference</link><br/>Usage: {html.escape(', '.join(font.get('usage') or []) or 'Not assigned')}<br/><font size='16'>The quick brown fox jumps over the lazy dog.</font>",
+                f"<b>{html.escape(family)}</b> - "
+                f"{html.escape(', '.join(map(str, font.get('variants') or [])))}<br/>"
+                f"<link href='{html.escape(reference)}'>Google Fonts reference</link><br/>"
+                f"Usage: {html.escape(', '.join(font.get('usage') or []) or 'Not assigned')}<br/>"
+                "<font size='16'>The quick brown fox jumps over the lazy dog.</font>",
                 styles["BodyText"],
             )
         )
@@ -364,12 +425,15 @@ class ThemeDesignerExporter:
     def run(self):
         self.job.mark_running()
         try:
+            export_theme = copy.deepcopy(self.job.theme)
+            if self.job.snapshot:
+                apply_designer_snapshot(export_theme, self.job.snapshot)
             self.job.progress = {"percent": 10, "message": "Collecting original theme assets"}
             self.job.save(update_fields=["progress", "updated_at"])
             rows = []
             rows_by_source = {}
-            for asset in collect_designer_assets(self.job.theme):
-                content = _read_asset(self.job.theme, asset)
+            for asset in collect_designer_assets(export_theme):
+                content = _read_asset(export_theme, asset)
                 if content is None:
                     continue
                 source_key = _storage_path(asset) or asset.get("url") or asset["assetKey"]
@@ -390,7 +454,7 @@ class ThemeDesignerExporter:
             _deduplicate_paths(rows)
             self.job.progress = {"percent": 55, "message": "Rendering the Designer Asset Book"}
             self.job.save(update_fields=["progress", "updated_at"])
-            pdf = render_asset_book_pdf(self.job.theme, rows)
+            pdf = render_asset_book_pdf(export_theme, rows)
             package = io.BytesIO()
             with zipfile.ZipFile(package, "w", zipfile.ZIP_DEFLATED) as archive:
                 archive.writestr("designer-asset-book.pdf", pdf)
