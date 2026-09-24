@@ -35,8 +35,8 @@ const workspace = {
     hasDraftChanges: false,
     colors: [{ name: 'brand', value: '#123456', usage: ['Article / h1'] }],
     fonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap', usage: ['Article / h1'] }],
-    typography: [{ groupIndex: 0, groupName: 'Article', element: 'h1', values: { fontFamily: 'Inter', fontSize: '32px' } }],
-    spacing: [{ scope: 'element', groupIndex: 0, groupName: 'Article', element: 'h1', values: { marginBottom: '16px' } }],
+    typography: [{ targetId: 'group:0:element:h1', groupIndex: 0, groupName: 'Article', element: 'h1', values: { fontFamily: 'Inter', fontSize: '32px' } }],
+    spacing: [{ targetId: 'group:0:element:h1', scope: 'element', groupIndex: 0, groupName: 'Article', element: 'h1', values: { marginBottom: '16px' } }],
     assets: [{
         assetKey: 'design:0:hero:md:background',
         displayName: 'Article hero',
@@ -51,6 +51,19 @@ const workspace = {
         validation: { status: 'ok', message: 'Explicit dimensions configured.' },
     }],
     canUndo: true,
+    catalog: {
+        designGroups: [{
+            id: 'group:0', groupIndex: 0, label: 'Article', description: 'Editorial content', slots: ['main'],
+            elements: [{ id: 'group:0:element:h1', element: 'h1', label: 'Heading 1' }],
+            parts: [{ id: 'group:0:part:hero', part: 'hero', label: 'Hero', breakpoints: ['md'] }],
+            assetKeys: ['design:0:hero:md:background'], colorNames: ['brand'],
+        }],
+        componentStyles: [
+            { key: 'feature-card', label: 'Feature card', description: 'Highlighted card', template: '<article class="feature-card">{{{content}}}</article>' },
+            { key: 'sub-navigation', label: 'Sub navigation', description: '', template: '{{#isInherited}}{{#hasCurrentChildren}}<nav>{{#currentChildren}}<a href="{{path}}">{{title}}</a>{{/currentChildren}}</nav>{{/hasCurrentChildren}}{{/isInherited}}' },
+        ],
+        layouts: [{ key: 'main_layout', label: 'Main layout', description: 'Content and sidebar', slots: [{ name: 'main', label: 'Main content' }], parts: [] }],
+    },
     constraints: {
         editableTypographyProperties: ['fontFamily', 'fontSize'],
         editableSpacingProperties: ['marginBottom', 'padding'],
@@ -73,19 +86,21 @@ describe('DesignerThemeWorkspacePage', () => {
     it('renders only the restricted design controls and a sandboxed preview', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         expect(await screen.findByRole('heading', { name: 'Editorial' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Assets' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Elements' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Colors' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Typography' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Spacing' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Fonts' })).toBeInTheDocument()
+        expect(screen.getByText('Design groups')).toBeInTheDocument()
+        expect(screen.getByText('Component styles')).toBeInTheDocument()
+        expect(screen.getByText('Layouts')).toBeInTheDocument()
         expect(screen.queryByText(/custom css/i)).not.toBeInTheDocument()
         expect(screen.queryByText(/selector/i)).not.toBeInTheDocument()
-        expect(screen.getByTitle('Live theme preview')).toHaveAttribute('sandbox', '')
+        expect(screen.getByTitle('Live theme preview')).toHaveAttribute('sandbox', 'allow-scripts')
         await waitFor(() => {
             const preview = screen.getByTitle('Live theme preview').getAttribute('srcdoc')
             expect(preview).toContain('fonts.googleapis.com')
-            expect(preview).toContain('Inter · 400 / 700')
-            expect(preview).toContain('fontFamily: Inter, fontSize: 32px')
-            expect(preview).toContain('Lorem ipsum dolor sit amet')
+            expect(preview).toContain('data-designer-target="group:0:element:h1"')
+            expect(preview).toContain('A heading with a realistic length')
+            expect(preview).toContain('Article hero')
         })
         expect(screen.queryByRole('button', { name: /ai sample/i })).not.toBeInTheDocument()
     })
@@ -96,8 +111,52 @@ describe('DesignerThemeWorkspacePage', () => {
 
         await screen.findByRole('heading', { name: 'Editorial' })
         const preview = screen.getByTitle('Live theme preview').getAttribute('srcdoc')
-        expect(preview).toContain('Förhandsvisning av typografi')
-        expect(preview).toContain('Det här är en längre svensk exempeltext')
+        expect(preview).toContain('En rubrik med verklig längd')
+        expect(preview).not.toContain('A heading with a realistic length')
+    })
+
+    it('opens groups and component styles in isolation and exposes clicked element values', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+
+        fireEvent.click(screen.getByRole('button', { name: /Article Editorial content/ }))
+        expect(screen.getByRole('heading', { name: 'Article' })).toBeInTheDocument()
+        expect(screen.getByLabelText('Design group')).toHaveValue('group:0')
+        expect(screen.getByLabelText('Component style')).toBeInTheDocument()
+
+        const iframe = screen.getByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-designer-preview', targetId: 'group:0:element:h1', kind: 'element', label: 'Heading 1' },
+            source: iframe.contentWindow,
+        }))
+        expect(screen.getByRole('heading', { name: 'Heading 1' })).toBeInTheDocument()
+        expect(screen.getByDisplayValue('32px')).toBeInTheDocument()
+        expect(screen.getByDisplayValue('16px')).toBeInTheDocument()
+    })
+
+    it('renders component styles that depend on navigation context with localized demo items', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+
+        fireEvent.click(screen.getByRole('button', { name: /Sub navigation Isolated preview/ }))
+
+        const preview = screen.getByTitle('Live theme preview').getAttribute('srcdoc')
+        expect(preview).toContain('<nav>')
+        expect(preview).toContain('First example item')
+        expect(preview).not.toContain('<main class="designer-preview cms-content"></main>')
+    })
+
+    it('opens catalog layouts with default rendering after previewing a component style', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+
+        fireEvent.click(screen.getByRole('button', { name: /Feature card Highlighted card/ }))
+        expect(screen.getByLabelText('Component style')).toHaveValue('feature-card')
+        fireEvent.click(screen.getByRole('button', { name: 'All previews' }))
+        fireEvent.click(screen.getByRole('button', { name: /Main layout Content and sidebar/ }))
+
+        expect(screen.getByLabelText('Component style')).toHaveValue('')
+        expect(screen.getByText('Layout', { selector: 'p' })).toBeInTheDocument()
     })
 
     it('saves a draft and publishes it only after explicit confirmation', async () => {
@@ -133,7 +192,11 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         fireEvent.click(screen.getByRole('button', { name: 'Colors' }))
         fireEvent.change(screen.getByLabelText('brand value'), { target: { value: '#abcdef' } })
-        fireEvent.click(screen.getByRole('button', { name: 'Assets' }))
+        const iframe = screen.getByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-designer-preview', targetId: 'asset:design:0:hero:md:background', kind: 'asset', label: 'Article hero' },
+            source: iframe.contentWindow,
+        }))
         const upload = new File(['image'], 'hero.png', { type: 'image/png' })
         fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [upload] } })
 

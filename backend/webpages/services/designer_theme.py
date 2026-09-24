@@ -54,6 +54,185 @@ COLOR_VALUE = re.compile(r"^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\([0-9.%+,\-\s/]+\
 logger = logging.getLogger(__name__)
 
 
+def _camel_to_snake(value):
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", value).lower()
+
+
+def _theme_property_value(values, property_name):
+    if property_name in values:
+        return values[property_name]
+    return values.get(_camel_to_snake(property_name), "")
+
+
+def _set_theme_property(values, property_name, value):
+    snake_name = _camel_to_snake(property_name)
+    if value in (None, ""):
+        values.pop(property_name, None)
+        values.pop(snake_name, None)
+        return
+    stored_name = snake_name if snake_name in values and property_name not in values else property_name
+    values[stored_name] = value
+
+
+def _humanize_identifier(value):
+    value = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", str(value or ""))
+    value = re.sub(r"[^a-zA-Z0-9]+", " ", value).strip()
+    return value[:1].upper() + value[1:] if value else "Element"
+
+
+def _designer_group_label(group, widget):
+    slots = group.get("slots") or ([group.get("slot")] if group.get("slot") else [])
+    if widget:
+        label = widget.name
+        if slots:
+            label += f" · {_humanize_identifier(slots[0])}"
+        return label
+    name = group.get("name") or "Design group"
+    if str(name).lower() in {"default", "global", "system default"}:
+        return "Global content"
+    return _humanize_identifier(str(name).lstrip("."))
+
+
+def _designer_element_label(element):
+    labels = {
+        "a": "Link",
+        "a:hover": "Link on hover",
+        "p": "Body text",
+        "em": "Emphasised text",
+        "strong": "Strong text",
+        "blockquote": "Quotation",
+        "ul": "Bullet list",
+        "ol": "Numbered list",
+        "li": "List item",
+        "pre": "Code block",
+        "code": "Inline code",
+    }
+    if element in labels:
+        return labels[element]
+    if re.fullmatch(r"h[1-6]", str(element)):
+        return f"Heading {str(element)[1:]}"
+    return _humanize_identifier(element)
+
+
+def _normalized_layout_parts(source):
+    normalized = {}
+    for part_name, config in (source or {}).items():
+        if isinstance(config, str):
+            config = {"label": config}
+        elif not isinstance(config, dict):
+            config = {}
+        normalized[part_name] = {
+            "label": config.get("label") or _humanize_identifier(part_name),
+            "properties": config.get("properties"),
+        }
+    return normalized
+
+
+def _collect_color_names(value, available_colors):
+    found = set()
+    if isinstance(value, dict):
+        for child in value.values():
+            found.update(_collect_color_names(child, available_colors))
+    elif isinstance(value, list):
+        for child in value:
+            found.update(_collect_color_names(child, available_colors))
+    elif isinstance(value, str) and value in available_colors:
+        found.add(value)
+    return found
+
+
+def build_designer_catalog(theme, assets):
+    """Build semantic preview metadata without exposing selectors to the Designer UI."""
+    from webpages.layout_autodiscovery import autodiscover_layouts
+    from webpages.layout_registry import layout_registry
+    from webpages.widget_registry import widget_type_registry
+
+    available_colors = set((theme.colors or {}).keys())
+    groups = []
+    for group_index, group in enumerate((theme.design_groups or {}).get("groups", [])):
+        widget_types = group.get("widgetTypes") or group.get("widget_types") or []
+        if not widget_types:
+            single_widget = group.get("widgetType") or group.get("widget_type")
+            widget_types = [single_widget] if single_widget else []
+        widget = widget_type_registry.get_widget_type_flexible(widget_types[0]) if widget_types else None
+        widget_parts = _normalized_layout_parts(getattr(widget, "layout_parts", {}))
+        slots = group.get("slots") or ([group.get("slot")] if group.get("slot") else [])
+        elements = [
+            {
+                "id": f"group:{group_index}:element:{element}",
+                "element": element,
+                "label": _designer_element_label(element),
+            }
+            for element in (group.get("elements") or {})
+        ]
+        part_map = {}
+        for part, breakpoint, _values in _iter_layout_properties(group):
+            entry = part_map.setdefault(
+                part,
+                {
+                    "id": f"group:{group_index}:part:{part}",
+                    "part": part,
+                    "label": widget_parts.get(part, {}).get("label") or _humanize_identifier(part),
+                    "breakpoints": [],
+                },
+            )
+            entry["breakpoints"].append(breakpoint)
+        group_assets = [asset["assetKey"] for asset in assets if asset.get("groupIndex") == group_index]
+        groups.append(
+            {
+                "id": f"group:{group_index}",
+                "groupIndex": group_index,
+                "label": _designer_group_label(group, widget),
+                "description": (
+                    getattr(widget, "description", "") if widget else "Theme styling shown with demo content."
+                ),
+                "widgetName": getattr(widget, "name", None),
+                "slots": slots,
+                "elements": elements,
+                "parts": list(part_map.values()),
+                "assetKeys": group_assets,
+                "colorNames": sorted(_collect_color_names(group, available_colors)),
+            }
+        )
+
+    component_styles = [
+        {
+            "key": key,
+            "label": style.get("name") or _humanize_identifier(key),
+            "description": style.get("description", ""),
+            "template": style.get("template", "{{{content}}}"),
+        }
+        for key, style in (theme.component_styles or {}).items()
+        if isinstance(style, dict)
+    ]
+
+    autodiscover_layouts()
+    layouts = []
+    for layout in layout_registry.list_layouts(active_only=True):
+        slots = sorted(layout.slot_configuration.get("slots", []), key=lambda slot: slot.get("order", 999))
+        layouts.append(
+            {
+                "key": layout.name,
+                "label": _humanize_identifier(layout.name),
+                "description": layout.description,
+                "slots": [
+                    {
+                        "name": slot.get("name"),
+                        "label": slot.get("title") or _humanize_identifier(slot.get("name")),
+                        "description": slot.get("description", ""),
+                    }
+                    for slot in slots
+                    if slot.get("name")
+                ],
+                "parts": [
+                    {"id": f"layout:{layout.name}:part:{name}", "part": name, **config}
+                    for name, config in _normalized_layout_parts(getattr(layout, "layout_parts", {})).items()
+                ],
+            }
+        )
+    return {"designGroups": groups, "componentStyles": component_styles, "layouts": layouts}
+
+
 class DesignerDraftConflict(Exception):
     """Raised when a draft or its live base changed since the client loaded it."""
 
@@ -407,30 +586,33 @@ def build_workspace(theme: PageTheme):
                 continue
             typography.append(
                 {
+                    "targetId": f"group:{group_index}:element:{element}",
                     "groupIndex": group_index,
                     "groupName": group_name,
                     "element": element,
-                    "values": {key: values.get(key, "") for key in TYPE_PROPERTIES},
+                    "values": {key: _theme_property_value(values, key) for key in TYPE_PROPERTIES},
                 }
             )
             spacing.append(
                 {
+                    "targetId": f"group:{group_index}:element:{element}",
                     "scope": "element",
                     "groupIndex": group_index,
                     "groupName": group_name,
                     "element": element,
-                    "values": {key: values.get(key, "") for key in SPACING_PROPERTIES},
+                    "values": {key: _theme_property_value(values, key) for key in SPACING_PROPERTIES},
                 }
             )
         for part, breakpoint, values in _iter_layout_properties(group):
             spacing.append(
                 {
+                    "targetId": f"group:{group_index}:part:{part}",
                     "scope": "layout",
                     "groupIndex": group_index,
                     "groupName": group_name,
                     "part": part,
                     "breakpoint": breakpoint,
-                    "values": {key: values.get(key, "") for key in SPACING_PROPERTIES},
+                    "values": {key: _theme_property_value(values, key) for key in SPACING_PROPERTIES},
                 }
             )
 
@@ -449,6 +631,7 @@ def build_workspace(theme: PageTheme):
     for font in fonts:
         font["usage"] = _walk_usage(theme.design_groups or {}, font.get("family"))
 
+    assets = collect_designer_assets(theme)
     return {
         "id": theme.id,
         "name": theme.name,
@@ -457,7 +640,8 @@ def build_workspace(theme: PageTheme):
         "fonts": fonts,
         "typography": typography,
         "spacing": spacing,
-        "assets": collect_designer_assets(theme),
+        "assets": assets,
+        "catalog": build_designer_catalog(theme, assets),
         "canUndo": theme.designer_revisions.exists(),
         "constraints": {
             "editableTypographyProperties": sorted(TYPE_PROPERTIES),
@@ -588,10 +772,8 @@ def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=Tr
             raise ValidationError(f"Unsupported typography properties: {', '.join(sorted(unknown))}")
         for key in TYPE_PROPERTIES:
             if key in incoming:
-                if incoming[key] in (None, ""):
-                    target.pop(key, None)
-                else:
-                    target[key] = _safe_css_value(incoming[key], key)
+                value = incoming[key]
+                _set_theme_property(target, key, None if value in (None, "") else _safe_css_value(value, key))
 
     for item in spacing:
         if not isinstance(item, dict):
@@ -619,10 +801,8 @@ def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=Tr
             raise ValidationError(f"Unsupported spacing properties: {', '.join(sorted(unknown))}")
         for key in SPACING_PROPERTIES:
             if key in incoming:
-                if incoming[key] in (None, ""):
-                    target.pop(key, None)
-                else:
-                    target[key] = _safe_css_value(incoming[key], key)
+                value = incoming[key]
+                _set_theme_property(target, key, None if value in (None, "") else _safe_css_value(value, key))
     theme.design_groups = design_groups
     return theme
 

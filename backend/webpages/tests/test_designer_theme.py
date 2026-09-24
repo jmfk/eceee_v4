@@ -31,6 +31,14 @@ class DesignerThemeApiTests(TestCase):
             name="Editorial",
             colors={"brandColor": "#123456"},
             fonts={"google_fonts": [{"family": "Inter", "variants": ["400", "700"], "display": "swap"}]},
+            component_styles={
+                "feature-card": {
+                    "name": "Feature card",
+                    "description": "Highlighted editorial card",
+                    "template": '<article class="feature-card">{{{content}}}</article>',
+                    "css": ".feature-card { padding: 1rem; }",
+                }
+            },
             design_groups={
                 "groups": [
                     {
@@ -94,6 +102,45 @@ class DesignerThemeApiTests(TestCase):
     def test_unassigned_user_is_denied(self):
         self.authenticate(self.other)
         self.assertEqual(self.client.get(self.workspace_url).status_code, 403)
+
+    def test_workspace_exposes_semantic_catalog_without_selectors(self):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+
+        group = workspace["catalog"]["designGroups"][0]
+        self.assertEqual(group["label"], "Article")
+        self.assertEqual(group["elements"][0]["id"], "group:0:element:h1")
+        self.assertEqual(group["parts"][0]["label"], "Hero")
+        self.assertEqual(group["assetKeys"], ["design:0:hero:md:background"])
+        self.assertNotIn("selector", str(workspace["catalog"]).lower())
+        self.assertEqual(workspace["catalog"]["componentStyles"][0]["label"], "Feature card")
+        self.assertTrue(workspace["catalog"]["layouts"])
+
+    def test_workspace_normalizes_legacy_snake_case_values_and_preserves_storage_style(self):
+        groups = self.theme.design_groups
+        groups["groups"][0]["elements"]["h1"] = {
+            "font_family": "Inter",
+            "font_size": "32px",
+            "margin_bottom": "16px",
+        }
+        self.theme.design_groups = groups
+        self.theme.save(update_fields=["design_groups"])
+        self.authenticate(self.designer)
+
+        workspace = self.client.get(self.workspace_url).data
+        self.assertEqual(workspace["typography"][0]["values"]["fontSize"], "32px")
+        saved = self.client.patch(
+            self.workspace_url,
+            {
+                "draftVersion": workspace["draftVersion"],
+                "typography": [{"groupIndex": 0, "element": "h1", "values": {"fontSize": "40px"}}],
+            },
+            format="json",
+        )
+        self.assertEqual(saved.status_code, 200, saved.data)
+        snapshot_element = self.theme.designer_draft.snapshot["design_groups"]["groups"][0]["elements"]["h1"]
+        self.assertEqual(snapshot_element["font_size"], "40px")
+        self.assertNotIn("fontSize", snapshot_element)
 
     def test_valid_patch_stays_in_draft_until_atomic_publish(self):
         self.authenticate(self.designer)
