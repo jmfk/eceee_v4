@@ -86,6 +86,7 @@ export const endpoints = {
         pageVersionDetail: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/`,
         workflow: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/workflow/`,
         workingCopy: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/working-copy/`,
+        savePageWorkingCopy: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/working-copy/save/`,
         unpublishExplicit: (pageId) => `${BASE_PATH}/webpages/pages/${pageId}/unpublish-explicit/`,
         saveWorkingCopy: (versionId) => `${BASE_PATH}/webpages/versions/${versionId}/save/`,
         schedule: (versionId) => `${BASE_PATH}/webpages/versions/${versionId}/schedule/`,

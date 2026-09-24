@@ -15,11 +15,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from ..models import PageDataSchema, PageTheme, PageVersion
-from ..services.page_version_workflow import (
-    find_page_slug_conflict,
-    normalize_change_summary,
-    page_with_attributes,
-)
+from ..services.page_version_workflow import find_page_slug_conflict, normalize_change_summary, page_with_attributes
 from .base import UserSerializer
 from .theme import PageThemeSerializer
 
@@ -314,7 +310,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
 
         # Check if client provided the timestamp they last saw
         request = self.context.get("request")
-        if request and hasattr(request, "data"):
+        if request and hasattr(request, "data") and not self.context.get("timestamp_conflict_checked"):
             client_updated_at = request.data.get("client_updated_at")
 
             if client_updated_at:

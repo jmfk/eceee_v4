@@ -15,7 +15,6 @@ import { describe, it, expect, vi } from 'vitest'
 import {
     analyzeChanges,
     buildVersionedPageData,
-    getCanonicalSaveVersion,
     mergeVersionedPageAttributes,
     smartSave,
 } from '../../utils/smartSaveUtils'
@@ -29,6 +28,7 @@ import { saveWidgetEditorChanges } from '../../utils/pageEditorWidgetSave'
 const baseWebpage = { id: 1, title: 'Page', slug: 'page', status: 'draft' }
 const baseVersion = {
     id: 10,
+    updatedAt: '2026-09-22T10:00:00Z',
     widgets: {
         main: [{ id: 'w1', type: 'easy_widgets.ContentWidget', config: { content: '<p>Original</p>' } }]
     }
@@ -149,51 +149,11 @@ describe('working-copy page attributes', () => {
     })
 })
 
-describe('canonical save version', () => {
-    it('reuses the loaded canonical working copy', async () => {
-        const versionsApi = { getOrCreateWorkingCopy: vi.fn() }
-
-        const version = await getCanonicalSaveVersion(1, baseVersion, { id: baseVersion.id }, versionsApi)
-
-        expect(version).toBe(baseVersion)
-        expect(versionsApi.getOrCreateWorkingCopy).not.toHaveBeenCalled()
-    })
-
-    it('creates a working copy when the editor loaded the live version', async () => {
-        const workingVersion = { ...baseVersion, id: 11, updatedAt: '2026-09-23T12:00:00Z' }
-        const versionsApi = {
-            getOrCreateWorkingCopy: vi.fn().mockResolvedValue({ created: true, version: workingVersion }),
-        }
-
-        const version = await getCanonicalSaveVersion(1, baseVersion, null, versionsApi)
-
-        expect(versionsApi.getOrCreateWorkingCopy).toHaveBeenCalledWith(1)
-        expect(version).toBe(workingVersion)
-    })
-
-    it('refuses to overwrite a working copy created after the editor loaded', async () => {
-        const newerWorkingVersion = { ...baseVersion, id: 11, updatedAt: '2026-09-23T12:00:00Z' }
-        const versionsApi = {
-            getOrCreateWorkingCopy: vi.fn().mockResolvedValue({
-                created: false,
-                version: newerWorkingVersion,
-            }),
-        }
-
-        await expect(
-            getCanonicalSaveVersion(1, baseVersion, null, versionsApi),
-        ).rejects.toMatchObject({
-            code: 'working_copy_changed',
-            serverVersion: newerWorkingVersion,
-        })
-    })
-})
-
 describe('smartSave working-copy workflow', () => {
     it('stores edited page attributes in the working copy instead of updating WebPage', async () => {
         const pagesApi = { update: vi.fn() }
         const versionsApi = {
-            saveWorkingCopy: vi.fn().mockResolvedValue(baseVersion),
+            savePageWorkingCopy: vi.fn().mockResolvedValue(baseVersion),
         }
 
         await smartSave(
@@ -202,11 +162,12 @@ describe('smartSave working-copy workflow', () => {
             baseVersion,
             baseVersion,
             { pagesApi, versionsApi },
-            { clientUpdatedAt: baseVersion.updatedAt },
+            { pageId: 1, expectedVersionId: baseVersion.id, clientUpdatedAt: baseVersion.updatedAt },
         )
 
         expect(pagesApi.update).not.toHaveBeenCalled()
-        expect(versionsApi.saveWorkingCopy).toHaveBeenCalledWith(
+        expect(versionsApi.savePageWorkingCopy).toHaveBeenCalledWith(
+            1,
             baseVersion.id,
             expect.objectContaining({
                 pageData: expect.objectContaining({
@@ -229,7 +190,7 @@ describe('smartSave working-copy workflow', () => {
             }
         }
         const versionsApi = {
-            saveWorkingCopy: vi.fn().mockResolvedValue(editedVersion),
+            savePageWorkingCopy: vi.fn().mockResolvedValue(editedVersion),
         }
 
         const result = await smartSave(
@@ -238,10 +199,11 @@ describe('smartSave working-copy workflow', () => {
             baseVersion,
             editedVersion,
             { pagesApi: {}, versionsApi },
-            { clientUpdatedAt: editedVersion.updatedAt },
+            { pageId: 1, expectedVersionId: baseVersion.id, clientUpdatedAt: editedVersion.updatedAt },
         )
 
-        expect(versionsApi.saveWorkingCopy).toHaveBeenCalledWith(
+        expect(versionsApi.savePageWorkingCopy).toHaveBeenCalledWith(
+            1,
             baseVersion.id,
             expect.objectContaining({ widgets: editedVersion.widgets }),
             editedVersion.updatedAt,
@@ -252,7 +214,7 @@ describe('smartSave working-copy workflow', () => {
     it('preserves the server working copy in a save conflict', async () => {
         const serverVersion = { ...baseVersion, updatedAt: '2026-09-22T10:01:00Z' }
         const versionsApi = {
-            saveWorkingCopy: vi.fn().mockRejectedValue({
+            savePageWorkingCopy: vi.fn().mockRejectedValue({
                 originalError: {
                     response: {
                         status: 409,
@@ -275,7 +237,11 @@ describe('smartSave working-copy workflow', () => {
             baseVersion,
             editedVersion,
             { pagesApi: {}, versionsApi },
-            { clientUpdatedAt: '2026-09-22T10:00:00Z' },
+            {
+                pageId: 1,
+                expectedVersionId: baseVersion.id,
+                clientUpdatedAt: '2026-09-22T10:00:00Z',
+            },
         )
 
         expect(result.conflict.serverVersion).toBe(serverVersion)

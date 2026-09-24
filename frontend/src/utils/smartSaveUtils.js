@@ -135,25 +135,6 @@ export function mergeVersionedPageAttributes(webpageData = {}, versionData = {})
     return pageAttributes ? { ...webpageData, ...pageAttributes } : webpageData
 }
 
-/** Return the current editable version, creating a working copy when needed. */
-export async function getCanonicalSaveVersion(pageId, currentVersion, editableVersion, versionsApi) {
-    if (editableVersion?.id && String(editableVersion.id) === String(currentVersion?.id)) {
-        return currentVersion
-    }
-
-    const workingCopy = await versionsApi.getOrCreateWorkingCopy(pageId)
-    if (
-        workingCopy.created === false
-        && String(workingCopy.version?.id) !== String(currentVersion?.id)
-    ) {
-        const error = new Error('A newer working version already exists. Reload it before saving.')
-        error.code = 'working_copy_changed'
-        error.serverVersion = workingCopy.version
-        throw error
-    }
-    return workingCopy.version
-}
-
 /**
  * Analyze what has changed between original and current data
  * @param {Object} originalWebpageData - Original webpage data
@@ -365,8 +346,9 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
                     currentWebpageData,
                 ),
             });
-            results.versionResult = await versionsApi.saveWorkingCopy(
-                versionId,
+            results.versionResult = await versionsApi.savePageWorkingCopy(
+                options.pageId,
+                options.expectedVersionId || versionId,
                 versionDataForSave,
                 updateOptions.clientUpdatedAt,
             );

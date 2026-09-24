@@ -302,6 +302,35 @@ class PageVersionWorkflowService:
         source = self.live_version(lock=True) or self._versions(lock=True).order_by("-version_number").first()
         return self._create_version_from(source), True
 
+    @transaction.atomic
+    def resolve_atomic_save_target(self, *, expected_version_id, expected_updated_at):
+        """Lock and return the reviewed save target, creating it from live content when needed."""
+        self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
+        editable = self.canonical_editable_version(lock=True)
+        if editable:
+            if editable.id != expected_version_id or editable.updated_at != expected_updated_at:
+                raise VersionConflictError(
+                    "The page's working version has changed.",
+                    details={
+                        "expected_version_id": expected_version_id,
+                        "server_version_id": editable.id,
+                        "server_updated_at": editable.updated_at.isoformat(),
+                    },
+                )
+            return editable, False
+
+        source = self.live_version(lock=True) or self._versions(lock=True).order_by("-version_number").first()
+        if not source or source.id != expected_version_id or source.updated_at != expected_updated_at:
+            raise VersionConflictError(
+                "The reviewed source version has changed.",
+                details={
+                    "expected_version_id": expected_version_id,
+                    "server_version_id": source.id if source else None,
+                    "server_updated_at": source.updated_at.isoformat() if source else None,
+                },
+            )
+        return self._create_version_from(source), True
+
     @staticmethod
     def _page_attributes(version):
         page_data = version.page_data if isinstance(version.page_data, dict) else {}
