@@ -12,6 +12,17 @@ import { pagesApi } from '../api'
 import UnifiedDataContext from '../contexts/unified-data/context/UnifiedDataContext'
 import { themeCSSManager } from '../utils/themeCSSManager'
 
+export const getFrontendThemeCSSUrl = (themeData) => {
+    const params = new URLSearchParams({ frontend_scoped: 'true' })
+    const version = Date.parse(themeData?.updatedAt || themeData?.updated_at)
+
+    if (!Number.isNaN(version)) {
+        params.set('v', String(version))
+    }
+
+    return `/api/v1/webpages/themes/${themeData.id}/styles.css?${params.toString()}`
+}
+
 /**
  * Hook for applying themes to content areas
  * @param {Object} options - Configuration options
@@ -82,8 +93,7 @@ export const useTheme = ({
             if (!theme?.id) return null
 
             // Fetch complete CSS from backend endpoint
-            const version = Date.parse(theme.updatedAt || theme.updated_at)
-            const url = `/api/v1/webpages/themes/${theme.id}/styles.css?v=${version}`
+            const url = getFrontendThemeCSSUrl(theme)
             const response = await fetch(url)
             if (!response.ok) {
                 throw new Error(`Failed to fetch theme CSS: ${response.statusText}`)
@@ -144,8 +154,7 @@ export const useTheme = ({
 
         try {
             // Fetch complete CSS from backend
-            const version = Date.parse(themeData.updatedAt || themeData.updated_at)
-            const response = await fetch(`/api/v1/webpages/themes/${themeData.id}/styles.css?v=${version}`)
+            const response = await fetch(getFrontendThemeCSSUrl(themeData))
             if (!response.ok) {
                 throw new Error(`Failed to fetch theme CSS: ${response.statusText}`)
             }
@@ -194,8 +203,7 @@ export const useTheme = ({
         generateThemeCSS: async (themeData) => {
             if (!themeData?.id) return ''
             try {
-                const version = Date.parse(themeData.updatedAt || themeData.updated_at)
-                const response = await fetch(`/api/v1/webpages/themes/${themeData.id}/styles.css?v=${version}`)
+                const response = await fetch(getFrontendThemeCSSUrl(themeData))
                 if (!response.ok) return ''
                 return await response.text()
             } catch {

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import SaveVersionControl from '../SaveVersionControl'
 
 describe('SaveVersionControl', () => {
-    it('keeps the primary save action enabled without exposing a version number', () => {
+    it('disables save and publish when there are no changes to act on', () => {
         const onSaveClick = vi.fn()
 
         render(
@@ -17,17 +17,19 @@ describe('SaveVersionControl', () => {
         )
 
         const saveButton = screen.getByRole('button', { name: /^save$/i })
+        const publishButton = screen.getByRole('button', { name: /publish changes/i })
 
-        expect(saveButton).toBeEnabled()
-        expect(saveButton).toHaveClass('bg-green-600')
+        expect(saveButton).toBeDisabled()
+        expect(saveButton).toHaveClass('bg-gray-100')
+        expect(publishButton).toBeDisabled()
+        expect(publishButton).toHaveClass('bg-gray-100')
         expect(screen.queryByText(/v3/i)).not.toBeInTheDocument()
-        expect(screen.getByRole('button', { name: /publish changes/i })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: /history/i })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: /schedule/i })).toBeInTheDocument()
 
         fireEvent.click(saveButton)
 
-        expect(onSaveClick).toHaveBeenCalledTimes(1)
+        expect(onSaveClick).not.toHaveBeenCalled()
     })
 
     it('uses the standard blue save state when there are unsaved changes', () => {
@@ -35,10 +37,13 @@ describe('SaveVersionControl', () => {
             <SaveVersionControl
                 isDirty={true}
                 onSaveClick={vi.fn()}
+                onPublishClick={vi.fn()}
+                canPublish
             />
         )
 
         expect(screen.getByRole('button', { name: /^save$/i })).toHaveClass('bg-blue-600')
+        expect(screen.getByRole('button', { name: /publish changes/i })).toBeEnabled()
     })
 
     it('does not show publishing controls while creating a new page', () => {
@@ -47,5 +52,11 @@ describe('SaveVersionControl', () => {
         expect(screen.getByRole('button', { name: /^save$/i })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: /publish changes/i })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: /history/i })).not.toBeInTheDocument()
+    })
+
+    it('omits controls that the current view cannot perform', () => {
+        const { container } = render(<SaveVersionControl />)
+
+        expect(container).toBeEmptyDOMElement()
     })
 })

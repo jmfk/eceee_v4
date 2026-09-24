@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Menu, X, Code, Settings, Grid3X3, ChevronDown, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Beaker } from 'lucide-react'
+import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Beaker } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 
 const Navbar = () => {
@@ -29,42 +29,6 @@ const Navbar = () => {
       return location.pathname.startsWith('/settings') || location.pathname.startsWith('/schemas')
     }
     return location.pathname === path || location.pathname.startsWith(path + '/')
-  }
-
-  const getCurrentContext = () => {
-    const path = location.pathname
-    if (path.startsWith('/settings/')) {
-      const section = path.split('/')[2]
-      const sectionNames = {
-        'layouts': 'Layouts',
-        'themes': 'Themes',
-        'widgets': 'Widgets',
-        'object-types': 'Object Types',
-        'value-lists': 'Value Lists',
-        'users': 'Users',
-        'versions': 'Versions',
-        'publishing': 'Publishing',
-        'namespaces': 'Namespaces'
-      }
-      return sectionNames[section] || 'Settings'
-    }
-    if (path.startsWith('/schemas/')) {
-      const section = path.split('/')[2]
-      const sectionNames = {
-        'system': 'System Schema',
-        'layout': 'Layout Schemas'
-      }
-      return sectionNames[section] || 'Schemas'
-    }
-    if (path.startsWith('/pages')) return 'Pages'
-    if (path.startsWith('/objects')) return 'Objects'
-    if (path.startsWith('/media')) return 'Media'
-    if (path.startsWith('/tags')) return 'Tags'
-    if (path.startsWith('/statistics')) return 'Statistics'
-    if (path.startsWith('/experiments')) return 'A/B Testing'
-    if (path.startsWith('/profile')) return 'Profile'
-    if (path.startsWith('/help/how-to')) return 'How-To Help'
-    return ''
   }
 
   // Overflow detection effect
@@ -102,27 +66,7 @@ const Navbar = () => {
   return (
     <nav ref={navRef} className={`bg-white shadow-sm border-b border-gray-200 ${isCollapsed ? 'nav-collapsed' : ''}`}>
       <div className="container mx-auto px-4">
-        <div className="flex justify-between h-16">
-          {/* Logo and brand */}
-          <div className="flex items-center">
-            <Link to="/pages" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <Code className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-gray-900">
-                EASY v4
-              </span>
-            </Link>
-
-            {/* Context Indicator */}
-            {getCurrentContext() && !isCollapsed && (
-              <div className="ml-4 flex items-center text-sm text-gray-500">
-                <span className="mx-2">›</span>
-                <span className="font-medium">{getCurrentContext()}</span>
-              </div>
-            )}
-          </div>
-
+        <div className="flex justify-start h-16">
           {/* Desktop navigation */}
           <div ref={desktopNavRef} className={`items-center space-x-8 ${isCollapsed ? 'hidden' : 'flex'}`}>
             {navigation.map((item) => (

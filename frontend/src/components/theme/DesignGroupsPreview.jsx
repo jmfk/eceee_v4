@@ -8,12 +8,13 @@ import React, { useMemo, useState } from 'react';
 import { generateDesignGroupsCSS, generateColorsCSS, mergeGroupElements, getBreakpoints } from '../../utils/themeUtils';
 
 const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = null, breakpoints = null }) => {
-    const groups = designGroups?.groups || [];
+    const groups = useMemo(() => designGroups?.groups || [], [designGroups?.groups]);
     const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
 
     // Generate CSS for the preview
     const previewCSS = useMemo(() => {
-        const colorCSS = generateColorsCSS(colors || {}, ':root');
+        const previewScope = '.design-groups-preview';
+        const colorCSS = generateColorsCSS(colors || {}, previewScope);
 
         // Find the default group (marked with isDefault: true)
         const defaultGroup = groups.find(g => g.isDefault === true);
@@ -47,7 +48,7 @@ const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = n
         const designGroupsCSS = generateDesignGroupsCSS(
             { groups: [mergedGroup] },
             colors || {},
-            '',  // No scope - use data attributes
+            previewScope,
             widgetType,
             slot,
             false, // frontendScoped
@@ -55,7 +56,7 @@ const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = n
         );
 
         return `${colorCSS}\n\n${designGroupsCSS}`;
-    }, [designGroups, groups, selectedGroupIndex, colors, widgetType, slot, breakpoints]);
+    }, [groups, selectedGroupIndex, colors, widgetType, slot, breakpoints]);
 
     return (
         <div className="design-groups-preview-container">
@@ -106,52 +107,51 @@ const DesignGroupsPreview = ({ designGroups, colors, widgetType = null, slot = n
                 {...(widgetType && { 'data-widget-type': widgetType })}
                 {...(slot && { 'data-slot-name': slot })}
             >
-                <div className="text-4xl font-semibold mb-6" role="heading" aria-level="1">Heading 1 - The Quick Brown Fox</div>
-                <div className="text-3xl font-medium mb-6" role="heading" aria-level="2">Heading 2 - Jumps Over the Lazy Dog</div>
-                <div className="text-2xl font-bold mb-6" role="heading" aria-level="3">Heading 3 - Typography Preview</div>
-                <div className="text-xl font-semibold mb-4" role="heading" aria-level="4">Heading 4 - Font Styling Examples</div>
-                <div className="text-lg font-semibold mb-4" role="heading" aria-level="5">Heading 5 - Smaller Heading</div>
-                <div className="text-base font-semibold mb-4" role="heading" aria-level="6">Heading 6 - Smallest Heading</div>
+                <h1 className="text-4xl font-semibold mb-6">Heading 1 - The Quick Brown Fox</h1>
+                <h2 className="text-3xl font-medium mb-6">Heading 2 - Jumps Over the Lazy Dog</h2>
+                <h3 className="text-2xl font-bold mb-6">Heading 3 - Typography Preview</h3>
+                <h4 className="text-xl font-semibold mb-4">Heading 4 - Font Styling Examples</h4>
+                <h5 className="text-lg font-semibold mb-4">Heading 5 - Smaller Heading</h5>
+                <h6 className="text-base font-semibold mb-4">Heading 6 - Smallest Heading</h6>
 
-                <div className="text-base font-light mb-6">
+                <p className="text-base font-light mb-6">
                     This is a paragraph with some <span className="font-bold">bold text</span> and <span className="italic">italic text</span>.
                     Here's a <a href="#" onClick={(e) => e.preventDefault()}>link to somewhere</a> in the text.
-                </div>
+                </p>
 
-                <div className="text-base font-light mb-6">
+                <p className="text-base font-light mb-6">
                     Paragraphs can contain multiple sentences. This helps demonstrate line height,
                     letter spacing, and other typography properties that affect readability and
                     visual hierarchy in your content.
-                </div>
+                </p>
 
-                <div className="mb-6 pl-6" role="list">
-                    <div className="mb-2 list-item list-disc">Unordered list item one</div>
-                    <div className="mb-2 list-item list-disc">Unordered list item two with more content</div>
-                    <div className="mb-2 list-item list-disc">Unordered list item three</div>
-                </div>
+                <ul className="mb-6 pl-6">
+                    <li className="mb-2 list-item list-disc">Unordered list item one</li>
+                    <li className="mb-2 list-item list-disc">Unordered list item two with more content</li>
+                    <li className="mb-2 list-item list-disc">Unordered list item three</li>
+                </ul>
 
-                <div className="mb-6 pl-6" role="list">
-                    <div className="mb-2 list-item list-decimal">Ordered list item one</div>
-                    <div className="mb-2 list-item list-decimal">Ordered list item two with more content</div>
-                    <div className="mb-2 list-item list-decimal">Ordered list item three</div>
-                </div>
+                <ol className="mb-6 pl-6">
+                    <li className="mb-2 list-item list-decimal">Ordered list item one</li>
+                    <li className="mb-2 list-item list-decimal">Ordered list item two with more content</li>
+                    <li className="mb-2 list-item list-decimal">Ordered list item three</li>
+                </ol>
 
-                <div className="border-l-4 border-blue-500 pl-4 my-6 italic">
+                <blockquote className="border-l-4 border-blue-500 pl-4 my-6 italic">
                     This is a blockquote element. It's typically used for quotes or callouts
                     that need to stand out from the regular content.
-                </div>
+                </blockquote>
 
-                <div className="text-base font-light mb-6">
-                    Here's some <span className="font-mono text-sm bg-gray-100 px-1 py-0.5 rounded">inline code</span> within a paragraph, and below is a code block:
-                </div>
+                <p className="text-base font-light mb-6">
+                    Here's some <code className="font-mono text-sm bg-gray-100 px-1 py-0.5 rounded">inline code</code> within a paragraph, and below is a code block:
+                </p>
 
-                <div className="bg-gray-100 p-4 rounded overflow-x-auto font-mono text-sm">{`function example() {
+                <pre className="bg-gray-100 p-4 rounded overflow-x-auto font-mono text-sm">{`function example() {
   return "Hello, World!";
-}`}</div>
+}`}</pre>
             </div>
         </div>
     );
 };
 
 export default DesignGroupsPreview;
-

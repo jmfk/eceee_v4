@@ -43,7 +43,7 @@ const MediaInsertModal = ({
     const isInsertMode = !!onInsert;
 
     // Load theme for configuration options
-    const { currentTheme } = useTheme({ pageId, enabled: true });
+    const { currentTheme } = useTheme({ pageId, enabled: isOpen && !!pageId });
     const [step, setStep] = useState('select'); // 'select' or 'configure'
     const [selectedMedia, setSelectedMedia] = useState(null);
     const [mediaType, setMediaType] = useState('image'); // 'image' or 'collection'
@@ -776,4 +776,3 @@ const MediaInsertModal = ({
 };
 
 export default MediaInsertModal;
-

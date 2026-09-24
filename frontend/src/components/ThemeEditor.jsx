@@ -1126,6 +1126,13 @@ const ThemeEditor = ({ onSave }) => {
                             breakpoints={themeData?.breakpoints || {}}
                             onChange={(designGroups) => updateThemeField('designGroups', designGroups)}
                             onDirty={() => setThemeDirty(true)}
+                            hasUnsavedChanges={isThemeDirty}
+                            onGroupsImported={(designGroups) => {
+                                updateThemeField('designGroups', designGroups)
+                                setThemeDirty(false)
+                                queryClient.invalidateQueries({ queryKey: ['themes', themeId] })
+                                queryClient.invalidateQueries({ queryKey: ['themes'] })
+                            }}
                         />
                     )}
 

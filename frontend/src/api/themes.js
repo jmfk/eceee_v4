@@ -224,6 +224,18 @@ export const themesApi = {
         return api.post(`${endpoints.themes.detail(themeId)}clone/`, data)
     }, 'themes.clone'),
 
+    listImportableDesignGroups: wrapApiCall(async (themeId) => {
+        return api.get(`${endpoints.themes.detail(themeId)}importable_design_groups/`)
+    }, 'themes.listImportableDesignGroups'),
+
+    previewDesignGroupImport: wrapApiCall(async (themeId, data) => {
+        return api.post(`${endpoints.themes.detail(themeId)}preview_design_group_import/`, data)
+    }, 'themes.previewDesignGroupImport'),
+
+    importDesignGroups: wrapApiCall(async (themeId, data) => {
+        return api.post(`${endpoints.themes.detail(themeId)}import_design_groups/`, data)
+    }, 'themes.importDesignGroups'),
+
     /**
      * Clear CSS cache for a theme
      * @param {number} themeId - Theme ID

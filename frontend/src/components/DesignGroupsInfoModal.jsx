@@ -8,31 +8,35 @@ import { useNavigate } from 'react-router-dom'
  */
 const DesignGroupsInfoModal = ({ widgetType, onClose, themeId }) => {
     const navigate = useNavigate()
+    const widgetLabel = widgetType?.replace(/([a-z])([A-Z])/g, '$1 $2') || 'Widget'
 
     const handleEditTheme = () => {
         if (themeId) {
-            navigate(`/themes/${themeId}/edit?tab=design-groups`)
+            navigate(`/settings/themes/${themeId}/typography`)
         } else {
-            // If no theme ID, go to themes list
-            navigate('/themes')
+            navigate('/settings/themes')
         }
         onClose()
     }
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10010]" onClick={onClose}>
-            <div 
-                className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4"
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[10010]" onClick={onClose}>
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="widget-styling-title"
+                className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                <div className="flex flex-shrink-0 items-center justify-between p-4 border-b border-gray-200">
                     <div className="flex items-center gap-2">
                         <Palette className="h-5 w-5 text-blue-600" />
-                        <h3 className="text-lg font-semibold text-gray-900">Widget Styling</h3>
+                        <h3 id="widget-styling-title" className="text-lg font-semibold text-gray-900">Widget Styling</h3>
                     </div>
                     <button
                         onClick={onClose}
+                        aria-label="Close widget styling"
                         className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
                     >
                         <X className="h-5 w-5" />
@@ -40,9 +44,9 @@ const DesignGroupsInfoModal = ({ widgetType, onClose, themeId }) => {
                 </div>
 
                 {/* Content */}
-                <div className="p-6">
+                <div className="flex-1 min-h-0 overflow-y-auto p-6">
                     <div className="mb-4">
-                        <h4 className="font-medium text-gray-900 mb-2">Header Widget</h4>
+                        <h4 className="font-medium text-gray-900 mb-2">{widgetLabel}</h4>
                         <p className="text-sm text-gray-600 mb-4">
                             This widget is styled entirely through Design Groups in the theme editor.
                         </p>
@@ -90,7 +94,7 @@ const DesignGroupsInfoModal = ({ widgetType, onClose, themeId }) => {
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200 bg-gray-50">
+                <div className="flex flex-shrink-0 items-center justify-end gap-2 p-4 border-t border-gray-200 bg-gray-50">
                     <button
                         onClick={onClose}
                         className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -112,4 +116,3 @@ const DesignGroupsInfoModal = ({ widgetType, onClose, themeId }) => {
 }
 
 export default DesignGroupsInfoModal
-

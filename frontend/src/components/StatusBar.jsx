@@ -27,6 +27,7 @@ const StatusBar = ({
     validationState = { isValid: true, hasErrors: false },
     // Dirty state prop (from PageEditor)
     isDirty = false,
+    canPublish = false,
 }) => {
     // Get global clipboard state
     const { clipboardData, pasteModePaused, togglePasteMode, clearClipboardState } = useClipboard();
@@ -264,48 +265,41 @@ const StatusBar = ({
                     )}
 
                     {/* Clipboard Indicator - compact below lg, descriptive on desktop. */}
-                    <div
-                        title={clipboardLabel}
-                        className={`flex min-h-9 min-w-9 shrink-0 items-center justify-center gap-2 rounded border px-2 text-xs transition-all lg:px-3 ${
-                    !clipboardData || !clipboardData.data || clipboardData.data.length === 0
-                        ? 'bg-gray-50 border-gray-200 text-gray-400'
-                        : pasteModePaused 
-                            ? 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200 cursor-pointer' 
-                            : 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 cursor-pointer'
-                        }`}
-                    >
-                        <button
-                            type="button"
-                            onClick={clipboardCount > 0 ? togglePasteMode : undefined}
-                            disabled={clipboardCount === 0 || !togglePasteMode}
-                            aria-label={clipboardCount > 0 ? `${clipboardLabel}. Toggle paste mode` : clipboardLabel}
-                            className="flex min-h-9 min-w-9 items-center justify-center lg:hidden"
+                    {clipboardCount > 0 && (
+                        <div
+                            title={clipboardLabel}
+                            className={`flex min-h-9 min-w-9 shrink-0 items-center justify-center gap-2 rounded border px-2 text-xs transition-all lg:px-3 ${pasteModePaused
+                                ? 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200 cursor-pointer'
+                                : 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 cursor-pointer'
+                                }`}
                         >
-                            <Clipboard className="h-4 w-4" />
-                        </button>
-                        <Clipboard className="hidden h-4 w-4 shrink-0 lg:block" />
-                        {clipboardCount > 0 ? (
-                            <>
-                                <button
-                                    onClick={togglePasteMode}
-                                    disabled={!togglePasteMode}
-                                    className="hidden items-center gap-2 lg:flex"
-                                    title={pasteModePaused ? 'Click to activate paste mode' : 'Click to pause paste mode (or press ESC / Right-click)'}
-                                >
-                                    {clipboardData.operation === 'cut' ? <Scissors className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                                    <span className="font-medium">{clipboardCount} widget{clipboardCount === 1 ? '' : 's'} {clipboardData.operation === 'cut' ? 'cut' : 'copied'}</span>
-                                    <span className={`rounded px-1.5 py-0.5 text-[10px] ${pasteModePaused ? 'bg-gray-200 text-gray-600' : 'bg-purple-200 text-purple-800'}`}>
-                                        {pasteModePaused ? 'PAUSED' : 'ACTIVE'}
-                                    </span>
-                                </button>
-                                <button onClick={clearClipboardState} className="hidden rounded p-1 transition-colors hover:bg-red-100 lg:block" title="Clear clipboard" aria-label="Clear clipboard">
-                                    <X className="h-3 w-3 text-red-600" />
-                                </button>
-                            </>
-                        ) : (
-                            <span className="hidden font-medium lg:inline">Empty</span>
-                        )}
-                    </div>
+                            <button
+                                type="button"
+                                onClick={togglePasteMode}
+                                disabled={!togglePasteMode}
+                                aria-label={`${clipboardLabel}. Toggle paste mode`}
+                                className="flex min-h-9 min-w-9 items-center justify-center lg:hidden"
+                            >
+                                <Clipboard className="h-4 w-4" />
+                            </button>
+                            <Clipboard className="hidden h-4 w-4 shrink-0 lg:block" />
+                            <button
+                                onClick={togglePasteMode}
+                                disabled={!togglePasteMode}
+                                className="hidden items-center gap-2 lg:flex"
+                                title={pasteModePaused ? 'Click to activate paste mode' : 'Click to pause paste mode (or press ESC / Right-click)'}
+                            >
+                                {clipboardData.operation === 'cut' ? <Scissors className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                                <span className="font-medium">{clipboardCount} widget{clipboardCount === 1 ? '' : 's'} {clipboardData.operation === 'cut' ? 'cut' : 'copied'}</span>
+                                <span className={`rounded px-1.5 py-0.5 text-[10px] ${pasteModePaused ? 'bg-gray-200 text-gray-600' : 'bg-purple-200 text-purple-800'}`}>
+                                    {pasteModePaused ? 'PAUSED' : 'ACTIVE'}
+                                </span>
+                            </button>
+                            <button onClick={clearClipboardState} className="hidden rounded p-1 transition-colors hover:bg-red-100 lg:block" title="Clear clipboard" aria-label="Clear clipboard">
+                                <X className="h-3 w-3 text-red-600" />
+                            </button>
+                        </div>
+                    )}
 
                     {/* Right side - Combined save and version control */}
                     <div className="flex shrink-0 items-center text-gray-600">
@@ -323,6 +317,7 @@ const StatusBar = ({
                             isNewPage={isNewPage}
                             validationState={validationState}
                             isDirty={isDirty}
+                            canPublish={canPublish}
                         />
                     </div>
                 </div>

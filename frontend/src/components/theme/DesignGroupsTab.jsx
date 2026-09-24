@@ -31,6 +31,7 @@ import ImagePropertyField from './design-groups/ImagePropertyField';
 import LayoutPartEditor from './design-groups/layout-properties/LayoutPartEditor';
 import { useImageValidation } from './design-groups/hooks/useImageValidation';
 import CSSModifierAutocomplete from './design-groups/autocomplete/CSSModifierAutocomplete';
+import DesignGroupImportModal from './DesignGroupImportModal';
 
 // Autocomplete Component for Widget Types
 const WidgetTypeAutocomplete = ({ availableWidgets, onSelect, disabled }) => {
@@ -661,7 +662,7 @@ const extractFilterOptions = (groups, widgetTypes = []) => {
   return options;
 };
 
-const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, onChange, onDirty }) => {
+const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, onChange, onDirty, onGroupsImported, hasUnsavedChanges = false }) => {
   const groups = designGroups?.groups || [];
 
   const [expandedContent, setExpandedContent] = useState({});
@@ -693,6 +694,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
 
   // Filter state
   const [filterValue, setFilterValue] = useState(null); // { type: 'widgetType' | 'slot' | 'selector', value: string }
+  const [showThemeImport, setShowThemeImport] = useState(false);
 
   // Fetch widget types from API
   const { widgetTypes = [], isLoadingTypes } = useWidgets();
@@ -2449,6 +2451,14 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
           />
           <button
             type="button"
+            onClick={() => setShowThemeImport(true)}
+            className="inline-flex items-center px-4 py-2 bg-white text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
+          >
+            <Package className="w-4 h-4 mr-2" />
+            Import from Theme
+          </button>
+          <button
+            type="button"
             onClick={() => openImportModal('global')}
             className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
             title="Import CSS to create new group"
@@ -2466,6 +2476,17 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
           </button>
         </div>
       </div>
+
+      {showThemeImport && (
+        <DesignGroupImportModal
+          themeId={themeId}
+          onClose={() => setShowThemeImport(false)}
+          onImported={(importedDesignGroups) => {
+            onGroupsImported(importedDesignGroups);
+          }}
+          hasUnsavedChanges={hasUnsavedChanges}
+        />
+      )}
 
       {/* Split layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

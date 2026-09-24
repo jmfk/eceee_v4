@@ -245,11 +245,17 @@ const PageWidgetFactory = ({
 
     // Get the widget component (supports EASY widgets and overrides)
     const CoreWidgetComponent = getWidgetComponent(widget.type)
+    const themeId = pageVersionData?.theme?.id
+        ?? pageVersionData?.theme
+        ?? pageVersionData?.effectiveTheme?.id
+        ?? webpageData?.theme?.id
+        ?? webpageData?.theme
+        ?? webpageData?.effectiveTheme?.id
 
     // Get custom actions from widget component metadata if available
     const customActions = CoreWidgetComponent?.customActions?.(widget, {
         pageId: pageId || webpageData?.id,
-        themeId: webpageData?.theme,
+        themeId,
         layoutRenderer: null
     })
 

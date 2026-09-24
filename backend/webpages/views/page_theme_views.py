@@ -2,13 +2,16 @@
 PageTheme ViewSet for managing page themes.
 """
 
+import copy
 import io
 import json
 import logging
+import os
 import zipfile
 from datetime import datetime
 
 from django.core.files.base import ContentFile
+from django.db import transaction
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, status, viewsets
@@ -376,6 +379,229 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 {"error": f"Failed to clone theme: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+    @staticmethod
+    def _group_image_references(group):
+        """Return unique image references used by one design group."""
+        references = []
+        seen = set()
+        for _part, _breakpoint, props in PageTheme._iter_design_group_layout_props(group):
+            values = [value for key, value in props.items() if key != "images"]
+            if isinstance(props.get("images"), dict):
+                values.extend(props["images"].values())
+            for value in values:
+                url = PageTheme._get_image_value_url(value)
+                if not url or url in seen:
+                    continue
+                seen.add(url)
+                references.append(
+                    {
+                        "url": url,
+                        "filename": value.get("filename") if isinstance(value, dict) else None,
+                    }
+                )
+        return references
+
+    def _design_group_import_context(self, target, request):
+        source_id = request.data.get("source_theme_id")
+        indices = request.data.get("group_indices")
+        if not source_id or not isinstance(indices, list) or not indices:
+            return (
+                None,
+                None,
+                Response(
+                    {"error": "source_theme_id and a non-empty group_indices list are required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                ),
+            )
+
+        source = self.get_queryset().filter(pk=source_id).first()
+        if source is None:
+            return (
+                None,
+                None,
+                Response(
+                    {"error": "Source theme was not found in the selected tenant"},
+                    status=status.HTTP_404_NOT_FOUND,
+                ),
+            )
+        if source.pk == target.pk:
+            return (
+                None,
+                None,
+                Response(
+                    {"error": "Choose a different source theme"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                ),
+            )
+
+        source_groups = (source.design_groups or {}).get("groups", [])
+        if any(not isinstance(index, int) or index < 0 or index >= len(source_groups) for index in indices):
+            return (
+                None,
+                None,
+                Response(
+                    {"error": "One or more selected design groups no longer exist"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                ),
+            )
+        selected = [source_groups[index] for index in dict.fromkeys(indices)]
+        return source, selected, None
+
+    @action(detail=True, methods=["get"])
+    def importable_design_groups(self, request, pk=None):
+        """List groups from other themes in the current tenant."""
+        target = self.get_object()
+        themes = []
+        for theme in self.get_queryset().exclude(pk=target.pk).order_by("name"):
+            groups = (theme.design_groups or {}).get("groups", [])
+            themes.append(
+                {
+                    "id": theme.id,
+                    "name": theme.name,
+                    "groups": [
+                        {
+                            "index": index,
+                            "name": group.get("name") or f"Unnamed group {index + 1}",
+                            "widget_types": group.get("widgetTypes") or group.get("widget_types") or [],
+                            "slots": group.get("slots") or [],
+                            "image_count": len(self._group_image_references(group)),
+                        }
+                        for index, group in enumerate(groups)
+                    ],
+                }
+            )
+        return Response({"themes": themes})
+
+    @action(detail=True, methods=["post"])
+    def preview_design_group_import(self, request, pk=None):
+        """Preview selected groups and same-name conflicts without changing state."""
+        target = self.get_object()
+        source, selected, error = self._design_group_import_context(target, request)
+        if error:
+            return error
+        target_names = {group.get("name") for group in (target.design_groups or {}).get("groups", [])}
+        groups = [
+            {
+                "name": group.get("name") or "Unnamed group",
+                "conflict": group.get("name") in target_names,
+                "image_count": len(self._group_image_references(group)),
+            }
+            for group in selected
+        ]
+        return Response(
+            {
+                "source_theme": {"id": source.id, "name": source.name},
+                "target_theme": {"id": target.id, "name": target.name},
+                "groups": groups,
+                "conflict_count": sum(1 for group in groups if group["conflict"]),
+                "image_count": sum(group["image_count"] for group in groups),
+            }
+        )
+
+    @action(detail=True, methods=["post"])
+    def import_design_groups(self, request, pk=None):
+        """Import selected groups and their images after explicit conflict resolution."""
+        target = self.get_object()
+        source, selected, error = self._design_group_import_context(target, request)
+        if error:
+            return error
+        resolution = request.data.get("conflict_resolution")
+        if resolution not in {"skip", "overwrite"}:
+            return Response(
+                {"error": "conflict_resolution must be 'skip' or 'overwrite'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        target_data = copy.deepcopy(target.design_groups or {})
+        target_groups = target_data.setdefault("groups", [])
+        target_name_indexes = {group.get("name"): index for index, group in enumerate(target_groups)}
+        imported = []
+        skipped = []
+        copied_images = 0
+        url_mapping = {}
+        filename_mapping = {}
+
+        groups_to_import = [
+            group for group in selected if not (group.get("name") in target_name_indexes and resolution == "skip")
+        ]
+        for group in groups_to_import:
+            for reference in self._group_image_references(group):
+                source_path = PageTheme._extract_path_from_url(reference["url"])
+                if (
+                    not source_path
+                    or not source_path.startswith(f"theme_images/{source.id}/")
+                    or not system_storage.exists(source_path)
+                ):
+                    return Response(
+                        {
+                            "error": f"Image used by '{group.get('name')}' could not be found in the source theme",
+                            "image_url": reference["url"],
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+
+        for original_group in selected:
+            group_name = original_group.get("name")
+            if group_name in target_name_indexes and resolution == "skip":
+                skipped.append(group_name or "Unnamed group")
+                continue
+
+            group = copy.deepcopy(original_group)
+            for reference in self._group_image_references(group):
+                old_url = reference["url"]
+                if old_url in url_mapping:
+                    continue
+                source_path = PageTheme._extract_path_from_url(old_url)
+                filename = os.path.basename(reference["filename"] or source_path)
+                stem, extension = os.path.splitext(filename)
+                target_filename = filename
+                target_path = f"theme_images/{target.id}/library/{target_filename}"
+                if system_storage.exists(target_path):
+                    target_filename = f"{stem}_from_theme_{source.id}{extension}"
+                    target_path = f"theme_images/{target.id}/library/{target_filename}"
+                with system_storage._open(source_path, "rb") as source_file:
+                    saved_path = system_storage._save(target_path, ContentFile(source_file.read()))
+                new_url = system_storage.url(saved_path)
+                url_mapping[old_url] = new_url
+                filename_mapping[new_url] = os.path.basename(saved_path)
+                copied_images += 1
+
+            group = PageTheme._update_image_urls_in_design_groups({"groups": [group]}, url_mapping)["groups"][0]
+
+            def update_copied_filenames(value):
+                if isinstance(value, dict):
+                    copied_filename = filename_mapping.get(PageTheme._get_image_value_url(value))
+                    if copied_filename:
+                        value["filename"] = copied_filename
+                    for child in value.values():
+                        update_copied_filenames(child)
+                elif isinstance(value, list):
+                    for child in value:
+                        update_copied_filenames(child)
+
+            update_copied_filenames(group)
+            if group_name in target_name_indexes:
+                target_groups[target_name_indexes[group_name]] = group
+            else:
+                target_name_indexes[group_name] = len(target_groups)
+                target_groups.append(group)
+            imported.append(group_name or "Unnamed group")
+
+        with transaction.atomic():
+            target.design_groups = target_data
+            target.save(update_fields=["design_groups", "updated_at"])
+        ThemeCSSGenerator().invalidate_cache(target.id)
+        serializer = self.get_serializer(target)
+        return Response(
+            {
+                "message": f"Imported {len(imported)} design group(s) from '{source.name}'",
+                "imported": imported,
+                "skipped": skipped,
+                "copied_images": copied_images,
+                "design_groups": serializer.data["design_groups"],
+            }
+        )
 
     @action(detail=True, methods=["post"])
     def clear_cache(self, request, pk=None):

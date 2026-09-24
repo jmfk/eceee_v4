@@ -2377,6 +2377,7 @@ const PageEditor = () => {
                 webpageData={webpageData}
                 pageVersionData={pageVersionData}
                 validationState={schemaValidationState}
+                canPublish={isDirty || Boolean(workflow?.editableVersion?.id)}
                 customStatusContent={
                     <div className="flex items-center space-x-4">
                         <span>
