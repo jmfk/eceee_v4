@@ -482,9 +482,10 @@ export async function mockCmsApi(page, { authenticated = false, pageEditor = fal
       return json(route, clone(editorState.version))
     }
 
-    if (pageEditor && url.pathname === '/api/v1/webpages/versions/201/save/' && method === 'PATCH') {
+    if (pageEditor && url.pathname === '/api/v1/webpages/pages/101/working-copy/save/' && method === 'PATCH') {
       const body = request.postDataJSON()
       delete body.clientUpdatedAt
+      delete body.expectedVersionId
       editorState.version = {
         ...editorState.version,
         ...body,
@@ -492,7 +493,7 @@ export async function mockCmsApi(page, { authenticated = false, pageEditor = fal
         updatedAt: new Date().toISOString(),
       }
       editorState.savedVersions.push(clone(body))
-      return json(route, clone(editorState.version))
+      return json(route, { created: false, version: clone(editorState.version) })
     }
 
     if (pageEditor && url.pathname === '/api/v1/webpages/pages/101/widget-inheritance/' && method === 'GET') {

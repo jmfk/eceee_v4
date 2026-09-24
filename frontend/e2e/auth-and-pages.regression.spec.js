@@ -132,6 +132,7 @@ test.describe('CMS auth and page management regressions', () => {
       const deepestId = 'accessibility-checklist-session-chairs'
 
       await expect(page.getByTestId(`page-tree-node-${rootId}`)).toBeVisible()
+      await page.getByTestId(`page-tree-expand-${rootId}`).click()
       await expect(page.getByTestId(`page-tree-node-${childId}`)).toBeVisible()
       await expect(
         page.getByTestId('page-tree-node-draft-registration-details').getByText('Not published', { exact: true })
