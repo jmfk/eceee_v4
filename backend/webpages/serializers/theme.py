@@ -173,6 +173,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "colors",
             "design_groups",
             "component_styles",
+            "designer_preview",
             "image_styles",
             "table_templates",
             "breakpoints",
@@ -287,6 +288,21 @@ class PageThemeSerializer(serializers.ModelSerializer):
             if "template" not in style_config:
                 raise serializers.ValidationError(f"Component style '{style_name}' must have a 'template' field")
 
+        return value
+
+    def validate_designer_preview(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Designer preview configuration must be a JSON object")
+        views = value.get("views", [])
+        if not isinstance(views, list):
+            raise serializers.ValidationError("Designer preview views must be a list")
+        for view in views:
+            if not isinstance(view, dict):
+                raise serializers.ValidationError("Each Designer preview view must be an object")
+            if view.get("kind", "page") not in {"page", "object"}:
+                raise serializers.ValidationError("Designer preview view kind must be page or object")
+            if not view.get("id") or not view.get("layout"):
+                raise serializers.ValidationError("Each Designer preview view needs an id and layout")
         return value
 
     def validate_image_styles(self, value):

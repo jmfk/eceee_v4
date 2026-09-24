@@ -28,6 +28,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
         breakpoints: true,
         designGroups: true,
         componentStyles: true,
+        designerPreview: true,
         imageStyles: true,
         tableTemplates: true,
     });
@@ -46,6 +47,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
         'breakpoints': 'breakpoints',
         'typography': 'designGroups',
         'component-styles': 'componentStyles',
+        'preview-views': 'designerPreview',
         'image-styles': 'imageStyles',
         'table-templates': 'tableTemplates',
     };
@@ -57,6 +59,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             breakpoints: themeData?.breakpoints || {},
             designGroups: themeData?.designGroups || { groups: [] },
             componentStyles: themeData?.componentStyles || {},
+            designerPreview: themeData?.designerPreview || {},
             imageStyles: themeData?.imageStyles || {},
             tableTemplates: themeData?.tableTemplates || {},
         };
@@ -112,6 +115,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             breakpoints: themeData?.breakpoints || {},
             designGroups: themeData?.designGroups || { groups: [] },
             componentStyles: themeData?.componentStyles || {},
+            designerPreview: themeData?.designerPreview || {},
             imageStyles: themeData?.imageStyles || {},
             tableTemplates: themeData?.tableTemplates || {},
         };
@@ -188,6 +192,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
                 breakpoints: themeData?.breakpoints || {},
                 designGroups: themeData?.designGroups || { groups: [] },
                 componentStyles: themeData?.componentStyles || {},
+                designerPreview: themeData?.designerPreview || {},
                 imageStyles: themeData?.imageStyles || {},
                 tableTemplates: themeData?.tableTemplates || {},
             };
@@ -222,6 +227,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
                 breakpoints: themeData?.breakpoints || {},
                 designGroups: themeData?.designGroups || { groups: [] },
                 componentStyles: themeData?.componentStyles || {},
+                designerPreview: themeData?.designerPreview || {},
                 imageStyles: themeData?.imageStyles || {},
                 tableTemplates: themeData?.tableTemplates || {},
             };
@@ -271,13 +277,14 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             breakpoints: 'Breakpoints',
             designGroups: 'Design Groups',
             componentStyles: 'Component Styles',
+            designerPreview: 'Preview Views',
             imageStyles: 'Image Styles',
             tableTemplates: 'Table Templates',
         };
         return labels[section] || section;
     };
 
-    const allSections = ['fonts', 'colors', 'breakpoints', 'designGroups', 'componentStyles', 'imageStyles', 'tableTemplates'];
+    const allSections = ['fonts', 'colors', 'breakpoints', 'designGroups', 'componentStyles', 'designerPreview', 'imageStyles', 'tableTemplates'];
 
     const handleSelectAll = () => {
         const newSelection = {};
@@ -646,4 +653,3 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
 };
 
 export default ThemeCopyPasteManager;
-

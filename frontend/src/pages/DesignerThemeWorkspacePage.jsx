@@ -170,6 +170,28 @@ const DesignerThemeWorkspacePage = () => {
         } catch (err) { addNotification({ type: 'error', message: err.message || 'Placeholder could not be created' }) }
     }
 
+    const savePreviewContent = async (viewId, texts) => {
+        try {
+            const result = await designerThemesApi.savePreviewContent(themeId, viewId, texts)
+            setWorkspace((current) => ({ ...current, previewContent: result.previewContent }))
+            return result
+        } catch (err) {
+            addNotification({ type: 'error', message: err.message || 'Preview content could not be saved' })
+            throw err
+        }
+    }
+
+    const replacePreviewImage = async (viewId, targetId, file) => {
+        try {
+            const result = await designerThemesApi.replacePreviewImage(themeId, viewId, targetId, file)
+            setWorkspace((current) => ({ ...current, previewContent: result.previewContent }))
+            return result
+        } catch (err) {
+            addNotification({ type: 'error', message: err.message || 'Preview image could not be saved' })
+            throw err
+        }
+    }
+
     const exportPackage = async () => {
         setExporting(true)
         try {
@@ -213,7 +235,7 @@ const DesignerThemeWorkspacePage = () => {
             </header>
             {workspace.draftIsStale && <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:px-6">The live theme changed after this draft was started. Discard the draft to reload the current live version before making or publishing more changes.</div>}
             <div className="flex border-b border-gray-200 bg-white lg:hidden"><button type="button" onClick={() => setMobilePane('edit')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'edit' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Edit</button><button type="button" onClick={() => setMobilePane('preview')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'preview' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Preview</button></div>
-            <SemanticThemeWorkspace workspace={workspace} preview={preview} viewport={viewport} mobilePane={mobilePane} updateWorkspace={updateWorkspace} replaceAsset={replaceAsset} createPlaceholder={createPlaceholder} placeholderDrafts={placeholderDrafts} setPlaceholderDrafts={setPlaceholderDrafts} disabled={controlsDisabled} />
+            <SemanticThemeWorkspace workspace={workspace} preview={preview} viewport={viewport} mobilePane={mobilePane} updateWorkspace={updateWorkspace} replaceAsset={replaceAsset} createPlaceholder={createPlaceholder} placeholderDrafts={placeholderDrafts} setPlaceholderDrafts={setPlaceholderDrafts} savePreviewContent={savePreviewContent} replacePreviewImage={replacePreviewImage} disabled={controlsDisabled} />
             <StatusBar customStatusContent={<span>{workspace.draftIsStale ? 'Draft is stale · discard to reload' : dirty ? 'Unsaved local draft changes' : workspace.hasDraftChanges ? 'Draft saved · not published' : 'Draft matches the live theme'}</span>} />
         </div>
     )

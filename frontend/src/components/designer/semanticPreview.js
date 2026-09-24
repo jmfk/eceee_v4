@@ -7,8 +7,8 @@ const copy = {
         body: 'This longer example text shows typography, line length, rhythm, and spacing with predictable demo content.',
         link: 'Read more',
         list: ['First example item', 'Second example item', 'Third example item'],
-        image: 'Demo image',
-        empty: 'This element has no configured visual values yet.',
+        image: 'Demo content image',
+        empty: 'This area has no configured demo content yet.',
     },
     sv: {
         eyebrow: 'Aktuellt ämne',
@@ -16,8 +16,8 @@ const copy = {
         body: 'Det här är en längre svensk exempeltext som visar typsnitt, radlängd, rytm och mellanrum med förutsägbart demoinnehåll.',
         link: 'Läs mer',
         list: ['Första exempelraden', 'Andra exempelraden', 'Tredje exempelraden'],
-        image: 'Demobild',
-        empty: 'Elementet har ännu inga konfigurerade visuella värden.',
+        image: 'Demobild för innehåll',
+        empty: 'Den här ytan har ännu inget konfigurerat demoinnehåll.',
     },
 }
 
@@ -30,126 +30,134 @@ const languageCopy = () => {
     return copy[language] || copy.en
 }
 
-const targetAttributes = (target) => [
+const targetAttributes = (target, editable = '') => [
     `data-designer-target="${escapeHtml(target.id)}"`,
     `data-designer-kind="${escapeHtml(target.kind || 'element')}"`,
     `data-designer-label="${escapeHtml(target.label)}"`,
-].join(' ')
+    editable ? `data-preview-editable="${editable}"` : '',
+].filter(Boolean).join(' ')
 
-const elementMarkup = (element) => {
+const defaultText = (tag) => {
     const text = languageCopy()
-    const target = { ...element, kind: 'element' }
-    const attributes = targetAttributes(target)
-    const tag = String(element.element || 'div').toLowerCase()
-    if (/^h[1-6]$/.test(tag)) return `<${tag} ${attributes}>${escapeHtml(text.heading)}</${tag}>`
-    if (tag === 'a' || tag === 'a:hover') return `<a href="#" ${attributes}>${escapeHtml(text.link)}</a>`
-    if (tag === 'ul' || tag === 'ol') return `<${tag} ${attributes}>${text.list.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</${tag}>`
-    if (tag === 'li') return `<div ${attributes}><span class="demo-bullet">•</span> ${escapeHtml(text.list[0])}</div>`
-    if (tag === 'blockquote') return `<blockquote ${attributes}>${escapeHtml(text.body)}</blockquote>`
-    if (tag === 'pre') return `<pre ${attributes}><code>const example = true</code></pre>`
-    if (tag === 'code') return `<code ${attributes}>exampleValue</code>`
-    if (tag === 'strong') return `<strong ${attributes}>${escapeHtml(text.heading)}</strong>`
-    if (tag === 'em') return `<em ${attributes}>${escapeHtml(text.body)}</em>`
-    return `<p ${attributes}>${escapeHtml(text.body)}</p>`
+    if (/^h[1-6]$/.test(tag)) return text.heading
+    if (tag === 'a' || tag === 'a:hover') return text.link
+    if (tag === 'li') return text.list[0]
+    if (tag === 'pre') return 'const example = true'
+    if (tag === 'code') return 'exampleValue'
+    if (tag === 'strong') return text.heading
+    return text.body
 }
 
-const assetMarkup = (asset) => {
+const elementMarkup = (element, texts) => {
+    const target = { ...element, kind: 'element' }
+    const attributes = targetAttributes(target, 'text')
+    const tag = String(element.element || 'div').toLowerCase()
+    const value = texts[element.id] ?? defaultText(tag)
+    if (/^h[1-6]$/.test(tag)) return `<${tag} ${attributes} contenteditable="true">${escapeHtml(value)}</${tag}>`
+    if (tag === 'a' || tag === 'a:hover') return `<a href="#" ${attributes} contenteditable="true">${escapeHtml(value)}</a>`
+    if (tag === 'ul' || tag === 'ol') {
+        const items = texts[element.id] ? String(texts[element.id]).split('\n').filter(Boolean) : languageCopy().list
+        return `<${tag} ${attributes}>${items.map((item) => `<li contenteditable="true">${escapeHtml(item)}</li>`).join('')}</${tag}>`
+    }
+    if (tag === 'li') return `<div ${attributes} contenteditable="true"><span class="demo-bullet">•</span> ${escapeHtml(value)}</div>`
+    if (tag === 'blockquote') return `<blockquote ${attributes} contenteditable="true">${escapeHtml(value)}</blockquote>`
+    if (tag === 'pre') return `<pre ${attributes} contenteditable="true"><code>${escapeHtml(value)}</code></pre>`
+    if (tag === 'code') return `<code ${attributes} contenteditable="true">${escapeHtml(value)}</code>`
+    if (tag === 'strong') return `<strong ${attributes} contenteditable="true">${escapeHtml(value)}</strong>`
+    if (tag === 'em') return `<em ${attributes} contenteditable="true">${escapeHtml(value)}</em>`
+    return `<p ${attributes} contenteditable="true">${escapeHtml(value)}</p>`
+}
+
+const themeAssetMarkup = (asset) => {
     const target = { id: `asset:${asset.assetKey}`, label: asset.displayName, kind: 'asset' }
     const badge = asset.isPlaceholder ? '<span class="demo-placeholder-badge">Placeholder</span>' : ''
-    if (asset.url) {
-        return `<figure ${targetAttributes(target)}><img src="${escapeHtml(asset.url)}" alt=""><figcaption>${escapeHtml(asset.displayName)} ${badge}</figcaption></figure>`
-    }
+    if (asset.url) return `<figure ${targetAttributes(target)}><img src="${escapeHtml(asset.url)}" alt=""><figcaption>${escapeHtml(asset.displayName)} ${badge}</figcaption></figure>`
     return `<div class="demo-image-placeholder" ${targetAttributes(target)}><span>${escapeHtml(asset.displayName || languageCopy().image)}</span>${badge}</div>`
 }
 
-const groupContent = (group, workspace, { includeRoot = true } = {}) => {
+const previewImageMarkup = (view, slotName) => {
+    const targetId = `preview:${view.id}:image:${slotName}`
+    const image = view.images?.[targetId]
+    const target = { id: targetId, label: languageCopy().image, kind: 'previewImage' }
+    if (image?.url) return `<figure class="demo-content-image" ${targetAttributes(target, 'image')}><img src="${escapeHtml(image.url)}" alt=""><figcaption>${escapeHtml(image.filename || languageCopy().image)}</figcaption></figure>`
+    return `<div class="demo-image-placeholder demo-content-image" ${targetAttributes(target, 'image')}><span>${escapeHtml(languageCopy().image)}</span></div>`
+}
+
+const groupContent = (group, workspace, texts, { includeRoot = true } = {}) => {
     const assets = (group.assetKeys || []).map((assetKey) => workspace.assets.find((asset) => asset.assetKey === assetKey)).filter(Boolean)
     const body = [
-        ...assets.map(assetMarkup),
-        ...(group.parts || []).map((part) => `<div class="demo-part" ${targetAttributes({ ...part, kind: 'part' })}>${escapeHtml(part.label)}</div>`),
-        ...(group.elements || []).map(elementMarkup),
+        ...assets.map(themeAssetMarkup),
+        ...(group.parts || []).map((part) => `<div class="demo-part" ${targetAttributes({ ...part, kind: 'part' })}></div>`),
+        ...(group.elements || []).map((element) => elementMarkup(element, texts)),
     ].join('') || `<p>${escapeHtml(languageCopy().empty)}</p>`
     if (!includeRoot) return body
-    return `<section class="demo-group" ${targetAttributes({ id: group.id, label: group.label, kind: 'group' })}><small class="demo-kicker">${escapeHtml(group.label)}</small>${body}</section>`
+    return `<section class="demo-group" ${targetAttributes({ id: group.id, label: group.label, kind: 'group' })}>${body}</section>`
 }
 
 const safeStyleTemplate = (template) => String(template || '{{{content}}}')
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/\son[a-z]+\s*=\s*(["']).*?\1/gi, '')
+    .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\s(?:href|src)\s*=\s*(["'])\s*javascript:[\s\S]*?\1/gi, '')
 
 const componentStyleContext = (content) => {
     const text = languageCopy()
     const links = text.list.map((title, index) => ({ title, path: `#demo-${index + 1}` }))
     return {
-        content,
-        passthru: content,
-        anchor: text.heading,
-        caption: text.body,
-        size: 'large',
-        alignment: 'center',
-        items: links,
-        menuItems: links,
-        currentChildren: links,
-        parentChildren: links,
-        ownerChildren: links,
-        currentPage: links[0],
-        parentPage: { title: text.eyebrow, path: '#demo-parent' },
-        ownerPage: links[0],
-        hasItems: true,
-        hasCurrentChildren: true,
-        hasParentChildren: true,
-        hasOwnerChildren: true,
-        isInherited: true,
-        isLevel1: false,
-        isLevel2: true,
-        isLevel3: false,
-        isLevel1AndBelow: true,
-        isLevel2AndBelow: true,
-        isLevel3AndBelow: false,
+        content, passthru: content, anchor: text.heading, caption: text.body, size: 'large', alignment: 'center',
+        items: links, menuItems: links, currentChildren: links, parentChildren: links, ownerChildren: links,
+        currentPage: links[0], parentPage: { title: text.eyebrow, path: '#demo-parent' }, ownerPage: links[0],
+        hasItems: true, hasCurrentChildren: true, hasParentChildren: true, hasOwnerChildren: true,
+        isInherited: true, isLevel1: false, isLevel2: true, isLevel3: false,
+        isLevel1AndBelow: true, isLevel2AndBelow: true, isLevel3AndBelow: false,
     }
 }
 
 const renderComponentStyle = (componentStyle, content) => {
-    const template = safeStyleTemplate(componentStyle?.template)
-        .replace(/\{\{\s*passthru\s*\}\}/g, '{{{passthru}}}')
+    const template = safeStyleTemplate(componentStyle?.template).replace(/\{\{\s*passthru\s*\}\}/g, '{{{passthru}}}')
     const rendered = renderMustache(template, componentStyleContext(content))
     return rendered.trim() ? rendered : content
 }
 
-const isolatedMarkup = (workspace, group, componentStyle) => {
-    const content = groupContent(group, workspace)
-    if (!componentStyle) return content
-    const styled = renderComponentStyle(componentStyle, content)
-    return `<div class="demo-component-style" ${targetAttributes({ id: `component-style:${componentStyle.key}`, label: componentStyle.label, kind: 'componentStyle' })}>${styled}</div>`
-}
+const shouldShowContentImage = (slotName) => ['main', 'content', 'body', 'landing_page', 'hero'].includes(slotName)
 
-const layoutMarkup = (workspace, layout, selectedStyle) => {
+const slotMarkup = (workspace, view, slot, primarySlot) => {
     const groups = workspace.catalog.designGroups || []
-    const fallback = groups[0]
-    const slots = (layout?.slots || []).map((slot) => {
-        const matching = groups.filter((group) => (group.slots || []).includes(slot.name))
-        const selectedGroups = matching.length ? matching : (slot.name === 'main' && fallback ? [fallback] : [])
-        const content = selectedGroups.map((group) => {
-            const markup = groupContent(group, workspace)
-            if (!selectedStyle) return markup
-            return renderComponentStyle(selectedStyle, markup)
-        }).join('') || `<p>${escapeHtml(languageCopy().body)}</p>`
-        return `<section class="demo-layout-slot slot-${escapeHtml(slot.name)}" ${targetAttributes({ id: `layout:${layout.key}:slot:${slot.name}`, label: slot.label, kind: 'layoutSlot' })}><span class="demo-slot-label">${escapeHtml(slot.label)}</span>${content}</section>`
-    }).join('')
-    return `<div class="demo-layout layout-${escapeHtml(layout?.key)}">${slots}</div>`
+    const matching = groups.filter((group) => (group.slots || []).includes(slot.name))
+    const selected = matching.length ? matching : (slot.name === primarySlot ? groups.slice(0, 1) : [])
+    const content = selected.map((group) => groupContent(group, workspace, view.texts || {})).join('')
+    const image = shouldShowContentImage(slot.name) ? previewImageMarkup(view, slot.name) : ''
+    const styleExamples = slot.name === primarySlot
+        ? (workspace.catalog.componentStyles || []).map((style) => {
+            const sampleGroup = selected[0] || groups[0]
+            const sample = sampleGroup ? groupContent(sampleGroup, workspace, view.texts || {}, { includeRoot: false }) : `<p>${escapeHtml(languageCopy().body)}</p>`
+            return `<section class="demo-component-style" ${targetAttributes({ id: `component-style:${style.key}`, label: style.label, kind: 'componentStyle' })}>${renderComponentStyle(style, sample)}</section>`
+        }).join('')
+        : ''
+    const fallbackText = !content && !image && !styleExamples ? `<p>${escapeHtml(languageCopy().empty)}</p>` : ''
+    return `<div class="demo-slot-content" ${targetAttributes({ id: `layout:${view.layout}:slot:${slot.name}`, label: slot.label, kind: 'layoutSlot' })}>${image}${content}${styleExamples}${fallbackText}</div>`
 }
 
-export const buildSemanticPreviewDocument = ({ workspace, css, fontUrl, mode, groupId, layoutKey, componentStyleKey, viewport }) => {
-    const group = workspace.catalog.designGroups.find((item) => item.id === groupId) || workspace.catalog.designGroups[0]
-    const layout = workspace.catalog.layouts.find((item) => item.key === layoutKey) || workspace.catalog.layouts[0]
-    const componentStyle = workspace.catalog.componentStyles.find((item) => item.key === componentStyleKey)
-    const content = mode === 'layout'
-        ? layoutMarkup(workspace, layout, componentStyle)
-        : isolatedMarkup(workspace, group, componentStyle)
-    const maxWidth = viewport === 'mobile' ? '390px' : viewport === 'tablet' ? '760px' : '1180px'
+const layoutMarkup = (workspace, layout, view) => {
+    const slots = layout?.slots || []
+    const primarySlot = slots.find((slot) => ['main', 'content', 'body', 'landing_page'].includes(slot.name))?.name || slots[0]?.name
+    let markup = layout?.previewTemplate || ''
+    slots.forEach((slot) => {
+        markup = markup.split(`__DESIGNER_SLOT_${slot.name}__`).join(slotMarkup(workspace, view, slot, primarySlot))
+    })
+    return markup.replace(/__DESIGNER_SLOT_[A-Za-z0-9_-]+__/g, '')
+}
+
+export const buildSemanticPreviewDocument = ({ workspace, css, fontUrl, viewId, viewport }) => {
+    const views = workspace.previewContent?.views || workspace.catalog.previewViews || []
+    const view = views.find((item) => item.id === viewId) || views[0]
+    const layout = workspace.catalog.layouts.find((item) => item.key === view?.layout) || workspace.catalog.layouts[0]
+    const content = view && layout ? layoutMarkup(workspace, layout, view) : `<p>${escapeHtml(languageCopy().empty)}</p>`
+    const maxWidth = viewport === 'mobile' ? '390px' : viewport === 'tablet' ? '760px' : '1280px'
     return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">${fontUrl ? `<link rel="stylesheet" href="${escapeHtml(fontUrl)}">` : ''}<style>
-html,body{margin:0;min-height:100%;background:#f3f4f6;color:#111827}body{padding:24px;font-family:system-ui,sans-serif}.designer-preview{max-width:${maxWidth};margin:auto;background:white}.demo-group{position:relative;padding:24px;border:1px solid #d1d5db;background:#fff}.demo-kicker,.demo-slot-label{display:block;margin-bottom:12px;color:#6b7280;font:600 11px/1.2 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase}.demo-group>*+*{margin-top:14px}.demo-layout{display:grid;gap:14px}.demo-layout-slot{position:relative;min-height:90px;padding:20px;border:1px solid #d1d5db;background:#fff}.slot-main{grid-column:1}.slot-sidebar{grid-column:2;grid-row:auto / span 2}.demo-image-placeholder{min-height:130px;display:grid;place-items:center;padding:20px;border:1px dashed #9ca3af;background:linear-gradient(135deg,#e5e7eb 50%,#d1d5db 50%);font:600 13px system-ui,sans-serif}.demo-placeholder-badge{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:999px;background:#fef3c7;color:#92400e;font:600 10px system-ui,sans-serif}figure{margin:0}figure img{display:block;width:100%;max-height:300px;object-fit:contain;background:#f9fafb}figcaption{padding:6px 0;color:#6b7280;font:12px system-ui,sans-serif}.demo-part{min-height:72px;padding:18px;border:1px dashed #9ca3af;background:#f9fafb}.demo-component-style{padding:20px}.demo-bullet{font-weight:700}[data-designer-target]{position:relative;cursor:pointer;transition:outline-color .1s,background-color .1s}[data-designer-target]:hover{outline:2px dashed #2563eb;outline-offset:3px}[data-designer-target].designer-selected{outline:3px solid #2563eb!important;outline-offset:4px!important}.designer-selected::after{content:attr(data-designer-label);position:absolute;z-index:20;top:-24px;left:0;padding:3px 7px;background:#1d4ed8;color:white;font:600 11px system-ui,sans-serif;white-space:nowrap}${css || ''}</style></head><body><main class="designer-preview cms-content">${content}</main><script>
-document.addEventListener('click',function(event){var target=event.target.closest('[data-designer-target]');if(!target)return;event.preventDefault();event.stopPropagation();document.querySelectorAll('.designer-selected').forEach(function(node){node.classList.remove('designer-selected')});target.classList.add('designer-selected');parent.postMessage({source:'eceee-designer-preview',targetId:target.dataset.designerTarget,kind:target.dataset.designerKind,label:target.dataset.designerLabel},'*')});
+html,body{margin:0;min-height:100%;background:#e5e7eb;color:#111827}body{font-family:system-ui,sans-serif}.designer-preview{max-width:${maxWidth};margin:auto;background:white;min-height:100vh}.demo-group{position:relative}.demo-group>*+*,.demo-slot-content>*+*{margin-top:14px}.demo-slot-content{position:relative;min-height:44px}.demo-image-placeholder{min-height:130px;display:grid;place-items:center;padding:20px;border:1px dashed #9ca3af;background:linear-gradient(135deg,#e5e7eb 50%,#d1d5db 50%);font:600 13px system-ui,sans-serif}.demo-placeholder-badge{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:999px;background:#fef3c7;color:#92400e;font:600 10px system-ui,sans-serif}figure{margin:0}figure img{display:block;width:100%;max-height:360px;object-fit:contain;background:#f9fafb}figcaption{padding:6px 0;color:#6b7280;font:12px system-ui,sans-serif}.demo-part{min-height:44px}.demo-component-style{position:relative}.demo-bullet{font-weight:700}[contenteditable=true]{outline:none}[data-designer-target]{position:relative;cursor:pointer;transition:outline-color .1s,background-color .1s}[data-designer-target]:hover{outline:2px dashed #2563eb;outline-offset:3px}[data-designer-target].designer-selected{outline:3px solid #2563eb!important;outline-offset:4px!important}.designer-selected::after{content:attr(data-designer-label);position:absolute;z-index:20;top:-24px;left:0;padding:3px 7px;background:#1d4ed8;color:white;font:600 11px system-ui,sans-serif;white-space:nowrap}${layout?.layoutCss || ''}${css || ''}</style></head><body><main class="designer-preview cms-content">${content}</main><script>
+function send(target,action){parent.postMessage({source:'eceee-designer-preview',action:action||'select',targetId:target.dataset.designerTarget,kind:target.dataset.designerKind,label:target.dataset.designerLabel,text:target.innerText},'*')}
+document.addEventListener('click',function(event){var target=event.target.closest('[data-designer-target]');if(!target)return;if(event.target.closest('a'))event.preventDefault();event.stopPropagation();document.querySelectorAll('.designer-selected').forEach(function(node){node.classList.remove('designer-selected')});target.classList.add('designer-selected');send(target,'select')});
+document.addEventListener('focusout',function(event){var target=event.target.closest('[data-preview-editable="text"]');if(target)send(target,'contentChange')});
 </script></body></html>`
 }
 

@@ -39,6 +39,7 @@ import CopyButton from './theme/CopyButton';
 import CloneThemeDialog from './theme/CloneThemeDialog';
 import PasteThemeDialog from './theme/PasteThemeDialog';
 import DesignerAccessPanel from './theme/DesignerAccessPanel';
+import PreviewViewsTab from './theme/PreviewViewsTab';
 
 const ThemeEditor = ({ onSave }) => {
     const { themeId, tab, imageFilename } = useParams();
@@ -138,6 +139,7 @@ const ThemeEditor = ({ onSave }) => {
                 colors: {},
                 designGroups: { groups: [] },
                 componentStyles: {},
+                designerPreview: { views: [] },
                 imageStyles: {},
                 tableTemplates: {},
                 isActive: true,
@@ -159,6 +161,7 @@ const ThemeEditor = ({ onSave }) => {
                 colors: normalizedData.colors || {},
                 designGroups: normalizedData.designGroups || normalizedData.typography || { groups: [] },
                 componentStyles: normalizedData.componentStyles || {},
+                designerPreview: normalizedData.designerPreview || { views: [] },
                 imageStyles: normalizedData.imageStyles || {},
                 tableTemplates: normalizedData.tableTemplates || {},
                 image: normalizedData.image || null,
@@ -399,6 +402,7 @@ const ThemeEditor = ({ onSave }) => {
                 colors: pastedData.colors || {},
                 designGroups: pastedData.designGroups || {},
                 componentStyles: pastedData.componentStyles || {},
+                designerPreview: pastedData.designerPreview || {},
                 imageStyles: pastedData.imageStyles || {},
                 tableTemplates: pastedData.tableTemplates || {},
             };
@@ -650,6 +654,7 @@ const ThemeEditor = ({ onSave }) => {
         { id: 'breakpoints', label: 'Breakpoints' },
         { id: 'typography', label: 'Design Groups' },
         { id: 'component-styles', label: 'Component Styles' },
+        { id: 'preview-views', label: 'Preview Views' },
         { id: 'image-styles', label: 'Image Styles' },
         { id: 'table-templates', label: 'Table Templates' },
     ];
@@ -790,6 +795,7 @@ const ThemeEditor = ({ onSave }) => {
                                                             colors: theme.colors || {},
                                                             designGroups: theme.designGroups || {},
                                                             componentStyles: theme.componentStyles || {},
+                                                            designerPreview: theme.designerPreview || {},
                                                             imageStyles: theme.imageStyles || {},
                                                             tableTemplates: theme.tableTemplates || {},
                                                             image: theme.image || null,
@@ -1148,6 +1154,13 @@ const ThemeEditor = ({ onSave }) => {
                             onChange={(componentStyles) => updateThemeField('componentStyles', componentStyles)}
                             onDirty={() => setThemeDirty(true)}
                             themeId={themeId}
+                        />
+                    )}
+
+                    {activeTab === 'preview-views' && (
+                        <PreviewViewsTab
+                            designerPreview={themeData?.designerPreview || { views: [] }}
+                            onChange={(designerPreview) => updateThemeField('designerPreview', designerPreview)}
                         />
                     )}
 

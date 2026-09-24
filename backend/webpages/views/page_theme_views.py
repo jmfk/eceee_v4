@@ -14,10 +14,14 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
+from djangorestframework_camel_case.parser import CamelCaseJSONParser
+from djangorestframework_camel_case.render import CamelCaseJSONRenderer
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.generics import get_object_or_404
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.response import Response
 
 from file_manager.storage import system_storage
@@ -31,12 +35,32 @@ from ..theme_service import ThemeService
 logger = logging.getLogger(__name__)
 
 
+THEME_CASE_OPTIONS = {
+    "no_underscore_before_number": True,
+    "ignore_fields": ("designer_preview", "designerPreview"),
+}
+
+
+class ThemeJSONParser(CamelCaseJSONParser):
+    """Preserve developer-defined preview metadata and element identifiers."""
+
+    json_underscoreize = THEME_CASE_OPTIONS
+
+
+class ThemeJSONRenderer(CamelCaseJSONRenderer):
+    """Return preview metadata exactly as it is stored in the theme."""
+
+    json_underscoreize = THEME_CASE_OPTIONS
+
+
 class PageThemeViewSet(viewsets.ModelViewSet):
     """ViewSet for managing page themes."""
 
     queryset = PageTheme.objects.all()
     serializer_class = PageThemeSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [ThemeJSONParser, FormParser, MultiPartParser]
+    renderer_classes = [ThemeJSONRenderer, BrowsableAPIRenderer]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["is_active", "created_by"]
     search_fields = ["name", "description"]
@@ -69,6 +93,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "colors",
             "design_groups",
             "component_styles",
+            "designer_preview",
             "table_templates",
             "css_variables",
             "html_elements",
@@ -100,6 +125,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "colors",
             "design_groups",
             "component_styles",
+            "designer_preview",
             "table_templates",
             "css_variables",
             "html_elements",
@@ -1452,6 +1478,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 "colors": theme.colors,
                 "design_groups": theme.design_groups,
                 "component_styles": theme.component_styles,
+                "designer_preview": theme.designer_preview,
                 "image_styles": theme.image_styles,
                 "gallery_styles": theme.gallery_styles,
                 "carousel_styles": theme.carousel_styles,
@@ -1608,6 +1635,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     colors=theme_data.get("colors", {}),
                     design_groups=theme_data.get("design_groups", {}),
                     component_styles=theme_data.get("component_styles", {}),
+                    designer_preview=theme_data.get("designer_preview", {}),
                     image_styles=theme_data.get("image_styles", {}),
                     gallery_styles=theme_data.get("gallery_styles", {}),
                     carousel_styles=theme_data.get("carousel_styles", {}),
