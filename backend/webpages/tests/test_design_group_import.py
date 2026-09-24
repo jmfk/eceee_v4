@@ -182,6 +182,28 @@ class DesignGroupImportAPITests(TestCase):
             ["Header", "Footer", "Cards"],
         )
 
+    def test_regular_update_does_not_overwrite_newer_design_groups(self):
+        stale_target = PageTheme.objects.get(pk=self.target.pk)
+        latest_design_groups = {
+            "groups": [
+                {"name": "Header", "elements": {"h1": {"color": "red"}}},
+                {"name": "Cards", "elements": {"h2": {"color": "blue"}}},
+            ]
+        }
+        PageTheme.objects.filter(pk=self.target.pk).update(design_groups=latest_design_groups)
+
+        with patch.object(PageThemeViewSet, "get_object", return_value=stale_target):
+            response = self.client.patch(
+                reverse("api:pagetheme-detail", kwargs={"pk": self.target.pk}),
+                {"name": "Updated target"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.target.refresh_from_db()
+        self.assertEqual(self.target.name, "Updated target")
+        self.assertEqual(self.target.design_groups, latest_design_groups)
+
     def test_cannot_import_from_a_theme_in_another_tenant(self):
         other_user = User.objects.create_user("foreign-owner", password="test")
         other_tenant = Tenant.objects.create(name="Foreign", identifier="foreign", created_by=other_user)

@@ -17,6 +17,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
 from file_manager.storage import system_storage
@@ -48,6 +49,15 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         if tenant is None or not tenant.user_has_access(self.request.user):
             return super().get_queryset().none()
         return super().get_queryset().filter(tenant=tenant)
+
+    def _get_object_for_update(self):
+        """Fetch the current tenant's theme while holding a row lock."""
+        queryset = self.filter_queryset(self.get_queryset()).select_for_update()
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        filter_kwargs = {self.lookup_field: self.kwargs[lookup_url_kwarg]}
+        instance = get_object_or_404(queryset, **filter_kwargs)
+        self.check_object_permissions(self.request, instance)
+        return instance
 
     def create(self, request, *args, **kwargs):
         """Handle theme creation with image upload and JSON field parsing"""
@@ -103,19 +113,21 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     # If parsing fails, let the serializer handle the validation error
                     pass
 
-        # Get the instance and update with processed data
         partial = kwargs.pop("partial", False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
+        with transaction.atomic():
+            instance = self._get_object_for_update()
+            serializer = self.get_serializer(instance, data=data, partial=partial)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
 
-        if getattr(instance, "_prefetched_objects_cache", None):
-            # If 'prefetch_related' has been applied to a queryset, we need to
-            # forcibly invalidate the prefetch cache on the instance.
-            instance._prefetched_objects_cache = {}
+            if getattr(instance, "_prefetched_objects_cache", None):
+                # If 'prefetch_related' has been applied to a queryset, we need to
+                # forcibly invalidate the prefetch cache on the instance.
+                instance._prefetched_objects_cache = {}
 
-        return Response(serializer.data)
+            response_data = serializer.data
+
+        return Response(response_data)
 
     def perform_create(self, serializer):
         tenant = getattr(self.request, "tenant", None)
@@ -520,7 +532,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         filename_mapping = {}
 
         with transaction.atomic():
-            target = self.get_queryset().select_for_update().get(pk=target.pk)
+            target = self._get_object_for_update()
             target_data = copy.deepcopy(target.design_groups or {})
             target_groups = target_data.setdefault("groups", [])
             target_name_indexes = {group.get("name"): index for index, group in enumerate(target_groups)}
