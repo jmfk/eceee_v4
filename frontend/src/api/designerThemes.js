@@ -9,6 +9,16 @@ export const designerThemesApi = {
     list: async () => unwrap(await api.get(`${base}/themes/`)),
     workspace: async (themeId) => unwrap(await api.get(`${base}/themes/${themeId}/workspace/`)),
     preview: async (themeId, patch) => unwrap(await api.post(`${base}/themes/${themeId}/preview/`, patch)),
+    savePreviewContent: async (themeId, viewId, texts) => unwrap(await api.patch(`${base}/themes/${themeId}/preview-content/`, { viewId, texts })),
+    replacePreviewImage: async (themeId, viewId, targetId, image) => {
+        const form = new FormData()
+        form.append('view_id', viewId)
+        form.append('target_id', targetId)
+        form.append('image', image)
+        return unwrap(await api.post(`${base}/themes/${themeId}/preview-content/image/`, form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        }))
+    },
     save: async (themeId, patch) => unwrap(await api.patch(`${base}/themes/${themeId}/workspace/`, patch)),
     publish: async (themeId, draftVersion) => unwrap(await api.post(`${base}/themes/${themeId}/publish/`, { draftVersion })),
     undo: async (themeId, draftVersion, liveSyncVersion) => unwrap(await api.post(`${base}/themes/${themeId}/undo/`, { draftVersion, liveSyncVersion })),

@@ -54,6 +54,14 @@ class PageTheme(models.Model):
         blank=True,
         help_text="Named component styles with HTML templates and optional CSS",
     )
+    designer_preview = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Designer preview views and demo content. Views may represent pages or objects and "
+            "reference a registered layout while keeping their demo text and images separate from live content."
+        ),
+    )
     image_styles = models.JSONField(
         default=dict,
         blank=True,
@@ -415,6 +423,7 @@ class PageTheme(models.Model):
             "colors": self.colors,
             "design_groups": self.design_groups,
             "component_styles": self.component_styles,
+            "designer_preview": self.designer_preview,
             "image_styles": self.image_styles,
             "gallery_styles": self.gallery_styles,  # Deprecated
             "carousel_styles": self.carousel_styles,  # Deprecated
@@ -2572,6 +2581,7 @@ class PageTheme(models.Model):
             colors=self.colors.copy() if self.colors else {},
             design_groups=self.design_groups.copy() if self.design_groups else {},
             component_styles=(self.component_styles.copy() if self.component_styles else {}),
+            designer_preview=(self.designer_preview.copy() if self.designer_preview else {}),
             image_styles=self.image_styles.copy() if self.image_styles else {},
             gallery_styles=self.gallery_styles.copy() if self.gallery_styles else {},
             carousel_styles=self.carousel_styles.copy() if self.carousel_styles else {},

@@ -115,6 +115,123 @@ class DesignerThemeApiTests(TestCase):
         self.assertNotIn("selector", str(workspace["catalog"]).lower())
         self.assertEqual(workspace["catalog"]["componentStyles"][0]["label"], "Feature card")
         self.assertTrue(workspace["catalog"]["layouts"])
+        main_layout = next(layout for layout in workspace["catalog"]["layouts"] if layout["key"] == "main_layout")
+        self.assertIn('class="main-layout-container"', main_layout["previewTemplate"])
+        self.assertIn("__DESIGNER_SLOT_main__", main_layout["previewTemplate"])
+        self.assertTrue(main_layout["layoutCss"])
+        self.assertEqual(workspace["previewContent"], {"views": workspace["catalog"]["previewViews"]})
+
+    def test_preview_text_is_saved_separately_from_theme_draft_and_preserves_metadata(self):
+        self.theme.designer_preview = {
+            "developerNote": "Use realistic editorial copy",
+            "views": [
+                {
+                    "id": "article-page",
+                    "label": "Article page",
+                    "kind": "page",
+                    "layout": "main_layout",
+                    "objectType": "article",
+                    "texts": {},
+                    "images": {},
+                }
+            ],
+        }
+        self.theme.save(update_fields=["designer_preview"])
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+        self.theme.refresh_from_db()
+        original_sync_version = self.theme.sync_version
+        original_draft_version = workspace["draftVersion"]
+
+        response = self.client.patch(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/",
+            {
+                "viewId": "article-page",
+                "texts": {"group:0:element:h1": "A temporary demo headline"},
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.theme.refresh_from_db()
+        self.theme.designer_draft.refresh_from_db()
+        self.assertEqual(self.theme.sync_version, original_sync_version)
+        self.assertEqual(self.theme.designer_draft.version, original_draft_version)
+        self.assertEqual(self.theme.colors["brandColor"], "#123456")
+        self.assertEqual(self.theme.designer_preview["developerNote"], "Use realistic editorial copy")
+        saved_view = self.theme.designer_preview["views"][0]
+        self.assertEqual(saved_view["objectType"], "article")
+        self.assertEqual(saved_view["texts"], {"group:0:element:h1": "A temporary demo headline"})
+
+    def test_advanced_theme_editor_preserves_preview_ids_and_metadata(self):
+        self.authenticate(self.owner)
+        designer_preview = {
+            "developerNote": "Object-specific demo",
+            "views": [
+                {
+                    "id": "article-card",
+                    "label": "Article card",
+                    "kind": "object",
+                    "layout": "main_layout",
+                    "objectType": "article",
+                    "texts": {"group:0:element:h1": "Demo heading"},
+                    "images": {"preview:article-card:image:main": {"url": "https://example.test/demo.png"}},
+                }
+            ],
+        }
+
+        response = self.client.patch(
+            f"/api/v1/webpages/themes/{self.theme.id}/",
+            {"designerPreview": designer_preview},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.designer_preview, designer_preview)
+        self.assertEqual(response.json()["designerPreview"], designer_preview)
+
+    @patch(
+        "webpages.services.designer_theme.system_storage.url",
+        return_value="https://storage.test/theme_images/preview.png",
+    )
+    @patch(
+        "webpages.services.designer_theme.system_storage.save",
+        return_value="theme_images/1/designer_preview/preview.png",
+    )
+    def test_preview_image_is_stored_as_demo_content(self, _save, _url):
+        self.theme.designer_preview = {
+            "views": [
+                {
+                    "id": "card-object",
+                    "label": "Card",
+                    "kind": "object",
+                    "layout": "main_layout",
+                    "texts": {},
+                    "images": {},
+                }
+            ]
+        }
+        self.theme.save(update_fields=["designer_preview"])
+        image_buffer = io.BytesIO()
+        Image.new("RGB", (80, 60), "#123456").save(image_buffer, format="PNG")
+        upload = SimpleUploadedFile("card.png", image_buffer.getvalue(), content_type="image/png")
+        self.authenticate(self.designer)
+
+        response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/image/",
+            {"view_id": "card-object", "target_id": "preview-image:main", "image": upload},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.theme.refresh_from_db()
+        saved_image = self.theme.designer_preview["views"][0]["images"]["preview-image:main"]
+        self.assertEqual(saved_image["url"], "https://storage.test/theme_images/preview.png")
+        self.assertEqual((saved_image["width"], saved_image["height"]), (80, 60))
+        self.assertNotIn(
+            "url", self.theme.design_groups["groups"][0]["layoutProperties"]["hero"]["md"]["images"]["background"]
+        )
 
     def test_workspace_normalizes_legacy_snake_case_values_and_preserves_storage_style(self):
         groups = self.theme.design_groups

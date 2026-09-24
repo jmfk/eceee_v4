@@ -141,6 +141,85 @@ def _collect_color_names(value, available_colors):
     return found
 
 
+def _render_layout_preview_template(layout):
+    """Render the real Django layout with replaceable slot sentinels for Designer previews."""
+    widgets_by_slot = {
+        slot["name"]: [{"html": f"__DESIGNER_SLOT_{slot['name']}__"}]
+        for slot in layout.slot_configuration.get("slots", [])
+        if slot.get("name")
+    }
+    try:
+        rendered = layout.get_template().render(
+            {
+                "meta_title": "Designer preview",
+                "current_page": None,
+                "root_page": None,
+                "widgets_by_slot": widgets_by_slot,
+                "effective_layout": layout,
+                "theme_css_url": None,
+            }
+        )
+        body = re.search(r"<body[^>]*>([\s\S]*?)</body>", rendered, re.IGNORECASE)
+        markup = body.group(1) if body else rendered
+        markup = markup.split("<!-- Lightbox Overlay", 1)[0]
+        return re.sub(r"<script\b[^>]*>[\s\S]*?</script>", "", markup, flags=re.IGNORECASE).strip()
+    except Exception as exc:
+        logger.debug("Using a generic Designer preview for layout %s: %s", layout.name, exc)
+        return "".join(
+            f'<div class="layout-slot slot-{slot_name}">__DESIGNER_SLOT_{slot_name}__</div>'
+            for slot_name in widgets_by_slot
+        )
+
+
+def normalized_designer_preview(theme, layouts=None):
+    """Return editable preview view metadata, generating page views when a theme has none."""
+    if layouts is None:
+        from webpages.layout_autodiscovery import autodiscover_layouts
+        from webpages.layout_registry import layout_registry
+
+        autodiscover_layouts()
+        layouts = layout_registry.list_layouts(active_only=True)
+    available = {layout.name: layout for layout in layouts}
+    preview_config = copy.deepcopy(theme.designer_preview) if isinstance(theme.designer_preview, dict) else {}
+    configured = preview_config.get("views", [])
+    views = []
+    seen = set()
+    for position, view in enumerate(configured):
+        if not isinstance(view, dict) or view.get("layout") not in available:
+            continue
+        view_id = str(view.get("id") or f"preview-{position + 1}")[:100]
+        if view_id in seen:
+            continue
+        seen.add(view_id)
+        views.append(
+            {
+                **view,
+                "id": view_id,
+                "label": str(view.get("label") or _humanize_identifier(view_id))[:160],
+                "kind": view.get("kind") if view.get("kind") in {"page", "object"} else "page",
+                "layout": view["layout"],
+                "texts": view.get("texts") if isinstance(view.get("texts"), dict) else {},
+                "images": view.get("images") if isinstance(view.get("images"), dict) else {},
+            }
+        )
+    if views:
+        return {**preview_config, "views": views}
+    return {
+        **preview_config,
+        "views": [
+            {
+                "id": f"page-{layout.name}",
+                "label": _humanize_identifier(layout.name),
+                "kind": "page",
+                "layout": layout.name,
+                "texts": {},
+                "images": {},
+            }
+            for layout in layouts
+        ],
+    }
+
+
 def build_designer_catalog(theme, assets):
     """Build semantic preview metadata without exposing selectors to the Designer UI."""
     from webpages.layout_autodiscovery import autodiscover_layouts
@@ -208,13 +287,16 @@ def build_designer_catalog(theme, assets):
 
     autodiscover_layouts()
     layouts = []
-    for layout in layout_registry.list_layouts(active_only=True):
+    registered_layouts = layout_registry.list_layouts(active_only=True)
+    for layout in registered_layouts:
         slots = sorted(layout.slot_configuration.get("slots", []), key=lambda slot: slot.get("order", 999))
         layouts.append(
             {
                 "key": layout.name,
                 "label": _humanize_identifier(layout.name),
                 "description": layout.description,
+                "previewTemplate": _render_layout_preview_template(layout),
+                "layoutCss": layout.css_content,
                 "slots": [
                     {
                         "name": slot.get("name"),
@@ -230,7 +312,13 @@ def build_designer_catalog(theme, assets):
                 ],
             }
         )
-    return {"designGroups": groups, "componentStyles": component_styles, "layouts": layouts}
+    preview_views = normalized_designer_preview(theme, registered_layouts)["views"]
+    return {
+        "designGroups": groups,
+        "componentStyles": component_styles,
+        "layouts": layouts,
+        "previewViews": preview_views,
+    }
 
 
 class DesignerDraftConflict(Exception):
@@ -632,6 +720,7 @@ def build_workspace(theme: PageTheme):
         font["usage"] = _walk_usage(theme.design_groups or {}, font.get("family"))
 
     assets = collect_designer_assets(theme)
+    catalog = build_designer_catalog(theme, assets)
     return {
         "id": theme.id,
         "name": theme.name,
@@ -641,7 +730,8 @@ def build_workspace(theme: PageTheme):
         "typography": typography,
         "spacing": spacing,
         "assets": assets,
-        "catalog": build_designer_catalog(theme, assets),
+        "catalog": catalog,
+        "previewContent": {"views": catalog["previewViews"]},
         "canUndo": theme.designer_revisions.exists(),
         "constraints": {
             "editableTypographyProperties": sorted(TYPE_PROPERTIES),
@@ -1018,6 +1108,77 @@ def validate_image_upload(upload):
         raise
     except Exception as exc:
         raise ValidationError("The uploaded file is not a valid image.") from exc
+
+
+def save_designer_preview_texts(theme_id, tenant, user, view_id, texts):
+    if not isinstance(texts, dict) or len(texts) > 200:
+        raise ValidationError("Preview text must be an object with at most 200 entries.")
+    cleaned = {}
+    for target_id, value in texts.items():
+        if not isinstance(target_id, str) or len(target_id) > 300:
+            raise ValidationError("Preview text target identifiers cannot exceed 300 characters.")
+        if not isinstance(value, str) or len(value) > 5000:
+            raise ValidationError("Each preview text value must be a string of at most 5000 characters.")
+        cleaned[target_id] = value
+
+    with transaction.atomic():
+        theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
+        if not user_can_design_theme(user, theme):
+            raise PermissionError
+        preview = normalized_designer_preview(theme)
+        view = next((item for item in preview["views"] if item["id"] == view_id), None)
+        if not view:
+            raise ValidationError("Unknown preview view.")
+        view["texts"] = cleaned
+        theme.designer_preview = preview
+        theme.save(update_fields=["designer_preview", "updated_at"], skip_version_increment=True)
+        return preview
+
+
+def replace_designer_preview_image(theme_id, tenant, user, view_id, target_id, upload):
+    if not isinstance(target_id, str) or not target_id or len(target_id) > 300:
+        raise ValidationError("Invalid preview image target.")
+    content, dimensions = validate_image_upload(upload)
+    extension = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/gif": ".gif",
+        "image/webp": ".webp",
+        "image/svg+xml": ".svg",
+    }[upload.content_type]
+
+    previous_path = None
+    with transaction.atomic():
+        theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
+        if not user_can_design_theme(user, theme):
+            raise PermissionError
+        preview = normalized_designer_preview(theme)
+        view = next((item for item in preview["views"] if item["id"] == view_id), None)
+        if not view:
+            raise ValidationError("Unknown preview view.")
+        previous = view["images"].get(target_id)
+        if isinstance(previous, dict):
+            previous_path = previous.get("storagePath")
+        filename = f"{slugify(os.path.splitext(upload.name)[0]) or 'preview'}-{uuid.uuid4().hex[:12]}{extension}"
+        path = f"theme_images/{theme.id}/designer_preview/{filename}"
+        saved_path = system_storage.save(path, ContentFile(content))
+        view["images"][target_id] = {
+            "url": system_storage.url(saved_path),
+            "storagePath": saved_path,
+            "filename": upload.name,
+            "width": dimensions[0],
+            "height": dimensions[1],
+        }
+        theme.designer_preview = preview
+        theme.save(update_fields=["designer_preview", "updated_at"], skip_version_increment=True)
+
+    if previous_path and previous_path != saved_path:
+        try:
+            if system_storage.exists(previous_path):
+                system_storage.delete(previous_path)
+        except Exception:
+            logger.warning("Could not remove replaced Designer preview image %s", previous_path, exc_info=True)
+    return preview
 
 
 def _find_asset(theme, asset_key):

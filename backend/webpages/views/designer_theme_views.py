@@ -28,7 +28,9 @@ from webpages.services.designer_theme import (
     generate_placeholder_png,
     get_or_create_designer_draft,
     publish_designer_draft,
+    replace_designer_preview_image,
     replace_designer_asset,
+    save_designer_preview_texts,
     save_designer_draft,
     theme_from_designer_draft,
     undo_designer_publish,
@@ -36,7 +38,7 @@ from webpages.services.designer_theme import (
 )
 from webpages.tasks import export_designer_theme
 
-DESIGNER_CASE_OPTIONS = {"ignore_fields": ("colors", "values")}
+DESIGNER_CASE_OPTIONS = {"ignore_fields": ("colors", "values", "texts", "images")}
 
 
 class DesignerJSONParser(CamelCaseJSONParser):
@@ -67,6 +69,17 @@ class DesignerPlaceholderSerializer(serializers.Serializer):
         if attrs["width"] * attrs["height"] > MAX_IMAGE_PIXELS:
             raise serializers.ValidationError("Placeholder images cannot exceed 16 megapixels.")
         return attrs
+
+
+class DesignerPreviewTextSerializer(serializers.Serializer):
+    view_id = serializers.CharField(max_length=100)
+    texts = serializers.DictField(child=serializers.CharField(max_length=5000, allow_blank=True), allow_empty=True)
+
+
+class DesignerPreviewImageSerializer(serializers.Serializer):
+    view_id = serializers.CharField(max_length=100)
+    target_id = serializers.CharField(max_length=300)
+    image = serializers.ImageField()
 
 
 def _theme(request, theme_id):
@@ -282,6 +295,51 @@ class DesignerThemePlaceholderView(APIView):
         except DesignerDraftConflict as exc:
             return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
         return Response(build_draft_workspace(theme, draft))
+
+
+class DesignerThemePreviewContentView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [DesignerJSONParser]
+    renderer_classes = [DesignerJSONRenderer]
+
+    def patch(self, request, theme_id):
+        serializer = DesignerPreviewTextSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            preview = save_designer_preview_texts(
+                theme_id,
+                request.tenant,
+                request.user,
+                data["view_id"],
+                data["texts"],
+            )
+        except PermissionError:
+            return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
+        return Response({"previewContent": preview})
+
+
+class DesignerThemePreviewImageView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+    renderer_classes = [DesignerJSONRenderer]
+
+    def post(self, request, theme_id):
+        serializer = DesignerPreviewImageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            preview = replace_designer_preview_image(
+                theme_id,
+                request.tenant,
+                request.user,
+                data["view_id"],
+                data["target_id"],
+                data["image"],
+            )
+        except PermissionError:
+            return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
+        return Response({"previewContent": preview})
 
 
 class ThemeDesignerAssignmentView(APIView):
