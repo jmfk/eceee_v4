@@ -7,7 +7,9 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework import permissions, status
+from djangorestframework_camel_case.parser import CamelCaseJSONParser
+from djangorestframework_camel_case.render import CamelCaseJSONRenderer
+from rest_framework import permissions, serializers, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -41,6 +43,34 @@ DEFAULT_PREVIEW_CONTENT = {
     "cardBody": "Use this area to judge hierarchy, rhythm, and readability before saving the live theme.",
     "listItems": ["First representative item", "A second item with more text", "Final list item"],
 }
+
+
+DESIGNER_CASE_OPTIONS = {"ignore_fields": ("colors", "values")}
+
+
+class DesignerJSONParser(CamelCaseJSONParser):
+    """Normalize request fields without rewriting user-defined theme keys."""
+
+    json_underscoreize = DESIGNER_CASE_OPTIONS
+
+
+class DesignerJSONRenderer(CamelCaseJSONRenderer):
+    """Normalize response fields without rewriting user-defined theme keys."""
+
+    json_underscoreize = DESIGNER_CASE_OPTIONS
+
+
+class DesignerPlaceholderSerializer(serializers.Serializer):
+    asset_key = serializers.CharField(max_length=500)
+    display_name = serializers.CharField(max_length=160, default="Placeholder")
+    width = serializers.IntegerField(min_value=16, max_value=8000)
+    height = serializers.IntegerField(min_value=16, max_value=8000)
+    draft_version = serializers.IntegerField(min_value=1)
+
+    def validate(self, attrs):
+        if attrs["width"] * attrs["height"] > 16_777_216:
+            raise serializers.ValidationError("Placeholder images cannot exceed 16 megapixels.")
+        return attrs
 
 
 def _theme(request, theme_id):
@@ -91,6 +121,8 @@ class DesignerThemeListView(APIView):
 
 class DesignerThemeWorkspaceView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [DesignerJSONParser]
+    renderer_classes = [DesignerJSONRenderer]
 
     def get(self, request, theme_id):
         theme = _theme(request, theme_id)
@@ -114,12 +146,13 @@ class DesignerThemeWorkspaceView(APIView):
 
 class DesignerThemePreviewView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [DesignerJSONParser]
 
     def post(self, request, theme_id):
         theme = _theme(request, theme_id)
         stored_draft = get_or_create_designer_draft(theme, request.user)
         preview_theme = theme_from_designer_draft(theme, stored_draft)
-        patch = {key: value for key, value in request.data.items() if key != "draftVersion"}
+        patch = {key: value for key, value in request.data.items() if key != "draft_version"}
         apply_designer_patch(preview_theme, patch, validate_version=False)
         css = ThemeCSSGenerator().generate_complete_css(preview_theme)
         return Response(
@@ -133,6 +166,7 @@ class DesignerThemePreviewView(APIView):
 
 class DesignerThemePublishView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    renderer_classes = [DesignerJSONRenderer]
 
     def post(self, request, theme_id):
         try:
@@ -140,7 +174,7 @@ class DesignerThemePublishView(APIView):
                 theme_id,
                 request.tenant,
                 request.user,
-                request.data.get("draftVersion"),
+                request.data.get("draft_version"),
             )
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
@@ -153,6 +187,7 @@ class DesignerThemePublishView(APIView):
 
 class DesignerThemeDiscardView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    renderer_classes = [DesignerJSONRenderer]
 
     def post(self, request, theme_id):
         try:
@@ -160,7 +195,7 @@ class DesignerThemeDiscardView(APIView):
                 theme_id,
                 request.tenant,
                 request.user,
-                request.data.get("draftVersion"),
+                request.data.get("draft_version"),
             )
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
@@ -174,6 +209,7 @@ class DesignerThemeDiscardView(APIView):
 class DesignerThemeAssetView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
+    renderer_classes = [DesignerJSONRenderer]
 
     def post(self, request, theme_id):
         _theme(request, theme_id)
@@ -199,15 +235,17 @@ class DesignerThemeAssetView(APIView):
 
 class DesignerThemePlaceholderView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    renderer_classes = [DesignerJSONRenderer]
 
     def post(self, request, theme_id):
         _theme(request, theme_id)
-        asset_key = request.data.get("assetKey")
-        display_name = str(request.data.get("displayName") or "Placeholder").strip()
-        width = request.data.get("width")
-        height = request.data.get("height")
-        if not asset_key or not width or not height:
-            return Response({"error": "assetKey, width, and height are required."}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = DesignerPlaceholderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        asset_key = data["asset_key"]
+        display_name = data["display_name"].strip()
+        width = data["width"]
+        height = data["height"]
         content = generate_placeholder_png(display_name, asset_key, width, height)
         upload = SimpleUploadedFile(f"{display_name}.png", content, content_type="image/png")
         try:
@@ -217,11 +255,11 @@ class DesignerThemePlaceholderView(APIView):
                 request.user,
                 asset_key,
                 upload,
-                request.data.get("draftVersion"),
+                data["draft_version"],
                 placeholder_metadata={
                     "displayName": display_name,
-                    "requiredWidth": int(width),
-                    "requiredHeight": int(height),
+                    "requiredWidth": width,
+                    "requiredHeight": height,
                 },
             )
         except DesignerDraftConflict as exc:
@@ -300,8 +338,8 @@ class ThemeDesignerAssignmentView(APIView):
     def post(self, request, theme_id):
         theme = self._admin_theme(request, theme_id)
         user_query = (
-            {"id": request.data.get("userId")}
-            if request.data.get("userId")
+            {"id": request.data.get("user_id")}
+            if request.data.get("user_id")
             else {"username": request.data.get("username")}
         )
         user = get_object_or_404(User, is_active=True, **user_query)
@@ -317,11 +355,11 @@ class ThemeDesignerAssignmentView(APIView):
 
     def delete(self, request, theme_id):
         theme = self._admin_theme(request, theme_id)
-        assignment_id = request.data.get("assignmentId")
+        assignment_id = request.data.get("assignment_id")
         queryset = (
             theme.designer_assignments.filter(id=assignment_id)
             if assignment_id
-            else theme.designer_assignments.filter(user_id=request.data.get("userId"))
+            else theme.designer_assignments.filter(user_id=request.data.get("user_id"))
         )
         deleted, _ = queryset.delete()
         return Response({"deleted": bool(deleted)})

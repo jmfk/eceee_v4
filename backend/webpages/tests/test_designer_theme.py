@@ -24,7 +24,7 @@ class DesignerThemeApiTests(TestCase):
             tenant=self.tenant,
             created_by=self.owner,
             name="Editorial",
-            colors={"brand": "#123456"},
+            colors={"brandColor": "#123456"},
             fonts={"google_fonts": [{"family": "Inter", "variants": ["400", "700"], "display": "swap"}]},
             design_groups={
                 "groups": [
@@ -97,7 +97,7 @@ class DesignerThemeApiTests(TestCase):
             self.workspace_url,
             {
                 "draftVersion": workspace["draftVersion"],
-                "colors": {"brand": "#abcdef"},
+                "colors": {"brandColor": "#abcdef"},
                 "fonts": [{"family": "Inter", "variants": ["400", "700"], "display": "swap"}],
                 "typography": [{"groupIndex": 0, "element": "h1", "values": {"fontSize": "40px"}}],
                 "spacing": [
@@ -114,7 +114,7 @@ class DesignerThemeApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 200, response.data)
         self.theme.refresh_from_db()
-        self.assertEqual(self.theme.colors["brand"], "#123456")
+        self.assertEqual(self.theme.colors["brandColor"], "#123456")
         self.assertEqual(self.theme.design_groups["groups"][0]["elements"]["h1"]["fontSize"], "32px")
         self.assertTrue(response.data["hasDraftChanges"])
         self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 0)
@@ -126,7 +126,7 @@ class DesignerThemeApiTests(TestCase):
         )
         self.assertEqual(published.status_code, 200, published.data)
         self.theme.refresh_from_db()
-        self.assertEqual(self.theme.colors["brand"], "#abcdef")
+        self.assertEqual(self.theme.colors["brandColor"], "#abcdef")
         self.assertEqual(self.theme.design_groups["groups"][0]["elements"]["h1"]["fontSize"], "40px")
         self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 1)
         self.assertFalse(published.data["hasDraftChanges"])
@@ -147,7 +147,7 @@ class DesignerThemeApiTests(TestCase):
             f"/api/v1/webpages/designer/themes/{self.theme.id}/preview/",
             {
                 "draftVersion": workspace["draftVersion"],
-                "colors": {"brand": "red; background:url(https://example.test)"},
+                "colors": {"brandColor": "red; background:url(https://example.test)"},
             },
             format="json",
         )
@@ -158,13 +158,13 @@ class DesignerThemeApiTests(TestCase):
         workspace = self.client.get(self.workspace_url).data
         response = self.client.post(
             f"/api/v1/webpages/designer/themes/{self.theme.id}/preview/",
-            {"draftVersion": workspace["draftVersion"], "colors": {"brand": "#ffffff"}},
+            {"draftVersion": workspace["draftVersion"], "colors": {"brandColor": "#ffffff"}},
             format="json",
         )
         self.assertEqual(response.status_code, 200, response.data)
         self.assertIn("css", response.data)
         self.theme.refresh_from_db()
-        self.assertEqual(self.theme.colors["brand"], "#123456")
+        self.assertEqual(self.theme.colors["brandColor"], "#123456")
 
     def test_only_tenant_admin_can_manage_assignments(self):
         url = f"/api/v1/webpages/themes/{self.other_theme.id}/designer-assignments/"
@@ -208,6 +208,24 @@ class DesignerThemeApiTests(TestCase):
         self.theme.refresh_from_db()
         live_asset = self.theme.design_groups["groups"][0]["layoutProperties"]["hero"]["md"]["images"]["background"]
         self.assertNotIn("url", live_asset)
+
+    @patch("webpages.views.designer_theme_views.generate_placeholder_png")
+    def test_placeholder_rejects_oversized_dimensions_before_generation(self, generate_placeholder):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+        response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/placeholder/",
+            {
+                "assetKey": "design:0:hero:md:background",
+                "displayName": "Too large",
+                "width": 5000,
+                "height": 5000,
+                "draftVersion": workspace["draftVersion"],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        generate_placeholder.assert_not_called()
 
 
 class DesignerPlaceholderTests(TestCase):

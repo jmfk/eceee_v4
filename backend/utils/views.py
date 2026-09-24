@@ -3,50 +3,42 @@ General utility API views for the schema system and value lists
 """
 
 import logging
-from django.http import HttpResponse
-from django.contrib.auth.models import User
-from django.contrib.auth import update_session_auth_hash
-from django.contrib.sites.shortcuts import get_current_site
-from django.db import models
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from rest_framework.response import Response
-from rest_framework import status, viewsets
-from rest_framework.decorators import action
-from rest_framework.views import APIView
-from django.shortcuts import get_object_or_404
-from .schema_system import field_registry, register_custom_field_type
-from .models import (
-    ValueList,
-    ValueListItem,
-    AIAgentTask,
-    AIAgentTaskTemplate,
-    AIAgentTaskUpdate,
-    ClipboardEntry,
-)
-from .serializers import (
-    ValueListSerializer,
-    ValueListItemSerializer,
-    ValueListCreateSerializer,
-    ValueListUpdateSerializer,
-    ValueListItemCreateSerializer,
-    AIAgentTaskSerializer,
-    AIAgentTaskCreateSerializer,
-    AIAgentTaskTemplateSerializer,
-    AIAgentTaskFromTemplateSerializer,
-    TaskStatusUpdateSerializer,
-    TaskConfigValidationSerializer,
-    UserSerializer,
-    UserListSerializer,
-    ChangePasswordSerializer,
-    PasswordResetLinkSerializer,
-    CreateUserSerializer,
-    UpdateUserSerializer,
-    ClipboardEntrySerializer,
-    ClipboardEntryCreateSerializer,
-    ClipboardEntryUpdateSerializer,
-)
 
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.models import User
+from django.db import models
+from django.db.models import Prefetch
+from django.shortcuts import get_object_or_404
+from rest_framework import status, viewsets
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from webpages.models import ThemeDesignerAssignment
+
+from .models import AIAgentTask, AIAgentTaskTemplate, ClipboardEntry, ValueList, ValueListItem
+from .schema_system import field_registry, register_custom_field_type
+from .serializers import (
+    AIAgentTaskCreateSerializer,
+    AIAgentTaskFromTemplateSerializer,
+    AIAgentTaskSerializer,
+    AIAgentTaskTemplateSerializer,
+    ChangePasswordSerializer,
+    ClipboardEntryCreateSerializer,
+    ClipboardEntrySerializer,
+    ClipboardEntryUpdateSerializer,
+    CreateUserSerializer,
+    PasswordResetLinkSerializer,
+    TaskConfigValidationSerializer,
+    UpdateUserSerializer,
+    UserListSerializer,
+    ValueListCreateSerializer,
+    ValueListItemCreateSerializer,
+    ValueListItemSerializer,
+    ValueListSerializer,
+    ValueListUpdateSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -169,15 +161,11 @@ class ValueListViewSet(viewsets.ModelViewSet):
         """Add an item to a value list"""
         value_list = self.get_object()
 
-        serializer = ValueListItemCreateSerializer(
-            data=request.data, context={"value_list": value_list}
-        )
+        serializer = ValueListItemCreateSerializer(data=request.data, context={"value_list": value_list})
 
         if serializer.is_valid():
             item = serializer.save(value_list=value_list)
-            return Response(
-                ValueListItemSerializer(item).data, status=status.HTTP_201_CREATED
-            )
+            return Response(ValueListItemSerializer(item).data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -188,18 +176,14 @@ class ValueListViewSet(viewsets.ModelViewSet):
         item_id = request.data.get("item_id")
 
         if not item_id:
-            return Response(
-                {"error": "item_id is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "item_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             item = value_list.items.get(id=item_id)
             item.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         except ValueListItem.DoesNotExist:
-            return Response(
-                {"error": "Item not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=["post"])
     def reorder_items(self, request, pk=None):
@@ -381,9 +365,7 @@ class AIAgentTaskTemplateViewSet(viewsets.ModelViewSet):
         """Create a new task from this template."""
         template = self.get_object()
 
-        serializer = AIAgentTaskFromTemplateSerializer(
-            data=request.data, context={"request": request}
-        )
+        serializer = AIAgentTaskFromTemplateSerializer(data=request.data, context={"request": request})
 
         if serializer.is_valid():
             # Set the template ID
@@ -392,9 +374,7 @@ class AIAgentTaskTemplateViewSet(viewsets.ModelViewSet):
 
             task = serializer.create(serializer.validated_data)
 
-            return Response(
-                AIAgentTaskSerializer(task).data, status=status.HTTP_201_CREATED
-            )
+            return Response(AIAgentTaskSerializer(task).data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -403,9 +383,7 @@ class AIAgentTaskTemplateViewSet(viewsets.ModelViewSet):
         """Get most popular templates by usage."""
         popular_templates = self.get_queryset().order_by("-usage_count")[:10]
         serializer = self.get_serializer(popular_templates, many=True)
-        return Response(
-            {"templates": serializer.data, "count": popular_templates.count()}
-        )
+        return Response({"templates": serializer.data, "count": popular_templates.count()})
 
 
 @api_view(["POST"])
@@ -471,8 +449,9 @@ def task_statistics(request):
         }
 
     # Recent activity (last 7 days)
-    from django.utils import timezone
     from datetime import timedelta
+
+    from django.utils import timezone
 
     week_ago = timezone.now() - timedelta(days=7)
     recent_tasks = user_tasks.filter(created_at__gte=week_ago)
@@ -495,18 +474,17 @@ def task_sse_stream(request, task_id):
     GET /api/v1/utils/tasks/{task_id}/stream/
     """
     from django.http import StreamingHttpResponse
+
     from .notifications import SSETaskNotificationView
 
     try:
         # Verify task exists and user has access
-        task = get_object_or_404(AIAgentTask, id=task_id, created_by=request.user)
+        get_object_or_404(AIAgentTask, id=task_id, created_by=request.user)
 
         # Create SSE stream
         sse_view = SSETaskNotificationView(request.user.id, task_id)
 
-        response = StreamingHttpResponse(
-            sse_view.get_event_stream(), content_type="text/event-stream"
-        )
+        response = StreamingHttpResponse(sse_view.get_event_stream(), content_type="text/event-stream")
 
         # Set headers for SSE
         response["Cache-Control"] = "no-cache"
@@ -527,9 +505,10 @@ def task_sse_stream(request, task_id):
 class CurrentUserView(APIView):
     """
     Get current authenticated user details.
-    
+
     GET /api/v1/utils/current-user/
     """
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -540,9 +519,9 @@ class CurrentUserView(APIView):
 class ChangePasswordView(APIView):
     """
     Change password for authenticated user.
-    
+
     POST /api/v1/utils/change-password/
-    
+
     Request body:
     {
         "old_password": "current_password",
@@ -550,6 +529,7 @@ class ChangePasswordView(APIView):
         "confirm_password": "new_password"
     }
     """
+
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -585,24 +565,37 @@ class ChangePasswordView(APIView):
 class UserListView(APIView):
     """
     List all users and create new users (superuser only).
-    
+
     GET /api/v1/utils/users/
     POST /api/v1/utils/users/
     """
+
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def get(self, request):
-        users = User.objects.all().order_by("username")
+        users = (
+            User.objects.all()
+            .prefetch_related(
+                Prefetch(
+                    "theme_designer_assignments",
+                    queryset=ThemeDesignerAssignment.objects.select_related("tenant").order_by("tenant__name"),
+                    to_attr="designer_assignments_for_access",
+                ),
+                Prefetch("created_tenants", to_attr="created_tenants_for_access"),
+                Prefetch("member_tenants", to_attr="member_tenants_for_access"),
+            )
+            .order_by("username")
+        )
         serializer = UserListSerializer(users, many=True)
         return Response({"users": serializer.data, "count": users.count()})
 
     def post(self, request):
         serializer = CreateUserSerializer(data=request.data)
-        
+
         if serializer.is_valid():
             user = serializer.save()
             logger.info(f"User {user.username} created by {request.user.username}")
-            
+
             return Response(
                 {
                     "message": f"User {user.username} created successfully.",
@@ -610,17 +603,18 @@ class UserListView(APIView):
                 },
                 status=status.HTTP_201_CREATED,
             )
-        
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserDetailView(APIView):
     """
     Update or delete a user (superuser only).
-    
+
     PATCH /api/v1/utils/users/<user_id>/
     DELETE /api/v1/utils/users/<user_id>/
     """
+
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def patch(self, request, user_id):
@@ -633,11 +627,11 @@ class UserDetailView(APIView):
             )
 
         serializer = UpdateUserSerializer(user, data=request.data, partial=True)
-        
+
         if serializer.is_valid():
             serializer.save()
             logger.info(f"User {user.username} updated by {request.user.username}")
-            
+
             return Response(
                 {
                     "message": f"User {user.username} updated successfully.",
@@ -645,7 +639,7 @@ class UserDetailView(APIView):
                 },
                 status=status.HTTP_200_OK,
             )
-        
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, user_id):
@@ -678,9 +672,10 @@ class UserDetailView(APIView):
 class GeneratePasswordResetView(APIView):
     """
     Generate password reset link for a user (superuser only).
-    
+
     POST /api/v1/utils/users/<user_id>/reset-password/
     """
+
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def post(self, request, user_id):
@@ -694,8 +689,8 @@ class GeneratePasswordResetView(APIView):
 
         # Generate password reset token using django-allauth
         from allauth.account.forms import default_token_generator
-        from django.utils.http import urlsafe_base64_encode
         from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
 
         # Generate token
         token = default_token_generator.make_token(user)
@@ -723,7 +718,7 @@ class GeneratePasswordResetView(APIView):
 class ClipboardEntryViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing clipboard entries.
-    
+
     Provides CRUD operations for server-side clipboard storage.
     All operations are user-scoped - users can only access their own clipboard entries.
     """
@@ -733,13 +728,12 @@ class ClipboardEntryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Return clipboard entries for the current user."""
         queryset = ClipboardEntry.objects.filter(user=self.request.user)
-        
+
         # Filter out expired entries
         from django.utils import timezone
-        queryset = queryset.filter(
-            models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=timezone.now())
-        )
-        
+
+        queryset = queryset.filter(models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=timezone.now()))
+
         return queryset.order_by("-created_at")
 
     def get_serializer_class(self):
@@ -756,40 +750,32 @@ class ClipboardEntryViewSet(viewsets.ModelViewSet):
 
     def get_by_type(self, request, **kwargs):
         """Get the most recent clipboard entry of a specific type for the current user."""
-        clipboard_type = kwargs.get('clipboard_type')
+        clipboard_type = kwargs.get("clipboard_type")
         if not clipboard_type:
             return Response(
                 {"error": "clipboard_type parameter is required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
-        entry = (
-            self.get_queryset()
-            .filter(clipboard_type=clipboard_type)
-            .first()
-        )
-        
+
+        entry = self.get_queryset().filter(clipboard_type=clipboard_type).first()
+
         if not entry:
             return Response(
                 {"error": f"No clipboard entry found for type: {clipboard_type}"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        
+
         serializer = self.get_serializer(entry)
         return Response(serializer.data)
-    
+
     def check_by_type(self, request, **kwargs):
         """Check if clipboard entry exists for a specific type (HEAD request)."""
-        clipboard_type = kwargs.get('clipboard_type')
+        clipboard_type = kwargs.get("clipboard_type")
         if not clipboard_type:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        
-        exists = (
-            self.get_queryset()
-            .filter(clipboard_type=clipboard_type)
-            .exists()
-        )
-        
+
+        exists = self.get_queryset().filter(clipboard_type=clipboard_type).exists()
+
         if exists:
             return Response(status=status.HTTP_204_NO_CONTENT)
         else:
@@ -797,23 +783,17 @@ class ClipboardEntryViewSet(viewsets.ModelViewSet):
 
     def clear_by_type(self, request, **kwargs):
         """Clear all clipboard entries of a specific type for the current user."""
-        clipboard_type = kwargs.get('clipboard_type')
+        clipboard_type = kwargs.get("clipboard_type")
         if not clipboard_type:
             return Response(
                 {"error": "clipboard_type parameter is required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
-        count = (
-            self.get_queryset()
-            .filter(clipboard_type=clipboard_type)
-            .delete()[0]
-        )
-        
+
+        count = self.get_queryset().filter(clipboard_type=clipboard_type).delete()[0]
+
         return Response(
-            {
-                "message": f"Cleared {count} clipboard entr{'y' if count == 1 else 'ies'} of type '{clipboard_type}'"
-            },
+            {"message": f"Cleared {count} clipboard entr{'y' if count == 1 else 'ies'} of type '{clipboard_type}'"},
             status=status.HTTP_200_OK,
         )
 
@@ -821,10 +801,8 @@ class ClipboardEntryViewSet(viewsets.ModelViewSet):
     def clear_all(self, request):
         """Clear all clipboard entries for the current user."""
         count = self.get_queryset().delete()[0]
-        
+
         return Response(
-            {
-                "message": f"Cleared {count} clipboard entr{'y' if count == 1 else 'ies'}"
-            },
+            {"message": f"Cleared {count} clipboard entr{'y' if count == 1 else 'ies'}"},
             status=status.HTTP_200_OK,
         )

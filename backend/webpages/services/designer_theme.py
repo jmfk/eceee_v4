@@ -254,9 +254,9 @@ def collect_designer_assets(theme: PageTheme):
                         "requiredWidth": spec["requiredWidth"],
                         "requiredHeight": spec["requiredHeight"],
                         "recommendedWidth": inferred_width,
-                        "requirementSource": "explicit"
-                        if spec["requiredWidth"] or spec["requiredHeight"]
-                        else "inferred",
+                        "requirementSource": (
+                            "explicit" if spec["requiredWidth"] or spec["requiredHeight"] else "inferred"
+                        ),
                         "dpr": spec["dpr"],
                         "isPlaceholder": spec["isPlaceholder"],
                         "usage": [f"{group_name} / {part} / {breakpoint} / {property_name}"],
@@ -279,9 +279,11 @@ def collect_designer_assets(theme: PageTheme):
                                     and value.get("height")
                                     and int(value["height"]) < int(spec["requiredHeight"])
                                 )
-                                else "warning"
-                                if inferred_width and value.get("width") and int(value["width"]) < inferred_width
-                                else "ok"
+                                else (
+                                    "warning"
+                                    if inferred_width and value.get("width") and int(value["width"]) < inferred_width
+                                    else "ok"
+                                )
                             ),
                             "message": (
                                 "Uploaded image is smaller than the explicit requirement."
@@ -295,9 +297,11 @@ def collect_designer_assets(theme: PageTheme):
                                     and value.get("height")
                                     and int(value["height"]) < int(spec["requiredHeight"])
                                 )
-                                else f"Recommended width is {inferred_width}px; height is not specified."
-                                if inferred_width
-                                else "No explicit dimensions are configured."
+                                else (
+                                    f"Recommended width is {inferred_width}px; height is not specified."
+                                    if inferred_width
+                                    else "No explicit dimensions are configured."
+                                )
                             ),
                         },
                     }
@@ -439,11 +443,11 @@ def _integer(value, field_name):
 def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=True):
     if not isinstance(payload, dict):
         raise ValidationError("Designer patch must be an object.")
-    allowed_top = {"syncVersion", "colors", "fonts", "typography", "spacing"}
+    allowed_top = {"sync_version", "colors", "fonts", "typography", "spacing"}
     unknown = set(payload) - allowed_top
     if unknown:
         raise ValidationError(f"Unsupported designer fields: {', '.join(sorted(unknown))}")
-    if validate_version and _integer(payload.get("syncVersion", -1), "syncVersion") != theme.sync_version:
+    if validate_version and _integer(payload.get("sync_version", -1), "syncVersion") != theme.sync_version:
         raise ValueError("stale")
 
     if "colors" in payload:
@@ -507,7 +511,7 @@ def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=Tr
     for item in typography:
         if not isinstance(item, dict):
             raise ValidationError("Typography entries must be objects.")
-        group_index = _integer(item.get("groupIndex", -1), "groupIndex")
+        group_index = _integer(item.get("group_index", -1), "groupIndex")
         element = item.get("element")
         if group_index < 0 or group_index >= len(groups) or element not in (groups[group_index].get("elements") or {}):
             raise ValidationError("Typography target no longer exists.")
@@ -528,7 +532,7 @@ def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=Tr
     for item in spacing:
         if not isinstance(item, dict):
             raise ValidationError("Spacing entries must be objects.")
-        group_index = _integer(item.get("groupIndex", -1), "groupIndex")
+        group_index = _integer(item.get("group_index", -1), "groupIndex")
         if group_index < 0 or group_index >= len(groups):
             raise ValidationError("Spacing target no longer exists.")
         if item.get("scope") == "element":
@@ -568,9 +572,9 @@ def save_designer_draft(theme_id, tenant, user, payload):
         draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
         if draft.base_sync_version != theme.sync_version:
             raise DesignerDraftConflict("The live theme changed after this draft was started.")
-        if _integer(payload.get("draftVersion", -1), "draftVersion") != draft.version:
+        if _integer(payload.get("draft_version", -1), "draftVersion") != draft.version:
             raise DesignerDraftConflict("The Designer draft changed after you opened it.")
-        patch = {key: value for key, value in payload.items() if key != "draftVersion"}
+        patch = {key: value for key, value in payload.items() if key != "draft_version"}
         draft_theme = theme_from_designer_draft(theme, draft)
         apply_designer_patch(draft_theme, patch, validate_version=False)
         draft.snapshot = theme_designer_snapshot(draft_theme)
