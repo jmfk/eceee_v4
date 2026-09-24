@@ -99,6 +99,8 @@ describe('DesignerThemeWorkspacePage', () => {
             expect(source).toContain('class="main-layout"')
             expect(source).toContain('data-designer-target="group:0:element:h1"')
             expect(source).toContain('data-designer-kind="previewImage"')
+            expect(source).toContain('top:4px;right:4px')
+            expect(source).not.toContain('top:-24px')
             expect(source).toContain('<nav>')
             expect(source).toContain('First example item')
         })
