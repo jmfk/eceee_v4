@@ -54,6 +54,19 @@ from .views.site_package_views import (
     SitePackageImportDetailView,
     SitePackageImportListView,
 )
+from .views.designer_theme_views import (
+    DesignerPreviewContentView,
+    DesignerThemeAssetView,
+    DesignerThemeExportDetailView,
+    DesignerThemeExportDownloadView,
+    DesignerThemeExportView,
+    DesignerThemeListView,
+    DesignerThemePlaceholderView,
+    DesignerThemePreviewView,
+    DesignerThemeUndoView,
+    DesignerThemeWorkspaceView,
+    ThemeDesignerAssignmentView,
+)
 from .views.theme_css_views import ThemeCSSView
 from .views.theme_sync_views import ThemeSyncViewSet
 from .views.widget_quick_reference_views import widget_quick_reference_detail, widget_quick_reference_list
@@ -116,6 +129,17 @@ widget_type_patterns = [
 
 # API URLs without app_name to avoid namespace conflicts when included in main API
 urlpatterns = [
+    path("designer/themes/", DesignerThemeListView.as_view(), name="designer-theme-list"),
+    path("designer/themes/<int:theme_id>/workspace/", DesignerThemeWorkspaceView.as_view(), name="designer-theme-workspace"),
+    path("designer/themes/<int:theme_id>/preview/", DesignerThemePreviewView.as_view(), name="designer-theme-preview"),
+    path("designer/themes/<int:theme_id>/undo/", DesignerThemeUndoView.as_view(), name="designer-theme-undo"),
+    path("designer/themes/<int:theme_id>/replace-asset/", DesignerThemeAssetView.as_view(), name="designer-theme-replace-asset"),
+    path("designer/themes/<int:theme_id>/placeholder/", DesignerThemePlaceholderView.as_view(), name="designer-theme-placeholder"),
+    path("designer/themes/<int:theme_id>/preview-content/", DesignerPreviewContentView.as_view(), name="designer-preview-content"),
+    path("designer/themes/<int:theme_id>/export/", DesignerThemeExportView.as_view(), name="designer-theme-export"),
+    path("designer/theme-exports/<uuid:job_id>/", DesignerThemeExportDetailView.as_view(), name="designer-theme-export-detail"),
+    path("designer/theme-exports/<uuid:job_id>/download/", DesignerThemeExportDownloadView.as_view(), name="designer-theme-export-download"),
+    path("themes/<int:theme_id>/designer-assignments/", ThemeDesignerAssignmentView.as_view(), name="theme-designer-assignments"),
     path(
         "pages/<int:page_id>/debug/",
         PageDebugExportView.as_view(),

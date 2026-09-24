@@ -62,6 +62,15 @@ export const AuthProvider = ({ children }) => {
 
             if (response.ok) {
                 const data = await response.json();
+                if (data.isDesignerOnly && data.designerTenants?.length) {
+                    const currentTenant = localStorage.getItem('eceee_tenant_id');
+                    const canUseCurrentTenant = data.designerTenants.some((tenant) =>
+                        tenant.id === currentTenant || tenant.identifier === currentTenant
+                    );
+                    if (!canUseCurrentTenant) {
+                        localStorage.setItem('eceee_tenant_id', data.designerTenants[0].identifier);
+                    }
+                }
                 return data;
             }
         } catch (error) {

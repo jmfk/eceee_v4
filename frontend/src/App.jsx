@@ -43,7 +43,7 @@ import ExperimentManager from '@components/statistics/ExperimentManager'
 import { getCurrentTenantId } from './utils/tenant'
 import { NotificationProvider } from '@components/NotificationManager'
 import { GlobalNotificationProvider } from './contexts/GlobalNotificationContext'
-import { AuthProvider } from './contexts/AuthContext'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { UnifiedDataProvider } from './contexts/unified-data'
 import { ClipboardProvider } from './contexts/ClipboardContext'
 import PrivateRoute from './components/PrivateRoute'
@@ -51,6 +51,9 @@ import LoginPage from './pages/LoginPage'
 import StatusBar from './components/StatusBar'
 import SessionExpiredOverlay from './components/SessionExpiredOverlay'
 import AppVersionReloadGuard from './components/AppVersionReloadGuard'
+import DesignerThemesPage from './pages/DesignerThemesPage'
+import DesignerThemeWorkspacePage from './pages/DesignerThemeWorkspacePage'
+import DesignerRoute from './components/DesignerRoute'
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -174,6 +177,7 @@ const GitHashBadge = () => {
 
 const AppRoutes = () => {
   useAutoPageTitle()
+  const { user } = useAuth()
   const tenantId = getCurrentTenantId()
 
   return (
@@ -184,7 +188,7 @@ const AppRoutes = () => {
         <Route path="/login" element={<LoginPage />} />
 
         {/* Main application routes with fixed layout */}
-        <Route path="/" element={<Navigate to="/pages" replace />} />
+        <Route path="/" element={<Navigate to={user?.isDesignerOnly ? '/designer/themes' : '/pages'} replace />} />
 
         {/* Self-Contained Form Demo Routes */}
         <Route path="/demo/self-contained-form" element={
@@ -356,6 +360,16 @@ const AppRoutes = () => {
               <StatusBar customStatusContent={<span>Edit Component Style</span>} />
             </div>
           </PrivateRoute>
+        } />
+        <Route path="/designer/themes" element={
+          <DesignerRoute>
+            <DesignerThemesPage />
+          </DesignerRoute>
+        } />
+        <Route path="/designer/themes/:themeId" element={
+          <DesignerRoute>
+            <DesignerThemeWorkspacePage />
+          </DesignerRoute>
         } />
         <Route path="/settings/widgets" element={
           <PrivateRoute>

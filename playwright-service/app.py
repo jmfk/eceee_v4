@@ -71,9 +71,7 @@ def validate_url(url: str) -> bool:
 
         # Check if URL has a valid scheme
         if parsed.scheme not in ["http", "https"]:
-            raise WebsiteRenderingError(
-                f"Invalid URL scheme: {parsed.scheme}. Only HTTP and HTTPS are allowed."
-            )
+            raise WebsiteRenderingError(f"Invalid URL scheme: {parsed.scheme}. Only HTTP and HTTPS are allowed.")
 
         # Check if URL has a valid hostname
         if not parsed.netloc:
@@ -83,9 +81,7 @@ def validate_url(url: str) -> bool:
         hostname = parsed.netloc.lower()
         for blocked in BLOCKED_DOMAINS:
             if blocked in hostname:
-                raise WebsiteRenderingError(
-                    f"Access to domain '{hostname}' is not allowed for security reasons."
-                )
+                raise WebsiteRenderingError(f"Access to domain '{hostname}' is not allowed for security reasons.")
 
         return True
 
@@ -244,9 +240,7 @@ async def handle_cookie_consent(page: Page) -> bool:
     return handled
 
 
-async def render_website_async(
-    url: str, config: Optional[Dict[str, Any]] = None
-) -> bytes:
+async def render_website_async(url: str, config: Optional[Dict[str, Any]] = None) -> bytes:
     """
     Asynchronously render a website to PNG bytes.
 
@@ -384,9 +378,7 @@ def render_website(url: str, config: Optional[Dict[str, Any]] = None) -> bytes:
 
             # Wait for all tasks to complete cancellation
             if pending:
-                loop.run_until_complete(
-                    asyncio.gather(*pending, return_exceptions=True)
-                )
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
 
             # Close the loop
             loop.close()
@@ -399,9 +391,62 @@ def render_website(url: str, config: Optional[Dict[str, Any]] = None) -> bytes:
                 pass
 
 
-async def extract_element_at_coordinates_async(
-    url: str, x: int, y: int, timeout: int = 30000
-) -> Dict[str, Any]:
+async def render_html_pdf_async(html_content: str) -> bytes:
+    """Render trusted, server-generated HTML to an A4 PDF."""
+    if not isinstance(html_content, str) or not html_content.strip():
+        raise WebsiteRenderingError("HTML content is required")
+    if len(html_content.encode("utf-8")) > 5 * 1024 * 1024:
+        raise WebsiteRenderingError("HTML content exceeds the 5 MB limit")
+
+    browser = None
+    context = None
+    playwright = None
+    try:
+        playwright = await async_playwright().start()
+        browser = await playwright.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+        )
+        context = await browser.new_context(java_script_enabled=False)
+        page = await context.new_page()
+
+        async def allow_font_requests(route):
+            parsed = urlparse(route.request.url)
+            if parsed.scheme in {"about", "data"} or parsed.hostname in {"fonts.googleapis.com", "fonts.gstatic.com"}:
+                await route.continue_()
+            else:
+                await route.abort()
+
+        await page.route("**/*", allow_font_requests)
+        await page.set_content(html_content, wait_until="networkidle", timeout=60000)
+        await page.evaluate("document.fonts && document.fonts.ready")
+        return await page.pdf(
+            format="A4",
+            print_background=True,
+            prefer_css_page_size=True,
+            margin={"top": "0", "right": "0", "bottom": "0", "left": "0"},
+        )
+    except Exception as exc:
+        raise WebsiteRenderingError(f"PDF rendering failed: {exc}") from exc
+    finally:
+        if context:
+            await context.close()
+        if browser:
+            await browser.close()
+        if playwright:
+            await playwright.stop()
+
+
+def render_html_pdf(html_content: str) -> bytes:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(render_html_pdf_async(html_content))
+    finally:
+        loop.close()
+
+
+async def extract_element_at_coordinates_async(url: str, x: int, y: int, timeout: int = 30000) -> Dict[str, Any]:
     """
     Extract HTML element at specific coordinates on a webpage.
 
@@ -527,9 +572,7 @@ async def extract_element_at_coordinates_async(
             await browser.close()
 
 
-def extract_element_at_coordinates(
-    url: str, x: int, y: int, timeout: int = 30000
-) -> Dict[str, Any]:
+def extract_element_at_coordinates(url: str, x: int, y: int, timeout: int = 30000) -> Dict[str, Any]:
     """
     Synchronous wrapper for element extraction.
 
@@ -550,9 +593,7 @@ def extract_element_at_coordinates(
     asyncio.set_event_loop(loop)
 
     try:
-        return loop.run_until_complete(
-            extract_element_at_coordinates_async(url, x, y, timeout)
-        )
+        return loop.run_until_complete(extract_element_at_coordinates_async(url, x, y, timeout))
     finally:
         # Always close the loop we created
         try:
@@ -563,9 +604,7 @@ def extract_element_at_coordinates(
 
             # Wait for all tasks to complete cancellation
             if pending:
-                loop.run_until_complete(
-                    asyncio.gather(*pending, return_exceptions=True)
-                )
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
 
             # Close the loop
             loop.close()
@@ -632,9 +671,7 @@ def render_website_endpoint():
         if "timeout" in data:
             custom_config["timeout"] = int(data["timeout"])
         if "remove_cookie_warnings" in data:
-            custom_config["remove_cookie_warnings"] = bool(
-                data["remove_cookie_warnings"]
-            )
+            custom_config["remove_cookie_warnings"] = bool(data["remove_cookie_warnings"])
 
         logger.info(f"Rendering website to PNG: {url}")
 
@@ -679,6 +716,32 @@ def render_website_endpoint():
             jsonify({"error": "An unexpected error occurred during website rendering"}),
             500,
         )
+
+
+@app.route("/render-pdf", methods=["POST"])
+def render_pdf_endpoint():
+    """Render trusted HTML supplied by the Django backend to a PDF."""
+    try:
+        data = request.get_json()
+        if not data or not data.get("html"):
+            return jsonify({"error": "HTML is required"}), 400
+        pdf_bytes = render_html_pdf(data["html"])
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+            tmp_file.write(pdf_bytes)
+            tmp_file_path = tmp_file.name
+        response = send_file(
+            tmp_file_path,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name="designer-asset-book.pdf",
+        )
+        response.call_on_close(lambda: os.path.exists(tmp_file_path) and os.unlink(tmp_file_path))
+        return response
+    except WebsiteRenderingError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception:
+        logger.exception("Unexpected error rendering PDF")
+        return jsonify({"error": "An unexpected PDF rendering error occurred"}), 500
 
 
 @app.route("/validate", methods=["POST"])
@@ -787,9 +850,7 @@ def extract_element_endpoint():
     except Exception as e:
         logger.error(f"Unexpected error extracting element: {str(e)}")
         return (
-            jsonify(
-                {"error": "An unexpected error occurred during element extraction"}
-            ),
+            jsonify({"error": "An unexpected error occurred during element extraction"}),
             500,
         )
 
@@ -805,6 +866,7 @@ def index():
                 "GET /": "This documentation",
                 "GET /health": "Health check",
                 "POST /render": "Render website to PNG",
+                "POST /render-pdf": "Render trusted HTML to PDF",
                 "POST /validate": "Validate URL without rendering",
                 "POST /extract-element": "Extract HTML at click coordinates",
             },

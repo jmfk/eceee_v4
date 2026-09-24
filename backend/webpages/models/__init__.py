@@ -18,6 +18,7 @@ from .page_data_schema import PageDataSchema
 from .preview_size import PreviewSize
 from .duplicate_page_log import DuplicatePageLog
 from .site_package_job import SitePackageJob
+from .theme_designer import ThemeDesignerAssignment, ThemeDesignerExportJob, ThemeDesignerRevision
 
 __all__ = [
     "PageTheme",
@@ -27,4 +28,7 @@ __all__ = [
     "PreviewSize",
     "DuplicatePageLog",
     "SitePackageJob",
+    "ThemeDesignerAssignment",
+    "ThemeDesignerExportJob",
+    "ThemeDesignerRevision",
 ]

@@ -175,6 +175,29 @@ class UserSerializer(serializers.ModelSerializer):
 class UserListSerializer(serializers.ModelSerializer):
     """Extended serializer for User model with staff/superuser status."""
 
+    designer_tenants = serializers.SerializerMethodField()
+    is_designer_only = serializers.SerializerMethodField()
+    has_tenant_admin_access = serializers.SerializerMethodField()
+
+    def get_designer_tenants(self, user):
+        assignments = user.theme_designer_assignments.select_related("tenant").order_by("tenant__name")
+        tenants = {}
+        for assignment in assignments:
+            tenants[str(assignment.tenant_id)] = {
+                "id": str(assignment.tenant_id),
+                "identifier": assignment.tenant.identifier,
+                "name": assignment.tenant.name,
+            }
+        return list(tenants.values())
+
+    def get_is_designer_only(self, user):
+        has_designer_access = user.theme_designer_assignments.exists()
+        has_admin_access = self.get_has_tenant_admin_access(user)
+        return has_designer_access and not has_admin_access
+
+    def get_has_tenant_admin_access(self, user):
+        return user.is_staff or user.created_tenants.exists() or user.member_tenants.exists()
+
     class Meta:
         model = User
         fields = [
@@ -187,6 +210,9 @@ class UserListSerializer(serializers.ModelSerializer):
             "is_superuser",
             "date_joined",
             "last_login",
+            "designer_tenants",
+            "is_designer_only",
+            "has_tenant_admin_access",
         ]
         read_only_fields = fields
 
