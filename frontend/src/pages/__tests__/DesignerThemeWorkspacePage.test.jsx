@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => ({
     workspace: vi.fn(),
     preview: vi.fn(),
     save: vi.fn(),
-    undo: vi.fn(),
+    publish: vi.fn(),
+    discard: vi.fn(),
     replaceAsset: vi.fn(),
     createPlaceholder: vi.fn(),
     generatePreviewContent: vi.fn(),
@@ -29,6 +30,9 @@ const workspace = {
     id: 7,
     name: 'Editorial',
     syncVersion: 4,
+    liveSyncVersion: 4,
+    draftVersion: 2,
+    hasDraftChanges: false,
     colors: [{ name: 'brand', value: '#123456', usage: ['Article / h1'] }],
     fonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap', usage: ['Article / h1'] }],
     typography: [{ groupIndex: 0, groupName: 'Article', element: 'h1', values: { fontFamily: 'Inter', fontSize: '32px' } }],
@@ -43,6 +47,7 @@ const workspace = {
         requirementSource: 'explicit',
         dpr: 2,
         isPlaceholder: true,
+        replaceable: true,
         validation: { status: 'ok', message: 'Explicit dimensions configured.' },
     }],
     canUndo: true,
@@ -57,8 +62,9 @@ describe('DesignerThemeWorkspacePage', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mocks.workspace.mockResolvedValue(structuredClone(workspace))
-        mocks.preview.mockResolvedValue({ css: '.designer-preview{color:#123456}', content: { eyebrow: 'Preview', title: 'Title', lead: 'Lead', cardTitle: 'Card', cardBody: 'Body', listItems: ['One', 'Two', 'Three'] } })
-        mocks.save.mockResolvedValue({ ...structuredClone(workspace), syncVersion: 5 })
+        mocks.preview.mockResolvedValue({ css: '.designer-preview{color:#123456}', fontUrl: 'https://fonts.googleapis.com/css2?family=Inter', content: { eyebrow: 'Preview', title: 'Title', lead: 'Lead', cardTitle: 'Card', cardBody: 'Body', listItems: ['One', 'Two', 'Three'] } })
+        mocks.save.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 3, hasDraftChanges: true })
+        mocks.publish.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4 })
         vi.spyOn(window, 'confirm').mockReturnValue(true)
     })
 
@@ -72,20 +78,38 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByText(/custom css/i)).not.toBeInTheDocument()
         expect(screen.queryByText(/selector/i)).not.toBeInTheDocument()
         expect(screen.getByTitle('Live theme preview')).toHaveAttribute('sandbox', '')
+        await waitFor(() => expect(screen.getByTitle('Live theme preview').getAttribute('srcdoc')).toContain('fonts.googleapis.com'))
     })
 
-    it('previews locally and saves only after explicit confirmation', async () => {
+    it('saves a draft and publishes it only after explicit confirmation', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         fireEvent.click(screen.getByRole('button', { name: 'Colors' }))
         fireEvent.change(screen.getByLabelText('brand value'), { target: { value: '#abcdef' } })
 
         await waitFor(() => expect(mocks.preview).toHaveBeenLastCalledWith('7', expect.objectContaining({ colors: { brand: '#abcdef' } })), { timeout: 1500 })
-        fireEvent.click(screen.getByRole('button', { name: /save live changes/i }))
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
         await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
-        expect(window.confirm).toHaveBeenCalledWith('Save these changes to the live theme now?')
         const patch = mocks.save.mock.calls[0][1]
-        expect(Object.keys(patch).sort()).toEqual(['colors', 'fonts', 'spacing', 'syncVersion', 'typography'])
+        expect(Object.keys(patch).sort()).toEqual(['colors', 'draftVersion', 'fonts', 'spacing', 'typography'])
+
+        fireEvent.click(screen.getByRole('button', { name: /publish changes/i }))
+        await waitFor(() => expect(mocks.publish).toHaveBeenCalledWith('7', 3))
+        expect(window.confirm).toHaveBeenCalledWith('Publish every saved Designer draft change to the live theme now?')
+    })
+
+    it('persists pending value edits before staging an asset upload', async () => {
+        mocks.replaceAsset.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 4, hasDraftChanges: true })
+        const { container } = renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        fireEvent.click(screen.getByRole('button', { name: 'Colors' }))
+        fireEvent.change(screen.getByLabelText('brand value'), { target: { value: '#abcdef' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Assets' }))
+        const upload = new File(['image'], 'hero.png', { type: 'image/png' })
+        fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [upload] } })
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
+        await waitFor(() => expect(mocks.replaceAsset).toHaveBeenCalledWith('7', 'design:0:hero:md:background', upload, 3))
     })
 
     it('switches between edit and preview on narrow layouts', async () => {

@@ -1,6 +1,5 @@
 """Restricted API surface for the theme Designer workspace."""
 
-import copy
 import json
 from datetime import timedelta
 
@@ -19,17 +18,20 @@ from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeDesignerExp
 from webpages.services import ThemeCSSGenerator
 from webpages.services.designer_export import designer_export_filename, designer_export_object_key
 from webpages.services.designer_theme import (
+    DesignerDraftConflict,
     apply_designer_patch,
-    build_workspace,
+    build_draft_workspace,
     designer_theme_queryset,
+    discard_designer_draft,
     generate_placeholder_png,
+    get_or_create_designer_draft,
+    publish_designer_draft,
     replace_designer_asset,
-    save_designer_patch,
-    undo_designer_change,
+    save_designer_draft,
+    theme_from_designer_draft,
     user_can_design_theme,
 )
 from webpages.tasks import export_designer_theme
-
 
 DEFAULT_PREVIEW_CONTENT = {
     "eyebrow": "Design system preview",
@@ -91,22 +93,23 @@ class DesignerThemeWorkspaceView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, theme_id):
-        return Response(build_workspace(_theme(request, theme_id)))
+        theme = _theme(request, theme_id)
+        draft = get_or_create_designer_draft(theme, request.user)
+        return Response(build_draft_workspace(theme, draft))
 
     def patch(self, request, theme_id):
         try:
-            theme = save_designer_patch(theme_id, request.tenant, request.user, request.data)
+            theme, draft = save_designer_draft(theme_id, request.tenant, request.user, request.data)
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
         except PageTheme.DoesNotExist:
             return Response({"error": "Theme not found."}, status=status.HTTP_404_NOT_FOUND)
-        if theme is None:
-            current = get_object_or_404(PageTheme, id=theme_id, tenant=request.tenant)
+        except DesignerDraftConflict as exc:
             return Response(
-                {"error": "The theme changed after you opened it.", "syncVersion": current.sync_version},
+                {"error": str(exc)},
                 status=status.HTTP_409_CONFLICT,
             )
-        return Response(build_workspace(theme))
+        return Response(build_draft_workspace(theme, draft))
 
 
 class DesignerThemePreviewView(APIView):
@@ -114,31 +117,58 @@ class DesignerThemePreviewView(APIView):
 
     def post(self, request, theme_id):
         theme = _theme(request, theme_id)
-        draft = copy.deepcopy(theme)
-        apply_designer_patch(draft, request.data, validate_version=False)
-        css = ThemeCSSGenerator().generate_complete_css(draft)
+        stored_draft = get_or_create_designer_draft(theme, request.user)
+        preview_theme = theme_from_designer_draft(theme, stored_draft)
+        patch = {key: value for key, value in request.data.items() if key != "draftVersion"}
+        apply_designer_patch(preview_theme, patch, validate_version=False)
+        css = ThemeCSSGenerator().generate_complete_css(preview_theme)
         return Response(
             {
                 "css": css,
-                "fontUrl": draft.get_google_fonts_url(),
+                "fontUrl": preview_theme.get_google_fonts_url(),
                 "content": DEFAULT_PREVIEW_CONTENT,
             }
         )
 
 
-class DesignerThemeUndoView(APIView):
+class DesignerThemePublishView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, theme_id):
         try:
-            theme = undo_designer_change(theme_id, request.tenant, request.user)
+            theme, draft = publish_designer_draft(
+                theme_id,
+                request.tenant,
+                request.user,
+                request.data.get("draftVersion"),
+            )
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
         except PageTheme.DoesNotExist:
             return Response({"error": "Theme not found."}, status=status.HTTP_404_NOT_FOUND)
-        if theme is None:
-            return Response({"error": "There is no designer change to undo."}, status=status.HTTP_409_CONFLICT)
-        return Response(build_workspace(theme))
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(build_draft_workspace(theme, draft))
+
+
+class DesignerThemeDiscardView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, theme_id):
+        try:
+            theme, draft = discard_designer_draft(
+                theme_id,
+                request.tenant,
+                request.user,
+                request.data.get("draftVersion"),
+            )
+        except PermissionError:
+            return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
+        except PageTheme.DoesNotExist:
+            return Response({"error": "Theme not found."}, status=status.HTTP_404_NOT_FOUND)
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(build_draft_workspace(theme, draft))
 
 
 class DesignerThemeAssetView(APIView):
@@ -152,10 +182,19 @@ class DesignerThemeAssetView(APIView):
         if not asset_key or not upload:
             return Response({"error": "asset_key and image are required."}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            theme = replace_designer_asset(theme_id, request.tenant, request.user, asset_key, upload)
+            theme, draft = replace_designer_asset(
+                theme_id,
+                request.tenant,
+                request.user,
+                asset_key,
+                upload,
+                request.data.get("draft_version"),
+            )
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
-        return Response(build_workspace(theme))
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(build_draft_workspace(theme, draft))
 
 
 class DesignerThemePlaceholderView(APIView):
@@ -171,36 +210,23 @@ class DesignerThemePlaceholderView(APIView):
             return Response({"error": "assetKey, width, and height are required."}, status=status.HTTP_400_BAD_REQUEST)
         content = generate_placeholder_png(display_name, asset_key, width, height)
         upload = SimpleUploadedFile(f"{display_name}.png", content, content_type="image/png")
-        theme = replace_designer_asset(theme_id, request.tenant, request.user, asset_key, upload)
-        # Mark the generated file as a placeholder without exposing arbitrary JSON edits.
-        if asset_key.startswith("design:"):
-            parts = asset_key.split(":", 4)
-            groups = copy.deepcopy(theme.design_groups.get("groups", []))
-            group = groups[int(parts[1])]
-            for part, breakpoint, values in _iter_layout_for_view(group):
-                if part == parts[2] and breakpoint == parts[3]:
-                    target = values.get(parts[4]) or (values.get("images") or {}).get(parts[4])
-                    if isinstance(target, dict):
-                        target.update(
-                            {
-                                "displayName": display_name,
-                                "requiredWidth": int(width),
-                                "requiredHeight": int(height),
-                                "isPlaceholder": True,
-                            }
-                        )
-                    break
-            theme.design_groups = {**theme.design_groups, "groups": groups}
-            theme.save(update_fields=["design_groups", "sync_version", "updated_at"])
-        return Response(build_workspace(theme))
-
-
-def _iter_layout_for_view(group):
-    for key in ("layoutProperties", "layout_properties"):
-        for part, breakpoints in (group.get(key) or {}).items():
-            for breakpoint, values in (breakpoints or {}).items():
-                if isinstance(values, dict):
-                    yield part, breakpoint, values
+        try:
+            theme, draft = replace_designer_asset(
+                theme_id,
+                request.tenant,
+                request.user,
+                asset_key,
+                upload,
+                request.data.get("draftVersion"),
+                placeholder_metadata={
+                    "displayName": display_name,
+                    "requiredWidth": int(width),
+                    "requiredHeight": int(height),
+                },
+            )
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(build_draft_workspace(theme, draft))
 
 
 class DesignerPreviewContentView(APIView):
@@ -214,7 +240,10 @@ class DesignerPreviewContentView(APIView):
         messages = [
             {
                 "role": "system",
-                "content": "Return only JSON with string fields eyebrow, title, lead, cardTitle, cardBody and a listItems array of exactly three short strings. Do not include HTML.",
+                "content": (
+                    "Return only JSON with string fields eyebrow, title, lead, cardTitle, cardBody and a "
+                    "listItems array of exactly three short strings. Do not include HTML."
+                ),
             },
             {"role": "user", "content": prompt},
         ]
@@ -303,10 +332,12 @@ class DesignerThemeExportView(APIView):
 
     def post(self, request, theme_id):
         theme = _theme(request, theme_id)
+        draft = get_or_create_designer_draft(theme, request.user)
         job = ThemeDesignerExportJob.objects.create(
             theme=theme,
             created_by=request.user,
             expires_at=timezone.now() + timedelta(hours=24),
+            snapshot=draft.snapshot,
         )
         job.object_key = designer_export_object_key(job)
         job.save(update_fields=["object_key", "updated_at"])

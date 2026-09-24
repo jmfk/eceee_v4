@@ -51,6 +51,20 @@ class ThemeDesignerRevision(models.Model):
         indexes = [models.Index(fields=["theme", "created_at"], name="theme_rev_theme_created_idx")]
 
 
+class ThemeDesignerDraft(models.Model):
+    """Shared staged Designer state for one theme."""
+
+    theme = models.OneToOneField("webpages.PageTheme", on_delete=models.CASCADE, related_name="designer_draft")
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_theme_designer_drafts")
+    updated_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="updated_theme_designer_drafts")
+    base_sync_version = models.PositiveIntegerField()
+    version = models.PositiveIntegerField(default=1)
+    snapshot = models.JSONField(default=dict)
+    has_changes = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class ThemeDesignerExportJob(models.Model):
     """Tracks an asynchronous designer ZIP export."""
 
@@ -72,6 +86,7 @@ class ThemeDesignerExportJob(models.Model):
     object_key = models.CharField(max_length=500, blank=True)
     progress = models.JSONField(default=dict, blank=True)
     errors = models.JSONField(default=list, blank=True)
+    snapshot = models.JSONField(default=dict, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
