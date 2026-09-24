@@ -146,6 +146,29 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(self.page.versions.count(), 1)
 
+    def test_atomic_save_target_refreshes_time_after_page_lock(self):
+        before_activation = timezone.now()
+        scheduled = self.page.create_version(self.user, "Scheduled")
+        scheduled.effective_date = before_activation + timedelta(minutes=1)
+        scheduled.save()
+        reviewed_at = scheduled.updated_at
+        service = PageVersionWorkflowService(self.page, self.user, now=before_activation)
+
+        with patch(
+            "webpages.services.page_version_workflow.timezone.now",
+            return_value=scheduled.effective_date + timedelta(seconds=1),
+        ):
+            target, created = service.resolve_atomic_save_target(
+                expected_version_id=scheduled.id,
+                expected_updated_at=reviewed_at,
+            )
+
+        self.assertTrue(created)
+        self.assertNotEqual(target.id, scheduled.id)
+        self.assertIsNone(target.effective_date)
+        scheduled.refresh_from_db()
+        self.assertEqual(scheduled.effective_date, before_activation + timedelta(minutes=1))
+
     def test_live_only_page_audit_is_read_only(self):
         self.publish_initial()
         before = self.page.versions.count()
