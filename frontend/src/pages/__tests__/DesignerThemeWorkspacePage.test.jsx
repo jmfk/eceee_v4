@@ -48,6 +48,12 @@ const workspace = {
             elements: [{ id: 'group:0:element:h1', element: 'h1', label: 'Heading 1' }],
             parts: [{ id: 'group:0:part:content-widget', part: 'content-widget', label: 'Content', breakpoints: ['md'] }],
             assetKeys: ['design:0:hero:md:background'], colorNames: ['brand'],
+        }, {
+            id: 'group:1', groupIndex: 1, label: 'Callout', description: 'Short highlighted content', slots: ['main'],
+            widgetTypes: ['easy_widgets.ContentWidget'],
+            elements: [{ id: 'group:1:element:p', element: 'p', label: 'Paragraph' }],
+            parts: [{ id: 'group:1:part:content-widget', part: 'content-widget', label: 'Content', breakpoints: ['md'] }],
+            assetKeys: [], colorNames: [],
         }],
         componentStyles: [
             { key: 'feature-card', label: 'Feature card', description: 'Highlighted card', template: '<article class="feature-card">{{{content}}}</article>' },
@@ -99,6 +105,11 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('navigation', { name: 'Preview views' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Article page' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Article card' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'What to show' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Layout default' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Show Article' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Show Callout' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Use Feature card' })).toBeInTheDocument()
         expect(screen.queryByText('Preview context')).not.toBeInTheDocument()
         expect(screen.queryByText('Design groups')).not.toBeInTheDocument()
         expect(screen.queryByText('Component styles')).not.toBeInTheDocument()
@@ -107,17 +118,31 @@ describe('DesignerThemeWorkspacePage', () => {
             const source = screen.getByTitle('Live theme preview').getAttribute('srcdoc')
             expect(source).toContain('class="main-layout"')
             expect(source).toContain('data-designer-target="group:0:element:h1"')
-            expect(source).toContain('data-designer-kind="previewImage"')
             expect(source).toContain('widget-type-easy-widgets-contentwidget')
             expect(source).toContain('widget-type-content')
             expect(source).toContain('demo-part content-widget')
-            expect(source).toContain('https://storage.test/theme-preview.png')
+            expect(source).not.toContain('group:1:element:p')
+            expect(source).not.toContain('https://storage.test/theme-preview.png')
+            expect(source).not.toContain('class="feature-card"')
             expect(source).toContain('outline:1px dashed rgba(100,116,139,.5)')
             expect(source).toContain('top:4px;right:4px')
             expect(source).not.toContain('top:-24px')
-            expect(source).toContain('<nav>')
-            expect(source).toContain('First example item')
         })
+    })
+
+    it('shows one layout alternative at a time and chooses alternatives from the left column', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Show Callout' }))
+        await waitFor(() => {
+            const source = screen.getByTitle('Live theme preview').getAttribute('srcdoc')
+            expect(source).toContain('group:1:element:p')
+            expect(source).not.toContain('group:0:element:h1')
+        })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Use Feature card' }))
+        await waitFor(() => expect(screen.getByTitle('Live theme preview').getAttribute('srcdoc')).toContain('class="feature-card"'))
     })
 
     it('uses localized default content', async () => {
@@ -227,6 +252,6 @@ describe('DesignerThemeWorkspacePage', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Preview', exact: true }))
         expect(screen.getByTitle('Live theme preview').closest('section')).toHaveClass('flex')
         fireEvent.click(screen.getByRole('button', { name: 'Edit', exact: true }))
-        expect(screen.getByText('Select something on the page').closest('section')).toHaveClass('flex')
+        expect(screen.getByRole('heading', { name: 'What to show' }).closest('section')).toHaveClass('flex')
     })
 })
