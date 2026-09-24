@@ -369,7 +369,10 @@ def build_designer_catalog(theme, assets):
                 ],
             }
         )
-    preview_views = normalized_designer_preview(theme, registered_layouts)["views"]
+    preview_views = _designer_reference_previews(
+        theme,
+        normalized_designer_preview(theme, registered_layouts)["views"],
+    )
     return {
         "designGroups": groups,
         "componentStyles": component_styles,
@@ -427,6 +430,98 @@ def designer_content_sources(theme):
             }
         )
     return sources
+
+
+def _safe_reference_preview_html(rendered_html):
+    """Keep a published page's body markup while removing executable page chrome."""
+    body = re.search(r"<body[^>]*>([\s\S]*?)</body>", rendered_html or "", re.IGNORECASE)
+    markup = body.group(1) if body else rendered_html or ""
+    markup = markup.split("<!-- Lightbox Overlay", 1)[0]
+    markup = re.sub(r"<script\b[^>]*>[\s\S]*?</script>", "", markup, flags=re.IGNORECASE)
+    markup = re.sub(r"<(?:iframe|object|embed)\b[^>]*>[\s\S]*?</(?:iframe|object|embed)>", "", markup, flags=re.IGNORECASE)
+    markup = re.sub(
+        r'''\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)''',
+        "",
+        markup,
+        flags=re.IGNORECASE,
+    )
+    markup = re.sub(
+        r'''\s+(href|src)\s*=\s*(["'])\s*javascript:[\s\S]*?\2''',
+        r' \1="#"',
+        markup,
+        flags=re.IGNORECASE,
+    )
+    return markup.strip()
+
+
+def _designer_reference_previews(theme, views):
+    """Attach real published page markup to matching layout previews."""
+    sources = designer_content_sources(theme)
+    if not sources:
+        return views
+
+    root = WebPage.objects.filter(
+        id=sources[0]["id"],
+        tenant=theme.tenant,
+        parent__isnull=True,
+        is_deleted=False,
+    ).first()
+    if not root:
+        return views
+
+    pages = list(
+        WebPage.objects.filter(
+            Q(id=root.id) | Q(cached_root_id=root.id),
+            tenant=theme.tenant,
+            is_deleted=False,
+            current_published_version__isnull=False,
+        )
+        .select_related("current_published_version__theme", "parent")
+        .order_by("cached_path", "sort_order", "id")[:100]
+    )
+    pages_by_layout = {}
+    for page in pages:
+        effective_theme = page.get_effective_theme()
+        version = page.current_published_version
+        if not effective_theme or effective_theme.id != theme.id or not version.code_layout:
+            continue
+        pages_by_layout.setdefault(version.code_layout, page)
+
+    if not pages_by_layout:
+        return views
+
+    from webpages.renderers import WebPageRenderer
+
+    renderer = WebPageRenderer()
+    rendered_by_page = {}
+    enriched = []
+    has_configured_homepage = any(view.get("isSourceHomepage") and view.get("referenceHtml") for view in views)
+    for view in views:
+        if view.get("referenceHtml"):
+            enriched.append(view)
+            continue
+        page = pages_by_layout.get(view.get("layout"))
+        if not page:
+            enriched.append(view)
+            continue
+        try:
+            if page.id not in rendered_by_page:
+                rendered_by_page[page.id] = _safe_reference_preview_html(
+                    renderer.render(page, version=page.current_published_version)["html"]
+                )
+            enriched.append(
+                {
+                    **view,
+                    "referenceHtml": rendered_by_page[page.id],
+                    "sourceSiteId": root.id,
+                    "sourcePageId": page.id,
+                    "isSourceHomepage": not has_configured_homepage and page.id == root.id,
+                }
+            )
+        except Exception:
+            logger.warning("Could not render Designer reference page %s", page.id, exc_info=True)
+            enriched.append(view)
+    return enriched
 
 
 def _collect_preview_content(value, texts, images, parent_key=""):
@@ -723,6 +818,7 @@ def _stored_asset_metadata(path):
 def collect_designer_assets(theme: PageTheme):
     assets = []
     referenced_filenames = set()
+    library_filenames = set(theme.list_library_images())
 
     if theme.image:
         width, height = _field_dimensions(theme.image)
@@ -780,12 +876,17 @@ def collect_designer_assets(theme: PageTheme):
                 filename = value.get("filename") or os.path.basename(str(_image_url(value) or ""))
                 if filename:
                     referenced_filenames.add(filename)
+                asset_url = (
+                    system_storage.url(f"theme_images/{theme.id}/library/{filename}")
+                    if filename in library_filenames
+                    else _image_url(value)
+                )
                 assets.append(
                     {
                         "assetKey": f"design:{group_index}:{part}:{breakpoint}:{property_name}",
                         "displayName": spec["displayName"] or f"{group_name} {property_name}",
                         "filename": filename,
-                        "url": _image_url(value),
+                        "url": asset_url,
                         "width": value.get("width"),
                         "height": value.get("height"),
                         "requiredWidth": spec["requiredWidth"],
@@ -844,7 +945,7 @@ def collect_designer_assets(theme: PageTheme):
                     }
                 )
 
-    for filename in sorted(theme.list_library_images()):
+    for filename in sorted(library_filenames):
         if filename in referenced_filenames:
             continue
         path = f"theme_images/{theme.id}/library/{filename}"
@@ -934,6 +1035,7 @@ def build_workspace(theme: PageTheme):
         "typography": typography,
         "spacing": spacing,
         "assets": assets,
+        "breakpoints": theme.get_breakpoints(),
         "catalog": catalog,
         "previewContent": {"views": catalog["previewViews"]},
         "contentSources": designer_content_sources(theme),

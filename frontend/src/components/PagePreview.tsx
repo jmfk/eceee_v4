@@ -247,8 +247,10 @@ const PagePreview: React.FC<PagePreviewProps> = ({
                                 src={previewUrl}
                                 className="w-full h-full border-0"
                                 title="Page Preview"
+                                scrolling="no"
                                 sandbox="allow-same-origin allow-scripts"
                                 referrerPolicy="same-origin"
+                                style={{ overflow: 'hidden' }}
                             />
                         </div>
                     </div>

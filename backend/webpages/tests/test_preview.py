@@ -77,6 +77,7 @@ class WebPagePreviewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"<!DOCTYPE html>", response.content)
         self.assertIn(b"eceee-preview-nav-link-menu", response.content)
+        self.assertIn(b"overflow: hidden !important", response.content)
 
     def test_preview_query_token_auth_succeeds(self):
         """Test that preview succeeds with token in query parameter."""
