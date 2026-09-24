@@ -165,6 +165,7 @@ class DesignerThemeApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 200, response.data)
         self.assertIn("css", response.data)
+        self.assertNotIn("content", response.data)
         self.theme.refresh_from_db()
         self.assertEqual(self.theme.colors["brandColor"], "#123456")
 

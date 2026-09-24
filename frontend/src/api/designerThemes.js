@@ -22,7 +22,6 @@ export const designerThemesApi = {
         }))
     },
     createPlaceholder: async (themeId, data) => unwrap(await api.post(`${base}/themes/${themeId}/placeholder/`, data)),
-    generatePreviewContent: async (themeId, prompt = '') => unwrap(await api.post(`${base}/themes/${themeId}/preview-content/`, { prompt })),
     createExport: async (themeId) => unwrap(await api.post(`${base}/themes/${themeId}/export/`)),
     getExport: async (jobId) => unwrap(await api.get(`${base}/theme-exports/${jobId}/`)),
     getExportDownload: async (jobId) => unwrap(await api.get(`${base}/theme-exports/${jobId}/download/`)),

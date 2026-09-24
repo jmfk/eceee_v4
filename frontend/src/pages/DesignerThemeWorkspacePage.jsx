@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Download, Image as ImageIcon, Loader2, Monitor, Palette, Plus, Redo2, RotateCcw, Save, Send, Smartphone, Sparkles, Tablet, Trash2, Type } from 'lucide-react'
+import { Download, Image as ImageIcon, Loader2, Monitor, Palette, Plus, Redo2, RotateCcw, Save, Send, Smartphone, Tablet, Trash2, Type } from 'lucide-react'
 import DesignerNavbar from '../components/DesignerNavbar'
 import StatusBar from '../components/StatusBar'
 import { designerThemesApi } from '../api/designerThemes'
@@ -13,13 +13,55 @@ const tabs = [
     { id: 'spacing', label: 'Spacing', icon: <Redo2 className="h-4 w-4" /> },
 ]
 
-const defaultPreviewContent = {
-    eyebrow: 'Design system preview',
-    title: 'A clear heading for representative content',
-    lead: 'This sample shows typography, colors, spacing, imagery, cards, lists, links, buttons, and tables.',
-    cardTitle: 'Representative card',
-    cardBody: 'Use this area to judge hierarchy, rhythm, and readability before saving the live theme.',
-    listItems: ['First representative item', 'A second item with more text', 'Final list item'],
+const previewCopy = {
+    en: {
+        eyebrow: 'Typography preview',
+        fontFamily: 'Font family',
+        typographyValues: 'Typography values',
+        longText: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere, nibh at cursus facilisis, justo sapien consequat libero, vitae tincidunt enim neque eget augue.',
+        listFallback: ['Readable headings and body copy', 'Balanced weight and line height', 'Clear rhythm across longer passages'],
+    },
+    sv: {
+        eyebrow: 'Förhandsvisning av typografi',
+        fontFamily: 'Typsnitt',
+        typographyValues: 'Typografivärden',
+        longText: 'Det här är en längre svensk exempeltext som visar hur typsnittet fungerar i löpande text. Flera ord och meningar gör radlängd, rytm och läsbarhet tydliga.',
+        listFallback: ['Läsbara rubriker och brödtexter', 'Balanserad vikt och radhöjd', 'Tydlig rytm i längre textstycken'],
+    },
+}
+
+const getPreviewCopy = () => {
+    const language = (document.documentElement.lang || navigator.language || 'en').toLowerCase().split('-')[0]
+    return previewCopy[language] || previewCopy.en
+}
+
+const formatFont = (font, copy) => {
+    const family = font?.family?.trim() || copy.fontFamily
+    const variants = (font?.variants || []).filter(Boolean).join(' / ') || '400'
+    return `${family} · ${variants}`
+}
+
+const buildFontPreviewContent = (workspace) => {
+    const copy = getPreviewCopy()
+    const fonts = (workspace?.fonts || []).filter((font) => font.family?.trim())
+    const primaryFont = fonts[0]
+    const typography = (workspace?.typography || []).map((row) => {
+        const values = Object.entries(row.values || {})
+            .filter(([, value]) => value !== '' && value !== null && value !== undefined)
+            .map(([name, value]) => `${name}: ${value}`)
+            .join(', ')
+        return values ? `${row.element} — ${values}` : row.element
+    }).filter(Boolean)
+    const listItems = [...fonts.map((font) => formatFont(font, copy)), ...typography, ...copy.listFallback].slice(0, 3)
+
+    return {
+        eyebrow: `${copy.eyebrow} · ${primaryFont?.family?.trim() || copy.fontFamily}`,
+        title: formatFont(primaryFont, copy),
+        lead: copy.longText,
+        cardTitle: typography[0] || `${copy.fontFamily}: ${formatFont(primaryFont, copy)}`,
+        cardBody: `${copy.typographyValues}: ${typography.slice(1).join(' · ') || formatFont(primaryFont, copy)}. ${copy.longText}`,
+        listItems,
+    }
 }
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]))
@@ -49,7 +91,7 @@ const DesignerThemeWorkspacePage = () => {
     const [activeTab, setActiveTab] = useState('assets')
     const [viewport, setViewport] = useState('desktop')
     const [mobilePane, setMobilePane] = useState('edit')
-    const [preview, setPreview] = useState({ css: '', fontUrl: '', content: defaultPreviewContent })
+    const [preview, setPreview] = useState({ css: '', fontUrl: '' })
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [publishing, setPublishing] = useState(false)
@@ -93,7 +135,7 @@ const DesignerThemeWorkspacePage = () => {
             try {
                 const result = await designerThemesApi.preview(themeId, payload)
                 if (requestId !== previewRequestRef.current) return
-                setPreview((current) => ({ css: result.css || '', fontUrl: result.fontUrl || '', content: current.content.title ? current.content : result.content }))
+                setPreview({ css: result.css || '', fontUrl: result.fontUrl || '' })
             } catch (err) {
                 addNotification({ type: 'error', message: err.message || 'Preview could not be updated' })
             }
@@ -190,14 +232,6 @@ const DesignerThemeWorkspacePage = () => {
         } catch (err) { addNotification({ type: 'error', message: err.message || 'Placeholder could not be created' }) }
     }
 
-    const generateCopy = async () => {
-        try {
-            const result = await designerThemesApi.generatePreviewContent(themeId)
-            setPreview((current) => ({ ...current, content: result.content }))
-            addNotification({ type: result.fallback ? 'warning' : 'success', message: result.fallback ? 'AI was unavailable; sample content was reset' : 'New sample content generated' })
-        } catch (err) { addNotification({ type: 'error', message: err.message || 'Sample content could not be generated' }) }
-    }
-
     const exportPackage = async () => {
         setExporting(true)
         try {
@@ -216,7 +250,8 @@ const DesignerThemeWorkspacePage = () => {
         finally { setExporting(false); setExportProgress(null) }
     }
 
-    const previewDocument = useMemo(() => buildPreviewDocument(preview.css, preview.fontUrl, preview.content || {}, viewport), [preview, viewport])
+    const previewContent = useMemo(() => buildFontPreviewContent(workspace), [workspace])
+    const previewDocument = useMemo(() => buildPreviewDocument(preview.css, preview.fontUrl, previewContent, viewport), [preview, previewContent, viewport])
     const hasDraftChanges = dirty || workspace?.hasDraftChanges
 
     if (loading) return <div className="fixed inset-0 flex items-center justify-center bg-gray-50"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /><span className="ml-3 text-gray-600">Loading Designer workspace…</span></div>
@@ -232,8 +267,6 @@ const DesignerThemeWorkspacePage = () => {
                     <div className="hidden rounded-md border border-gray-300 p-1 sm:flex" aria-label="Preview size">
                         {[['desktop', <Monitor className="h-4 w-4" />], ['tablet', <Tablet className="h-4 w-4" />], ['mobile', <Smartphone className="h-4 w-4" />]].map(([name, icon]) => <button key={name} onClick={() => setViewport(name)} aria-label={`${name} preview`} className={`rounded p-1.5 ${viewport === name ? 'bg-gray-200 text-gray-900' : 'text-gray-500'}`}>{icon}</button>)}
                     </div>
-                    <button onClick={generateCopy} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"><Sparkles className="h-4 w-4" />AI sample</button>
-                    <button onClick={() => setPreview((current) => ({ ...current, content: defaultPreviewContent }))} className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm">Refresh sample</button>
                     <button onClick={exportPackage} disabled={exporting} title={exportProgress?.message} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-50">{exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{exporting ? `Export ${exportProgress?.percent || 0}%` : 'Export'}</button>
                     <button onClick={discardDraft} disabled={(!hasDraftChanges && !workspace.draftIsStale) || saving || publishing} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-40"><RotateCcw className="h-4 w-4" />Discard draft</button>
                     <button onClick={() => saveDraft()} disabled={!dirty || workspace.draftIsStale || saving || publishing} className="inline-flex items-center gap-2 rounded-md border border-blue-600 bg-white px-3 py-2 text-sm font-medium text-blue-700 disabled:opacity-40">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save draft</button>
