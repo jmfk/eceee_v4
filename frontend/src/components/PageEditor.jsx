@@ -1310,7 +1310,6 @@ const PageEditor = () => {
                     description: saveOptions.description || 'Auto-save',
                     clientUpdatedAt,
                     pageId,
-                    expectedVersionId: pageVersionData?.id,
                 }
             );
 

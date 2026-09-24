@@ -246,6 +246,37 @@ describe('smartSave working-copy workflow', () => {
 
         expect(result.conflict.serverVersion).toBe(serverVersion)
     })
+
+    it('targets the merged server working copy when retrying a conflict', async () => {
+        const mergedVersion = {
+            ...baseVersion,
+            id: 11,
+            updatedAt: '2026-09-22T10:01:00Z',
+            widgets: { main: [] },
+        }
+        const versionsApi = {
+            savePageWorkingCopy: vi.fn().mockResolvedValue(mergedVersion),
+        }
+
+        await smartSave(
+            baseWebpage,
+            baseWebpage,
+            baseVersion,
+            mergedVersion,
+            { pagesApi: {}, versionsApi },
+            {
+                pageId: 1,
+                clientUpdatedAt: mergedVersion.updatedAt,
+            },
+        )
+
+        expect(versionsApi.savePageWorkingCopy).toHaveBeenCalledWith(
+            1,
+            mergedVersion.id,
+            expect.objectContaining({ widgets: mergedVersion.widgets }),
+            mergedVersion.updatedAt,
+        )
+    })
 })
 
 // ---------------------------------------------------------------------------
