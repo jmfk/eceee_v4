@@ -7,6 +7,7 @@ import DesignerThemeWorkspacePage from '../DesignerThemeWorkspacePage'
 const mocks = vi.hoisted(() => ({
     workspace: vi.fn(), preview: vi.fn(), save: vi.fn(), publish: vi.fn(), undo: vi.fn(), discard: vi.fn(),
     replaceAsset: vi.fn(), createPlaceholder: vi.fn(), savePreviewContent: vi.fn(), replacePreviewImage: vi.fn(),
+    importPreviewFromSite: vi.fn(),
     createExport: vi.fn(), getExport: vi.fn(), getExportDownload: vi.fn(),
 }))
 
@@ -38,6 +39,7 @@ const workspace = {
         validation: { status: 'ok', message: 'Explicit dimensions configured.' },
     }],
     canUndo: true,
+    contentSources: [{ id: 12, label: 'conference.example', hostname: 'conference.example' }],
     previewContent: { views: previewViews },
     catalog: {
         designGroups: [{
@@ -85,6 +87,9 @@ describe('DesignerThemeWorkspacePage', () => {
             previewContent: { views: previewViews.map((view) => view.id === viewId ? { ...view, texts } : view) },
         }))
         mocks.replacePreviewImage.mockResolvedValue({ previewContent: { views: previewViews } })
+        mocks.importPreviewFromSite.mockResolvedValue({
+            previewContent: { views: previewViews.map((view) => ({ ...view, texts: { 'group:0:element:h1': 'Site heading' }, sourceSiteId: 12 })) },
+        })
         vi.spyOn(window, 'confirm').mockReturnValue(true)
     })
 
@@ -122,6 +127,15 @@ describe('DesignerThemeWorkspacePage', () => {
         const source = screen.getByTitle('Live theme preview').getAttribute('srcdoc')
         expect(source).toContain('En rubrik med verklig längd')
         expect(source).not.toContain('A heading with a realistic length')
+    })
+
+    it('copies published content from a site using the theme into preview content', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        expect(screen.getByLabelText('Demo content from site')).toHaveValue('12')
+        fireEvent.click(screen.getByRole('button', { name: 'Use site content' }))
+        await waitFor(() => expect(mocks.importPreviewFromSite).toHaveBeenCalledWith('7', 12))
+        expect(window.confirm).toHaveBeenCalledWith('Replace saved and unsaved preview content with published content from this site?')
     })
 
     it('shows only relevant values after clicking a visible element', async () => {

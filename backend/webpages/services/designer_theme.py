@@ -1,6 +1,7 @@
 """Restricted theme editing helpers used by the Designer workspace."""
 
 import copy
+import html
 import io
 import logging
 import os
@@ -10,6 +11,8 @@ import xml.etree.ElementTree as ET
 
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.db.models import Q
+from django.utils.html import strip_tags
 from django.utils.text import slugify
 from PIL import Image, ImageDraw, ImageFont
 from rest_framework.exceptions import ValidationError
@@ -17,6 +20,7 @@ from rest_framework.exceptions import ValidationError
 from file_manager.storage import system_storage
 from webpages.models import (
     PageTheme,
+    WebPage,
     ThemeDesignerAssignment,
     ThemeDesignerDraft,
     ThemeDesignerExportJob,
@@ -52,6 +56,36 @@ IMAGE_TYPES = RASTER_TYPES | {"image/svg+xml"}
 CSS_VALUE_FORBIDDEN = re.compile(r"[;{}<>]|url\s*\(|expression\s*\(|@import", re.IGNORECASE)
 COLOR_VALUE = re.compile(r"^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\([0-9.%+,\-\s/]+\)|[a-zA-Z]+)$")
 logger = logging.getLogger(__name__)
+
+PREVIEW_TEXT_KEYS = {
+    "body",
+    "caption",
+    "content",
+    "description",
+    "headline",
+    "heading",
+    "intro",
+    "label",
+    "menu",
+    "quote",
+    "short_title",
+    "shorttitle",
+    "subtitle",
+    "summary",
+    "text",
+    "title",
+}
+PREVIEW_IMAGE_KEYS = {
+    "background_image",
+    "background_image_url",
+    "file_url",
+    "image",
+    "image_1",
+    "image_2",
+    "image_url",
+    "imgproxy_base_url",
+    "thumbnail",
+}
 
 
 def _camel_to_snake(value):
@@ -361,6 +395,153 @@ def designer_theme_queryset(user, tenant):
     if tenant.user_has_access(user):
         return queryset
     return queryset.filter(designer_assignments__user=user).distinct()
+
+
+def designer_content_sources(theme):
+    """List tenant-local site roots whose published pages use this theme."""
+    roots = list(
+        WebPage.objects.filter(tenant=theme.tenant, parent__isnull=True, is_deleted=False)
+        .select_related("current_published_version__theme")
+        .order_by("title", "id")
+    )
+    direct_pages = WebPage.objects.filter(
+        tenant=theme.tenant,
+        is_deleted=False,
+        current_published_version__theme=theme,
+    ).only("id", "parent_id", "cached_root_id")
+    direct_root_ids = {
+        page.id if page.parent_id is None else page.cached_root_id or page.get_root_page().id for page in direct_pages
+    }
+    sources = []
+    for root in roots:
+        root_theme_id = root.current_published_version.theme_id if root.current_published_version else None
+        uses_default = theme.is_default and root_theme_id is None
+        if root.id not in direct_root_ids and root_theme_id != theme.id and not uses_default:
+            continue
+        hostname = next((value for value in (root.hostnames or []) if value not in {"*", "default"}), "")
+        sources.append(
+            {
+                "id": root.id,
+                "label": hostname or root.title or f"Site {root.id}",
+                "hostname": hostname,
+            }
+        )
+    return sources
+
+
+def _collect_preview_content(value, texts, images, parent_key=""):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            normalized_key = str(key).lower().replace("-", "_")
+            _collect_preview_content(child, texts, images, normalized_key)
+        return
+    if isinstance(value, list):
+        for child in value:
+            _collect_preview_content(child, texts, images, parent_key)
+        return
+    if not isinstance(value, str):
+        return
+    candidate = value.strip()
+    if parent_key in PREVIEW_IMAGE_KEYS:
+        if candidate.startswith(("http://", "https://", "/")) and candidate not in images:
+            images.append(candidate)
+        return
+    if parent_key not in PREVIEW_TEXT_KEYS:
+        return
+    candidate = re.sub(r"\s+", " ", html.unescape(strip_tags(candidate))).strip()
+    if candidate and not candidate.startswith(("http://", "https://", "/")) and candidate not in texts:
+        texts.append(candidate[:5000])
+
+
+def _page_preview_content(page, version):
+    texts = []
+    images = []
+    for value in (page.title, page.description):
+        cleaned = re.sub(r"\s+", " ", html.unescape(strip_tags(value or ""))).strip()
+        if cleaned and cleaned not in texts:
+            texts.append(cleaned[:5000])
+    _collect_preview_content(version.page_data or {}, texts, images)
+    _collect_preview_content(version.widgets or {}, texts, images)
+    return texts, images
+
+
+def _preview_primary_slot(catalog, layout_name):
+    layout = next((item for item in catalog["layouts"] if item["key"] == layout_name), None)
+    slots = layout["slots"] if layout else []
+    return next(
+        (slot["name"] for slot in slots if slot["name"] in {"main", "content", "body", "landing_page"}),
+        slots[0]["name"] if slots else "main",
+    )
+
+
+def import_designer_preview_from_site(theme_id, tenant, user, source_site_id):
+    """Replace saved preview content with public content from a site using the theme."""
+    with transaction.atomic():
+        theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
+        if not user_can_design_theme(user, theme):
+            raise PermissionError
+        sources = designer_content_sources(theme)
+        allowed_source_ids = {source["id"] for source in sources}
+        try:
+            source_site_id = int(source_site_id)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError("Choose a valid source site.") from exc
+        if source_site_id not in allowed_source_ids:
+            raise ValidationError("That site does not use this theme.")
+
+        root = WebPage.objects.get(id=source_site_id, tenant=tenant, parent__isnull=True, is_deleted=False)
+        pages = list(
+            WebPage.objects.filter(
+                Q(id=root.id) | Q(cached_root_id=root.id),
+                tenant=tenant,
+                is_deleted=False,
+                current_published_version__isnull=False,
+            )
+            .select_related("current_published_version__theme", "parent")
+            .order_by("cached_path", "sort_order", "id")[:100]
+        )
+        themed_pages = []
+        for page in pages:
+            effective_theme = page.get_effective_theme()
+            if effective_theme and effective_theme.id == theme.id:
+                themed_pages.append(page)
+        pages = themed_pages
+        if not pages:
+            raise ValidationError("That site has no published content using this theme.")
+
+        catalog = build_designer_catalog(theme, collect_designer_assets(theme))
+        preview = normalized_designer_preview(theme)
+        targets = [element for group in catalog["designGroups"] for element in group.get("elements", [])]
+        fallback_page = pages[0]
+        for view in preview["views"]:
+            page = next(
+                (candidate for candidate in pages if candidate.current_published_version.code_layout == view["layout"]),
+                fallback_page,
+            )
+            version = page.current_published_version
+            texts, images = _page_preview_content(page, version)
+            view["texts"] = (
+                {target["id"]: texts[index % len(texts)] for index, target in enumerate(targets)} if texts else {}
+            )
+            if images:
+                slot = _preview_primary_slot(catalog, view["layout"])
+                image_url = images[0]
+                view["images"] = {
+                    f"preview:{view['id']}:image:{slot}": {
+                        "url": image_url,
+                        "filename": os.path.basename(image_url.split("?", 1)[0]) or "Site image",
+                    }
+                }
+            else:
+                view["images"] = {}
+            view["sourceSiteId"] = root.id
+            view["sourcePageId"] = page.id
+
+        preview["sourceSiteId"] = root.id
+        preview["sourceSiteLabel"] = next(source["label"] for source in sources if source["id"] == root.id)
+        theme.designer_preview = preview
+        theme.save(update_fields=["designer_preview", "updated_at"], skip_version_increment=True)
+        return preview
 
 
 def theme_designer_snapshot(theme):
@@ -755,6 +936,7 @@ def build_workspace(theme: PageTheme):
         "assets": assets,
         "catalog": catalog,
         "previewContent": {"views": catalog["previewViews"]},
+        "contentSources": designer_content_sources(theme),
         "canUndo": theme.designer_revisions.exists(),
         "constraints": {
             "editableTypographyProperties": sorted(TYPE_PROPERTIES),
