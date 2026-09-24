@@ -397,7 +397,7 @@ describe('TreePageManager', () => {
         })
     })
 
-    it('automatically loads children for first-level pages with children', async () => {
+    it('starts branches collapsed and loads children only after expansion', async () => {
         // Mock pages with children
         const mockPagesWithChildren = {
             results: [
@@ -455,13 +455,49 @@ describe('TreePageManager', () => {
             expect(screen.getByText('About Page')).toBeInTheDocument()
         })
 
-        // Verify that getPageChildren was called for the page with children
+        expect(pagesApi.getPageChildren).not.toHaveBeenCalled()
+        expect(screen.getByRole('button', { name: 'Expand Home Page' })).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Expand Home Page' }))
+
         await waitFor(() => {
             expect(pagesApi.getPageChildren).toHaveBeenCalledWith(1)
+            expect(screen.getByText('Child Page 1')).toBeInTheDocument()
         })
 
         // Verify that getPageChildren was NOT called for the page without children
         expect(pagesApi.getPageChildren).not.toHaveBeenCalledWith(2)
+    })
+
+    it('restores expanded branches after the pages workspace remounts', async () => {
+        const mockChildren = {
+            results: [{
+                id: 3,
+                title: 'Child Page 1',
+                slug: 'child-1',
+                publicationStatus: 'published',
+                childrenCount: 0,
+                sortOrder: 0,
+            }],
+            count: 1,
+        }
+        pagesApi.getPageChildren.mockResolvedValue(mockChildren)
+
+        const firstRender = renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+        await waitFor(() => expect(screen.getByText('Home Page')).toBeInTheDocument())
+
+        fireEvent.click(screen.getByRole('button', { name: 'Expand Home Page' }))
+        await waitFor(() => expect(screen.getByText('Child Page 1')).toBeInTheDocument())
+        firstRender.unmount()
+        pagesApi.getPageChildren.mockClear()
+
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Collapse Home Page' })).toBeInTheDocument()
+            expect(screen.getByText('Child Page 1')).toBeInTheDocument()
+        })
+        expect(pagesApi.getPageChildren).toHaveBeenCalledWith(1)
     })
 
 

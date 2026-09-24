@@ -237,13 +237,17 @@ const PageTreeNode = memo(({
     canMoveDown = true,
     selectedPageIds = new Set(),
     onPageClick = null,
-    isSelectionMode = false
+    isSelectionMode = false,
+    expandedPageIds,
+    parentPageId = null,
+    onExpansionChange,
+    onChildrenLoaded,
 }) => {
-    // Each node manages its own state independently
+    // Nodes own their loaded children; the pages workspace owns persisted expansion state.
     const [page, setPage] = useState(initialPage)
     const childrenRef = useRef([])
     const [, forceUpdate] = useState({})
-    const [isExpanded, setIsExpanded] = useState(initialPage.isExpanded || false)
+    const [localIsExpanded, setLocalIsExpanded] = useState(initialPage.isExpanded || false)
     const [childrenLoaded, setChildrenLoaded] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const queryClient = useQueryClient()
@@ -254,12 +258,17 @@ const PageTreeNode = memo(({
         setPage(initialPage)
     }, [initialPage.id, initialPage.title, initialPage.slug, initialPage.workflowState])
 
-    // Sync local expansion state with page prop changes
+    const isExpansionControlled = expandedPageIds instanceof Set && typeof onExpansionChange === 'function'
+    const isExpanded = isExpansionControlled
+        ? expandedPageIds.has(String(page.id))
+        : localIsExpanded
+
+    // Preserve standalone node behavior for callers that do not provide shared tree state.
     useEffect(() => {
-        if (page.isExpanded !== undefined) {
-            setIsExpanded(page.isExpanded)
+        if (!isExpansionControlled && page.isExpanded !== undefined) {
+            setLocalIsExpanded(page.isExpanded)
         }
-    }, [page.isExpanded, page.id])
+    }, [isExpansionControlled, page.isExpanded, page.id])
 
     // Check if page has children (memoized)
     const hasChildren = useMemo(() => pageTreeUtils.hasChildren(page), [page])
@@ -317,11 +326,13 @@ const PageTreeNode = memo(({
         setIsLoading(true)
         try {
             const childrenData = await pagesApi.getPageChildren(page.id)
-            const loadedChildren = childrenData.results.map(child =>
+            const results = Array.isArray(childrenData?.results) ? childrenData.results : []
+            const loadedChildren = results.map(child =>
                 pageTreeUtils.formatPageForTree(child)
             )
             childrenRef.current = loadedChildren
             setChildrenLoaded(true)
+            onChildrenLoaded?.(page.id, loadedChildren)
 
             // Cache the children data in React Query for invalidation
             queryClient.setQueryData(['page-children', page.id], childrenData)
@@ -331,7 +342,7 @@ const PageTreeNode = memo(({
         } finally {
             setIsLoading(false)
         }
-    }, [page.id, childrenLoaded, isLoading, queryClient, showError])
+    }, [page.id, childrenLoaded, isLoading, onChildrenLoaded, queryClient, showError])
 
     // Auto-load children if this node starts expanded and has children
     useEffect(() => {
@@ -345,7 +356,11 @@ const PageTreeNode = memo(({
         if (!hasChildren) return
 
         const newExpanded = !isExpanded
-        setIsExpanded(newExpanded)
+        if (isExpansionControlled) {
+            onExpansionChange(page.id, parentPageId, newExpanded)
+        } else {
+            setLocalIsExpanded(newExpanded)
+        }
 
         // Load children when expanding if not already loaded
         if (newExpanded && !childrenLoaded) {
@@ -694,6 +709,7 @@ const PageTreeNode = memo(({
                         `}
                     disabled={isLoading || !hasChildren}
                     aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${page.title}`}
+                    aria-expanded={hasChildren ? isExpanded : undefined}
                 >
                     {isLoading ? (
                         <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
@@ -881,6 +897,10 @@ const PageTreeNode = memo(({
                             selectedPageIds={selectedPageIds}
                             onPageClick={onPageClick}
                             isSelectionMode={isSelectionMode}
+                            expandedPageIds={expandedPageIds}
+                            parentPageId={page.id}
+                            onExpansionChange={onExpansionChange}
+                            onChildrenLoaded={onChildrenLoaded}
                         />
                     ))}
                 </div>
@@ -895,6 +915,10 @@ const PageTreeNode = memo(({
     // This is simpler and more reliable than checking individual page selection
     if (prevProps.selectedPageIds !== nextProps.selectedPageIds) {
         return false // Re-render because selection changed
+    }
+
+    if (prevProps.expandedPageIds !== nextProps.expandedPageIds) {
+        return false
     }
 
     // Compare array props by stringifying for simplicity
@@ -920,6 +944,7 @@ const PageTreeNode = memo(({
     return (
         prevProps.page.id === nextProps.page.id &&
         prevProps.page.title === nextProps.page.title &&
+        prevProps.page.childrenCount === nextProps.page.childrenCount &&
         prevProps.rowHeight === nextProps.rowHeight &&
         prevProps.canMoveUp === nextProps.canMoveUp &&
         prevProps.canMoveDown === nextProps.canMoveDown &&
