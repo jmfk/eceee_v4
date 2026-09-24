@@ -333,7 +333,8 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         # Clear any existing default themes and set this one
         self.get_queryset().filter(is_default=True).update(is_default=False)
         theme.is_default = True
-        theme.save()
+        theme.save(update_fields=["is_default", "updated_at"])
+        theme.refresh_from_db()
 
         serializer = PageThemeSerializer(theme)
         return Response(
@@ -1017,24 +1018,26 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            # Check usage before deleting
-            used_in = theme.get_image_usage(filename)
-            if used_in and request.query_params.get("force") != "true":
-                return Response(
-                    {
-                        "error": "Image is in use",
-                        "usedIn": used_in,
-                        "message": "Add ?force=true to delete anyway",
-                    },
-                    status=status.HTTP_409_CONFLICT,
-                )
+            with transaction.atomic():
+                theme = self._get_object_for_update()
 
-            # Delete the file
-            storage.delete(file_path)
+                # Check current usage before deleting
+                used_in = theme.get_image_usage(filename)
+                if used_in and request.query_params.get("force") != "true":
+                    return Response(
+                        {
+                            "error": "Image is in use",
+                            "usedIn": used_in,
+                            "message": "Add ?force=true to delete anyway",
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
 
-            # If forced, clean up references
-            if used_in:
-                theme.delete_library_image(filename)
+                storage.delete(file_path)
+
+                # If forced, clean up references
+                if used_in:
+                    theme.delete_library_image(filename)
 
             return Response(
                 {"message": f"Image '{filename}' deleted successfully"},
@@ -1072,32 +1075,34 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         errors = []
         in_use = []
 
-        for filename in filenames:
-            try:
-                file_path = f"theme_images/{theme.id}/library/{filename}"
+        with transaction.atomic():
+            theme = self._get_object_for_update()
 
-                if not storage.exists(file_path):
-                    errors.append({"filename": filename, "error": "Image not found"})
-                    continue
+            for filename in filenames:
+                try:
+                    file_path = f"theme_images/{theme.id}/library/{filename}"
 
-                # Check usage
-                used_in = theme.get_image_usage(filename)
-                if used_in and not force:
-                    in_use.append({"filename": filename, "usedIn": used_in})
-                    continue
+                    if not storage.exists(file_path):
+                        errors.append({"filename": filename, "error": "Image not found"})
+                        continue
 
-                # Delete the file
-                storage.delete(file_path)
+                    # Check current usage
+                    used_in = theme.get_image_usage(filename)
+                    if used_in and not force:
+                        in_use.append({"filename": filename, "usedIn": used_in})
+                        continue
 
-                # Clean up references if forced
-                if used_in:
-                    theme.delete_library_image(filename)
+                    storage.delete(file_path)
 
-                deleted.append(filename)
+                    # Clean up references if forced
+                    if used_in:
+                        theme.delete_library_image(filename)
 
-            except Exception as e:
-                logger.error(f"Failed to delete {filename}: {str(e)}")
-                errors.append({"filename": filename, "error": str(e)})
+                    deleted.append(filename)
+
+                except Exception as e:
+                    logger.error(f"Failed to delete {filename}: {str(e)}")
+                    errors.append({"filename": filename, "error": str(e)})
 
         return Response(
             {
@@ -1191,50 +1196,53 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             # Delete old file
             storage.delete(old_path)
 
-            # Update references in design_groups, including current direct
-            # layoutProperties.backgroundImage objects and legacy images maps.
-            if theme.design_groups:
-                image_reference_keys = {
-                    "backgroundImage",
-                    "fileUrl",
-                    "filename",
-                    "image",
-                    "imgproxyBaseUrl",
-                    "publicUrl",
-                    "url",
-                }
+            with transaction.atomic():
+                theme = self._get_object_for_update()
 
-                def replace_filename(value, key=None):
-                    if isinstance(value, str):
-                        if key not in image_reference_keys:
-                            return value, False
-                        replaced = value.replace(filename, new_filename)
-                        return replaced, replaced != value
+                # Update references in design_groups, including current direct
+                # layoutProperties.backgroundImage objects and legacy images maps.
+                if theme.design_groups:
+                    image_reference_keys = {
+                        "backgroundImage",
+                        "fileUrl",
+                        "filename",
+                        "image",
+                        "imgproxyBaseUrl",
+                        "publicUrl",
+                        "url",
+                    }
 
-                    if isinstance(value, list):
-                        changed = False
-                        updated_items = []
-                        for item in value:
-                            updated_item, item_changed = replace_filename(item, key)
-                            updated_items.append(updated_item)
-                            changed = changed or item_changed
-                        return updated_items, changed
+                    def replace_filename(value, key=None):
+                        if isinstance(value, str):
+                            if key not in image_reference_keys:
+                                return value, False
+                            replaced = value.replace(filename, new_filename)
+                            return replaced, replaced != value
 
-                    if isinstance(value, dict):
-                        changed = False
-                        updated_dict = {}
-                        for child_key, item in value.items():
-                            updated_item, item_changed = replace_filename(item, child_key)
-                            updated_dict[child_key] = updated_item
-                            changed = changed or item_changed
-                        return updated_dict, changed
+                        if isinstance(value, list):
+                            changed = False
+                            updated_items = []
+                            for item in value:
+                                updated_item, item_changed = replace_filename(item, key)
+                                updated_items.append(updated_item)
+                                changed = changed or item_changed
+                            return updated_items, changed
 
-                    return value, False
+                        if isinstance(value, dict):
+                            changed = False
+                            updated_dict = {}
+                            for child_key, item in value.items():
+                                updated_item, item_changed = replace_filename(item, child_key)
+                                updated_dict[child_key] = updated_item
+                                changed = changed or item_changed
+                            return updated_dict, changed
 
-                updated_design_groups, updated = replace_filename(theme.design_groups)
-                if updated:
-                    theme.design_groups = updated_design_groups
-                    theme.save(update_fields=["design_groups"])
+                        return value, False
+
+                    updated_design_groups, updated = replace_filename(theme.design_groups)
+                    if updated:
+                        theme.design_groups = updated_design_groups
+                        theme.save(update_fields=["design_groups"])
 
             # Update theme preview image if it matches
             if theme.image and filename in theme.image.name:
