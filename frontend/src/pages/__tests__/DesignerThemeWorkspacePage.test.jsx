@@ -30,6 +30,9 @@ const workspace = {
     typography: [{ targetId: 'group:0:element:h1', groupIndex: 0, groupName: 'Article', element: 'h1', values: { fontFamily: 'Inter', fontSize: '32px' } }],
     spacing: [{ targetId: 'group:0:element:h1', scope: 'element', groupIndex: 0, groupName: 'Article', element: 'h1', values: { marginBottom: '16px' } }],
     assets: [{
+        assetKey: 'preview', displayName: 'Theme preview', filename: 'theme-preview.png', url: 'https://storage.test/theme-preview.png',
+        kind: 'preview', usage: ['Theme listing preview'], isPlaceholder: false, replaceable: true,
+    }, {
         assetKey: 'design:0:hero:md:background', displayName: 'Article hero', kind: 'design-group', usage: ['Article / hero / md / background'],
         requiredWidth: 1600, requiredHeight: 900, requirementSource: 'explicit', dpr: 2, isPlaceholder: true, replaceable: true,
         validation: { status: 'ok', message: 'Explicit dimensions configured.' },
@@ -39,8 +42,9 @@ const workspace = {
     catalog: {
         designGroups: [{
             id: 'group:0', groupIndex: 0, label: 'Article', description: 'Editorial content', slots: ['main'],
+            widgetTypes: ['easy_widgets.ContentWidget'],
             elements: [{ id: 'group:0:element:h1', element: 'h1', label: 'Heading 1' }],
-            parts: [{ id: 'group:0:part:hero', part: 'hero', label: 'Hero', breakpoints: ['md'] }],
+            parts: [{ id: 'group:0:part:content-widget', part: 'content-widget', label: 'Content', breakpoints: ['md'] }],
             assetKeys: ['design:0:hero:md:background'], colorNames: ['brand'],
         }],
         componentStyles: [
@@ -49,8 +53,8 @@ const workspace = {
         ],
         layouts: [{
             key: 'main_layout', label: 'Main layout', description: 'Content and sidebar',
-            slots: [{ name: 'main', label: 'Main content' }], parts: [], layoutCss: '.main-layout{display:block}',
-            previewTemplate: '<div class="main-layout"><main>__DESIGNER_SLOT_main__</main></div>',
+            slots: [{ name: 'hero', label: 'Hero' }, { name: 'main', label: 'Main content' }], parts: [], layoutCss: '.main-layout{display:block}',
+            previewTemplate: '<div class="main-layout"><div class="slot-hero">__DESIGNER_SLOT_hero__</div><main class="slot-main">__DESIGNER_SLOT_main__</main></div>',
         }],
         previewViews,
     },
@@ -99,6 +103,11 @@ describe('DesignerThemeWorkspacePage', () => {
             expect(source).toContain('class="main-layout"')
             expect(source).toContain('data-designer-target="group:0:element:h1"')
             expect(source).toContain('data-designer-kind="previewImage"')
+            expect(source).toContain('widget-type-easy-widgets-contentwidget')
+            expect(source).toContain('widget-type-content')
+            expect(source).toContain('demo-part content-widget')
+            expect(source).toContain('https://storage.test/theme-preview.png')
+            expect(source).toContain('outline:1px dashed rgba(100,116,139,.5)')
             expect(source).toContain('top:4px;right:4px')
             expect(source).not.toContain('top:-24px')
             expect(source).toContain('<nav>')

@@ -121,6 +121,30 @@ class DesignerThemeApiTests(TestCase):
         self.assertTrue(main_layout["layoutCss"])
         self.assertEqual(workspace["previewContent"], {"views": workspace["catalog"]["previewViews"]})
 
+    def test_workspace_places_chrome_widgets_in_natural_preview_slots(self):
+        groups = self.theme.design_groups
+        groups["groups"].append(
+            {
+                "name": "Navigation",
+                "widgetTypes": ["easy_widgets.NavigationWidget"],
+                "layoutProperties": {"nav-container": {"md": {"padding": "12px"}}},
+                "elements": {},
+            }
+        )
+        self.theme.design_groups = groups
+        self.theme.save(update_fields=["design_groups"])
+        self.authenticate(self.designer)
+
+        workspace = self.client.get(self.workspace_url).data
+        navigation = next(
+            group
+            for group in workspace["catalog"]["designGroups"]
+            if group["widgetTypes"] == ["easy_widgets.NavigationWidget"]
+        )
+
+        self.assertEqual(navigation["slots"], ["sidebar"])
+        self.assertEqual(navigation["parts"][0]["part"], "nav-container")
+
     def test_preview_text_is_saved_separately_from_theme_draft_and_preserves_metadata(self):
         self.theme.designer_preview = {
             "developerNote": "Use realistic editorial copy",
