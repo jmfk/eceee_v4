@@ -1,7 +1,9 @@
 from datetime import timedelta
+from io import StringIO
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.db import connection
 from django.test import TestCase, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
@@ -64,6 +66,101 @@ class PageVersionWorkflowTest(TestCase):
         self.assertIsNone(first.effective_date)
         self.page.refresh_from_db()
         self.assertEqual(self.page.current_published_version_id, live.id)
+
+    def test_page_scoped_save_atomically_creates_and_updates_first_working_copy(self):
+        live = self.publish_initial()
+
+        response = self.client.patch(
+            reverse("api:page-working-copy-save", kwargs={"page_id": self.page.pk}),
+            {
+                "expectedVersionId": live.id,
+                "clientUpdatedAt": live.updated_at.isoformat(),
+                "metaTitle": "First migrated edit",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["created"])
+        working = self.page.versions.get(effective_date__isnull=True)
+        self.assertEqual(working.meta_title, "First migrated edit")
+        self.assertEqual(response.data["version"]["id"], working.id)
+        self.page.refresh_from_db()
+        self.assertEqual(self.page.current_published_version_id, live.id)
+
+    def test_page_scoped_save_updates_the_reviewed_working_copy(self):
+        draft = self.page.create_version(self.user, "Working copy")
+
+        response = self.client.patch(
+            reverse("api:page-working-copy-save", kwargs={"page_id": self.page.pk}),
+            {
+                "expectedVersionId": draft.id,
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "metaTitle": "Updated atomically",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["created"])
+        draft.refresh_from_db()
+        self.assertEqual(draft.meta_title, "Updated atomically")
+
+    def test_page_scoped_first_save_rejects_a_concurrently_created_working_copy(self):
+        live = self.publish_initial()
+        draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+
+        response = self.client.patch(
+            reverse("api:page-working-copy-save", kwargs={"page_id": self.page.pk}),
+            {
+                "expectedVersionId": live.id,
+                "clientUpdatedAt": live.updated_at.isoformat(),
+                "metaTitle": "Stale edit",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["error"], "version_conflict")
+        self.assertEqual(response.data["details"]["server_version"]["id"], draft.id)
+        self.assertEqual(self.page.versions.count(), 2)
+        draft.refresh_from_db()
+        self.assertNotEqual(draft.meta_title, "Stale edit")
+
+    def test_page_scoped_first_save_rejects_a_stale_live_snapshot(self):
+        live = self.publish_initial()
+        observed_at = live.updated_at
+        live.meta_title = "Changed elsewhere"
+        live.save()
+
+        response = self.client.patch(
+            reverse("api:page-working-copy-save", kwargs={"page_id": self.page.pk}),
+            {
+                "expectedVersionId": live.id,
+                "clientUpdatedAt": observed_at.isoformat(),
+                "metaTitle": "Stale edit",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(self.page.versions.count(), 1)
+
+    def test_live_only_page_audit_is_read_only(self):
+        self.publish_initial()
+        before = self.page.versions.count()
+        output = StringIO()
+
+        call_command(
+            "audit_live_only_pages",
+            tenant=self.tenant.identifier,
+            limit=10,
+            stdout=output,
+        )
+
+        self.assertIn("Live-only pages: 1", output.getvalue())
+        self.assertIn(f"{self.page.id}\t{self.tenant.identifier}", output.getvalue())
+        self.assertEqual(self.page.versions.count(), before)
 
     def test_unrelated_user_cannot_open_tenant_working_copy(self):
         draft = self.page.create_version(self.user, "Shared draft")
@@ -1597,6 +1694,24 @@ class PageVersionMutationTransactionTest(TransactionTestCase):
                 {
                     "clientUpdatedAt": self.version.updated_at.isoformat(),
                     "metaTitle": "Lock order",
+                },
+                format="json",
+            )
+
+        lock_queries = [query["sql"] for query in queries.captured_queries if "FOR UPDATE" in query["sql"].upper()]
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(lock_queries), 2)
+        self.assertIn("webpages_webpage", lock_queries[0])
+        self.assertIn("webpages_pageversion", lock_queries[1])
+
+    def test_page_scoped_working_copy_save_locks_page_before_version(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.patch(
+                reverse("api:page-working-copy-save", kwargs={"page_id": self.page.pk}),
+                {
+                    "expectedVersionId": self.version.id,
+                    "clientUpdatedAt": self.version.updated_at.isoformat(),
+                    "metaTitle": "Page lock order",
                 },
                 format="json",
             )

@@ -340,12 +340,76 @@ class PageVersionViewSet(
                     locked,
                     data=payload,
                     partial=True,
-                    context={"request": request},
+                    context={"request": request, "timestamp_conflict_checked": True},
                 )
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
             return Response(serializer.data)
         except WorkflowError as error:
+            return self._workflow_error_response(error)
+
+    def save_page_working_copy(self, request, page_id=None):
+        """Atomically create (when needed) and save the page's canonical working copy."""
+        if "page" in request.data or "page_id" in request.data:
+            return Response(
+                {"error": "immutable_field", "message": "A working version cannot be moved to another page."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        expected_version_id = request.data.get("expected_version_id")
+        if expected_version_id is None:
+            return Response(
+                {
+                    "error": "expected_version_id_required",
+                    "message": "expectedVersionId is required when saving a page working version.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            expected_version_id = int(expected_version_id)
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "invalid_version_id", "message": "expectedVersionId is invalid."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        client_timestamp, error_response = self._parse_required_client_updated_at(request)
+        if error_response:
+            return error_response
+
+        page = get_object_or_404(self._page_queryset(), pk=page_id)
+        try:
+            with transaction.atomic():
+                service = PageVersionWorkflowService(page, request.user)
+                version, created = service.resolve_atomic_save_target(
+                    expected_version_id=expected_version_id,
+                    expected_updated_at=client_timestamp,
+                )
+                payload = request.data.copy()
+                payload.pop("expected_version_id", None)
+                payload.pop("client_updated_at", None)
+                payload.pop("effective_date", None)
+                payload.pop("expiry_date", None)
+                serializer = PageVersionSerializer(
+                    version,
+                    data=payload,
+                    partial=True,
+                    context={"request": request, "timestamp_conflict_checked": True},
+                )
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+            return Response(
+                {"created": created, "version": serializer.data},
+                status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+            )
+        except WorkflowError as error:
+            server_version_id = error.details.get("server_version_id")
+            if server_version_id:
+                server_version = self.get_queryset().filter(pk=server_version_id).first()
+                if server_version:
+                    error.details["server_version"] = PageVersionSerializer(
+                        server_version,
+                        context={"request": request},
+                    ).data
             return self._workflow_error_response(error)
 
     @action(detail=True, methods=["post"], url_path="schedule")

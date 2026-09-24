@@ -41,7 +41,6 @@ import {
     processLoadedVersionData,
     buildVersionedPageData,
     mergeVersionedPageAttributes,
-    getCanonicalSaveVersion,
 } from '../utils/smartSaveUtils'
 import { applyWidgetUpdateToWidgetMap } from '../utils/pageEditorWidgetState'
 import { saveWidgetEditorChanges } from '../utils/pageEditorWidgetSave'
@@ -1293,23 +1292,12 @@ const PageEditor = () => {
                 ...collectedData.metadata
             };
 
-            const saveVersion = await getCanonicalSaveVersion(
-                pageId,
-                pageVersionData,
-                workflow?.editableVersion,
-                versionsApi,
-            );
             const currentVersionDataForSave = {
-                ...saveVersion,
                 ...(saveOptions.resolvedData?.version || pageVersionData),
                 ...versionDataOverrides,
-                id: saveVersion.id,
-                versionId: saveVersion.versionId || saveVersion.id,
                 widgets: versionDataOverrides.widgets || saveOptions.resolvedData?.version?.widgets || collectedData.widgets
             };
-            const clientUpdatedAt = String(saveVersion.id) === String(pageVersionData?.id)
-                ? saveOptions.resolvedData?.version?.updatedAt || originalPageVersionData?.updatedAt
-                : saveVersion.updatedAt;
+            const clientUpdatedAt = saveOptions.resolvedData?.version?.updatedAt || originalPageVersionData?.updatedAt;
 
             // Use smart save with separated data (include timestamp for conflict detection)
             const saveResult = await smartSave(
@@ -1320,7 +1308,9 @@ const PageEditor = () => {
                 { pagesApi, versionsApi },      // API functions
                 {
                     description: saveOptions.description || 'Auto-save',
-                    clientUpdatedAt
+                    clientUpdatedAt,
+                    pageId,
+                    expectedVersionId: pageVersionData?.id,
                 }
             );
 
@@ -1460,7 +1450,7 @@ const PageEditor = () => {
             }
             throw error;
         }
-    }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, workflow, pageId, queryClient, currentVersion, finalizePendingCutSources]); // Removed loadVersionsPreserveCurrent to break circular dependency
+    }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, pageId, queryClient, currentVersion, finalizePendingCutSources]); // Removed loadVersionsPreserveCurrent to break circular dependency
 
 
     // Smart save - analyze changes first, then show modal only if needed
@@ -1580,15 +1570,7 @@ const PageEditor = () => {
     const handleSave = useCallback(async () => {
         setIsSaving(true);
         try {
-            const targetVersion = await getCanonicalSaveVersion(
-                pageId,
-                pageVersionData,
-                workflow?.editableVersion,
-                versionsApi,
-            );
-            const clientUpdatedAt = String(targetVersion.id) === String(pageVersionData?.id)
-                ? originalPageVersionData?.updatedAt || pageVersionData?.updatedAt
-                : targetVersion.updatedAt;
+            const clientUpdatedAt = originalPageVersionData?.updatedAt || pageVersionData?.updatedAt;
 
             const versionPayload = {
                 pageData: buildVersionedPageData(pageVersionData?.pageData || {}, webpageData || {}),
@@ -1602,8 +1584,9 @@ const PageEditor = () => {
                 enableCssInjection: pageVersionData?.enableCssInjection !== false,
                 tags: pageVersionData?.tags || [],
             };
-            const saved = await versionsApi.saveWorkingCopy(
-                targetVersion.id,
+            const saved = await versionsApi.savePageWorkingCopy(
+                pageId,
+                pageVersionData.id,
                 versionPayload,
                 clientUpdatedAt,
             );
@@ -1639,7 +1622,7 @@ const PageEditor = () => {
         } finally {
             setIsSaving(false);
         }
-    }, [pageVersionData, originalPageVersionData, workflow, pageId, localWidgets, publishUpdate, webpageData, refetchWorkflow, loadVersionsPreserveCurrent, setIsDirty, addNotification]);
+    }, [pageVersionData, originalPageVersionData, pageId, localWidgets, publishUpdate, webpageData, refetchWorkflow, loadVersionsPreserveCurrent, setIsDirty, addNotification]);
 
     const handleVersionRestored = useCallback(async (restoredVersion) => {
         const processed = processLoadedVersionData(restoredVersion);

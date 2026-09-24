@@ -90,6 +90,7 @@ Page authors currently encounter version numbers, overlapping status badges, dir
 - 2026-09-22: Review follow-up keeps public page attributes inside the working version until publication, makes scheduled takeover reversible on cancellation without reviving superseded content, restores tenant-wide History comparison, and runs legacy mutations inside explicit database transactions.
 - 2026-09-22: Delayed slug changes now reject existing sibling collisions on Save and recheck the shared sibling namespace under lock before immediate, scheduled, bulk, or descendant publication.
 - 2026-09-22: The follow-up hardening contract is tracked in PRD-0002 and ADR-0002; legacy mutations and implicit descendant publication are removed in favor of one reviewed working-copy boundary.
+- 2026-09-24: First save for a live-only migrated page now creates and writes the working copy in one atomic request. A read-only audit command reports pages that will use this path without manufacturing no-op unpublished changes.
 
 ## Linked ADRs
 

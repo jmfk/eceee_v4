@@ -18,7 +18,7 @@ Direct page updates, granular version endpoints, implicit subtree publication, a
 
 ## Decision
 
-The complete working-copy save endpoint is the only page-editor write boundary. It requires the last observed version timestamp, validates the whole submitted state, and cannot change the owning page. Publication and scheduling use the workflow service and an explicit reviewed version timestamp. Multi-page actions accept explicit page/version/timestamp items. Legacy mutation and implicit subtree endpoints return HTTP 410.
+The complete working-copy save endpoint is the only page-editor write boundary. It requires the last observed version identifier and timestamp, validates the whole submitted state, and cannot change the owning page. When the reviewed page is live-only, that same transaction creates the working copy from the reviewed live version and applies the submitted state; there is no separate empty-copy creation request. Publication and scheduling use the workflow service and an explicit reviewed version timestamp. Multi-page actions accept explicit page/version/timestamp items. Legacy mutation and implicit subtree endpoints return HTTP 410.
 
 Restoring history into an existing working copy uses the same last-observed timestamp rule. A stale restore returns a conflict instead of replacing newer editor work, and the client reloads the returned working-copy snapshot after a confirmed restore.
 
@@ -35,6 +35,7 @@ One boundary makes optimistic locking, schema validation, authorization, and pub
 ## Consequences
 
 - Old web clients must reload before they can save or publish.
+- First save for a live-only page is one atomic request and does not require pre-created working copies.
 - External legacy mutation clients must migrate to workflow endpoints.
 - Descendant publication is temporarily unavailable rather than operating on unreviewed inferred versions.
 - Scheduled activation failures remain recoverable and do not leave contradictory dates.

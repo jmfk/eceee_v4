@@ -181,6 +181,11 @@ urlpatterns = [
         name="page-working-copy",
     ),
     path(
+        "pages/<int:page_id>/working-copy/save/",
+        PageVersionViewSet.as_view({"patch": "save_page_working_copy"}),
+        name="page-working-copy-save",
+    ),
+    path(
         "pages/<int:page_id>/unpublish-explicit/",
         PageVersionViewSet.as_view({"post": "unpublish_page"}),
         name="page-unpublish-explicit",

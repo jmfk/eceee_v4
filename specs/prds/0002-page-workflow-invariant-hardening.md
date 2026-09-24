@@ -77,6 +77,7 @@ The simplified version workflow still has compatibility paths that can mutate pa
 - 2026-09-23: Tenant scoping now covers page hierarchy bulk mutations and theme CRUD, working-copy saves follow the page-then-version lock order, and admin restores create working copies instead of changing public page data.
 - 2026-09-23: Historical restore now rejects stale working-copy snapshots and refreshes the editor after confirmation. Tenant boundaries also cover default-theme fallback/creation and root-page ordering; partial new-page setup failures are surfaced to the editor.
 - 2026-09-23: The consolidated review-fix batch restricts publication to explicit page attributes, scopes site-package jobs to the selected tenant, rejects invalid explicit tenant selection, and gives root publication paths one lock order. Scheduled activation failures are isolated per page, first-save races return a conflict, legacy schedules can be cancelled explicitly, and restored legacy page attributes are normalized into the working-copy namespace.
+- 2026-09-24: The page-scoped save boundary now atomically creates and writes a working copy when the reviewed source is live-only, retaining exact identifier-and-timestamp conflict detection.
 
 ## Linked ADRs
 
