@@ -21,6 +21,7 @@ from webpages.services import ThemeCSSGenerator
 from webpages.services.designer_export import designer_export_filename, designer_export_object_key
 from webpages.services.designer_theme import (
     DesignerDraftConflict,
+    MAX_IMAGE_PIXELS,
     apply_designer_patch,
     build_draft_workspace,
     designer_theme_queryset,
@@ -68,7 +69,7 @@ class DesignerPlaceholderSerializer(serializers.Serializer):
     draft_version = serializers.IntegerField(min_value=1)
 
     def validate(self, attrs):
-        if attrs["width"] * attrs["height"] > 16_777_216:
+        if attrs["width"] * attrs["height"] > MAX_IMAGE_PIXELS:
             raise serializers.ValidationError("Placeholder images cannot exceed 16 megapixels.")
         return attrs
 

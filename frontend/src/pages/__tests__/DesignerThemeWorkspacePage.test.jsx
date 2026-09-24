@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 
 import DesignerThemeWorkspacePage from '../DesignerThemeWorkspacePage'
 import { renderWithStateProviders } from '../../test/testUtils'
@@ -110,6 +110,21 @@ describe('DesignerThemeWorkspacePage', () => {
 
         await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
         await waitFor(() => expect(mocks.replaceAsset).toHaveBeenCalledWith('7', 'design:0:hero:md:background', upload, 3))
+    })
+
+    it('locks draft controls while a save response is pending', async () => {
+        let finishSave
+        mocks.save.mockImplementation(() => new Promise((resolve) => { finishSave = resolve }))
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        fireEvent.click(screen.getByRole('button', { name: 'Colors' }))
+        fireEvent.change(screen.getByLabelText('brand value'), { target: { value: '#abcdef' } })
+
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+
+        await waitFor(() => expect(screen.getByLabelText('brand value')).toBeDisabled())
+        await act(async () => finishSave({ ...structuredClone(workspace), draftVersion: 3, hasDraftChanges: true }))
+        await waitFor(() => expect(screen.getByLabelText('brand value')).not.toBeDisabled())
     })
 
     it('switches between edit and preview on narrow layouts', async () => {

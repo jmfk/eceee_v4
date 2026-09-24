@@ -33,6 +33,7 @@ services:
       APP_VERSION: ${IMAGE_TAG:-unknown}
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
+      PLAYWRIGHT_SERVICE_URL: ${PLAYWRIGHT_SERVICE_URL:-http://playwright:5000}
     volumes:
       - backend_static:/app/staticfiles
     depends_on:
@@ -134,6 +135,7 @@ services:
       DEBUG: "0"
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
+      PLAYWRIGHT_SERVICE_URL: ${PLAYWRIGHT_SERVICE_URL:-http://playwright:5000}
     depends_on:
       - backend
     networks: [eceee_prod]

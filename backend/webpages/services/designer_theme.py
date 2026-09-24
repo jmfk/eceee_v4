@@ -38,6 +38,7 @@ SPACING_PROPERTIES = {
     "paddingLeft",
 }
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_IMAGE_PIXELS = 16_777_216
 REVISION_LIMIT = 20
 RASTER_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 IMAGE_TYPES = RASTER_TYPES | {"image/svg+xml"}
@@ -704,6 +705,8 @@ def validate_image_upload(upload):
         return content, (int(float(view_box.group(1))), int(float(view_box.group(2)))) if view_box else (None, None)
     try:
         image = Image.open(io.BytesIO(content))
+        if image.width * image.height > MAX_IMAGE_PIXELS:
+            raise ValidationError("Images cannot exceed 16 megapixels.")
         detected_type = Image.MIME.get(image.format)
         if detected_type != content_type and {detected_type, content_type} != {"image/jpeg", "image/jpg"}:
             raise ValidationError("The uploaded content does not match its declared image type.")
@@ -820,8 +823,8 @@ def replace_designer_asset(theme_id, tenant, user, asset_key, upload, draft_vers
 def generate_placeholder_png(display_name, usage, width, height):
     width = int(width)
     height = int(height)
-    if width < 16 or height < 16 or width > 8000 or height > 8000 or width * height > 32_000_000:
-        raise ValidationError("Placeholder dimensions must be between 16px and 8000px and at most 32 megapixels.")
+    if width < 16 or height < 16 or width > 8000 or height > 8000 or width * height > MAX_IMAGE_PIXELS:
+        raise ValidationError("Placeholder dimensions must be between 16px and 8000px and at most 16 megapixels.")
     image = Image.new("RGB", (width, height), "#e5e7eb")
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default(size=max(12, min(width, height) // 18))
