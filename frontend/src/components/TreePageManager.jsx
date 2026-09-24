@@ -7,7 +7,7 @@
  * as published by MongoDB, Inc. See the LICENSE file for details.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -40,6 +40,14 @@ import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import pageTreeUtils from '../utils/pageTreeUtils'
 import DeletedPagesView from './DeletedPagesView'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { getCurrentTenantId } from '../utils/tenant'
+import {
+    getPageTreeExpansionStorageKey,
+    loadPageTreeExpansionRecords,
+    persistPageTreeExpansionRecords,
+    reconcilePageTreeExpansionRecords,
+    setPageTreeBranchExpanded,
+} from '../utils/pageTreeExpansionStorage'
 
 // Search helper function - excludes root pages
 const searchAllPages = async (searchTerm, filters = {}) => {
@@ -99,6 +107,7 @@ const isSitePackageJobDismissed = (jobId) => {
 
 const TreePageManager = () => {
     const navigate = useNavigate()
+    const tenantId = getCurrentTenantId()
     
     // Set document title
     useDocumentTitle('Pages')
@@ -122,6 +131,8 @@ const TreePageManager = () => {
     const [positioningParams, setPositioningParams] = useState(null)
     const [searchResults, setSearchResults] = useState([])
     const [isSearching, setIsSearching] = useState(false)
+    const [expandedPageRecords, setExpandedPageRecords] = useState(() => loadPageTreeExpansionRecords(tenantId))
+    const expandedPageIds = useMemo(() => new Set(expandedPageRecords.keys()), [expandedPageRecords])
 
     // Multi-select state
     const [selectedPageIds, setSelectedPageIds] = useState(new Set())
@@ -140,6 +151,36 @@ const TreePageManager = () => {
     const queryClient = useQueryClient()
     const { showError, showConfirm } = useNotificationContext()
     const { addNotification } = useGlobalNotifications()
+
+    const updateExpandedBranch = useCallback((pageId, parentId, isExpanded) => {
+        setExpandedPageRecords(previous => {
+            const next = setPageTreeBranchExpanded(previous, pageId, parentId, isExpanded)
+            persistPageTreeExpansionRecords(next, tenantId)
+            return next
+        })
+    }, [tenantId])
+
+    const reconcileExpandedChildren = useCallback((parentId, pages) => {
+        setExpandedPageRecords(previous => {
+            const next = reconcilePageTreeExpansionRecords(previous, parentId, pages)
+            if (next !== previous) {
+                persistPageTreeExpansionRecords(next, tenantId)
+            }
+            return next
+        })
+    }, [tenantId])
+
+    useEffect(() => {
+        const storageKey = getPageTreeExpansionStorageKey(tenantId)
+        const handleStorageChange = (event) => {
+            if (event.key === storageKey) {
+                setExpandedPageRecords(loadPageTreeExpansionRecords(tenantId))
+            }
+        }
+
+        window.addEventListener('storage', handleStorageChange)
+        return () => window.removeEventListener('storage', handleStorageChange)
+    }, [tenantId])
 
     // Debounce search term to avoid excessive API calls
     const debouncedSearchTerm = useDebounce(searchTerm, 300)
@@ -360,18 +401,13 @@ const TreePageManager = () => {
     // Update pages when data changes
     useEffect(() => {
         if (rootPagesData?.results) {
-            // Simply format and set pages - each node manages its own expansion and children
-            const formattedPages = rootPagesData.results.map(page => {
-                const formatted = formatPage(page)
-                // Auto-expand root pages on initial load
-                formatted.isExpanded = true
-                return formatted
-            })
+            const formattedPages = rootPagesData.results.map(formatPage)
 
             pagesRef.current = formattedPages
+            reconcileExpandedChildren(null, formattedPages)
             forceUpdate({})
         }
-    }, [rootPagesData, formatPage])
+    }, [rootPagesData, formatPage, reconcileExpandedChildren])
 
     // Process search results
     useEffect(() => {
@@ -464,8 +500,7 @@ const TreePageManager = () => {
         }
     }, [addNotification, showError, refetch])
 
-    // Note: loadChildren is now handled by each PageTreeNode independently
-    // No need for central loading or expand/collapse tracking
+    // Child data remains lazy-loaded by each node; expansion is persisted centrally.
 
     // Cut/Copy/Paste handlers
     const handleCut = useCallback((pageId) => {
@@ -1640,6 +1675,10 @@ const TreePageManager = () => {
                                         selectedPageIds={selectedPageIds}
                                         onPageClick={handlePageClick}
                                         isSelectionMode={selectedPageIds.size > 0}
+                                        expandedPageIds={expandedPageIds}
+                                        parentPageId={null}
+                                        onExpansionChange={updateExpandedBranch}
+                                        onChildrenLoaded={reconcileExpandedChildren}
                                     />
                                 ))}
                             </div>
