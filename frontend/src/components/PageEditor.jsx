@@ -40,7 +40,9 @@ import {
     generateChangeSummary,
     processLoadedVersionData,
     buildVersionedPageData,
+    canPublishWorkingCopy,
     mergeVersionedPageAttributes,
+    refreshAfterWorkingCopySave,
 } from '../utils/smartSaveUtils'
 import { applyWidgetUpdateToWidgetMap } from '../utils/pageEditorWidgetState'
 import { saveWidgetEditorChanges } from '../utils/pageEditorWidgetSave'
@@ -1051,20 +1053,22 @@ const PageEditor = () => {
     }, [webpageData?.id, isNewPage, showError, pageId, workflow]);
 
     // Load versions but preserve current version selection
-    const loadVersionsPreserveCurrent = useCallback(async () => {
+    const loadVersionsPreserveCurrent = useCallback(async ({ workflowOverride, skipDirtyCheck = false } = {}) => {
 
         if (!webpageData?.id || isNewPage) {
             return;
         }
-        const changes = analyzeChanges(
-            originalWebpageData,
-            webpageData,
-            originalPageVersionData,
-            pageVersionData
-        );
-        if (changes.hasPageChanges || changes.hasVersionChanges) {
-            // TODO: Handle unsaved changes
-            return;
+        if (!skipDirtyCheck) {
+            const changes = analyzeChanges(
+                originalWebpageData,
+                webpageData,
+                originalPageVersionData,
+                pageVersionData
+            );
+            if (changes.hasPageChanges || changes.hasVersionChanges) {
+                // TODO: Handle unsaved changes
+                return;
+            }
         }
 
         try {
@@ -1072,7 +1076,8 @@ const PageEditor = () => {
             setAvailableVersions(versionsData.results || []);
 
 
-            const targetId = workflow?.editableVersion?.id || workflow?.liveVersion?.id;
+            const currentWorkflow = workflowOverride || workflow;
+            const targetId = currentWorkflow?.editableVersion?.id || currentWorkflow?.liveVersion?.id;
             const targetVersion = (versionsData.results || []).find(
                 version => String(version.id) === String(targetId)
             );
@@ -1081,7 +1086,16 @@ const PageEditor = () => {
             console.error('PageEditor: Error loading versions', error);
             showError('Failed to load page versions');
         }
-    }, [webpageData?.id, isNewPage, showError, pageId, workflow]);
+    }, [
+        webpageData,
+        isNewPage,
+        originalWebpageData,
+        originalPageVersionData,
+        pageVersionData,
+        showError,
+        pageId,
+        workflow,
+    ]);
 
     // Define switchToVersion first since updatePageData depends on it
     const switchToVersion = useCallback(async (versionId) => {
@@ -1420,10 +1434,11 @@ const PageEditor = () => {
                 'success'
             );
 
-            // Reload versions if a version was created/updated
-            if (saveResult.versionResult) {
-                await loadVersionsPreserveCurrent();
-            }
+            await refreshAfterWorkingCopySave(
+                saveResult,
+                refetchWorkflow,
+                loadVersionsPreserveCurrent,
+            );
 
             // Invalidate queries to refresh data
             queryClient.invalidateQueries(['page', webpageData?.id || pageId]);
@@ -1449,7 +1464,7 @@ const PageEditor = () => {
             }
             throw error;
         }
-    }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, pageId, queryClient, currentVersion, finalizePendingCutSources]); // Removed loadVersionsPreserveCurrent to break circular dependency
+    }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, pageId, queryClient, currentVersion, finalizePendingCutSources, refetchWorkflow, loadVersionsPreserveCurrent]);
 
 
     // Smart save - analyze changes first, then show modal only if needed
@@ -1600,8 +1615,11 @@ const PageEditor = () => {
 
             setOriginalWebpageData(webpageData);
 
-            await refetchWorkflow();
-            await loadVersionsPreserveCurrent();
+            await refreshAfterWorkingCopySave(
+                { versionResult: saved },
+                refetchWorkflow,
+                loadVersionsPreserveCurrent,
+            );
             setIsDirty(false);
             addNotification(
                 'Working version saved',
@@ -2359,7 +2377,7 @@ const PageEditor = () => {
                 webpageData={webpageData}
                 pageVersionData={pageVersionData}
                 validationState={schemaValidationState}
-                canPublish={isDirty || Boolean(workflow?.editableVersion?.id)}
+                canPublish={canPublishWorkingCopy(isDirty, workflow)}
                 customStatusContent={
                     <div className="flex items-center space-x-4">
                         <span>
