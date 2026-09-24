@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Box, Check, Copy, FileText, Image as ImageIcon, Loader2, MousePointer2, Save, X } from 'lucide-react'
+import { Box, Check, Copy, FileText, Image as ImageIcon, Loader2, Save, X } from 'lucide-react'
 
 import { buildSemanticPreviewDocument } from './semanticPreview'
 
@@ -36,6 +36,8 @@ const SemanticThemeWorkspace = ({
     const [previewDirty, setPreviewDirty] = useState(false)
     const [savingPreview, setSavingPreview] = useState(false)
     const [pendingImages, setPendingImages] = useState({})
+    const [activeGroupId, setActiveGroupId] = useState('')
+    const [activeComponentStyleKey, setActiveComponentStyleKey] = useState('')
     const [sourceSiteId, setSourceSiteId] = useState(workspace.contentSources?.[0]?.id || '')
     const [importingSite, setImportingSite] = useState(false)
     const iframeRef = useRef(null)
@@ -76,7 +78,20 @@ const SemanticThemeWorkspace = ({
     const previewWorkspace = useMemo(() => ({ ...workspace, previewContent }), [workspace, previewContent])
     const previewDocument = useMemo(() => buildSemanticPreviewDocument({
         workspace: previewWorkspace, css: preview.css, fontUrl: preview.fontUrl, viewId, viewport,
-    }), [previewWorkspace, preview, viewId, viewport])
+        activeGroupId, activeComponentStyleKey,
+    }), [previewWorkspace, preview, viewId, viewport, activeGroupId, activeComponentStyleKey])
+
+    const selectedLayout = workspace.catalog.layouts.find((layout) => layout.key === selectedView?.layout)
+        || workspace.catalog.layouts[0]
+    const layoutSlotNames = new Set((selectedLayout?.slots || []).map((slot) => slot.name))
+    const availableGroups = (workspace.catalog.designGroups || []).filter((group) => (
+        !(group.slots || []).length || group.slots.some((slot) => layoutSlotNames.has(slot))
+    ))
+    const primarySlot = (selectedLayout?.slots || []).find((slot) => ['main', 'content', 'body', 'landing_page'].includes(slot.name))?.name
+        || selectedLayout?.slots?.[0]?.name || 'main'
+    const previewImageTarget = selectedView
+        ? { id: `preview:${selectedView.id}:image:${primarySlot}`, kind: 'previewImage', label: 'Page content image' }
+        : null
 
     const selectedGroupIndex = Number(selectedTarget?.id?.match(/^group:(\d+)/)?.[1])
     const selectedGroup = Number.isInteger(selectedGroupIndex)
@@ -164,16 +179,22 @@ const SemanticThemeWorkspace = ({
         </section>
     )
 
+    const previewOptions = (
+        <div className="space-y-6">
+            <div><h2 className="text-lg font-semibold text-gray-900">What to show</h2><p className="mt-1 text-sm text-gray-500">Choose an alternative here, then click anything in the page to edit it.</p></div>
+            {availableGroups.length > 0 && <section className="space-y-2"><h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Page elements</h3><div className="grid gap-2"><button type="button" onClick={() => setActiveGroupId('')} className={`rounded-lg border px-3 py-2 text-left text-sm font-medium ${!activeGroupId ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200' : 'border-gray-200 hover:bg-gray-50'}`}>Layout default</button>{availableGroups.map((group) => <button type="button" key={group.id} aria-label={`Show ${group.label}`} onClick={() => { setActiveGroupId(group.id); setSelectedTarget(null) }} className={`rounded-lg border px-3 py-2 text-left transition ${activeGroupId === group.id ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200' : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'}`}><span className="block text-sm font-medium text-gray-900">{group.label}</span>{group.slots?.[0] && <span className="mt-0.5 block text-xs text-gray-500">{selectedLayout?.slots?.find((slot) => slot.name === group.slots[0])?.label || 'Page content'}</span>}</button>)}</div></section>}
+            {(workspace.catalog.componentStyles || []).length > 0 && <section className="space-y-2"><h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Appearance</h3><div className="grid gap-2"><button type="button" aria-label="Use theme default appearance" onClick={() => setActiveComponentStyleKey('')} className={`rounded-lg border px-3 py-2 text-left text-sm font-medium ${!activeComponentStyleKey ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200' : 'border-gray-200 hover:bg-gray-50'}`}>Theme default</button>{workspace.catalog.componentStyles.map((style) => <button type="button" key={style.key} aria-label={`Use ${style.label}`} onClick={() => setActiveComponentStyleKey(style.key)} className={`rounded-lg border px-3 py-2 text-left ${activeComponentStyleKey === style.key ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200' : 'border-gray-200 hover:bg-gray-50'}`}><span className="block text-sm font-medium text-gray-900">{style.label}</span>{style.description && <span className="mt-0.5 block text-xs text-gray-500">{style.description}</span>}</button>)}</div></section>}
+            <section className="space-y-2"><h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Images</h3><div className="grid gap-2">{previewImageTarget && <button type="button" onClick={() => setSelectedTarget(previewImageTarget)} className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-left text-sm font-medium text-gray-900 hover:bg-gray-50"><ImageIcon className="h-4 w-4 text-gray-500" />Page content image</button>}{(workspace.assets || []).map((asset) => <button type="button" key={asset.assetKey} onClick={() => setSelectedTarget({ id: `asset:${asset.assetKey}`, kind: 'asset', label: asset.displayName })} className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-left text-sm font-medium text-gray-900 hover:bg-gray-50"><ImageIcon className="h-4 w-4 text-gray-500" /><span className="truncate">{asset.displayName}</span></button>)}</div></section>
+            {(workspace.contentSources || []).length > 0 && <section className="space-y-2 border-t border-gray-200 pt-4"><h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Demo content</h3><label htmlFor="preview-source-site" className="sr-only">Demo content from site</label><select id="preview-source-site" value={sourceSiteId} onChange={(event) => setSourceSiteId(event.target.value)} disabled={disabled || importingSite} className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"><option value="">Choose site</option>{workspace.contentSources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}</select><button type="button" onClick={copySiteContent} disabled={!sourceSiteId || disabled || importingSite} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-200 disabled:opacity-50">{importingSite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}Use site content</button></section>}
+        </div>
+    )
+
     return (
         <main className="grid min-h-0 flex-1 lg:grid-cols-[360px_minmax(0,1fr)]">
             <section className={`${mobilePane === 'preview' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-r border-gray-200 bg-white lg:flex`}>
                 <fieldset disabled={disabled || savingPreview} className="min-h-0 flex-1 overflow-y-auto p-4">
                     {!selectedTarget ? (
-                        <div className="flex h-full flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 p-6 text-center">
-                            <MousePointer2 className="mb-3 h-8 w-8 text-gray-400" />
-                            <h2 className="font-semibold text-gray-900">Select something on the page</h2>
-                            <p className="mt-1 text-sm text-gray-500">Click text, an image, or another visible element to edit only the values that apply to it.</p>
-                        </div>
+                        previewOptions
                     ) : (
                         <div className="space-y-5">
                             <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Selected element</p><h2 className="truncate text-xl font-semibold text-gray-900">{selectedTarget.label}</h2></div><button type="button" aria-label="Close selection" onClick={() => setSelectedTarget(null)} className="rounded-md p-1 text-gray-500 hover:bg-gray-100"><X className="h-5 w-5" /></button></div>
@@ -191,7 +212,6 @@ const SemanticThemeWorkspace = ({
             <section className={`${mobilePane === 'edit' ? 'hidden' : 'flex'} min-h-0 flex-col bg-gray-100 p-3 lg:flex lg:p-5`}>
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                     <nav className="flex min-w-0 flex-1 gap-1 overflow-x-auto" aria-label="Preview views">{previewContent.views.map((view) => <button type="button" key={view.id} onClick={() => { setViewId(view.id); setSelectedTarget(null) }} className={`inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${view.id === viewId ? 'bg-white text-blue-700 shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:bg-white/70'}`}>{view.kind === 'object' ? <Box className="h-4 w-4" /> : <FileText className="h-4 w-4" />}{view.label}</button>)}</nav>
-                    {(workspace.contentSources || []).length > 0 && <div className="flex items-center gap-1 rounded-md border border-gray-300 bg-white p-1"><label htmlFor="preview-source-site" className="sr-only">Demo content from site</label><select id="preview-source-site" value={sourceSiteId} onChange={(event) => setSourceSiteId(event.target.value)} disabled={disabled || importingSite} className="max-w-44 rounded border-0 bg-transparent px-2 py-1 text-sm text-gray-700"><option value="">Choose site</option>{workspace.contentSources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}</select><button type="button" onClick={copySiteContent} disabled={!sourceSiteId || disabled || importingSite} className="inline-flex items-center gap-1.5 rounded bg-gray-100 px-2.5 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-200 disabled:opacity-50">{importingSite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}Use site content</button></div>}
                     {previewDirty && <button type="button" onClick={saveCurrentPreview} disabled={savingPreview} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{savingPreview ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}{savingPreview ? 'Saving…' : 'Save preview content'}</button>}
                     <span className="text-xs capitalize text-gray-500">{viewport}</span>
                 </div>

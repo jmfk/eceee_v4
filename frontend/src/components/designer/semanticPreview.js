@@ -106,18 +106,37 @@ const partDemoContent = (part) => {
     return `<p>${escapeHtml(text.body)}</p>`
 }
 
-const groupContent = (group, workspace, texts, { includeRoot = true } = {}) => {
+const responsiveAsset = (group, workspace, viewport) => {
     const assets = (group.assetKeys || []).map((assetKey) => workspace.assets.find((asset) => asset.assetKey === assetKey)).filter(Boolean)
+    const preference = viewport === 'mobile'
+        ? ['xs', 'sm', 'md', 'lg', 'xl']
+        : viewport === 'tablet' ? ['md', 'sm', 'lg', 'xs', 'xl'] : ['lg', 'xl', 'md', 'sm', 'xs']
+    const rank = (asset) => {
+        const index = preference.indexOf(asset.breakpoint)
+        return index === -1 ? preference.length : index
+    }
+    return [...assets].sort((left, right) => rank(left) - rank(right))[0]
+}
+
+const groupContent = (group, workspace, texts, { includeRoot = true, viewport = 'desktop' } = {}) => {
+    const asset = responsiveAsset(group, workspace, viewport)
     const elements = (group.elements || []).map((element) => elementMarkup(element, texts)).join('')
     const parts = (group.parts || []).map((part, index) => {
         const content = index === 0 && elements ? elements : partDemoContent(part)
         const partName = String(part.part || '').toLowerCase()
         const tag = partName.includes('nav') || partName.includes('menu') ? 'ul' : 'div'
-        return `<${tag} class="demo-part ${escapeHtml(partClassNames(part))}" ${targetAttributes({ ...part, kind: 'part' })}>${content}</${tag}>`
+        const target = asset?.part === part.part
+            ? { id: `asset:${asset.assetKey}`, label: asset.displayName, kind: 'asset' }
+            : { ...part, kind: 'part' }
+        const placeholder = asset?.part === part.part && !asset.url ? themeAssetMarkup(asset) : ''
+        return `<${tag} class="demo-part ${escapeHtml(partClassNames(part))}" ${targetAttributes(target)}>${placeholder}${content}</${tag}>`
     }).join('')
-    const body = [...assets.map(themeAssetMarkup), parts || elements].join('') || `<p>${escapeHtml(languageCopy().empty)}</p>`
+    const body = parts || elements || (asset ? themeAssetMarkup(asset) : '') || `<p>${escapeHtml(languageCopy().empty)}</p>`
     if (!includeRoot) return body
-    return `<section class="demo-group ${escapeHtml(widgetClassNames(group))}" ${targetAttributes({ id: group.id, label: group.label, kind: 'group' })}>${body}</section>`
+    const rootTarget = asset && !(group.parts || []).some((part) => part.part === asset.part)
+        ? { id: `asset:${asset.assetKey}`, label: asset.displayName, kind: 'asset' }
+        : { id: group.id, label: group.label, kind: 'group' }
+    return `<section class="demo-group ${escapeHtml(widgetClassNames(group))}" ${targetAttributes(rootTarget)}>${body}</section>`
 }
 
 const safeStyleTemplate = (template) => String(template || '{{{content}}}')
@@ -144,49 +163,47 @@ const renderComponentStyle = (componentStyle, content) => {
     return rendered.trim() ? rendered : content
 }
 
-const slotMarkup = (workspace, view, slot, primarySlot) => {
+const slotMarkup = (workspace, view, slot, primarySlot, options) => {
     const groups = workspace.catalog.designGroups || []
     const matching = groups.filter((group) => (group.slots || []).includes(slot.name))
-    const selected = matching.length ? matching : (slot.name === primarySlot ? groups.slice(0, 1) : [])
-    const content = selected.map((group) => groupContent(group, workspace, view.texts || {})).join('')
-    const themePreview = workspace.assets.find((asset) => asset.kind === 'preview')
-    const siteIcon = workspace.assets.find((asset) => asset.kind === 'site-icon')
-    const themeAsset = slot.name === 'hero' && themePreview
-        ? themeAssetMarkup(themePreview)
-        : slot.name === 'header' && siteIcon ? themeAssetMarkup(siteIcon) : ''
-    const image = previewImageMarkup(view, slot.name, slot.name === primarySlot && !themeAsset)
-    const styleExamples = slot.name === primarySlot
-        ? (workspace.catalog.componentStyles || []).map((style) => {
-            const sampleGroup = selected[0] || groups[0]
-            const sample = sampleGroup ? groupContent(sampleGroup, workspace, view.texts || {}, { includeRoot: false }) : `<p>${escapeHtml(languageCopy().body)}</p>`
-            return `<section class="demo-component-style" ${targetAttributes({ id: `component-style:${style.key}`, label: style.label, kind: 'componentStyle' })}>${renderComponentStyle(style, sample)}</section>`
-        }).join('')
-        : ''
-    const fallbackText = !themeAsset && !content && !image && !styleExamples ? `<p>${escapeHtml(languageCopy().empty)}</p>` : ''
-    return `${themeAsset}${image}${content}${styleExamples}${fallbackText}`
+    const requested = groups.find((group) => group.id === options.activeGroupId)
+    const requestedBelongsHere = requested && (
+        (requested.slots || []).includes(slot.name)
+        || (slot.name === primarySlot && !(requested.slots || []).length)
+    )
+    const selected = requestedBelongsHere ? requested : matching[0] || null
+    const image = previewImageMarkup(view, slot.name)
+    let content = selected ? groupContent(selected, workspace, view.texts || {}, { viewport: options.viewport }) : ''
+    const activeStyle = slot.name === primarySlot
+        ? (workspace.catalog.componentStyles || []).find((style) => style.key === options.activeComponentStyleKey)
+        : null
+    if (activeStyle) {
+        content = `<section class="demo-component-style" ${targetAttributes({ id: `component-style:${activeStyle.key}`, label: activeStyle.label, kind: 'componentStyle' })}>${renderComponentStyle(activeStyle, content || `<p>${escapeHtml(languageCopy().body)}</p>`)}</section>`
+    }
+    return `${image}${content}`
 }
 
-const layoutMarkup = (workspace, layout, view) => {
+const layoutMarkup = (workspace, layout, view, options) => {
     const slots = layout?.slots || []
     const primarySlot = slots.find((slot) => ['main', 'content', 'body', 'landing_page'].includes(slot.name))?.name || slots[0]?.name
     let markup = layout?.previewTemplate || ''
     slots.forEach((slot) => {
-        markup = markup.split(`__DESIGNER_SLOT_${slot.name}__`).join(slotMarkup(workspace, view, slot, primarySlot))
+        markup = markup.split(`__DESIGNER_SLOT_${slot.name}__`).join(slotMarkup(workspace, view, slot, primarySlot, options))
     })
     return markup.replace(/__DESIGNER_SLOT_[A-Za-z0-9_-]+__/g, '')
 }
 
-export const buildSemanticPreviewDocument = ({ workspace, css, fontUrl, viewId, viewport }) => {
+export const buildSemanticPreviewDocument = ({ workspace, css, fontUrl, viewId, viewport, activeGroupId, activeComponentStyleKey }) => {
     const views = workspace.previewContent?.views || workspace.catalog.previewViews || []
     const view = views.find((item) => item.id === viewId) || views[0]
     const layout = workspace.catalog.layouts.find((item) => item.key === view?.layout) || workspace.catalog.layouts[0]
-    const content = view && layout ? layoutMarkup(workspace, layout, view) : `<p>${escapeHtml(languageCopy().empty)}</p>`
+    const content = view && layout ? layoutMarkup(workspace, layout, view, { viewport, activeGroupId, activeComponentStyleKey }) : `<p>${escapeHtml(languageCopy().empty)}</p>`
     const maxWidth = viewport === 'mobile' ? '390px' : viewport === 'tablet' ? '760px' : '1280px'
     const slotTargets = JSON.stringify((layout?.slots || []).map((slot) => ({
         name: slot.name, id: `layout:${view?.layout}:slot:${slot.name}`, label: slot.label,
     }))).replace(/</g, '\\u003c')
     return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">${fontUrl ? `<link rel="stylesheet" href="${escapeHtml(fontUrl)}">` : ''}<style>
-html,body{margin:0;min-height:100%;background:#e5e7eb;color:#111827}body{font-family:system-ui,sans-serif}.designer-preview{max-width:${maxWidth};margin:auto;background:white;min-height:100vh}.demo-group{position:relative}.demo-group>*+*,.demo-part>*+*{margin-top:14px}.demo-image-placeholder{min-height:130px;display:grid;place-items:center;padding:20px;border:1px dashed #9ca3af;background:linear-gradient(135deg,#e5e7eb 50%,#d1d5db 50%);font:600 13px system-ui,sans-serif}.demo-placeholder-badge{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:999px;background:#fef3c7;color:#92400e;font:600 10px system-ui,sans-serif}.demo-theme-asset-preview img{width:100%;max-height:420px;object-fit:cover}.demo-theme-asset-site-icon{display:inline-block;margin:12px}.demo-theme-asset-site-icon img{width:64px;height:64px;object-fit:contain}figure{margin:0}figure img{display:block;width:100%;max-height:360px;object-fit:contain;background:#f9fafb}figcaption{padding:6px 0;color:#6b7280;font:12px system-ui,sans-serif}.demo-part{min-height:44px}.demo-component-style{position:relative}.demo-bullet{font-weight:700}[contenteditable=true]{outline:none}[data-designer-target]{position:relative;cursor:pointer;outline:1px dashed rgba(100,116,139,.5)!important;outline-offset:-1px;transition:outline-color .1s,background-color .1s}[data-designer-target]:hover{outline:2px dashed #2563eb!important;outline-offset:-2px}[data-designer-target].designer-selected{outline:3px solid #2563eb!important;outline-offset:-3px!important}.designer-selected::after{content:attr(data-designer-label);position:absolute;z-index:20;top:4px;right:4px;box-sizing:border-box;max-width:calc(100% - 8px);overflow:hidden;padding:3px 7px;border-radius:3px;background:#1d4ed8;color:white;font:600 11px system-ui,sans-serif;line-height:1.2;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}${layout?.layoutCss || ''}${css || ''}</style></head><body><main class="designer-preview cms-content">${content}</main><script>
+html,body{margin:0;min-height:100%;background:#e5e7eb;color:#111827}body{font-family:system-ui,sans-serif}.designer-preview{max-width:${maxWidth};margin:auto;background:white;min-height:100vh}.demo-group{position:relative}.demo-group>*+*,.demo-part>*+*{margin-top:14px}.demo-image-placeholder{min-height:130px;display:grid;place-items:center;padding:20px;border:1px dashed #9ca3af;background:linear-gradient(135deg,#e5e7eb 50%,#d1d5db 50%);font:600 13px system-ui,sans-serif}.demo-placeholder-badge{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:999px;background:#fef3c7;color:#92400e;font:600 10px system-ui,sans-serif}figure{margin:0}figure img{display:block;width:100%;max-height:360px;object-fit:contain;background:#f9fafb}figcaption{padding:6px 0;color:#6b7280;font:12px system-ui,sans-serif}.demo-part{min-height:44px}.demo-component-style{position:relative}.demo-bullet{font-weight:700}[contenteditable=true]{outline:none}[data-designer-target]{position:relative;cursor:pointer;outline:1px dashed rgba(100,116,139,.5)!important;outline-offset:-1px;transition:outline-color .1s,background-color .1s}[data-designer-kind=layoutSlot]:empty{display:block;min-height:44px}[data-designer-target]:hover{outline:2px dashed #2563eb!important;outline-offset:-2px}[data-designer-target].designer-selected{outline:3px solid #2563eb!important;outline-offset:-3px!important}.designer-selected::after{content:attr(data-designer-label);position:absolute;z-index:20;top:4px;right:4px;box-sizing:border-box;max-width:calc(100% - 8px);overflow:hidden;padding:3px 7px;border-radius:3px;background:#1d4ed8;color:white;font:600 11px system-ui,sans-serif;line-height:1.2;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}${layout?.layoutCss || ''}${css || ''}</style></head><body><main class="designer-preview cms-content">${content}</main><script>
 ${slotTargets}.forEach(function(slot){Array.from(document.getElementsByClassName('slot-'+slot.name)).forEach(function(node){node.dataset.designerTarget=slot.id;node.dataset.designerKind='layoutSlot';node.dataset.designerLabel=slot.label})});
 function send(target,action){parent.postMessage({source:'eceee-designer-preview',action:action||'select',targetId:target.dataset.designerTarget,kind:target.dataset.designerKind,label:target.dataset.designerLabel,text:target.innerText},'*')}
 document.addEventListener('click',function(event){var target=event.target.closest('[data-designer-target]');if(!target)return;if(event.target.closest('a'))event.preventDefault();event.stopPropagation();document.querySelectorAll('.designer-selected').forEach(function(node){node.classList.remove('designer-selected')});target.classList.add('designer-selected');send(target,'select')});
