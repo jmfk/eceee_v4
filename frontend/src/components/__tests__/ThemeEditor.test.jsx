@@ -186,6 +186,15 @@ describe('ThemeEditor', () => {
         })
     })
 
+    it('does not offer cross-theme imports before a new theme is saved', async () => {
+        routerMocks.params = { themeId: 'new', tab: 'typography' }
+
+        renderThemeEditor()
+
+        expect(await screen.findByRole('heading', { name: 'Create Theme' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Import from Theme' })).not.toBeInTheDocument()
+    })
+
     it('renders an existing theme in edit mode from the current route params', async () => {
         routerMocks.params = { themeId: '1' }
 
@@ -195,6 +204,15 @@ describe('ThemeEditor', () => {
         expect(screen.getByPlaceholderText('My Awesome Theme')).toHaveValue('Blue Theme')
         expect(screen.getByPlaceholderText('Brief description of this theme')).toHaveValue('A professional blue color scheme')
         expect(screen.getByRole('button', { name: /clear css cache/i })).toBeInTheDocument()
+    })
+
+    it('offers cross-theme imports for an existing theme', async () => {
+        routerMocks.params = { themeId: '1', tab: 'typography' }
+
+        renderThemeEditor()
+
+        expect(await screen.findByRole('heading', { name: 'Edit: Blue Theme' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Import from Theme' })).toBeInTheDocument()
     })
 
     it('navigates between editor tabs using the route model', async () => {

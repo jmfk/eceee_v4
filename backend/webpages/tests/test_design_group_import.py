@@ -9,6 +9,7 @@ from rest_framework.test import APIClient
 
 from core.models import Tenant
 from webpages.models import PageTheme
+from webpages.views.page_theme_views import PageThemeViewSet
 
 
 class DesignGroupImportAPITests(TestCase):
@@ -108,7 +109,7 @@ class DesignGroupImportAPITests(TestCase):
         source_path = f"theme_images/{self.source.id}/library/header.png"
         storage.exists.side_effect = lambda path: path == source_path
         storage._open.return_value = BytesIO(b"image")
-        storage._save.side_effect = lambda path, _content: path
+        storage.save.side_effect = lambda path, _content: path
         storage.url.side_effect = lambda path: f"https://storage.test/{path}"
 
         response = self.client.post(
@@ -120,7 +121,7 @@ class DesignGroupImportAPITests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["imported"], ["Header"])
         self.assertEqual(response.data["copied_images"], 1)
-        storage._save.assert_called_once()
+        storage.save.assert_called_once()
         self.target.refresh_from_db()
         imported_image = self.target.design_groups["groups"][0]["layoutProperties"]["header-widget"]["xs"][
             "backgroundImage"
@@ -136,9 +137,9 @@ class DesignGroupImportAPITests(TestCase):
         source_path = f"theme_images/{self.source.id}/library/header.png"
         target_path = f"theme_images/{self.target.id}/library/header.png"
         collision_path = f"theme_images/{self.target.id}/library/header_from_theme_{self.source.id}.png"
-        storage.exists.side_effect = lambda path: path in {source_path, target_path}
+        storage.exists.side_effect = lambda path: path == source_path
         storage._open.return_value = BytesIO(b"image")
-        storage._save.return_value = collision_path
+        storage.save.return_value = collision_path
         storage.url.side_effect = lambda path: f"https://storage.test/{path}"
 
         response = self.client.post(
@@ -154,6 +155,32 @@ class DesignGroupImportAPITests(TestCase):
         ]
         self.assertEqual(imported_image["url"], f"https://storage.test/{collision_path}")
         self.assertEqual(imported_image["filename"], f"header_from_theme_{self.source.id}.png")
+        storage.save.assert_called_once()
+        self.assertEqual(storage.save.call_args.args[0], target_path)
+
+    def test_import_merges_into_the_latest_target_design_groups(self):
+        stale_target = PageTheme.objects.get(pk=self.target.pk)
+        latest_design_groups = {
+            "groups": [
+                {"name": "Header", "elements": {"h1": {"color": "red"}}},
+                {"name": "Footer", "elements": {"p": {"color": "gray"}}},
+            ]
+        }
+        PageTheme.objects.filter(pk=self.target.pk).update(design_groups=latest_design_groups)
+
+        with patch.object(PageThemeViewSet, "get_object", return_value=stale_target):
+            response = self.client.post(
+                reverse("api:pagetheme-import-design-groups", kwargs={"pk": self.target.pk}),
+                self.payload([1], "skip"),
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.target.refresh_from_db()
+        self.assertEqual(
+            [group["name"] for group in self.target.design_groups["groups"]],
+            ["Header", "Footer", "Cards"],
+        )
 
     def test_cannot_import_from_a_theme_in_another_tenant(self):
         other_user = User.objects.create_user("foreign-owner", password="test")

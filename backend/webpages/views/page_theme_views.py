@@ -513,82 +513,79 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        target_data = copy.deepcopy(target.design_groups or {})
-        target_groups = target_data.setdefault("groups", [])
-        target_name_indexes = {group.get("name"): index for index, group in enumerate(target_groups)}
         imported = []
         skipped = []
         copied_images = 0
         url_mapping = {}
         filename_mapping = {}
 
-        groups_to_import = [
-            group for group in selected if not (group.get("name") in target_name_indexes and resolution == "skip")
-        ]
-        for group in groups_to_import:
-            for reference in self._group_image_references(group):
-                source_path = PageTheme._extract_path_from_url(reference["url"])
-                if (
-                    not source_path
-                    or not source_path.startswith(f"theme_images/{source.id}/")
-                    or not system_storage.exists(source_path)
-                ):
-                    return Response(
-                        {
-                            "error": f"Image used by '{group.get('name')}' could not be found in the source theme",
-                            "image_url": reference["url"],
-                        },
-                        status=status.HTTP_409_CONFLICT,
-                    )
-
-        for original_group in selected:
-            group_name = original_group.get("name")
-            if group_name in target_name_indexes and resolution == "skip":
-                skipped.append(group_name or "Unnamed group")
-                continue
-
-            group = copy.deepcopy(original_group)
-            for reference in self._group_image_references(group):
-                old_url = reference["url"]
-                if old_url in url_mapping:
-                    continue
-                source_path = PageTheme._extract_path_from_url(old_url)
-                filename = os.path.basename(reference["filename"] or source_path)
-                stem, extension = os.path.splitext(filename)
-                target_filename = filename
-                target_path = f"theme_images/{target.id}/library/{target_filename}"
-                if system_storage.exists(target_path):
-                    target_filename = f"{stem}_from_theme_{source.id}{extension}"
-                    target_path = f"theme_images/{target.id}/library/{target_filename}"
-                with system_storage._open(source_path, "rb") as source_file:
-                    saved_path = system_storage._save(target_path, ContentFile(source_file.read()))
-                new_url = system_storage.url(saved_path)
-                url_mapping[old_url] = new_url
-                filename_mapping[new_url] = os.path.basename(saved_path)
-                copied_images += 1
-
-            group = PageTheme._update_image_urls_in_design_groups({"groups": [group]}, url_mapping)["groups"][0]
-
-            def update_copied_filenames(value):
-                if isinstance(value, dict):
-                    copied_filename = filename_mapping.get(PageTheme._get_image_value_url(value))
-                    if copied_filename:
-                        value["filename"] = copied_filename
-                    for child in value.values():
-                        update_copied_filenames(child)
-                elif isinstance(value, list):
-                    for child in value:
-                        update_copied_filenames(child)
-
-            update_copied_filenames(group)
-            if group_name in target_name_indexes:
-                target_groups[target_name_indexes[group_name]] = group
-            else:
-                target_name_indexes[group_name] = len(target_groups)
-                target_groups.append(group)
-            imported.append(group_name or "Unnamed group")
-
         with transaction.atomic():
+            target = self.get_queryset().select_for_update().get(pk=target.pk)
+            target_data = copy.deepcopy(target.design_groups or {})
+            target_groups = target_data.setdefault("groups", [])
+            target_name_indexes = {group.get("name"): index for index, group in enumerate(target_groups)}
+
+            groups_to_import = [
+                group for group in selected if not (group.get("name") in target_name_indexes and resolution == "skip")
+            ]
+            for group in groups_to_import:
+                for reference in self._group_image_references(group):
+                    source_path = PageTheme._extract_path_from_url(reference["url"])
+                    if (
+                        not source_path
+                        or not source_path.startswith(f"theme_images/{source.id}/")
+                        or not system_storage.exists(source_path)
+                    ):
+                        return Response(
+                            {
+                                "error": f"Image used by '{group.get('name')}' could not be found in the source theme",
+                                "image_url": reference["url"],
+                            },
+                            status=status.HTTP_409_CONFLICT,
+                        )
+
+            for original_group in selected:
+                group_name = original_group.get("name")
+                if group_name in target_name_indexes and resolution == "skip":
+                    skipped.append(group_name or "Unnamed group")
+                    continue
+
+                group = copy.deepcopy(original_group)
+                for reference in self._group_image_references(group):
+                    old_url = reference["url"]
+                    if old_url in url_mapping:
+                        continue
+                    source_path = PageTheme._extract_path_from_url(old_url)
+                    filename = os.path.basename(reference["filename"] or source_path)
+                    target_path = f"theme_images/{target.id}/library/{filename}"
+                    with system_storage._open(source_path, "rb") as source_file:
+                        saved_path = system_storage.save(target_path, ContentFile(source_file.read()))
+                    new_url = system_storage.url(saved_path)
+                    url_mapping[old_url] = new_url
+                    filename_mapping[new_url] = os.path.basename(saved_path)
+                    copied_images += 1
+
+                group = PageTheme._update_image_urls_in_design_groups({"groups": [group]}, url_mapping)["groups"][0]
+
+                def update_copied_filenames(value):
+                    if isinstance(value, dict):
+                        copied_filename = filename_mapping.get(PageTheme._get_image_value_url(value))
+                        if copied_filename:
+                            value["filename"] = copied_filename
+                        for child in value.values():
+                            update_copied_filenames(child)
+                    elif isinstance(value, list):
+                        for child in value:
+                            update_copied_filenames(child)
+
+                update_copied_filenames(group)
+                if group_name in target_name_indexes:
+                    target_groups[target_name_indexes[group_name]] = group
+                else:
+                    target_name_indexes[group_name] = len(target_groups)
+                    target_groups.append(group)
+                imported.append(group_name or "Unnamed group")
+
             target.design_groups = target_data
             target.save(update_fields=["design_groups", "updated_at"])
         ThemeCSSGenerator().invalidate_cache(target.id)

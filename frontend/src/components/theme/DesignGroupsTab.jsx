@@ -662,7 +662,18 @@ const extractFilterOptions = (groups, widgetTypes = []) => {
   return options;
 };
 
-const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, onChange, onDirty, onGroupsImported, hasUnsavedChanges = false }) => {
+const DesignGroupsTab = ({
+  themeId,
+  designGroups,
+  colors,
+  fonts,
+  breakpoints,
+  onChange,
+  onDirty,
+  onGroupsImported,
+  canImportFromTheme = false,
+  hasUnsavedChanges = false,
+}) => {
   const groups = designGroups?.groups || [];
 
   const [expandedContent, setExpandedContent] = useState({});
@@ -2449,14 +2460,16 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
             onSuccess={() => addNotification({ type: 'success', message: 'Design groups copied to clipboard' })}
             onError={(error) => addNotification({ type: 'error', message: `Failed to copy: ${error}` })}
           />
-          <button
-            type="button"
-            onClick={() => setShowThemeImport(true)}
-            className="inline-flex items-center px-4 py-2 bg-white text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
-          >
-            <Package className="w-4 h-4 mr-2" />
-            Import from Theme
-          </button>
+          {canImportFromTheme && (
+            <button
+              type="button"
+              onClick={() => setShowThemeImport(true)}
+              className="inline-flex items-center px-4 py-2 bg-white text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
+            >
+              <Package className="w-4 h-4 mr-2" />
+              Import from Theme
+            </button>
+          )}
           <button
             type="button"
             onClick={() => openImportModal('global')}
@@ -2477,7 +2490,7 @@ const DesignGroupsTab = ({ themeId, designGroups, colors, fonts, breakpoints, on
         </div>
       </div>
 
-      {showThemeImport && (
+      {canImportFromTheme && showThemeImport && (
         <DesignGroupImportModal
           themeId={themeId}
           onClose={() => setShowThemeImport(false)}

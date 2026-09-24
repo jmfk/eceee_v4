@@ -1126,6 +1126,7 @@ const ThemeEditor = ({ onSave }) => {
                             breakpoints={themeData?.breakpoints || {}}
                             onChange={(designGroups) => updateThemeField('designGroups', designGroups)}
                             onDirty={() => setThemeDirty(true)}
+                            canImportFromTheme={isEditing}
                             hasUnsavedChanges={isThemeDirty}
                             onGroupsImported={(designGroups) => {
                                 updateThemeField('designGroups', designGroups)
