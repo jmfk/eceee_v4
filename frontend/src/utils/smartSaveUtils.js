@@ -135,6 +135,30 @@ export function mergeVersionedPageAttributes(webpageData = {}, versionData = {})
     return pageAttributes ? { ...webpageData, ...pageAttributes } : webpageData
 }
 
+/** Refresh workflow state before reloading versions after a successful save. */
+export async function refreshAfterWorkingCopySave(saveResult, refetchWorkflow, loadVersions) {
+    if (!saveResult?.versionResult) return
+    const refreshedWorkflow = await refetchWorkflow()
+    const savedVersionId = saveResult.versionResult.id
+    const editableVersionId = refreshedWorkflow.data?.editableVersion?.id
+    if (
+        refreshedWorkflow.isError
+        || !editableVersionId
+        || String(editableVersionId) !== String(savedVersionId)
+    ) {
+        return
+    }
+    await loadVersions({
+        workflowOverride: refreshedWorkflow.data,
+        skipDirtyCheck: true,
+    })
+    return refreshedWorkflow.data
+}
+
+export function canPublishWorkingCopy(isDirty, workflow) {
+    return isDirty || Boolean(workflow?.editableVersion?.id)
+}
+
 /**
  * Analyze what has changed between original and current data
  * @param {Object} originalWebpageData - Original webpage data

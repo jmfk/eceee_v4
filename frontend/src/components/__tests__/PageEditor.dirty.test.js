@@ -15,7 +15,9 @@ import { describe, it, expect, vi } from 'vitest'
 import {
     analyzeChanges,
     buildVersionedPageData,
+    canPublishWorkingCopy,
     mergeVersionedPageAttributes,
+    refreshAfterWorkingCopySave,
     smartSave,
 } from '../../utils/smartSaveUtils'
 import { applyWidgetUpdateToWidgetMap } from '../../utils/pageEditorWidgetState'
@@ -150,6 +152,77 @@ describe('working-copy page attributes', () => {
 })
 
 describe('smartSave working-copy workflow', () => {
+    it('refreshes workflow before versions after creating or updating a working copy', async () => {
+        const calls = []
+        const refreshedWorkflow = { editableVersion: { id: 11 }, state: 'draft' }
+        const refetchWorkflow = vi.fn(async () => {
+            calls.push('workflow')
+            return { data: refreshedWorkflow }
+        })
+        const loadVersions = vi.fn(async () => calls.push('versions'))
+
+        const workflow = await refreshAfterWorkingCopySave(
+            { versionResult: { ...baseVersion, id: 11 } },
+            refetchWorkflow,
+            loadVersions,
+        )
+
+        expect(calls).toEqual(['workflow', 'versions'])
+        expect(refetchWorkflow).toHaveBeenCalledOnce()
+        expect(loadVersions).toHaveBeenCalledWith({
+            workflowOverride: refreshedWorkflow,
+            skipDirtyCheck: true,
+        })
+        expect(canPublishWorkingCopy(false, workflow)).toBe(true)
+    })
+
+    it('does not refresh workflow when no version was saved', async () => {
+        const refetchWorkflow = vi.fn()
+        const loadVersions = vi.fn()
+
+        await refreshAfterWorkingCopySave(
+            { versionResult: null },
+            refetchWorkflow,
+            loadVersions,
+        )
+
+        expect(refetchWorkflow).not.toHaveBeenCalled()
+        expect(loadVersions).not.toHaveBeenCalled()
+    })
+
+    it('does not reload versions from a failed workflow refresh', async () => {
+        const staleWorkflow = { editableVersion: null, liveVersion: { id: 10 }, state: 'live' }
+        const refetchWorkflow = vi.fn().mockResolvedValue({
+            data: staleWorkflow,
+            isError: true,
+        })
+        const loadVersions = vi.fn()
+
+        const workflow = await refreshAfterWorkingCopySave(
+            { versionResult: { ...baseVersion, id: 11 } },
+            refetchWorkflow,
+            loadVersions,
+        )
+
+        expect(workflow).toBeUndefined()
+        expect(loadVersions).not.toHaveBeenCalled()
+        expect(canPublishWorkingCopy(false, staleWorkflow)).toBe(false)
+    })
+
+    it('does not reload versions when workflow returns a different editable version', async () => {
+        const mismatchedWorkflow = { editableVersion: { id: 12 }, state: 'draft' }
+        const refetchWorkflow = vi.fn().mockResolvedValue({ data: mismatchedWorkflow })
+        const loadVersions = vi.fn()
+
+        await refreshAfterWorkingCopySave(
+            { versionResult: { ...baseVersion, id: 11 } },
+            refetchWorkflow,
+            loadVersions,
+        )
+
+        expect(loadVersions).not.toHaveBeenCalled()
+    })
+
     it('stores edited page attributes in the working copy instead of updating WebPage', async () => {
         const pagesApi = { update: vi.fn() }
         const versionsApi = {
