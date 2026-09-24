@@ -22,7 +22,12 @@ from webpages.models import (
     WebPage,
 )
 from webpages.services.designer_export import ThemeDesignerExporter, cleanup_expired_designer_exports
-from webpages.services.designer_theme import generate_placeholder_png, validate_image_upload
+from webpages.services.designer_theme import (
+    _safe_reference_preview_html,
+    collect_designer_assets,
+    generate_placeholder_png,
+    validate_image_upload,
+)
 from webpages.views.designer_theme_views import DesignerExportThrottle, DesignerThemeExportView
 
 
@@ -126,6 +131,7 @@ class DesignerThemeApiTests(TestCase):
         self.assertIn('class="main-layout-container"', main_layout["previewTemplate"])
         self.assertIn("__DESIGNER_SLOT_main__", main_layout["previewTemplate"])
         self.assertTrue(main_layout["layoutCss"])
+        self.assertEqual(workspace["breakpoints"], {"xs": 0, "sm": 640, "md": 768, "lg": 1024, "xl": 1280})
         self.assertEqual(workspace["previewContent"], {"views": workspace["catalog"]["previewViews"]})
 
     def test_workspace_places_chrome_widgets_in_natural_preview_slots(self):
@@ -195,6 +201,14 @@ class DesignerThemeApiTests(TestCase):
             workspace["contentSources"],
             [{"id": root.id, "label": "conference.example", "hostname": "conference.example"}],
         )
+        reference_view = next(
+            view for view in workspace["previewContent"]["views"] if view["layout"] == "main_layout"
+        )
+        self.assertEqual(reference_view["sourcePageId"], root.id)
+        self.assertTrue(reference_view["isSourceHomepage"])
+        self.assertIn('class="main-layout-container"', reference_view["referenceHtml"])
+        self.assertIn("Real body content from the site.", reference_view["referenceHtml"])
+        self.assertNotIn("<script", reference_view["referenceHtml"].lower())
 
         response = self.client.post(
             f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/from-site/",
@@ -549,6 +563,56 @@ class DesignerThemeApiTests(TestCase):
 
 
 class DesignerPlaceholderTests(SimpleTestCase):
+    @patch("webpages.services.designer_theme._stored_asset_metadata", return_value=(None, None, None))
+    @patch("webpages.services.designer_theme.system_storage.url", return_value="/media/current-theme/header.png")
+    def test_designer_asset_prefers_current_theme_library_file(self, storage_url, _metadata):
+        theme = SimpleNamespace(
+            id=3,
+            image=None,
+            site_icon=None,
+            design_groups={
+                "groups": [{
+                    "name": "Header",
+                    "layoutProperties": {
+                        "header-widget": {
+                            "lg": {
+                                "background_image": {
+                                    "filename": "header.png",
+                                    "url": "https://storage.invalid/theme_images/2/library/header.png",
+                                }
+                            }
+                        }
+                    },
+                }]
+            },
+            get_breakpoints=lambda: {"lg": 1024},
+            list_library_images=lambda: ["header.png"],
+        )
+
+        asset = next(item for item in collect_designer_assets(theme) if item["kind"] == "design-group")
+
+        self.assertEqual(asset["url"], "/media/current-theme/header.png")
+        storage_url.assert_any_call("theme_images/3/library/header.png")
+
+    def test_reference_preview_html_removes_executable_markup(self):
+        markup = _safe_reference_preview_html(
+            """
+            <html><body>
+                <script>alert('script')</script>
+                <button onclick="alert('click')">Safe button</button>
+                <a href="javascript:alert('link')">Safe link</a>
+                <iframe src="https://example.com">unsafe frame</iframe>
+            </body></html>
+            """
+        )
+
+        self.assertIn("Safe button", markup)
+        self.assertIn("Safe link", markup)
+        self.assertNotIn("<script", markup)
+        self.assertNotIn("onclick", markup)
+        self.assertNotIn("javascript:", markup)
+        self.assertNotIn("<iframe", markup)
+
     @patch("webpages.services.designer_theme.Image.open")
     def test_raster_upload_rejects_excessive_decoded_pixel_count(self, open_image):
         image = open_image.return_value

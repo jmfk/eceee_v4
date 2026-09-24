@@ -519,6 +519,11 @@ def render_version_preview(request, page_id, version_id):
         
         /* Page CSS */
         {result.get('css', '')}
+
+        /* The editor owns preview scrolling; avoid a nested iframe scrollbar. */
+        html, body {{
+            overflow: hidden !important;
+        }}
     </style>
     <script>
 {PREVIEW_NAVIGATION_MENU_SCRIPT}
