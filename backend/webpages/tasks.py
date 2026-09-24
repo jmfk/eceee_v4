@@ -148,6 +148,14 @@ def export_designer_theme(self, job_id):
         raise
 
 
+@shared_task
+def cleanup_expired_designer_exports():
+    """Remove expired Designer ZIP objects and snapshots in bounded batches."""
+    from webpages.services.designer_export import cleanup_expired_designer_exports as cleanup
+
+    return cleanup()
+
+
 @shared_task(bind=True, max_retries=3)
 def send_duplicate_page_report(self, period="day"):
     """

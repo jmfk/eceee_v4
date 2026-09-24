@@ -11,6 +11,7 @@ from djangorestframework_camel_case.render import CamelCaseJSONRenderer
 from rest_framework import permissions, serializers, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from file_manager.storage import S3MediaStorage
@@ -30,6 +31,7 @@ from webpages.services.designer_theme import (
     replace_designer_asset,
     save_designer_draft,
     theme_from_designer_draft,
+    undo_designer_publish,
     user_can_design_theme,
 )
 from webpages.tasks import export_designer_theme
@@ -47,6 +49,11 @@ class DesignerJSONRenderer(CamelCaseJSONRenderer):
     """Normalize response fields without rewriting user-defined theme keys."""
 
     json_underscoreize = DESIGNER_CASE_OPTIONS
+
+
+class DesignerExportThrottle(UserRateThrottle):
+    scope = "designer_theme_export"
+    rate = "10/hour"
 
 
 class DesignerPlaceholderSerializer(serializers.Serializer):
@@ -194,6 +201,28 @@ class DesignerThemeDiscardView(APIView):
         return Response(build_draft_workspace(theme, draft))
 
 
+class DesignerThemeUndoView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    renderer_classes = [DesignerJSONRenderer]
+
+    def post(self, request, theme_id):
+        try:
+            theme, draft = undo_designer_publish(
+                theme_id,
+                request.tenant,
+                request.user,
+                request.data.get("draft_version"),
+                request.data.get("live_sync_version"),
+            )
+        except PermissionError:
+            return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
+        except PageTheme.DoesNotExist:
+            return Response({"error": "Theme not found."}, status=status.HTTP_404_NOT_FOUND)
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(build_draft_workspace(theme, draft))
+
+
 class DesignerThemeAssetView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
@@ -310,6 +339,7 @@ class ThemeDesignerAssignmentView(APIView):
 
 class DesignerThemeExportView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [DesignerExportThrottle]
 
     def post(self, request, theme_id):
         theme = _theme(request, theme_id)

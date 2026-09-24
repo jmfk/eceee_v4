@@ -1,19 +1,22 @@
 import io
 import zipfile
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
 from PIL import Image
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
 from core.models import Tenant
-from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeDesignerRevision
-from webpages.services.designer_export import ThemeDesignerExporter
+from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeDesignerExportJob, ThemeDesignerRevision
+from webpages.services.designer_export import ThemeDesignerExporter, cleanup_expired_designer_exports
 from webpages.services.designer_theme import generate_placeholder_png, validate_image_upload
+from webpages.views.designer_theme_views import DesignerExportThrottle, DesignerThemeExportView
 
 
 class DesignerThemeApiTests(TestCase):
@@ -132,6 +135,68 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(self.theme.design_groups["groups"][0]["elements"]["h1"]["fontSize"], "40px")
         self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 1)
         self.assertFalse(published.data["hasDraftChanges"])
+
+    def test_undo_restores_and_consumes_latest_published_revision(self):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+        saved = self.client.patch(
+            self.workspace_url,
+            {"draftVersion": workspace["draftVersion"], "colors": {"brandColor": "#abcdef"}},
+            format="json",
+        )
+        published = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/publish/",
+            {"draftVersion": saved.data["draftVersion"]},
+            format="json",
+        )
+
+        stale = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/undo/",
+            {
+                "draftVersion": published.data["draftVersion"],
+                "liveSyncVersion": published.data["liveSyncVersion"] - 1,
+            },
+            format="json",
+        )
+        self.assertEqual(stale.status_code, 409, stale.data)
+        self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 1)
+
+        restored = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/undo/",
+            {
+                "draftVersion": published.data["draftVersion"],
+                "liveSyncVersion": published.data["liveSyncVersion"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(restored.status_code, 200, restored.data)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.colors["brandColor"], "#123456")
+        self.assertFalse(restored.data["canUndo"])
+        self.assertFalse(restored.data["hasDraftChanges"])
+        self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 0)
+
+    @patch("webpages.services.designer_theme.system_storage.delete")
+    @patch("webpages.services.designer_theme.system_storage.exists", return_value=True)
+    def test_discard_removes_unreferenced_immutable_draft_asset(self, _exists, delete):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+        draft = self.theme.designer_draft
+        object_key = f"theme_images/{self.theme.id}/designer_drafts/{draft.id}/abandoned.png"
+        draft.snapshot = {**draft.snapshot, "image": object_key}
+        draft.has_changes = True
+        draft.save(update_fields=["snapshot", "has_changes", "updated_at"])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                f"/api/v1/webpages/designer/themes/{self.theme.id}/discard/",
+                {"draftVersion": workspace["draftVersion"]},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        delete.assert_called_once_with(object_key)
 
     def test_stale_or_unsupported_patch_is_rejected(self):
         self.authenticate(self.designer)
@@ -294,3 +359,39 @@ class DesignerPlaceholderTests(SimpleTestCase):
         self.assertEqual(names.count("designer-asset-book.pdf"), 1)
         self.assertEqual(len([name for name in names if name.startswith("images/")]), 1)
         self.assertFalse(any(name.endswith((".yaml", ".yml", ".json")) for name in names))
+
+
+class DesignerExportLifecycleTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("designer-export-owner", password="test")
+        self.tenant = Tenant.objects.create(
+            name="Export tenant", identifier="designer-export-tenant", created_by=self.user
+        )
+        self.theme = PageTheme.objects.create(tenant=self.tenant, created_by=self.user, name="Exportable")
+
+    def test_export_creation_has_an_explicit_per_user_rate_limit(self):
+        self.assertEqual(DesignerThemeExportView.throttle_classes, [DesignerExportThrottle])
+        self.assertEqual(DesignerExportThrottle.rate, "10/hour")
+
+    @patch("webpages.services.designer_export.delete_unreferenced_designer_assets")
+    def test_expired_export_objects_and_snapshots_are_deleted(self, delete_assets):
+        job = ThemeDesignerExportJob.objects.create(
+            theme=self.theme,
+            created_by=self.user,
+            status=ThemeDesignerExportJob.STATUS_COMPLETED,
+            object_key="theme-designer-exports/1/job/export.zip",
+            expires_at=timezone.now() - timedelta(minutes=1),
+            snapshot={"image": f"theme_images/{self.theme.id}/designer_drafts/1/old.png"},
+        )
+        storage = MagicMock()
+        storage.exists.return_value = True
+
+        removed = cleanup_expired_designer_exports(storage=storage)
+
+        self.assertEqual(removed, 1)
+        storage.delete.assert_called_once_with(job.object_key)
+        self.assertFalse(ThemeDesignerExportJob.objects.filter(id=job.id).exists())
+        delete_assets.assert_called_once_with(
+            self.theme.id,
+            {f"theme_images/{self.theme.id}/designer_drafts/1/old.png"},
+        )

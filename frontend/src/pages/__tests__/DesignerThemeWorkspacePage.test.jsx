@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
     preview: vi.fn(),
     save: vi.fn(),
     publish: vi.fn(),
+    undo: vi.fn(),
     discard: vi.fn(),
     replaceAsset: vi.fn(),
     createPlaceholder: vi.fn(),
@@ -65,6 +66,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.preview.mockResolvedValue({ css: '.designer-preview{color:#123456}', fontUrl: 'https://fonts.googleapis.com/css2?family=Inter' })
         mocks.save.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 3, hasDraftChanges: true })
         mocks.publish.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4 })
+        mocks.undo.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4, canUndo: false })
         vi.spyOn(window, 'confirm').mockReturnValue(true)
     })
 
@@ -113,6 +115,16 @@ describe('DesignerThemeWorkspacePage', () => {
         fireEvent.click(screen.getByRole('button', { name: /publish changes/i }))
         await waitFor(() => expect(mocks.publish).toHaveBeenCalledWith('7', 3))
         expect(window.confirm).toHaveBeenCalledWith('Publish every saved Designer draft change to the live theme now?')
+    })
+
+    it('restores the latest published revision only when the draft is clean', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+
+        fireEvent.click(screen.getByRole('button', { name: /undo publish/i }))
+
+        await waitFor(() => expect(mocks.undo).toHaveBeenCalledWith('7', 2, 4))
+        expect(window.confirm).toHaveBeenCalledWith('Restore the theme version from immediately before the latest Designer publish?')
     })
 
     it('persists pending value edits before staging an asset upload', async () => {
