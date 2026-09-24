@@ -4,14 +4,16 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import SimpleTestCase, TestCase
 from PIL import Image
+from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
 from core.models import Tenant
 from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeDesignerRevision
 from webpages.services.designer_export import ThemeDesignerExporter
-from webpages.services.designer_theme import generate_placeholder_png
+from webpages.services.designer_theme import generate_placeholder_png, validate_image_upload
 
 
 class DesignerThemeApiTests(TestCase):
@@ -228,7 +230,20 @@ class DesignerThemeApiTests(TestCase):
         generate_placeholder.assert_not_called()
 
 
-class DesignerPlaceholderTests(TestCase):
+class DesignerPlaceholderTests(SimpleTestCase):
+    @patch("webpages.services.designer_theme.Image.open")
+    def test_raster_upload_rejects_excessive_decoded_pixel_count(self, open_image):
+        image = open_image.return_value
+        image.width = 5000
+        image.height = 5000
+        image.format = "PNG"
+        upload = SimpleUploadedFile("oversized.png", b"compressed-image", content_type="image/png")
+
+        with self.assertRaisesMessage(ValidationError, "Images cannot exceed 16 megapixels."):
+            validate_image_upload(upload)
+
+        image.verify.assert_not_called()
+
     def test_generated_placeholder_uses_requested_full_size(self):
         content = generate_placeholder_png("Hero artwork", "Article / hero", 1200, 630)
         with Image.open(io.BytesIO(content)) as image:
