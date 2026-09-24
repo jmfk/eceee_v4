@@ -32,6 +32,7 @@ export { previewSizesApi } from './previewSizes.js'
 export { mediaApi, mediaTagsApi, mediaCollectionsApi } from './media.js'
 export { objectTypesApi, objectInstancesApi, objectVersionsApi } from './objectStorage.js'
 export { sitePackagesApi } from './sitePackages.js'
+export { designerThemesApi } from './designerThemes.js'
 export { default as pageImportApi } from './pageImport.js'
 
 // Utility functions
@@ -51,6 +52,7 @@ import { previewSizesApi } from './previewSizes.js'
 import { mediaApi, mediaTagsApi, mediaCollectionsApi } from './media.js'
 import { objectTypesApi, objectInstancesApi, objectVersionsApi } from './objectStorage.js'
 import { sitePackagesApi } from './sitePackages.js'
+import { designerThemesApi } from './designerThemes.js'
 import pageImportApi from './pageImport.js'
 
 export default {
@@ -71,5 +73,6 @@ export default {
     objectInstances: objectInstancesApi,
     objectVersions: objectVersionsApi,
     sitePackages: sitePackagesApi,
+    designerThemes: designerThemesApi,
     pageImport: pageImportApi
 }

@@ -38,6 +38,7 @@ import ThemeCopyPasteManager from './theme/ThemeCopyPasteManager';
 import CopyButton from './theme/CopyButton';
 import CloneThemeDialog from './theme/CloneThemeDialog';
 import PasteThemeDialog from './theme/PasteThemeDialog';
+import DesignerAccessPanel from './theme/DesignerAccessPanel';
 
 const ThemeEditor = ({ onSave }) => {
     const { themeId, tab, imageFilename } = useParams();
@@ -1004,6 +1005,9 @@ const ThemeEditor = ({ onSave }) => {
                                     </label>
                                 </div>
                             </div>
+
+                            {/* Restricted Designer access */}
+                            {!isCreating && <DesignerAccessPanel themeId={themeId} />}
 
                             {/* Site Icon (Favicon) */}
                             <div className="border-t border-gray-200 pt-6">

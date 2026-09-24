@@ -102,7 +102,11 @@ class TenantContextMiddleware:
         if request.user.is_authenticated:
             accessible = (
                 Tenant.objects.filter(is_active=True)
-                .filter(Q(created_by=request.user) | Q(members=request.user))
+                .filter(
+                    Q(created_by=request.user)
+                    | Q(members=request.user)
+                    | Q(theme_designer_assignments__user=request.user)
+                )
                 .distinct()
             )
             if accessible.count() == 1:

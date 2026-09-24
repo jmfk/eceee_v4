@@ -134,6 +134,20 @@ def import_site_package(self, job_id):
         raise
 
 
+@shared_task(bind=True, max_retries=1)
+def export_designer_theme(self, job_id):
+    """Create a designer ZIP package and store it for download."""
+    from webpages.models import ThemeDesignerExportJob
+    from webpages.services.designer_export import ThemeDesignerExporter
+
+    job = ThemeDesignerExportJob.objects.select_related("theme").get(id=job_id)
+    try:
+        return ThemeDesignerExporter(job).run()
+    except Exception as error:
+        logger.error("Designer theme export %s failed: %s", job_id, error)
+        raise
+
+
 @shared_task(bind=True, max_retries=3)
 def send_duplicate_page_report(self, period="day"):
     """

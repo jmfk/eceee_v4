@@ -1,0 +1,727 @@
+"""Restricted theme editing helpers used by the Designer workspace."""
+
+import copy
+import io
+import os
+import re
+import uuid
+import xml.etree.ElementTree as ET
+
+from django.core.files.base import ContentFile
+from django.db import transaction
+from django.utils.text import slugify
+from PIL import Image, ImageDraw, ImageFont
+from rest_framework.exceptions import ValidationError
+
+from file_manager.storage import system_storage
+from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeDesignerRevision
+from webpages.serializers.theme import PageThemeSerializer
+
+
+TYPE_PROPERTIES = {
+    "fontFamily",
+    "fontSize",
+    "fontWeight",
+    "fontStyle",
+    "lineHeight",
+    "letterSpacing",
+}
+SPACING_PROPERTIES = {
+    "margin",
+    "marginTop",
+    "marginRight",
+    "marginBottom",
+    "marginLeft",
+    "padding",
+    "paddingTop",
+    "paddingRight",
+    "paddingBottom",
+    "paddingLeft",
+}
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+REVISION_LIMIT = 20
+RASTER_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+IMAGE_TYPES = RASTER_TYPES | {"image/svg+xml"}
+CSS_VALUE_FORBIDDEN = re.compile(r"[;{}<>]|url\s*\(|expression\s*\(|@import", re.IGNORECASE)
+COLOR_VALUE = re.compile(r"^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\([0-9.%+,\-\s/]+\)|[a-zA-Z]+)$")
+
+
+def user_can_design_theme(user, theme: PageTheme) -> bool:
+    if not user or not user.is_authenticated:
+        return False
+    if theme.tenant.user_has_access(user):
+        return True
+    return ThemeDesignerAssignment.objects.filter(theme=theme, tenant=theme.tenant, user=user).exists()
+
+
+def designer_theme_queryset(user, tenant):
+    queryset = PageTheme.objects.filter(tenant=tenant)
+    if tenant.user_has_access(user):
+        return queryset
+    return queryset.filter(designer_assignments__user=user).distinct()
+
+
+def _iter_layout_properties(group):
+    for key in ("layoutProperties", "layout_properties"):
+        layout = group.get(key)
+        if not isinstance(layout, dict):
+            continue
+        for part, breakpoints in layout.items():
+            if not isinstance(breakpoints, dict):
+                continue
+            for breakpoint, values in breakpoints.items():
+                if isinstance(values, dict):
+                    yield part, breakpoint, values
+
+
+def _image_url(value):
+    if not isinstance(value, dict):
+        return None
+    for key in ("url", "fileUrl", "file_url", "publicUrl", "public_url", "imgproxyBaseUrl", "imgproxy_base_url"):
+        if value.get(key):
+            return value[key]
+    return None
+
+
+def _asset_spec(value):
+    value = value if isinstance(value, dict) else {}
+    return {
+        "displayName": value.get("displayName") or value.get("display_name") or value.get("filename"),
+        "requiredWidth": value.get("requiredWidth") or value.get("required_width"),
+        "requiredHeight": value.get("requiredHeight") or value.get("required_height"),
+        "dpr": value.get("dpr", 2),
+        "isPlaceholder": bool(value.get("isPlaceholder") or value.get("is_placeholder")),
+    }
+
+
+def _walk_usage(value, needle, path=""):
+    usages = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_path = f"{path}.{key}" if path else str(key)
+            usages.extend(_walk_usage(child, needle, child_path))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            usages.extend(_walk_usage(child, needle, f"{path}[{index}]"))
+    elif isinstance(value, str) and needle and str(needle) in value:
+        usages.append(path)
+    return usages
+
+
+def _field_dimensions(field):
+    try:
+        return field.width, field.height
+    except Exception:
+        return None, None
+
+
+def _stored_asset_metadata(path):
+    try:
+        size = system_storage.size(path)
+        with system_storage.open(path, "rb") as source:
+            image = Image.open(source)
+            return image.width, image.height, size
+    except Exception:
+        try:
+            return None, None, system_storage.size(path)
+        except Exception:
+            return None, None, None
+
+
+def collect_designer_assets(theme: PageTheme):
+    assets = []
+    referenced_filenames = set()
+
+    if theme.image:
+        width, height = _field_dimensions(theme.image)
+        assets.append(
+            {
+                "assetKey": "preview",
+                "displayName": "Theme preview",
+                "filename": os.path.basename(theme.image.name),
+                "url": theme.image.url,
+                "usage": ["Theme listing preview"],
+                "kind": "preview",
+                "isPlaceholder": False,
+                "width": width,
+                "height": height,
+            }
+        )
+    if theme.site_icon:
+        width, height = _field_dimensions(theme.site_icon)
+        assets.append(
+            {
+                "assetKey": "site-icon",
+                "displayName": "Site icon",
+                "filename": os.path.basename(theme.site_icon.name),
+                "url": theme.site_icon.url,
+                "usage": ["Browser and application icon"],
+                "kind": "site-icon",
+                "isPlaceholder": False,
+                "width": width,
+                "height": height,
+            }
+        )
+
+    groups = (theme.design_groups or {}).get("groups", [])
+    breakpoints = theme.get_breakpoints()
+    for group_index, group in enumerate(groups):
+        group_name = group.get("name") or f"Group {group_index + 1}"
+        for part, breakpoint, values in _iter_layout_properties(group):
+            candidates = []
+            for property_name, value in values.items():
+                if property_name == "images" and isinstance(value, dict):
+                    candidates.extend(value.items())
+                elif isinstance(value, dict) and (
+                    _image_url(value) or value.get("isPlaceholder") or value.get("requiredWidth")
+                ):
+                    candidates.append((property_name, value))
+            for property_name, value in candidates:
+                if not isinstance(value, dict):
+                    continue
+                spec = _asset_spec(value)
+                inferred_width = None
+                if not spec["requiredWidth"] and breakpoint in breakpoints:
+                    inferred_width = int(breakpoints[breakpoint]) * int(spec["dpr"] or 2)
+                filename = value.get("filename") or os.path.basename(str(_image_url(value) or ""))
+                if filename:
+                    referenced_filenames.add(filename)
+                assets.append(
+                    {
+                        "assetKey": f"design:{group_index}:{part}:{breakpoint}:{property_name}",
+                        "displayName": spec["displayName"] or f"{group_name} {property_name}",
+                        "filename": filename,
+                        "url": _image_url(value),
+                        "width": value.get("width"),
+                        "height": value.get("height"),
+                        "requiredWidth": spec["requiredWidth"],
+                        "requiredHeight": spec["requiredHeight"],
+                        "recommendedWidth": inferred_width,
+                        "requirementSource": "explicit"
+                        if spec["requiredWidth"] or spec["requiredHeight"]
+                        else "inferred",
+                        "dpr": spec["dpr"],
+                        "isPlaceholder": spec["isPlaceholder"],
+                        "usage": [f"{group_name} / {part} / {breakpoint} / {property_name}"],
+                        "kind": "design-group",
+                        "groupIndex": group_index,
+                        "part": part,
+                        "breakpoint": breakpoint,
+                        "property": property_name,
+                        "validation": {
+                            "status": (
+                                "error"
+                                if (
+                                    spec["requiredWidth"]
+                                    and value.get("width")
+                                    and int(value["width"]) < int(spec["requiredWidth"])
+                                )
+                                or (
+                                    spec["requiredHeight"]
+                                    and value.get("height")
+                                    and int(value["height"]) < int(spec["requiredHeight"])
+                                )
+                                else "warning"
+                                if inferred_width and value.get("width") and int(value["width"]) < inferred_width
+                                else "ok"
+                            ),
+                            "message": (
+                                "Uploaded image is smaller than the explicit requirement."
+                                if (
+                                    spec["requiredWidth"]
+                                    and value.get("width")
+                                    and int(value["width"]) < int(spec["requiredWidth"])
+                                )
+                                or (
+                                    spec["requiredHeight"]
+                                    and value.get("height")
+                                    and int(value["height"]) < int(spec["requiredHeight"])
+                                )
+                                else f"Recommended width is {inferred_width}px; height is not specified."
+                                if inferred_width
+                                else "No explicit dimensions are configured."
+                            ),
+                        },
+                    }
+                )
+
+    for filename in sorted(theme.list_library_images()):
+        if filename in referenced_filenames:
+            continue
+        path = f"theme_images/{theme.id}/library/{filename}"
+        width, height, size = _stored_asset_metadata(path)
+        assets.append(
+            {
+                "assetKey": f"library:{filename}",
+                "displayName": filename,
+                "filename": filename,
+                "url": system_storage.url(path),
+                "usage": ["Unused theme library asset"],
+                "kind": "library",
+                "isPlaceholder": False,
+                "width": width,
+                "height": height,
+                "size": size,
+            }
+        )
+    return assets
+
+
+def build_workspace(theme: PageTheme):
+    groups = (theme.design_groups or {}).get("groups", [])
+    typography = []
+    spacing = []
+    for group_index, group in enumerate(groups):
+        group_name = group.get("name") or f"Group {group_index + 1}"
+        for element, values in (group.get("elements") or {}).items():
+            if not isinstance(values, dict):
+                continue
+            typography.append(
+                {
+                    "groupIndex": group_index,
+                    "groupName": group_name,
+                    "element": element,
+                    "values": {key: values.get(key, "") for key in TYPE_PROPERTIES},
+                }
+            )
+            spacing.append(
+                {
+                    "scope": "element",
+                    "groupIndex": group_index,
+                    "groupName": group_name,
+                    "element": element,
+                    "values": {key: values.get(key, "") for key in SPACING_PROPERTIES},
+                }
+            )
+        for part, breakpoint, values in _iter_layout_properties(group):
+            spacing.append(
+                {
+                    "scope": "layout",
+                    "groupIndex": group_index,
+                    "groupName": group_name,
+                    "part": part,
+                    "breakpoint": breakpoint,
+                    "values": {key: values.get(key, "") for key in SPACING_PROPERTIES},
+                }
+            )
+
+    colors = []
+    for name, value in (theme.colors or {}).items():
+        colors.append(
+            {
+                "name": name,
+                "value": value,
+                "usage": _walk_usage(theme.design_groups or {}, name),
+            }
+        )
+
+    font_data = copy.deepcopy(theme.fonts or {})
+    fonts = font_data.get("google_fonts") or font_data.get("googleFonts") or []
+    for font in fonts:
+        font["usage"] = _walk_usage(theme.design_groups or {}, font.get("family"))
+
+    return {
+        "id": theme.id,
+        "name": theme.name,
+        "syncVersion": theme.sync_version,
+        "colors": colors,
+        "fonts": fonts,
+        "typography": typography,
+        "spacing": spacing,
+        "assets": collect_designer_assets(theme),
+        "canUndo": theme.designer_revisions.exists(),
+        "constraints": {
+            "editableTypographyProperties": sorted(TYPE_PROPERTIES),
+            "editableSpacingProperties": sorted(SPACING_PROPERTIES),
+            "maxImageBytes": MAX_IMAGE_BYTES,
+        },
+    }
+
+
+def create_revision(theme, user, summary):
+    revision = ThemeDesignerRevision.objects.create(
+        theme=theme,
+        created_by=user,
+        summary=summary,
+        snapshot={
+            "colors": copy.deepcopy(theme.colors),
+            "fonts": copy.deepcopy(theme.fonts),
+            "design_groups": copy.deepcopy(theme.design_groups),
+            "image": theme.image.name if theme.image else None,
+            "site_icon": theme.site_icon.name if theme.site_icon else None,
+        },
+    )
+    old_ids = list(theme.designer_revisions.values_list("id", flat=True)[REVISION_LIMIT:])
+    if old_ids:
+        for old_snapshot in ThemeDesignerRevision.objects.filter(id__in=old_ids).values_list("snapshot", flat=True):
+            backup_path = (old_snapshot.get("asset_restore") or {}).get("backup_path")
+            if backup_path and system_storage.exists(backup_path):
+                system_storage.delete(backup_path)
+        ThemeDesignerRevision.objects.filter(id__in=old_ids).delete()
+    return revision
+
+
+def _safe_css_value(value, property_name):
+    value = str(value).strip()
+    if len(value) > 160 or CSS_VALUE_FORBIDDEN.search(value):
+        raise ValidationError(f"Unsafe {property_name} value.")
+    if not re.fullmatch(r"[\w\s.,%+\-'\"()/]+", value, re.UNICODE):
+        raise ValidationError(f"Unsupported {property_name} value.")
+    return value
+
+
+def _integer(value, field_name):
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(f"{field_name} must be an integer.") from exc
+
+
+def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=True):
+    if not isinstance(payload, dict):
+        raise ValidationError("Designer patch must be an object.")
+    allowed_top = {"syncVersion", "colors", "fonts", "typography", "spacing"}
+    unknown = set(payload) - allowed_top
+    if unknown:
+        raise ValidationError(f"Unsupported designer fields: {', '.join(sorted(unknown))}")
+    if validate_version and _integer(payload.get("syncVersion", -1), "syncVersion") != theme.sync_version:
+        raise ValueError("stale")
+
+    if "colors" in payload:
+        colors = payload["colors"]
+        if not isinstance(colors, dict):
+            raise ValidationError("Colors must be an object.")
+        if len(colors) > 200:
+            raise ValidationError("The palette contains too many colors.")
+        colors = {str(name): str(value).strip() for name, value in colors.items()}
+        if any(not name or len(name) > 100 or not COLOR_VALUE.fullmatch(value) for name, value in colors.items()):
+            raise ValidationError(
+                "Designer colors must be CSS color values such as #123456, rgb(), hsl(), or a named color."
+            )
+        serializer = PageThemeSerializer(theme, data={"colors": colors}, partial=True)
+        serializer.is_valid(raise_exception=True)
+        theme.colors = colors
+
+    if "fonts" in payload:
+        fonts = payload["fonts"]
+        if not isinstance(fonts, list):
+            raise ValidationError("Fonts must be a list.")
+        if len(fonts) > 30 or any(not isinstance(font, dict) for font in fonts):
+            raise ValidationError("Fonts must contain at most 30 font definitions.")
+        if any(not isinstance(font.get("variants", ["400"]), list) for font in fonts):
+            raise ValidationError("Font variants must be a list.")
+        font_payload = {
+            "google_fonts": [
+                {
+                    "family": str(font.get("family", "")).strip(),
+                    "variants": list(font.get("variants") or ["400"]),
+                    "display": font.get("display", "swap"),
+                }
+                for font in fonts
+            ]
+        }
+        if any(not font["family"] for font in font_payload["google_fonts"]):
+            raise ValidationError("Every font needs a family name.")
+        for font in font_payload["google_fonts"]:
+            if not re.fullmatch(r"[\w .&+\-]{1,100}", font["family"], re.UNICODE):
+                raise ValidationError("Font family names contain unsupported characters.")
+            if len(font["variants"]) > 20 or any(
+                not re.fullmatch(r"(?:[1-9]00)(?:italic)?|italic|regular", str(variant)) for variant in font["variants"]
+            ):
+                raise ValidationError("Font variants must use Google Fonts values such as 400, 700, or 400italic.")
+            if font["display"] not in {"auto", "block", "swap", "fallback", "optional"}:
+                raise ValidationError("Unsupported font display strategy.")
+        serializer = PageThemeSerializer(theme, data={"fonts": font_payload}, partial=True)
+        serializer.is_valid(raise_exception=True)
+        theme.fonts = font_payload
+
+    design_groups = copy.deepcopy(theme.design_groups or {"groups": []})
+    groups = design_groups.get("groups", [])
+    typography = payload.get("typography", [])
+    spacing = payload.get("spacing", [])
+    if not isinstance(typography, list) or not isinstance(spacing, list):
+        raise ValidationError("Typography and spacing must be lists.")
+    for item in typography:
+        if not isinstance(item, dict):
+            raise ValidationError("Typography entries must be objects.")
+        group_index = _integer(item.get("groupIndex", -1), "groupIndex")
+        element = item.get("element")
+        if group_index < 0 or group_index >= len(groups) or element not in (groups[group_index].get("elements") or {}):
+            raise ValidationError("Typography target no longer exists.")
+        target = groups[group_index]["elements"][element]
+        incoming = item.get("values", {})
+        if not isinstance(incoming, dict):
+            raise ValidationError("Typography values must be an object.")
+        unknown = set(incoming) - TYPE_PROPERTIES
+        if unknown:
+            raise ValidationError(f"Unsupported typography properties: {', '.join(sorted(unknown))}")
+        for key in TYPE_PROPERTIES:
+            if key in incoming:
+                if incoming[key] in (None, ""):
+                    target.pop(key, None)
+                else:
+                    target[key] = _safe_css_value(incoming[key], key)
+
+    for item in spacing:
+        if not isinstance(item, dict):
+            raise ValidationError("Spacing entries must be objects.")
+        group_index = _integer(item.get("groupIndex", -1), "groupIndex")
+        if group_index < 0 or group_index >= len(groups):
+            raise ValidationError("Spacing target no longer exists.")
+        if item.get("scope") == "element":
+            target = (groups[group_index].get("elements") or {}).get(item.get("element"))
+        elif item.get("scope") == "layout":
+            target = None
+            for part, breakpoint, values in _iter_layout_properties(groups[group_index]):
+                if part == item.get("part") and breakpoint == item.get("breakpoint"):
+                    target = values
+                    break
+        else:
+            raise ValidationError("Unsupported spacing scope.")
+        if target is None:
+            raise ValidationError("Spacing target no longer exists.")
+        incoming = item.get("values", {})
+        if not isinstance(incoming, dict):
+            raise ValidationError("Spacing values must be an object.")
+        unknown = set(incoming) - SPACING_PROPERTIES
+        if unknown:
+            raise ValidationError(f"Unsupported spacing properties: {', '.join(sorted(unknown))}")
+        for key in SPACING_PROPERTIES:
+            if key in incoming:
+                if incoming[key] in (None, ""):
+                    target.pop(key, None)
+                else:
+                    target[key] = _safe_css_value(incoming[key], key)
+    theme.design_groups = design_groups
+    return theme
+
+
+def save_designer_patch(theme_id, tenant, user, payload):
+    with transaction.atomic():
+        theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
+        if not user_can_design_theme(user, theme):
+            raise PermissionError
+        if _integer(payload.get("syncVersion", -1), "syncVersion") != theme.sync_version:
+            return None
+        create_revision(theme, user, "Designer workspace save")
+        apply_designer_patch(theme, payload)
+        theme.sync_source = "web"
+        theme.save(update_fields=["colors", "fonts", "design_groups", "sync_source", "sync_version", "updated_at"])
+        return theme
+
+
+def undo_designer_change(theme_id, tenant, user):
+    with transaction.atomic():
+        theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
+        if not user_can_design_theme(user, theme):
+            raise PermissionError
+        revision = theme.designer_revisions.first()
+        if not revision:
+            return None
+        snapshot = revision.snapshot
+        theme.colors = snapshot.get("colors", {})
+        theme.fonts = snapshot.get("fonts", {})
+        theme.design_groups = snapshot.get("design_groups", {})
+        theme.image.name = snapshot["image"] if snapshot.get("image") else ""
+        theme.site_icon.name = snapshot["site_icon"] if snapshot.get("site_icon") else ""
+        asset_restore = snapshot.get("asset_restore") or {}
+        backup_path = asset_restore.get("backup_path")
+        target_path = asset_restore.get("target_path")
+        if backup_path and target_path and system_storage.exists(backup_path):
+            with system_storage.open(backup_path, "rb") as source:
+                restored_content = source.read()
+            if system_storage.exists(target_path):
+                system_storage.delete(target_path)
+            system_storage.save(target_path, ContentFile(restored_content))
+            system_storage.delete(backup_path)
+        theme.save()
+        revision.delete()
+        return theme
+
+
+def validate_image_upload(upload):
+    if upload.size > MAX_IMAGE_BYTES:
+        raise ValidationError("Image exceeds the 10 MB limit.")
+    content_type = upload.content_type or ""
+    if content_type not in IMAGE_TYPES:
+        raise ValidationError("Use a PNG, JPEG, GIF, WebP, or SVG image.")
+    content = upload.read()
+    upload.seek(0)
+    if content_type == "image/svg+xml":
+        text = content.decode("utf-8", errors="ignore").lower()
+        forbidden = ("<!doctype", "<!entity", "<script", "javascript:", "@import", "expression(")
+        if "<svg" not in text[:1000] or any(marker in text for marker in forbidden):
+            raise ValidationError("Unsafe SVG content was rejected.")
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError as exc:
+            raise ValidationError("The uploaded SVG is not valid XML.") from exc
+        if root.tag.rsplit("}", 1)[-1].lower() != "svg":
+            raise ValidationError("The uploaded file is not an SVG image.")
+        blocked_tags = {"script", "style", "foreignobject", "iframe", "object", "embed"}
+        for element in root.iter():
+            if element.tag.rsplit("}", 1)[-1].lower() in blocked_tags:
+                raise ValidationError("Unsafe SVG content was rejected.")
+            for raw_name, raw_value in element.attrib.items():
+                name = raw_name.rsplit("}", 1)[-1].lower()
+                value = str(raw_value).strip().lower()
+                safe_embedded_image = value.startswith(
+                    ("data:image/png", "data:image/jpeg", "data:image/gif", "data:image/webp")
+                )
+                if name.startswith("on") or (
+                    name in {"href", "xlink:href"} and value and not (value.startswith("#") or safe_embedded_image)
+                ):
+                    raise ValidationError("Unsafe SVG content was rejected.")
+                if name == "style" and CSS_VALUE_FORBIDDEN.search(value):
+                    raise ValidationError("Unsafe SVG content was rejected.")
+        opening_tag = text[text.find("<svg") : text.find(">", text.find("<svg")) + 1]
+        width_match = re.search(r"\bwidth=[\"']?(\d+(?:\.\d+)?)", opening_tag)
+        height_match = re.search(r"\bheight=[\"']?(\d+(?:\.\d+)?)", opening_tag)
+        if width_match and height_match:
+            return content, (int(float(width_match.group(1))), int(float(height_match.group(1))))
+        view_box = re.search(r"\bviewbox=[\"']\s*[-\d.]+\s+[-\d.]+\s+([\d.]+)\s+([\d.]+)", opening_tag)
+        return content, (int(float(view_box.group(1))), int(float(view_box.group(2)))) if view_box else (None, None)
+    try:
+        image = Image.open(io.BytesIO(content))
+        detected_type = Image.MIME.get(image.format)
+        if detected_type != content_type and {detected_type, content_type} != {"image/jpeg", "image/jpg"}:
+            raise ValidationError("The uploaded content does not match its declared image type.")
+        image.verify()
+        return content, image.size
+    except ValidationError:
+        raise
+    except Exception as exc:
+        raise ValidationError("The uploaded file is not a valid image.") from exc
+
+
+def _find_asset(theme, asset_key):
+    return next((asset for asset in collect_designer_assets(theme) if asset["assetKey"] == asset_key), None)
+
+
+def _replace_shared_image_references(value, old_url, old_filename, replacement):
+    if isinstance(value, dict):
+        current_url = _image_url(value)
+        current_filename = value.get("filename")
+        if (old_url and current_url == old_url) or (old_filename and current_filename == old_filename):
+            value.update(replacement)
+            value.pop("fileUrl", None)
+            value.pop("file_url", None)
+        for child in value.values():
+            _replace_shared_image_references(child, old_url, old_filename, replacement)
+    elif isinstance(value, list):
+        for child in value:
+            _replace_shared_image_references(child, old_url, old_filename, replacement)
+
+
+def replace_designer_asset(theme_id, tenant, user, asset_key, upload):
+    content, (width, height) = validate_image_upload(upload)
+    with transaction.atomic():
+        theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
+        if not user_can_design_theme(user, theme):
+            raise PermissionError
+        asset = _find_asset(theme, asset_key)
+        if not asset:
+            raise ValidationError("Asset slot was not found.")
+        required_width = asset.get("requiredWidth")
+        required_height = asset.get("requiredHeight")
+        if width and required_width and width < int(required_width):
+            raise ValidationError(f"Image must be at least {required_width}px wide.")
+        if height and required_height and height < int(required_height):
+            raise ValidationError(f"Image must be at least {required_height}px high.")
+        revision = create_revision(theme, user, f"Replace {asset.get('displayName')}")
+        extension = os.path.splitext(upload.name)[1].lower() or ".png"
+        safe_name = slugify(os.path.splitext(asset.get("displayName") or upload.name)[0]) or "asset"
+        filename = f"{safe_name}-{uuid.uuid4().hex[:10]}{extension}"
+
+        if asset_key == "preview":
+            theme.image.save(filename, ContentFile(content), save=False)
+            theme.save()
+        elif asset_key == "site-icon":
+            theme.site_icon.save(filename, ContentFile(content), save=False)
+            theme.save()
+        elif asset_key.startswith("library:"):
+            library_filename = asset_key.split(":", 1)[1]
+            expected_type = {
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".png": "image/png",
+                ".gif": "image/gif",
+                ".webp": "image/webp",
+                ".svg": "image/svg+xml",
+            }.get(os.path.splitext(library_filename)[1].lower())
+            if expected_type and upload.content_type != expected_type:
+                raise ValidationError("An unused library replacement must keep the original file format.")
+            library_path = f"theme_images/{theme.id}/library/{library_filename}"
+            backup_path = f"theme_images/{theme.id}/designer_history/{uuid.uuid4().hex}/{library_filename}"
+            if system_storage.exists(library_path):
+                with system_storage.open(library_path, "rb") as source:
+                    previous_content = source.read()
+                system_storage.save(backup_path, ContentFile(previous_content))
+                revision.snapshot = {
+                    **revision.snapshot,
+                    "asset_restore": {"backup_path": backup_path, "target_path": library_path},
+                }
+                revision.save(update_fields=["snapshot"])
+                try:
+                    system_storage.delete(library_path)
+                    system_storage.save(library_path, ContentFile(content))
+                except Exception:
+                    if not system_storage.exists(library_path):
+                        system_storage.save(library_path, ContentFile(previous_content))
+                    raise
+            else:
+                system_storage.save(library_path, ContentFile(content))
+            theme.save(update_fields=["sync_version", "updated_at"])
+        else:
+            path = f"theme_images/{theme.id}/designer_assets/{filename}"
+            saved_path = system_storage.save(path, ContentFile(content))
+            url = system_storage.url(saved_path)
+            if asset_key.startswith("design:"):
+                _, group_index, part, breakpoint, property_name = asset_key.split(":", 4)
+                groups = copy.deepcopy((theme.design_groups or {}).get("groups", []))
+                target = None
+                for candidate_part, candidate_breakpoint, values in _iter_layout_properties(groups[int(group_index)]):
+                    if candidate_part == part and candidate_breakpoint == breakpoint:
+                        target = values.get(property_name)
+                        if target is None and isinstance(values.get("images"), dict):
+                            target = values["images"].get(property_name)
+                        break
+                if not isinstance(target, dict):
+                    raise ValidationError("Asset slot was not found.")
+                replacement = {
+                    "url": url,
+                    "filename": filename,
+                    "size": len(content),
+                    "width": width,
+                    "height": height,
+                    "isPlaceholder": False,
+                }
+                _replace_shared_image_references(
+                    groups,
+                    _image_url(target),
+                    target.get("filename"),
+                    replacement,
+                )
+                target.update(replacement)
+                theme.design_groups = {**(theme.design_groups or {}), "groups": groups}
+                theme.save(update_fields=["design_groups", "sync_version", "updated_at"])
+        return theme
+
+
+def generate_placeholder_png(display_name, usage, width, height):
+    width = int(width)
+    height = int(height)
+    if width < 16 or height < 16 or width > 8000 or height > 8000 or width * height > 32_000_000:
+        raise ValidationError("Placeholder dimensions must be between 16px and 8000px and at most 32 megapixels.")
+    image = Image.new("RGB", (width, height), "#e5e7eb")
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.load_default(size=max(12, min(width, height) // 18))
+    lines = [display_name, usage, f"{width} x {height} px"]
+    y = height // 2 - (len(lines) * (font.size + 8)) // 2
+    for line in lines:
+        box = draw.textbbox((0, 0), line, font=font)
+        draw.text(((width - (box[2] - box[0])) // 2, y), line, fill="#111827", font=font)
+        y += font.size + 8
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", optimize=True)
+    return buffer.getvalue()
