@@ -38,7 +38,6 @@ from .views import (
     resolve_links,
 )
 from .views.designer_theme_views import (
-    DesignerPreviewContentView,
     DesignerThemeAssetView,
     DesignerThemeDiscardView,
     DesignerThemeExportDetailView,
@@ -148,11 +147,6 @@ urlpatterns = [
         "designer/themes/<int:theme_id>/placeholder/",
         DesignerThemePlaceholderView.as_view(),
         name="designer-theme-placeholder",
-    ),
-    path(
-        "designer/themes/<int:theme_id>/preview-content/",
-        DesignerPreviewContentView.as_view(),
-        name="designer-preview-content",
     ),
     path("designer/themes/<int:theme_id>/export/", DesignerThemeExportView.as_view(), name="designer-theme-export"),
     path(

@@ -1,6 +1,5 @@
 """Restricted API surface for the theme Designer workspace."""
 
-import json
 from datetime import timedelta
 
 from django.contrib.auth.models import User
@@ -14,14 +13,13 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ai_tracking.services.ai_client import AIClient
 from file_manager.storage import S3MediaStorage
 from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeDesignerExportJob
 from webpages.services import ThemeCSSGenerator
 from webpages.services.designer_export import designer_export_filename, designer_export_object_key
 from webpages.services.designer_theme import (
-    DesignerDraftConflict,
     MAX_IMAGE_PIXELS,
+    DesignerDraftConflict,
     apply_designer_patch,
     build_draft_workspace,
     designer_theme_queryset,
@@ -35,16 +33,6 @@ from webpages.services.designer_theme import (
     user_can_design_theme,
 )
 from webpages.tasks import export_designer_theme
-
-DEFAULT_PREVIEW_CONTENT = {
-    "eyebrow": "Design system preview",
-    "title": "A clear heading for representative content",
-    "lead": "This sample shows typography, colors, spacing, imagery, cards, lists, links, buttons, and tables.",
-    "cardTitle": "Representative card",
-    "cardBody": "Use this area to judge hierarchy, rhythm, and readability before saving the live theme.",
-    "listItems": ["First representative item", "A second item with more text", "Final list item"],
-}
-
 
 DESIGNER_CASE_OPTIONS = {"ignore_fields": ("colors", "values")}
 
@@ -160,7 +148,6 @@ class DesignerThemePreviewView(APIView):
             {
                 "css": css,
                 "fontUrl": preview_theme.get_google_fonts_url(),
-                "content": DEFAULT_PREVIEW_CONTENT,
             }
         )
 
@@ -266,51 +253,6 @@ class DesignerThemePlaceholderView(APIView):
         except DesignerDraftConflict as exc:
             return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
         return Response(build_draft_workspace(theme, draft))
-
-
-class DesignerPreviewContentView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request, theme_id):
-        _theme(request, theme_id)
-        prompt = str(request.data.get("prompt") or "Create neutral sample website copy for a design-system preview.")[
-            :1000
-        ]
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "Return only JSON with string fields eyebrow, title, lead, cardTitle, cardBody and a "
-                    "listItems array of exactly three short strings. Do not include HTML."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ]
-        try:
-            result = AIClient(
-                provider="openai", model="gpt-4o-mini", user=request.user, prompt_type="theme_designer_preview"
-            ).call(
-                prompt=messages,
-                task_description="Generate designer preview sample content",
-                metadata={"theme_id": theme_id},
-                response_format={"type": "json_object"},
-                store_full_data=False,
-            )
-            content = json.loads(result["response"])
-            required = {"eyebrow", "title", "lead", "cardTitle", "cardBody", "listItems"}
-            if (
-                set(content) != required
-                or not all(isinstance(content[key], str) for key in required - {"listItems"})
-                or not isinstance(content["listItems"], list)
-                or len(content["listItems"]) != 3
-            ):
-                raise ValueError("AI response did not match the preview schema")
-            for key in required - {"listItems"}:
-                content[key] = content[key][:500]
-            content["listItems"] = [str(item)[:160] for item in content["listItems"]]
-            return Response({"content": content})
-        except Exception:
-            return Response({"content": DEFAULT_PREVIEW_CONTENT, "fallback": True})
 
 
 class ThemeDesignerAssignmentView(APIView):

@@ -6,6 +6,8 @@ Tenant administrators assign an existing user from the **Designer access** secti
 
 Edits remain local while the server generates debounced preview CSS. **Save draft** persists approved value changes without updating the live theme. Asset uploads use immutable draft-specific object keys and are also invisible to the live theme. **Publish changes** verifies the draft and live-theme versions, records one recoverable revision, and swaps every staged field and asset reference into the live theme in one database transaction. **Discard draft** resets the shared theme draft to current live state.
 
+Preview copy is generated locally from the configured font families, variants, and typography values. Longer passages use deterministic filler text for the current document or browser language; the Designer preview does not call an AI service.
+
 The draft is shared by all assigned designers for the theme. If another designer changes the draft, or an administrator changes the live theme after the draft starts, stale requests are rejected instead of overwriting newer work. Unused library assets are read-only in the draft workflow because replacing their fixed object keys cannot share the database transaction boundary.
 
 ## Image sizing and placeholders

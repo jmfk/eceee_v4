@@ -12,7 +12,6 @@ const mocks = vi.hoisted(() => ({
     discard: vi.fn(),
     replaceAsset: vi.fn(),
     createPlaceholder: vi.fn(),
-    generatePreviewContent: vi.fn(),
     createExport: vi.fn(),
     getExport: vi.fn(),
     getExportDownload: vi.fn(),
@@ -62,7 +61,8 @@ describe('DesignerThemeWorkspacePage', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mocks.workspace.mockResolvedValue(structuredClone(workspace))
-        mocks.preview.mockResolvedValue({ css: '.designer-preview{color:#123456}', fontUrl: 'https://fonts.googleapis.com/css2?family=Inter', content: { eyebrow: 'Preview', title: 'Title', lead: 'Lead', cardTitle: 'Card', cardBody: 'Body', listItems: ['One', 'Two', 'Three'] } })
+        document.documentElement.lang = 'en'
+        mocks.preview.mockResolvedValue({ css: '.designer-preview{color:#123456}', fontUrl: 'https://fonts.googleapis.com/css2?family=Inter' })
         mocks.save.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 3, hasDraftChanges: true })
         mocks.publish.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4 })
         vi.spyOn(window, 'confirm').mockReturnValue(true)
@@ -78,7 +78,24 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByText(/custom css/i)).not.toBeInTheDocument()
         expect(screen.queryByText(/selector/i)).not.toBeInTheDocument()
         expect(screen.getByTitle('Live theme preview')).toHaveAttribute('sandbox', '')
-        await waitFor(() => expect(screen.getByTitle('Live theme preview').getAttribute('srcdoc')).toContain('fonts.googleapis.com'))
+        await waitFor(() => {
+            const preview = screen.getByTitle('Live theme preview').getAttribute('srcdoc')
+            expect(preview).toContain('fonts.googleapis.com')
+            expect(preview).toContain('Inter · 400 / 700')
+            expect(preview).toContain('fontFamily: Inter, fontSize: 32px')
+            expect(preview).toContain('Lorem ipsum dolor sit amet')
+        })
+        expect(screen.queryByRole('button', { name: /ai sample/i })).not.toBeInTheDocument()
+    })
+
+    it('uses localized filler copy for the current document language', async () => {
+        document.documentElement.lang = 'sv-SE'
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const preview = screen.getByTitle('Live theme preview').getAttribute('srcdoc')
+        expect(preview).toContain('Förhandsvisning av typografi')
+        expect(preview).toContain('Det här är en längre svensk exempeltext')
     })
 
     it('saves a draft and publishes it only after explicit confirmation', async () => {

@@ -9,9 +9,9 @@ from webpages.models import PageTheme, ThemeDesignerAssignment
 
 class UserListQueryTests(TestCase):
     def test_user_list_access_fields_use_bounded_queries(self):
-        admin = User.objects.create_superuser("admin", password="test")
-        designer = User.objects.create_user("designer", password="test")
-        tenant = Tenant.objects.create(name="Tenant", identifier="tenant", created_by=admin)
+        admin = User.objects.create_superuser("designer-query-admin", password="test")
+        designer = User.objects.create_user("designer-query-user", password="test")
+        tenant = Tenant.objects.create(name="Tenant", identifier="designer-query-tenant", created_by=admin)
         theme = PageTheme.objects.create(tenant=tenant, created_by=admin, name="Theme")
         ThemeDesignerAssignment.objects.create(
             tenant=tenant,
@@ -26,7 +26,7 @@ class UserListQueryTests(TestCase):
             response = UserListView.as_view()(request)
 
         self.assertEqual(response.status_code, 200)
-        serialized_designer = next(user for user in response.data["users"] if user["username"] == "designer")
+        serialized_designer = next(user for user in response.data["users"] if user["username"] == "designer-query-user")
         self.assertTrue(serialized_designer["is_designer_only"])
         self.assertFalse(serialized_designer["has_tenant_admin_access"])
-        self.assertEqual(serialized_designer["designer_tenants"][0]["identifier"], "tenant")
+        self.assertEqual(serialized_designer["designer_tenants"][0]["identifier"], "designer-query-tenant")
