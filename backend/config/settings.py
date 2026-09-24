@@ -623,6 +623,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "site_statistics.tasks.update_experiment_metrics",
         "schedule": 3600.0,  # Every hour
     },
+    "cleanup-expired-designer-exports-hourly": {
+        "task": "webpages.tasks.cleanup_expired_designer_exports",
+        "schedule": 3600.0,  # Every hour
+    },
 }
 
 # Rate Limiting

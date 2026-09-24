@@ -2,6 +2,7 @@
 
 import copy
 import io
+import logging
 import os
 import re
 import uuid
@@ -14,7 +15,13 @@ from PIL import Image, ImageDraw, ImageFont
 from rest_framework.exceptions import ValidationError
 
 from file_manager.storage import system_storage
-from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeDesignerDraft, ThemeDesignerRevision
+from webpages.models import (
+    PageTheme,
+    ThemeDesignerAssignment,
+    ThemeDesignerDraft,
+    ThemeDesignerExportJob,
+    ThemeDesignerRevision,
+)
 from webpages.serializers.theme import PageThemeSerializer
 
 TYPE_PROPERTIES = {
@@ -44,6 +51,7 @@ RASTER_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 IMAGE_TYPES = RASTER_TYPES | {"image/svg+xml"}
 CSS_VALUE_FORBIDDEN = re.compile(r"[;{}<>]|url\s*\(|expression\s*\(|@import", re.IGNORECASE)
 COLOR_VALUE = re.compile(r"^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\([0-9.%+,\-\s/]+\)|[a-zA-Z]+)$")
+logger = logging.getLogger(__name__)
 
 
 class DesignerDraftConflict(Exception):
@@ -73,6 +81,63 @@ def theme_designer_snapshot(theme):
         "image": theme.image.name if theme.image else None,
         "site_icon": theme.site_icon.name if theme.site_icon else None,
     }
+
+
+def designer_snapshot_asset_paths(snapshot, theme_id):
+    """Return immutable Designer draft object keys referenced by a snapshot."""
+    prefix = f"theme_images/{theme_id}/designer_drafts/"
+    paths = set()
+
+    def collect(value):
+        if isinstance(value, dict):
+            for child in value.values():
+                collect(child)
+        elif isinstance(value, list):
+            for child in value:
+                collect(child)
+        elif isinstance(value, str) and prefix in value:
+            path = value[value.index(prefix) :].split("?", 1)[0].split("#", 1)[0]
+            paths.add(path)
+
+    collect(snapshot)
+    return paths
+
+
+def delete_unreferenced_designer_assets(theme_id, candidate_paths):
+    """Delete immutable draft objects only after every persisted reference is gone."""
+    prefix = f"theme_images/{theme_id}/designer_drafts/"
+    candidates = {path for path in candidate_paths if path and path.startswith(prefix)}
+    if not candidates:
+        return 0
+
+    referenced = set()
+    theme = PageTheme.objects.filter(id=theme_id).first()
+    if theme:
+        referenced.update(designer_snapshot_asset_paths(theme_designer_snapshot(theme), theme_id))
+    for snapshot in ThemeDesignerDraft.objects.filter(theme_id=theme_id).values_list("snapshot", flat=True):
+        referenced.update(designer_snapshot_asset_paths(snapshot, theme_id))
+    for snapshot in ThemeDesignerRevision.objects.filter(theme_id=theme_id).values_list("snapshot", flat=True):
+        referenced.update(designer_snapshot_asset_paths(snapshot, theme_id))
+    for snapshot in ThemeDesignerExportJob.objects.filter(theme_id=theme_id).values_list("snapshot", flat=True):
+        referenced.update(designer_snapshot_asset_paths(snapshot, theme_id))
+
+    deleted = 0
+    for path in candidates - referenced:
+        try:
+            if system_storage.exists(path):
+                system_storage.delete(path)
+                deleted += 1
+        except Exception:
+            logger.exception("Could not remove unreferenced Designer asset %s", path)
+    return deleted
+
+
+def _cleanup_designer_assets_after_commit(theme_id, snapshots):
+    candidates = set()
+    for snapshot in snapshots:
+        candidates.update(designer_snapshot_asset_paths(snapshot, theme_id))
+    if candidates:
+        transaction.on_commit(lambda: delete_unreferenced_designer_assets(theme_id, candidates))
 
 
 def apply_designer_snapshot(theme, snapshot):
@@ -417,11 +482,9 @@ def create_revision(theme, user, summary):
     )
     old_ids = list(theme.designer_revisions.values_list("id", flat=True)[REVISION_LIMIT:])
     if old_ids:
-        for old_snapshot in ThemeDesignerRevision.objects.filter(id__in=old_ids).values_list("snapshot", flat=True):
-            backup_path = (old_snapshot.get("asset_restore") or {}).get("backup_path")
-            if backup_path and system_storage.exists(backup_path):
-                system_storage.delete(backup_path)
+        old_snapshots = list(ThemeDesignerRevision.objects.filter(id__in=old_ids).values_list("snapshot", flat=True))
         ThemeDesignerRevision.objects.filter(id__in=old_ids).delete()
+        _cleanup_designer_assets_after_commit(theme.id, old_snapshots)
     return revision
 
 
@@ -634,15 +697,44 @@ def publish_designer_draft(theme_id, tenant, user, draft_version):
         return theme, draft
 
 
-def discard_designer_draft(theme_id, tenant, user, draft_version):
+def undo_designer_publish(theme_id, tenant, user, draft_version, live_sync_version):
+    """Restore the latest pre-publish snapshot without overwriting draft work."""
     with transaction.atomic():
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
         if not user_can_design_theme(user, theme):
             raise PermissionError
-        draft = get_or_create_designer_draft(theme, user)
-        draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
+        draft = ThemeDesignerDraft.objects.select_for_update().filter(theme=theme).first()
+        if not draft:
+            raise DesignerDraftConflict("There is no Designer draft to restore.")
         if draft.version != _integer(draft_version, "draftVersion"):
             raise DesignerDraftConflict("The Designer draft changed after you opened it.")
+        if theme.sync_version != _integer(live_sync_version, "liveSyncVersion"):
+            raise DesignerDraftConflict("The live theme changed after you opened it.")
+        if draft.base_sync_version != theme.sync_version:
+            raise DesignerDraftConflict("The live theme changed after this draft was started.")
+        if draft.has_changes:
+            raise DesignerDraftConflict("Publish or discard the saved draft before restoring a revision.")
+
+        revision = ThemeDesignerRevision.objects.select_for_update().filter(theme=theme).first()
+        if not revision:
+            raise DesignerDraftConflict("There is no Designer revision to restore.")
+
+        replaced_snapshot = theme_designer_snapshot(theme)
+        apply_designer_snapshot(theme, revision.snapshot)
+        theme.sync_source = "web"
+        theme.save(
+            update_fields=[
+                "colors",
+                "fonts",
+                "design_groups",
+                "image",
+                "site_icon",
+                "sync_source",
+                "sync_version",
+                "updated_at",
+            ]
+        )
+        revision.delete()
         draft.snapshot = theme_designer_snapshot(theme)
         draft.base_sync_version = theme.sync_version
         draft.version += 1
@@ -658,6 +750,36 @@ def discard_designer_draft(theme_id, tenant, user, draft_version):
                 "updated_at",
             ]
         )
+        _cleanup_designer_assets_after_commit(theme.id, [replaced_snapshot])
+        return theme, draft
+
+
+def discard_designer_draft(theme_id, tenant, user, draft_version):
+    with transaction.atomic():
+        theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
+        if not user_can_design_theme(user, theme):
+            raise PermissionError
+        draft = get_or_create_designer_draft(theme, user)
+        draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
+        if draft.version != _integer(draft_version, "draftVersion"):
+            raise DesignerDraftConflict("The Designer draft changed after you opened it.")
+        discarded_snapshot = draft.snapshot
+        draft.snapshot = theme_designer_snapshot(theme)
+        draft.base_sync_version = theme.sync_version
+        draft.version += 1
+        draft.has_changes = False
+        draft.updated_by = user
+        draft.save(
+            update_fields=[
+                "snapshot",
+                "base_sync_version",
+                "version",
+                "has_changes",
+                "updated_by",
+                "updated_at",
+            ]
+        )
+        _cleanup_designer_assets_after_commit(theme.id, [discarded_snapshot])
         return theme, draft
 
 
@@ -740,84 +862,98 @@ def _replace_shared_image_references(value, old_url, old_filename, replacement):
 
 def replace_designer_asset(theme_id, tenant, user, asset_key, upload, draft_version, placeholder_metadata=None):
     content, (width, height) = validate_image_upload(upload)
-    with transaction.atomic():
-        theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
-        if not user_can_design_theme(user, theme):
-            raise PermissionError
-        draft = get_or_create_designer_draft(theme, user)
-        draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
-        if draft.base_sync_version != theme.sync_version:
-            raise DesignerDraftConflict("The live theme changed after this draft was started.")
-        if draft.version != _integer(draft_version, "draftVersion"):
-            raise DesignerDraftConflict("The Designer draft changed after you opened it.")
+    saved_path = None
+    try:
+        with transaction.atomic():
+            theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
+            if not user_can_design_theme(user, theme):
+                raise PermissionError
+            draft = get_or_create_designer_draft(theme, user)
+            draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
+            if draft.base_sync_version != theme.sync_version:
+                raise DesignerDraftConflict("The live theme changed after this draft was started.")
+            if draft.version != _integer(draft_version, "draftVersion"):
+                raise DesignerDraftConflict("The Designer draft changed after you opened it.")
 
-        draft_theme = theme_from_designer_draft(theme, draft)
-        asset = _find_asset(draft_theme, asset_key)
-        if not asset:
-            raise ValidationError("Asset slot was not found.")
-        if asset_key.startswith("library:"):
-            raise ValidationError("Unused library assets cannot be replaced from the Designer draft.")
-        required_width = asset.get("requiredWidth")
-        required_height = asset.get("requiredHeight")
-        if width and required_width and width < int(required_width):
-            raise ValidationError(f"Image must be at least {required_width}px wide.")
-        if height and required_height and height < int(required_height):
-            raise ValidationError(f"Image must be at least {required_height}px high.")
-        extension = {
-            "image/jpeg": ".jpg",
-            "image/png": ".png",
-            "image/gif": ".gif",
-            "image/webp": ".webp",
-            "image/svg+xml": ".svg",
-        }[upload.content_type]
-        safe_name = slugify(os.path.splitext(asset.get("displayName") or upload.name)[0]) or "asset"
-        filename = f"{safe_name}-{uuid.uuid4().hex[:10]}{extension}"
-        path = f"theme_images/{theme.id}/designer_drafts/{draft.id}/{filename}"
-        saved_path = system_storage.save(path, ContentFile(content))
+            draft_theme = theme_from_designer_draft(theme, draft)
+            previous_snapshot = draft.snapshot
+            asset = _find_asset(draft_theme, asset_key)
+            if not asset:
+                raise ValidationError("Asset slot was not found.")
+            if asset_key.startswith("library:"):
+                raise ValidationError("Unused library assets cannot be replaced from the Designer draft.")
+            required_width = asset.get("requiredWidth")
+            required_height = asset.get("requiredHeight")
+            if width and required_width and width < int(required_width):
+                raise ValidationError(f"Image must be at least {required_width}px wide.")
+            if height and required_height and height < int(required_height):
+                raise ValidationError(f"Image must be at least {required_height}px high.")
+            extension = {
+                "image/jpeg": ".jpg",
+                "image/png": ".png",
+                "image/gif": ".gif",
+                "image/webp": ".webp",
+                "image/svg+xml": ".svg",
+            }[upload.content_type]
+            safe_name = slugify(os.path.splitext(asset.get("displayName") or upload.name)[0]) or "asset"
+            filename = f"{safe_name}-{uuid.uuid4().hex[:10]}{extension}"
+            path = f"theme_images/{theme.id}/designer_drafts/{draft.id}/{filename}"
+            saved_path = system_storage.save(path, ContentFile(content))
 
-        if asset_key == "preview":
-            draft_theme.image.name = saved_path
-        elif asset_key == "site-icon":
-            draft_theme.site_icon.name = saved_path
-        else:
-            url = system_storage.url(saved_path)
-            if asset_key.startswith("design:"):
-                _, group_index, part, breakpoint, property_name = asset_key.split(":", 4)
-                groups = copy.deepcopy((draft_theme.design_groups or {}).get("groups", []))
-                target = None
-                for candidate_part, candidate_breakpoint, values in _iter_layout_properties(groups[int(group_index)]):
-                    if candidate_part == part and candidate_breakpoint == breakpoint:
-                        target = values.get(property_name)
-                        if target is None and isinstance(values.get("images"), dict):
-                            target = values["images"].get(property_name)
-                        break
-                if not isinstance(target, dict):
-                    raise ValidationError("Asset slot was not found.")
-                replacement = {
-                    "url": url,
-                    "filename": filename,
-                    "size": len(content),
-                    "width": width,
-                    "height": height,
-                    "isPlaceholder": bool(placeholder_metadata),
-                }
-                if placeholder_metadata:
-                    replacement.update(placeholder_metadata)
-                _replace_shared_image_references(
-                    groups,
-                    _image_url(target),
-                    target.get("filename"),
-                    replacement,
-                )
-                target.update(replacement)
-                draft_theme.design_groups = {**(draft_theme.design_groups or {}), "groups": groups}
+            if asset_key == "preview":
+                draft_theme.image.name = saved_path
+            elif asset_key == "site-icon":
+                draft_theme.site_icon.name = saved_path
+            else:
+                url = system_storage.url(saved_path)
+                if asset_key.startswith("design:"):
+                    _, group_index, part, breakpoint, property_name = asset_key.split(":", 4)
+                    groups = copy.deepcopy((draft_theme.design_groups or {}).get("groups", []))
+                    target = None
+                    for candidate_part, candidate_breakpoint, values in _iter_layout_properties(
+                        groups[int(group_index)]
+                    ):
+                        if candidate_part == part and candidate_breakpoint == breakpoint:
+                            target = values.get(property_name)
+                            if target is None and isinstance(values.get("images"), dict):
+                                target = values["images"].get(property_name)
+                            break
+                    if not isinstance(target, dict):
+                        raise ValidationError("Asset slot was not found.")
+                    replacement = {
+                        "url": url,
+                        "filename": filename,
+                        "size": len(content),
+                        "width": width,
+                        "height": height,
+                        "isPlaceholder": bool(placeholder_metadata),
+                    }
+                    if placeholder_metadata:
+                        replacement.update(placeholder_metadata)
+                    _replace_shared_image_references(
+                        groups,
+                        _image_url(target),
+                        target.get("filename"),
+                        replacement,
+                    )
+                    target.update(replacement)
+                    draft_theme.design_groups = {**(draft_theme.design_groups or {}), "groups": groups}
 
-        draft.snapshot = theme_designer_snapshot(draft_theme)
-        draft.version += 1
-        draft.has_changes = True
-        draft.updated_by = user
-        draft.save(update_fields=["snapshot", "version", "has_changes", "updated_by", "updated_at"])
-        return theme, draft
+            draft.snapshot = theme_designer_snapshot(draft_theme)
+            draft.version += 1
+            draft.has_changes = True
+            draft.updated_by = user
+            draft.save(update_fields=["snapshot", "version", "has_changes", "updated_by", "updated_at"])
+            _cleanup_designer_assets_after_commit(theme.id, [previous_snapshot])
+            return theme, draft
+    except Exception:
+        if saved_path:
+            try:
+                if system_storage.exists(saved_path):
+                    system_storage.delete(saved_path)
+            except Exception:
+                logger.exception("Could not remove rolled-back Designer asset %s", saved_path)
+        raise
 
 
 def generate_placeholder_png(display_name, usage, width, height):

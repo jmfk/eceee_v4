@@ -4,6 +4,7 @@ import base64
 import copy
 import html
 import io
+import logging
 import os
 import re
 import zipfile
@@ -23,8 +24,12 @@ from webpages.services.designer_theme import (
     apply_designer_snapshot,
     build_workspace,
     collect_designer_assets,
+    delete_unreferenced_designer_assets,
+    designer_snapshot_asset_paths,
     generate_placeholder_png,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def designer_export_filename(theme):
@@ -33,6 +38,31 @@ def designer_export_filename(theme):
 
 def designer_export_object_key(job):
     return f"theme-designer-exports/{job.theme_id}/{job.id}/{designer_export_filename(job.theme)}"
+
+
+def cleanup_expired_designer_exports(now=None, batch_size=200, storage=None):
+    """Delete expired export objects and their database snapshots in bounded batches."""
+    from webpages.models import ThemeDesignerExportJob
+
+    now = now or timezone.now()
+    storage = storage or S3MediaStorage()
+    jobs = list(ThemeDesignerExportJob.objects.filter(expires_at__lte=now).order_by("expires_at")[:batch_size])
+    removed = 0
+    cleanup_paths = {}
+    for job in jobs:
+        try:
+            if job.object_key and storage.exists(job.object_key):
+                storage.delete(job.object_key)
+        except Exception:
+            logger.exception("Could not remove expired Designer export %s", job.id)
+            continue
+        cleanup_paths.setdefault(job.theme_id, set()).update(designer_snapshot_asset_paths(job.snapshot, job.theme_id))
+        job.delete()
+        removed += 1
+
+    for theme_id, paths in cleanup_paths.items():
+        delete_unreferenced_designer_assets(theme_id, paths)
+    return removed
 
 
 def _safe_part(value, fallback="asset"):

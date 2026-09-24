@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Download, Image as ImageIcon, Loader2, Monitor, Palette, Plus, Redo2, RotateCcw, Save, Send, Smartphone, Tablet, Trash2, Type } from 'lucide-react'
+import { Download, Image as ImageIcon, Loader2, Monitor, Palette, Plus, Redo2, RotateCcw, Save, Send, Smartphone, Tablet, Trash2, Type, Undo2 } from 'lucide-react'
 import DesignerNavbar from '../components/DesignerNavbar'
 import StatusBar from '../components/StatusBar'
 import { designerThemesApi } from '../api/designerThemes'
@@ -95,6 +95,7 @@ const DesignerThemeWorkspacePage = () => {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [publishing, setPublishing] = useState(false)
+    const [restoring, setRestoring] = useState(false)
     const [dirty, setDirty] = useState(false)
     const [error, setError] = useState('')
     const [exporting, setExporting] = useState(false)
@@ -196,6 +197,21 @@ const DesignerThemeWorkspacePage = () => {
         }
     }
 
+    const undoPublish = async () => {
+        if (!window.confirm('Restore the theme version from immediately before the latest Designer publish?')) return
+        setRestoring(true)
+        try {
+            const result = await designerThemesApi.undo(themeId, workspace.draftVersion, workspace.liveSyncVersion)
+            setWorkspace(result)
+            setDirty(false)
+            addNotification({ type: 'success', message: 'Latest Designer publish restored' })
+        } catch (err) {
+            addNotification({ type: 'error', message: err.message || 'Published revision could not be restored' })
+        } finally {
+            setRestoring(false)
+        }
+    }
+
     const replaceAsset = async (asset, file) => {
         if (!file) return
         try {
@@ -268,16 +284,17 @@ const DesignerThemeWorkspacePage = () => {
                         {[['desktop', <Monitor className="h-4 w-4" />], ['tablet', <Tablet className="h-4 w-4" />], ['mobile', <Smartphone className="h-4 w-4" />]].map(([name, icon]) => <button key={name} onClick={() => setViewport(name)} aria-label={`${name} preview`} className={`rounded p-1.5 ${viewport === name ? 'bg-gray-200 text-gray-900' : 'text-gray-500'}`}>{icon}</button>)}
                     </div>
                     <button onClick={exportPackage} disabled={exporting} title={exportProgress?.message} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-50">{exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{exporting ? `Export ${exportProgress?.percent || 0}%` : 'Export'}</button>
-                    <button onClick={discardDraft} disabled={(!hasDraftChanges && !workspace.draftIsStale) || saving || publishing} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-40"><RotateCcw className="h-4 w-4" />Discard draft</button>
-                    <button onClick={() => saveDraft()} disabled={!dirty || workspace.draftIsStale || saving || publishing} className="inline-flex items-center gap-2 rounded-md border border-blue-600 bg-white px-3 py-2 text-sm font-medium text-blue-700 disabled:opacity-40">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save draft</button>
-                    <button onClick={publish} disabled={!hasDraftChanges || workspace.draftIsStale || saving || publishing} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Publish changes</button>
+                    <button onClick={undoPublish} disabled={!workspace.canUndo || hasDraftChanges || workspace.draftIsStale || saving || publishing || restoring} title={hasDraftChanges ? 'Publish or discard draft changes before restoring' : 'Restore the version before the latest Designer publish'} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-40">{restoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}Undo publish</button>
+                    <button onClick={discardDraft} disabled={(!hasDraftChanges && !workspace.draftIsStale) || saving || publishing || restoring} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-40"><RotateCcw className="h-4 w-4" />Discard draft</button>
+                    <button onClick={() => saveDraft()} disabled={!dirty || workspace.draftIsStale || saving || publishing || restoring} className="inline-flex items-center gap-2 rounded-md border border-blue-600 bg-white px-3 py-2 text-sm font-medium text-blue-700 disabled:opacity-40">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save draft</button>
+                    <button onClick={publish} disabled={!hasDraftChanges || workspace.draftIsStale || saving || publishing || restoring} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Publish changes</button>
                 </div>
             </header>
             {workspace.draftIsStale && <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:px-6">The live theme changed after this draft was started. Discard the draft to reload the current live version before making or publishing more changes.</div>}
             <div className="flex border-b border-gray-200 bg-white lg:hidden"><button onClick={() => setMobilePane('edit')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'edit' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Edit</button><button onClick={() => setMobilePane('preview')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'preview' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Preview</button></div>
             <main className="grid min-h-0 flex-1 lg:grid-cols-2">
                 <section className={`${mobilePane === 'preview' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-r border-gray-200 bg-white lg:flex`}>
-                    <fieldset disabled={saving || publishing} aria-busy={saving || publishing} className="flex min-h-0 flex-1 flex-col">
+                    <fieldset disabled={saving || publishing || restoring} aria-busy={saving || publishing || restoring} className="flex min-h-0 flex-1 flex-col">
                     <nav className="flex overflow-x-auto border-b border-gray-200 px-3" aria-label="Designer sections">{tabs.map(({ id, label, icon }) => <button key={id} onClick={() => setActiveTab(id)} className={`inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-3 text-sm ${activeTab === id ? 'border-blue-600 font-medium text-blue-700' : 'border-transparent text-gray-600'}`}>{icon}{label}</button>)}</nav>
                     <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
                         {activeTab === 'assets' && (

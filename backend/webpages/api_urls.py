@@ -47,6 +47,7 @@ from .views.designer_theme_views import (
     DesignerThemePlaceholderView,
     DesignerThemePreviewView,
     DesignerThemePublishView,
+    DesignerThemeUndoView,
     DesignerThemeWorkspaceView,
     ThemeDesignerAssignmentView,
 )
@@ -138,6 +139,7 @@ urlpatterns = [
     path("designer/themes/<int:theme_id>/preview/", DesignerThemePreviewView.as_view(), name="designer-theme-preview"),
     path("designer/themes/<int:theme_id>/publish/", DesignerThemePublishView.as_view(), name="designer-theme-publish"),
     path("designer/themes/<int:theme_id>/discard/", DesignerThemeDiscardView.as_view(), name="designer-theme-discard"),
+    path("designer/themes/<int:theme_id>/undo/", DesignerThemeUndoView.as_view(), name="designer-theme-undo"),
     path(
         "designer/themes/<int:theme_id>/replace-asset/",
         DesignerThemeAssetView.as_view(),
