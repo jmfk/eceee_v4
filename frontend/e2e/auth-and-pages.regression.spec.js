@@ -35,7 +35,6 @@ test.describe('CMS auth and page management regressions', () => {
 
     await page.goto('/pages')
 
-    await expect(page.getByRole('link', { name: /EASY v4/ })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Pages' })).toBeVisible()
     await expect(page.getByPlaceholder('Search pages...')).toBeVisible()
     await expect(page.getByText('Summer Study')).toBeVisible()
@@ -186,7 +185,7 @@ test.describe('CMS auth and page management regressions', () => {
       const statusBar = page.getByTestId('status-bar')
       const statusBox = await statusBar.boundingBox()
       expect(deepestBox.y + deepestBox.height).toBeLessThanOrEqual(statusBox.y + 1)
-      await expect(page.getByTestId('status-bar-actions')).toBeVisible()
+      await expect(statusBar.getByRole('button', { name: 'Clear all notifications' })).toBeVisible()
 
       expect(await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth

@@ -19,14 +19,37 @@ info() {
 
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/eceee-prod-preflight.XXXXXX")"
 WORKTREE="$TMP_ROOT/worktree"
+BACKEND_WAS_RUNNING=0
+FRONTEND_WAS_RUNNING=0
+
+if docker compose --project-directory "$REPO" -f "$REPO/docker-compose.dev.yml" ps --status running -q backend | grep -q .; then
+    BACKEND_WAS_RUNNING=1
+fi
+if docker compose --project-directory "$REPO" -f "$REPO/docker-compose.dev.yml" ps --status running -q frontend | grep -q .; then
+    FRONTEND_WAS_RUNNING=1
+fi
 
 cleanup() {
     local status=$?
 
+    if [ -f "$WORKTREE/docker-compose.dev.yml" ]; then
+        docker compose --project-directory "$WORKTREE" -f "$WORKTREE/docker-compose.dev.yml" \
+            stop backend frontend >/dev/null 2>&1 || true
+    fi
+
     if git -C "$REPO" worktree list --porcelain | grep -Fqx "worktree $WORKTREE"; then
         git -C "$REPO" worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true
     fi
-    rm -rf "$TMP_ROOT"
+    rm -rf "$TMP_ROOT" || true
+
+    if [ "$BACKEND_WAS_RUNNING" -eq 1 ]; then
+        docker compose --project-directory "$REPO" -f "$REPO/docker-compose.dev.yml" \
+            up -d --force-recreate backend >/dev/null 2>&1 || true
+    fi
+    if [ "$FRONTEND_WAS_RUNNING" -eq 1 ]; then
+        docker compose --project-directory "$REPO" -f "$REPO/docker-compose.dev.yml" \
+            up -d --force-recreate frontend >/dev/null 2>&1 || true
+    fi
 
     exit "$status"
 }
@@ -58,7 +81,8 @@ fi
 
 for target in $PREFLIGHT_TARGETS; do
     info "Running make $target..."
-    make -C "$WORKTREE" "$target"
+    SHARED_LOCAL_INFRA_ROOT="${SHARED_LOCAL_INFRA_ROOT:-$REPO/../shared-local-infrastructure}" \
+        make -C "$WORKTREE" "$target"
 done
 
 if [ -n "${PREFLIGHT_RESOLVED_REF_FILE:-}" ]; then

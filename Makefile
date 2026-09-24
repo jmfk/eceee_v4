@@ -584,13 +584,15 @@ test-build: test
 # Run the full suite with parallel backend tests.
 test-parallel: backend-test-parallel frontend-test
 
-# Populate the container-owned node_modules volume used by the Playwright runner.
+# Populate the platform-specific node_modules volumes used by the frontend and
+# Playwright runner. The frontend image uses musl while Playwright uses glibc.
 prepare-frontend-e2e:
+	$(COMPOSE_DEV) run --rm --no-deps -T frontend npm ci
 	$(COMPOSE_DEV) run --rm --no-deps -T frontend-e2e npm ci
 
 # Run admin browser regression tests
 frontend-admin-e2e-test: prepare-frontend-e2e
-	$(COMPOSE_DEV) up -d frontend
+	$(COMPOSE_DEV) up -d --force-recreate frontend
 	@FP=$${FRONTEND_PORT:-10100}; \
 	echo "Waiting for frontend on http://127.0.0.1:$$FP..."; \
 	i=0; \
