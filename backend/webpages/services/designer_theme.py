@@ -93,6 +93,28 @@ def _designer_group_label(group, widget):
     return _humanize_identifier(str(name).lstrip("."))
 
 
+def _designer_preview_slots(group, widget_types):
+    """Map code-targeted chrome widgets to their natural layout slot for previews."""
+    configured = group.get("slots") or ([group.get("slot")] if group.get("slot") else [])
+    if configured:
+        return configured
+    inferred = []
+    slot_by_widget = {
+        "headerwidget": "header",
+        "navbarwidget": "navbar",
+        "herowidget": "hero",
+        "footerwidget": "footer",
+        "sidebarwidget": "sidebar",
+        "navigationwidget": "sidebar",
+    }
+    for widget_type in widget_types:
+        class_name = str(widget_type).rsplit(".", 1)[-1].lower()
+        slot = slot_by_widget.get(class_name)
+        if slot and slot not in inferred:
+            inferred.append(slot)
+    return inferred
+
+
 def _designer_element_label(element):
     labels = {
         "a": "Link",
@@ -235,7 +257,7 @@ def build_designer_catalog(theme, assets):
             widget_types = [single_widget] if single_widget else []
         widget = widget_type_registry.get_widget_type_flexible(widget_types[0]) if widget_types else None
         widget_parts = _normalized_layout_parts(getattr(widget, "layout_parts", {}))
-        slots = group.get("slots") or ([group.get("slot")] if group.get("slot") else [])
+        slots = _designer_preview_slots(group, widget_types)
         elements = [
             {
                 "id": f"group:{group_index}:element:{element}",
@@ -266,6 +288,7 @@ def build_designer_catalog(theme, assets):
                     getattr(widget, "description", "") if widget else "Theme styling shown with demo content."
                 ),
                 "widgetName": getattr(widget, "name", None),
+                "widgetTypes": widget_types,
                 "slots": slots,
                 "elements": elements,
                 "parts": list(part_map.values()),
