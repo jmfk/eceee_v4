@@ -500,5 +500,42 @@ describe('TreePageManager', () => {
         expect(pagesApi.getPageChildren).toHaveBeenCalledWith(1)
     })
 
+    it('keeps expansion state when a status filter hides a branch', async () => {
+        const mockChildren = {
+            results: [{
+                id: 3,
+                title: 'Child Page 1',
+                slug: 'child-1',
+                publicationStatus: 'published',
+                childrenCount: 0,
+                sortOrder: 0,
+            }],
+            count: 1,
+        }
+        pagesApi.getPageChildren.mockResolvedValue(mockChildren)
+        pagesApi.getRootPages.mockImplementation((filters = {}) => {
+            if (filters.workflow_state === 'live') {
+                return Promise.resolve({ results: [mockPages.results[1]], count: 1 })
+            }
+            return Promise.resolve(mockPages)
+        })
+
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+        await waitFor(() => expect(screen.getByText('Home Page')).toBeInTheDocument())
+
+        fireEvent.click(screen.getByRole('button', { name: 'Expand Home Page' }))
+        await waitFor(() => expect(screen.getByText('Child Page 1')).toBeInTheDocument())
+
+        fireEvent.click(screen.getByTestId('filter-button'))
+        fireEvent.change(screen.getByDisplayValue('All'), { target: { value: 'live' } })
+        await waitFor(() => expect(screen.queryByText('Home Page')).not.toBeInTheDocument())
+
+        fireEvent.change(screen.getByDisplayValue('Live'), { target: { value: 'all' } })
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Collapse Home Page' })).toBeInTheDocument()
+            expect(screen.getByText('Child Page 1')).toBeInTheDocument()
+        })
+    })
+
 
 })

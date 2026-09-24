@@ -169,4 +169,39 @@ describe('PageTreeNode - Child Page Refresh', () => {
         expect(mockOnRefreshChildren).not.toHaveBeenCalled()
     })
 
+    it('updates branch controls when only childrenCount changes', () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false }
+            }
+        })
+        const page = {
+            id: 4,
+            title: 'Changing Page',
+            slug: 'changing-page',
+            publicationStatus: 'published',
+            workflowState: 'live',
+            childrenCount: 0,
+            children: [],
+            isExpanded: false,
+        }
+        const renderNode = (currentPage) => (
+            <QueryClientProvider client={queryClient}>
+                <NotificationProvider>
+                    <PageTreeNode page={currentPage} />
+                </NotificationProvider>
+            </QueryClientProvider>
+        )
+
+        const view = render(renderNode(page))
+        expect(screen.getByRole('button', { name: 'Expand Changing Page' })).toBeDisabled()
+
+        view.rerender(renderNode({ ...page, childrenCount: 1 }))
+        expect(screen.getByRole('button', { name: 'Expand Changing Page' })).toBeEnabled()
+
+        view.rerender(renderNode(page))
+        expect(screen.getByRole('button', { name: 'Expand Changing Page' })).toBeDisabled()
+    })
+
 })

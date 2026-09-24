@@ -38,7 +38,7 @@ describe('page tree expansion storage', () => {
         expect(localStorage.getItem(storageKey)).toBeNull()
     })
 
-    it('removes vanished branches and their remembered descendants', () => {
+    it('preserves absent branches when the sibling response is filtered or partial', () => {
         const records = new Map([
             ['1', { id: '1', parentId: null }],
             ['2', { id: '2', parentId: '1' }],
@@ -50,7 +50,50 @@ describe('page tree expansion storage', () => {
             { id: 4, childrenCount: 1 },
         ])
 
-        expect([...reconciled.keys()]).toEqual(['4'])
+        expect(reconciled).toBe(records)
+    })
+
+    it('updates the recorded parent when an expanded branch moves', () => {
+        const records = new Map([
+            ['2', { id: '2', parentId: '1' }],
+            ['3', { id: '3', parentId: '2' }],
+        ])
+
+        const reconciled = reconcilePageTreeExpansionRecords(records, 4, [
+            { id: 2, childrenCount: 1 },
+        ])
+
+        expect([...reconciled.values()]).toEqual([
+            { id: '2', parentId: '4' },
+            { id: '3', parentId: '2' },
+        ])
+    })
+
+    it('preserves a moved descendant until its collapsed destination is loaded', () => {
+        const records = new Map([
+            ['1', { id: '1', parentId: null }],
+            ['2', { id: '2', parentId: '1' }],
+            ['3', { id: '3', parentId: '2' }],
+        ])
+
+        const afterOldParentBecomesLeaf = reconcilePageTreeExpansionRecords(records, null, [
+            { id: 1, childrenCount: 0 },
+            { id: 4, childrenCount: 1 },
+        ])
+
+        expect([...afterOldParentBecomesLeaf.values()]).toEqual([
+            { id: '2', parentId: '1' },
+            { id: '3', parentId: '2' },
+        ])
+
+        const afterDestinationLoads = reconcilePageTreeExpansionRecords(afterOldParentBecomesLeaf, 4, [
+            { id: 2, childrenCount: 1 },
+        ])
+
+        expect([...afterDestinationLoads.values()]).toEqual([
+            { id: '2', parentId: '4' },
+            { id: '3', parentId: '2' },
+        ])
     })
 
     it('forgets a page that externally stops being a branch', () => {
@@ -63,6 +106,8 @@ describe('page tree expansion storage', () => {
             { id: 1, childrenCount: 0 },
         ])
 
-        expect(reconciled.size).toBe(0)
+        expect([...reconciled.values()]).toEqual([
+            { id: '2', parentId: '1' },
+        ])
     })
 })

@@ -256,7 +256,7 @@ const PageTreeNode = memo(({
     // Update local state when prop changes (for updates from parent)
     useEffect(() => {
         setPage(initialPage)
-    }, [initialPage.id, initialPage.title, initialPage.slug, initialPage.workflowState])
+    }, [initialPage])
 
     const isExpansionControlled = expandedPageIds instanceof Set && typeof onExpansionChange === 'function'
     const isExpanded = isExpansionControlled
