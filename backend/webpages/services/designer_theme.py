@@ -20,11 +20,11 @@ from rest_framework.exceptions import ValidationError
 from file_manager.storage import system_storage
 from webpages.models import (
     PageTheme,
-    WebPage,
     ThemeDesignerAssignment,
     ThemeDesignerDraft,
     ThemeDesignerExportJob,
     ThemeDesignerRevision,
+    WebPage,
 )
 from webpages.serializers.theme import PageThemeSerializer
 
@@ -438,15 +438,17 @@ def _safe_reference_preview_html(rendered_html):
     markup = body.group(1) if body else rendered_html or ""
     markup = markup.split("<!-- Lightbox Overlay", 1)[0]
     markup = re.sub(r"<script\b[^>]*>[\s\S]*?</script>", "", markup, flags=re.IGNORECASE)
-    markup = re.sub(r"<(?:iframe|object|embed)\b[^>]*>[\s\S]*?</(?:iframe|object|embed)>", "", markup, flags=re.IGNORECASE)
     markup = re.sub(
-        r'''\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)''',
+        r"<(?:iframe|object|embed)\b[^>]*>[\s\S]*?</(?:iframe|object|embed)>", "", markup, flags=re.IGNORECASE
+    )
+    markup = re.sub(
+        r"""\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)""",
         "",
         markup,
         flags=re.IGNORECASE,
     )
     markup = re.sub(
-        r'''\s+(href|src)\s*=\s*(["'])\s*javascript:[\s\S]*?\2''',
+        r"""\s+(href|src)\s*=\s*(["'])\s*javascript:[\s\S]*?\2""",
         r' \1="#"',
         markup,
         flags=re.IGNORECASE,

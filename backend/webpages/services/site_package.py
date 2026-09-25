@@ -169,12 +169,7 @@ def build_site_package_export_filename(
     Prefer the first hostname because it maps to the public site visitors know.
     Fall back to the root page title when the site has not been assigned a hostname.
     """
-    site_name = (
-        (root_page.hostnames or [None])[0]
-        or root_page.title
-        or root_page.slug
-        or "site"
-    )
+    site_name = (root_page.hostnames or [None])[0] or root_page.title or root_page.slug or "site"
     random_code = random_part or secrets.token_hex(4)
     suffix = f"{_format_export_datetime(export_datetime)}-{random_code}"
     return f"{_safe_export_filename_part(site_name)}-{suffix}.zip"
@@ -432,9 +427,7 @@ class SitePackageExporter:
         options = self.job.options or {}
         include_media = options.get("include_media", True)
         include_themes = options.get("include_themes", True)
-        object_key = self.job.object_key or build_site_package_export_object_key(
-            root_page
-        )
+        object_key = self.job.object_key or build_site_package_export_object_key(root_page)
         writer = MultipartUploadWriter(self.storage, object_key)
         try:
             with zipfile.ZipFile(writer, "w", zipfile.ZIP_DEFLATED) as package:

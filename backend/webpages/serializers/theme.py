@@ -10,7 +10,9 @@ Theme-related serializers for the Web Page Publishing System
 """
 
 from rest_framework import serializers
+
 from file_manager.imgproxy import imgproxy_service
+
 from ..models import PageTheme, PreviewSize
 from .base import UserSerializer
 
@@ -331,7 +333,8 @@ class PageThemeSerializer(serializers.ModelSerializer):
 
             if style_config["styleType"] not in ["gallery", "carousel"]:
                 raise serializers.ValidationError(
-                    f"Image style '{style_name}' has invalid styleType: {style_config['styleType']}. Must be 'gallery' or 'carousel'"
+                    f"Image style '{style_name}' has invalid styleType: {style_config['styleType']}. "
+                    "Must be 'gallery' or 'carousel'"
                 )
 
             # Validate lightbox configuration

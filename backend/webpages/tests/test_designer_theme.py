@@ -201,9 +201,7 @@ class DesignerThemeApiTests(TestCase):
             workspace["contentSources"],
             [{"id": root.id, "label": "conference.example", "hostname": "conference.example"}],
         )
-        reference_view = next(
-            view for view in workspace["previewContent"]["views"] if view["layout"] == "main_layout"
-        )
+        reference_view = next(view for view in workspace["previewContent"]["views"] if view["layout"] == "main_layout")
         self.assertEqual(reference_view["sourcePageId"], root.id)
         self.assertTrue(reference_view["isSourceHomepage"])
         self.assertIn('class="main-layout-container"', reference_view["referenceHtml"])
@@ -571,19 +569,21 @@ class DesignerPlaceholderTests(SimpleTestCase):
             image=None,
             site_icon=None,
             design_groups={
-                "groups": [{
-                    "name": "Header",
-                    "layoutProperties": {
-                        "header-widget": {
-                            "lg": {
-                                "background_image": {
-                                    "filename": "header.png",
-                                    "url": "https://storage.invalid/theme_images/2/library/header.png",
+                "groups": [
+                    {
+                        "name": "Header",
+                        "layoutProperties": {
+                            "header-widget": {
+                                "lg": {
+                                    "background_image": {
+                                        "filename": "header.png",
+                                        "url": "https://storage.invalid/theme_images/2/library/header.png",
+                                    }
                                 }
                             }
-                        }
-                    },
-                }]
+                        },
+                    }
+                ]
             },
             get_breakpoints=lambda: {"lg": 1024},
             list_library_images=lambda: ["header.png"],
