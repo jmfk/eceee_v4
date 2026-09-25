@@ -4,21 +4,19 @@ Preview-related views for page editor
 
 import os
 
-from rest_framework import viewsets, permissions, status
+from django.conf import settings
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import get_object_or_404
+from django.views.decorators.clickjacking import xframe_options_exempt
+from rest_framework import permissions, viewsets
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from rest_framework.decorators import api_view, permission_classes, authentication_classes
-from rest_framework.response import Response
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from django.shortcuts import get_object_or_404
-from django.http import HttpResponse, HttpRequest
-from django.template.loader import render_to_string
-from django.conf import settings
-from django.views.decorators.clickjacking import xframe_options_exempt
 
-from ..models import PreviewSize, WebPage, PageVersion
-from ..serializers import PreviewSizeSerializer
+from ..models import PageVersion, PreviewSize, WebPage
 from ..renderers import WebPageRenderer
+from ..serializers import PreviewSizeSerializer
 
 
 class PreviewTokenAuthentication(JWTAuthentication):
@@ -136,7 +134,9 @@ PREVIEW_NAVIGATION_MENU_SCRIPT = r"""
             }
 
             function isNavigationLink(link) {
-                return Boolean(link.closest('nav, .navigation-widget, .navbar-widget, .widget-type-navigation, .widget-type-navbar'));
+                return Boolean(link.closest(
+                    'nav, .navigation-widget, .navbar-widget, .widget-type-navigation, .widget-type-navbar'
+                ));
             }
 
             function openNewTab(url) {
@@ -213,9 +213,11 @@ PREVIEW_NAVIGATION_MENU_SCRIPT = r"""
                 const publishedPage = await fetchJson(`${API_BASE}/pages/by-path/?${currentQuery}`).catch(function() {
                     return null;
                 });
-                const page = publishedPage || await fetchJson(`${API_BASE}/pages/by-path/?${anyQuery}`).catch(function() {
-                    return null;
-                });
+                const page = publishedPage || await fetchJson(
+                    `${API_BASE}/pages/by-path/?${anyQuery}`
+                ).catch(function() {
+                        return null;
+                    });
 
                 const pageId = page && (page.id || page.pageId || page.page_id);
                 const latestVersion = pageId
@@ -223,7 +225,9 @@ PREVIEW_NAVIGATION_MENU_SCRIPT = r"""
                         return null;
                     })
                     : null;
-                const versionId = latestVersion && (latestVersion.id || latestVersion.versionId || latestVersion.version_id);
+                const versionId = latestVersion && (
+                    latestVersion.id || latestVersion.versionId || latestVersion.version_id
+                );
 
                 return {
                     pageId,
@@ -265,7 +269,10 @@ PREVIEW_NAVIGATION_MENU_SCRIPT = r"""
 
                 const editorUrl = `/pages/${page.pageId}/edit`;
                 const previewUrl = page.latestVersionId
-                    ? `${API_BASE}/pages/${page.pageId}/versions/${page.latestVersionId}/preview/${window.location.search || ''}`
+                    ? (
+                        `${API_BASE}/pages/${page.pageId}/versions/`
+                        + `${page.latestVersionId}/preview/${window.location.search || ''}`
+                    )
                     : '';
 
                 renderMenu(link, [
@@ -389,11 +396,13 @@ PREVIEW_NAVIGATION_MENU_SCRIPT = r"""
 
 
 @api_view(["GET"])
-@authentication_classes([
-    PreviewTokenAuthentication,
-    SessionAuthentication,
-    TokenAuthentication,
-])
+@authentication_classes(
+    [
+        PreviewTokenAuthentication,
+        SessionAuthentication,
+        TokenAuthentication,
+    ]
+)
 @permission_classes([permissions.IsAuthenticated])
 @xframe_options_exempt
 def render_version_preview(request, page_id, version_id):
@@ -475,7 +484,7 @@ def render_version_preview(request, page_id, version_id):
         else:
             protocol = "https"
 
-        # In development mode, if the hostname doesn't have a port, 
+        # In development mode, if the hostname doesn't have a port,
         # use the port from the current request to ensure assets load correctly.
         if settings.DEBUG and ":" not in hostname:
             request_host = request.get_host()
@@ -495,7 +504,7 @@ def render_version_preview(request, page_id, version_id):
         lightbox_css = ""
         lightbox_css_path = os.path.join(settings.BASE_DIR, "static", "css", "lightbox.css")
         try:
-            with open(lightbox_css_path, 'r') as f:
+            with open(lightbox_css_path, "r") as f:
                 lightbox_css = f.read()
         except FileNotFoundError:
             pass  # Lightbox CSS not found, continue without it
@@ -509,14 +518,14 @@ def render_version_preview(request, page_id, version_id):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <base href="{base_url}">
     {result.get('meta', '')}
-    
+
     <!-- Tailwind CSS - required for responsive utilities like useContentMargins -->
     <link href="{base_url}static/css/tailwind.output.css" rel="stylesheet">
-    
+
     <style>
         /* Lightbox CSS */
         {lightbox_css}
-        
+
         /* Page CSS */
         {result.get('css', '')}
 
