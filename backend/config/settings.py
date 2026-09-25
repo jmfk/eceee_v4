@@ -195,6 +195,7 @@ LOCAL_APPS = [
     "htmx",
     "webpages",  # Core CMS system (required)
     "content",
+    "taxonomy",  # Canonical typed tags shared by content and media
     "content_import",  # Content import from external websites
     "easy_layouts",  # Easy layout definitions
     "easy_widgets",  # Easy widget definitions

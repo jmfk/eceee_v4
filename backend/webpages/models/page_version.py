@@ -84,6 +84,12 @@ class PageVersion(models.Model):
         blank=True,
         help_text="List of tag names for organizing and categorizing page versions",
     )
+    canonical_tags = models.ManyToManyField(
+        "taxonomy.Tag",
+        through="PageVersionTag",
+        related_name="page_versions",
+        blank=True,
+    )
 
     # Timestamps and ownership
     created_at = models.DateTimeField(auto_now_add=True)
@@ -373,3 +379,20 @@ class PageVersion(models.Model):
         )
 
         return draft
+
+
+class PageVersionTag(models.Model):
+    """Ordered canonical tag assignment used during the typed-tag transition."""
+
+    page_version = models.ForeignKey(PageVersion, on_delete=models.CASCADE, related_name="canonical_tag_links")
+    tag = models.ForeignKey("taxonomy.Tag", on_delete=models.CASCADE, related_name="page_version_links")
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["position"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["page_version", "position"],
+                name="webpages_version_tag_position_uniq",
+            )
+        ]
