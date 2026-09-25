@@ -5,13 +5,14 @@ This module provides models for managing media files with S3 storage integration
 AI-powered tagging, collections, and advanced metadata handling.
 """
 
-import uuid
 import hashlib
-from typing import Optional, Dict, Any
-from django.db import models
+import uuid
+from typing import Optional
+
 from django.contrib.auth.models import User
-from django.core.validators import FileExtensionValidator
+from django.db import models
 from django.utils.text import slugify
+
 from content.models import Namespace
 
 
@@ -21,21 +22,15 @@ class MediaTag(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=50)
     slug = models.SlugField(max_length=50)
-    color = models.CharField(
-        max_length=7, default="#3B82F6", help_text="Hex color code"
-    )
+    color = models.CharField(max_length=7, default="#3B82F6", help_text="Hex color code")
     description = models.TextField(blank=True, help_text="Optional tag description")
 
     # Namespace integration
-    namespace = models.ForeignKey(
-        Namespace, on_delete=models.CASCADE, help_text="Namespace this tag belongs to"
-    )
+    namespace = models.ForeignKey(Namespace, on_delete=models.CASCADE, help_text="Namespace this tag belongs to")
 
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="created_media_tags"
-    )
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_media_tags")
 
     class Meta:
         unique_together = [["name", "namespace"], ["slug", "namespace"]]
@@ -67,6 +62,7 @@ class MediaCollection(models.Model):
 
     # Organization
     tags = models.ManyToManyField(MediaTag, blank=True)
+    canonical_tags = models.ManyToManyField("taxonomy.Tag", related_name="media_collections", blank=True)
     namespace = models.ForeignKey(
         Namespace,
         on_delete=models.CASCADE,
@@ -88,12 +84,8 @@ class MediaCollection(models.Model):
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="created_media_collections"
-    )
-    last_modified_by = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="modified_media_collections"
-    )
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_media_collections")
+    last_modified_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="modified_media_collections")
 
     class Meta:
         unique_together = [["slug", "namespace"]]
@@ -124,11 +116,7 @@ class MediaCollection(models.Model):
         counter = 1
 
         # Check for existing slugs in the same namespace
-        while (
-            MediaCollection.objects.filter(namespace=self.namespace, slug=slug)
-            .exclude(pk=self.pk)
-            .exists()
-        ):
+        while MediaCollection.objects.filter(namespace=self.namespace, slug=slug).exclude(pk=self.pk).exists():
             slug = f"{base_slug}-{counter}"
             counter += 1
 
@@ -142,7 +130,7 @@ class MediaCollection(models.Model):
     def can_accept_uploads(self):
         """
         Check if collection can accept file uploads.
-        
+
         Returns:
             bool: True if collection has at least one tag, False otherwise.
         """
@@ -184,9 +172,7 @@ class PendingMediaFile(models.Model):
     file_path = models.CharField(max_length=500, help_text="S3 key/path")
     file_size = models.BigIntegerField(help_text="File size in bytes")
     content_type = models.CharField(max_length=100)
-    file_hash = models.CharField(
-        max_length=64, unique=True, help_text="SHA-256 hash for deduplication"
-    )
+    file_hash = models.CharField(max_length=64, unique=True, help_text="SHA-256 hash for deduplication")
 
     # Media-specific metadata
     file_type = models.CharField(max_length=20, choices=FILE_TYPE_CHOICES)
@@ -202,9 +188,7 @@ class PendingMediaFile(models.Model):
         help_text="AI-suggested tags based on content analysis",
     )
     ai_suggested_title = models.CharField(max_length=255, blank=True)
-    ai_extracted_text = models.TextField(
-        blank=True, help_text="Text extracted from images/documents via OCR"
-    )
+    ai_extracted_text = models.TextField(blank=True, help_text="Text extracted from images/documents via OCR")
     ai_confidence_score = models.FloatField(
         null=True, blank=True, help_text="AI confidence score for suggestions (0.0-1.0)"
     )
@@ -217,12 +201,8 @@ class PendingMediaFile(models.Model):
     )
 
     # Organization
-    namespace = models.ForeignKey(
-        Namespace, on_delete=models.CASCADE, help_text="Namespace this file belongs to"
-    )
-    folder_path = models.CharField(
-        max_length=500, blank=True, help_text="Optional folder path"
-    )
+    namespace = models.ForeignKey(Namespace, on_delete=models.CASCADE, help_text="Namespace this file belongs to")
+    folder_path = models.CharField(max_length=500, blank=True, help_text="Optional folder path")
 
     # Approval workflow
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
@@ -230,9 +210,7 @@ class PendingMediaFile(models.Model):
     # Timestamps and ownership
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(help_text="When this pending file expires")
-    uploaded_by = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="pending_media_files"
-    )
+    uploaded_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="pending_media_files")
 
     class Meta:
         ordering = ["-created_at"]
@@ -263,7 +241,6 @@ class PendingMediaFile(models.Model):
         Returns:
             MediaFile instance
         """
-        from django.utils import timezone
         import logging
 
         logger = logging.getLogger(__name__)
@@ -272,7 +249,7 @@ class PendingMediaFile(models.Model):
             # Ensure we have a namespace
             if not self.namespace:
                 raise ValueError("PendingMediaFile has no namespace. Cannot approve without a namespace.")
-            
+
             # Create the MediaFile using atomic helper
             # This will handle any soft-deleted files with the same hash
             media_file = MediaFile.create_with_hash_cleanup(
@@ -316,17 +293,16 @@ class PendingMediaFile(models.Model):
             return media_file
 
         except Exception as e:
-            logger.error(
-                f"Failed to create MediaFile for pending file {self.original_filename}: {e}"
-            )
+            logger.error(f"Failed to create MediaFile for pending file {self.original_filename}: {e}")
             logger.error(f"Exception details: {type(e).__name__}: {str(e)}")
             # Don't update status if MediaFile creation failed
             raise
 
     def reject(self):
         """Reject this pending file and clean up storage."""
-        from .storage import S3MediaStorage
         import logging
+
+        from .storage import S3MediaStorage
 
         logger = logging.getLogger(__name__)
 
@@ -339,9 +315,7 @@ class PendingMediaFile(models.Model):
         else:
             # Check if other pending files with same hash exist
             other_pending_files = (
-                PendingMediaFile.objects.filter(
-                    file_hash=self.file_hash, status__in=["pending", "approved"]
-                )
+                PendingMediaFile.objects.filter(file_hash=self.file_hash, status__in=["pending", "approved"])
                 .exclude(id=self.id)
                 .exists()
             )
@@ -354,9 +328,7 @@ class PendingMediaFile(models.Model):
                     storage = S3MediaStorage()
                     storage.delete(self.file_path)
                 except Exception as e:
-                    logger.error(
-                        f"Failed to delete rejected file {self.file_path}: {e}"
-                    )
+                    logger.error(f"Failed to delete rejected file {self.file_path}: {e}")
 
         # Update status
         self.status = "rejected"
@@ -377,7 +349,7 @@ class PendingMediaFile(models.Model):
         """
         if not self.metadata:
             return None
-        return self.metadata.get('thumbnail_path')
+        return self.metadata.get("thumbnail_path")
 
     def has_thumbnail(self):
         """
@@ -391,14 +363,14 @@ class PendingMediaFile(models.Model):
     @classmethod
     def cleanup_expired(cls):
         """Clean up expired pending files."""
-        from django.utils import timezone
-        from .storage import S3MediaStorage
         import logging
 
+        from django.utils import timezone
+
+        from .storage import S3MediaStorage
+
         logger = logging.getLogger(__name__)
-        expired_files = cls.objects.filter(
-            status="pending", expires_at__lt=timezone.now()
-        )
+        expired_files = cls.objects.filter(status="pending", expires_at__lt=timezone.now())
 
         storage = S3MediaStorage()
 
@@ -406,9 +378,7 @@ class PendingMediaFile(models.Model):
             try:
                 # Check if the same file exists in MediaFile (approved files)
                 # If it does, don't delete from S3 as it's still being used
-                existing_media_file = MediaFile.objects.filter(
-                    file_hash=pending_file.file_hash
-                ).first()
+                existing_media_file = MediaFile.objects.filter(file_hash=pending_file.file_hash).first()
 
                 if existing_media_file:
                     pass
@@ -433,9 +403,7 @@ class PendingMediaFile(models.Model):
                 pending_file.status = "expired"
                 pending_file.save()
             except Exception as e:
-                logger.error(
-                    f"Failed to cleanup expired file {pending_file.file_path}: {e}"
-                )
+                logger.error(f"Failed to cleanup expired file {pending_file.file_path}: {e}")
 
 
 class MediaFileManager(models.Manager):
@@ -483,14 +451,10 @@ class MediaFile(models.Model):
     # File information
     original_filename = models.CharField(max_length=255)
     file_path = models.CharField(max_length=500, help_text="S3 key/path")
-    file_url = models.URLField(
-        max_length=500, help_text="Public URL for the file", null=True, blank=True
-    )
+    file_url = models.URLField(max_length=500, help_text="Public URL for the file", null=True, blank=True)
     file_size = models.BigIntegerField(help_text="File size in bytes")
     content_type = models.CharField(max_length=100)
-    file_hash = models.CharField(
-        max_length=64, unique=True, help_text="SHA-256 hash for deduplication"
-    )
+    file_hash = models.CharField(max_length=64, unique=True, help_text="SHA-256 hash for deduplication")
     uploaded_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -513,9 +477,7 @@ class MediaFile(models.Model):
         help_text="AI-suggested tags based on content analysis",
     )
     ai_suggested_title = models.CharField(max_length=255, blank=True)
-    ai_extracted_text = models.TextField(
-        blank=True, help_text="Text extracted from images/documents via OCR"
-    )
+    ai_extracted_text = models.TextField(blank=True, help_text="Text extracted from images/documents via OCR")
     ai_confidence_score = models.FloatField(
         null=True, blank=True, help_text="AI confidence score for suggestions (0.0-1.0)"
     )
@@ -528,10 +490,8 @@ class MediaFile(models.Model):
     )
 
     # Organization
-    namespace = models.ForeignKey(
-        Namespace, on_delete=models.CASCADE, help_text="Namespace this file belongs to"
-    )
-    
+    namespace = models.ForeignKey(Namespace, on_delete=models.CASCADE, help_text="Namespace this file belongs to")
+
     # Multi-tenancy support
     tenant = models.ForeignKey(
         "core.Tenant",
@@ -539,14 +499,13 @@ class MediaFile(models.Model):
         related_name="media_files",
         help_text="Tenant this media file belongs to",
     )
-    
+
     tags = models.ManyToManyField(MediaTag, blank=True)
+    canonical_tags = models.ManyToManyField("taxonomy.Tag", related_name="media_files", blank=True)
     collections = models.ManyToManyField(MediaCollection, blank=True)
 
     # Access control
-    access_level = models.CharField(
-        max_length=20, choices=ACCESS_LEVEL_CHOICES, default="public"
-    )
+    access_level = models.CharField(max_length=20, choices=ACCESS_LEVEL_CHOICES, default="public")
 
     # Usage tracking
     download_count = models.PositiveIntegerField(default=0)
@@ -587,12 +546,8 @@ class MediaFile(models.Model):
     # Timestamps and ownership
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="created_media_files"
-    )
-    last_modified_by = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="modified_media_files"
-    )
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_media_files")
+    last_modified_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="modified_media_files")
 
     class Meta:
         unique_together = [["slug", "namespace"]]
@@ -637,9 +592,10 @@ class MediaFile(models.Model):
             ValidationError: If an active (non-deleted) file with the same hash already exists
             IntegrityError: If the creation fails due to other database constraints
         """
-        from django.db import transaction
-        from django.core.exceptions import ValidationError
         import logging
+
+        from django.core.exceptions import ValidationError
+        from django.db import transaction
 
         logger = logging.getLogger(__name__)
 
@@ -648,18 +604,14 @@ class MediaFile(models.Model):
             existing_active = cls.objects.filter(file_hash=file_hash).first()
             if existing_active:
                 logger.warning(
-                    f"Cannot create MediaFile: active file with hash {file_hash} already exists (ID: {existing_active.id})"
+                    "Cannot create MediaFile: active file with hash %s already exists (ID: %s)",
+                    file_hash,
+                    existing_active.id,
                 )
-                raise ValidationError(
-                    f"An active file with this content already exists: {existing_active.title}"
-                )
+                raise ValidationError(f"An active file with this content already exists: {existing_active.title}")
 
             # Find and hard delete any soft-deleted records with same hash
-            existing_deleted = (
-                cls.objects.with_deleted()
-                .filter(file_hash=file_hash, is_deleted=True)
-                .first()
-            )
+            existing_deleted = cls.objects.with_deleted().filter(file_hash=file_hash, is_deleted=True).first()
 
             if existing_deleted:
                 # Hard delete the soft-deleted record
@@ -668,17 +620,14 @@ class MediaFile(models.Model):
 
             # Create the new MediaFile
             kwargs["file_hash"] = file_hash
-            
+
             # Generate slug if not provided
             if not kwargs.get("slug"):
                 # Create a temporary instance to use the slug generation method
                 # Include namespace to avoid RelatedObjectDoesNotExist
-                temp_instance = cls(
-                    title=kwargs.get("title", "untitled"),
-                    namespace=kwargs.get("namespace")
-                )
+                temp_instance = cls(title=kwargs.get("title", "untitled"), namespace=kwargs.get("namespace"))
                 kwargs["slug"] = temp_instance._generate_unique_slug()
-            
+
             new_file = cls.objects.create(**kwargs)
 
             return new_file
@@ -708,9 +657,7 @@ class MediaFile(models.Model):
             self.reference_count = self.reference_count + 1
             self.last_referenced = timezone.now()
             self.referenced_in = refs
-            self.save(
-                update_fields=["reference_count", "last_referenced", "referenced_in"]
-            )
+            self.save(update_fields=["reference_count", "last_referenced", "referenced_in"])
 
     def remove_reference(self, content_type, content_id):
         """
@@ -774,18 +721,16 @@ class MediaFile(models.Model):
         """
         if force:
             # Handle S3 cleanup and related files
-            from .storage import S3MediaStorage
             import logging
+
+            from .storage import S3MediaStorage
 
             logger = logging.getLogger(__name__)
 
             # Check if other files reference the same S3 object (same file_hash)
             # Need to check both active and soft-deleted MediaFile records
             other_media_files = (
-                MediaFile.objects.with_deleted()
-                .filter(file_hash=self.file_hash)
-                .exclude(id=self.id)
-                .exists()
+                MediaFile.objects.with_deleted().filter(file_hash=self.file_hash).exclude(id=self.id).exists()
             )
 
             other_pending_files = PendingMediaFile.objects.filter(
@@ -802,9 +747,7 @@ class MediaFile(models.Model):
                     # Don't fail the database deletion if S3 cleanup fails
 
             # Delete any related PendingMediaFile records with same hash that are approved
-            related_pending = PendingMediaFile.objects.filter(
-                file_hash=self.file_hash, status="approved"
-            )
+            related_pending = PendingMediaFile.objects.filter(file_hash=self.file_hash, status="approved")
             if related_pending.exists():
                 related_pending.delete()
 
@@ -824,8 +767,8 @@ class MediaFile(models.Model):
 
     def _generate_unique_slug(self):
         """Generate a unique, SEO-friendly slug for the media file."""
-        import re
         import os
+
         from django.utils.text import slugify
 
         # Start with the title, fallback to filename without extension
@@ -876,11 +819,7 @@ class MediaFile(models.Model):
         counter = 1
 
         # Check if slug exists in the same namespace
-        while (
-            MediaFile.objects.filter(namespace=self.namespace, slug=slug)
-            .exclude(pk=self.pk)
-            .exists()
-        ):
+        while MediaFile.objects.filter(namespace=self.namespace, slug=slug).exclude(pk=self.pk).exists():
             slug = f"{base_slug}-{counter}"
             counter += 1
 
@@ -921,6 +860,7 @@ class MediaFile(models.Model):
         """Get file extension from original filename or derive from content_type."""
         import mimetypes
         import os
+
         # Try from original filename first
         if self.original_filename:
             ext = os.path.splitext(self.original_filename)[1]
@@ -928,7 +868,7 @@ class MediaFile(models.Model):
                 return ext.lower()
         # Fallback to mime type
         ext = mimetypes.guess_extension(self.content_type)
-        return ext.lower() if ext else ''
+        return ext.lower() if ext else ""
 
     def get_absolute_url(self):
         """Get the canonical URL for this media file using slug and extension."""
@@ -940,9 +880,7 @@ class MediaFile(models.Model):
         """Get the UUID-based URL for this media file."""
         from django.urls import reverse
 
-        return reverse(
-            "file_manager:media-file-by-uuid", kwargs={"file_uuid": str(self.id)}
-        )
+        return reverse("file_manager:media-file-by-uuid", kwargs={"file_uuid": str(self.id)})
 
     def get_download_url(self):
         """Get the download URL (SEO-friendly slug version)."""
@@ -1021,9 +959,7 @@ class MediaFile(models.Model):
         # Use file hash as version for cache-busting
         kwargs.setdefault("version", self.file_hash)
 
-        return get_image_url(
-            source_url=source_url, width=width, height=height, **kwargs
-        )
+        return get_image_url(source_url=source_url, width=width, height=height, **kwargs)
 
     def get_imgproxy_thumbnail_url(self, size=150):
         """
@@ -1114,7 +1050,7 @@ class MediaFile(models.Model):
         """
         if not self.metadata:
             return None
-        return self.metadata.get('thumbnail_path')
+        return self.metadata.get("thumbnail_path")
 
     def has_thumbnail(self):
         """
@@ -1138,32 +1074,20 @@ class MediaUsage(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    media_file = models.ForeignKey(
-        MediaFile, on_delete=models.CASCADE, related_name="usage_records"
-    )
+    media_file = models.ForeignKey(MediaFile, on_delete=models.CASCADE, related_name="usage_records")
 
     # Usage context
     usage_type = models.CharField(max_length=20, choices=USAGE_TYPE_CHOICES)
-    object_id = models.CharField(
-        max_length=100, help_text="ID of the object using this media"
-    )
-    object_type = models.CharField(
-        max_length=50, help_text="Type of object (model name)"
-    )
-    field_name = models.CharField(
-        max_length=100, blank=True, help_text="Field name where media is used"
-    )
+    object_id = models.CharField(max_length=100, help_text="ID of the object using this media")
+    object_type = models.CharField(max_length=50, help_text="Type of object (model name)")
+    field_name = models.CharField(max_length=100, blank=True, help_text="Field name where media is used")
 
     # Context metadata
-    context_data = models.JSONField(
-        default=dict, blank=True, help_text="Additional context about usage"
-    )
+    context_data = models.JSONField(default=dict, blank=True, help_text="Additional context about usage")
 
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="media_usage_records"
-    )
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="media_usage_records")
 
     class Meta:
         unique_together = [["media_file", "usage_type", "object_id", "field_name"]]

@@ -14,7 +14,7 @@ Models have been split into separate files for better maintainability:
 from .duplicate_page_log import DuplicatePageLog
 from .page_data_schema import PageDataSchema
 from .page_theme import PageTheme
-from .page_version import PageVersion
+from .page_version import PageVersion, PageVersionTag
 from .preview_size import PreviewSize
 from .site_package_job import SitePackageJob
 from .theme_designer import ThemeDesignerAssignment, ThemeDesignerDraft, ThemeDesignerExportJob, ThemeDesignerRevision
@@ -24,6 +24,7 @@ __all__ = [
     "PageTheme",
     "WebPage",
     "PageVersion",
+    "PageVersionTag",
     "PageDataSchema",
     "PreviewSize",
     "DuplicatePageLog",
