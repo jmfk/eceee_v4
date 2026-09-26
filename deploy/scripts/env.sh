@@ -39,3 +39,25 @@ unset -f _eceee_env_strip
 docker_compose() {
     docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" --env-file "$ENV_FILE" "$@"
 }
+
+# Keep deploys, database restores, and maintenance workflows from changing
+# application service state concurrently. The open descriptor holds the lock
+# until the calling script exits.
+acquire_production_operation_lock() {
+    local operation="${1:-production operation}"
+    local lock_file="/mnt/data/.eceee-production-operation.lock"
+
+    if ! command -v flock >/dev/null 2>&1; then
+        echo "[$operation] flock is required for production operation locking." >&2
+        return 1
+    fi
+    if [ "${ECEEE_PRODUCTION_LOCK_FD:-}" = "200" ] && flock -n 200; then
+        return 0
+    fi
+    exec 200>"$lock_file"
+    if ! flock -n 200; then
+        echo "[$operation] Another deploy, restore, or maintenance operation is already running." >&2
+        return 1
+    fi
+    export ECEEE_PRODUCTION_LOCK_FD=200
+}

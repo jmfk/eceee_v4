@@ -30,6 +30,8 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
+acquire_production_operation_lock "typed-tags"
+
 DEPLOYED_VERSION=$(
     docker_compose exec -T backend python -c \
         'import os; value = os.environ.get("APP_VERSION", ""); print(value if value != "unknown" else "")'
@@ -40,12 +42,33 @@ if [ -z "$DEPLOYED_VERSION" ]; then
 fi
 
 maintenance_started=false
+verify_application_services() {
+    local service
+    for service in backend celery-worker celery-beat; do
+        if ! docker_compose ps --status running --services "$service" | grep -Fxq "$service"; then
+            echo "[typed-tags] Application service $service is not running." >&2
+            return 1
+        fi
+    done
+}
+
 restore_services() {
     status=$?
     trap - EXIT
     if [ "$maintenance_started" = true ]; then
         echo "[typed-tags] Restoring application services..."
-        IMAGE_TAG="$DEPLOYED_VERSION" docker_compose up -d backend celery-worker celery-beat >/dev/null 2>&1 || true
+        if ! IMAGE_TAG="$DEPLOYED_VERSION" docker_compose up -d backend celery-worker celery-beat; then
+            echo "[typed-tags] RECOVERY FAILED: application services could not be restarted." >&2
+            exit 70
+        fi
+        if ! bash "$SCRIPT_DIR/healthcheck.sh"; then
+            echo "[typed-tags] RECOVERY FAILED: application services restarted but did not become healthy." >&2
+            exit 70
+        fi
+        if ! verify_application_services; then
+            echo "[typed-tags] RECOVERY FAILED: one or more application services did not stay running." >&2
+            exit 70
+        fi
     fi
     exit "$status"
 }
@@ -56,8 +79,10 @@ run_backend() {
 }
 
 echo "[typed-tags] Entering maintenance mode for deployed version $DEPLOYED_VERSION..."
-docker_compose stop backend celery-worker celery-beat
+# Compose may stop only part of the service set before returning an error or
+# receiving an interrupt, so arm EXIT recovery before shutdown begins.
 maintenance_started=true
+docker_compose stop backend celery-worker celery-beat
 
 echo "[typed-tags] Creating mandatory maintenance-window backup..."
 bash "$SCRIPT_DIR/backup.sh"
@@ -79,10 +104,11 @@ run_backend backfill_typed_tags --run-id "$RUN_ID" --verify-only
 
 echo "[typed-tags] Restarting application services..."
 IMAGE_TAG="$DEPLOYED_VERSION" docker_compose up -d backend celery-worker celery-beat
-maintenance_started=false
 
 echo "[typed-tags] Waiting for application health..."
 bash "$SCRIPT_DIR/healthcheck.sh"
+verify_application_services
+maintenance_started=false
 
 echo "$RUN_ID ($DEPLOYED_VERSION) $(date '+%Y-%m-%d %H:%M:%S')" >> "$REPO/typed-tag-backfill.log"
 trap - EXIT

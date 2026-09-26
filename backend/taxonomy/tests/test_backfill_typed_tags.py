@@ -166,6 +166,88 @@ class TypedTagBackfillTests(TestCase):
         self.assertEqual(Tag.objects.count(), 0)
         self.assertEqual(TagBackfillRun.objects.count(), 0)
 
+    def test_preflight_rejects_stale_canonical_slug_collision(self):
+        Tag.objects.create(
+            tenant=self.tenant,
+            namespace=self.namespace,
+            name="C++",
+            slug="c",
+        )
+        self.version.tags = ["C#"]
+        self.version.save(update_fields=["tags"])
+
+        with self.assertRaisesMessage(CommandError, "same canonical identity"):
+            call_command("backfill_typed_tags", preflight_only=True)
+
+        self.assertEqual(Tag.objects.get(slug="c").name, "C++")
+        self.assertEqual(TagBackfillRun.objects.count(), 0)
+
+    def test_backfill_rejects_stale_canonical_slug_collision_without_preflight(self):
+        Tag.objects.create(
+            tenant=self.tenant,
+            namespace=self.namespace,
+            name="C++",
+            slug="c",
+        )
+        self.version.tags = ["C#"]
+        self.version.save(update_fields=["tags"])
+
+        with self.assertRaisesMessage(CommandError, "Backfill recorded 1 failed work unit"):
+            call_command("backfill_typed_tags", run_id="stale-canonical")
+
+        failed = TagBackfillUnit.objects.get(
+            run_id="stale-canonical",
+            work_unit_id=f"page-version:{self.version.pk}",
+        )
+        self.assertIn("conflicts with source name 'C#'", failed.error)
+        self.assertEqual(Tag.objects.get(slug="c").name, "C++")
+
+    def test_preflight_rejects_stale_legacy_mapping(self):
+        wrong_tag = Tag.objects.create(
+            tenant=self.tenant,
+            namespace=self.namespace,
+            name="Wrong",
+            slug="wrong",
+        )
+        LegacyTagMapping.objects.create(
+            source_kind=LegacyTagMapping.SourceKind.CONTENT,
+            source_id=str(self.content_tag.pk),
+            canonical_tag=wrong_tag,
+            source_name=self.content_tag.name,
+        )
+
+        with self.assertRaisesMessage(CommandError, "mapping does not match its current source identity"):
+            call_command("backfill_typed_tags", preflight_only=True)
+
+    def test_preflight_rejects_cross_tenant_legacy_mapping(self):
+        other_tenant = Tenant.objects.create(
+            name="Other tenant",
+            identifier="other-tag-backfill-test",
+            created_by=self.user,
+        )
+        other_namespace = Namespace.objects.create(
+            name="Other tag backfill namespace",
+            slug="other-tag-backfill",
+            is_active=True,
+            created_by=self.user,
+            tenant=other_tenant,
+        )
+        cross_tenant_tag = Tag.objects.create(
+            tenant=other_tenant,
+            namespace=other_namespace,
+            name=self.content_tag.name,
+            slug=self.content_tag.slug,
+        )
+        LegacyTagMapping.objects.create(
+            source_kind=LegacyTagMapping.SourceKind.CONTENT,
+            source_id=str(self.content_tag.pk),
+            canonical_tag=cross_tenant_tag,
+            source_name=self.content_tag.name,
+        )
+
+        with self.assertRaisesMessage(CommandError, "mapping does not match its current source identity"):
+            call_command("backfill_typed_tags", preflight_only=True)
+
     def test_interrupted_canary_fails_if_a_processed_unit_failed(self):
         self.version.tags = ["   "]
         self.version.save(update_fields=["tags"])

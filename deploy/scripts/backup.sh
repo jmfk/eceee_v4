@@ -26,6 +26,21 @@ info()    { echo -e "${BLUE}[backup]${NC} $*"; }
 success() { echo -e "${GREEN}[backup]${NC} $*"; }
 error()   { echo -e "${RED}[backup]${NC} $*" >&2; }
 
+if [ "${1:-}" = "restore" ]; then
+    acquire_production_operation_lock "restore"
+fi
+
+mkdir -p "$BACKUP_DIR"
+if ! command -v flock >/dev/null 2>&1; then
+    error "flock is required to serialize production backup and restore operations."
+    exit 1
+fi
+exec 9>"$BACKUP_DIR/.backup.lock"
+if ! flock -n 9; then
+    error "Another production backup or restore operation is already running."
+    exit 1
+fi
+
 # ── Restore mode ──────────────────────────────────────────────────────────────
 if [ "${1:-}" = "restore" ]; then
     BACKUP_FILE="${2:-}"
@@ -53,9 +68,7 @@ if [ "${1:-}" = "restore" ]; then
 fi
 
 # ── Backup mode ───────────────────────────────────────────────────────────────
-mkdir -p "$BACKUP_DIR"
-
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)_$$
 OUTFILE="$BACKUP_DIR/eceee_v4_${TIMESTAMP}.sql.gz"
 OUTFILE_TMP="${OUTFILE}.partial"
 

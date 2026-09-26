@@ -4,6 +4,7 @@ import os
 import signal
 from pathlib import Path
 
+from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
@@ -182,6 +183,45 @@ class Command(BaseCommand):
                 )
                 return
             identities.setdefault(identity, {"name": comparable_name, "source": source_label})
+
+        for existing in Tag.objects.select_related("namespace").order_by("pk").iterator(chunk_size=self.batch_size):
+            register_identity(
+                name=existing.name,
+                namespace=existing.namespace,
+                source_label=f"canonical-tag:{existing.pk}",
+            )
+
+        for mapping in (
+            LegacyTagMapping.objects.select_related("canonical_tag__namespace")
+            .order_by("pk")
+            .iterator(chunk_size=self.batch_size)
+        ):
+            if mapping.source_kind == LegacyTagMapping.SourceKind.CONTENT:
+                source_model = ContentTag
+                source_queryset = ContentTag.objects.select_related("namespace", "tenant")
+            elif mapping.source_kind == LegacyTagMapping.SourceKind.MEDIA:
+                source_model = MediaTag
+                source_queryset = MediaTag.objects.select_related("namespace")
+            else:
+                error(f"legacy-mapping:{mapping.pk} has unsupported source kind {mapping.source_kind!r}")
+                continue
+            try:
+                source = source_queryset.get(pk=mapping.source_id)
+            except (source_model.DoesNotExist, ValidationError, ValueError):
+                error(
+                    f"legacy-mapping:{mapping.pk} references missing "
+                    f"{mapping.source_kind} source {mapping.source_id}"
+                )
+                continue
+            try:
+                namespace = (
+                    source.namespace
+                    if mapping.source_kind == LegacyTagMapping.SourceKind.MEDIA
+                    else (source.namespace or self._namespace_for_tenant(source.tenant))
+                )
+                self._assert_mapping_matches_source(mapping, source, namespace)
+            except ValueError as exc:
+                error(f"legacy-mapping:{mapping.pk}: {exc}")
 
         for source in (
             ContentTag.objects.select_related("namespace", "tenant").order_by("pk").iterator(chunk_size=self.batch_size)
@@ -408,6 +448,12 @@ class Command(BaseCommand):
             },
         )
         if not created:
+            normalized_name = name.strip()
+            if tag.name.strip().casefold() != normalized_name.casefold():
+                raise ValueError(
+                    f"Canonical tag {tag.pk} is named {tag.name!r}, "
+                    f"which conflicts with source name {normalized_name!r}"
+                )
             update_fields = []
             if tag.color == "#3B82F6" and color and color != tag.color:
                 tag.color = color
@@ -428,9 +474,33 @@ class Command(BaseCommand):
             source_id=str(source.pk),
             defaults={"canonical_tag": canonical_tag, "source_name": source.name},
         )
-        if not created and mapping.canonical_tag_id != canonical_tag.pk:
-            raise ValueError(f"Legacy {source_kind} tag {source.pk} maps to a different canonical tag")
+        if not created:
+            if mapping.canonical_tag_id != canonical_tag.pk:
+                raise ValueError(f"Legacy {source_kind} tag {source.pk} maps to a different canonical tag")
+            self._assert_mapping_matches_source(mapping, source, canonical_tag.namespace)
         return mapping
+
+    def _assert_mapping_matches_source(self, mapping, source, namespace):
+        normalized_name = source.name.strip()
+        canonical = mapping.canonical_tag
+        expected_identity = (
+            namespace.tenant_id,
+            namespace.pk,
+            DEFAULT_TAG_TYPE,
+            slugify(normalized_name),
+            normalized_name.casefold(),
+        )
+        actual_identity = (
+            canonical.tenant_id,
+            canonical.namespace_id,
+            canonical.tag_type,
+            canonical.slug,
+            canonical.name.strip().casefold(),
+        )
+        if actual_identity != expected_identity or mapping.source_name.strip().casefold() != normalized_name.casefold():
+            raise ValueError(
+                f"Legacy {mapping.source_kind} tag {source.pk} mapping does not match its current source identity"
+            )
 
     def _backfill_content_tag(self, source):
         namespace = source.namespace or self._namespace_for_tenant(source.tenant)
@@ -462,6 +532,8 @@ class Command(BaseCommand):
                 .first()
             )
             if mapping:
+                namespace = legacy.namespace or self._namespace_for_tenant(legacy.tenant)
+                self._assert_mapping_matches_source(mapping, legacy, namespace)
                 return mapping.canonical_tag
             self._backfill_content_tag(legacy)
             return LegacyTagMapping.objects.get(
@@ -488,6 +560,7 @@ class Command(BaseCommand):
             .first()
         )
         if mapping:
+            self._assert_mapping_matches_source(mapping, media_tag, media_tag.namespace)
             return mapping.canonical_tag
         self._backfill_media_tag(media_tag)
         return LegacyTagMapping.objects.get(
