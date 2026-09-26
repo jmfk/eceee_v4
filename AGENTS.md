@@ -59,6 +59,33 @@ Use `make help` for the full list of targets. Key ones: `make servers`, `make mi
 
 Backend static assets: `cd backend && npm run build` / `npm run watch:css`
 
+## Pull Request Review And Merge Gate
+
+- Never equate passing CI with code review or approval. Report CI status,
+  submitted reviews, and GitHub's `reviewDecision` as separate facts.
+- Before merging any pull request, fetch its current checks, submitted reviews,
+  review decision, unresolved review threads when available, and mergeability.
+  Do this immediately before the merge even if the PR was inspected earlier.
+- Never merge a pull request unless the user has explicitly instructed the agent
+  to merge that specific PR and the PR has at least one submitted GitHub review
+  in the `APPROVED` state. An empty or missing review decision is not approval.
+  Comments, bot reports, successful checks, branch-protection bypasses, and the
+  agent's own review do not count as an approval.
+- Do not infer merge authorization from requests to review, fix, commit, push,
+  synchronize, rebase, make mergeable, or report which branches can be merged.
+- Treat migrations, data migrations, backfills, tenancy or authorization changes,
+  destructive cleanup, and production data-path changes as high-risk. An agent
+  must never merge such a PR without both a verified human GitHub approval and a
+  separate explicit user instruction to merge after the approval exists.
+- For migration or backfill PRs, the review must explicitly consider clean-database
+  installation, upgrade from existing data, idempotency and resumability, tenant
+  isolation, locking and performance, failure recovery, rollback or roll-forward,
+  and operational verification. Record gaps instead of treating green tests as
+  sufficient evidence.
+- If the required approval or authorization is absent, stop at a merge-ready PR,
+  state exactly what is missing, and leave the merge to the user. Repository rules
+  being bypassable does not weaken this gate.
+
 ## Testing Expectations
 
 - Run the narrowest relevant tests for the change, then broader suites when the change affects shared behavior.
