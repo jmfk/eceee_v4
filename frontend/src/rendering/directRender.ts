@@ -101,20 +101,14 @@ export const loadResolvedRenderModel = async (resolved: ResolvedRenderLocation):
 }
 
 export const loadDirectRenderModel = async ({ siteId, slugPath }: DirectRenderLocation): Promise<RenderPageModel> => {
-    // Resolve the site without a tenant header. A copied standalone URL can
-    // be opened before an administrative tenant has been selected.
     const selectedTenantId = getCurrentTenantId()
-    const resolutionResponse = await fetch(
-        `${endpoints.pages.resolveRenderPath}${buildQueryParams({ site_id: siteId, path: slugPath })}`,
-        {
-            credentials: 'include',
-            headers: {
-                Accept: 'application/json',
-                ...(selectedTenantId ? { 'X-Tenant-ID': selectedTenantId } : {}),
-            },
-        },
-    )
-    const resolved: any = await resolutionResponse.json().catch(() => ({}))
-    if (!resolutionResponse.ok) throw new Error(resolved.detail || 'Could not resolve this page.')
-    return loadResolvedRenderModel(resolved)
+    try {
+        const response: any = await api.get(
+            `${endpoints.pages.resolveRenderPath}${buildQueryParams({ site_id: siteId, path: slugPath })}`,
+            selectedTenantId ? { headers: { 'X-Tenant-ID': selectedTenantId } } : undefined,
+        )
+        return loadResolvedRenderModel(response?.data || response)
+    } catch (error: any) {
+        throw new Error(error?.response?.data?.detail || 'Could not resolve this page.')
+    }
 }

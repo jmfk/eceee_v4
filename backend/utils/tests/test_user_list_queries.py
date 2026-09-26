@@ -1,8 +1,9 @@
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
 from core.models import Tenant
+from core.permissions import user_can_switch_tenant
 from utils.views import CurrentUserView, UserListView
 from webpages.models import PageTheme, ThemeDesignerAssignment
 
@@ -54,9 +55,8 @@ class UserListQueryTests(TestCase):
         self.assertEqual(response.data["current_workspace"]["identifier"], first.identifier)
         self.assertTrue(response.data["can_switch_tenant"])
 
-    def test_only_superusers_and_dev_auto_user_can_switch_workspace(self):
+    def test_only_superusers_can_switch_workspace_outside_local_dev(self):
         owner = User.objects.create_user("workspace-owner", password="test")
-        dev_user = User.objects.create_user("dev_auto_user", password="test")
         superuser = User.objects.create_superuser("workspace-superuser", password="test")
         workspace = Tenant.objects.create(name="Switch target", identifier="switch-target", created_by=owner)
         client = APIClient()
@@ -69,16 +69,27 @@ class UserListQueryTests(TestCase):
         )
         self.assertEqual(denied.status_code, 403)
 
-        for allowed_user in (dev_user, superuser):
-            client.force_authenticate(allowed_user)
-            response = client.post(
-                "/api/v1/utils/current-workspace/",
-                {"identifier": workspace.identifier},
-                format="json",
-            )
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.data["currentWorkspace"]["identifier"], workspace.identifier)
-            self.assertEqual(client.session["selected_tenant_identifier"], workspace.identifier)
+        client.force_authenticate(superuser)
+        response = client.post(
+            "/api/v1/utils/current-workspace/",
+            {"identifier": workspace.identifier},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["currentWorkspace"]["identifier"], workspace.identifier)
+        self.assertEqual(client.session["selected_tenant_identifier"], workspace.identifier)
+
+    @override_settings(DEBUG=True)
+    def test_dev_auto_user_can_switch_workspace_in_local_debug(self):
+        dev_user = User.objects.create_user("dev_auto_user", password="test")
+
+        self.assertTrue(user_can_switch_tenant(dev_user))
+
+    @override_settings(DEBUG=False)
+    def test_dev_auto_user_cannot_switch_workspace_outside_debug(self):
+        dev_user = User.objects.create_user("dev_auto_user", password="test")
+
+        self.assertFalse(user_can_switch_tenant(dev_user))
 
     def test_workspace_switch_rejects_inactive_workspace(self):
         superuser = User.objects.create_superuser("inactive-workspace-superuser", password="test")
