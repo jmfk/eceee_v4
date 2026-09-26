@@ -15,7 +15,8 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from file_manager.storage import S3MediaStorage
-from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeDesignerExportJob
+from object_storage.models import ObjectInstance, ObjectVersion
+from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeDesignerExportJob, WebPage
 from webpages.services import ThemeCSSGenerator
 from webpages.services.designer_export import designer_export_filename, designer_export_object_key
 from webpages.services.designer_theme import (
@@ -23,6 +24,8 @@ from webpages.services.designer_theme import (
     DesignerDraftConflict,
     apply_designer_patch,
     build_draft_workspace,
+    designer_preview_layout,
+    designer_preview_version,
     designer_theme_queryset,
     discard_designer_draft,
     generate_placeholder_png,
@@ -30,7 +33,6 @@ from webpages.services.designer_theme import (
     import_designer_preview_from_site,
     publish_designer_draft,
     replace_designer_asset,
-    replace_designer_preview_image,
     save_designer_draft,
     save_designer_preview_texts,
     theme_from_designer_draft,
@@ -75,16 +77,20 @@ class DesignerPlaceholderSerializer(serializers.Serializer):
 class DesignerPreviewTextSerializer(serializers.Serializer):
     view_id = serializers.CharField(max_length=100)
     texts = serializers.DictField(child=serializers.CharField(max_length=5000, allow_blank=True), allow_empty=True)
-
-
-class DesignerPreviewImageSerializer(serializers.Serializer):
-    view_id = serializers.CharField(max_length=100)
-    target_id = serializers.CharField(max_length=300)
-    image = serializers.ImageField()
+    draft_version = serializers.IntegerField(min_value=1)
 
 
 class DesignerPreviewSiteSerializer(serializers.Serializer):
     source_site_id = serializers.IntegerField(min_value=1)
+    draft_version = serializers.IntegerField(min_value=1)
+
+
+class DesignerPreviewPageSerializer(serializers.Serializer):
+    source_page_id = serializers.IntegerField(min_value=1)
+
+
+class DesignerPreviewObjectSerializer(serializers.Serializer):
+    source_object_id = serializers.IntegerField(min_value=1)
 
 
 def _theme(request, theme_id):
@@ -312,16 +318,19 @@ class DesignerThemePreviewContentView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         try:
-            preview = save_designer_preview_texts(
+            theme, draft = save_designer_preview_texts(
                 theme_id,
                 request.tenant,
                 request.user,
                 data["view_id"],
                 data["texts"],
+                data["draft_version"],
             )
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
-        return Response({"previewContent": preview})
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(build_draft_workspace(theme, draft))
 
 
 class DesignerThemePreviewSiteView(APIView):
@@ -333,40 +342,94 @@ class DesignerThemePreviewSiteView(APIView):
         serializer = DesignerPreviewSiteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            preview = import_designer_preview_from_site(
+            theme, draft = import_designer_preview_from_site(
                 theme_id,
                 request.tenant,
                 request.user,
                 serializer.validated_data["source_site_id"],
+                serializer.validated_data["draft_version"],
             )
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
         except PageTheme.DoesNotExist:
             return Response({"error": "Theme not found."}, status=status.HTTP_404_NOT_FOUND)
-        return Response({"previewContent": preview})
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(build_draft_workspace(theme, draft))
 
 
-class DesignerThemePreviewImageView(APIView):
+class DesignerThemePreviewPageView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [DesignerJSONParser]
     renderer_classes = [DesignerJSONRenderer]
 
     def post(self, request, theme_id):
-        serializer = DesignerPreviewImageSerializer(data=request.data)
+        theme = _theme(request, theme_id)
+        serializer = DesignerPreviewPageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        try:
-            preview = replace_designer_preview_image(
-                theme_id,
-                request.tenant,
-                request.user,
-                data["view_id"],
-                data["target_id"],
-                data["image"],
-            )
-        except PermissionError:
-            return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
-        return Response({"previewContent": preview})
+        page = get_object_or_404(
+            WebPage.objects.select_related("current_published_version", "latest_version", "parent"),
+            id=serializer.validated_data["source_page_id"],
+            tenant=theme.tenant,
+            is_deleted=False,
+        )
+
+        from .webpage_views import WebPageViewSet
+
+        inheritance = WebPageViewSet._widget_inheritance_legacy(page).data
+        version = designer_preview_version(page)
+        layout = designer_preview_layout(page, version)
+        return Response(
+            {
+                "page": {
+                    "id": page.id,
+                    "path_pattern_key": page.path_pattern_key,
+                    "hostnames": page.hostnames,
+                    "cached_root_hostnames": page.cached_root_hostnames,
+                },
+                "version": {
+                    "id": version.id if version else None,
+                    "code_layout": layout,
+                    "widgets": version.widgets if version else {},
+                },
+                "inheritance": inheritance,
+            }
+        )
+
+
+class DesignerThemePreviewObjectView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [DesignerJSONParser]
+    renderer_classes = [DesignerJSONRenderer]
+
+    def post(self, request, theme_id):
+        theme = _theme(request, theme_id)
+        serializer = DesignerPreviewObjectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = get_object_or_404(
+            ObjectInstance.objects.select_related("object_type"),
+            id=serializer.validated_data["source_object_id"],
+            tenant=theme.tenant,
+            current_version_id__isnull=False,
+        )
+        version = (
+            ObjectVersion.objects.filter(id=instance.current_version_id, object_instance=instance)
+            .values("id", "data", "widgets")
+            .first()
+        )
+        if version is None:
+            return Response({"error": "That object has no content to preview."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {
+                "object": {"id": instance.id, "title": instance.title},
+                "objectType": {
+                    "key": instance.object_type.name,
+                    "label": instance.object_type.label,
+                    "schema": instance.object_type.schema or {},
+                },
+                "version": version,
+            }
+        )
 
 
 class ThemeDesignerAssignmentView(APIView):
