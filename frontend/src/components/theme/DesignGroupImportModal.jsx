@@ -78,7 +78,7 @@ const DesignGroupImportModal = ({ themeId, onClose, onImported, hasUnsavedChange
                 <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 p-4">
                     <div>
                         <h2 id="design-group-import-title" className="text-lg font-semibold text-gray-900">Import Design Groups</h2>
-                        <p className="mt-1 text-sm text-gray-600">Copy groups and their images from another theme in this tenant.</p>
+                        <p className="mt-1 text-sm text-gray-600">Copy groups and their images from another theme in this workspace.</p>
                     </div>
                     <button type="button" onClick={onClose} aria-label="Close import dialog" className="rounded p-1 text-gray-400 hover:text-gray-600">
                         <X className="h-5 w-5" />
@@ -89,7 +89,7 @@ const DesignGroupImportModal = ({ themeId, onClose, onImported, hasUnsavedChange
                     {isLoading ? (
                         <p className="text-sm text-gray-600">Loading themes…</p>
                     ) : themes.length === 0 ? (
-                        <p className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">No other themes are available in this tenant.</p>
+                        <p className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">No other themes are available in this workspace.</p>
                     ) : hasUnsavedChanges ? (
                         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
                             <div className="flex items-start gap-3">

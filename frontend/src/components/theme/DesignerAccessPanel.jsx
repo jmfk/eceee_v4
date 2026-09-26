@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Trash2, UserPlus } from 'lucide-react'
+import { ArrowRight, Trash2, UserPlus } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
 import { processResponse } from '../../api/utils'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
@@ -47,8 +48,14 @@ const DesignerAccessPanel = ({ themeId }) => {
 
     return (
         <section className="border-t border-gray-200 pt-6">
-            <h3 className="text-md font-semibold text-gray-900">Designer access</h3>
-            <p className="mt-1 text-sm text-gray-600">Assign restricted access to this theme by exact username. Designer-only users should not also be tenant members.</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-md font-semibold text-gray-900">Designer access</h3>
+                <Link to={`/designer/themes/${themeId}`} className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900">
+                    Open in Designer
+                    <ArrowRight className="h-4 w-4" />
+                </Link>
+            </div>
+            <p className="mt-1 text-sm text-gray-600">Assign restricted access to this theme by exact username. Designer-only users should not also have full workspace access.</p>
             <div className="mt-4 flex max-w-lg gap-2">
                 <input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Designer username" className="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm" />
                 <button type="button" onClick={add} disabled={busy || !username.trim()} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"><UserPlus className="h-4 w-4" />Assign</button>
