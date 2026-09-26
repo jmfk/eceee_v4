@@ -19,7 +19,10 @@ from webpages.services.site_package import (
     MultipartUploadWriter,
     SitePackageExporter,
     SitePackageImporter,
+    _remap_structured_references,
     build_site_package_export_filename,
+    build_theme_transfer_package,
+    restore_theme_transfer_package,
 )
 
 
@@ -102,6 +105,7 @@ class SitePackageServiceTests(TestCase):
             widgets={},
             created_by=self.user,
         )
+
         current = PageVersion.objects.create(
             page=self.root,
             version_number=2,
@@ -153,6 +157,59 @@ class SitePackageServiceTests(TestCase):
         self.assertEqual(manifest["counts"]["pages"], 2)
         self.assertEqual(manifest["counts"]["media"], 1)
         self.assertEqual(media_manifest["files"][0]["source_id"], str(self.media.id))
+
+    def test_theme_transfer_package_copies_and_rewrites_all_theme_assets(self):
+        storage = MemoryStorage()
+        self.theme.image.name = "theme_images/source/preview.png"
+        self.theme.site_icon.name = "theme_images/source/favicon.png"
+        self.theme.design_groups = {
+            "groups": [
+                {"layoutProperties": {"hero": {"md": {"background": {"url": "/media/theme_images/source/hero.png"}}}}}
+            ]
+        }
+        self.theme.designer_preview = {
+            "views": [
+                {
+                    "id": "home",
+                    "images": {"hero": {"url": f"/media/theme_images/{self.theme.id}/library/demo.png"}},
+                }
+            ]
+        }
+        self.theme.list_library_images = lambda: ["demo.png"]
+        storage.files = {
+            "theme_images/source/preview.png": b"preview",
+            "theme_images/source/favicon.png": b"favicon",
+            "theme_images/source/hero.png": b"hero",
+            f"theme_images/{self.theme.id}/library/demo.png": b"demo",
+        }
+
+        encoded = build_theme_transfer_package(self.theme, storage=storage)
+        imported = PageTheme.objects.create(tenant=self.tenant, name="Imported", created_by=self.user)
+        restored = restore_theme_transfer_package(encoded, imported, storage=storage)
+
+        destination = f"theme_images/{imported.id}/library"
+        self.assertEqual(restored["image"], f"{destination}/preview.png")
+        self.assertEqual(restored["site_icon"], f"{destination}/favicon.png")
+        self.assertIn(f"{destination}/hero.png", str(restored["design_groups"]))
+        self.assertIn(f"{destination}/demo.png", str(restored["designer_preview"]))
+        self.assertEqual(storage.files[f"{destination}/preview.png"], b"preview")
+
+    def test_theme_transfer_package_keeps_assets_with_the_same_basename_distinct(self):
+        storage = MemoryStorage()
+        self.theme.image.name = "theme_images/source/preview/logo.png"
+        self.theme.site_icon.name = "theme_images/source/favicon/logo.png"
+        storage.files = {
+            self.theme.image.name: b"preview-logo",
+            self.theme.site_icon.name: b"favicon-logo",
+        }
+
+        encoded = build_theme_transfer_package(self.theme, storage=storage)
+        imported = PageTheme.objects.create(tenant=self.tenant, name="Imported", created_by=self.user)
+        restored = restore_theme_transfer_package(encoded, imported, storage=storage)
+
+        self.assertNotEqual(restored["image"], restored["site_icon"])
+        self.assertEqual(storage.files[restored["image"]], b"preview-logo")
+        self.assertEqual(storage.files[restored["site_icon"]], b"favicon-logo")
 
     def test_import_creates_copy_clears_root_hostnames_and_remaps_media(self):
         PageVersion.objects.create(
@@ -256,8 +313,18 @@ class SitePackageServiceTests(TestCase):
             created_by=self.user,
             options={"tenant_id": str(self.tenant.id)},
         )
-        with zipfile.ZipFile(buffer, "r") as package:
-            imported_root = SitePackageImporter(import_job, storage=storage).import_package(package)
+        with patch(
+            "webpages.services.site_package._remap_structured_references",
+            wraps=_remap_structured_references,
+        ) as remap_references:
+            with zipfile.ZipFile(buffer, "r") as package:
+                imported_root = SitePackageImporter(import_job, storage=storage).import_package(package)
+
+        self.assertTrue(remap_references.called)
+        self.assertTrue(
+            all(call.kwargs.get("version_map") for call in remap_references.call_args_list),
+            "Structured references must only be remapped once all object maps are complete",
+        )
 
         imported_child = imported_root.children.get(title="Child")
         imported_root_version = imported_root.versions.get(version_number=1)

@@ -32,6 +32,7 @@ django-htmx>=1.16.0
 django-ratelimit>=4.1.0
 bleach>=6.0.0
 tinycss2>=1.2.0
+cryptography>=42.0.0
 
 # Authentication and authorization
 django-allauth>=0.54.0

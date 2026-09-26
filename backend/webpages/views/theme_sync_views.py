@@ -5,7 +5,7 @@ Provides endpoints for bidirectional sync between local Python files and server 
 """
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -20,6 +20,13 @@ from ..serializers.theme_sync import (
     ThemeSyncPushSerializer,
     ThemeSyncSerializer,
 )
+from ..services.site_package import (
+    build_theme_transfer_package,
+    restore_theme_transfer_package,
+    validate_theme_transfer_package,
+)
+from ..services.theme_remote_credentials import ThemeRemoteAccessKeyAuthentication
+from ..services.theme_versions import SNAPSHOT_FIELDS, record_theme_version
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -28,6 +35,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
 
     permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
     authentication_classes = [
+        ThemeRemoteAccessKeyAuthentication,
         authentication.TokenAuthentication,
         authentication.SessionAuthentication,
     ]
@@ -99,7 +107,13 @@ class ThemeSyncViewSet(viewsets.ViewSet):
             )
 
         themes = PageTheme.objects.filter(tenant=tenant).order_by("name")
+        stable_key = request.data.get("stable_key") or request.data.get("stableKey")
+        if stable_key:
+            themes = themes.filter(stable_key=stable_key)
         serializer = ThemeSyncSerializer(themes, many=True, context={"request": request})
+        serialized_themes = list(serializer.data)
+        if stable_key and serialized_themes:
+            serialized_themes[0]["transfer_package"] = build_theme_transfer_package(themes.first())
 
         max_version = (
             PageTheme.objects.filter(tenant=tenant).aggregate(max_version=models.Max("sync_version"))["max_version"]
@@ -109,7 +123,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
         # For output serialization, pass data directly
         return Response(
             {
-                "themes": serializer.data,
+                "themes": serialized_themes,
                 "max_version": max_version,
             }
         )
@@ -139,9 +153,19 @@ class ThemeSyncViewSet(viewsets.ViewSet):
         if not push_serializer.is_valid():
             return Response(push_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        theme_data = push_serializer.validated_data["theme_data"]
+        theme_data = dict(push_serializer.validated_data["theme_data"])
+        theme_data.pop("is_default", None)
+        transfer_package = push_serializer.validated_data.get("transfer_package")
+        if transfer_package:
+            theme_data.pop("image", None)
+            theme_data.pop("site_icon", None)
+            try:
+                validate_theme_transfer_package(transfer_package)
+            except ValueError as exc:
+                return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         client_version = push_serializer.validated_data["sync_version"]
         theme_name = theme_data.get("name")
+        stable_key = theme_data.get("stable_key")
 
         if not theme_name:
             return Response(
@@ -158,43 +182,65 @@ class ThemeSyncViewSet(viewsets.ViewSet):
             )
 
         try:
-            theme = PageTheme.objects.get(name=theme_name, tenant=tenant)
-            # Check version conflict
-            if client_version < theme.sync_version:
-                return Response(
-                    {
-                        "error": "Version conflict",
-                        "client_version": client_version,
-                        "server_version": theme.sync_version,
-                        "message": (
-                            f"Client version ({client_version}) is older than "
-                            f"server version ({theme.sync_version}). "
-                            "Please pull latest changes and resolve conflicts."
-                        ),
-                    },
-                    status=status.HTTP_409_CONFLICT,
-                )
+            with transaction.atomic():
+                created = False
+                previous_version_ids = []
+                lookup = {"stable_key": stable_key} if stable_key else {"name": theme_name}
+                try:
+                    theme = PageTheme.objects.select_for_update().get(tenant=tenant, **lookup)
+                    previous_version_ids = list(theme.versions.values_list("id", flat=True))
+                    if client_version < theme.sync_version:
+                        return Response(
+                            {
+                                "error": "Version conflict",
+                                "client_version": client_version,
+                                "server_version": theme.sync_version,
+                                "message": (
+                                    f"Client version ({client_version}) is older than "
+                                    f"server version ({theme.sync_version}). "
+                                    "Please pull latest changes and resolve conflicts."
+                                ),
+                            },
+                            status=status.HTTP_409_CONFLICT,
+                        )
+                    serializer = ThemeSyncSerializer(theme, data=theme_data, partial=True, context={"request": request})
+                except PageTheme.DoesNotExist:
+                    created = True
+                    serializer = ThemeSyncSerializer(data=theme_data, context={"request": request})
 
-            # Update existing theme
-            serializer = ThemeSyncSerializer(theme, data=theme_data, partial=True, context={"request": request})
-        except PageTheme.DoesNotExist:
-            # Create new theme - set tenant from request
-            theme_data["tenant"] = tenant.id
-            serializer = ThemeSyncSerializer(data=theme_data, context={"request": request})
+                if not serializer.is_valid():
+                    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        # Save with sync metadata
-        theme = serializer.save(
-            sync_source="sync",
-            last_synced_at=timezone.now(),
-            skip_version_increment=False,  # Will increment in save()
-        )
+                save_kwargs = {"sync_source": "sync", "last_synced_at": timezone.now()}
+                if created:
+                    save_kwargs.update({"tenant": tenant, "created_by": request.user})
+                theme = serializer.save(**save_kwargs)
+                if transfer_package:
+                    restored = restore_theme_transfer_package(transfer_package, theme)
+                    restored.pop("is_default", None)
+                    for field in SNAPSHOT_FIELDS:
+                        if field in restored:
+                            setattr(theme, field, restored[field])
+                    theme.save(
+                        update_fields=[*SNAPSHOT_FIELDS, "updated_at"],
+                        skip_version_increment=True,
+                    )
+                    theme.versions.exclude(id__in=previous_version_ids).delete()
+                    record_theme_version(
+                        theme,
+                        source="remote-upload",
+                        source_label="Theme sync API",
+                        created_by=request.user,
+                        force=True,
+                    )
+                elif theme.versions.count() == len(previous_version_ids):
+                    record_theme_version(theme, source="remote-upload", source_label="Theme sync API", force=True)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(
             ThemeSyncSerializer(theme, context={"request": request}).data,
-            status=status.HTTP_200_OK if theme.id else status.HTTP_201_CREATED,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
     @action(detail=False, methods=["get"])

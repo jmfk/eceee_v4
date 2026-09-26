@@ -522,7 +522,7 @@ class DesignerThemeApiTests(TestCase):
         original = self.client.get(self.workspace_url).data
 
         self.theme.description = "Updated outside Designer"
-        self.theme.save()
+        self.theme.save(version_created_by=self.owner)
         self.theme.refresh_from_db()
         refreshed = self.client.get(self.workspace_url)
 
@@ -544,7 +544,7 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(saved.status_code, 200, saved.data)
 
         self.theme.description = "Updated outside Designer"
-        self.theme.save()
+        self.theme.save(version_created_by=self.owner)
         refreshed = self.client.get(self.workspace_url)
 
         self.assertEqual(refreshed.status_code, 200, refreshed.data)

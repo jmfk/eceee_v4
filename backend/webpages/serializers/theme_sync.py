@@ -5,7 +5,7 @@ Serializer for theme synchronization with version conflict detection.
 """
 
 from rest_framework import serializers
-from ..models import PageTheme
+
 from .theme import PageThemeSerializer
 
 
@@ -15,6 +15,7 @@ class ThemeSyncSerializer(PageThemeSerializer):
     sync_version = serializers.IntegerField(read_only=True)
     last_synced_at = serializers.DateTimeField(read_only=True)
     sync_source = serializers.CharField(read_only=True)
+    stable_key = serializers.UUIDField(required=False)
 
     class Meta(PageThemeSerializer.Meta):
         fields = PageThemeSerializer.Meta.fields + [
@@ -22,7 +23,7 @@ class ThemeSyncSerializer(PageThemeSerializer):
             "last_synced_at",
             "sync_source",
         ]
-        read_only_fields = PageThemeSerializer.Meta.read_only_fields + [
+        read_only_fields = [field for field in PageThemeSerializer.Meta.read_only_fields if field != "stable_key"] + [
             "sync_version",
             "last_synced_at",
             "sync_source",
@@ -53,32 +54,13 @@ class ThemeSyncPushSerializer(serializers.Serializer):
 
     sync_version = serializers.IntegerField(help_text="Current client version")
     theme_data = ThemeSyncSerializer(help_text="Theme data to push")
+    transfer_package = serializers.CharField(required=False, write_only=True)
 
     def validate(self, attrs):
         """Validate version before push"""
         theme_data = attrs.get("theme_data")
-        client_version = attrs.get("sync_version")
-
         if not theme_data:
             raise serializers.ValidationError("theme_data is required")
-
-        # If updating existing theme, check version
-        theme_name = theme_data.get("name")
-        if theme_name:
-            try:
-                theme = PageTheme.objects.get(name=theme_name)
-                if client_version < theme.sync_version:
-                    raise serializers.ValidationError(
-                        {
-                            "sync_version": (
-                                f"Version conflict: Client version ({client_version}) "
-                                f"is older than server version ({theme.sync_version}). "
-                                "Please pull latest changes first."
-                            )
-                        }
-                    )
-            except PageTheme.DoesNotExist:
-                pass  # New theme, no version check needed
 
         return attrs
 
@@ -97,4 +79,3 @@ class ThemeSyncConflictCheckSerializer(serializers.Serializer):
     client_version = serializers.IntegerField()
     server_version = serializers.IntegerField()
     theme_name = serializers.CharField()
-

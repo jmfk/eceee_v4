@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from djangorestframework_camel_case.parser import CamelCaseJSONParser
@@ -16,7 +17,14 @@ from rest_framework.views import APIView
 
 from file_manager.storage import S3MediaStorage
 from object_storage.models import ObjectInstance, ObjectVersion
-from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeDesignerExportJob, WebPage
+from webpages.models import (
+    PageTheme,
+    ThemeDesignerAssignment,
+    ThemeDesignerExportJob,
+    ThemeRemoteConnection,
+    ThemeVersion,
+    WebPage,
+)
 from webpages.services import ThemeCSSGenerator
 from webpages.services.designer_export import designer_export_filename, designer_export_object_key
 from webpages.services.designer_theme import (
@@ -38,6 +46,26 @@ from webpages.services.designer_theme import (
     theme_from_designer_draft,
     undo_designer_publish,
     user_can_design_theme,
+)
+from webpages.services.site_package import (
+    build_theme_transfer_package,
+    restore_theme_transfer_package,
+    validate_theme_transfer_package,
+)
+from webpages.services.theme_remote import RemoteThemeError, remote_sync_request
+from webpages.services.theme_remote_credentials import (
+    RemoteCredentialConfigurationError,
+    decrypt_access_key,
+    encrypt_access_key,
+)
+from webpages.services.theme_versions import (
+    SNAPSHOT_FIELDS,
+    compare_themes,
+    record_theme_version,
+    restore_theme_version,
+    snapshot_hash,
+    snapshot_matches_current,
+    theme_snapshot,
 )
 from webpages.tasks import export_designer_theme
 
@@ -93,6 +121,39 @@ class DesignerPreviewObjectSerializer(serializers.Serializer):
     source_object_id = serializers.IntegerField(min_value=1)
 
 
+class DesignerThemeCheckpointSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=160, trim_whitespace=True)
+
+
+class DesignerThemeVersionNameSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=160, trim_whitespace=True, allow_blank=True)
+
+
+class DesignerThemeCompareSerializer(serializers.Serializer):
+    left_theme_id = serializers.IntegerField(min_value=1)
+    right_theme_id = serializers.IntegerField(min_value=1)
+
+
+class DesignerRemoteSerializer(serializers.Serializer):
+    connection_id = serializers.UUIDField()
+
+
+class DesignerRemotePullSerializer(DesignerRemoteSerializer):
+    stable_key = serializers.UUIDField()
+
+
+class DesignerRemotePushSerializer(DesignerRemoteSerializer):
+    theme_id = serializers.IntegerField(min_value=1)
+
+
+class DesignerRemoteConnectionSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=120)
+    base_url = serializers.URLField(max_length=500)
+    remote_workspace = serializers.CharField(max_length=100)
+    access_key = serializers.CharField(max_length=500, trim_whitespace=False, write_only=True, required=False)
+    is_default = serializers.BooleanField(default=False)
+
+
 def _theme(request, theme_id):
     tenant = getattr(request, "tenant", None)
     theme = get_object_or_404(PageTheme.objects.select_related("tenant"), id=theme_id, tenant=tenant)
@@ -123,7 +184,7 @@ class DesignerThemeListView(APIView):
         tenant = getattr(request, "tenant", None)
         if tenant is None:
             return Response({"results": []})
-        themes = designer_theme_queryset(request.user, tenant).order_by("name")
+        themes = designer_theme_queryset(request.user, tenant).prefetch_related("versions").order_by("name")
         return Response(
             {
                 "results": [
@@ -132,9 +193,423 @@ class DesignerThemeListView(APIView):
                         "name": theme.name,
                         "description": theme.description,
                         "syncVersion": theme.sync_version,
+                        "stableKey": str(theme.stable_key),
+                        "updatedAt": theme.updated_at,
+                        "versionCount": len(theme.versions.all()),
+                        "contentHash": snapshot_hash(theme_snapshot(theme)),
                     }
                     for theme in themes
+                ],
+                "canManageRemotes": tenant.user_has_access(request.user),
+            }
+        )
+
+
+class DesignerThemeCompareView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = DesignerThemeCompareSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        themes = designer_theme_queryset(request.user, request.tenant).filter(
+            id__in=[serializer.validated_data["left_theme_id"], serializer.validated_data["right_theme_id"]]
+        )
+        by_id = {theme.id: theme for theme in themes}
+        left = by_id.get(serializer.validated_data["left_theme_id"])
+        right = by_id.get(serializer.validated_data["right_theme_id"])
+        if not left or not right:
+            return Response({"error": "Theme not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(compare_themes(left, right))
+
+
+class DesignerThemeVersionsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, theme_id):
+        theme = _theme(request, theme_id)
+        current_snapshot = theme_snapshot(theme)
+        versions = list(theme.versions.select_related("created_by").all())
+        current_version_id = next(
+            (version.id for version in versions if snapshot_matches_current(version.snapshot, current_snapshot)),
+            None,
+        )
+        return Response(
+            {
+                "results": [
+                    {
+                        "id": version.id,
+                        "versionNumber": version.version_number,
+                        "name": version.name,
+                        "syncVersion": version.sync_version,
+                        "contentHash": version.content_hash,
+                        "source": version.source,
+                        "sourceLabel": version.source_label,
+                        "createdAt": version.created_at,
+                        "createdBy": version.created_by.username if version.created_by else None,
+                        "isCurrent": version.id == current_version_id,
+                    }
+                    for version in versions
                 ]
+            }
+        )
+
+    def post(self, request, theme_id):
+        theme = _theme(request, theme_id)
+        serializer = DesignerThemeCheckpointSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        version = record_theme_version(
+            theme,
+            source="named-checkpoint",
+            source_label="Manual checkpoint",
+            name=serializer.validated_data["name"],
+            created_by=request.user,
+            force=True,
+        )
+        return Response(
+            {"id": version.id, "versionNumber": version.version_number, "name": version.name},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class DesignerThemeVersionDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, theme_id, version_id):
+        theme = _theme(request, theme_id)
+        version = get_object_or_404(ThemeVersion, id=version_id, theme=theme)
+        serializer = DesignerThemeVersionNameSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        version.name = serializer.validated_data["name"]
+        version.save(update_fields=["name"])
+        return Response({"id": version.id, "versionNumber": version.version_number, "name": version.name})
+
+
+class DesignerThemeRestoreView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, theme_id, version_id):
+        theme = _theme(request, theme_id)
+        version = get_object_or_404(ThemeVersion, id=version_id, theme=theme)
+        restored = restore_theme_version(theme, version, user=request.user)
+        return Response({"versionNumber": restored.version_number, "syncVersion": theme.sync_version})
+
+
+def _remote_admin(request):
+    tenant = getattr(request, "tenant", None)
+    if tenant is None or not tenant.user_has_access(request.user):
+        from rest_framework.exceptions import PermissionDenied
+
+        raise PermissionDenied("Workspace administrator access is required.")
+    return tenant
+
+
+def _remote_user(request):
+    tenant = getattr(request, "tenant", None)
+    if tenant is None or (
+        not tenant.user_has_access(request.user) and not designer_theme_queryset(request.user, tenant).exists()
+    ):
+        from rest_framework.exceptions import PermissionDenied
+
+        raise PermissionDenied("Designer access is required.")
+    return tenant
+
+
+def _connection_data(connection):
+    return {
+        "id": str(connection.id),
+        "name": connection.name,
+        "baseUrl": connection.base_url,
+        "remoteWorkspace": connection.remote_workspace,
+        "isDefault": connection.is_default,
+        "isActive": connection.is_active,
+        "hasAccessKey": bool(connection.encrypted_access_key),
+        "updatedAt": connection.updated_at,
+    }
+
+
+def _remote_connection(request, connection_id):
+    tenant = _remote_user(request)
+    return get_object_or_404(ThemeRemoteConnection, id=connection_id, tenant=tenant, is_active=True)
+
+
+def _remote_request(connection, action, payload=None):
+    token = decrypt_access_key(connection.encrypted_access_key)
+    return remote_sync_request(connection.base_url, connection.remote_workspace, token, action, payload)
+
+
+class DesignerRemoteConnectionsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        tenant = _remote_user(request)
+        connections = ThemeRemoteConnection.objects.filter(tenant=tenant, is_active=True).order_by(
+            "-is_default", "name"
+        )
+        return Response(
+            {
+                "results": [_connection_data(connection) for connection in connections],
+                "canManage": tenant.user_has_access(request.user),
+            }
+        )
+
+    @transaction.atomic
+    def post(self, request):
+        tenant = _remote_admin(request)
+        serializer = DesignerRemoteConnectionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        access_key = data.pop("access_key", "")
+        if not access_key:
+            raise serializers.ValidationError({"accessKey": "Access key is required."})
+        is_first = not ThemeRemoteConnection.objects.filter(tenant=tenant, is_active=True).exists()
+        make_default = data.pop("is_default", False) or is_first
+        if make_default:
+            ThemeRemoteConnection.objects.filter(tenant=tenant, is_default=True).update(is_default=False)
+        try:
+            encrypted = encrypt_access_key(access_key)
+        except RemoteCredentialConfigurationError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        connection = ThemeRemoteConnection.objects.create(
+            tenant=tenant,
+            encrypted_access_key=encrypted,
+            is_default=make_default,
+            created_by=request.user,
+            updated_by=request.user,
+            **data,
+        )
+        return Response(_connection_data(connection), status=status.HTTP_201_CREATED)
+
+
+class DesignerRemoteConnectionDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @transaction.atomic
+    def patch(self, request, connection_id):
+        tenant = _remote_admin(request)
+        connection = get_object_or_404(ThemeRemoteConnection, id=connection_id, tenant=tenant)
+        serializer = DesignerRemoteConnectionSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        access_key = data.pop("access_key", None)
+        make_default = data.pop("is_default", connection.is_default)
+        if make_default:
+            ThemeRemoteConnection.objects.filter(tenant=tenant, is_default=True).exclude(pk=connection.pk).update(
+                is_default=False
+            )
+        elif connection.is_default:
+            raise serializers.ValidationError({"isDefault": "Choose another default connection first."})
+        if access_key:
+            try:
+                connection.encrypted_access_key = encrypt_access_key(access_key)
+            except RemoteCredentialConfigurationError as exc:
+                return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        for field, value in data.items():
+            setattr(connection, field, value)
+        connection.is_default = make_default
+        connection.updated_by = request.user
+        connection.save()
+        return Response(_connection_data(connection))
+
+    @transaction.atomic
+    def delete(self, request, connection_id):
+        tenant = _remote_admin(request)
+        connection = get_object_or_404(ThemeRemoteConnection, id=connection_id, tenant=tenant)
+        was_default = connection.is_default
+        connection.delete()
+        if was_default:
+            replacement = (
+                ThemeRemoteConnection.objects.filter(tenant=tenant, is_active=True).order_by("created_at").first()
+            )
+            if replacement:
+                replacement.is_default = True
+                replacement.save(update_fields=["is_default"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DesignerRemoteThemesView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = DesignerRemoteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        connection = _remote_connection(request, serializer.validated_data["connection_id"])
+        try:
+            result = _remote_request(connection, "pull")
+        except (RemoteThemeError, RemoteCredentialConfigurationError) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        themes = result.get("themes", [])
+        return Response(
+            {
+                "results": [
+                    {
+                        "stableKey": str(item.get("stable_key") or item.get("stableKey") or ""),
+                        "name": item.get("name"),
+                        "description": item.get("description", ""),
+                        "syncVersion": item.get("sync_version", item.get("syncVersion", 1)),
+                    }
+                    for item in themes
+                ]
+            }
+        )
+
+
+class DesignerRemotePullView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        tenant = _remote_user(request)
+        serializer = DesignerRemotePullSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        connection = _remote_connection(request, data["connection_id"])
+        try:
+            result = _remote_request(connection, "pull", {"stable_key": str(data["stable_key"])})
+        except (RemoteThemeError, RemoteCredentialConfigurationError) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        remote_theme = next(
+            (
+                item
+                for item in result.get("themes", [])
+                if str(item.get("stable_key") or item.get("stableKey")) == str(data["stable_key"])
+            ),
+            None,
+        )
+        if remote_theme is None:
+            return Response({"error": "Remote theme not found."}, status=status.HTTP_404_NOT_FOUND)
+        camel_names = {
+            "site_icon": "siteIcon",
+            "design_groups": "designGroups",
+            "component_styles": "componentStyles",
+            "designer_preview": "designerPreview",
+            "image_styles": "imageStyles",
+            "gallery_styles": "galleryStyles",
+            "carousel_styles": "carouselStyles",
+            "table_templates": "tableTemplates",
+            "css_variables": "cssVariables",
+            "html_elements": "htmlElements",
+            "custom_css": "customCss",
+            "is_active": "isActive",
+            "is_default": "isDefault",
+        }
+        snapshot = {
+            field: remote_theme[field] if field in remote_theme else remote_theme[camel_names[field]]
+            for field in SNAPSHOT_FIELDS
+            if field in remote_theme or camel_names.get(field) in remote_theme
+        }
+        snapshot.pop("is_default", None)
+        packaged_snapshot = remote_theme.get("transfer_package") or remote_theme.get("transferPackage")
+        if packaged_snapshot:
+            try:
+                validate_theme_transfer_package(packaged_snapshot)
+            except ValueError as exc:
+                return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                theme = (
+                    PageTheme.objects.select_for_update().filter(tenant=tenant, stable_key=data["stable_key"]).first()
+                )
+                if theme is None:
+                    if not tenant.user_has_access(request.user):
+                        from rest_framework.exceptions import PermissionDenied
+
+                        raise PermissionDenied("Workspace administrator access is required to import a new theme.")
+                    base_name = snapshot.get("name") or "Imported theme"
+                    name = base_name
+                    suffix = 2
+                    while PageTheme.objects.filter(tenant=tenant, name=name).exists():
+                        name = f"{base_name} ({suffix})"
+                        suffix += 1
+                    snapshot["name"] = name
+                    snapshot["is_default"] = False
+                    initial_snapshot = dict(snapshot)
+                    if packaged_snapshot:
+                        initial_snapshot.pop("image", None)
+                        initial_snapshot.pop("site_icon", None)
+                    theme = PageTheme(
+                        tenant=tenant, created_by=request.user, stable_key=data["stable_key"], **initial_snapshot
+                    )
+                    theme.save(
+                        version_source="remote-download",
+                        version_source_label=connection.name,
+                        version_created_by=request.user,
+                        force_version=True,
+                    )
+                    if packaged_snapshot:
+                        snapshot = restore_theme_transfer_package(packaged_snapshot, theme)
+                        snapshot.pop("is_default", None)
+                        snapshot["is_default"] = False
+                        snapshot["name"] = name
+                        for field in SNAPSHOT_FIELDS:
+                            if field in snapshot:
+                                setattr(theme, field, snapshot[field])
+                        theme.save(update_fields=[*SNAPSHOT_FIELDS, "updated_at"], skip_version_increment=True)
+                        theme.versions.all().delete()
+                        version = record_theme_version(
+                            theme,
+                            source="remote-download",
+                            source_label=connection.name,
+                            created_by=request.user,
+                            force=True,
+                        )
+                    else:
+                        version = theme.versions.first()
+                else:
+                    if not user_can_design_theme(request.user, theme):
+                        from rest_framework.exceptions import PermissionDenied
+
+                        raise PermissionDenied("You do not have Designer access to this theme.")
+                    if packaged_snapshot:
+                        snapshot = restore_theme_transfer_package(packaged_snapshot, theme)
+                        snapshot.pop("is_default", None)
+                    snapshot["is_default"] = theme.is_default
+                    version = record_theme_version(
+                        theme,
+                        source="remote-download",
+                        source_label=connection.name,
+                        created_by=request.user,
+                        force=True,
+                        snapshot=snapshot,
+                    )
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"themeId": theme.id, "versionNumber": version.version_number}, status=status.HTTP_201_CREATED)
+
+
+class DesignerRemotePushView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = DesignerRemotePushSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        theme = _theme(request, data["theme_id"])
+        connection = _remote_connection(request, data["connection_id"])
+        try:
+            remote = _remote_request(connection, "pull")
+            match = next(
+                (
+                    item
+                    for item in remote.get("themes", [])
+                    if str(item.get("stable_key") or item.get("stableKey")) == str(theme.stable_key)
+                ),
+                None,
+            )
+            remote_snapshot = theme_snapshot(theme)
+            for package_only_field in ("image", "site_icon", "gallery_styles", "carousel_styles", "is_default"):
+                remote_snapshot.pop(package_only_field, None)
+            payload = {
+                "sync_version": (match or {}).get("sync_version", (match or {}).get("syncVersion", 0)),
+                "theme_data": remote_snapshot | {"stable_key": str(theme.stable_key)},
+                "transfer_package": build_theme_transfer_package(theme),
+            }
+            result = _remote_request(connection, "push", payload)
+        except (RemoteThemeError, RemoteCredentialConfigurationError) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "name": result.get("name", theme.name),
+                "syncVersion": result.get("sync_version", result.get("syncVersion")),
             }
         )
 

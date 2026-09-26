@@ -168,6 +168,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
         model = PageTheme
         fields = [
             "id",
+            "stable_key",
             "name",
             "description",
             # New fields
@@ -191,7 +192,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "updated_at",
             "created_by",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "created_by"]
+        read_only_fields = ["id", "stable_key", "created_at", "updated_at", "created_by"]
 
     def validate_breakpoints(self, value):
         """Validate breakpoints configuration"""

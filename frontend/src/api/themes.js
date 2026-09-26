@@ -12,6 +12,22 @@ import { wrapApiCall, buildQueryParams } from './utils.js'
  * Theme API operations
  */
 export const themesApi = {
+    versions: wrapApiCall(async (themeId) => {
+        return api.get(`/api/v1/webpages/designer/themes/${themeId}/versions/`)
+    }, 'themes.versions'),
+
+    createVersion: wrapApiCall(async (themeId, name) => {
+        return api.post(`/api/v1/webpages/designer/themes/${themeId}/versions/`, { name })
+    }, 'themes.createVersion'),
+
+    renameVersion: wrapApiCall(async (themeId, versionId, name) => {
+        return api.patch(`/api/v1/webpages/designer/themes/${themeId}/versions/${versionId}/`, { name })
+    }, 'themes.renameVersion'),
+
+    restoreVersion: wrapApiCall(async (themeId, versionId) => {
+        return api.post(`/api/v1/webpages/designer/themes/${themeId}/versions/${versionId}/restore/`)
+    }, 'themes.restoreVersion'),
+
     /**
      * Get all themes with optional filtering
      * @param {Object} params - Query parameters
@@ -279,6 +295,17 @@ export const themesApi = {
     listLibraryImages: wrapApiCall(async (themeId) => {
         return api.get(`${endpoints.themes.detail(themeId)}library_images/`)
     }, 'themes.listLibraryImages'),
+
+    previewContentSources: wrapApiCall(async (themeId) => {
+        return api.get(`${endpoints.themes.detail(themeId)}preview-content/sources/`)
+    }, 'themes.previewContentSources'),
+
+    importPreviewContent: wrapApiCall(async (themeId, sourceKind, sourceId) => {
+        return api.post(`${endpoints.themes.detail(themeId)}preview-content/import/`, {
+            sourceKind,
+            sourceId,
+        })
+    }, 'themes.importPreviewContent'),
 
     /**
      * Upload images to theme library
