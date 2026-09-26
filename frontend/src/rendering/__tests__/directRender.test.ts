@@ -27,33 +27,29 @@ describe('direct render URL', () => {
     })
 
     it('loads the saved page using the resolved tenant', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-            ok: true,
-            json: async () => ({
-                siteId: 85,
-                tenantIdentifier: 'summer-study',
-                pageId: 92,
-                versionId: 125,
-                slugPath: 'for-authors/review-process',
-            }),
-            text: async () => '',
-        }))
         clientApi.get
+            .mockResolvedValueOnce({
+                data: {
+                    siteId: 85,
+                    tenantIdentifier: 'summer-study',
+                    pageId: 92,
+                    versionId: 125,
+                    slugPath: 'for-authors/review-process',
+                },
+            })
             .mockResolvedValueOnce({ data: { id: 92, cachedRootHostnames: ['summerstudy.localhost'] } })
             .mockResolvedValueOnce({ data: { id: 125, codeLayout: 'main_layout', widgets: {} } })
             .mockResolvedValueOnce({ data: { slots: {} } })
 
         const model = await loadDirectRenderModel({ siteId: 85, slugPath: 'for-authors/review-process' })
 
-        expect(fetch).toHaveBeenCalledWith(
+        expect(clientApi.get).toHaveBeenNthCalledWith(
+            1,
             expect.stringContaining('site_id=85'),
-            expect.objectContaining({
-                credentials: 'include',
-                headers: expect.objectContaining({ 'X-Tenant-ID': 'summer-study' }),
-            }),
+            { headers: { 'X-Tenant-ID': 'summer-study' } },
         )
-        expect(clientApi.get).toHaveBeenCalledTimes(3)
-        clientApi.get.mock.calls.forEach(([, config]) => {
+        expect(clientApi.get).toHaveBeenCalledTimes(4)
+        clientApi.get.mock.calls.slice(1).forEach(([, config]) => {
             expect(config).toEqual({ headers: { 'X-Tenant-ID': 'summer-study' } })
         })
         expect(model.context).toMatchObject({
