@@ -593,6 +593,52 @@ class DesignerThemeApiTests(TestCase):
         self.assertFalse(restored.data["hasDraftChanges"])
         self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 0)
 
+    def test_undo_restores_published_preview_content(self):
+        original_preview = {
+            "views": [
+                {
+                    "id": "article-page",
+                    "label": "Article page",
+                    "kind": "page",
+                    "layout": "main_layout",
+                    "texts": {"group:0:element:h1": "Original headline"},
+                    "images": {},
+                }
+            ]
+        }
+        self.theme.designer_preview = original_preview
+        self.theme.save(update_fields=["designer_preview"])
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+
+        saved = self.client.patch(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/",
+            {
+                "viewId": "article-page",
+                "texts": {"group:0:element:h1": "Published headline"},
+                "draftVersion": workspace["draftVersion"],
+            },
+            format="json",
+        )
+        published = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/publish/",
+            {"draftVersion": saved.data["draftVersion"]},
+            format="json",
+        )
+        restored = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/undo/",
+            {
+                "draftVersion": published.data["draftVersion"],
+                "liveSyncVersion": published.data["liveSyncVersion"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(restored.status_code, 200, restored.data)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.designer_preview, original_preview)
+        self.assertEqual(restored.data["previewContent"]["views"][0]["texts"], original_preview["views"][0]["texts"])
+
     @patch("webpages.services.designer_theme.system_storage.delete")
     @patch("webpages.services.designer_theme.system_storage.exists", return_value=True)
     def test_discard_removes_unreferenced_immutable_draft_asset(self, _exists, delete):

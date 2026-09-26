@@ -405,8 +405,11 @@ const SemanticThemeWorkspace = ({
         setSavingPreview(true)
         try {
             let saved = previewContent
+            let savedWorkspace
             for (const view of previewContent.views) {
-                const response = await savePreviewContent(view.id, view.texts || {})
+                const response = await savePreviewContent(view.id, view.texts || {}, savedWorkspace)
+                if (!response) return
+                savedWorkspace = response
                 saved = response.previewContent || saved
             }
             setPreviewContent(saved)

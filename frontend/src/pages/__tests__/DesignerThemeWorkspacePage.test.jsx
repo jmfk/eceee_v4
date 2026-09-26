@@ -130,12 +130,16 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.save.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 3, hasDraftChanges: true })
         mocks.publish.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4 })
         mocks.undo.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4, canUndo: false })
-        mocks.savePreviewContent.mockImplementation(async (_themeId, viewId, texts) => ({
-            ...structuredClone(workspace),
-            draftVersion: 3,
-            hasDraftChanges: true,
-            previewContent: { views: previewViews.map((view) => view.id === viewId ? { ...view, texts } : view) },
-        }))
+        let savedPreviewViews = structuredClone(previewViews)
+        mocks.savePreviewContent.mockImplementation(async (_themeId, viewId, texts, draftVersion) => {
+            savedPreviewViews = savedPreviewViews.map((view) => view.id === viewId ? { ...view, texts } : view)
+            return {
+                ...structuredClone(workspace),
+                draftVersion: draftVersion + 1,
+                hasDraftChanges: true,
+                previewContent: { views: structuredClone(savedPreviewViews) },
+            }
+        })
         mocks.loadPreviewPage.mockResolvedValue({ page: { id: 42 }, version: { id: 9 }, inheritance: { slots: {} } })
         mocks.loadPreviewObject.mockResolvedValue({
             object: { id: 55, title: 'Welcome article' },
@@ -520,6 +524,7 @@ describe('DesignerThemeWorkspacePage', () => {
         fireEvent.change(screen.getByLabelText('Preview text'), { target: { value: 'A saved preview headline' } })
         fireEvent.click(screen.getByRole('button', { name: 'Save preview content' }))
         await waitFor(() => expect(mocks.savePreviewContent).toHaveBeenCalledWith('7', 'page-main', expect.objectContaining({ 'group:0:element:h1': 'A saved preview headline' }), 2))
+        await waitFor(() => expect(mocks.savePreviewContent).toHaveBeenCalledWith('7', 'object-card', {}, 3))
         expect(mocks.save).not.toHaveBeenCalled()
     })
 
