@@ -204,6 +204,7 @@ describe('ThemeEditor', () => {
         expect(screen.getByPlaceholderText('My Awesome Theme')).toHaveValue('Blue Theme')
         expect(screen.getByPlaceholderText('Brief description of this theme')).toHaveValue('A professional blue color scheme')
         expect(screen.getByRole('button', { name: /clear css cache/i })).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Open in Designer' })).toHaveAttribute('href', '/designer/themes/1')
     })
 
     it('offers cross-theme imports for an existing theme', async () => {

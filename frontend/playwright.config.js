@@ -5,7 +5,7 @@ const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:${PORT}`
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: ['auth-and-pages.regression.spec.js', 'page-editor.regression.spec.js'],
+  testMatch: ['auth-and-pages.regression.spec.js', 'page-editor.regression.spec.js', 'render-layer.visual.spec.ts'],
   timeout: 120_000,
   expect: {
     timeout: 5_000,
@@ -15,6 +15,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? [['html', { open: 'never' }], ['github']] : [['list'], ['html', { open: 'never' }]],
+  snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
   use: {
     baseURL: BASE_URL,
     trace: 'on-first-retry',

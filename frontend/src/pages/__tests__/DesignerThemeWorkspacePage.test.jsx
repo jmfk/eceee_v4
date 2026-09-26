@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithStateProviders } from '../../test/testUtils'
@@ -6,12 +7,13 @@ import DesignerThemeWorkspacePage from '../DesignerThemeWorkspacePage'
 
 const mocks = vi.hoisted(() => ({
     workspace: vi.fn(), preview: vi.fn(), save: vi.fn(), publish: vi.fn(), undo: vi.fn(), discard: vi.fn(),
-    replaceAsset: vi.fn(), createPlaceholder: vi.fn(), savePreviewContent: vi.fn(), replacePreviewImage: vi.fn(),
-    importPreviewFromSite: vi.fn(),
+    replaceAsset: vi.fn(), createPlaceholder: vi.fn(), savePreviewContent: vi.fn(),
+    loadPreviewPage: vi.fn(), loadPreviewObject: vi.fn(), buildResolvedRenderModel: vi.fn(),
     createExport: vi.fn(), getExport: vi.fn(), getExportDownload: vi.fn(),
 }))
 
 vi.mock('../../api/designerThemes', () => ({ designerThemesApi: mocks }))
+vi.mock('../../rendering/directRender', () => ({ buildResolvedRenderModel: mocks.buildResolvedRenderModel }))
 vi.mock('../../components/DesignerNavbar', () => ({ default: () => <div>Designer navigation</div> }))
 vi.mock('../../components/StatusBar', () => ({ default: ({ customStatusContent }) => <div>{customStatusContent}</div> }))
 vi.mock('react-router-dom', async () => {
@@ -25,7 +27,7 @@ const previewViews = [
 ]
 
 const workspace = {
-    id: 7, name: 'Editorial', syncVersion: 4, liveSyncVersion: 4, draftVersion: 2, hasDraftChanges: false,
+    id: 7, name: 'Editorial', description: 'Theme for editorial sites', syncVersion: 4, liveSyncVersion: 4, draftVersion: 2, hasDraftChanges: false,
     colors: [{ name: 'brand', value: '#123456', usage: ['Article / h1'] }],
     fonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap', usage: ['Article / h1'] }],
     typography: [{ targetId: 'group:0:element:h1', groupIndex: 0, groupName: 'Article', element: 'h1', values: { fontFamily: 'Inter', fontSize: '32px' } }],
@@ -34,8 +36,11 @@ const workspace = {
         { targetId: 'group:0:part:content-widget', scope: 'layout', groupIndex: 0, groupName: 'Article', part: 'content-widget', breakpoint: 'md', values: { padding: '24px' } },
     ],
     assets: [{
-        assetKey: 'preview', displayName: 'Theme preview', filename: 'theme-preview.png', url: 'https://storage.test/theme-preview.png',
+        assetKey: 'preview', displayName: 'Theme preview image', filename: 'theme-preview.png', url: 'https://storage.test/theme-preview.png',
         kind: 'preview', usage: ['Theme listing preview'], isPlaceholder: false, replaceable: true,
+    }, {
+        assetKey: 'site-icon', displayName: 'Site icon (favicon)', filename: null, url: null,
+        kind: 'site-icon', usage: ['Browser and application icon'], isPlaceholder: true, replaceable: true,
     }, {
         assetKey: 'design:0:hero:md:background', displayName: 'Article hero', kind: 'design-group', usage: ['Article / hero / md / background'],
         requiredWidth: 1600, requiredHeight: 900, requirementSource: 'explicit', dpr: 2, isPlaceholder: true, replaceable: true,
@@ -55,7 +60,27 @@ const workspace = {
     }],
     canUndo: true,
     breakpoints: { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 },
-    contentSources: [{ id: 12, label: 'conference.example', hostname: 'conference.example' }],
+    contentSources: [
+        { id: 12, label: 'conference.example', hostname: 'conference.example' },
+        { id: 13, label: 'Draft site', hostname: '' },
+    ],
+    contentPages: [{
+        id: 42, pageId: 42, pageTitle: 'Programme', label: 'conference.example — Programme',
+        siteId: 12, siteLabel: 'conference.example', tenantIdentifier: 'theme-tenant', slugPath: 'programme',
+        versionId: 9, versionStatus: 'published', layout: 'main_layout',
+    }, {
+        id: 43, pageId: 43, pageTitle: 'Draft programme', label: 'Draft site — Draft programme',
+        siteId: 13, siteLabel: 'Draft site', tenantIdentifier: 'theme-tenant', slugPath: 'draft-programme',
+        versionId: 10, versionStatus: 'draft', layout: 'main_layout',
+    }, {
+        id: 44, pageId: 44, pageTitle: 'Empty page', label: 'Draft site — Empty page',
+        siteId: 13, siteLabel: 'Draft site', tenantIdentifier: 'theme-tenant', slugPath: 'empty',
+        versionId: null, versionStatus: 'empty', layout: 'main_layout',
+    }],
+    contentObjects: [{
+        id: 55, objectId: 55, objectTitle: 'Welcome article', label: 'Article — Welcome article',
+        objectType: 'article', objectTypeLabel: 'Article', versionId: 15,
+    }],
     previewContent: { views: previewViews },
     catalog: {
         designGroups: [{
@@ -106,22 +131,33 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.publish.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4 })
         mocks.undo.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4, canUndo: false })
         mocks.savePreviewContent.mockImplementation(async (_themeId, viewId, texts) => ({
+            ...structuredClone(workspace),
+            draftVersion: 3,
+            hasDraftChanges: true,
             previewContent: { views: previewViews.map((view) => view.id === viewId ? { ...view, texts } : view) },
         }))
-        mocks.replacePreviewImage.mockResolvedValue({ previewContent: { views: previewViews } })
-        mocks.importPreviewFromSite.mockResolvedValue({
-            previewContent: { views: previewViews.map((view) => ({ ...view, texts: { 'group:0:element:h1': 'Site heading' }, sourceSiteId: 12 })) },
+        mocks.loadPreviewPage.mockResolvedValue({ page: { id: 42 }, version: { id: 9 }, inheritance: { slots: {} } })
+        mocks.loadPreviewObject.mockResolvedValue({
+            object: { id: 55, title: 'Welcome article' },
+            objectType: { key: 'article', label: 'Article', schema: {} },
+            version: { id: 15, data: { summary: 'Welcome' }, widgets: { main: [] } },
+        })
+        mocks.buildResolvedRenderModel.mockResolvedValue({
+            layout: 'main_layout',
+            slots: { main: [{ id: 'page-content', type: 'easy_widgets.ContentWidget', config: { content: '<h1>Programme</h1>' } }] },
+            context: { preview: true, tenantId: 'theme-tenant', pageId: 42, versionId: 9 },
         })
         vi.spyOn(window, 'confirm').mockReturnValue(true)
     })
 
-    it('renders real layout previews without exposing internal theme concepts', async () => {
+    it('uses the isolated React render frame without exposing internal theme concepts', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         expect(await screen.findByRole('heading', { name: 'Editorial' })).toBeInTheDocument()
         expect(screen.getByRole('navigation', { name: 'Designer views' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Article page' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Article card' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Theme images' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Theme details' })).toBeInTheDocument()
         expect(screen.queryByRole('heading', { name: 'What to show' })).not.toBeInTheDocument()
         expect(screen.queryByRole('heading', { name: 'Page elements' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Layout default' })).not.toBeInTheDocument()
@@ -130,32 +166,14 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByText('Preview context')).not.toBeInTheDocument()
         expect(screen.queryByText('Design groups')).not.toBeInTheDocument()
         expect(screen.queryByText('Component styles')).not.toBeInTheDocument()
-        expect(screen.getByTitle('Live theme preview')).toHaveAttribute('sandbox', 'allow-scripts')
-        await waitFor(() => {
-            const source = screen.getByTitle('Live theme preview').getAttribute('srcdoc')
-            const markup = source.split('<script>')[0]
-            expect(source).toContain('class="main-layout"')
-            expect(source).toContain('data-designer-target="group:0:element:h1"')
-            expect(source).toContain('widget-type-easy-widgets-contentwidget')
-            expect(source).toContain('widget-type-content')
-            expect(source).toContain('demo-part content-widget')
-            expect(markup).not.toContain('group:1:element:p')
-            expect(source).not.toContain('https://storage.test/theme-preview.png')
-            expect(source).not.toContain('class="feature-card"')
-            expect(source).toContain('outline:1px dashed rgba(100,116,139,.5)')
-            expect(source).toContain('.designer-spacing-margin{border:1px dashed rgba(217,119,6,.65)')
-            expect(source).toContain('.designer-spacing-padding{border:1px dashed rgba(8,145,178,.7)')
-            expect(source).toContain("addSpacingLabel(readout,'designer-spacing-margin-label','Margin:',own.margin)")
-            expect(source).toContain("addSpacingLabel(readout,'designer-spacing-padding-label','Padding:',own.padding)")
-            expect(source).toContain("'Container margin:',outer.margin")
-            expect(source).toContain("'Container padding:',outer.padding")
-            expect(source).toContain('function outermostSpacing(target)')
-            expect(source).toContain("document.addEventListener('mouseover'")
-            expect(source).not.toContain('.designer-selected::after')
-        })
+        expect(screen.queryByText('Page content image')).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Choose preview image' })).not.toBeInTheDocument()
+        expect(screen.getByTitle('Live theme preview')).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin')
+        expect(screen.getByTitle('Live theme preview')).toHaveAttribute('src', '/__render-frame')
+        expect(screen.getByTitle('Live theme preview')).not.toHaveAttribute('srcdoc')
     })
 
-    it('uses a matching published page as the default layout preview', async () => {
+    it('selects a matching source view but renders deterministic fixtures', async () => {
         const referenceWorkspace = structuredClone(workspace)
         const reference = '<div class="main-layout-container"><div class="slot-main"><div class="widget-type-easy-widgets-contentwidget"><h1>Published site heading</h1></div></div></div>'
         referenceWorkspace.previewContent.views[1].referenceHtml = reference
@@ -170,34 +188,128 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
 
         expect(screen.getByRole('button', { name: 'Article card' })).toHaveClass('text-blue-700')
-        const source = screen.getByTitle('Live theme preview').getAttribute('srcdoc')
-        expect(source).toContain('Published site heading')
-        expect(source).toContain('widget-type-easy-widgets-contentwidget')
-        expect(source).toContain("registerTarget(root,{id:group.id,kind:'group'")
-        expect(source).toContain("var id='preview:'+viewId+':text:'+index")
-        expect(source).toContain("var id='preview:'+viewId+':image:auto:'+index")
-        expect(source).toContain('function registerTarget(node,target)')
-        expect(source).toContain('[data-designer-target].designer-selected{outline:3px solid #2563eb')
-        expect(source).not.toContain('.designer-selected::after')
-        expect(source).toContain('.navbar-widget>div:last-child{display:flex!important;position:relative!important;justify-content:space-between!important')
+        expect(screen.getByTitle('Live theme preview')).toHaveAttribute('src', '/__render-frame')
+        expect(screen.getByTitle('Live theme preview')).not.toHaveAttribute('srcdoc')
     })
 
-    it('uses localized default content', async () => {
+    it('keeps deterministic fixtures independent of browser locale', async () => {
         document.documentElement.lang = 'sv-SE'
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const source = screen.getByTitle('Live theme preview').getAttribute('srcdoc')
-        expect(source).toContain('En rubrik med verklig längd')
-        expect(source).not.toContain('A heading with a realistic length')
+        expect(screen.getByTitle('Live theme preview')).toHaveAttribute('src', '/__render-frame')
+        expect(screen.getByTitle('Live theme preview')).not.toHaveAttribute('srcdoc')
     })
 
-    it('copies published content from a site using the theme into preview content', async () => {
+    it('searches theme demo pages and objects in a combobox', async () => {
+        const user = userEvent.setup()
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        expect(screen.getByLabelText('Demo content from site')).toHaveValue('12')
-        fireEvent.click(screen.getByRole('button', { name: 'Use site content' }))
-        await waitFor(() => expect(mocks.importPreviewFromSite).toHaveBeenCalledWith('7', 12))
-        expect(window.confirm).toHaveBeenCalledWith('Replace saved and unsaved preview content with published content from this site?')
+        const selector = screen.getByLabelText('Theme demo page or object')
+        await user.click(selector)
+        await user.clear(selector)
+        await user.type(selector, 'Article card')
+        await user.click(await screen.findByRole('option', { name: /Article card/ }))
+
+        await waitFor(() => expect(selector).toHaveValue('Article card'))
+        expect(screen.getByRole('button', { name: 'Article card' })).toHaveClass('text-blue-700')
+    })
+
+    it('can preview a specific page from this tenant independently of its theme', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'content' } })
+        expect(screen.getByLabelText('Page or object from your sites')).toHaveValue('conference.example — Programme')
+        await waitFor(() => expect(mocks.loadPreviewPage).toHaveBeenCalledWith('7', 42))
+        expect(mocks.buildResolvedRenderModel).toHaveBeenCalledWith({
+            resolved: expect.objectContaining(workspace.contentPages[0]),
+            page: { id: 42 },
+            version: { id: 9 },
+            rawInheritance: { slots: {} },
+        })
+        expect(screen.getByRole('button', { name: 'Programme' })).toBeInTheDocument()
+        expect(screen.getByText('The selected content is read-only; theme styling remains editable.')).toBeInTheDocument()
+    })
+
+    it('searches pages from every site and excludes pages without content', async () => {
+        const user = userEvent.setup()
+        mocks.loadPreviewPage.mockImplementation(async (_themeId, pageId) => ({
+            page: { id: pageId },
+            version: { id: pageId === 43 ? 10 : 9 },
+            inheritance: { slots: {} },
+        }))
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'content' } })
+
+        expect(screen.queryByText(/tenant/i)).not.toBeInTheDocument()
+        const selector = screen.getByLabelText('Page or object from your sites')
+        await waitFor(() => expect(selector).not.toBeDisabled())
+        await user.click(selector)
+        await user.clear(selector)
+        await user.type(selector, 'Draft programme')
+        await user.click(await screen.findByRole('option', { name: /Draft site — Draft programme/ }))
+        await waitFor(() => expect(selector).toHaveValue('Draft site — Draft programme'))
+        await waitFor(() => expect(selector).not.toBeDisabled())
+        await user.clear(selector)
+        await user.type(selector, 'Empty page')
+        expect(screen.queryByRole('option', { name: /Empty page/ })).not.toBeInTheDocument()
+        await waitFor(() => expect(mocks.loadPreviewPage).toHaveBeenCalledWith('7', 43))
+    })
+
+    it('searches and previews objects in the same content combobox', async () => {
+        const user = userEvent.setup()
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'content' } })
+        const selector = screen.getByLabelText('Page or object from your sites')
+        await waitFor(() => expect(selector).not.toBeDisabled())
+        await user.click(selector)
+        await user.clear(selector)
+        await user.type(selector, 'Welcome article')
+        await user.click(await screen.findByRole('option', { name: /Article — Welcome article/ }))
+
+        await waitFor(() => expect(mocks.loadPreviewObject).toHaveBeenCalledWith('7', 55))
+        expect(screen.getByRole('button', { name: 'Welcome article' })).toBeInTheDocument()
+    })
+
+    it('shows no preview when there are no pages or objects with content', async () => {
+        const emptyWorkspace = structuredClone(workspace)
+        emptyWorkspace.previewContent.views = []
+        emptyWorkspace.catalog.previewViews = []
+        emptyWorkspace.contentPages = emptyWorkspace.contentPages.filter((page) => !page.versionId)
+        emptyWorkspace.contentObjects = []
+        mocks.workspace.mockResolvedValue(emptyWorkspace)
+
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+
+        expect(screen.getByLabelText('Source')).toHaveValue('none')
+        expect(screen.getByRole('option', { name: 'No preview content' })).toBeInTheDocument()
+        expect(screen.getAllByText('There is no page or object to preview.')).toHaveLength(2)
+        expect(screen.queryByTitle('Live theme preview')).not.toBeInTheDocument()
+    })
+
+    it('toggles Designer support guides without changing the content source', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-frame', action: 'ready' },
+            source: iframe.contentWindow,
+        }))
+
+        expect(screen.getByRole('button', { name: 'Hide guides' })).toHaveAttribute('aria-pressed', 'true')
+        fireEvent.click(screen.getByRole('button', { name: 'Hide guides' }))
+        expect(screen.getByRole('button', { name: 'Show guides' })).toHaveAttribute('aria-pressed', 'false')
+        await waitFor(() => expect(postMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+                source: 'eceee-render-host',
+                action: 'render',
+                model: expect.objectContaining({ designer: expect.objectContaining({ guidesEnabled: false }) }),
+            }),
+            '*',
+        ))
     })
 
     it('shows only relevant values after clicking a visible element', async () => {
@@ -210,7 +322,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByDisplayValue('16px')).toBeInTheDocument()
         expect(screen.getByLabelText('brand value')).toBeInTheDocument()
         expect(screen.queryByRole('heading', { name: 'Choose what to edit' })).not.toBeInTheDocument()
-        expect(screen.getByRole('heading', { name: 'Preview content' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Preview content source' })).toBeInTheDocument()
 
         const accordion = screen.getByRole('button', { name: 'Collapse Heading 1 settings' })
         expect(accordion).toHaveAttribute('aria-expanded', 'true')
@@ -225,7 +337,47 @@ describe('DesignerThemeWorkspacePage', () => {
         }))
         expect(screen.getByRole('heading', { name: 'Heading 1' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Expand Heading 1 settings' })).toHaveAttribute('aria-expanded', 'false')
-        expect(screen.getByRole('heading', { name: 'Preview content' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Preview content source' })).toBeInTheDocument()
+    })
+
+    it('hides defaults until added and restores the rendered theme default when an override is removed', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:h1', kind: 'element', label: 'Heading 1', text: 'Heading',
+                computedStyles: { fontSize: '18px', padding: '10px' },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(screen.queryByLabelText('Inner spacing')).not.toBeInTheDocument()
+        fireEvent.change(screen.getByLabelText('Add theme value'), { target: { value: 'spacing:0:padding' } })
+        expect(screen.getByLabelText('Inner spacing')).toHaveValue('10px')
+        expect(screen.getByText('Theme default')).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Remove Size' }))
+        expect(window.confirm).toHaveBeenCalledWith('Remove Size? It will use the current theme default instead.')
+        expect(screen.getByLabelText('Size')).toHaveValue('18px')
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
+        expect(mocks.save.mock.calls[0][1].typography[0].values.fontSize).toBe('')
+    })
+
+    it('hides typography and spacing groups that contain only defaults', async () => {
+        const defaultOnlyWorkspace = structuredClone(workspace)
+        defaultOnlyWorkspace.typography[0].values = { fontFamily: '', fontSize: '' }
+        defaultOnlyWorkspace.spacing[0].values = { marginBottom: '', padding: '' }
+        mocks.workspace.mockResolvedValue(defaultOnlyWorkspace)
+
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        await selectHeading()
+
+        expect(screen.queryByRole('heading', { name: /Typography/ })).not.toBeInTheDocument()
+        expect(screen.queryByRole('heading', { name: /^Spacing/ })).not.toBeInTheDocument()
+        expect(screen.getByLabelText('Add theme value')).toBeInTheDocument()
     })
 
     it('offers nested elements as alternatives when they share the clicked area', async () => {
@@ -255,9 +407,16 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByText('These elements share the same area.')).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Link' })).toHaveAttribute('aria-pressed', 'true')
         expect(screen.getByRole('button', { name: 'List item' })).toBeInTheDocument()
+        const iframe = screen.getByTitle('Live theme preview')
+        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
         fireEvent.click(screen.getByRole('button', { name: 'Bullet list' }))
         expect(screen.getByRole('heading', { name: 'Bullet list' })).toBeInTheDocument()
         expect(screen.queryByLabelText('Preview text')).not.toBeInTheDocument()
+        expect(postMessage).toHaveBeenCalledWith({
+            source: 'eceee-render-host',
+            action: 'selectTarget',
+            targetId: 'group:0:element:ul',
+        }, '*')
     })
 
     it('shows theme properties without mixing image replacement into element editing', async () => {
@@ -300,6 +459,33 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByText('Shown at every screen width.')).toBeInTheDocument()
     })
 
+    it('edits theme identity and uploads preview and favicon images from Theme details', async () => {
+        mocks.replaceAsset.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 4, hasDraftChanges: true })
+        const user = userEvent.setup()
+        const { container } = renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+
+        await user.click(screen.getByRole('button', { name: 'Theme details' }))
+        expect(screen.getByRole('heading', { name: 'Theme details' })).toBeInTheDocument()
+        const nameInput = screen.getByRole('textbox', { name: /^Name/ })
+        await user.clear(nameInput)
+        await user.type(nameInput, 'Editorial 2027')
+        await user.clear(screen.getByLabelText('Description'))
+        await user.type(screen.getByLabelText('Description'), 'A renewed editorial theme')
+        expect(screen.getByRole('heading', { level: 1, name: 'Editorial 2027' })).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalledWith('7', expect.objectContaining({
+            name: 'Editorial 2027',
+            description: 'A renewed editorial theme',
+        })))
+
+        const favicon = new File(['icon'], 'favicon.png', { type: 'image/png' })
+        const fileInputs = container.querySelectorAll('input[type="file"]')
+        fireEvent.change(fileInputs[1], { target: { files: [favicon] } })
+        await waitFor(() => expect(mocks.replaceAsset).toHaveBeenCalledWith('7', 'site-icon', favicon, 3))
+    })
+
     it('keeps the preview visible and shows the responsive image family in the left panel', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
@@ -327,33 +513,14 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByText('Used for theme size: SM.')).toBeInTheDocument()
     })
 
-    it('saves edited demo text as preview content without changing the theme draft', async () => {
+    it('saves edited demo text in the theme draft', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         await selectHeading()
         fireEvent.change(screen.getByLabelText('Preview text'), { target: { value: 'A saved preview headline' } })
         fireEvent.click(screen.getByRole('button', { name: 'Save preview content' }))
-        await waitFor(() => expect(mocks.savePreviewContent).toHaveBeenCalledWith('7', 'page-main', expect.objectContaining({ 'group:0:element:h1': 'A saved preview headline' })))
+        await waitFor(() => expect(mocks.savePreviewContent).toHaveBeenCalledWith('7', 'page-main', expect.objectContaining({ 'group:0:element:h1': 'A saved preview headline' }), 2))
         expect(mocks.save).not.toHaveBeenCalled()
-    })
-
-    it('stages a content image locally and uploads it only when preview content is saved', async () => {
-        const { container } = renderWithStateProviders(<DesignerThemeWorkspacePage />)
-        await screen.findByRole('heading', { name: 'Editorial' })
-        await waitFor(() => {
-            const iframe = screen.getByTitle('Live theme preview')
-            fireEvent(window, new MessageEvent('message', {
-                data: { source: 'eceee-designer-preview', action: 'select', targetId: 'preview:page-main:image:main', kind: 'previewImage', label: 'Demo content image' },
-                source: iframe.contentWindow,
-            }))
-            expect(screen.getByRole('button', { name: 'Choose preview image' })).toBeInTheDocument()
-        })
-        const image = new File(['image'], 'content.png', { type: 'image/png' })
-        fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [image] } })
-        await waitFor(() => expect(screen.getByRole('button', { name: 'Save preview content' })).toBeInTheDocument())
-        expect(mocks.replacePreviewImage).not.toHaveBeenCalled()
-        fireEvent.click(screen.getByRole('button', { name: 'Save preview content' }))
-        await waitFor(() => expect(mocks.replacePreviewImage).toHaveBeenCalledWith('7', 'page-main', 'preview:page-main:image:main', image))
     })
 
     it('saves a theme draft and publishes only after confirmation', async () => {
@@ -364,7 +531,7 @@ describe('DesignerThemeWorkspacePage', () => {
         await waitFor(() => expect(mocks.preview).toHaveBeenLastCalledWith('7', expect.objectContaining({ typography: expect.any(Array) })), { timeout: 1500 })
         fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
         await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
-        expect(Object.keys(mocks.save.mock.calls[0][1]).sort()).toEqual(['colors', 'draftVersion', 'fonts', 'spacing', 'typography'])
+        expect(Object.keys(mocks.save.mock.calls[0][1]).sort()).toEqual(['colors', 'description', 'draftVersion', 'fonts', 'name', 'spacing', 'typography'])
         fireEvent.click(screen.getByRole('button', { name: /publish changes/i }))
         await waitFor(() => expect(mocks.publish).toHaveBeenCalledWith('7', 3))
     })
@@ -406,6 +573,6 @@ describe('DesignerThemeWorkspacePage', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Preview', exact: true }))
         expect(screen.getByTitle('Live theme preview').closest('section')).toHaveClass('flex')
         fireEvent.click(screen.getByRole('button', { name: 'Edit', exact: true }))
-        expect(screen.getByRole('heading', { name: 'Preview content' }).closest('fieldset')?.parentElement).toHaveClass('flex')
+        expect(screen.getByRole('heading', { name: 'Preview content source' }).closest('fieldset')?.parentElement).toHaveClass('flex')
     })
 })

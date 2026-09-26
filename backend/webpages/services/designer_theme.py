@@ -18,6 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 from rest_framework.exceptions import ValidationError
 
 from file_manager.storage import system_storage
+from object_storage.models import ObjectInstance
 from webpages.models import (
     PageTheme,
     ThemeDesignerAssignment,
@@ -228,7 +229,7 @@ def _render_layout_preview_template(layout):
 
 
 def normalized_designer_preview(theme, layouts=None):
-    """Return editable preview view metadata, generating page views when a theme has none."""
+    """Return only explicitly saved Designer preview documents."""
     if layouts is None:
         from webpages.layout_autodiscovery import autodiscover_layouts
         from webpages.layout_registry import layout_registry
@@ -258,22 +259,7 @@ def normalized_designer_preview(theme, layouts=None):
                 "images": view.get("images") if isinstance(view.get("images"), dict) else {},
             }
         )
-    if views:
-        return {**preview_config, "views": views}
-    return {
-        **preview_config,
-        "views": [
-            {
-                "id": f"page-{layout.name}",
-                "label": _humanize_identifier(layout.name),
-                "kind": "page",
-                "layout": layout.name,
-                "texts": {},
-                "images": {},
-            }
-            for layout in layouts
-        ],
-    }
+    return {**preview_config, "views": views}
 
 
 def build_designer_catalog(theme, assets):
@@ -401,26 +387,14 @@ def designer_theme_queryset(user, tenant):
 
 
 def designer_content_sources(theme):
-    """List tenant-local site roots whose published pages use this theme."""
-    roots = list(
-        WebPage.objects.filter(tenant=theme.tenant, parent__isnull=True, is_deleted=False)
-        .select_related("current_published_version__theme")
-        .order_by("title", "id")
-    )
-    direct_pages = WebPage.objects.filter(
+    """List every non-deleted site root in the theme's tenant."""
+    roots = WebPage.objects.filter(
         tenant=theme.tenant,
+        parent__isnull=True,
         is_deleted=False,
-        current_published_version__theme=theme,
-    ).only("id", "parent_id", "cached_root_id")
-    direct_root_ids = {
-        page.id if page.parent_id is None else page.cached_root_id or page.get_root_page().id for page in direct_pages
-    }
+    ).order_by("title", "id")
     sources = []
     for root in roots:
-        root_theme_id = root.current_published_version.theme_id if root.current_published_version else None
-        uses_default = theme.is_default and root_theme_id is None
-        if root.id not in direct_root_ids and root_theme_id != theme.id and not uses_default:
-            continue
         hostname = next((value for value in (root.hostnames or []) if value not in {"*", "default"}), "")
         sources.append(
             {
@@ -430,6 +404,97 @@ def designer_content_sources(theme):
             }
         )
     return sources
+
+
+def designer_preview_version(page):
+    """Prefer the latest administrative content, then fall back to the live version."""
+    return page.latest_version or page.current_published_version
+
+
+def designer_preview_layout(page, version=None, pages_by_id=None):
+    """Resolve the selected page's own or inherited layout without requiring publication."""
+    current = page
+    current_version = version
+    visited = set()
+    while current and current.id not in visited:
+        visited.add(current.id)
+        current_version = current_version or designer_preview_version(current)
+        if current_version and current_version.code_layout:
+            return current_version.code_layout
+        if not current.parent_id:
+            break
+        current = pages_by_id.get(current.parent_id) if pages_by_id else current.parent
+        current_version = None
+    return "main_layout"
+
+
+def designer_page_sources(theme):
+    """List every non-deleted page in this tenant as a Designer content source."""
+    roots = {
+        page.id: page
+        for page in WebPage.objects.filter(
+            tenant=theme.tenant,
+            parent__isnull=True,
+            is_deleted=False,
+        ).order_by("title", "id")
+    }
+    pages_query = WebPage.objects.filter(
+        tenant=theme.tenant,
+        is_deleted=False,
+    )
+    pages = list(
+        pages_query.select_related("current_published_version", "latest_version", "parent").order_by(
+            "cached_root_id", "cached_path", "sort_order", "id"
+        )
+    )
+    pages_by_id = {page.id: page for page in pages}
+    sources = []
+    for page in pages:
+        root_id = page.id if page.parent_id is None else page.cached_root_id
+        root = roots.get(root_id)
+        if root is None:
+            root = page.get_root_page()
+            roots[root.id] = root
+        hostname = next((value for value in (root.hostnames or []) if value not in {"*", "default"}), "")
+        site_label = hostname or root.title or f"Site {root.id}"
+        version = designer_preview_version(page)
+        version_status = "published" if version and version.id == page.current_published_version_id else "draft"
+        sources.append(
+            {
+                "id": page.id,
+                "pageId": page.id,
+                "label": f"{site_label} — {page.title or page.slug or f'Page {page.id}'}",
+                "pageTitle": page.title or page.slug or f"Page {page.id}",
+                "siteId": root.id,
+                "siteLabel": site_label,
+                "tenantIdentifier": theme.tenant.identifier,
+                "slugPath": (page.cached_path or page.get_absolute_url() or "").strip("/"),
+                "versionId": version.id if version else None,
+                "versionStatus": version_status if version else "empty",
+                "layout": designer_preview_layout(page, version, pages_by_id),
+            }
+        )
+    return sources
+
+
+def designer_object_sources(theme):
+    """List tenant objects that have a version available for Designer preview."""
+    return [
+        {
+            "id": instance.id,
+            "objectId": instance.id,
+            "objectTitle": instance.title,
+            "label": f"{instance.object_type.label} — {instance.title}",
+            "objectType": instance.object_type.name,
+            "objectTypeLabel": instance.object_type.label,
+            "versionId": instance.current_version_id,
+        }
+        for instance in (
+            ObjectInstance.objects.filter(tenant=theme.tenant, current_version_id__isnull=False)
+            .select_related("object_type")
+            .order_by("object_type__label", "title", "id")
+        )
+    ]
 
 
 def _safe_reference_preview_html(rendered_html):
@@ -499,7 +564,7 @@ def _designer_reference_previews(theme, views):
     enriched = []
     has_configured_homepage = any(view.get("isSourceHomepage") and view.get("referenceHtml") for view in views)
     for view in views:
-        if view.get("referenceHtml"):
+        if isinstance(view.get("content"), dict) or view.get("referenceHtml"):
             enriched.append(view)
             continue
         page = pages_by_layout.get(view.get("layout"))
@@ -571,12 +636,19 @@ def _preview_primary_slot(catalog, layout_name):
     )
 
 
-def import_designer_preview_from_site(theme_id, tenant, user, source_site_id):
+def import_designer_preview_from_site(theme_id, tenant, user, source_site_id, draft_version):
     """Replace saved preview content with public content from a site using the theme."""
     with transaction.atomic():
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
         if not user_can_design_theme(user, theme):
             raise PermissionError
+        draft = get_or_create_designer_draft(theme, user)
+        draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
+        if draft.base_sync_version != theme.sync_version:
+            raise DesignerDraftConflict("The live theme changed after this draft was started.")
+        if draft.version != _integer(draft_version, "draftVersion"):
+            raise DesignerDraftConflict("The Designer draft changed after you opened it.")
+        draft_theme = theme_from_designer_draft(theme, draft)
         sources = designer_content_sources(theme)
         allowed_source_ids = {source["id"] for source in sources}
         try:
@@ -606,10 +678,27 @@ def import_designer_preview_from_site(theme_id, tenant, user, source_site_id):
         if not pages:
             raise ValidationError("That site has no published content using this theme.")
 
-        catalog = build_designer_catalog(theme, collect_designer_assets(theme))
-        preview = normalized_designer_preview(theme)
+        catalog = build_designer_catalog(draft_theme, collect_designer_assets(draft_theme))
+        preview = normalized_designer_preview(draft_theme)
         targets = [element for group in catalog["designGroups"] for element in group.get("elements", [])]
         fallback_page = pages[0]
+        if not preview["views"]:
+            pages_by_layout = {}
+            for page in pages:
+                layout = page.current_published_version.code_layout
+                if layout:
+                    pages_by_layout.setdefault(layout, page)
+            preview["views"] = [
+                {
+                    "id": f"imported-page-{page.id}",
+                    "label": page.title or page.slug or f"Page {page.id}",
+                    "kind": "page",
+                    "layout": layout,
+                    "texts": {},
+                    "images": {},
+                }
+                for layout, page in pages_by_layout.items()
+            ]
         for view in preview["views"]:
             page = next(
                 (candidate for candidate in pages if candidate.current_published_version.code_layout == view["layout"]),
@@ -636,16 +725,23 @@ def import_designer_preview_from_site(theme_id, tenant, user, source_site_id):
 
         preview["sourceSiteId"] = root.id
         preview["sourceSiteLabel"] = next(source["label"] for source in sources if source["id"] == root.id)
-        theme.designer_preview = preview
-        theme.save(update_fields=["designer_preview", "updated_at"], skip_version_increment=True)
-        return preview
+        draft_theme.designer_preview = preview
+        draft.snapshot = theme_designer_snapshot(draft_theme)
+        draft.version += 1
+        draft.has_changes = True
+        draft.updated_by = user
+        draft.save(update_fields=["snapshot", "version", "has_changes", "updated_by", "updated_at"])
+        return theme, draft
 
 
 def theme_designer_snapshot(theme):
     return {
+        "name": theme.name,
+        "description": theme.description,
         "colors": copy.deepcopy(theme.colors),
         "fonts": copy.deepcopy(theme.fonts),
         "design_groups": copy.deepcopy(theme.design_groups),
+        "designer_preview": copy.deepcopy(theme.designer_preview),
         "image": theme.image.name if theme.image else None,
         "site_icon": theme.site_icon.name if theme.site_icon else None,
     }
@@ -709,9 +805,12 @@ def _cleanup_designer_assets_after_commit(theme_id, snapshots):
 
 
 def apply_designer_snapshot(theme, snapshot):
+    theme.name = snapshot.get("name", theme.name)
+    theme.description = snapshot.get("description", theme.description)
     theme.colors = copy.deepcopy(snapshot.get("colors", {}))
     theme.fonts = copy.deepcopy(snapshot.get("fonts", {}))
     theme.design_groups = copy.deepcopy(snapshot.get("design_groups", {}))
+    theme.designer_preview = copy.deepcopy(snapshot.get("designer_preview", theme.designer_preview))
     theme.image.name = snapshot.get("image") or ""
     theme.site_icon.name = snapshot.get("site_icon") or ""
     return theme
@@ -723,7 +822,7 @@ def theme_from_designer_draft(theme, draft):
 
 
 def get_or_create_designer_draft(theme, user):
-    draft, _ = ThemeDesignerDraft.objects.get_or_create(
+    draft, created = ThemeDesignerDraft.objects.get_or_create(
         theme=theme,
         defaults={
             "created_by": user,
@@ -732,6 +831,20 @@ def get_or_create_designer_draft(theme, user):
             "snapshot": theme_designer_snapshot(theme),
         },
     )
+    if not created and not draft.has_changes and draft.base_sync_version != theme.sync_version:
+        draft.snapshot = theme_designer_snapshot(theme)
+        draft.base_sync_version = theme.sync_version
+        draft.version += 1
+        draft.updated_by = user
+        draft.save(
+            update_fields=[
+                "snapshot",
+                "base_sync_version",
+                "version",
+                "updated_by",
+                "updated_at",
+            ]
+        )
     return draft
 
 
@@ -822,38 +935,36 @@ def collect_designer_assets(theme: PageTheme):
     referenced_filenames = set()
     library_filenames = set(theme.list_library_images())
 
-    if theme.image:
-        width, height = _field_dimensions(theme.image)
-        assets.append(
-            {
-                "assetKey": "preview",
-                "displayName": "Theme preview",
-                "filename": os.path.basename(theme.image.name),
-                "url": theme.image.url,
-                "usage": ["Theme listing preview"],
-                "kind": "preview",
-                "replaceable": True,
-                "isPlaceholder": False,
-                "width": width,
-                "height": height,
-            }
-        )
-    if theme.site_icon:
-        width, height = _field_dimensions(theme.site_icon)
-        assets.append(
-            {
-                "assetKey": "site-icon",
-                "displayName": "Site icon",
-                "filename": os.path.basename(theme.site_icon.name),
-                "url": theme.site_icon.url,
-                "usage": ["Browser and application icon"],
-                "kind": "site-icon",
-                "replaceable": True,
-                "isPlaceholder": False,
-                "width": width,
-                "height": height,
-            }
-        )
+    width, height = _field_dimensions(theme.image) if theme.image else (None, None)
+    assets.append(
+        {
+            "assetKey": "preview",
+            "displayName": "Theme preview image",
+            "filename": os.path.basename(theme.image.name) if theme.image else None,
+            "url": theme.image.url if theme.image else None,
+            "usage": ["Theme listing preview"],
+            "kind": "preview",
+            "replaceable": True,
+            "isPlaceholder": not bool(theme.image),
+            "width": width,
+            "height": height,
+        }
+    )
+    width, height = _field_dimensions(theme.site_icon) if theme.site_icon else (None, None)
+    assets.append(
+        {
+            "assetKey": "site-icon",
+            "displayName": "Site icon (favicon)",
+            "filename": os.path.basename(theme.site_icon.name) if theme.site_icon else None,
+            "url": theme.site_icon.url if theme.site_icon else None,
+            "usage": ["Browser and application icon"],
+            "kind": "site-icon",
+            "replaceable": True,
+            "isPlaceholder": not bool(theme.site_icon),
+            "width": width,
+            "height": height,
+        }
+    )
 
     groups = (theme.design_groups or {}).get("groups", [])
     breakpoints = theme.get_breakpoints()
@@ -1031,6 +1142,7 @@ def build_workspace(theme: PageTheme):
     return {
         "id": theme.id,
         "name": theme.name,
+        "description": theme.description,
         "syncVersion": theme.sync_version,
         "colors": colors,
         "fonts": fonts,
@@ -1041,6 +1153,8 @@ def build_workspace(theme: PageTheme):
         "catalog": catalog,
         "previewContent": {"views": catalog["previewViews"]},
         "contentSources": designer_content_sources(theme),
+        "contentPages": designer_page_sources(theme),
+        "contentObjects": designer_object_sources(theme),
         "canUndo": theme.designer_revisions.exists(),
         "constraints": {
             "editableTypographyProperties": sorted(TYPE_PROPERTIES),
@@ -1055,13 +1169,7 @@ def create_revision(theme, user, summary):
         theme=theme,
         created_by=user,
         summary=summary,
-        snapshot={
-            "colors": copy.deepcopy(theme.colors),
-            "fonts": copy.deepcopy(theme.fonts),
-            "design_groups": copy.deepcopy(theme.design_groups),
-            "image": theme.image.name if theme.image else None,
-            "site_icon": theme.site_icon.name if theme.site_icon else None,
-        },
+        snapshot=theme_designer_snapshot(theme),
     )
     old_ids = list(theme.designer_revisions.values_list("id", flat=True)[REVISION_LIMIT:])
     if old_ids:
@@ -1090,12 +1198,32 @@ def _integer(value, field_name):
 def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=True):
     if not isinstance(payload, dict):
         raise ValidationError("Designer patch must be an object.")
-    allowed_top = {"sync_version", "colors", "fonts", "typography", "spacing"}
+    allowed_top = {"sync_version", "name", "description", "colors", "fonts", "typography", "spacing"}
     unknown = set(payload) - allowed_top
     if unknown:
         raise ValidationError(f"Unsupported designer fields: {', '.join(sorted(unknown))}")
     if validate_version and _integer(payload.get("sync_version", -1), "syncVersion") != theme.sync_version:
         raise ValueError("stale")
+
+    if "name" in payload:
+        if not isinstance(payload["name"], str):
+            raise ValidationError("Theme name must be text.")
+        name = payload["name"].strip()
+        if not name:
+            raise ValidationError("Theme name is required.")
+        if len(name) > 255:
+            raise ValidationError("Theme name cannot exceed 255 characters.")
+        if PageTheme.objects.filter(tenant=theme.tenant, name=name).exclude(pk=theme.pk).exists():
+            raise ValidationError("A theme with this name already exists.")
+        theme.name = name
+
+    if "description" in payload:
+        if not isinstance(payload["description"], str):
+            raise ValidationError("Theme description must be text.")
+        description = payload["description"]
+        if len(description) > 10000:
+            raise ValidationError("Theme description cannot exceed 10,000 characters.")
+        theme.description = description
 
     if "colors" in payload:
         colors = payload["colors"]
@@ -1245,12 +1373,17 @@ def publish_designer_draft(theme_id, tenant, user, draft_version):
 
         create_revision(theme, user, "Publish Designer draft")
         apply_designer_snapshot(theme, draft.snapshot)
+        if PageTheme.objects.filter(tenant=theme.tenant, name=theme.name).exclude(pk=theme.pk).exists():
+            raise DesignerDraftConflict("Another theme now uses this name. Choose a different name before publishing.")
         theme.sync_source = "web"
         theme.save(
             update_fields=[
+                "name",
+                "description",
                 "colors",
                 "fonts",
                 "design_groups",
+                "designer_preview",
                 "image",
                 "site_icon",
                 "sync_source",
@@ -1303,6 +1436,8 @@ def undo_designer_publish(theme_id, tenant, user, draft_version, live_sync_versi
         theme.sync_source = "web"
         theme.save(
             update_fields=[
+                "name",
+                "description",
                 "colors",
                 "fonts",
                 "design_groups",
@@ -1419,7 +1554,7 @@ def validate_image_upload(upload):
         raise ValidationError("The uploaded file is not a valid image.") from exc
 
 
-def save_designer_preview_texts(theme_id, tenant, user, view_id, texts):
+def save_designer_preview_texts(theme_id, tenant, user, view_id, texts, draft_version):
     if not isinstance(texts, dict) or len(texts) > 200:
         raise ValidationError("Preview text must be an object with at most 200 entries.")
     cleaned = {}
@@ -1434,60 +1569,25 @@ def save_designer_preview_texts(theme_id, tenant, user, view_id, texts):
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
         if not user_can_design_theme(user, theme):
             raise PermissionError
-        preview = normalized_designer_preview(theme)
+        draft = get_or_create_designer_draft(theme, user)
+        draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
+        if draft.base_sync_version != theme.sync_version:
+            raise DesignerDraftConflict("The live theme changed after this draft was started.")
+        if draft.version != _integer(draft_version, "draftVersion"):
+            raise DesignerDraftConflict("The Designer draft changed after you opened it.")
+        draft_theme = theme_from_designer_draft(theme, draft)
+        preview = normalized_designer_preview(draft_theme)
         view = next((item for item in preview["views"] if item["id"] == view_id), None)
         if not view:
             raise ValidationError("Unknown preview view.")
         view["texts"] = cleaned
-        theme.designer_preview = preview
-        theme.save(update_fields=["designer_preview", "updated_at"], skip_version_increment=True)
-        return preview
-
-
-def replace_designer_preview_image(theme_id, tenant, user, view_id, target_id, upload):
-    if not isinstance(target_id, str) or not target_id or len(target_id) > 300:
-        raise ValidationError("Invalid preview image target.")
-    content, dimensions = validate_image_upload(upload)
-    extension = {
-        "image/jpeg": ".jpg",
-        "image/png": ".png",
-        "image/gif": ".gif",
-        "image/webp": ".webp",
-        "image/svg+xml": ".svg",
-    }[upload.content_type]
-
-    previous_path = None
-    with transaction.atomic():
-        theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
-        if not user_can_design_theme(user, theme):
-            raise PermissionError
-        preview = normalized_designer_preview(theme)
-        view = next((item for item in preview["views"] if item["id"] == view_id), None)
-        if not view:
-            raise ValidationError("Unknown preview view.")
-        previous = view["images"].get(target_id)
-        if isinstance(previous, dict):
-            previous_path = previous.get("storagePath")
-        filename = f"{slugify(os.path.splitext(upload.name)[0]) or 'preview'}-{uuid.uuid4().hex[:12]}{extension}"
-        path = f"theme_images/{theme.id}/designer_preview/{filename}"
-        saved_path = system_storage.save(path, ContentFile(content))
-        view["images"][target_id] = {
-            "url": system_storage.url(saved_path),
-            "storagePath": saved_path,
-            "filename": upload.name,
-            "width": dimensions[0],
-            "height": dimensions[1],
-        }
-        theme.designer_preview = preview
-        theme.save(update_fields=["designer_preview", "updated_at"], skip_version_increment=True)
-
-    if previous_path and previous_path != saved_path:
-        try:
-            if system_storage.exists(previous_path):
-                system_storage.delete(previous_path)
-        except Exception:
-            logger.warning("Could not remove replaced Designer preview image %s", previous_path, exc_info=True)
-    return preview
+        draft_theme.designer_preview = preview
+        draft.snapshot = theme_designer_snapshot(draft_theme)
+        draft.version += 1
+        draft.has_changes = True
+        draft.updated_by = user
+        draft.save(update_fields=["snapshot", "version", "has_changes", "updated_by", "updated_at"])
+        return theme, draft
 
 
 def _find_asset(theme, asset_key):
