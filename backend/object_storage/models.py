@@ -10,20 +10,18 @@ This system complements the hierarchical page system by providing flexible,
 database-driven object types for content like news, blogs, events, etc.
 """
 
-from django.db import models, transaction
-from django.db.models import Case, When, F
 from django.contrib.auth.models import User
-from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
-from django.utils import timezone
-from django.urls import reverse
 from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import Case, When
+from django.utils import timezone
 from django.utils.text import slugify
 from mptt.models import MPTTModel, TreeForeignKey
-import json
-from utils.schema_system import validate_schema, get_field_types_for_django_choices
+
 from content.models import Namespace
 from file_manager.storage import system_storage
+from utils.schema_system import get_field_types_for_django_choices, validate_schema
 
 
 class ObjectTypeDefinition(models.Model):
@@ -42,15 +40,9 @@ class ObjectTypeDefinition(models.Model):
         unique=True,
         help_text="Unique identifier for the object type (e.g., 'news', 'blog')",
     )
-    label = models.CharField(
-        max_length=200, help_text="Display name for the object type"
-    )
-    plural_label = models.CharField(
-        max_length=200, help_text="Plural display name for the object type"
-    )
-    description = models.TextField(
-        blank=True, help_text="Description of what this object type represents"
-    )
+    label = models.CharField(max_length=200, help_text="Display name for the object type")
+    plural_label = models.CharField(max_length=200, help_text="Plural display name for the object type")
+    description = models.TextField(blank=True, help_text="Description of what this object type represents")
     icon_image = models.ImageField(
         storage=system_storage,
         upload_to="object_types/icons/",
@@ -59,9 +51,7 @@ class ObjectTypeDefinition(models.Model):
         help_text="Visual representation of this object type",
     )
     schema = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="JSON schema defining the fields for this object type"
+        default=dict, blank=True, help_text="JSON schema defining the fields for this object type"
     )
     slot_configuration = models.JSONField(
         default=dict,
@@ -94,16 +84,12 @@ class ObjectTypeDefinition(models.Model):
         null=True,
         help_text="Namespace for organizing content and media for this object type",
     )
-    is_active = models.BooleanField(
-        default=True, help_text="Whether this object type is available for use"
-    )
+    is_active = models.BooleanField(default=True, help_text="Whether this object type is available for use")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
     metadata = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Additional extensible properties for this object type"
+        default=dict, blank=True, help_text="Additional extensible properties for this object type"
     )
 
     class Meta:
@@ -173,20 +159,14 @@ class ObjectTypeDefinition(models.Model):
 
                 if widget_controls_key:
                     if not isinstance(slot[widget_controls_key], list):
-                        raise ValidationError(
-                            f"Slot '{slot['name']}': widget_controls must be an array"
-                        )
+                        raise ValidationError(f"Slot '{slot['name']}': widget_controls must be an array")
 
                     for i, widget_control in enumerate(slot[widget_controls_key]):
                         if not isinstance(widget_control, dict):
-                            raise ValidationError(
-                                f"Slot '{slot['name']}': widget control {i+1} must be an object"
-                            )
+                            raise ValidationError(f"Slot '{slot['name']}': widget control {i+1} must be an object")
 
                         # Required fields (accept both cases)
-                        widget_type = widget_control.get(
-                            "widget_type"
-                        ) or widget_control.get("widgetType")
+                        widget_type = widget_control.get("widget_type") or widget_control.get("widgetType")
                         if not widget_type:
                             raise ValidationError(
                                 f"Slot '{slot['name']}': widget control {i+1} missing 'widget_type' field"
@@ -196,13 +176,12 @@ class ObjectTypeDefinition(models.Model):
                         self._validate_widget_types([widget_type], slot["name"])
 
                         # Validate optional fields (accept both cases)
-                        max_instances = widget_control.get(
-                            "max_instances"
-                        ) or widget_control.get("maxInstances")
+                        max_instances = widget_control.get("max_instances") or widget_control.get("maxInstances")
                         if max_instances is not None:
                             if not isinstance(max_instances, int) or max_instances < 0:
                                 raise ValidationError(
-                                    f"Slot '{slot['name']}': widget control {i+1} max_instances must be a positive integer or null"
+                                    f"Slot '{slot['name']}': widget control {i+1} max_instances must be "
+                                    "a positive integer or null"
                                 )
 
                         required = widget_control.get("required")
@@ -211,40 +190,27 @@ class ObjectTypeDefinition(models.Model):
                                 f"Slot '{slot['name']}': widget control {i+1} required must be a boolean"
                             )
 
-                        pre_create = widget_control.get(
-                            "pre_create"
-                        ) or widget_control.get("preCreate")
+                        pre_create = widget_control.get("pre_create") or widget_control.get("preCreate")
                         if pre_create is not None and not isinstance(pre_create, bool):
                             raise ValidationError(
                                 f"Slot '{slot['name']}': widget control {i+1} pre_create must be a boolean"
                             )
 
-                        default_config = widget_control.get(
-                            "default_config"
-                        ) or widget_control.get("defaultConfig")
-                        if default_config is not None and not isinstance(
-                            default_config, dict
-                        ):
+                        default_config = widget_control.get("default_config") or widget_control.get("defaultConfig")
+                        if default_config is not None and not isinstance(default_config, dict):
                             raise ValidationError(
                                 f"Slot '{slot['name']}': widget control {i+1} default_config must be an object"
                             )
 
                 if "maxWidgets" in slot and slot["maxWidgets"] is not None:
-                    if (
-                        not isinstance(slot["maxWidgets"], int)
-                        or slot["maxWidgets"] < 0
-                    ):
-                        raise ValidationError(
-                            f"Slot '{slot['name']}': maxWidgets must be a positive integer or null"
-                        )
+                    if not isinstance(slot["maxWidgets"], int) or slot["maxWidgets"] < 0:
+                        raise ValidationError(f"Slot '{slot['name']}': maxWidgets must be a positive integer or null")
 
                 # Validate allowed_types (accept both camelCase and snake_case)
                 allowed_types = slot.get("allowed_types") or slot.get("allowedTypes")
                 if allowed_types is not None:
                     if not isinstance(allowed_types, list):
-                        raise ValidationError(
-                            f"Slot '{slot['name']}': allowed_types must be an array"
-                        )
+                        raise ValidationError(f"Slot '{slot['name']}': allowed_types must be an array")
                     # Validate widget types exist
                     self._validate_widget_types(allowed_types, slot["name"])
 
@@ -252,36 +218,26 @@ class ObjectTypeDefinition(models.Model):
                 disallowed_types = slot.get("disallowed_types") or slot.get("disallowedTypes")
                 if disallowed_types is not None:
                     if not isinstance(disallowed_types, list):
-                        raise ValidationError(
-                            f"Slot '{slot['name']}': disallowed_types must be an array"
-                        )
+                        raise ValidationError(f"Slot '{slot['name']}': disallowed_types must be an array")
                     # Validate widget types exist
                     self._validate_widget_types(disallowed_types, slot["name"])
 
                 if "preCreatedWidgets" in slot:
                     if not isinstance(slot["preCreatedWidgets"], list):
-                        raise ValidationError(
-                            f"Slot '{slot['name']}': preCreatedWidgets must be an array"
-                        )
+                        raise ValidationError(f"Slot '{slot['name']}': preCreatedWidgets must be an array")
 
                     for widget in slot["preCreatedWidgets"]:
                         if not isinstance(widget, dict):
-                            raise ValidationError(
-                                f"Slot '{slot['name']}': each pre-created widget must be an object"
-                            )
+                            raise ValidationError(f"Slot '{slot['name']}': each pre-created widget must be an object")
 
                         if "type" not in widget:
-                            raise ValidationError(
-                                f"Slot '{slot['name']}': pre-created widget missing 'type' field"
-                            )
+                            raise ValidationError(f"Slot '{slot['name']}': pre-created widget missing 'type' field")
 
     def _validate_widget_types(self, widget_types, slot_name):
         """Validate that widget types exist in the registry."""
         from webpages.widget_registry import widget_type_registry
 
-        available_widgets = {
-            widget.type for widget in widget_type_registry.list_widget_types()
-        }
+        available_widgets = {widget.type for widget in widget_type_registry.list_widget_types()}
 
         for widget_type in widget_types:
             if widget_type not in available_widgets:
@@ -331,9 +287,7 @@ class ObjectTypeDefinition(models.Model):
 
         # New format: use widgetControls
         if "widgetControls" in slot:
-            allowed_slugs = {
-                control["widgetType"] for control in slot["widgetControls"]
-            }
+            allowed_slugs = {control["widgetType"] for control in slot["widgetControls"]}
             return [w for w in all_widgets if w.slug in allowed_slugs]
 
         # Otherwise, all widgets are allowed
@@ -369,9 +323,7 @@ class ObjectTypeDefinition(models.Model):
             "icon_image": self.icon_image.url if self.icon_image else None,
             "schema": self.schema,
             "slot_configuration": self.slot_configuration,
-            "allowed_child_types": [
-                child.name for child in self.allowed_child_types.all()
-            ],
+            "allowed_child_types": [child.name for child in self.allowed_child_types.all()],
             "is_active": self.is_active,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -394,13 +346,11 @@ class PublishedObjectManager(models.Manager):
         if now is None:
             now = timezone.now()
 
-        from django.db.models import F, Exists, OuterRef, Subquery
+        from django.db.models import Exists, F, OuterRef
 
         # Subquery to get published version for each object
         published_versions = (
-            ObjectVersion.objects.filter(
-                object_instance=OuterRef("pk"), effective_date__lte=now
-            )
+            ObjectVersion.objects.filter(object_instance=OuterRef("pk"), effective_date__lte=now)
             .filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
             .order_by("-version_number")
         )
@@ -426,9 +376,7 @@ class PublishedObjectManager(models.Manager):
             object_instance=OuterRef("pk"), effective_date__lte=now
         ).filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
 
-        return self.get_queryset().filter(
-            Exists(published_versions), current_version__isnull=False
-        )
+        return self.get_queryset().filter(Exists(published_versions), current_version__isnull=False)
 
     def with_featured_first(self):
         """
@@ -559,9 +507,7 @@ class ObjectInstance(MPTTModel):
         help_text="The type definition this object follows",
     )
     title = models.CharField(max_length=300, help_text="Display title for this object")
-    slug = models.SlugField(
-        max_length=300, help_text="URL-friendly identifier, unique within object type"
-    )
+    slug = models.SlugField(max_length=300, help_text="URL-friendly identifier, unique within object type")
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -584,19 +530,13 @@ class ObjectInstance(MPTTModel):
         related_name="current_for_objects",
         help_text="The currently active version of this object",
     )
-    publish_date = models.DateTimeField(
-        blank=True, null=True, help_text="When this object should be published"
-    )
-    unpublish_date = models.DateTimeField(
-        blank=True, null=True, help_text="When this object should be unpublished"
-    )
+    publish_date = models.DateTimeField(blank=True, null=True, help_text="When this object should be published")
+    unpublish_date = models.DateTimeField(blank=True, null=True, help_text="When this object should be unpublished")
     version = models.PositiveIntegerField(default=1, help_text="Current version number")
-    created_by = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="created_objects"
-    )
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_objects")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     # Multi-tenancy support
     tenant = models.ForeignKey(
         "core.Tenant",
@@ -604,12 +544,8 @@ class ObjectInstance(MPTTModel):
         related_name="object_instances",
         help_text="Tenant this object instance belongs to",
     )
-    
-    metadata = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Additional extensible properties for this object"
-    )
+
+    metadata = models.JSONField(default=dict, blank=True, help_text="Additional extensible properties for this object")
     relationships = models.JSONField(
         default=list,
         blank=True,
@@ -631,11 +567,7 @@ class ObjectInstance(MPTTModel):
             models.Index(fields=["current_version"]),
             models.Index(fields=["tenant_id"], name="objectinstance_tenant_idx"),
         ]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["slug", "object_type"], name="unique_slug_per_object_type"
-            )
-        ]
+        constraints = [models.UniqueConstraint(fields=["slug", "object_type"], name="unique_slug_per_object_type")]
 
     class MPTTMeta:
         order_insertion_by = ["title"]
@@ -713,26 +645,23 @@ class ObjectInstance(MPTTModel):
             field_name = field_def["name"]
             field_required = field_def.get("required", False)
 
-            if field_required and (
-                field_name not in version_data or not version_data[field_name]
-            ):
-                raise ValidationError(
-                    f"Required field '{field_name}' is missing or empty"
-                )
+            if field_required and (field_name not in version_data or not version_data[field_name]):
+                raise ValidationError(f"Required field '{field_name}' is missing or empty")
 
     def _validate_parent_child_relationship(self):
         """Validate that the parent-child relationship is allowed."""
         if not self.parent.object_type.can_have_child_type(self.object_type):
             raise ValidationError(
-                f"Object type '{self.object_type.name}' cannot be a child of "
-                f"'{self.parent.object_type.name}'"
+                f"Object type '{self.object_type.name}' cannot be a child of " f"'{self.parent.object_type.name}'"
             )
 
     def _create_pre_defined_widgets(self):
         """Create pre-defined widgets for new object instances."""
-        from webpages.widget_registry import widget_type_registry
-        from django.utils import timezone
         import uuid
+
+        from django.utils import timezone
+
+        from webpages.widget_registry import widget_type_registry
 
         slots = self.object_type.get_slots()
         pre_widgets = {}
@@ -752,9 +681,7 @@ class ObjectInstance(MPTTModel):
                         continue
 
                     # Get widget type from registry (supports multiple formats for compatibility)
-                    widget_instance = widget_type_registry.get_widget_type_flexible(
-                        widget_type
-                    )
+                    widget_instance = widget_type_registry.get_widget_type_flexible(widget_type)
                     if not widget_instance:
                         continue
 
@@ -785,9 +712,7 @@ class ObjectInstance(MPTTModel):
                         continue
 
                     # Get widget type from registry (supports multiple formats for compatibility)
-                    widget_instance = widget_type_registry.get_widget_type_flexible(
-                        widget_type
-                    )
+                    widget_instance = widget_type_registry.get_widget_type_flexible(widget_type)
                     if not widget_instance:
                         continue
 
@@ -910,9 +835,7 @@ class ObjectInstance(MPTTModel):
 
     def get_root_objects(self):
         """Get all root objects (objects without parents) of the same type."""
-        return ObjectInstance.objects.filter(
-            object_type=self.object_type, parent__isnull=True
-        )
+        return ObjectInstance.objects.filter(object_type=self.object_type, parent__isnull=True)
 
     def get_tree_objects(self):
         """Get all objects in the same tree."""
@@ -949,25 +872,12 @@ class ObjectInstance(MPTTModel):
             change_description: Description of changes
         """
         # Find the next available version number
-        max_version = (
-            self.versions.aggregate(max_version=models.Max("version_number"))[
-                "max_version"
-            ]
-            or 0
-        )
+        max_version = self.versions.aggregate(max_version=models.Max("version_number"))["max_version"] or 0
         next_version = max_version + 1
 
         # Use provided data/widgets or copy from current version
-        version_data = (
-            data
-            if data is not None
-            else (self.data.copy() if self.current_version else {})
-        )
-        version_widgets = (
-            widgets
-            if widgets is not None
-            else (self.widgets.copy() if self.current_version else {})
-        )
+        version_data = data if data is not None else (self.data.copy() if self.current_version else {})
+        version_widgets = widgets if widgets is not None else (self.widgets.copy() if self.current_version else {})
 
         # Create the new version
         new_version = ObjectVersion.objects.create(
@@ -986,9 +896,7 @@ class ObjectInstance(MPTTModel):
 
         return new_version
 
-    def update_current_version(
-        self, user, data=None, widgets=None, change_description=""
-    ):
+    def update_current_version(self, user, data=None, widgets=None, change_description=""):
         """Update the current version with new data and widgets (doesn't create new version).
 
         Args:
@@ -999,9 +907,7 @@ class ObjectInstance(MPTTModel):
         """
         if not self.current_version:
             # No current version exists, create one
-            return self.create_version(
-                user, data=data, widgets=widgets, change_description=change_description
-            )
+            return self.create_version(user, data=data, widgets=widgets, change_description=change_description)
 
         # Update the existing current version
         if data is not None:
@@ -1045,6 +951,7 @@ class ObjectInstance(MPTTModel):
         sort_order="-created_at",
         now=None,
         prioritize_featured=False,
+        tenant=None,
     ):
         """
         Get published objects with flexible filtering and sorting.
@@ -1056,6 +963,7 @@ class ObjectInstance(MPTTModel):
                        Note: "publish_date" will be mapped to "current_version__effective_date"
             now: Timestamp to use for publication checks (default: timezone.now())
             prioritize_featured: If True, sort featured items first (default: False)
+            tenant: Restrict results to one tenant (optional)
 
         Returns:
             QuerySet of ObjectInstance with published versions pre-loaded
@@ -1066,9 +974,10 @@ class ObjectInstance(MPTTModel):
         from django.db.models import F
 
         # Start with published objects only
-        queryset = cls.published.published_only(now).select_related(
-            "object_type", "current_version"
-        )
+        queryset = cls.published.published_only(now).select_related("object_type", "current_version")
+
+        if tenant is not None:
+            queryset = queryset.filter(tenant=tenant)
 
         # Filter by object types if specified
         if object_type_ids:
@@ -1081,9 +990,7 @@ class ObjectInstance(MPTTModel):
         # Map publish_date to actual field
         sort_field = sort_order
         if "publish_date" in sort_order:
-            sort_field = sort_order.replace(
-                "publish_date", "current_version__effective_date"
-            )
+            sort_field = sort_order.replace("publish_date", "current_version__effective_date")
 
         # Apply sorting
         if prioritize_featured:
@@ -1129,10 +1036,7 @@ class ObjectInstance(MPTTModel):
 
         # Check for duplicate
         relationship_obj = {"type": relationship_type, "object_id": object_id}
-        if any(
-            r.get("type") == relationship_type and r.get("object_id") == object_id
-            for r in self.relationships
-        ):
+        if any(r.get("type") == relationship_type and r.get("object_id") == object_id for r in self.relationships):
             return False
 
         # Add relationship
@@ -1163,9 +1067,7 @@ class ObjectInstance(MPTTModel):
         self.relationships = [
             r
             for r in self.relationships
-            if not (
-                r.get("type") == relationship_type and r.get("object_id") == object_id
-            )
+            if not (r.get("type") == relationship_type and r.get("object_id") == object_id)
         ]
 
         if len(self.relationships) < original_length:
@@ -1191,12 +1093,8 @@ class ObjectInstance(MPTTModel):
 
         if relationship_type:
             # Clear specific type
-            to_clear = [
-                r for r in self.relationships if r.get("type") == relationship_type
-            ]
-            self.relationships = [
-                r for r in self.relationships if r.get("type") != relationship_type
-            ]
+            to_clear = [r for r in self.relationships if r.get("type") == relationship_type]
+            self.relationships = [r for r in self.relationships if r.get("type") != relationship_type]
         else:
             # Clear all
             to_clear = list(self.relationships)
@@ -1206,9 +1104,7 @@ class ObjectInstance(MPTTModel):
 
         # Update reverse relationships
         for rel in to_clear:
-            self._update_reverse_relationship(
-                "remove", rel.get("type"), rel.get("object_id")
-            )
+            self._update_reverse_relationship("remove", rel.get("type"), rel.get("object_id"))
 
     def set_relationships(self, relationship_type, object_ids):
         """
@@ -1241,9 +1137,7 @@ class ObjectInstance(MPTTModel):
         to_add = new_ids - current_ids
 
         # Remove old relationships
-        self.relationships = [
-            r for r in self.relationships if r.get("type") != relationship_type
-        ]
+        self.relationships = [r for r in self.relationships if r.get("type") != relationship_type]
 
         # Add new relationships
         for obj_id in object_ids:
@@ -1277,14 +1171,10 @@ class ObjectInstance(MPTTModel):
 
         # Verify the IDs match
         if set(object_ids_in_order) != current_ids:
-            raise ValueError(
-                "Provided object IDs must exactly match existing relationships"
-            )
+            raise ValueError("Provided object IDs must exactly match existing relationships")
 
         # Remove old relationships of this type
-        self.relationships = [
-            r for r in self.relationships if r.get("type") != relationship_type
-        ]
+        self.relationships = [r for r in self.relationships if r.get("type") != relationship_type]
 
         # Add them back in the new order
         for obj_id in object_ids_in_order:
@@ -1319,9 +1209,7 @@ class ObjectInstance(MPTTModel):
             # Return queryset preserving order
             object_ids = [r.get("object_id") for r in rels]
             # Use Django's preserve order with case
-            preserved = Case(
-                *[When(pk=pk, then=pos) for pos, pk in enumerate(object_ids)]
-            )
+            preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(object_ids)])
             return ObjectInstance.objects.filter(id__in=object_ids).order_by(preserved)
         else:
             # Return list with relationship type info
@@ -1329,9 +1217,7 @@ class ObjectInstance(MPTTModel):
                 {
                     "type": r.get("type"),
                     "object_id": r.get("object_id"),
-                    "object": ObjectInstance.objects.filter(
-                        id=r.get("object_id")
-                    ).first(),
+                    "object": ObjectInstance.objects.filter(id=r.get("object_id")).first(),
                 }
                 for r in rels
             ]
@@ -1362,9 +1248,7 @@ class ObjectInstance(MPTTModel):
         if as_queryset:
             # Return queryset preserving order
             object_ids = [r.get("object_id") for r in rels]
-            preserved = Case(
-                *[When(pk=pk, then=pos) for pos, pk in enumerate(object_ids)]
-            )
+            preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(object_ids)])
             return ObjectInstance.objects.filter(id__in=object_ids).order_by(preserved)
         else:
             # Return list with relationship type info
@@ -1372,9 +1256,7 @@ class ObjectInstance(MPTTModel):
                 {
                     "type": r.get("type"),
                     "object_id": r.get("object_id"),
-                    "object": ObjectInstance.objects.filter(
-                        id=r.get("object_id")
-                    ).first(),
+                    "object": ObjectInstance.objects.filter(id=r.get("object_id")).first(),
                 }
                 for r in rels
             ]
@@ -1392,10 +1274,7 @@ class ObjectInstance(MPTTModel):
         """
         if not self.relationships:
             return False
-        return any(
-            r.get("type") == relationship_type and r.get("object_id") == object_id
-            for r in self.relationships
-        )
+        return any(r.get("type") == relationship_type and r.get("object_id") == object_id for r in self.relationships)
 
     def get_relationship_types(self):
         """
@@ -1422,9 +1301,7 @@ class ObjectInstance(MPTTModel):
             return 0
 
         if relationship_type:
-            return sum(
-                1 for r in self.relationships if r.get("type") == relationship_type
-            )
+            return sum(1 for r in self.relationships if r.get("type") == relationship_type)
         return len(self.relationships)
 
     def _update_reverse_relationship(self, action, relationship_type, object_id):
@@ -1450,8 +1327,7 @@ class ObjectInstance(MPTTModel):
         if action == "add":
             # Add reverse relationship if not already present
             if not any(
-                r.get("type") == relationship_type and r.get("object_id") == self.id
-                for r in target.related_from
+                r.get("type") == relationship_type and r.get("object_id") == self.id for r in target.related_from
             ):
                 target.related_from.append(reverse_rel)
                 target.save(update_fields=["related_from"])
@@ -1461,9 +1337,7 @@ class ObjectInstance(MPTTModel):
             target.related_from = [
                 r
                 for r in target.related_from
-                if not (
-                    r.get("type") == relationship_type and r.get("object_id") == self.id
-                )
+                if not (r.get("type") == relationship_type and r.get("object_id") == self.id)
             ]
             if len(target.related_from) < original_length:
                 target.save(update_fields=["related_from"])
@@ -1480,9 +1354,7 @@ class ObjectInstance(MPTTModel):
         self.related_from = []
 
         # Query all objects that might have relationships to this object
-        all_objects = ObjectInstance.objects.exclude(id=self.id).exclude(
-            relationships=[]
-        )
+        all_objects = ObjectInstance.objects.exclude(id=self.id).exclude(relationships=[])
 
         for obj in all_objects:
             if obj.relationships:
@@ -1546,11 +1418,7 @@ class ObjectInstance(MPTTModel):
                 try:
                     target = ObjectInstance.objects.get(id=rel.get("object_id"))
                     if target.related_from:
-                        target.related_from = [
-                            r
-                            for r in target.related_from
-                            if r.get("object_id") != self.id
-                        ]
+                        target.related_from = [r for r in target.related_from if r.get("object_id") != self.id]
                         target.save(update_fields=["related_from"])
                 except ObjectInstance.DoesNotExist:
                     pass
@@ -1561,11 +1429,7 @@ class ObjectInstance(MPTTModel):
                 try:
                     source = ObjectInstance.objects.get(id=rel.get("object_id"))
                     if source.relationships:
-                        source.relationships = [
-                            r
-                            for r in source.relationships
-                            if r.get("object_id") != self.id
-                        ]
+                        source.relationships = [r for r in source.relationships if r.get("object_id") != self.id]
                         source.save(update_fields=["relationships"])
                 except ObjectInstance.DoesNotExist:
                     pass
@@ -1580,31 +1444,17 @@ class ObjectVersion(models.Model):
     Stores snapshots of object data and widgets at specific points in time.
     """
 
-    object_instance = models.ForeignKey(
-        ObjectInstance, on_delete=models.CASCADE, related_name="versions"
-    )
+    object_instance = models.ForeignKey(ObjectInstance, on_delete=models.CASCADE, related_name="versions")
     version_number = models.PositiveIntegerField()
-    data = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Snapshot of object data at this version"
-    )
-    widgets = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Snapshot of widget configurations at this version"
-    )
+    data = models.JSONField(default=dict, blank=True, help_text="Snapshot of object data at this version")
+    widgets = models.JSONField(default=dict, blank=True, help_text="Snapshot of widget configurations at this version")
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    change_description = models.TextField(
-        blank=True, help_text="Description of changes made in this version"
-    )
+    change_description = models.TextField(blank=True, help_text="Description of changes made in this version")
 
     # Publication date fields - similar to PageVersion
-    effective_date = models.DateTimeField(
-        blank=True, null=True, help_text="When this version becomes active/published"
-    )
+    effective_date = models.DateTimeField(blank=True, null=True, help_text="When this version becomes active/published")
     expiry_date = models.DateTimeField(
         blank=True,
         null=True,
@@ -1612,9 +1462,7 @@ class ObjectVersion(models.Model):
     )
 
     # Featured status
-    is_featured = models.BooleanField(
-        default=False, help_text="Mark this version as featured/pinned in listings"
-    )
+    is_featured = models.BooleanField(default=False, help_text="Mark this version as featured/pinned in listings")
 
     class Meta:
         ordering = ["-version_number"]
@@ -1637,11 +1485,7 @@ class ObjectVersion(models.Model):
         super().clean()
 
         # Validate that effective_date is before expiry_date
-        if (
-            self.effective_date
-            and self.expiry_date
-            and self.effective_date >= self.expiry_date
-        ):
+        if self.effective_date and self.expiry_date and self.effective_date >= self.expiry_date:
             from django.core.exceptions import ValidationError
 
             raise ValidationError("Effective date must be before expiry date.")
@@ -1709,8 +1553,6 @@ class ObjectVersion(models.Model):
         2. Extracts values from self.data
         3. Updates ObjectInstance.relationships accordingly
         """
-        from utils.schema_system import field_registry
-
         # Get schema fields
         schema_fields = self.object_instance.object_type.get_schema_fields()
 
