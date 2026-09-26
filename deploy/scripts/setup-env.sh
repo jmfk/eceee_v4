@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# setup-env.sh - Securely stage or install local deploy/.env on production.
-# Usage: bash deploy/scripts/setup-env.sh [PROD_HOST] [PROD_DIR] [--stage]
+# setup-env.sh - Securely install deploy/.env with an optional locked operation.
+# Usage: bash deploy/scripts/setup-env.sh [PROD_HOST] [PROD_DIR] [--deploy REF|--restart]
 #   PROD_HOST: SSH target (default: root@eceee-vps)
 #   PROD_DIR:  Remote path (default: /srv/eceee_v4)
 
@@ -10,6 +10,7 @@ LOCAL_ENV="deploy/.env"
 PROD_HOST="${1:-root@eceee-vps}"
 PROD_DIR="${2:-/srv/eceee_v4}"
 MODE="${3:-install}"
+REF="${4:-}"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'
@@ -23,10 +24,19 @@ success() { echo -e "${GREEN}[env]${NC} $*" >&2; }
 warn()    { echo -e "${YELLOW}[env]${NC} $*" >&2; }
 error()   { echo -e "${RED}[env]${NC} $*" >&2; }
 
-if [ "$MODE" != "install" ] && [ "$MODE" != "--stage" ]; then
-    error "Third argument must be --stage when provided."
-    exit 2
-fi
+case "$MODE" in
+    install|--restart) ;;
+    --deploy)
+        if [ -z "$REF" ]; then
+            error "--deploy requires a resolved Git ref."
+            exit 2
+        fi
+        ;;
+    *)
+        error "Third argument must be --deploy or --restart when provided."
+        exit 2
+        ;;
+esac
 
 # ── 1. Check local .env ───────────────────────────────────────────────────────
 if [ ! -f "$LOCAL_ENV" ]; then
@@ -50,8 +60,10 @@ fi
 # ── 3. Push to server ─────────────────────────────────────────────────────────
 info "Staging $LOCAL_ENV on $PROD_HOST..."
 
-# Create directory if it doesn't exist and set permissions
-ssh "$PROD_HOST" "mkdir -p $PROD_DIR/deploy && chmod 700 $PROD_DIR/deploy"
+# Create the protected directory and remove abandoned staging files from older
+# failed invocations without touching a currently active transfer.
+ssh "$PROD_HOST" \
+    "mkdir -p '$PROD_DIR/deploy' && chmod 700 '$PROD_DIR/deploy' && find '$PROD_DIR/deploy' -maxdepth 1 -type f -name '.env.incoming.*' -mmin +60 -delete"
 
 REMOTE_STAGE=$(ssh "$PROD_HOST" "mktemp '$PROD_DIR/deploy/.env.incoming.XXXXXX'")
 cleanup_stage() {
@@ -64,16 +76,14 @@ trap cleanup_stage EXIT
 scp "$LOCAL_ENV" "$PROD_HOST":"$REMOTE_STAGE"
 ssh "$PROD_HOST" "chmod 600 '$REMOTE_STAGE'"
 
-if [ "$MODE" = "--stage" ]; then
-    printf '%s\n' "$REMOTE_STAGE"
-    REMOTE_STAGE=""
-    trap - EXIT
-    success "Secure production environment staging completed."
-    exit 0
-fi
+case "$MODE" in
+    install) OPERATION="install-env" ;;
+    --restart) OPERATION="restart" ;;
+    --deploy) OPERATION="deploy" ;;
+esac
 
-ssh "$PROD_HOST" "cd '$PROD_DIR' && bash -s -- install-env '$REMOTE_STAGE'" \
+ssh "$PROD_HOST" "cd '$PROD_DIR' && bash -s -- '$OPERATION' '$REMOTE_STAGE' '$REF'" \
     < deploy/scripts/production-operation.sh
 REMOTE_STAGE=""
 trap - EXIT
-success "Successfully installed and secured .env on production."
+success "Successfully installed and secured .env during $OPERATION."

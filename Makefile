@@ -1091,12 +1091,10 @@ prod-deploy: ## Run checks, then deploy to production (use: make prod-deploy [TA
 	@DEPLOY_REF=$$(bash deploy/scripts/resolve-deploy-ref.sh "$(TAG)"); \
 	echo "Resolved deploy ref: $$DEPLOY_REF"; \
 	bash deploy/scripts/preflight.sh "$$DEPLOY_REF"; \
-	ENV_STAGE=$$(bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)" --stage); \
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash -s -- deploy '$$ENV_STAGE' '$$DEPLOY_REF'" < deploy/scripts/production-operation.sh
+	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)" --deploy "$$DEPLOY_REF"
 
 prod-restart: ## Sync deploy/.env and restart production containers
-	@ENV_STAGE=$$(bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)" --stage); \
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash -s -- restart '$$ENV_STAGE'" < deploy/scripts/production-operation.sh
+	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)" --restart
 
 prod-env: ## Securely push local deploy/.env to production
 	bash deploy/scripts/setup-env.sh $(PROD_HOST) $(PROD_DIR)
