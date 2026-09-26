@@ -83,4 +83,16 @@ describe('DesignerThemesPage', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
         await waitFor(() => expect(mocks.createRemoteConnection).toHaveBeenCalledWith(expect.objectContaining({ name: 'Staging', remoteWorkspace: 'staging' })))
     })
+
+    it('can upload the first theme to an empty remote site', async () => {
+        mocks.remoteThemes.mockResolvedValue({ results: [] })
+        mocks.pushRemoteTheme.mockResolvedValue({ name: 'Editorial', syncVersion: 1 })
+        renderWithStateProviders(<DesignerThemesPage />)
+        fireEvent.click(await screen.findByRole('button', { name: 'Remote sites' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh themes' }))
+        await waitFor(() => expect(mocks.remoteThemes).toHaveBeenCalledWith('connection-1'))
+
+        fireEvent.click(screen.getAllByRole('button', { name: 'Upload new remote version' })[0])
+        await waitFor(() => expect(mocks.pushRemoteTheme).toHaveBeenCalledWith('connection-1', 1))
+    })
 })
