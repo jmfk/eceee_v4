@@ -1441,6 +1441,7 @@ def undo_designer_publish(theme_id, tenant, user, draft_version, live_sync_versi
                 "colors",
                 "fonts",
                 "design_groups",
+                "designer_preview",
                 "image",
                 "site_icon",
                 "sync_source",

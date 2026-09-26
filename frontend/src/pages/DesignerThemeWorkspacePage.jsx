@@ -184,9 +184,9 @@ const DesignerThemeWorkspacePage = () => {
         } catch (err) { addNotification({ type: 'error', message: err.message || 'Placeholder could not be created' }) }
     }
 
-    const savePreviewContent = async (viewId, texts) => {
+    const savePreviewContent = async (viewId, texts, savedWorkspace) => {
         try {
-            const current = dirty ? await saveDraft({ silent: true }) : workspace
+            const current = savedWorkspace || (dirty ? await saveDraft({ silent: true }) : workspace)
             if (!current) return null
             const result = await designerThemesApi.savePreviewContent(themeId, viewId, texts, current.draftVersion)
             setWorkspace(result)
