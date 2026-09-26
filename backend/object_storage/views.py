@@ -4,42 +4,42 @@ Object Storage System API Views
 Provides REST API endpoints for managing object types and instances.
 """
 
-from django.shortcuts import get_object_or_404
-from django.core.exceptions import ValidationError
-from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework.filters import SearchFilter, OrderingFilter
-from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q, Count
-from django.utils import timezone
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
-import uuid
+import logging
 import os
 import re
-import logging
+import uuid
+
+from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from django.db.models import Q
+from django.utils import timezone
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.response import Response
+
+from core.permissions import HasTenantAccess
+
+from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
+from .serializers import (
+    ObjectInstanceListSerializer,
+    ObjectInstanceSerializer,
+    ObjectTypeDefinitionListSerializer,
+    ObjectTypeDefinitionSerializer,
+    ObjectVersionListSerializer,
+    ObjectVersionSerializer,
+)
 
 # Set up logger
 logger = logging.getLogger(__name__)
-
-from .models import ObjectTypeDefinition, ObjectInstance, ObjectVersion
-from .serializers import (
-    ObjectTypeDefinitionSerializer,
-    ObjectTypeDefinitionListSerializer,
-    ObjectInstanceSerializer,
-    ObjectInstanceListSerializer,
-    ObjectVersionSerializer,
-    ObjectVersionListSerializer,
-)
 
 
 class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
     """ViewSet for managing Object Type Definitions"""
 
-    queryset = ObjectTypeDefinition.objects.select_related(
-        "created_by"
-    ).prefetch_related("allowed_child_types")
+    queryset = ObjectTypeDefinition.objects.select_related("created_by").prefetch_related("allowed_child_types")
     serializer_class = ObjectTypeDefinitionSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -64,9 +64,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         Supports force_delete query parameter to delete even when instances exist.
         """
         instance = self.get_object()
-        force_delete = (
-            request.query_params.get("force_delete", "false").lower() == "true"
-        )
+        force_delete = request.query_params.get("force_delete", "false").lower() == "true"
 
         # Check for existing instances
         instance_count = ObjectInstance.objects.filter(object_type=instance).count()
@@ -100,9 +98,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
     def main_browser_types(self, request):
         """Get object types that should appear in the main browser grid"""
         # Show types that can appear at top level: 'top_level_only' and 'both'
-        queryset = self.get_queryset().filter(
-            is_active=True, hierarchy_level__in=["top_level_only", "both"]
-        )
+        queryset = self.get_queryset().filter(is_active=True, hierarchy_level__in=["top_level_only", "both"])
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -145,9 +141,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            serializer = self.get_serializer(
-                obj_type, data=basic_info_data, partial=True
-            )
+            serializer = self.get_serializer(obj_type, data=basic_info_data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
@@ -168,9 +162,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
-            logger.error(
-                f"Unexpected error updating basic info: {str(e)}", exc_info=True
-            )
+            logger.error(f"Unexpected error updating basic info: {str(e)}", exc_info=True)
             return Response(
                 {"error": "Failed to update basic info due to server error"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -184,9 +176,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         # Validate that request.data contains a valid slot configuration
         if not isinstance(request.data, dict) or "slots" not in request.data:
             return Response(
-                {
-                    "error": "Invalid slot configuration format. Expected object with 'slots' array."
-                },
+                {"error": "Invalid slot configuration format. Expected object with 'slots' array."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -218,9 +208,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                 )
 
         # Check for duplicate slot names
-        slot_names = [
-            slot["name"] for slot in request.data["slots"] if slot.get("name")
-        ]
+        slot_names = [slot["name"] for slot in request.data["slots"] if slot.get("name")]
         if len(slot_names) != len(set(slot_names)):
             return Response(
                 {"error": "Duplicate slot names are not allowed"},
@@ -231,9 +219,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
             # Wrap the slots in slot_configuration object
             slot_config_data = {"slot_configuration": request.data}
 
-            serializer = self.get_serializer(
-                obj_type, data=slot_config_data, partial=True
-            )
+            serializer = self.get_serializer(obj_type, data=slot_config_data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
@@ -248,9 +234,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
 
             if warnings:
                 response_data["warnings"] = warnings
-                response_data["message"] = (
-                    f"Widget slots updated with {len(warnings)} warning(s)"
-                )
+                response_data["message"] = f"Widget slots updated with {len(warnings)} warning(s)"
 
             return Response(response_data, status=status.HTTP_200_OK)
 
@@ -261,9 +245,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
-            logger.error(
-                f"Unexpected error updating widget slots: {str(e)}", exc_info=True
-            )
+            logger.error(f"Unexpected error updating widget slots: {str(e)}", exc_info=True)
             return Response(
                 {"error": "Failed to update widget slots due to server error"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -277,9 +259,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         # Validate that request.data contains a valid schema
         if not isinstance(request.data, dict) or "properties" not in request.data:
             return Response(
-                {
-                    "error": "Invalid schema format. Expected schema object with 'properties' object."
-                },
+                {"error": "Invalid schema format. Expected schema object with 'properties' object."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -291,9 +271,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            serializer = self.get_serializer(
-                obj_type, data={"schema": request.data}, partial=True
-            )
+            serializer = self.get_serializer(obj_type, data={"schema": request.data}, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
@@ -329,9 +307,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                 "both",
             ]:
                 return Response(
-                    {
-                        "error": "Invalid hierarchy level. Must be 'top_level_only', 'sub_object_only', or 'both'"
-                    },
+                    {"error": "Invalid hierarchy level. Must be 'top_level_only', 'sub_object_only', or 'both'"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -350,17 +326,13 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                     invalid_names = set(allowed_child_types) - set(existing_types)
                     if invalid_names:
                         return Response(
-                            {
-                                "error": f"Invalid child types: {', '.join(invalid_names)}"
-                            },
+                            {"error": f"Invalid child types: {', '.join(invalid_names)}"},
                             status=status.HTTP_400_BAD_REQUEST,
                         )
 
                 # Get the ObjectTypeDefinition instances
                 child_types = (
-                    ObjectTypeDefinition.objects.filter(
-                        name__in=allowed_child_types, is_active=True
-                    )
+                    ObjectTypeDefinition.objects.filter(name__in=allowed_child_types, is_active=True)
                     if allowed_child_types
                     else []
                 )
@@ -377,9 +349,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                 {
                     "message": "Relationships updated successfully",
                     "hierarchy_level": obj_type.hierarchy_level,
-                    "allowed_child_types": [
-                        ct.name for ct in obj_type.allowed_child_types.all()
-                    ],
+                    "allowed_child_types": [ct.name for ct in obj_type.allowed_child_types.all()],
                     "updated_at": serializer.data.get("updated_at"),
                 },
                 status=status.HTTP_200_OK,
@@ -395,9 +365,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
     def instances(self, request, pk=None):
         """Get all instances of this object type"""
         obj_type = self.get_object()
-        instances = ObjectInstance.objects.filter(object_type=obj_type).select_related(
-            "created_by", "parent"
-        )
+        instances = ObjectInstance.objects.filter(object_type=obj_type).select_related("created_by", "parent")
 
         # Apply filters
         status_filter = request.query_params.get("status")
@@ -436,9 +404,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                         "description": widget.description,
                         "template_name": widget.template_name,
                         "is_active": widget.is_active,
-                        "has_configuration_model": hasattr(
-                            widget, "configuration_model"
-                        ),
+                        "has_configuration_model": hasattr(widget, "configuration_model"),
                     }
                 )
 
@@ -473,9 +439,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                         "description": widget.description,
                         "template_name": widget.template_name,
                         "is_active": widget.is_active,
-                        "has_configuration_model": hasattr(
-                            widget, "configuration_model"
-                        ),
+                        "has_configuration_model": hasattr(widget, "configuration_model"),
                     }
                 )
 
@@ -495,7 +459,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         "object_type", "created_by", "parent", "current_version"
     ).prefetch_related("versions")
     serializer_class = ObjectInstanceSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ["title", "slug", "current_version__data"]
     ordering_fields = ["title", "created_at", "updated_at", "publish_date"]
@@ -511,20 +475,21 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter queryset by tenant"""
         queryset = super().get_queryset()
-        
+
         # Filter by tenant from middleware
-        tenant = getattr(self.request, 'tenant', None)
+        tenant = getattr(self.request, "tenant", None)
         if tenant:
             queryset = queryset.filter(tenant=tenant)
-        
+
         return queryset
 
     def perform_create(self, serializer):
         """Set the created_by and tenant fields when creating"""
         # Get tenant from request (set by middleware)
-        tenant = getattr(self.request, 'tenant', None)
+        tenant = getattr(self.request, "tenant", None)
         if not tenant:
             from rest_framework.exceptions import ValidationError
+
             raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
         serializer.save(created_by=self.request.user, tenant=tenant)
 
@@ -537,9 +502,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         latest_version = instance.get_latest_version()
         if not latest_version:
             # Create a version if none exists
-            latest_version = instance.create_version(
-                request.user, change_description="Published via API"
-            )
+            latest_version = instance.create_version(request.user, change_description="Published via API")
 
         # Set effective_date to now to publish immediately
         effective_date = request.data.get("effective_date", timezone.now())
@@ -549,9 +512,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         latest_version.effective_date = effective_date
         latest_version.expiry_date = expiry_date
         latest_version.is_featured = is_featured
-        latest_version.save(
-            update_fields=["effective_date", "expiry_date", "is_featured"]
-        )
+        latest_version.save(update_fields=["effective_date", "expiry_date", "is_featured"])
 
         # Update current_version pointer
         instance.current_version = latest_version
@@ -588,9 +549,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         # Extract data and widgets from request
         data = request.data.get("data")
         widgets = request.data.get("widgets")
-        change_description = request.data.get(
-            "change_description", "Updated current version via API"
-        )
+        change_description = request.data.get("change_description", "Updated current version via API")
 
         # Extract other object fields that can be updated
         title = request.data.get("title")
@@ -637,9 +596,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                             instance.parent = parent_obj
                         except ObjectInstance.DoesNotExist:
                             return Response(
-                                {
-                                    "error": f"Parent object with ID {parent} does not exist"
-                                },
+                                {"error": f"Parent object with ID {parent} does not exist"},
                                 status=status.HTTP_400_BAD_REQUEST,
                             )
                     else:
@@ -707,17 +664,13 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         try:
             # Validate widgets against slots
             serializer = self.get_serializer()
-            serializer._validate_widgets_against_slots(
-                new_widgets, instance.object_type
-            )
+            serializer._validate_widgets_against_slots(new_widgets, instance.object_type)
 
             # Update current version with only widgets
             updated_version = instance.update_current_version(
                 user=request.user,
                 widgets=new_widgets,
-                change_description=request.data.get(
-                    "change_description", "Widget update"
-                ),
+                change_description=request.data.get("change_description", "Widget update"),
             )
 
             return Response(
@@ -757,9 +710,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def descendants(self, request, pk=None):
         """Get all descendant objects (children, grandchildren, etc.)"""
         instance = self.get_object()
-        descendants = instance.get_descendants().select_related(
-            "object_type", "created_by"
-        )
+        descendants = instance.get_descendants().select_related("object_type", "created_by")
         serializer = ObjectInstanceListSerializer(descendants, many=True)
         return Response(serializer.data)
 
@@ -783,9 +734,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     def tree(self, request, pk=None):
         """Get the entire tree this object belongs to"""
         instance = self.get_object()
-        tree_objects = instance.get_tree_objects().select_related(
-            "object_type", "created_by"
-        )
+        tree_objects = instance.get_tree_objects().select_related("object_type", "created_by")
         serializer = ObjectInstanceListSerializer(tree_objects, many=True)
         return Response(serializer.data)
 
@@ -802,9 +751,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         """Move this object to a new parent"""
         instance = self.get_object()
         new_parent_id = request.data.get("new_parent_id")
-        position = request.data.get(
-            "position", "last-child"
-        )  # first-child, last-child, left, right
+        position = request.data.get("position", "last-child")  # first-child, last-child, left, right
 
         # Validate new parent
         new_parent = None
@@ -812,9 +759,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             try:
                 new_parent = ObjectInstance.objects.get(id=new_parent_id)
             except ObjectInstance.DoesNotExist:
-                return Response(
-                    {"error": "New parent not found"}, status=status.HTTP_404_NOT_FOUND
-                )
+                return Response({"error": "New parent not found"}, status=status.HTTP_404_NOT_FOUND)
 
         # Check if move is allowed
         if not instance.can_move_to_parent(new_parent):
@@ -846,9 +791,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
 
         except Exception as e:
-            return Response(
-                {"error": f"Move failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": f"Move failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
     # ============================================================================
     # RELATIONSHIP MANAGEMENT ACTIONS
@@ -869,9 +812,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         relationships_data = instance.get_related_objects(as_queryset=False)
         serializer = RelatedObjectSerializer(relationships_data, many=True)
 
-        return Response(
-            {"relationships": serializer.data, "count": len(relationships_data)}
-        )
+        return Response({"relationships": serializer.data, "count": len(relationships_data)})
 
     @action(detail=True, methods=["post"])
     def add_relationship(self, request, pk=None):
@@ -939,9 +880,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         if removed:
             return Response({"message": "Relationship removed successfully"})
         else:
-            return Response(
-                {"message": "Relationship not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"message": "Relationship not found"}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=["put"])
     def set_relationships(self, request, pk=None):
@@ -1010,11 +949,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
         try:
             instance.reorder_relationships(relationship_type, object_ids)
-            return Response(
-                {
-                    "message": f"Relationships of type '{relationship_type}' reordered successfully"
-                }
-            )
+            return Response({"message": f"Relationships of type '{relationship_type}' reordered successfully"})
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1034,11 +969,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         instance.clear_relationships(relationship_type)
 
         if relationship_type:
-            return Response(
-                {
-                    "message": f"Relationships of type '{relationship_type}' cleared successfully"
-                }
-            )
+            return Response({"message": f"Relationships of type '{relationship_type}' cleared successfully"})
         else:
             return Response({"message": "All relationships cleared successfully"})
 
@@ -1054,17 +985,13 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         relationship_type = request.query_params.get("relationship_type")
 
         # Get related objects
-        related_objs = instance.get_related_objects(
-            relationship_type=relationship_type, as_queryset=False
-        )
+        related_objs = instance.get_related_objects(relationship_type=relationship_type, as_queryset=False)
 
         from .serializers import RelatedObjectSerializer
 
         serializer = RelatedObjectSerializer(related_objs, many=True)
 
-        return Response(
-            {"related_objects": serializer.data, "count": len(related_objs)}
-        )
+        return Response({"related_objects": serializer.data, "count": len(related_objs)})
 
     @action(detail=True, methods=["get"])
     def related_from_objects(self, request, pk=None):
@@ -1078,17 +1005,13 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         relationship_type = request.query_params.get("relationship_type")
 
         # Get reverse related objects
-        related_objs = instance.get_related_from_objects(
-            relationship_type=relationship_type, as_queryset=False
-        )
+        related_objs = instance.get_related_from_objects(relationship_type=relationship_type, as_queryset=False)
 
         from .serializers import RelatedObjectSerializer
 
         serializer = RelatedObjectSerializer(related_objs, many=True)
 
-        return Response(
-            {"related_from_objects": serializer.data, "count": len(related_objs)}
-        )
+        return Response({"related_from_objects": serializer.data, "count": len(related_objs)})
 
     @action(detail=True, methods=["post"])
     def rebuild_related_from(self, request, pk=None):
@@ -1134,8 +1057,8 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
         Returns minimal object info for selection UI.
         """
-        from django.db.models import Q
         from django.core.paginator import Paginator
+        from django.db.models import Q
 
         search_term = request.query_params.get("q", "").strip()
         object_types = request.query_params.get("object_types", "").strip()
@@ -1153,9 +1076,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
         # Search by term
         if search_term:
-            queryset = queryset.filter(
-                Q(title__icontains=search_term) | Q(slug__icontains=search_term)
-            )
+            queryset = queryset.filter(Q(title__icontains=search_term) | Q(slug__icontains=search_term))
 
         # Order by relevance (title match first) and recency
         queryset = queryset.order_by("-created_at")
@@ -1205,9 +1126,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                 obj_type = ObjectTypeDefinition.objects.get(name=object_type)
                 roots = roots.filter(object_type=obj_type)
             except ObjectTypeDefinition.DoesNotExist:
-                return Response(
-                    {"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND
-                )
+                return Response({"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND)
 
         # Filter by status
         if status_filter and status_filter != "all":
@@ -1241,9 +1160,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                 obj_type = ObjectTypeDefinition.objects.get(name=object_type)
                 instances = instances.filter(object_type=obj_type)
             except ObjectTypeDefinition.DoesNotExist:
-                return Response(
-                    {"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND
-                )
+                return Response({"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND)
 
         # Filter by status
         status_filter = request.query_params.get("status")
@@ -1259,27 +1176,24 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                 pass
 
         # Filter by published status (using version-based logic)
-        published_only = (
-            request.query_params.get("published_only", "").lower() == "true"
-        )
+        published_only = request.query_params.get("published_only", "").lower() == "true"
         if published_only:
             now = timezone.now()
             # Use version-based publishing logic
             from django.db.models import Exists, OuterRef
+
             from .models import ObjectVersion
 
             published_versions = ObjectVersion.objects.filter(
                 object_instance=OuterRef("pk"), effective_date__lte=now
             ).filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
 
-            instances = instances.filter(
-                Exists(published_versions), current_version__isnull=False
-            )
+            instances = instances.filter(Exists(published_versions), current_version__isnull=False)
 
         # Order results by relevance
         if query:
             # Use database functions for better relevance scoring
-            from django.db.models import Case, When, IntegerField
+            from django.db.models import Case, IntegerField, When
 
             instances = instances.annotate(
                 relevance=Case(
@@ -1324,9 +1238,9 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         now = timezone.now()
 
         # Use the published manager to get objects with published versions
-        published_instances = ObjectInstance.published.published_only(
-            now
-        ).select_related("object_type", "current_version", "created_by")
+        published_instances = ObjectInstance.published.published_only(now).select_related(
+            "object_type", "current_version", "created_by"
+        )
 
         serializer = self.get_serializer(published_instances, many=True)
         return Response(serializer.data)
@@ -1349,14 +1263,10 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            object_type_ids = [
-                int(id.strip()) for id in object_types_param.split(",") if id.strip()
-            ]
+            object_type_ids = [int(id.strip()) for id in object_types_param.split(",") if id.strip()]
         except ValueError:
             return Response(
-                {
-                    "error": "Invalid object_types format. Expected comma-separated integers."
-                },
+                {"error": "Invalid object_types format. Expected comma-separated integers."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -1397,6 +1307,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             limit=limit,
             sort_order=sort_order,
             prioritize_featured=True,
+            tenant=request.tenant,
         )
 
         # Serialize and return
@@ -1417,9 +1328,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         try:
             obj_type = ObjectTypeDefinition.objects.get(name=type_name)
         except ObjectTypeDefinition.DoesNotExist:
-            return Response(
-                {"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND)
 
         instances = self.get_queryset().filter(object_type=obj_type)
 
@@ -1433,9 +1342,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             try:
                 instances = instances.filter(parent_id=int(parent_id))
             except (ValueError, TypeError):
-                return Response(
-                    {"error": "Invalid parent ID"}, status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"error": "Invalid parent ID"}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = self.get_serializer(instances, many=True)
         return Response(serializer.data)
@@ -1447,22 +1354,16 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         object_ids = request.data.get("object_ids", [])
 
         if not operation:
-            return Response(
-                {"error": "Operation is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Operation is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         if not object_ids:
-            return Response(
-                {"error": "Object IDs are required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Object IDs are required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get objects that exist and user has permission for
         objects = self.get_queryset().filter(id__in=object_ids)
 
         if not objects.exists():
-            return Response(
-                {"error": "No valid objects found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "No valid objects found"}, status=status.HTTP_404_NOT_FOUND)
 
         results = []
         errors = []
@@ -1473,17 +1374,13 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                     if operation == "publish":
                         obj.status = "published"
                         obj.save()
-                        obj.create_version(
-                            request.user, change_description="Bulk published via API"
-                        )
+                        obj.create_version(request.user, change_description="Bulk published via API")
                         results.append({"id": obj.id, "status": "published"})
 
                     elif operation == "unpublish":
                         obj.status = "draft"
                         obj.save()
-                        obj.create_version(
-                            request.user, change_description="Bulk unpublished via API"
-                        )
+                        obj.create_version(request.user, change_description="Bulk unpublished via API")
                         results.append({"id": obj.id, "status": "unpublished"})
 
                     elif operation == "delete":
@@ -1494,15 +1391,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                     elif operation == "archive":
                         obj.status = "archived"
                         obj.save()
-                        obj.create_version(
-                            request.user, change_description="Bulk archived via API"
-                        )
+                        obj.create_version(request.user, change_description="Bulk archived via API")
                         results.append({"id": obj.id, "status": "archived"})
 
                     else:
-                        errors.append(
-                            {"id": obj.id, "error": f"Unknown operation: {operation}"}
-                        )
+                        errors.append({"id": obj.id, "error": f"Unknown operation: {operation}"})
 
                 except Exception as e:
                     errors.append({"id": obj.id, "error": str(e)})
@@ -1527,9 +1420,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for viewing Object Versions (read-only)"""
 
-    queryset = ObjectVersion.objects.select_related(
-        "object_instance", "object_instance__object_type", "created_by"
-    )
+    queryset = ObjectVersion.objects.select_related("object_instance", "object_instance__object_type", "created_by")
     serializer_class = ObjectVersionSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -1657,9 +1548,7 @@ def upload_image(request):
     Otherwise, returns the URL for manual handling.
     """
     if "image" not in request.FILES:
-        return Response(
-            {"error": "No image file provided"}, status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({"error": "No image file provided"}, status=status.HTTP_400_BAD_REQUEST)
 
     image_file = request.FILES["image"]
     object_type_id = request.data.get("object_type_id")
@@ -1686,9 +1575,7 @@ def upload_image(request):
         try:
             object_type = ObjectTypeDefinition.objects.get(id=object_type_id)
         except ObjectTypeDefinition.DoesNotExist:
-            return Response(
-                {"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND)
 
     try:
         # Sanitize and validate file extension
@@ -1698,9 +1585,7 @@ def upload_image(request):
         allowed_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
         if file_extension not in allowed_extensions:
             return Response(
-                {
-                    "error": f"Invalid file extension. Allowed: {', '.join(allowed_extensions)}"
-                },
+                {"error": f"Invalid file extension. Allowed: {', '.join(allowed_extensions)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -1709,9 +1594,7 @@ def upload_image(request):
         unique_filename = f"object_type_icons/{uuid.uuid4()}{safe_extension}"
 
         # Save the file
-        file_path = default_storage.save(
-            unique_filename, ContentFile(image_file.read())
-        )
+        file_path = default_storage.save(unique_filename, ContentFile(image_file.read()))
 
         # Get the full URL
         file_url = request.build_absolute_uri(default_storage.url(file_path))
@@ -1722,7 +1605,7 @@ def upload_image(request):
             if object_type.icon_image:
                 try:
                     default_storage.delete(object_type.icon_image.name)
-                except:
+                except Exception:
                     pass  # Ignore errors when deleting old image
 
             # Save the new image path to the object type

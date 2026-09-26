@@ -74,7 +74,12 @@ apiClient.interceptors.request.use(
     async (config) => {
         // Add session ID to all requests
         config.headers['X-Session-ID'] = getSessionId();
-        config.headers['X-Tenant-ID'] = getCurrentTenantId();
+        // Explicitly resolved tenant headers, such as those used by the
+        // standalone renderer, must not be overwritten by browser state.
+        if (!config.headers['X-Tenant-ID']) {
+            const currentTenantId = getCurrentTenantId();
+            if (currentTenantId) config.headers['X-Tenant-ID'] = currentTenantId;
+        }
         
         // Add JWT token to requests
         const accessToken = localStorage.getItem('access_token');

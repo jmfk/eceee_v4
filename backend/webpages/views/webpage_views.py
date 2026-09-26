@@ -221,6 +221,80 @@ class WebPageViewSet(viewsets.ModelViewSet):
         serializer = PageHierarchySerializer(root_pages, many=True, context={"request": request})
         return Response(serializer.data)
 
+    @action(detail=False, methods=["get"], url_path="resolve-render-path")
+    def resolve_render_path(self, request):
+        """Resolve a standalone render URL to a page and its latest saved version."""
+        site_id = request.query_params.get("site_id")
+        slug_path = request.query_params.get("path", "").strip("/")
+
+        if not site_id:
+            return Response(
+                {"site_id": ["This query parameter is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            site_id = int(site_id)
+        except (TypeError, ValueError):
+            return Response(
+                {"site_id": ["A valid integer is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # The standalone URL identifies the site before the frontend knows its
+        # tenant. Resolve that explicit id independently of a stale/default
+        # tenant header, then authorize and scope every descendant lookup to
+        # the site's owning tenant.
+        site = (
+            WebPage.objects.select_related("tenant").filter(pk=site_id, parent__isnull=True, is_deleted=False).first()
+        )
+        if site is None or not site.tenant.user_has_access(request.user):
+            return Response(
+                {"detail": "Site not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        queryset = WebPage.objects.filter(tenant=site.tenant, is_deleted=False)
+
+        segments = [segment for segment in slug_path.split("/") if segment]
+        if any(segment in {".", ".."} for segment in segments):
+            return Response(
+                {"path": ["Invalid page path."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # The site id already identifies the root. Also accept copied public
+        # paths that include the root slug.
+        if segments and segments[0] == site.slug:
+            segments = segments[1:]
+
+        page = site
+        for segment in segments:
+            page = queryset.filter(parent=page, slug=segment).first()
+            if page is None:
+                return Response(
+                    {"detail": "Page not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        version = page.get_latest_version()
+        if version is None:
+            return Response(
+                {"detail": "The page has no saved version."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        resolved_path = "/".join(segments)
+        return Response(
+            {
+                "site_id": site.id,
+                "tenant_identifier": site.tenant.identifier,
+                "page_id": page.id,
+                "version_id": version.id,
+                "slug_path": resolved_path,
+                "render_path": f"/_render/{site.id}/{resolved_path}".rstrip("/"),
+            }
+        )
+
     @action(detail=False, methods=["get"])
     def published(self, request):
         """Get only published pages"""
@@ -296,7 +370,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
             # Fallback to old system
             return self._widget_inheritance_legacy(page)
 
-    def _widget_inheritance_legacy(self, page):
+    @staticmethod
+    def _widget_inheritance_legacy(page):
         """Legacy widget inheritance method (backup)"""
         # Get inheritance info from the model method
         inheritance_info = page.get_widgets_inheritance_info()
