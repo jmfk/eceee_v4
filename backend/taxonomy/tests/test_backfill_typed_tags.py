@@ -128,3 +128,52 @@ class TypedTagBackfillTests(TestCase):
 
         with self.assertRaisesMessage(CommandError, "Run identity does not match"):
             call_command("backfill_typed_tags", run_id="mismatch-test")
+
+    def test_preflight_is_read_only(self):
+        legacy_counts = (
+            ContentTag.objects.count(),
+            MediaTag.objects.count(),
+            PageVersion.objects.count(),
+            MediaFile.objects.with_deleted().count(),
+            MediaCollection.objects.count(),
+        )
+
+        call_command("backfill_typed_tags", preflight_only=True)
+
+        self.assertEqual(Tag.objects.count(), 0)
+        self.assertEqual(LegacyTagMapping.objects.count(), 0)
+        self.assertEqual(TagBackfillRun.objects.count(), 0)
+        self.assertEqual(TagBackfillUnit.objects.count(), 0)
+        self.assertEqual(PageVersionTag.objects.count(), 0)
+        self.assertEqual(
+            (
+                ContentTag.objects.count(),
+                MediaTag.objects.count(),
+                PageVersion.objects.count(),
+                MediaFile.objects.with_deleted().count(),
+                MediaCollection.objects.count(),
+            ),
+            legacy_counts,
+        )
+
+    def test_preflight_rejects_lossy_slug_collisions(self):
+        self.version.tags = ["C++", "C#"]
+        self.version.save(update_fields=["tags"])
+
+        with self.assertRaisesMessage(CommandError, "same canonical identity"):
+            call_command("backfill_typed_tags", preflight_only=True)
+
+        self.assertEqual(Tag.objects.count(), 0)
+        self.assertEqual(TagBackfillRun.objects.count(), 0)
+
+    def test_interrupted_canary_fails_if_a_processed_unit_failed(self):
+        self.version.tags = ["   "]
+        self.version.save(update_fields=["tags"])
+
+        with self.assertRaisesMessage(CommandError, "Canary recorded 1 failed work unit"):
+            call_command("backfill_typed_tags", run_id="failed-canary", stop_after=3)
+
+        run = TagBackfillRun.objects.get(pk="failed-canary")
+        self.assertEqual(run.status, TagBackfillRun.Status.INTERRUPTED)
+        self.assertEqual(run.completed_work_units, 2)
+        self.assertEqual(run.failed_work_units, 1)

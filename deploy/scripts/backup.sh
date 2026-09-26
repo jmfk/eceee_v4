@@ -8,6 +8,7 @@
 # Backups older than 30 days are automatically pruned.
 
 set -euo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=deploy/scripts/env.sh
@@ -56,9 +57,18 @@ mkdir -p "$BACKUP_DIR"
 
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 OUTFILE="$BACKUP_DIR/eceee_v4_${TIMESTAMP}.sql.gz"
+OUTFILE_TMP="${OUTFILE}.partial"
+
+cleanup_partial_backup() {
+    rm -f "$OUTFILE_TMP"
+}
+trap cleanup_partial_backup EXIT
 
 info "Backing up database to $OUTFILE..."
-docker_compose exec -T db pg_dump -U postgres eceee_v4 | gzip > "$OUTFILE"
+docker_compose exec -T db pg_dump -U postgres eceee_v4 | gzip > "$OUTFILE_TMP"
+gzip -t "$OUTFILE_TMP"
+mv "$OUTFILE_TMP" "$OUTFILE"
+trap - EXIT
 
 BACKUP_SIZE=$(du -sh "$OUTFILE" | cut -f1)
 success "Backup complete: $OUTFILE ($BACKUP_SIZE)"
