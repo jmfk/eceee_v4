@@ -256,6 +256,32 @@ To enable in production:
 3. Consider restricting access to sync endpoints via firewall/network policies
 4. Monitor sync activity and version conflicts
 
+## Saved Designer remote sites
+
+Designer can use several saved remote-site connections per workspace, with one connection marked as the default. Workspace administrators manage the connections; Designer users can select and use them but cannot read the stored access key.
+
+On the remote installation:
+
+1. Enable the sync API with `THEME_SYNC_ENABLED=True`.
+2. Create or rotate a theme-only access key. The command prints the key once:
+
+   ```bash
+   python manage.py setup_theme_remote_access \
+     --workspace WORKSPACE_IDENTIFIER \
+     --created-by ADMIN_USERNAME \
+     --name "Primary Designer connection"
+   ```
+
+3. Copy the final output line directly into the local installation's **Designer themes → Remote sites → Add remote site** form. Do not save it in source control or chat.
+
+On the local installation, configure credential encryption before saving connections. Generate a Fernet key once and place it in the protected runtime environment as `THEME_REMOTE_CREDENTIAL_KEYS`. The first key encrypts new values; additional comma-separated keys allow key rotation and decrypt older values.
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+In development only, Django derives a local encryption key from `SECRET_KEY` when the setting is absent. Production intentionally refuses to save or use remote credentials without the explicit encryption key.
+
 ## API Endpoints
 
 The sync service uses these backend endpoints:
@@ -279,4 +305,3 @@ The theme sync service supports multi-tenancy. Each tenant has:
 - Tenant-specific sync state
 
 To work with a different tenant, change the `TENANT_ID` environment variable and restart the service.
-

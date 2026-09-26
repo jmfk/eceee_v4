@@ -57,6 +57,9 @@ else:
 
 # Theme sync configuration
 THEME_SYNC_ENABLED = config("THEME_SYNC_ENABLED", default=False, cast=bool)
+THEME_REMOTE_CREDENTIAL_KEYS = [
+    key.strip() for key in config("THEME_REMOTE_CREDENTIAL_KEYS", default="").split(",") if key.strip()
+]
 
 # Multi-tenancy configuration
 TENANT_HEADER = config("TENANT_HEADER", default="X-Tenant-ID")

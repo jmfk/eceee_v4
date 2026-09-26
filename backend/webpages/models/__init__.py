@@ -18,6 +18,8 @@ from .page_version import PageVersion, PageVersionTag
 from .preview_size import PreviewSize
 from .site_package_job import SitePackageJob
 from .theme_designer import ThemeDesignerAssignment, ThemeDesignerDraft, ThemeDesignerExportJob, ThemeDesignerRevision
+from .theme_remote import ThemeRemoteAccessKey, ThemeRemoteConnection
+from .theme_version import ThemeVersion
 from .web_page import WebPage
 
 __all__ = [
@@ -33,4 +35,7 @@ __all__ = [
     "ThemeDesignerDraft",
     "ThemeDesignerExportJob",
     "ThemeDesignerRevision",
+    "ThemeVersion",
+    "ThemeRemoteAccessKey",
+    "ThemeRemoteConnection",
 ]

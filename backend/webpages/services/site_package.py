@@ -2,6 +2,8 @@
 Site ZIP package export/import services.
 """
 
+import base64
+import hashlib
 import io
 import json
 import mimetypes
@@ -393,6 +395,101 @@ def _theme_asset_paths(theme: PageTheme) -> Set[str]:
     return paths
 
 
+def build_theme_transfer_package(theme: PageTheme, storage=None) -> str:
+    """Package one theme and its referenced files for remote synchronization."""
+    storage = storage or S3MediaStorage()
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+        _write_json(package, "theme.json", _serialize_theme(theme))
+        for path in _theme_asset_paths(theme):
+            file_obj = None
+            try:
+                file_obj = storage._open(path, "rb")
+                package.writestr(f"assets/{path}", file_obj.read())
+            except Exception:
+                continue
+            finally:
+                if file_obj:
+                    file_obj.close()
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+def _read_theme_transfer_package(encoded_package: str):
+    try:
+        raw_package = base64.b64decode(encoded_package, validate=True)
+        package = zipfile.ZipFile(io.BytesIO(raw_package), "r")
+        data = json.loads(package.read("theme.json").decode("utf-8"))
+    except (ValueError, KeyError, UnicodeDecodeError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
+        raise ValueError("Invalid theme transfer package.") from exc
+    if not isinstance(data, dict):
+        package.close()
+        raise ValueError("Invalid theme transfer package.")
+    for name in package.namelist():
+        if not name.startswith("assets/") or name.endswith("/"):
+            continue
+        original_path = name[len("assets/") :]
+        if not original_path or original_path.startswith("/") or ".." in original_path.split("/"):
+            package.close()
+            raise ValueError("Invalid asset path in theme transfer package.")
+    return package, data
+
+
+def validate_theme_transfer_package(encoded_package: str):
+    """Validate a package before its caller mutates theme records."""
+    package, _data = _read_theme_transfer_package(encoded_package)
+    try:
+        with package:
+            if package.testzip() is not None:
+                raise ValueError("Invalid theme transfer package.")
+    except zipfile.BadZipFile as exc:
+        raise ValueError("Invalid theme transfer package.") from exc
+
+
+def restore_theme_transfer_package(encoded_package: str, theme: PageTheme, storage=None) -> Dict[str, Any]:
+    """Copy packaged files into a theme's library and return rewritten theme data."""
+    storage = storage or S3MediaStorage()
+    package, data = _read_theme_transfer_package(encoded_package)
+
+    replacements = {}
+    with package:
+        asset_names = [name for name in package.namelist() if name.startswith("assets/") and not name.endswith("/")]
+        original_paths = [name[len("assets/") :] for name in asset_names]
+        basename_counts = {}
+        for original_path in original_paths:
+            basename = os.path.basename(original_path)
+            basename_counts[basename] = basename_counts.get(basename, 0) + 1
+        for name, original_path in zip(asset_names, original_paths):
+            basename = os.path.basename(original_path)
+            if basename_counts[basename] > 1:
+                stem, suffix = os.path.splitext(basename)
+                digest = hashlib.sha256(original_path.encode("utf-8")).hexdigest()[:12]
+                basename = f"{stem}-{digest}{suffix}"
+            new_path = f"theme_images/{theme.id}/library/{basename}"
+            storage._save(new_path, ContentFile(package.read(name)))
+            replacements[original_path] = new_path
+
+    if replacements:
+        for field_name in (
+            "fonts",
+            "colors",
+            "design_groups",
+            "component_styles",
+            "designer_preview",
+            "image_styles",
+            "gallery_styles",
+            "carousel_styles",
+            "table_templates",
+            "breakpoints",
+            "css_variables",
+            "html_elements",
+            "custom_css",
+        ):
+            data[field_name] = _replace_in_json(data.get(field_name), replacements)
+        data["image"] = replacements.get(data.get("image"), data.get("image"))
+        data["site_icon"] = replacements.get(data.get("site_icon"), data.get("site_icon"))
+    return data
+
+
 def _unique_theme_name(base_name: str) -> str:
     name = base_name or "Imported Theme"
     candidate = name
@@ -671,18 +768,6 @@ class SitePackageImporter:
                 preserve_publication = (self.job.options or {}).get("preserve_publication_status", True)
                 page_data_payload = _replace_in_json(version_data.get("page_data", {}), replacements)
                 widgets_payload = _replace_in_json(version_data.get("widgets", {}), replacements)
-                page_data_payload = _remap_structured_references(
-                    page_data_payload,
-                    page_map=page_reference_map,
-                    theme_map=theme_reference_map,
-                    media_map=media_reference_map,
-                )
-                widgets_payload = _remap_structured_references(
-                    widgets_payload,
-                    page_map=page_reference_map,
-                    theme_map=theme_reference_map,
-                    media_map=media_reference_map,
-                )
                 imported_version = PageVersion.objects.create(
                     page=page,
                     version_number=version_data["version_number"],
