@@ -64,3 +64,21 @@ class TenantAccessPermissionTest(TestCase):
             "The selected tenant does not exist or is inactive.",
             status_code=status.HTTP_403_FORBIDDEN,
         )
+
+    def test_superuser_session_workspace_is_used_without_explicit_header(self):
+        superuser = User.objects.create_superuser("workspace-switcher", password="test")
+        selected = Tenant.objects.create(
+            name="Selected workspace",
+            identifier="selected-workspace",
+            created_by=superuser,
+        )
+        client = APIClient()
+        client.force_login(superuser)
+        session = client.session
+        session["selected_tenant_identifier"] = selected.identifier
+        session.save()
+
+        response = client.get("/api/v1/utils/current-user/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["current_workspace"]["identifier"], selected.identifier)

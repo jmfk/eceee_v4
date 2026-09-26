@@ -10,6 +10,7 @@ from django.db.models import Q
 from django.http import HttpResponseForbidden
 
 from core.models import Tenant
+from core.permissions import user_can_switch_tenant
 from core.rls import clear_tenant_context, set_tenant_context
 
 
@@ -89,14 +90,29 @@ class TenantContextMiddleware:
 
                 tenant_uuid = uuid.UUID(tenant_id_header)
                 tenant = Tenant.objects.get(id=tenant_uuid, is_active=True)
-                return tenant
             except (ValueError, Tenant.DoesNotExist):
                 # Try by identifier
                 try:
                     tenant = Tenant.objects.get(identifier=tenant_id_header, is_active=True)
-                    return tenant
                 except Tenant.DoesNotExist:
                     raise self.InvalidTenantSelection from None
+            if request.user.is_authenticated and not user_can_switch_tenant(request.user):
+                has_access = (
+                    tenant.user_has_access(request.user)
+                    or tenant.theme_designer_assignments.filter(user=request.user).exists()
+                )
+                if not has_access:
+                    raise self.InvalidTenantSelection
+            return tenant
+
+        # A privileged profile selection supplies the fallback when clients do
+        # not send an explicit workspace header.
+        selected_identifier = request.session.get("selected_tenant_identifier")
+        if selected_identifier and user_can_switch_tenant(request.user):
+            try:
+                return Tenant.objects.get(identifier=selected_identifier, is_active=True)
+            except Tenant.DoesNotExist:
+                request.session.pop("selected_tenant_identifier", None)
 
         # 2. An omitted header is only unambiguous when the user can access one tenant.
         if request.user.is_authenticated:

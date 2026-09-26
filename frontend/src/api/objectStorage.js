@@ -134,8 +134,8 @@ export const objectInstancesApi = {
     /**
      * Get object instance by ID
      */
-    async get(id) {
-        const response = await api.get(`${BASE_URL}/objects/${id}/`)
+    async get(id, requestConfig = {}) {
+        const response = await api.get(`${BASE_URL}/objects/${id}/`, requestConfig)
         return response
     },
 
@@ -292,9 +292,12 @@ export const objectInstancesApi = {
     /**
      * Search objects
      */
-    async search(query, params = {}) {
+    async search(query, params = {}, requestConfig = {}) {
         const allParams = { ...params, q: query }
-        const response = await api.get(`${BASE_URL}/objects/search/`, { params: allParams })
+        const response = await api.get(`${BASE_URL}/objects/search/`, {
+            ...requestConfig,
+            params: { ...(requestConfig.params || {}), ...allParams },
+        })
         return response
     },
 
@@ -314,12 +317,15 @@ export const objectInstancesApi = {
      * @param {Array<number>} objectTypes - Array of object type IDs
      * @param {Object} params - Query parameters (limit, sort_order)
      */
-    async getNewsList(objectTypes, params = {}) {
+    async getNewsList(objectTypes, params = {}, requestConfig = {}) {
         const allParams = {
             ...params,
             object_types: objectTypes.join(',')
         }
-        const response = await api.get(`${BASE_URL}/objects/news_list/`, { params: allParams })
+        const response = await api.get(`${BASE_URL}/objects/news_list/`, {
+            ...requestConfig,
+            params: { ...(requestConfig.params || {}), ...allParams },
+        })
         return response
     }
 }

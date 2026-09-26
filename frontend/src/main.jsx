@@ -12,9 +12,17 @@ import './index.css'
 import App from './App.jsx'
 import analytics from './utils/analytics'
 import { getCurrentTenantId } from './utils/tenant'
+import RenderFrameRuntime from './rendering/RenderFrameRuntime'
+import StandaloneRenderRuntime from './rendering/StandaloneRenderRuntime'
 
-analytics.init(getCurrentTenantId());
+const isRenderFrame = window.location.pathname === '/__render-frame'
+const isStandaloneRender = window.location.pathname.startsWith('/_render/')
+if (!isRenderFrame && !isStandaloneRender) analytics.init(getCurrentTenantId());
 
-createRoot(document.getElementById('root')).render(
-  <App />,
-)
+const RootComponent = isRenderFrame
+    ? RenderFrameRuntime
+    : isStandaloneRender
+        ? StandaloneRenderRuntime
+        : App
+
+createRoot(document.getElementById('root')).render(<RootComponent />)

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
-import { changePassword } from '../api/users';
-import { Lock, User, Mail, Shield, AlertCircle, CheckCircle } from 'lucide-react';
+import { changePassword, switchCurrentWorkspace } from '../api/users';
+import { Lock, User, Mail, Shield, AlertCircle, CheckCircle, Building2 } from 'lucide-react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { getCurrentTenantId } from '../utils/tenant';
 
 const ProfilePage = () => {
     // Set document title
@@ -21,6 +22,30 @@ const ProfilePage = () => {
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [selectedWorkspace, setSelectedWorkspace] = useState('');
+    const [isSwitchingWorkspace, setIsSwitchingWorkspace] = useState(false);
+
+    useEffect(() => {
+        if (!user?.canSwitchTenant) return;
+        const available = user.designerTenants || [];
+        const current = user.currentWorkspace?.identifier || getCurrentTenantId();
+        const selection = available.find((workspace) => workspace.identifier === current) || available[0];
+        setSelectedWorkspace(selection?.identifier || '');
+    }, [user]);
+
+    const handleWorkspaceSwitch = async () => {
+        if (!selectedWorkspace) return;
+        setIsSwitchingWorkspace(true);
+        try {
+            const response = await switchCurrentWorkspace(selectedWorkspace);
+            const identifier = response.data.currentWorkspace.identifier;
+            localStorage.setItem('eceee_tenant_id', identifier);
+            window.location.assign('/profile');
+        } catch (error) {
+            addNotification(error.response?.data?.error || 'Failed to switch workspace', 'error');
+            setIsSwitchingWorkspace(false);
+        }
+    };
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -177,6 +202,41 @@ const ProfilePage = () => {
                 </div>
             </div>
 
+            {user.canSwitchTenant && user.designerTenants?.length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+                    <div className="flex items-start gap-3">
+                        <Building2 className="w-5 h-5 text-blue-500 mt-0.5" />
+                        <div className="flex-1">
+                            <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Workspace</div>
+                            <p className="text-sm text-gray-600 mt-1">Choose which workspace to administer in this browser session.</p>
+                            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                                <label className="flex-1 text-sm font-medium text-gray-700">
+                                    Current workspace
+                                    <select
+                                        aria-label="Current workspace"
+                                        value={selectedWorkspace}
+                                        onChange={(event) => setSelectedWorkspace(event.target.value)}
+                                        className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        {user.designerTenants.map((workspace) => (
+                                            <option key={workspace.id} value={workspace.identifier}>{workspace.name}</option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={handleWorkspaceSwitch}
+                                    disabled={!selectedWorkspace || isSwitchingWorkspace}
+                                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {isSwitchingWorkspace ? 'Switching…' : 'Switch workspace'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Change Password */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <div className="text-xl font-semibold text-gray-900 mb-4" role="heading" aria-level="2">Change Password</div>
@@ -292,4 +352,3 @@ const ProfilePage = () => {
 };
 
 export default ProfilePage;
-

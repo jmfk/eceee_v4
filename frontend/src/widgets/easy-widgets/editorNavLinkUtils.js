@@ -1,3 +1,5 @@
+import { normalizeNavigationItem, processNavigationItems } from '../../utils/navigationItems'
+
 const isAbsoluteWebUrl = (url = '') => /^https?:\/\//i.test(url)
 
 export const isExternalNavItem = (item = {}) => {
@@ -31,33 +33,11 @@ export const isEditorNavMenuContext = (mode = 'preview', context = {}) => {
 }
 
 export const normalizeNavItem = (item = {}, index = 0) => {
-    const linkData = item.linkData || item.link_data || null
-    const source = linkData || item
-    const order = item.order !== undefined ? item.order : index
-
-    return {
-        ...item,
-        ...source,
-        label: source.label || item.label || '',
-        url: source.url || item.url || '',
-        isActive: source.isActive !== false && source.is_active !== false && item.isActive !== false && item.is_active !== false,
-        targetBlank: source.targetBlank || source.target_blank || item.targetBlank || item.target_blank || false,
-        type: source.type || item.type || (source.url ? 'external' : 'external'),
-        pageId: source.pageId || source.page_id || item.pageId || item.page_id || null,
-        pageTitle: source.pageTitle || source.page_title || item.pageTitle || item.page_title || '',
-        pageShortTitle: source.pageShortTitle || source.page_short_title || item.pageShortTitle || item.page_short_title || '',
-        anchor: source.anchor || item.anchor || '',
-        isPublished: source.isPublished ?? source.is_published ?? item.isPublished ?? item.is_published,
-        currentVersionId: source.currentVersionId || source.current_version_id || item.currentVersionId || item.current_version_id || null,
-        _navListKey: item._navListKey,
-        _navIndex: item._navIndex,
-        order,
-    }
+    return normalizeNavigationItem(item, index)
 }
 
 export const processNavItems = (items = []) => {
-    if (!Array.isArray(items)) return []
-    return items.map((item, index) => normalizeNavItem(item, index))
+    return processNavigationItems(items)
 }
 
 export const processEditableNavItems = (items = [], listKey = 'menuItems') => {

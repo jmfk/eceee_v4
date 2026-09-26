@@ -2324,6 +2324,11 @@ const PageEditor = () => {
                                         pageVersionData={pageVersionData}
                                         isLoadingLayout={isLoadingLayout}
                                         layoutData={layoutData}
+                                        localWidgets={localWidgets}
+                                        inheritedWidgets={inheritedWidgets}
+                                        slotInheritanceRules={slotInheritanceRules}
+                                        pathVariables={pathVariables}
+                                        simulatedPath={simulatedPath}
                                     />
                                 )}
                             </div>

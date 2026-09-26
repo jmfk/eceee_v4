@@ -7,14 +7,16 @@ import logging
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
-from rest_framework import status, viewsets
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.models import Tenant
+from core.permissions import user_can_switch_tenant
 from webpages.models import ThemeDesignerAssignment
 
 from .models import AIAgentTask, AIAgentTaskTemplate, ClipboardEntry, ValueList, ValueListItem
@@ -512,8 +514,52 @@ class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        serializer = UserListSerializer(request.user)
-        return Response(serializer.data)
+        administrative_tenants = Tenant.objects.filter(is_active=True)
+        if not user_can_switch_tenant(request.user):
+            administrative_tenants = administrative_tenants.filter(
+                Q(created_by=request.user) | Q(members=request.user)
+            ).distinct()
+        serializer = UserListSerializer(
+            request.user,
+            context={"additional_designer_tenants": list(administrative_tenants.order_by("name"))},
+        )
+        data = dict(serializer.data)
+        current_workspace = getattr(request, "tenant", None)
+        data["current_workspace"] = (
+            {
+                "id": str(current_workspace.id),
+                "identifier": current_workspace.identifier,
+                "name": current_workspace.name,
+            }
+            if current_workspace
+            else None
+        )
+        return Response(data)
+
+
+class WorkspaceSelectionSerializer(serializers.Serializer):
+    identifier = serializers.SlugField(max_length=100)
+
+
+class CurrentWorkspaceView(APIView):
+    """Validate and remember a privileged user's current workspace."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not user_can_switch_tenant(request.user):
+            return Response({"error": "Workspace switching is not allowed."}, status=status.HTTP_403_FORBIDDEN)
+        serializer = WorkspaceSelectionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        tenant = get_object_or_404(
+            Tenant,
+            identifier=serializer.validated_data["identifier"],
+            is_active=True,
+        )
+        request.session["selected_tenant_identifier"] = tenant.identifier
+        return Response(
+            {"currentWorkspace": {"id": str(tenant.id), "identifier": tenant.identifier, "name": tenant.name}}
+        )
 
 
 class ChangePasswordView(APIView):
