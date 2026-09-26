@@ -323,6 +323,7 @@ const ObjectDataForm = forwardRef(({
                 ...prev,
                 data: { ...prev.data, [fieldName]: value }
             };
+            onFormChange?.(updated);
             return updated;
         });
 

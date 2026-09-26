@@ -1161,6 +1161,7 @@ const ThemeEditor = ({ onSave }) => {
                         <PreviewViewsTab
                             designerPreview={themeData?.designerPreview || { views: [] }}
                             onChange={(designerPreview) => updateThemeField('designerPreview', designerPreview)}
+                            themeId={themeId}
                         />
                     )}
 

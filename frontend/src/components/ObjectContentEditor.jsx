@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { Layout, Plus, Settings, Trash2, Eye, Check, X, MoreHorizontal, Clipboard, Scissors, ChevronDown, ChevronUp } from 'lucide-react'
-import { ObjectWidgetFactory, createObjectEditorEventSystem } from '../editors/object-editor'
+import { ObjectWidgetFactory } from '../editors/object-editor'
 import { useWidgets, getWidgetDisplayName, createDefaultWidgetConfig } from '../hooks/useWidgets'
 import { filterAvailableWidgetTypes } from '../utils/widgetTypeValidation'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
@@ -11,8 +11,9 @@ import { useEditorContext } from '../contexts/unified-data/hooks'
 import { useClipboard } from '../contexts/ClipboardContext'
 import { copyWidgetsToClipboard, cutWidgetsToClipboard } from '../utils/clipboardService'
 import ImportDialog from './ImportDialog'
+import WidgetEditorPanel from './WidgetEditorPanel'
 
-const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidgetEditorStateChange, context }) => {
+const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context }) => {
     // 1. STATE & HOOKS (Top level)
     const [selectedWidgets, setSelectedWidgets] = useState(() => new Set())
     const [cutWidgets, setCutWidgets] = useState(() => new Set())
@@ -21,7 +22,6 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
     const { useExternalChanges, publishUpdate } = useUnifiedData()
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
     const [editingWidget, setEditingWidget] = useState(null)
-    const widgetEditorRef = useRef(null)
     const [widgetModalOpen, setWidgetModalOpen] = useState(false)
     const [selectedSlotForModal, setSelectedSlotForModal] = useState(null)
     const [importDialogOpen, setImportDialogOpen] = useState(false)
@@ -34,14 +34,20 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
     const componentId = useMemo(() => `object-content-editor-${instanceId || 'new'}`, [instanceId])
     const normalizedWidgets = useMemo(() => internalWidgets, [internalWidgets])
     const normalizedWidgetsRef = useRef(internalWidgets)
+    const onWidgetChangeRef = useRef(onWidgetChange)
     const { widgetTypes } = useWidgets(internalWidgets)
     const [filteredWidgetTypes, setFilteredWidgetTypes] = useState([])
     const [isFilteringTypes, setIsFilteringTypes] = useState(false)
 
     // 2. EFFECTS
     useEffect(() => {
+        onWidgetChangeRef.current = onWidgetChange
+    }, [onWidgetChange])
+
+    useEffect(() => {
         internalWidgetsRef.current = internalWidgets
         normalizedWidgetsRef.current = internalWidgets
+        if (isInitialized.current) onWidgetChangeRef.current?.(internalWidgets)
     }, [internalWidgets])
 
     useEffect(() => {
@@ -236,6 +242,10 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
     const handleSaveWidget = useCallback(async (updatedWidget) => {
         if (!editingWidget) return
         const slotName = editingWidget.slotName || 'main'
+        setInternalWidgets(prev => ({
+            ...prev,
+            [slotName]: (prev[slotName] || []).map(widget => widget.id === updatedWidget.id ? updatedWidget : widget),
+        }))
         await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
             id: updatedWidget.id, slotName, contextType, config: updatedWidget.config
         })
@@ -524,6 +534,15 @@ const ObjectContentEditor = ({ objectType, widgets = {}, mode = 'object', onWidg
             <ImportDialog
                 isOpen={importDialogOpen} onClose={() => { setImportDialogOpen(false); setImportSlotName(null) }}
                 slotName={importSlotName} onImportComplete={handleImportComplete}
+            />
+            <WidgetEditorPanel
+                isOpen={widgetEditorOpen}
+                onClose={handleCloseWidgetEditor}
+                onSave={handleSaveWidget}
+                widgetData={editingWidget}
+                title={editingWidget ? `Edit ${getWidgetDisplayName(editingWidget.type, widgetTypes)}` : 'Edit widget'}
+                autoOpenSpecialEditor
+                context={{ ...context, instanceId }}
             />
         </div>
     )

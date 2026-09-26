@@ -37,6 +37,7 @@ const PageContentEditor = forwardRef(({
     pathVariables,
     simulatedPath,
     onSimulatedPathChange,
+    applyPageTheme = true,
     ...otherProps
 }, ref) => {
     // State for default layout fetched from backend
@@ -59,7 +60,7 @@ const PageContentEditor = forwardRef(({
     // Apply theme CSS - ensures theme loads even on pages with no widgets
     useTheme({
         pageId: pageId,
-        enabled: !!pageId
+        enabled: applyPageTheme && !!pageId
     });
 
     // Use local widgets from PageEditor (fast local state)

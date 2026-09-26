@@ -1,31 +1,71 @@
 import { useState } from 'react'
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { renderWithStateProviders } from '../../../test/testUtils'
 import PreviewViewsTab from '../PreviewViewsTab'
+
+const mocks = vi.hoisted(() => ({
+    previewContentSources: vi.fn(),
+    importPreviewContent: vi.fn(),
+}))
+
+vi.mock('../../../api', () => ({ themesApi: mocks }))
+vi.mock('../../../editors/page-editor/PageContentEditor', () => ({
+    default: ({ pageVersionData }) => <div>Page widgets for {pageVersionData.codeLayout}</div>,
+}))
+vi.mock('../../ObjectContentEditor', () => ({ default: () => <div>Object widgets</div> }))
+vi.mock('../../WidgetEditorPanel', () => ({ default: () => null }))
+vi.mock('../../objectEdit/ObjectDataForm', () => ({ default: () => <div>Object fields</div> }))
+
+const sources = {
+    layouts: [{ key: 'main_layout', label: 'Main layout' }],
+    pages: [{ id: 12, label: 'Conference — Programme' }],
+    objects: [{ id: 21, label: 'Article — Welcome' }],
+    objectTypes: [{ key: 'article', label: 'Article', schema: { properties: {} }, slotConfiguration: { slots: [] } }],
+}
 
 const Harness = () => {
     const [preview, setPreview] = useState({ views: [] })
-    return <PreviewViewsTab designerPreview={preview} onChange={setPreview} />
+    return <PreviewViewsTab designerPreview={preview} onChange={setPreview} themeId="7" />
 }
 
 describe('PreviewViewsTab', () => {
-    it('lets a developer add page and object previews with their own demo content', () => {
-        render(<Harness />)
-
-        fireEvent.click(screen.getByRole('button', { name: 'Add page preview' }))
-        fireEvent.click(screen.getByRole('button', { name: 'Add object preview' }))
-
-        expect(screen.getByDisplayValue('Page preview 1')).toBeInTheDocument()
-        expect(screen.getByDisplayValue('Object preview 2')).toBeInTheDocument()
-        expect(screen.getAllByLabelText('Preview type')).toHaveLength(2)
-
-        const textEditors = screen.getAllByLabelText('Demo text by element id')
-        fireEvent.change(textEditors[1], {
-            target: { value: '{"group:0:element:h1":"A saved object headline"}' },
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mocks.previewContentSources.mockResolvedValue(sources)
+        mocks.importPreviewContent.mockResolvedValue({
+            designer_preview: {
+                views: [{
+                    id: 'page-imported', label: 'Programme', kind: 'page', layout: 'main_layout',
+                    content: { title: 'Programme', pageData: {}, widgets: {}, codeLayout: 'main_layout' },
+                }],
+            },
         })
-        fireEvent.blur(textEditors[1])
+        vi.spyOn(window, 'confirm').mockReturnValue(true)
+    })
 
-        expect(screen.getByDisplayValue(/A saved object headline/)).toBeInTheDocument()
+    it('creates theme-owned pages and objects with the regular content editors', async () => {
+        renderWithStateProviders(<Harness />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'New page' }))
+        expect(screen.getAllByDisplayValue('New preview page')).toHaveLength(2)
+        expect(screen.getByText('Page widgets for main_layout')).toBeInTheDocument()
+
+        await screen.findByRole('option', { name: 'Article' })
+        fireEvent.click(screen.getByRole('button', { name: 'New object' }))
+        expect(screen.getByDisplayValue('New Article')).toBeInTheDocument()
+        expect(screen.getByText('Object widgets')).toBeInTheDocument()
+        expect(screen.getByText('Object fields')).toBeInTheDocument()
+    })
+
+    it('copies a selected tenant page into the theme preview collection', async () => {
+        renderWithStateProviders(<Harness />)
+
+        await screen.findByRole('option', { name: 'Conference — Programme' })
+        fireEvent.click(screen.getByRole('button', { name: 'Copy into theme' }))
+
+        await waitFor(() => expect(mocks.importPreviewContent).toHaveBeenCalledWith('7', 'page', 12))
+        expect(await screen.findAllByDisplayValue('Programme')).toHaveLength(2)
     })
 })

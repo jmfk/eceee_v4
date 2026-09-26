@@ -7,3 +7,4 @@
 | PRD-0003 | [Designer draft publishing](0003-designer-draft-publishing.md) | started | [ADR-0004](../adrs/active/0004-designer-draft-publication.md) |
 | PRD-0004 | [Typed tag backfill](0004-typed-tag-backfill.md) | completed | [ADR-0005](../adrs/active/0005-canonical-typed-tag-taxonomy.md) |
 | PRD-0006 | [Privileged workspace switching](0006-privileged-workspace-switching.md) | completed | [ADR-0007](../adrs/active/0007-session-backed-workspace-selection.md) |
+| PRD-0008 | [Theme-owned preview content](0008-theme-owned-preview-content.md) | completed | [ADR-0009](../adrs/active/0009-theme-preview-documents.md) |
