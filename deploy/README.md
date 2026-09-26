@@ -15,6 +15,8 @@ deploy/
     ├── deploy.sh              backup → pull → build → migrate → up → healthcheck
     ├── rollback.sh            re-deploy previous tag
     ├── backup.sh              pg_dump to /mnt/data/backups/
+    ├── backfill-typed-tags.sh maintenance → backup → canary → verify
+    ├── validate-typed-tags-backup.sh  disposable local restore validation
     └── healthcheck.sh         polls backend /health/ (Host from DOMAIN in deploy/.env)
 ```
 
@@ -153,6 +155,37 @@ make prod-backup
 Backups are stored at `/mnt/data/backups/eceee_v4_TIMESTAMP.sql.gz`.
 They are pruned automatically after 30 days.
 
+`deploy.sh` treats backup failure as fatal. `backup.sh` writes to a partial file,
+verifies the gzip stream, and only then publishes the timestamped backup name.
+
+### Validate the typed-tag migration against production data
+
+After creating a current backup, transfer it through an approved secure channel,
+make it readable only by the local operator, and run the disposable validator:
+
+```bash
+chmod 600 /absolute/path/eceee_v4_TIMESTAMP.sql.gz
+make validate-typed-tags-backup BACKUP_FILE=/absolute/path/eceee_v4_TIMESTAMP.sql.gz
+```
+
+The dump is restored into an isolated local PostgreSQL 15 container. Its contents
+and restore errors are not printed. The current schema migration, typed-tag source
+preflight, interrupted/resumed backfill, independent verification, and Django
+checks must all pass before scheduling production.
+
+### Run the typed-tag production backfill
+
+After deploying the reviewed commit, run the one-time maintenance workflow:
+
+```bash
+make prod-backfill-typed-tags RUN_ID=typed-tags-v1 CANARY_SIZE=100
+```
+
+This stops application writers, creates a mandatory backup, preflights existing
+data, runs and resumes a bounded canary, verifies all canonical relations, restores
+services, and waits for a healthy backend. Legacy fields remain authoritative, so
+a failed expansion can return to service without switching reads to partial data.
+
 ---
 
 ## Database Restore
@@ -199,7 +232,7 @@ Edit `deploy/.env` on the server, then run `make prod-deploy` (the containers wi
 `deploy.sh` runs these steps in order:
 
 1. Pre-flight check (`deploy/.env` exists, repo is present)
-2. Backup (`pg_dump` → `/mnt/data/backups/`)
+2. Mandatory verified backup (`pg_dump` → `/mnt/data/backups/`); abort on failure
 3. `git fetch --tags && git checkout TAG`
 4. `docker compose build backend frontend playwright`
 5. `python manage.py migrate` (fail fast if unapplied migrations exist)

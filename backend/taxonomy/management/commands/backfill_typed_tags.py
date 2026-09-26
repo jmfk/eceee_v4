@@ -34,6 +34,11 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--run-id", default="typed-tags-v1")
         parser.add_argument("--batch-size", type=int, default=500)
+        parser.add_argument(
+            "--preflight-only",
+            action="store_true",
+            help="Validate legacy sources without creating canonical tags or backfill checkpoints",
+        )
         parser.add_argument("--verify-only", action="store_true")
         parser.add_argument("--stop-after", type=int, help="Testing/operational canary limit")
 
@@ -41,6 +46,10 @@ class Command(BaseCommand):
         self.batch_size = max(1, options["batch_size"])
         self.stop_requested = False
         self._install_signal_handlers()
+
+        if options["preflight_only"]:
+            self._preflight()
+            return
 
         run_id = options["run_id"]
         source_fingerprint, total_work_units = self._source_fingerprint()
@@ -77,6 +86,11 @@ class Command(BaseCommand):
         for work_unit_id, processor, source in self._work_units():
             if self.stop_requested or (options["stop_after"] is not None and processed >= options["stop_after"]):
                 self._finish_run(run, TagBackfillRun.Status.INTERRUPTED)
+                if run.failed_work_units:
+                    raise CommandError(
+                        f"Canary recorded {run.failed_work_units} failed work unit(s); "
+                        "correct the cause before resuming."
+                    )
                 self.stdout.write(self.style.WARNING(f"Interrupted typed-tag backfill run {run_id}"))
                 return
 
@@ -134,6 +148,130 @@ class Command(BaseCommand):
         self._verify(run, total_work_units)
         self._finish_run(run, TagBackfillRun.Status.COMPLETE)
         self.stdout.write(self.style.SUCCESS(self._progress_line(run)))
+
+    def _preflight(self):
+        """Validate every legacy source without writing taxonomy data."""
+        errors = []
+        identities = {}
+        source_counts = {kind: 0 for kind in SOURCE_KINDS}
+
+        def error(message):
+            if len(errors) < 20:
+                errors.append(message)
+
+        def register_identity(*, name, namespace, source_label):
+            if not isinstance(name, str):
+                error(f"{source_label} has a non-text tag name")
+                return
+            normalized_name = name.strip()
+            slug = slugify(normalized_name)
+            if not normalized_name or not slug:
+                error(f"{source_label} has no usable normalized tag name")
+                return
+            if namespace is None or namespace.tenant_id is None:
+                error(f"{source_label} has no tenant-scoped namespace")
+                return
+
+            identity = (str(namespace.tenant_id), str(namespace.pk), DEFAULT_TAG_TYPE, slug)
+            comparable_name = normalized_name.casefold()
+            previous = identities.get(identity)
+            if previous and previous["name"] != comparable_name:
+                error(
+                    f"{source_label} normalizes to the same canonical identity as "
+                    f"{previous['source']} but has a different name"
+                )
+                return
+            identities.setdefault(identity, {"name": comparable_name, "source": source_label})
+
+        for source in (
+            ContentTag.objects.select_related("namespace", "tenant").order_by("pk").iterator(chunk_size=self.batch_size)
+        ):
+            source_counts["content-tag"] += 1
+            try:
+                namespace = source.namespace or self._namespace_for_tenant(source.tenant)
+            except ValueError as exc:
+                error(f"content-tag:{source.pk}: {exc}")
+                continue
+            if namespace.tenant_id != source.tenant_id:
+                error(f"content-tag:{source.pk} crosses a tenant boundary")
+                continue
+            register_identity(name=source.name, namespace=namespace, source_label=f"content-tag:{source.pk}")
+
+        for source in (
+            MediaTag.objects.select_related("namespace__tenant").order_by("pk").iterator(chunk_size=self.batch_size)
+        ):
+            source_counts["media-tag"] += 1
+            register_identity(name=source.name, namespace=source.namespace, source_label=f"media-tag:{source.pk}")
+
+        for version in (
+            PageVersion.objects.select_related("page__tenant").order_by("pk").iterator(chunk_size=self.batch_size)
+        ):
+            if not version.tags:
+                continue
+            source_counts["page-version"] += 1
+            for position, name in enumerate(version.tags):
+                if not isinstance(name, str):
+                    error(f"page-version:{version.pk}[{position}] has a non-text tag name")
+                    continue
+                legacy = (
+                    ContentTag.objects.filter(tenant=version.page.tenant, name__iexact=name.strip())
+                    .select_related("namespace", "tenant")
+                    .order_by("pk")
+                    .first()
+                )
+                try:
+                    namespace = (
+                        (legacy.namespace or self._namespace_for_tenant(legacy.tenant))
+                        if legacy
+                        else self._namespace_for_tenant(version.page.tenant)
+                    )
+                except ValueError as exc:
+                    error(f"page-version:{version.pk}[{position}]: {exc}")
+                    continue
+                if namespace.tenant_id != version.page.tenant_id:
+                    error(f"page-version:{version.pk}[{position}] crosses a tenant boundary")
+                    continue
+                register_identity(
+                    name=name,
+                    namespace=namespace,
+                    source_label=f"page-version:{version.pk}[{position}]",
+                )
+
+        for media_file in (
+            MediaFile.objects.with_deleted()
+            .filter(tags__isnull=False)
+            .distinct()
+            .select_related("tenant", "namespace__tenant")
+            .prefetch_related("tags")
+            .order_by("pk")
+            .iterator(chunk_size=self.batch_size)
+        ):
+            source_counts["media-file"] += 1
+            if media_file.tenant_id != media_file.namespace.tenant_id:
+                error(f"media-file:{media_file.pk} crosses a tenant boundary")
+            for tag in media_file.tags.all():
+                if tag.namespace_id != media_file.namespace_id:
+                    error(f"media-file:{media_file.pk} references a tag from another namespace")
+
+        for collection in (
+            MediaCollection.objects.filter(tags__isnull=False)
+            .distinct()
+            .select_related("namespace__tenant")
+            .prefetch_related("tags")
+            .order_by("pk")
+            .iterator(chunk_size=self.batch_size)
+        ):
+            source_counts["media-collection"] += 1
+            for tag in collection.tags.all():
+                if tag.namespace_id != collection.namespace_id:
+                    error(f"media-collection:{collection.pk} references a tag from another namespace")
+
+        if errors:
+            raise CommandError("Typed-tag preflight failed: " + "; ".join(errors))
+
+        total = sum(source_counts.values())
+        counts = " ".join(f"{kind}={source_counts[kind]}" for kind in SOURCE_KINDS)
+        self.stdout.write(self.style.SUCCESS(f"Typed-tag preflight passed: total={total} {counts}"))
 
     def _install_signal_handlers(self):
         def request_stop(signum, frame):

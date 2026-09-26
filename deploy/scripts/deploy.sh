@@ -83,9 +83,7 @@ info "Deploying: $REF (image tag: $IMAGE_TAG)"
 
 # ── 3. Backup ─────────────────────────────────────────────────────────────────
 info "Running pre-deploy backup..."
-bash "$SCRIPT_DIR/backup.sh" || {
-    warn "Backup failed — continuing anyway. Check /mnt/data/backups/ manually."
-}
+bash "$SCRIPT_DIR/backup.sh"
 
 # ── 4. Git pull + checkout ────────────────────────────────────────────────────
 info "Checking out $REF..."
@@ -113,7 +111,11 @@ IMAGE_TAG="$IMAGE_TAG" docker_compose run --rm backend python manage.py collects
 info "Stopping existing containers..."
 docker_compose down --timeout 30 2>/dev/null || true
 # Remove any stale containers not managed by compose (e.g. from manual runs)
-docker rm -f $(docker ps -aq --filter "name=deploy-" 2>/dev/null) 2>/dev/null || true
+while IFS= read -r stale_container; do
+    if [ -n "$stale_container" ]; then
+        docker rm -f "$stale_container" >/dev/null 2>&1 || true
+    fi
+done < <(docker ps -aq --filter "name=deploy-" 2>/dev/null)
 info "Bringing up containers..."
 IMAGE_TAG="$IMAGE_TAG" docker_compose up -d --remove-orphans
 
