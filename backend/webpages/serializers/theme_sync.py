@@ -54,6 +54,7 @@ class ThemeSyncPushSerializer(serializers.Serializer):
 
     sync_version = serializers.IntegerField(help_text="Current client version")
     theme_data = ThemeSyncSerializer(help_text="Theme data to push")
+    transfer_package = serializers.CharField(required=False, write_only=True)
 
     def validate(self, attrs):
         """Validate version before push"""

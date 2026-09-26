@@ -38,9 +38,12 @@ def remote_sync_request(remote_url, workspace, token, action, payload=None):
             json=payload or {},
             headers={"Authorization": f"ThemeKey {token}", "X-Tenant-ID": workspace, "Accept": "application/json"},
             timeout=(5, 30),
+            allow_redirects=False,
         )
     except requests.RequestException as exc:
         raise RemoteThemeError("The remote site could not be reached.") from exc
+    if 300 <= response.status_code < 400:
+        raise RemoteThemeError("The remote site redirected the request. Configure its final URL instead.")
     if response.status_code >= 400:
         message = "The remote site rejected the request."
         if response.status_code in {401, 403}:

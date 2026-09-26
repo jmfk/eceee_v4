@@ -21,6 +21,8 @@ from webpages.services.site_package import (
     SitePackageImporter,
     _remap_structured_references,
     build_site_package_export_filename,
+    build_theme_transfer_package,
+    restore_theme_transfer_package,
 )
 
 
@@ -103,6 +105,7 @@ class SitePackageServiceTests(TestCase):
             widgets={},
             created_by=self.user,
         )
+
         current = PageVersion.objects.create(
             page=self.root,
             version_number=2,
@@ -154,6 +157,42 @@ class SitePackageServiceTests(TestCase):
         self.assertEqual(manifest["counts"]["pages"], 2)
         self.assertEqual(manifest["counts"]["media"], 1)
         self.assertEqual(media_manifest["files"][0]["source_id"], str(self.media.id))
+
+    def test_theme_transfer_package_copies_and_rewrites_all_theme_assets(self):
+        storage = MemoryStorage()
+        self.theme.image.name = "theme_images/source/preview.png"
+        self.theme.site_icon.name = "theme_images/source/favicon.png"
+        self.theme.design_groups = {
+            "groups": [
+                {"layoutProperties": {"hero": {"md": {"background": {"url": "/media/theme_images/source/hero.png"}}}}}
+            ]
+        }
+        self.theme.designer_preview = {
+            "views": [
+                {
+                    "id": "home",
+                    "images": {"hero": {"url": f"/media/theme_images/{self.theme.id}/library/demo.png"}},
+                }
+            ]
+        }
+        self.theme.list_library_images = lambda: ["demo.png"]
+        storage.files = {
+            "theme_images/source/preview.png": b"preview",
+            "theme_images/source/favicon.png": b"favicon",
+            "theme_images/source/hero.png": b"hero",
+            f"theme_images/{self.theme.id}/library/demo.png": b"demo",
+        }
+
+        encoded = build_theme_transfer_package(self.theme, storage=storage)
+        imported = PageTheme.objects.create(tenant=self.tenant, name="Imported", created_by=self.user)
+        restored = restore_theme_transfer_package(encoded, imported, storage=storage)
+
+        destination = f"theme_images/{imported.id}/library"
+        self.assertEqual(restored["image"], f"{destination}/preview.png")
+        self.assertEqual(restored["site_icon"], f"{destination}/favicon.png")
+        self.assertIn(f"{destination}/hero.png", str(restored["design_groups"]))
+        self.assertIn(f"{destination}/demo.png", str(restored["designer_preview"]))
+        self.assertEqual(storage.files[f"{destination}/preview.png"], b"preview")
 
     def test_import_creates_copy_clears_root_hostnames_and_remaps_media(self):
         PageVersion.objects.create(

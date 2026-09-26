@@ -469,17 +469,22 @@ class PageTheme(models.Model):
                 # New theme - start at version 1
                 self.sync_version = 1
 
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                kwargs["update_fields"] = set(update_fields) | {"sync_version"}
+
         super().save(*args, **kwargs)
 
-        from webpages.services.theme_versions import record_theme_version
+        if not skip_version:
+            from webpages.services.theme_versions import record_theme_version
 
-        record_theme_version(
-            self,
-            source=version_source or self.sync_source,
-            source_label=version_source_label,
-            created_by=version_created_by,
-            force=force_version,
-        )
+            record_theme_version(
+                self,
+                source=version_source or self.sync_source,
+                source_label=version_source_label,
+                created_by=version_created_by,
+                force=force_version,
+            )
 
         # Invalidate CSS cache for this theme
         if self.id:

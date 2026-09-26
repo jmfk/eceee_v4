@@ -7,10 +7,11 @@ import hashlib
 import json
 import uuid
 
-
 SNAPSHOT_FIELDS = (
     "name",
     "description",
+    "image",
+    "site_icon",
     "fonts",
     "colors",
     "design_groups",
@@ -33,7 +34,10 @@ def create_initial_versions(apps, schema_editor):
     PageTheme = apps.get_model("webpages", "PageTheme")
     ThemeVersion = apps.get_model("webpages", "ThemeVersion")
     for theme in PageTheme.objects.all().iterator():
-        snapshot = {field: getattr(theme, field) for field in SNAPSHOT_FIELDS}
+        snapshot = {
+            field: (getattr(theme, field).name or None) if field in {"image", "site_icon"} else getattr(theme, field)
+            for field in SNAPSHOT_FIELDS
+        }
         encoded = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         ThemeVersion.objects.create(
             theme=theme,

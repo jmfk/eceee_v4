@@ -5,7 +5,7 @@ Provides endpoints for bidirectional sync between local Python files and server 
 """
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -20,8 +20,9 @@ from ..serializers.theme_sync import (
     ThemeSyncPushSerializer,
     ThemeSyncSerializer,
 )
+from ..services.site_package import build_theme_transfer_package, restore_theme_transfer_package
 from ..services.theme_remote_credentials import ThemeRemoteAccessKeyAuthentication
-from ..services.theme_versions import record_theme_version
+from ..services.theme_versions import SNAPSHOT_FIELDS, record_theme_version
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -102,7 +103,13 @@ class ThemeSyncViewSet(viewsets.ViewSet):
             )
 
         themes = PageTheme.objects.filter(tenant=tenant).order_by("name")
+        stable_key = request.data.get("stable_key") or request.data.get("stableKey")
+        if stable_key:
+            themes = themes.filter(stable_key=stable_key)
         serializer = ThemeSyncSerializer(themes, many=True, context={"request": request})
+        serialized_themes = list(serializer.data)
+        if stable_key and serialized_themes:
+            serialized_themes[0]["transfer_package"] = build_theme_transfer_package(themes.first())
 
         max_version = (
             PageTheme.objects.filter(tenant=tenant).aggregate(max_version=models.Max("sync_version"))["max_version"]
@@ -112,7 +119,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
         # For output serialization, pass data directly
         return Response(
             {
-                "themes": serializer.data,
+                "themes": serialized_themes,
                 "max_version": max_version,
             }
         )
@@ -142,7 +149,11 @@ class ThemeSyncViewSet(viewsets.ViewSet):
         if not push_serializer.is_valid():
             return Response(push_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        theme_data = push_serializer.validated_data["theme_data"]
+        theme_data = dict(push_serializer.validated_data["theme_data"])
+        transfer_package = push_serializer.validated_data.get("transfer_package")
+        if transfer_package:
+            theme_data.pop("image", None)
+            theme_data.pop("site_icon", None)
         client_version = push_serializer.validated_data["sync_version"]
         theme_name = theme_data.get("name")
         stable_key = theme_data.get("stable_key")
@@ -162,9 +173,11 @@ class ThemeSyncViewSet(viewsets.ViewSet):
             )
 
         created = False
+        previous_version_ids = []
         try:
             lookup = {"stable_key": stable_key} if stable_key else {"name": theme_name}
             theme = PageTheme.objects.get(tenant=tenant, **lookup)
+            previous_version_ids = list(theme.versions.values_list("id", flat=True))
             # Check version conflict
             if client_version < theme.sync_version:
                 return Response(
@@ -190,14 +203,35 @@ class ThemeSyncViewSet(viewsets.ViewSet):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # Save with sync metadata
-        previous_version_count = theme.versions.count() if not created else 0
-        save_kwargs = {"sync_source": "sync", "last_synced_at": timezone.now()}
-        if created:
-            save_kwargs.update({"tenant": tenant, "created_by": request.user})
-        theme = serializer.save(**save_kwargs)
-        if theme.versions.count() == previous_version_count:
-            record_theme_version(theme, source="remote-upload", source_label="Theme sync API", force=True)
+        # Save with sync metadata. If a package is present, replace the serializer's
+        # interim version with one that references the copied local assets.
+        with transaction.atomic():
+            save_kwargs = {"sync_source": "sync", "last_synced_at": timezone.now()}
+            if created:
+                save_kwargs.update({"tenant": tenant, "created_by": request.user})
+            theme = serializer.save(**save_kwargs)
+            if transfer_package:
+                try:
+                    restored = restore_theme_transfer_package(transfer_package, theme)
+                except ValueError as exc:
+                    return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+                for field in SNAPSHOT_FIELDS:
+                    if field in restored:
+                        setattr(theme, field, restored[field])
+                theme.save(
+                    update_fields=[*SNAPSHOT_FIELDS, "updated_at"],
+                    skip_version_increment=True,
+                )
+                theme.versions.exclude(id__in=previous_version_ids).delete()
+                record_theme_version(
+                    theme,
+                    source="remote-upload",
+                    source_label="Theme sync API",
+                    created_by=request.user,
+                    force=True,
+                )
+            elif theme.versions.count() == len(previous_version_ids):
+                record_theme_version(theme, source="remote-upload", source_label="Theme sync API", force=True)
 
         return Response(
             ThemeSyncSerializer(theme, context={"request": request}).data,

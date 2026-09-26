@@ -47,6 +47,7 @@ from webpages.services.designer_theme import (
     undo_designer_publish,
     user_can_design_theme,
 )
+from webpages.services.site_package import build_theme_transfer_package, restore_theme_transfer_package
 from webpages.services.theme_remote import RemoteThemeError, remote_sync_request
 from webpages.services.theme_remote_credentials import (
     RemoteCredentialConfigurationError,
@@ -456,7 +457,7 @@ class DesignerRemotePullView(APIView):
         data = serializer.validated_data
         connection = _remote_connection(request, data["connection_id"])
         try:
-            result = _remote_request(connection, "pull")
+            result = _remote_request(connection, "pull", {"stable_key": str(data["stable_key"])})
         except (RemoteThemeError, RemoteCredentialConfigurationError) as exc:
             return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         remote_theme = next(
@@ -502,19 +503,49 @@ class DesignerRemotePullView(APIView):
                 name = f"{base_name} ({suffix})"
                 suffix += 1
             snapshot["name"] = name
-            theme = PageTheme(tenant=tenant, created_by=request.user, stable_key=data["stable_key"], **snapshot)
+            packaged_snapshot = remote_theme.get("transfer_package") or remote_theme.get("transferPackage")
+            initial_snapshot = dict(snapshot)
+            if packaged_snapshot:
+                initial_snapshot.pop("image", None)
+                initial_snapshot.pop("site_icon", None)
+            theme = PageTheme(tenant=tenant, created_by=request.user, stable_key=data["stable_key"], **initial_snapshot)
             theme.save(
                 version_source="remote-download",
                 version_source_label=connection.name,
                 version_created_by=request.user,
                 force_version=True,
             )
-            version = theme.versions.first()
+            if packaged_snapshot:
+                try:
+                    snapshot = restore_theme_transfer_package(packaged_snapshot, theme)
+                except ValueError as exc:
+                    return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+                snapshot["name"] = name
+                for field in SNAPSHOT_FIELDS:
+                    if field in snapshot:
+                        setattr(theme, field, snapshot[field])
+                theme.save(update_fields=[*SNAPSHOT_FIELDS, "updated_at"], skip_version_increment=True)
+                theme.versions.all().delete()
+                version = record_theme_version(
+                    theme,
+                    source="remote-download",
+                    source_label=connection.name,
+                    created_by=request.user,
+                    force=True,
+                )
+            else:
+                version = theme.versions.first()
         else:
             if not user_can_design_theme(request.user, theme):
                 from rest_framework.exceptions import PermissionDenied
 
                 raise PermissionDenied("You do not have Designer access to this theme.")
+            packaged_snapshot = remote_theme.get("transfer_package") or remote_theme.get("transferPackage")
+            if packaged_snapshot:
+                try:
+                    snapshot = restore_theme_transfer_package(packaged_snapshot, theme)
+                except ValueError as exc:
+                    return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
             version = record_theme_version(
                 theme,
                 source="remote-download",
@@ -545,9 +576,13 @@ class DesignerRemotePushView(APIView):
                 ),
                 None,
             )
+            remote_snapshot = theme_snapshot(theme)
+            for package_only_field in ("image", "site_icon", "gallery_styles", "carousel_styles"):
+                remote_snapshot.pop(package_only_field, None)
             payload = {
                 "sync_version": (match or {}).get("sync_version", (match or {}).get("syncVersion", 0)),
-                "theme_data": theme.to_dict() | {"stable_key": str(theme.stable_key)},
+                "theme_data": remote_snapshot | {"stable_key": str(theme.stable_key)},
+                "transfer_package": build_theme_transfer_package(theme),
             }
             result = _remote_request(connection, "push", payload)
         except (RemoteThemeError, RemoteCredentialConfigurationError) as exc:
