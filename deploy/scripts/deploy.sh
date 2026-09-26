@@ -71,6 +71,8 @@ if [ "${#_sk}" -lt 50 ]; then
 fi
 unset _sk
 
+acquire_production_operation_lock "deploy"
+
 # ── 2. Determine REF ─────────────────────────────────────────────────────────
 REF="${1:-}"
 git -C "$REPO" fetch origin --tags --prune --quiet

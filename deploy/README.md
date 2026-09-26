@@ -17,6 +17,7 @@ deploy/
     ├── backup.sh              pg_dump to /mnt/data/backups/
     ├── backfill-typed-tags.sh maintenance → backup → canary → verify
     ├── validate-typed-tags-backup.sh  disposable local restore validation
+    ├── production-operation.sh shared lock → atomic env install → deploy/restart
     └── healthcheck.sh         polls backend /health/ (Host from DOMAIN in deploy/.env)
 ```
 
@@ -185,6 +186,10 @@ This stops application writers, creates a mandatory backup, preflights existing
 data, runs and resumes a bounded canary, verifies all canonical relations, restores
 services, and waits for a healthy backend. Legacy fields remain authoritative, so
 a failed expansion can return to service without switching reads to partial data.
+Deploys, database restores, and this maintenance workflow share a nonblocking
+host lock so they cannot change application service state concurrently.
+Environment updates are staged with restrictive permissions and installed
+atomically while the same lock is held through any requested deploy or restart.
 
 ---
 

@@ -37,6 +37,8 @@ The validator restores into disposable PostgreSQL 15, applies the current migrat
 
 The production script determines the running immutable application version, stops the backend and Celery writers, creates another mandatory backup, checks migration state, and runs a read-only legacy-source preflight. It then runs a bounded canary, resumes the same immutable run, verifies the result independently, restores services, and waits for application health. If any step fails, application services are restarted and the script exits unsuccessfully.
 
+Deploys, database restores, and the typed-tag maintenance workflow share a nonblocking host lock. A conflicting operation fails before changing application service state.
+
 Use a distinct run ID if legacy tags changed after the canary. Do not delete or modify legacy tags as part of this phase.
 
 For an operator-only dry source check after deployment, without writing canonical data or checkpoints:

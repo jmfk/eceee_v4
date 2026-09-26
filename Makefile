@@ -1082,6 +1082,7 @@ TAG       ?=
 RUN_ID    ?= typed-tags-v1
 CANARY_SIZE ?= 100
 BACKUP_FILE ?=
+export RUN_ID CANARY_SIZE
 
 prod-preflight: ## Run checks required before production deploy (use: make prod-preflight [TAG=v0.x.x|hash])
 	bash deploy/scripts/preflight.sh "$(TAG)"
@@ -1090,12 +1091,12 @@ prod-deploy: ## Run checks, then deploy to production (use: make prod-deploy [TA
 	@DEPLOY_REF=$$(bash deploy/scripts/resolve-deploy-ref.sh "$(TAG)"); \
 	echo "Resolved deploy ref: $$DEPLOY_REF"; \
 	bash deploy/scripts/preflight.sh "$$DEPLOY_REF"; \
-	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)"; \
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && git fetch origin --tags --prune --quiet && git checkout --force origin/main -- deploy/scripts/ && bash deploy/scripts/deploy.sh $$DEPLOY_REF"
+	ENV_STAGE=$$(bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)" --stage); \
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash -s -- deploy '$$ENV_STAGE' '$$DEPLOY_REF'" < deploy/scripts/production-operation.sh
 
 prod-restart: ## Sync deploy/.env and restart production containers
-	bash deploy/scripts/setup-env.sh $(PROD_HOST) $(PROD_DIR)
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d"
+	@ENV_STAGE=$$(bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)" --stage); \
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash -s -- restart '$$ENV_STAGE'" < deploy/scripts/production-operation.sh
 
 prod-env: ## Securely push local deploy/.env to production
 	bash deploy/scripts/setup-env.sh $(PROD_HOST) $(PROD_DIR)
@@ -1107,7 +1108,10 @@ prod-backup: ## Run ad-hoc production DB backup
 	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash deploy/scripts/backup.sh"
 
 prod-backfill-typed-tags: ## Run maintenance-window typed-tag backfill (optional: RUN_ID=... CANARY_SIZE=...)
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash deploy/scripts/backfill-typed-tags.sh '$(RUN_ID)' '$(CANARY_SIZE)'"
+	@case "$$RUN_ID" in ""|*[!A-Za-z0-9_-]*) echo "RUN_ID must contain only letters, numbers, underscores, and hyphens" >&2; exit 2;; esac
+	@[ "$${#RUN_ID}" -le 100 ] || (echo "RUN_ID must be at most 100 characters" >&2; exit 2)
+	@case "$$CANARY_SIZE" in ""|0*|*[!0-9]*) echo "CANARY_SIZE must be a positive integer without leading zeros" >&2; exit 2;; esac
+	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash deploy/scripts/backfill-typed-tags.sh '$$RUN_ID' '$$CANARY_SIZE'"
 
 validate-typed-tags-backup: ## Restore and validate a local production backup (BACKUP_FILE=/absolute/path.sql.gz)
 	@test -n "$(BACKUP_FILE)" || (echo "BACKUP_FILE is required" >&2; exit 2)
