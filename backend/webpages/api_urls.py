@@ -38,7 +38,13 @@ from .views import (
     resolve_links,
 )
 from .views.designer_theme_views import (
+    DesignerRemoteConnectionDetailView,
+    DesignerRemoteConnectionsView,
+    DesignerRemotePullView,
+    DesignerRemotePushView,
+    DesignerRemoteThemesView,
     DesignerThemeAssetView,
+    DesignerThemeCompareView,
     DesignerThemeDiscardView,
     DesignerThemeExportDetailView,
     DesignerThemeExportDownloadView,
@@ -51,7 +57,10 @@ from .views.designer_theme_views import (
     DesignerThemePreviewSiteView,
     DesignerThemePreviewView,
     DesignerThemePublishView,
+    DesignerThemeRestoreView,
     DesignerThemeUndoView,
+    DesignerThemeVersionDetailView,
+    DesignerThemeVersionsView,
     DesignerThemeWorkspaceView,
     ThemeDesignerAssignmentView,
 )
@@ -135,6 +144,35 @@ widget_type_patterns = [
 # API URLs without app_name to avoid namespace conflicts when included in main API
 urlpatterns = [
     path("designer/themes/", DesignerThemeListView.as_view(), name="designer-theme-list"),
+    path("designer/themes/compare/", DesignerThemeCompareView.as_view(), name="designer-theme-compare"),
+    path("designer/themes/remote/", DesignerRemoteThemesView.as_view(), name="designer-remote-themes"),
+    path("designer/themes/remote/pull/", DesignerRemotePullView.as_view(), name="designer-remote-pull"),
+    path("designer/themes/remote/push/", DesignerRemotePushView.as_view(), name="designer-remote-push"),
+    path(
+        "designer/remote-connections/",
+        DesignerRemoteConnectionsView.as_view(),
+        name="designer-remote-connections",
+    ),
+    path(
+        "designer/remote-connections/<uuid:connection_id>/",
+        DesignerRemoteConnectionDetailView.as_view(),
+        name="designer-remote-connection-detail",
+    ),
+    path(
+        "designer/themes/<int:theme_id>/versions/",
+        DesignerThemeVersionsView.as_view(),
+        name="designer-theme-versions",
+    ),
+    path(
+        "designer/themes/<int:theme_id>/versions/<int:version_id>/restore/",
+        DesignerThemeRestoreView.as_view(),
+        name="designer-theme-version-restore",
+    ),
+    path(
+        "designer/themes/<int:theme_id>/versions/<int:version_id>/",
+        DesignerThemeVersionDetailView.as_view(),
+        name="designer-theme-version-detail",
+    ),
     path(
         "designer/themes/<int:theme_id>/workspace/",
         DesignerThemeWorkspaceView.as_view(),

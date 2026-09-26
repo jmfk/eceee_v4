@@ -73,6 +73,13 @@ const listResponse = {
     results: mockThemes,
 }
 
+const versionResponse = {
+    results: [
+        { id: 12, versionNumber: 2, name: 'Approved design', source: 'named-checkpoint', sourceLabel: 'Manual checkpoint', createdAt: '2026-09-26T12:00:00Z', createdBy: 'testuser', isCurrent: true },
+        { id: 11, versionNumber: 1, name: '', source: 'web', sourceLabel: 'Initial version', createdAt: '2026-09-25T12:00:00Z', createdBy: 'testuser', isCurrent: false },
+    ],
+}
+
 const renderThemeEditor = (component = <ThemeEditor />) => {
     const queryClient = createTestQueryClient()
     return renderWithStateProviders(component, { queryClient })
@@ -80,6 +87,10 @@ const renderThemeEditor = (component = <ThemeEditor />) => {
 
 const mockThemeRequests = () => {
     mockAxiosInstance.get.mockImplementation((url) => {
+        if (url === '/api/v1/webpages/designer/themes/1/versions/') {
+            return Promise.resolve(apiResponse(versionResponse))
+        }
+
         if (url === '/api/v1/webpages/themes/1/') {
             return Promise.resolve(apiResponse(mockThemes[0]))
         }
@@ -167,6 +178,7 @@ describe('ThemeEditor', () => {
         expect(await screen.findByRole('heading', { name: 'Create Theme' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Basic Info' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Colors' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Versions' })).not.toBeInTheDocument()
         expect(screen.getByText('Basic Information')).toBeInTheDocument()
         expect(screen.getByPlaceholderText('My Awesome Theme')).toBeInTheDocument()
         expect(screen.getByPlaceholderText('Brief description of this theme')).toBeInTheDocument()
@@ -226,6 +238,35 @@ describe('ThemeEditor', () => {
         await user.click(screen.getByRole('button', { name: 'Colors' }))
 
         expect(routerMocks.navigate).toHaveBeenCalledWith('/settings/themes/1/colors')
+    })
+
+    it('manages named theme versions from the Settings theme editor', async () => {
+        const user = userEvent.setup()
+        vi.spyOn(window, 'confirm').mockReturnValue(true)
+        routerMocks.params = { themeId: '1', tab: 'versions' }
+
+        renderThemeEditor()
+
+        expect(await screen.findByRole('heading', { name: 'Theme Versions' })).toBeInTheDocument()
+        expect(await screen.findByText('Approved design')).toBeInTheDocument()
+        expect(screen.getByText('Unnamed version')).toBeInTheDocument()
+        expect(screen.getByText('Current')).toBeInTheDocument()
+
+        await user.type(screen.getByLabelText('New version name'), 'Before autumn launch')
+        await user.click(screen.getByRole('button', { name: 'Save version' }))
+        await waitFor(() => expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+            '/api/v1/webpages/designer/themes/1/versions/',
+            { name: 'Before autumn launch' },
+            {},
+        ))
+
+        await user.click(screen.getByRole('button', { name: 'Restore' }))
+        expect(window.confirm).toHaveBeenCalledWith('Restore v1 “Unnamed version” as the current theme? Existing history will be kept.')
+        await waitFor(() => expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+            '/api/v1/webpages/designer/themes/1/versions/11/restore/',
+            {},
+            {},
+        ))
     })
 
     it('exports a theme through the wrapped themes API', async () => {

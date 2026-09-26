@@ -40,6 +40,7 @@ import CloneThemeDialog from './theme/CloneThemeDialog';
 import PasteThemeDialog from './theme/PasteThemeDialog';
 import DesignerAccessPanel from './theme/DesignerAccessPanel';
 import PreviewViewsTab from './theme/PreviewViewsTab';
+import ThemeVersionsTab from './theme/ThemeVersionsTab';
 
 const ThemeEditor = ({ onSave }) => {
     const { themeId, tab, imageFilename } = useParams();
@@ -648,6 +649,7 @@ const ThemeEditor = ({ onSave }) => {
 
     const tabs = [
         { id: 'basic', label: 'Basic Info' },
+        ...(!isCreating ? [{ id: 'versions', label: 'Versions' }] : []),
         { id: 'images', label: 'Images' },
         { id: 'fonts', label: 'Fonts' },
         { id: 'colors', label: 'Colors' },
@@ -1155,6 +1157,10 @@ const ThemeEditor = ({ onSave }) => {
                             onDirty={() => setThemeDirty(true)}
                             themeId={themeId}
                         />
+                    )}
+
+                    {activeTab === 'versions' && !isCreating && (
+                        <ThemeVersionsTab themeId={themeId} hasUnsavedChanges={isThemeDirty} />
                     )}
 
                     {activeTab === 'preview-views' && (
