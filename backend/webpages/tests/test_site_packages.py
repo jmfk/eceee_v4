@@ -1,3 +1,5 @@
+import base64
+import hashlib
 import io
 import json
 import zipfile
@@ -191,11 +193,15 @@ class SitePackageServiceTests(TestCase):
         restored = restore_theme_transfer_package(encoded, imported, storage=storage)
 
         destination = f"theme_images/{imported.id}/library"
-        self.assertEqual(restored["image"], f"{destination}/preview.png")
-        self.assertEqual(restored["site_icon"], f"{destination}/favicon.png")
-        self.assertIn(f"{destination}/hero.png", str(restored["design_groups"]))
-        self.assertIn(f"{destination}/demo.png", str(restored["designer_preview"]))
-        self.assertEqual(storage.files[f"{destination}/preview.png"], b"preview")
+        preview_path = f"{destination}/{hashlib.sha256(b'preview').hexdigest()}.png"
+        favicon_path = f"{destination}/{hashlib.sha256(b'favicon').hexdigest()}.png"
+        hero_path = f"{destination}/{hashlib.sha256(b'hero').hexdigest()}.png"
+        demo_path = f"{destination}/{hashlib.sha256(b'demo').hexdigest()}.png"
+        self.assertEqual(restored["image"], preview_path)
+        self.assertEqual(restored["site_icon"], favicon_path)
+        self.assertIn(hero_path, str(restored["design_groups"]))
+        self.assertIn(demo_path, str(restored["designer_preview"]))
+        self.assertEqual(storage.files[preview_path], b"preview")
 
     def test_theme_transfer_package_keeps_assets_with_the_same_basename_distinct(self):
         storage = MemoryStorage()
@@ -213,6 +219,61 @@ class SitePackageServiceTests(TestCase):
         self.assertNotEqual(restored["image"], restored["site_icon"])
         self.assertEqual(storage.files[restored["image"]], b"preview-logo")
         self.assertEqual(storage.files[restored["site_icon"]], b"favicon-logo")
+
+    def test_theme_transfer_package_does_not_overwrite_earlier_asset_content(self):
+        storage = MemoryStorage()
+        self.theme.image.name = "theme_images/source/preview.png"
+        imported = PageTheme.objects.create(tenant=self.tenant, name="Imported", created_by=self.user)
+
+        storage.files[self.theme.image.name] = b"first-preview"
+        first = restore_theme_transfer_package(
+            build_theme_transfer_package(self.theme, storage=storage), imported, storage=storage
+        )
+        storage.files[self.theme.image.name] = b"second-preview"
+        second = restore_theme_transfer_package(
+            build_theme_transfer_package(self.theme, storage=storage), imported, storage=storage
+        )
+
+        self.assertNotEqual(first["image"], second["image"])
+        self.assertEqual(storage.files[first["image"]], b"first-preview")
+        self.assertEqual(storage.files[second["image"]], b"second-preview")
+
+    @patch("webpages.services.site_package.THEME_TRANSFER_MAX_FILE_SIZE", 3)
+    def test_theme_transfer_package_rejects_oversized_files(self):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr("theme.json", "{}")
+            package.writestr("assets/image.png", b"large")
+
+        with self.assertRaisesMessage(ValueError, "Invalid theme transfer package"):
+            restore_theme_transfer_package(
+                base64.b64encode(buffer.getvalue()).decode(), self.theme, storage=MemoryStorage()
+            )
+
+    @patch("webpages.services.site_package.THEME_TRANSFER_MAX_FILES", 1)
+    def test_theme_transfer_package_rejects_too_many_files(self):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr("theme.json", "{}")
+            package.writestr("assets/image.png", b"image")
+
+        with self.assertRaisesMessage(ValueError, "Invalid theme transfer package"):
+            restore_theme_transfer_package(
+                base64.b64encode(buffer.getvalue()).decode(), self.theme, storage=MemoryStorage()
+            )
+
+    @patch("webpages.services.site_package.THEME_TRANSFER_MAX_TOTAL_SIZE", 6)
+    def test_theme_transfer_package_rejects_excessive_total_size(self):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr("theme.json", "{}")
+            package.writestr("assets/one.png", b"123")
+            package.writestr("assets/two.png", b"456")
+
+        with self.assertRaisesMessage(ValueError, "Invalid theme transfer package"):
+            restore_theme_transfer_package(
+                base64.b64encode(buffer.getvalue()).decode(), self.theme, storage=MemoryStorage()
+            )
 
     def test_import_creates_copy_clears_root_hostnames_and_remaps_media(self):
         PageVersion.objects.create(

@@ -32,6 +32,9 @@ from webpages.services.theme_preview_content import (
 )
 
 PACKAGE_VERSION = "1.0"
+THEME_TRANSFER_MAX_FILES = 250
+THEME_TRANSFER_MAX_FILE_SIZE = 25 * 1024 * 1024
+THEME_TRANSFER_MAX_TOTAL_SIZE = 100 * 1024 * 1024
 UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 PAGE_REFERENCE_KEYS = {
     "pageId",
@@ -419,11 +422,21 @@ def build_theme_transfer_package(theme: PageTheme, storage=None) -> str:
 
 
 def _read_theme_transfer_package(encoded_package: str):
+    package = None
     try:
         raw_package = base64.b64decode(encoded_package, validate=True)
         package = zipfile.ZipFile(io.BytesIO(raw_package), "r")
+        files = [item for item in package.infolist() if not item.is_dir()]
+        if (
+            len(files) > THEME_TRANSFER_MAX_FILES
+            or any(item.file_size > THEME_TRANSFER_MAX_FILE_SIZE for item in files)
+            or sum(item.file_size for item in files) > THEME_TRANSFER_MAX_TOTAL_SIZE
+        ):
+            raise ValueError("Theme transfer package exceeds size limits.")
         data = json.loads(package.read("theme.json").decode("utf-8"))
     except (ValueError, KeyError, UnicodeDecodeError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
+        if package is not None:
+            package.close()
         raise ValueError("Invalid theme transfer package.") from exc
     if not isinstance(data, dict):
         package.close()
@@ -458,18 +471,12 @@ def restore_theme_transfer_package(encoded_package: str, theme: PageTheme, stora
     with package:
         asset_names = [name for name in package.namelist() if name.startswith("assets/") and not name.endswith("/")]
         original_paths = [name[len("assets/") :] for name in asset_names]
-        basename_counts = {}
-        for original_path in original_paths:
-            basename = os.path.basename(original_path)
-            basename_counts[basename] = basename_counts.get(basename, 0) + 1
         for name, original_path in zip(asset_names, original_paths):
-            basename = os.path.basename(original_path)
-            if basename_counts[basename] > 1:
-                stem, suffix = os.path.splitext(basename)
-                digest = hashlib.sha256(original_path.encode("utf-8")).hexdigest()[:12]
-                basename = f"{stem}-{digest}{suffix}"
-            new_path = f"theme_images/{theme.id}/library/{basename}"
-            storage._save(new_path, ContentFile(package.read(name)))
+            content = package.read(name)
+            suffix = os.path.splitext(original_path)[1]
+            filename = f"{hashlib.sha256(content).hexdigest()}{suffix}"
+            new_path = f"theme_images/{theme.id}/library/{filename}"
+            storage._save(new_path, ContentFile(content))
             replacements[original_path] = new_path
 
     if replacements:
