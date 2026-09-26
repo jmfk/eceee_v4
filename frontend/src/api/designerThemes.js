@@ -7,6 +7,18 @@ const unwrap = async (promise) => processResponse(await promise)
 
 export const designerThemesApi = {
     list: async () => unwrap(await api.get(`${base}/themes/`)),
+    compare: async (leftThemeId, rightThemeId) => unwrap(await api.post(`${base}/themes/compare/`, { leftThemeId, rightThemeId })),
+    versions: async (themeId) => unwrap(await api.get(`${base}/themes/${themeId}/versions/`)),
+    createVersion: async (themeId, name) => unwrap(await api.post(`${base}/themes/${themeId}/versions/`, { name })),
+    nameVersion: async (themeId, versionId, name) => unwrap(await api.patch(`${base}/themes/${themeId}/versions/${versionId}/`, { name })),
+    restoreVersion: async (themeId, versionId) => unwrap(await api.post(`${base}/themes/${themeId}/versions/${versionId}/restore/`)),
+    remoteConnections: async () => unwrap(await api.get(`${base}/remote-connections/`)),
+    createRemoteConnection: async (connection) => unwrap(await api.post(`${base}/remote-connections/`, connection)),
+    updateRemoteConnection: async (connectionId, connection) => unwrap(await api.patch(`${base}/remote-connections/${connectionId}/`, connection)),
+    deleteRemoteConnection: async (connectionId) => unwrap(await api.delete(`${base}/remote-connections/${connectionId}/`)),
+    remoteThemes: async (connectionId) => unwrap(await api.post(`${base}/themes/remote/`, { connectionId })),
+    pullRemoteTheme: async (connectionId, stableKey) => unwrap(await api.post(`${base}/themes/remote/pull/`, { connectionId, stableKey })),
+    pushRemoteTheme: async (connectionId, themeId) => unwrap(await api.post(`${base}/themes/remote/push/`, { connectionId, themeId })),
     workspace: async (themeId) => unwrap(await api.get(`${base}/themes/${themeId}/workspace/`)),
     preview: async (themeId, patch) => unwrap(await api.post(`${base}/themes/${themeId}/preview/`, patch)),
     savePreviewContent: async (themeId, viewId, texts, draftVersion) => unwrap(await api.patch(`${base}/themes/${themeId}/preview-content/`, { viewId, texts, draftVersion })),
