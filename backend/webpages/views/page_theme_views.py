@@ -10,6 +10,7 @@ import os
 import zipfile
 from datetime import datetime
 
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.http import HttpResponse
@@ -30,6 +31,11 @@ from ..models import PageTheme
 from ..serializers import PageThemeSerializer
 from ..services import ThemeCSSGenerator
 from ..services.style_ai_helper import StyleAIHelper
+from ..services.theme_preview_content import (
+    import_theme_preview_document,
+    list_theme_preview_sources,
+    rewrite_theme_library_image_urls,
+)
 from ..theme_service import ThemeService
 
 logger = logging.getLogger(__name__)
@@ -166,6 +172,27 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 
             raise PermissionDenied("You do not have access to this tenant.")
         serializer.save(created_by=self.request.user, tenant=tenant)
+
+    @action(detail=True, methods=["get"], url_path="preview-content/sources")
+    def preview_content_sources(self, request, pk=None):
+        """List pages, objects, layouts, and object types available to this theme."""
+        theme = self.get_object()
+        return Response(list_theme_preview_sources(theme))
+
+    @action(detail=True, methods=["post"], url_path="preview-content/import")
+    def import_preview_content(self, request, pk=None):
+        """Build a detached theme preview document from tenant-owned content."""
+        theme = self.get_object()
+        try:
+            preview, copied_images = import_theme_preview_document(
+                theme,
+                request.data.get("source_kind") or request.data.get("sourceKind"),
+                request.data.get("source_id") or request.data.get("sourceId"),
+            )
+        except ValidationError as exc:
+            message = exc.messages[0] if getattr(exc, "messages", None) else str(exc)
+            return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"designer_preview": {"views": [preview]}, "copied_images": copied_images})
 
     @action(detail=False, methods=["get"])
     def active(self, request):
@@ -1719,6 +1746,13 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 
                         new_theme.design_groups = updated_groups
                         new_theme.save()
+
+                    if url_mapping and new_theme.designer_preview:
+                        new_theme.designer_preview = rewrite_theme_library_image_urls(
+                            new_theme.designer_preview,
+                            url_mapping,
+                        )
+                        new_theme.save(update_fields=["designer_preview", "updated_at"])
 
             serializer = PageThemeSerializer(new_theme, context={"request": request})
             return Response(

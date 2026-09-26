@@ -671,18 +671,6 @@ class SitePackageImporter:
                 preserve_publication = (self.job.options or {}).get("preserve_publication_status", True)
                 page_data_payload = _replace_in_json(version_data.get("page_data", {}), replacements)
                 widgets_payload = _replace_in_json(version_data.get("widgets", {}), replacements)
-                page_data_payload = _remap_structured_references(
-                    page_data_payload,
-                    page_map=page_reference_map,
-                    theme_map=theme_reference_map,
-                    media_map=media_reference_map,
-                )
-                widgets_payload = _remap_structured_references(
-                    widgets_payload,
-                    page_map=page_reference_map,
-                    theme_map=theme_reference_map,
-                    media_map=media_reference_map,
-                )
                 imported_version = PageVersion.objects.create(
                     page=page,
                     version_number=version_data["version_number"],

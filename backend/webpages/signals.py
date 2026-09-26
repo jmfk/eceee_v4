@@ -32,17 +32,20 @@ def invalidate_page_tree_on_save(sender, instance, created, **kwargs):
             if new_parent_id:
                 InheritanceTreeCache.invalidate_hierarchy(new_parent_id)
 
-    # Update children cached_path if this page's path changed
-    if hasattr(instance, "_skip_children_path_update"):
-        return
-
+    # Propagate denormalized path/root changes through the entire subtree.
     old_path = getattr(instance, "_old_cached_path", None)
-    if old_path and old_path != instance.cached_path:
-        # Path changed - update all children recursively
+    old_root_id = getattr(instance, "_old_cached_root_id", None)
+    old_root_hostnames = getattr(instance, "_old_cached_root_hostnames", None)
+    cache_changed = any(
+        (
+            old_path is not None and old_path != instance.cached_path,
+            old_root_id is not None and old_root_id != instance.cached_root_id,
+            old_root_hostnames is not None and old_root_hostnames != instance.cached_root_hostnames,
+        )
+    )
+    if cache_changed:
         for child in instance.children.all():
-            child._skip_children_path_update = True
             child.save(update_fields=["cached_path", "cached_root_id", "cached_root_hostnames"])
-            delattr(child, "_skip_children_path_update")
 
 
 @receiver(pre_save, sender=WebPage)
@@ -54,9 +57,13 @@ def track_parent_changes(sender, instance, **kwargs):
             old_instance = WebPage.objects.get(pk=instance.pk)
             instance._old_parent_id = old_instance.parent_id
             instance._old_cached_path = old_instance.cached_path
+            instance._old_cached_root_id = old_instance.cached_root_id
+            instance._old_cached_root_hostnames = old_instance.cached_root_hostnames
         except WebPage.DoesNotExist:
             instance._old_parent_id = None
             instance._old_cached_path = None
+            instance._old_cached_root_id = None
+            instance._old_cached_root_hostnames = None
 
     # Calculate and update cached_path
     if instance.parent:

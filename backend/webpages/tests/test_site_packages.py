@@ -19,6 +19,7 @@ from webpages.services.site_package import (
     MultipartUploadWriter,
     SitePackageExporter,
     SitePackageImporter,
+    _remap_structured_references,
     build_site_package_export_filename,
 )
 
@@ -256,8 +257,18 @@ class SitePackageServiceTests(TestCase):
             created_by=self.user,
             options={"tenant_id": str(self.tenant.id)},
         )
-        with zipfile.ZipFile(buffer, "r") as package:
-            imported_root = SitePackageImporter(import_job, storage=storage).import_package(package)
+        with patch(
+            "webpages.services.site_package._remap_structured_references",
+            wraps=_remap_structured_references,
+        ) as remap_references:
+            with zipfile.ZipFile(buffer, "r") as package:
+                imported_root = SitePackageImporter(import_job, storage=storage).import_package(package)
+
+        self.assertTrue(remap_references.called)
+        self.assertTrue(
+            all(call.kwargs.get("version_map") for call in remap_references.call_args_list),
+            "Structured references must only be remapped once all object maps are complete",
+        )
 
         imported_child = imported_root.children.get(title="Child")
         imported_root_version = imported_root.versions.get(version_number=1)

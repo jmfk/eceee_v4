@@ -37,6 +37,7 @@ export const endpoints = {
         publicationStatus: `${BASE_PATH}/webpages/pages/publicationStatus/`,
         anchors: (id) => `${BASE_PATH}/webpages/pages/${id}/anchors/`,
         lookup: `${BASE_PATH}/webpages/pages/lookup/`,
+        resolveRenderPath: `${BASE_PATH}/webpages/pages/resolve-render-path/`,
         // Page tree import endpoints
         importTree: `${BASE_PATH}/webpages/pages/import-tree/`,
         importStatus: (taskId) => `${BASE_PATH}/webpages/pages/import-tree/${taskId}/status/`,

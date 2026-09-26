@@ -4,6 +4,8 @@ PageTheme Model
 Theme configurations for page styling including colors, fonts, and CSS.
 """
 
+import uuid
+
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.db import models
@@ -18,6 +20,7 @@ class PageTheme(models.Model):
     Supports HTML element-specific styling and can be applied to pages, layouts, and object types.
     """
 
+    stable_key = models.UUIDField(default=uuid.uuid4, editable=False, db_index=True)
     name = models.CharField(max_length=255)  # Unique per tenant (enforced by unique_together)
     description = models.TextField(blank=True)
 
@@ -168,6 +171,7 @@ class PageTheme(models.Model):
             models.Index(fields=["tenant_id"], name="pagetheme_tenant_idx"),
         ]
         unique_together = [["tenant", "name"]]  # Name unique per tenant
+        constraints = [models.UniqueConstraint(fields=["tenant", "stable_key"], name="unique_theme_lineage_per_tenant")]
 
     def __str__(self):
         return self.name
@@ -451,6 +455,10 @@ class PageTheme(models.Model):
 
         # Increment sync version on each save (unless explicitly skipped)
         skip_version = kwargs.pop("skip_version_increment", False)
+        version_source = kwargs.pop("version_source", None)
+        version_source_label = kwargs.pop("version_source_label", "")
+        version_created_by = kwargs.pop("version_created_by", None)
+        force_version = kwargs.pop("force_version", False)
         if not skip_version:
             if self.pk:
                 # Existing theme - get current version and increment
@@ -462,6 +470,16 @@ class PageTheme(models.Model):
                 self.sync_version = 1
 
         super().save(*args, **kwargs)
+
+        from webpages.services.theme_versions import record_theme_version
+
+        record_theme_version(
+            self,
+            source=version_source or self.sync_source,
+            source_label=version_source_label,
+            created_by=version_created_by,
+            force=force_version,
+        )
 
         # Invalidate CSS cache for this theme
         if self.id:

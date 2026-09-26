@@ -24,6 +24,11 @@ export const changePassword = (data) => {
     return client.post('/api/v1/utils/change-password/', data);
 };
 
+/** Validate and select the current workspace for a privileged user. */
+export const switchCurrentWorkspace = (identifier) => {
+    return client.post('/api/v1/utils/current-workspace/', { identifier });
+};
+
 /**
  * Get list of all users (superuser only)
  * @returns {Promise} List of users
@@ -85,10 +90,10 @@ export const deleteUser = (userId) => {
 export default {
     getCurrentUser,
     changePassword,
+    switchCurrentWorkspace,
     getUserList,
     generatePasswordReset,
     createUser,
     updateUser,
     deleteUser,
 };
-

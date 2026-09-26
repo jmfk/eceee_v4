@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
+import { getCurrentTenantId } from '../utils/tenant';
+
 const AuthContext = createContext();
 
 export const useAuth = () => {
@@ -62,13 +64,17 @@ export const AuthProvider = ({ children }) => {
 
             if (response.ok) {
                 const data = await response.json();
-                if (data.isDesignerOnly && data.designerTenants?.length) {
-                    const currentTenant = localStorage.getItem('eceee_tenant_id');
+                if (data.designerTenants?.length) {
+                    const currentTenant = getCurrentTenantId();
                     const canUseCurrentTenant = data.designerTenants.some((tenant) =>
                         tenant.id === currentTenant || tenant.identifier === currentTenant
                     );
                     if (!canUseCurrentTenant) {
-                        localStorage.setItem('eceee_tenant_id', data.designerTenants[0].identifier);
+                        const serverWorkspace = data.currentWorkspace;
+                        const fallback = data.designerTenants.find((workspace) =>
+                            workspace.id === serverWorkspace?.id || workspace.identifier === serverWorkspace?.identifier
+                        ) || data.designerTenants[0];
+                        localStorage.setItem('eceee_tenant_id', fallback.identifier);
                     }
                 }
                 return data;

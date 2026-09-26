@@ -178,6 +178,7 @@ class UserListSerializer(serializers.ModelSerializer):
     designer_tenants = serializers.SerializerMethodField()
     is_designer_only = serializers.SerializerMethodField()
     has_tenant_admin_access = serializers.SerializerMethodField()
+    can_switch_tenant = serializers.SerializerMethodField()
 
     def _access_snapshot(self, user):
         cache = getattr(self, "_access_snapshot_cache", {})
@@ -205,6 +206,12 @@ class UserListSerializer(serializers.ModelSerializer):
                 "identifier": assignment.tenant.identifier,
                 "name": assignment.tenant.name,
             }
+        for tenant in self.context.get("additional_designer_tenants", []):
+            tenants[str(tenant.id)] = {
+                "id": str(tenant.id),
+                "identifier": tenant.identifier,
+                "name": tenant.name,
+            }
         return list(tenants.values())
 
     def get_is_designer_only(self, user):
@@ -214,6 +221,11 @@ class UserListSerializer(serializers.ModelSerializer):
     def get_has_tenant_admin_access(self, user):
         _, has_admin_access = self._access_snapshot(user)
         return has_admin_access
+
+    def get_can_switch_tenant(self, user):
+        from core.permissions import user_can_switch_tenant
+
+        return user_can_switch_tenant(user)
 
     class Meta:
         model = User
@@ -230,6 +242,7 @@ class UserListSerializer(serializers.ModelSerializer):
             "designer_tenants",
             "is_designer_only",
             "has_tenant_admin_access",
+            "can_switch_tenant",
         ]
         read_only_fields = fields
 

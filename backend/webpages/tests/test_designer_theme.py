@@ -41,6 +41,7 @@ class DesignerThemeApiTests(TestCase):
             tenant=self.tenant,
             created_by=self.owner,
             name="Editorial",
+            description="Theme for editorial sites",
             colors={"brandColor": "#123456"},
             fonts={"google_fonts": [{"family": "Inter", "variants": ["400", "700"], "display": "swap"}]},
             component_styles={
@@ -132,7 +133,15 @@ class DesignerThemeApiTests(TestCase):
         self.assertIn("__DESIGNER_SLOT_main__", main_layout["previewTemplate"])
         self.assertTrue(main_layout["layoutCss"])
         self.assertEqual(workspace["breakpoints"], {"xs": 0, "sm": 640, "md": 768, "lg": 1024, "xl": 1280})
-        self.assertEqual(workspace["previewContent"], {"views": workspace["catalog"]["previewViews"]})
+        self.assertEqual(workspace["previewContent"], {"views": []})
+        self.assertEqual(workspace["catalog"]["previewViews"], [])
+        self.assertEqual(workspace["contentObjects"], [])
+        self.assertEqual(workspace["name"], "Editorial")
+        self.assertEqual(workspace["description"], "Theme for editorial sites")
+        self.assertEqual(
+            {asset["assetKey"] for asset in workspace["assets"] if asset["kind"] in {"preview", "site-icon"}},
+            {"preview", "site-icon"},
+        )
 
     def test_workspace_places_chrome_widgets_in_natural_preview_slots(self):
         groups = self.theme.design_groups
@@ -194,20 +203,150 @@ class DesignerThemeApiTests(TestCase):
         root.save(
             update_fields=["current_published_version", "latest_version", "is_currently_published", "cached_root_id"]
         )
+        other_theme_page = WebPage.objects.create(
+            title="Archive",
+            slug="archive",
+            parent=root,
+            cached_path="/archive/",
+            cached_root_id=root.id,
+            tenant=self.tenant,
+            created_by=self.owner,
+            last_modified_by=self.owner,
+        )
+        other_theme_version = PageVersion.objects.create(
+            page=other_theme_page,
+            version_number=1,
+            effective_date=timezone.now() - timedelta(days=1),
+            code_layout="main_layout",
+            theme=self.other_theme,
+            widgets={"main": []},
+            created_by=self.owner,
+        )
+        other_theme_page.current_published_version = other_theme_version
+        other_theme_page.latest_version = other_theme_version
+        other_theme_page.is_currently_published = True
+        other_theme_page.save(update_fields=["current_published_version", "latest_version", "is_currently_published"])
+        other_theme_draft = PageVersion.objects.create(
+            page=other_theme_page,
+            version_number=2,
+            code_layout="main_layout",
+            theme=self.other_theme,
+            widgets={"main": [{"type": "easy_widgets.ContentWidget", "config": {"content": "Draft archive"}}]},
+            created_by=self.owner,
+        )
+        other_theme_page.latest_version = other_theme_draft
+        other_theme_page.save(update_fields=["latest_version"])
+
+        draft_site = WebPage.objects.create(
+            title="Draft site",
+            slug="draft-site",
+            tenant=self.tenant,
+            created_by=self.owner,
+            last_modified_by=self.owner,
+        )
+        draft_site_version = PageVersion.objects.create(
+            page=draft_site,
+            version_number=1,
+            code_layout="main_layout",
+            theme=self.other_theme,
+            widgets={"main": []},
+            created_by=self.owner,
+        )
+        draft_site.latest_version = draft_site_version
+        draft_site.cached_root_id = draft_site.id
+        draft_site.save(update_fields=["latest_version", "cached_root_id"])
+        empty_page = WebPage.objects.create(
+            title="Empty page",
+            slug="empty",
+            parent=draft_site,
+            cached_path="/empty/",
+            cached_root_id=draft_site.id,
+            tenant=self.tenant,
+            created_by=self.owner,
+            last_modified_by=self.owner,
+        )
+
+        foreign_owner = User.objects.create_user("foreign-theme-owner", password="test")
+        foreign_tenant = Tenant.objects.create(
+            name="Foreign theme tenant",
+            identifier="foreign-theme-tenant",
+            created_by=foreign_owner,
+        )
+        foreign_theme = PageTheme.objects.create(
+            tenant=foreign_tenant,
+            created_by=foreign_owner,
+            name="Foreign",
+        )
+        foreign_page = WebPage.objects.create(
+            title="Private foreign page",
+            slug="private",
+            tenant=foreign_tenant,
+            created_by=foreign_owner,
+            last_modified_by=foreign_owner,
+        )
+        foreign_version = PageVersion.objects.create(
+            page=foreign_page,
+            version_number=1,
+            effective_date=timezone.now() - timedelta(days=1),
+            code_layout="main_layout",
+            theme=foreign_theme,
+            widgets={"main": []},
+            created_by=foreign_owner,
+        )
+        foreign_page.current_published_version = foreign_version
+        foreign_page.latest_version = foreign_version
+        foreign_page.is_currently_published = True
+        foreign_page.cached_root_id = foreign_page.id
+        foreign_page.save(
+            update_fields=["current_published_version", "latest_version", "is_currently_published", "cached_root_id"]
+        )
         self.authenticate(self.designer)
 
         workspace = self.client.get(self.workspace_url).data
+        self.assertEqual({source["id"] for source in workspace["contentSources"]}, {root.id, draft_site.id})
         self.assertEqual(
-            workspace["contentSources"],
-            [{"id": root.id, "label": "conference.example", "hostname": "conference.example"}],
+            {source["id"] for source in workspace["contentPages"]},
+            {root.id, other_theme_page.id, draft_site.id, empty_page.id},
         )
-        reference_view = next(view for view in workspace["previewContent"]["views"] if view["layout"] == "main_layout")
-        self.assertEqual(reference_view["sourcePageId"], root.id)
-        self.assertTrue(reference_view["isSourceHomepage"])
-        self.assertIn('class="main-layout-container"', reference_view["referenceHtml"])
-        self.assertIn("Real body content from the site.", reference_view["referenceHtml"])
-        self.assertNotIn("<script", reference_view["referenceHtml"].lower())
+        archive_source = next(source for source in workspace["contentPages"] if source["id"] == other_theme_page.id)
+        self.assertEqual(archive_source["siteId"], root.id)
+        self.assertEqual(archive_source["versionId"], other_theme_draft.id)
+        self.assertEqual(archive_source["versionStatus"], "draft")
+        self.assertEqual(archive_source["tenantIdentifier"], self.tenant.identifier)
+        self.assertEqual(archive_source["slugPath"], "archive")
+        empty_source = next(source for source in workspace["contentPages"] if source["id"] == empty_page.id)
+        self.assertIsNone(empty_source["versionId"])
+        self.assertEqual(empty_source["versionStatus"], "empty")
+        self.assertEqual(empty_source["layout"], "main_layout")
+        self.assertNotIn(foreign_page.id, {source["id"] for source in workspace["contentPages"]})
+        self.assertEqual(workspace["previewContent"]["views"], [])
 
+        page_response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/from-page/",
+            {"sourcePageId": other_theme_page.id},
+            format="json",
+        )
+        self.assertEqual(page_response.status_code, 200, page_response.data)
+        self.assertEqual(page_response.data["page"]["id"], other_theme_page.id)
+        self.assertEqual(page_response.data["version"]["id"], other_theme_draft.id)
+        self.assertIn("slots", page_response.data["inheritance"])
+
+        empty_response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/from-page/",
+            {"sourcePageId": empty_page.id},
+            format="json",
+        )
+        self.assertEqual(empty_response.status_code, 200, empty_response.data)
+        self.assertIsNone(empty_response.data["version"]["id"])
+        self.assertEqual(empty_response.data["version"]["code_layout"], "main_layout")
+        self.assertEqual(empty_response.data["version"]["widgets"], {})
+
+        foreign_response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/from-page/",
+            {"sourcePageId": foreign_page.id},
+            format="json",
+        )
+        self.assertEqual(foreign_response.status_code, 404)
         response = self.client.post(
             f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/from-site/",
             {"sourceSiteId": root.id},
@@ -291,48 +430,6 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(self.theme.designer_preview, designer_preview)
         self.assertEqual(response.json()["designerPreview"], designer_preview)
 
-    @patch(
-        "webpages.services.designer_theme.system_storage.url",
-        return_value="https://storage.test/theme_images/preview.png",
-    )
-    @patch(
-        "webpages.services.designer_theme.system_storage.save",
-        return_value="theme_images/1/designer_preview/preview.png",
-    )
-    def test_preview_image_is_stored_as_demo_content(self, _save, _url):
-        self.theme.designer_preview = {
-            "views": [
-                {
-                    "id": "card-object",
-                    "label": "Card",
-                    "kind": "object",
-                    "layout": "main_layout",
-                    "texts": {},
-                    "images": {},
-                }
-            ]
-        }
-        self.theme.save(update_fields=["designer_preview"])
-        image_buffer = io.BytesIO()
-        Image.new("RGB", (80, 60), "#123456").save(image_buffer, format="PNG")
-        upload = SimpleUploadedFile("card.png", image_buffer.getvalue(), content_type="image/png")
-        self.authenticate(self.designer)
-
-        response = self.client.post(
-            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/image/",
-            {"view_id": "card-object", "target_id": "preview-image:main", "image": upload},
-            format="multipart",
-        )
-
-        self.assertEqual(response.status_code, 200, response.data)
-        self.theme.refresh_from_db()
-        saved_image = self.theme.designer_preview["views"][0]["images"]["preview-image:main"]
-        self.assertEqual(saved_image["url"], "https://storage.test/theme_images/preview.png")
-        self.assertEqual((saved_image["width"], saved_image["height"]), (80, 60))
-        self.assertNotIn(
-            "url", self.theme.design_groups["groups"][0]["layoutProperties"]["hero"]["md"]["images"]["background"]
-        )
-
     def test_workspace_normalizes_legacy_snake_case_values_and_preserves_storage_style(self):
         groups = self.theme.design_groups
         groups["groups"][0]["elements"]["h1"] = {
@@ -366,6 +463,8 @@ class DesignerThemeApiTests(TestCase):
             self.workspace_url,
             {
                 "draftVersion": workspace["draftVersion"],
+                "name": "Editorial refresh",
+                "description": "Updated identity and styles",
                 "colors": {"brandColor": "#abcdef"},
                 "fonts": [{"family": "Inter", "variants": ["400", "700"], "display": "swap"}],
                 "typography": [{"groupIndex": 0, "element": "h1", "values": {"fontSize": "40px"}}],
@@ -383,6 +482,8 @@ class DesignerThemeApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 200, response.data)
         self.theme.refresh_from_db()
+        self.assertEqual(self.theme.name, "Editorial")
+        self.assertEqual(self.theme.description, "Theme for editorial sites")
         self.assertEqual(self.theme.colors["brandColor"], "#123456")
         self.assertEqual(self.theme.design_groups["groups"][0]["elements"]["h1"]["fontSize"], "32px")
         self.assertTrue(response.data["hasDraftChanges"])
@@ -395,10 +496,47 @@ class DesignerThemeApiTests(TestCase):
         )
         self.assertEqual(published.status_code, 200, published.data)
         self.theme.refresh_from_db()
+        self.assertEqual(self.theme.name, "Editorial refresh")
+        self.assertEqual(self.theme.description, "Updated identity and styles")
         self.assertEqual(self.theme.colors["brandColor"], "#abcdef")
         self.assertEqual(self.theme.design_groups["groups"][0]["elements"]["h1"]["fontSize"], "40px")
         self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 1)
         self.assertFalse(published.data["hasDraftChanges"])
+
+    def test_clean_draft_automatically_reloads_when_live_theme_changes(self):
+        self.authenticate(self.designer)
+        original = self.client.get(self.workspace_url).data
+
+        self.theme.description = "Updated outside Designer"
+        self.theme.save(version_created_by=self.owner)
+        self.theme.refresh_from_db()
+        refreshed = self.client.get(self.workspace_url)
+
+        self.assertEqual(refreshed.status_code, 200, refreshed.data)
+        self.assertFalse(refreshed.data["draftIsStale"])
+        self.assertFalse(refreshed.data["hasDraftChanges"])
+        self.assertEqual(refreshed.data["description"], "Updated outside Designer")
+        self.assertEqual(refreshed.data["liveSyncVersion"], self.theme.sync_version)
+        self.assertGreater(refreshed.data["draftVersion"], original["draftVersion"])
+
+    def test_changed_draft_stays_stale_when_live_theme_changes(self):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+        saved = self.client.patch(
+            self.workspace_url,
+            {"draftVersion": workspace["draftVersion"], "colors": {"brandColor": "#abcdef"}},
+            format="json",
+        )
+        self.assertEqual(saved.status_code, 200, saved.data)
+
+        self.theme.description = "Updated outside Designer"
+        self.theme.save(version_created_by=self.owner)
+        refreshed = self.client.get(self.workspace_url)
+
+        self.assertEqual(refreshed.status_code, 200, refreshed.data)
+        self.assertTrue(refreshed.data["draftIsStale"])
+        self.assertTrue(refreshed.data["hasDraftChanges"])
+        self.assertEqual(refreshed.data["description"], "Theme for editorial sites")
 
     def test_undo_restores_and_consumes_latest_published_revision(self):
         self.authenticate(self.designer)
@@ -470,7 +608,7 @@ class DesignerThemeApiTests(TestCase):
         workspace = self.client.get(self.workspace_url).data
         unsupported = self.client.patch(
             self.workspace_url,
-            {"draftVersion": workspace["draftVersion"], "name": "Hacked"},
+            {"draftVersion": workspace["draftVersion"], "unsupportedField": "Hacked"},
             format="json",
         )
         self.assertEqual(unsupported.status_code, 400)
@@ -497,6 +635,36 @@ class DesignerThemeApiTests(TestCase):
         self.assertNotIn("content", response.data)
         self.theme.refresh_from_db()
         self.assertEqual(self.theme.colors["brandColor"], "#123456")
+
+    @patch("webpages.services.designer_theme._field_dimensions", return_value=(64, 64))
+    @patch("webpages.services.designer_theme.system_storage.url", return_value="https://storage.test/identity.png")
+    @patch(
+        "webpages.services.designer_theme.system_storage.save",
+        side_effect=["theme_images/1/designer_drafts/1/preview.png", "theme_images/1/designer_drafts/1/favicon.png"],
+    )
+    def test_preview_and_site_icon_can_be_added_when_theme_has_no_identity_images(self, _save, _url, _dimensions):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+
+        for asset_key, filename in (("preview", "preview.png"), ("site-icon", "favicon.png")):
+            upload = SimpleUploadedFile(
+                filename,
+                generate_placeholder_png(filename, asset_key, 64, 64),
+                content_type="image/png",
+            )
+            response = self.client.post(
+                f"/api/v1/webpages/designer/themes/{self.theme.id}/replace-asset/",
+                {"asset_key": asset_key, "image": upload, "draft_version": workspace["draftVersion"]},
+                format="multipart",
+            )
+            self.assertEqual(response.status_code, 200, response.data)
+            workspace = response.data
+            saved_asset = next(asset for asset in response.data["assets"] if asset["assetKey"] == asset_key)
+            self.assertEqual(saved_asset["url"], "https://storage.test/identity.png")
+
+        self.theme.designer_draft.refresh_from_db()
+        self.assertTrue(self.theme.designer_draft.snapshot["image"].endswith("preview.png"))
+        self.assertTrue(self.theme.designer_draft.snapshot["site_icon"].endswith("favicon.png"))
 
     def test_only_tenant_admin_can_manage_assignments(self):
         url = f"/api/v1/webpages/themes/{self.other_theme.id}/designer-assignments/"

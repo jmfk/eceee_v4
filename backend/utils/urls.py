@@ -2,8 +2,9 @@
 URL Configuration for General Utilities
 """
 
-from django.urls import path, include, re_path
+from django.urls import include, path, re_path
 from rest_framework.routers import DefaultRouter
+
 from . import views
 
 app_name = "utils"
@@ -12,20 +13,14 @@ app_name = "utils"
 router = DefaultRouter()
 router.register(r"value-lists", views.ValueListViewSet, basename="value-lists")
 router.register(r"ai-tasks", views.AIAgentTaskViewSet, basename="ai-tasks")
-router.register(
-    r"ai-task-templates", views.AIAgentTaskTemplateViewSet, basename="ai-task-templates"
-)
+router.register(r"ai-task-templates", views.AIAgentTaskTemplateViewSet, basename="ai-task-templates")
 router.register(r"clipboard", views.ClipboardEntryViewSet, basename="clipboard")
 
 # Custom clipboard URL patterns for path parameters
 clipboard_patterns = [
     re_path(
         r"^clipboard/by-type/(?P<clipboard_type>[^/.]+)/$",
-        views.ClipboardEntryViewSet.as_view({
-            "get": "get_by_type",
-            "head": "check_by_type",
-            "delete": "clear_by_type"
-        }),
+        views.ClipboardEntryViewSet.as_view({"get": "get_by_type", "head": "check_by_type", "delete": "clear_by_type"}),
         name="clipboard-by-type",
     ),
 ]
@@ -33,9 +28,7 @@ clipboard_patterns = [
 urlpatterns = [
     # Field Types
     path("field-types/", views.get_field_types, name="get_field_types"),
-    path(
-        "field-types/register/", views.register_field_type, name="register_field_type"
-    ),
+    path("field-types/register/", views.register_field_type, name="register_field_type"),
     # Value Lists
     path(
         "value-lists-for-field/",
@@ -60,6 +53,7 @@ urlpatterns = [
     ),
     # User Management
     path("current-user/", views.CurrentUserView.as_view(), name="current_user"),
+    path("current-workspace/", views.CurrentWorkspaceView.as_view(), name="current_workspace"),
     path("change-password/", views.ChangePasswordView.as_view(), name="change_password"),
     path("users/", views.UserListView.as_view(), name="user_list"),
     path("users/<int:user_id>/", views.UserDetailView.as_view(), name="user_detail"),

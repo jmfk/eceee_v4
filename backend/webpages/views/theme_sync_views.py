@@ -20,6 +20,8 @@ from ..serializers.theme_sync import (
     ThemeSyncPushSerializer,
     ThemeSyncSerializer,
 )
+from ..services.theme_remote_credentials import ThemeRemoteAccessKeyAuthentication
+from ..services.theme_versions import record_theme_version
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -28,6 +30,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
 
     permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
     authentication_classes = [
+        ThemeRemoteAccessKeyAuthentication,
         authentication.TokenAuthentication,
         authentication.SessionAuthentication,
     ]
@@ -142,6 +145,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
         theme_data = push_serializer.validated_data["theme_data"]
         client_version = push_serializer.validated_data["sync_version"]
         theme_name = theme_data.get("name")
+        stable_key = theme_data.get("stable_key")
 
         if not theme_name:
             return Response(
@@ -157,8 +161,10 @@ class ThemeSyncViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        created = False
         try:
-            theme = PageTheme.objects.get(name=theme_name, tenant=tenant)
+            lookup = {"stable_key": stable_key} if stable_key else {"name": theme_name}
+            theme = PageTheme.objects.get(tenant=tenant, **lookup)
             # Check version conflict
             if client_version < theme.sync_version:
                 return Response(
@@ -178,23 +184,24 @@ class ThemeSyncViewSet(viewsets.ViewSet):
             # Update existing theme
             serializer = ThemeSyncSerializer(theme, data=theme_data, partial=True, context={"request": request})
         except PageTheme.DoesNotExist:
-            # Create new theme - set tenant from request
-            theme_data["tenant"] = tenant.id
+            created = True
             serializer = ThemeSyncSerializer(data=theme_data, context={"request": request})
 
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         # Save with sync metadata
-        theme = serializer.save(
-            sync_source="sync",
-            last_synced_at=timezone.now(),
-            skip_version_increment=False,  # Will increment in save()
-        )
+        previous_version_count = theme.versions.count() if not created else 0
+        save_kwargs = {"sync_source": "sync", "last_synced_at": timezone.now()}
+        if created:
+            save_kwargs.update({"tenant": tenant, "created_by": request.user})
+        theme = serializer.save(**save_kwargs)
+        if theme.versions.count() == previous_version_count:
+            record_theme_version(theme, source="remote-upload", source_label="Theme sync API", force=True)
 
         return Response(
             ThemeSyncSerializer(theme, context={"request": request}).data,
-            status=status.HTTP_200_OK if theme.id else status.HTTP_201_CREATED,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
     @action(detail=False, methods=["get"])

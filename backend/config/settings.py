@@ -57,6 +57,9 @@ else:
 
 # Theme sync configuration
 THEME_SYNC_ENABLED = config("THEME_SYNC_ENABLED", default=False, cast=bool)
+THEME_REMOTE_CREDENTIAL_KEYS = [
+    key.strip() for key in config("THEME_REMOTE_CREDENTIAL_KEYS", default="").split(",") if key.strip()
+]
 
 # Multi-tenancy configuration
 TENANT_HEADER = config("TENANT_HEADER", default="X-Tenant-ID")
@@ -221,8 +224,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "core.middleware.TenantContextMiddleware",  # Set tenant context for RLS (after auth, before other DB queries)
     "utils.middleware.dev_auth.DevAutoLoginMiddleware",  # Auto-login for development (only active when DEBUG=True)
+    "core.middleware.TenantContextMiddleware",  # Set tenant context after session/dev authentication
     "allauth.account.middleware.AccountMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
