@@ -194,6 +194,23 @@ class SitePackageServiceTests(TestCase):
         self.assertIn(f"{destination}/demo.png", str(restored["designer_preview"]))
         self.assertEqual(storage.files[f"{destination}/preview.png"], b"preview")
 
+    def test_theme_transfer_package_keeps_assets_with_the_same_basename_distinct(self):
+        storage = MemoryStorage()
+        self.theme.image.name = "theme_images/source/preview/logo.png"
+        self.theme.site_icon.name = "theme_images/source/favicon/logo.png"
+        storage.files = {
+            self.theme.image.name: b"preview-logo",
+            self.theme.site_icon.name: b"favicon-logo",
+        }
+
+        encoded = build_theme_transfer_package(self.theme, storage=storage)
+        imported = PageTheme.objects.create(tenant=self.tenant, name="Imported", created_by=self.user)
+        restored = restore_theme_transfer_package(encoded, imported, storage=storage)
+
+        self.assertNotEqual(restored["image"], restored["site_icon"])
+        self.assertEqual(storage.files[restored["image"]], b"preview-logo")
+        self.assertEqual(storage.files[restored["site_icon"]], b"favicon-logo")
+
     def test_import_creates_copy_clears_root_hostnames_and_remaps_media(self):
         PageVersion.objects.create(
             page=self.root,

@@ -20,7 +20,11 @@ from ..serializers.theme_sync import (
     ThemeSyncPushSerializer,
     ThemeSyncSerializer,
 )
-from ..services.site_package import build_theme_transfer_package, restore_theme_transfer_package
+from ..services.site_package import (
+    build_theme_transfer_package,
+    restore_theme_transfer_package,
+    validate_theme_transfer_package,
+)
 from ..services.theme_remote_credentials import ThemeRemoteAccessKeyAuthentication
 from ..services.theme_versions import SNAPSHOT_FIELDS, record_theme_version
 
@@ -150,10 +154,15 @@ class ThemeSyncViewSet(viewsets.ViewSet):
             return Response(push_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         theme_data = dict(push_serializer.validated_data["theme_data"])
+        theme_data.pop("is_default", None)
         transfer_package = push_serializer.validated_data.get("transfer_package")
         if transfer_package:
             theme_data.pop("image", None)
             theme_data.pop("site_icon", None)
+            try:
+                validate_theme_transfer_package(transfer_package)
+            except ValueError as exc:
+                return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         client_version = push_serializer.validated_data["sync_version"]
         theme_name = theme_data.get("name")
         stable_key = theme_data.get("stable_key")
@@ -172,66 +181,62 @@ class ThemeSyncViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        created = False
-        previous_version_ids = []
         try:
-            lookup = {"stable_key": stable_key} if stable_key else {"name": theme_name}
-            theme = PageTheme.objects.get(tenant=tenant, **lookup)
-            previous_version_ids = list(theme.versions.values_list("id", flat=True))
-            # Check version conflict
-            if client_version < theme.sync_version:
-                return Response(
-                    {
-                        "error": "Version conflict",
-                        "client_version": client_version,
-                        "server_version": theme.sync_version,
-                        "message": (
-                            f"Client version ({client_version}) is older than "
-                            f"server version ({theme.sync_version}). "
-                            "Please pull latest changes and resolve conflicts."
-                        ),
-                    },
-                    status=status.HTTP_409_CONFLICT,
-                )
-
-            # Update existing theme
-            serializer = ThemeSyncSerializer(theme, data=theme_data, partial=True, context={"request": request})
-        except PageTheme.DoesNotExist:
-            created = True
-            serializer = ThemeSyncSerializer(data=theme_data, context={"request": request})
-
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        # Save with sync metadata. If a package is present, replace the serializer's
-        # interim version with one that references the copied local assets.
-        with transaction.atomic():
-            save_kwargs = {"sync_source": "sync", "last_synced_at": timezone.now()}
-            if created:
-                save_kwargs.update({"tenant": tenant, "created_by": request.user})
-            theme = serializer.save(**save_kwargs)
-            if transfer_package:
+            with transaction.atomic():
+                created = False
+                previous_version_ids = []
+                lookup = {"stable_key": stable_key} if stable_key else {"name": theme_name}
                 try:
+                    theme = PageTheme.objects.select_for_update().get(tenant=tenant, **lookup)
+                    previous_version_ids = list(theme.versions.values_list("id", flat=True))
+                    if client_version < theme.sync_version:
+                        return Response(
+                            {
+                                "error": "Version conflict",
+                                "client_version": client_version,
+                                "server_version": theme.sync_version,
+                                "message": (
+                                    f"Client version ({client_version}) is older than "
+                                    f"server version ({theme.sync_version}). "
+                                    "Please pull latest changes and resolve conflicts."
+                                ),
+                            },
+                            status=status.HTTP_409_CONFLICT,
+                        )
+                    serializer = ThemeSyncSerializer(theme, data=theme_data, partial=True, context={"request": request})
+                except PageTheme.DoesNotExist:
+                    created = True
+                    serializer = ThemeSyncSerializer(data=theme_data, context={"request": request})
+
+                if not serializer.is_valid():
+                    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+                save_kwargs = {"sync_source": "sync", "last_synced_at": timezone.now()}
+                if created:
+                    save_kwargs.update({"tenant": tenant, "created_by": request.user})
+                theme = serializer.save(**save_kwargs)
+                if transfer_package:
                     restored = restore_theme_transfer_package(transfer_package, theme)
-                except ValueError as exc:
-                    return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-                for field in SNAPSHOT_FIELDS:
-                    if field in restored:
-                        setattr(theme, field, restored[field])
-                theme.save(
-                    update_fields=[*SNAPSHOT_FIELDS, "updated_at"],
-                    skip_version_increment=True,
-                )
-                theme.versions.exclude(id__in=previous_version_ids).delete()
-                record_theme_version(
-                    theme,
-                    source="remote-upload",
-                    source_label="Theme sync API",
-                    created_by=request.user,
-                    force=True,
-                )
-            elif theme.versions.count() == len(previous_version_ids):
-                record_theme_version(theme, source="remote-upload", source_label="Theme sync API", force=True)
+                    restored.pop("is_default", None)
+                    for field in SNAPSHOT_FIELDS:
+                        if field in restored:
+                            setattr(theme, field, restored[field])
+                    theme.save(
+                        update_fields=[*SNAPSHOT_FIELDS, "updated_at"],
+                        skip_version_increment=True,
+                    )
+                    theme.versions.exclude(id__in=previous_version_ids).delete()
+                    record_theme_version(
+                        theme,
+                        source="remote-upload",
+                        source_label="Theme sync API",
+                        created_by=request.user,
+                        force=True,
+                    )
+                elif theme.versions.count() == len(previous_version_ids):
+                    record_theme_version(theme, source="remote-upload", source_label="Theme sync API", force=True)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(
             ThemeSyncSerializer(theme, context={"request": request}).data,

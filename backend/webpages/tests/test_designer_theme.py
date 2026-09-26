@@ -349,7 +349,7 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(foreign_response.status_code, 404)
         response = self.client.post(
             f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/from-site/",
-            {"sourceSiteId": root.id},
+            {"sourceSiteId": root.id, "draftVersion": workspace["draftVersion"]},
             format="json",
         )
 
@@ -360,7 +360,7 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(main_view["sourceSiteId"], root.id)
         self.assertIn("https://media.example/conference.jpg", str(main_view["images"]))
 
-    def test_preview_text_is_saved_separately_from_theme_draft_and_preserves_metadata(self):
+    def test_preview_text_is_saved_in_theme_draft_and_preserves_metadata(self):
         self.theme.designer_preview = {
             "developerNote": "Use realistic editorial copy",
             "views": [
@@ -387,6 +387,7 @@ class DesignerThemeApiTests(TestCase):
             {
                 "viewId": "article-page",
                 "texts": {"group:0:element:h1": "A temporary demo headline"},
+                "draftVersion": original_draft_version,
             },
             format="json",
         )
@@ -395,12 +396,25 @@ class DesignerThemeApiTests(TestCase):
         self.theme.refresh_from_db()
         self.theme.designer_draft.refresh_from_db()
         self.assertEqual(self.theme.sync_version, original_sync_version)
-        self.assertEqual(self.theme.designer_draft.version, original_draft_version)
+        self.assertEqual(self.theme.designer_draft.version, original_draft_version + 1)
+        self.assertTrue(self.theme.designer_draft.has_changes)
         self.assertEqual(self.theme.colors["brandColor"], "#123456")
         self.assertEqual(self.theme.designer_preview["developerNote"], "Use realistic editorial copy")
-        saved_view = self.theme.designer_preview["views"][0]
+        saved_view = self.theme.designer_draft.snapshot["designer_preview"]["views"][0]
         self.assertEqual(saved_view["objectType"], "article")
         self.assertEqual(saved_view["texts"], {"group:0:element:h1": "A temporary demo headline"})
+        self.assertEqual(response.data["draftVersion"], original_draft_version + 1)
+
+        publish = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/publish/",
+            {"draftVersion": response.data["draftVersion"]},
+            format="json",
+        )
+        self.assertEqual(publish.status_code, 200, publish.data)
+        self.theme.refresh_from_db()
+        published_view = self.theme.designer_preview["views"][0]
+        self.assertEqual(published_view["texts"], {"group:0:element:h1": "A temporary demo headline"})
+        self.assertGreater(self.theme.sync_version, original_sync_version)
 
     def test_advanced_theme_editor_preserves_preview_ids_and_metadata(self):
         self.authenticate(self.owner)
@@ -763,16 +777,14 @@ class DesignerPlaceholderTests(SimpleTestCase):
         storage_url.assert_any_call("theme_images/3/library/header.png")
 
     def test_reference_preview_html_removes_executable_markup(self):
-        markup = _safe_reference_preview_html(
-            """
+        markup = _safe_reference_preview_html("""
             <html><body>
                 <script>alert('script')</script>
                 <button onclick="alert('click')">Safe button</button>
                 <a href="javascript:alert('link')">Safe link</a>
                 <iframe src="https://example.com">unsafe frame</iframe>
             </body></html>
-            """
-        )
+            """)
 
         self.assertIn("Safe button", markup)
         self.assertIn("Safe link", markup)

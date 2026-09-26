@@ -636,12 +636,19 @@ def _preview_primary_slot(catalog, layout_name):
     )
 
 
-def import_designer_preview_from_site(theme_id, tenant, user, source_site_id):
+def import_designer_preview_from_site(theme_id, tenant, user, source_site_id, draft_version):
     """Replace saved preview content with public content from a site using the theme."""
     with transaction.atomic():
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
         if not user_can_design_theme(user, theme):
             raise PermissionError
+        draft = get_or_create_designer_draft(theme, user)
+        draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
+        if draft.base_sync_version != theme.sync_version:
+            raise DesignerDraftConflict("The live theme changed after this draft was started.")
+        if draft.version != _integer(draft_version, "draftVersion"):
+            raise DesignerDraftConflict("The Designer draft changed after you opened it.")
+        draft_theme = theme_from_designer_draft(theme, draft)
         sources = designer_content_sources(theme)
         allowed_source_ids = {source["id"] for source in sources}
         try:
@@ -671,8 +678,8 @@ def import_designer_preview_from_site(theme_id, tenant, user, source_site_id):
         if not pages:
             raise ValidationError("That site has no published content using this theme.")
 
-        catalog = build_designer_catalog(theme, collect_designer_assets(theme))
-        preview = normalized_designer_preview(theme)
+        catalog = build_designer_catalog(draft_theme, collect_designer_assets(draft_theme))
+        preview = normalized_designer_preview(draft_theme)
         targets = [element for group in catalog["designGroups"] for element in group.get("elements", [])]
         fallback_page = pages[0]
         if not preview["views"]:
@@ -718,9 +725,13 @@ def import_designer_preview_from_site(theme_id, tenant, user, source_site_id):
 
         preview["sourceSiteId"] = root.id
         preview["sourceSiteLabel"] = next(source["label"] for source in sources if source["id"] == root.id)
-        theme.designer_preview = preview
-        theme.save(update_fields=["designer_preview", "updated_at"], skip_version_increment=True)
-        return preview
+        draft_theme.designer_preview = preview
+        draft.snapshot = theme_designer_snapshot(draft_theme)
+        draft.version += 1
+        draft.has_changes = True
+        draft.updated_by = user
+        draft.save(update_fields=["snapshot", "version", "has_changes", "updated_by", "updated_at"])
+        return theme, draft
 
 
 def theme_designer_snapshot(theme):
@@ -730,6 +741,7 @@ def theme_designer_snapshot(theme):
         "colors": copy.deepcopy(theme.colors),
         "fonts": copy.deepcopy(theme.fonts),
         "design_groups": copy.deepcopy(theme.design_groups),
+        "designer_preview": copy.deepcopy(theme.designer_preview),
         "image": theme.image.name if theme.image else None,
         "site_icon": theme.site_icon.name if theme.site_icon else None,
     }
@@ -798,6 +810,7 @@ def apply_designer_snapshot(theme, snapshot):
     theme.colors = copy.deepcopy(snapshot.get("colors", {}))
     theme.fonts = copy.deepcopy(snapshot.get("fonts", {}))
     theme.design_groups = copy.deepcopy(snapshot.get("design_groups", {}))
+    theme.designer_preview = copy.deepcopy(snapshot.get("designer_preview", theme.designer_preview))
     theme.image.name = snapshot.get("image") or ""
     theme.site_icon.name = snapshot.get("site_icon") or ""
     return theme
@@ -1370,6 +1383,7 @@ def publish_designer_draft(theme_id, tenant, user, draft_version):
                 "colors",
                 "fonts",
                 "design_groups",
+                "designer_preview",
                 "image",
                 "site_icon",
                 "sync_source",
@@ -1540,7 +1554,7 @@ def validate_image_upload(upload):
         raise ValidationError("The uploaded file is not a valid image.") from exc
 
 
-def save_designer_preview_texts(theme_id, tenant, user, view_id, texts):
+def save_designer_preview_texts(theme_id, tenant, user, view_id, texts, draft_version):
     if not isinstance(texts, dict) or len(texts) > 200:
         raise ValidationError("Preview text must be an object with at most 200 entries.")
     cleaned = {}
@@ -1555,14 +1569,25 @@ def save_designer_preview_texts(theme_id, tenant, user, view_id, texts):
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
         if not user_can_design_theme(user, theme):
             raise PermissionError
-        preview = normalized_designer_preview(theme)
+        draft = get_or_create_designer_draft(theme, user)
+        draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
+        if draft.base_sync_version != theme.sync_version:
+            raise DesignerDraftConflict("The live theme changed after this draft was started.")
+        if draft.version != _integer(draft_version, "draftVersion"):
+            raise DesignerDraftConflict("The Designer draft changed after you opened it.")
+        draft_theme = theme_from_designer_draft(theme, draft)
+        preview = normalized_designer_preview(draft_theme)
         view = next((item for item in preview["views"] if item["id"] == view_id), None)
         if not view:
             raise ValidationError("Unknown preview view.")
         view["texts"] = cleaned
-        theme.designer_preview = preview
-        theme.save(update_fields=["designer_preview", "updated_at"], skip_version_increment=True)
-        return preview
+        draft_theme.designer_preview = preview
+        draft.snapshot = theme_designer_snapshot(draft_theme)
+        draft.version += 1
+        draft.has_changes = True
+        draft.updated_by = user
+        draft.save(update_fields=["snapshot", "version", "has_changes", "updated_by", "updated_at"])
+        return theme, draft
 
 
 def _find_asset(theme, asset_key):

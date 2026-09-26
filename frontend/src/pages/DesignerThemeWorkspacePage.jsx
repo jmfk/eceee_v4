@@ -186,8 +186,11 @@ const DesignerThemeWorkspacePage = () => {
 
     const savePreviewContent = async (viewId, texts) => {
         try {
-            const result = await designerThemesApi.savePreviewContent(themeId, viewId, texts)
-            setWorkspace((current) => ({ ...current, previewContent: result.previewContent }))
+            const current = dirty ? await saveDraft({ silent: true }) : workspace
+            if (!current) return null
+            const result = await designerThemesApi.savePreviewContent(themeId, viewId, texts, current.draftVersion)
+            setWorkspace(result)
+            setDirty(false)
             return result
         } catch (err) {
             addNotification({ type: 'error', message: err.message || 'Preview content could not be saved' })

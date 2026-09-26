@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import Mock, patch
 
 from cryptography.fernet import Fernet
@@ -321,11 +322,13 @@ class ThemeVersionApiTests(TestCase):
         build_package.assert_called_once_with(self.left)
 
     @override_settings(THEME_SYNC_ENABLED=True)
+    @patch("webpages.views.theme_sync_views.validate_theme_transfer_package")
     @patch("webpages.views.theme_sync_views.restore_theme_transfer_package")
-    def test_sync_push_restores_asset_package_before_recording_version(self, restore_package):
+    def test_sync_push_restores_asset_package_before_recording_version(self, restore_package, _validate_package):
         restore_package.return_value = {
             "image": "theme_images/remote/library/preview.png",
             "site_icon": "theme_images/remote/library/favicon.png",
+            "is_default": True,
         }
         previous_count = self.left.versions.count()
 
@@ -347,8 +350,68 @@ class ThemeVersionApiTests(TestCase):
         self.left.refresh_from_db()
         self.assertEqual(self.left.image.name, "theme_images/remote/library/preview.png")
         self.assertEqual(self.left.site_icon.name, "theme_images/remote/library/favicon.png")
+        self.assertFalse(self.left.is_default)
         self.assertEqual(self.left.versions.count(), previous_count + 1)
         self.assertEqual(self.left.versions.first().snapshot["image"], self.left.image.name)
+
+    @override_settings(THEME_SYNC_ENABLED=True)
+    @patch("webpages.views.theme_sync_views.validate_theme_transfer_package")
+    @patch("webpages.views.theme_sync_views.restore_theme_transfer_package", side_effect=ValueError("Invalid package"))
+    def test_failed_sync_push_rolls_back_theme_and_versions(self, _restore_package, _validate_package):
+        original_colors = self.left.colors
+        original_sync_version = self.left.sync_version
+        original_version_count = self.left.versions.count()
+
+        response = self.client.post(
+            "/api/v1/webpages/themes/sync/push/",
+            {
+                "sync_version": self.left.sync_version,
+                "theme_data": {
+                    "stable_key": str(self.left.stable_key),
+                    "name": self.left.name,
+                    "colors": {"brand": "#ffffff"},
+                },
+                "transfer_package": "encoded-package",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.left.refresh_from_db()
+        self.assertEqual(self.left.colors, original_colors)
+        self.assertEqual(self.left.sync_version, original_sync_version)
+        self.assertEqual(self.left.versions.count(), original_version_count)
+
+    @patch("webpages.views.designer_theme_views.remote_sync_request")
+    def test_failed_remote_download_does_not_create_theme(self, remote_request):
+        connection = ThemeRemoteConnection.objects.create(
+            tenant=self.tenant,
+            name="Production",
+            base_url="https://remote.example",
+            remote_workspace="remote-workspace",
+            encrypted_access_key=encrypt_access_key("secret-token"),
+            created_by=self.user,
+            updated_by=self.user,
+        )
+        stable_key = uuid.uuid4()
+        remote_request.return_value = {
+            "themes": [
+                {
+                    "stable_key": str(stable_key),
+                    "name": "Broken remote theme",
+                    "transfer_package": "not-a-package",
+                }
+            ]
+        }
+
+        response = self.client.post(
+            "/api/v1/webpages/designer/themes/remote/pull/",
+            {"connection_id": str(connection.id), "stable_key": str(stable_key)},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(PageTheme.objects.filter(tenant=self.tenant, stable_key=stable_key).exists())
 
     @override_settings(THEME_SYNC_ENABLED=True)
     def test_sync_upload_of_identical_content_still_appends_a_remote_version(self):

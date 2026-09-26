@@ -47,7 +47,11 @@ from webpages.services.designer_theme import (
     undo_designer_publish,
     user_can_design_theme,
 )
-from webpages.services.site_package import build_theme_transfer_package, restore_theme_transfer_package
+from webpages.services.site_package import (
+    build_theme_transfer_package,
+    restore_theme_transfer_package,
+    validate_theme_transfer_package,
+)
 from webpages.services.theme_remote import RemoteThemeError, remote_sync_request
 from webpages.services.theme_remote_credentials import (
     RemoteCredentialConfigurationError,
@@ -101,10 +105,12 @@ class DesignerPlaceholderSerializer(serializers.Serializer):
 class DesignerPreviewTextSerializer(serializers.Serializer):
     view_id = serializers.CharField(max_length=100)
     texts = serializers.DictField(child=serializers.CharField(max_length=5000, allow_blank=True), allow_empty=True)
+    draft_version = serializers.IntegerField(min_value=1)
 
 
 class DesignerPreviewSiteSerializer(serializers.Serializer):
     source_site_id = serializers.IntegerField(min_value=1)
+    draft_version = serializers.IntegerField(min_value=1)
 
 
 class DesignerPreviewPageSerializer(serializers.Serializer):
@@ -490,70 +496,83 @@ class DesignerRemotePullView(APIView):
             for field in SNAPSHOT_FIELDS
             if field in remote_theme or camel_names.get(field) in remote_theme
         }
-        theme = PageTheme.objects.filter(tenant=tenant, stable_key=data["stable_key"]).first()
-        if theme is None:
-            if not tenant.user_has_access(request.user):
-                from rest_framework.exceptions import PermissionDenied
+        snapshot.pop("is_default", None)
+        packaged_snapshot = remote_theme.get("transfer_package") or remote_theme.get("transferPackage")
+        if packaged_snapshot:
+            try:
+                validate_theme_transfer_package(packaged_snapshot)
+            except ValueError as exc:
+                return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-                raise PermissionDenied("Workspace administrator access is required to import a new theme.")
-            base_name = snapshot.get("name") or "Imported theme"
-            name = base_name
-            suffix = 2
-            while PageTheme.objects.filter(tenant=tenant, name=name).exists():
-                name = f"{base_name} ({suffix})"
-                suffix += 1
-            snapshot["name"] = name
-            packaged_snapshot = remote_theme.get("transfer_package") or remote_theme.get("transferPackage")
-            initial_snapshot = dict(snapshot)
-            if packaged_snapshot:
-                initial_snapshot.pop("image", None)
-                initial_snapshot.pop("site_icon", None)
-            theme = PageTheme(tenant=tenant, created_by=request.user, stable_key=data["stable_key"], **initial_snapshot)
-            theme.save(
-                version_source="remote-download",
-                version_source_label=connection.name,
-                version_created_by=request.user,
-                force_version=True,
-            )
-            if packaged_snapshot:
-                try:
-                    snapshot = restore_theme_transfer_package(packaged_snapshot, theme)
-                except ValueError as exc:
-                    return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-                snapshot["name"] = name
-                for field in SNAPSHOT_FIELDS:
-                    if field in snapshot:
-                        setattr(theme, field, snapshot[field])
-                theme.save(update_fields=[*SNAPSHOT_FIELDS, "updated_at"], skip_version_increment=True)
-                theme.versions.all().delete()
-                version = record_theme_version(
-                    theme,
-                    source="remote-download",
-                    source_label=connection.name,
-                    created_by=request.user,
-                    force=True,
+        try:
+            with transaction.atomic():
+                theme = (
+                    PageTheme.objects.select_for_update().filter(tenant=tenant, stable_key=data["stable_key"]).first()
                 )
-            else:
-                version = theme.versions.first()
-        else:
-            if not user_can_design_theme(request.user, theme):
-                from rest_framework.exceptions import PermissionDenied
+                if theme is None:
+                    if not tenant.user_has_access(request.user):
+                        from rest_framework.exceptions import PermissionDenied
 
-                raise PermissionDenied("You do not have Designer access to this theme.")
-            packaged_snapshot = remote_theme.get("transfer_package") or remote_theme.get("transferPackage")
-            if packaged_snapshot:
-                try:
-                    snapshot = restore_theme_transfer_package(packaged_snapshot, theme)
-                except ValueError as exc:
-                    return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-            version = record_theme_version(
-                theme,
-                source="remote-download",
-                source_label=connection.name,
-                created_by=request.user,
-                force=True,
-                snapshot=snapshot,
-            )
+                        raise PermissionDenied("Workspace administrator access is required to import a new theme.")
+                    base_name = snapshot.get("name") or "Imported theme"
+                    name = base_name
+                    suffix = 2
+                    while PageTheme.objects.filter(tenant=tenant, name=name).exists():
+                        name = f"{base_name} ({suffix})"
+                        suffix += 1
+                    snapshot["name"] = name
+                    snapshot["is_default"] = False
+                    initial_snapshot = dict(snapshot)
+                    if packaged_snapshot:
+                        initial_snapshot.pop("image", None)
+                        initial_snapshot.pop("site_icon", None)
+                    theme = PageTheme(
+                        tenant=tenant, created_by=request.user, stable_key=data["stable_key"], **initial_snapshot
+                    )
+                    theme.save(
+                        version_source="remote-download",
+                        version_source_label=connection.name,
+                        version_created_by=request.user,
+                        force_version=True,
+                    )
+                    if packaged_snapshot:
+                        snapshot = restore_theme_transfer_package(packaged_snapshot, theme)
+                        snapshot.pop("is_default", None)
+                        snapshot["is_default"] = False
+                        snapshot["name"] = name
+                        for field in SNAPSHOT_FIELDS:
+                            if field in snapshot:
+                                setattr(theme, field, snapshot[field])
+                        theme.save(update_fields=[*SNAPSHOT_FIELDS, "updated_at"], skip_version_increment=True)
+                        theme.versions.all().delete()
+                        version = record_theme_version(
+                            theme,
+                            source="remote-download",
+                            source_label=connection.name,
+                            created_by=request.user,
+                            force=True,
+                        )
+                    else:
+                        version = theme.versions.first()
+                else:
+                    if not user_can_design_theme(request.user, theme):
+                        from rest_framework.exceptions import PermissionDenied
+
+                        raise PermissionDenied("You do not have Designer access to this theme.")
+                    if packaged_snapshot:
+                        snapshot = restore_theme_transfer_package(packaged_snapshot, theme)
+                        snapshot.pop("is_default", None)
+                    snapshot["is_default"] = theme.is_default
+                    version = record_theme_version(
+                        theme,
+                        source="remote-download",
+                        source_label=connection.name,
+                        created_by=request.user,
+                        force=True,
+                        snapshot=snapshot,
+                    )
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"themeId": theme.id, "versionNumber": version.version_number}, status=status.HTTP_201_CREATED)
 
 
@@ -577,7 +596,7 @@ class DesignerRemotePushView(APIView):
                 None,
             )
             remote_snapshot = theme_snapshot(theme)
-            for package_only_field in ("image", "site_icon", "gallery_styles", "carousel_styles"):
+            for package_only_field in ("image", "site_icon", "gallery_styles", "carousel_styles", "is_default"):
                 remote_snapshot.pop(package_only_field, None)
             payload = {
                 "sync_version": (match or {}).get("sync_version", (match or {}).get("syncVersion", 0)),
@@ -774,16 +793,19 @@ class DesignerThemePreviewContentView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         try:
-            preview = save_designer_preview_texts(
+            theme, draft = save_designer_preview_texts(
                 theme_id,
                 request.tenant,
                 request.user,
                 data["view_id"],
                 data["texts"],
+                data["draft_version"],
             )
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
-        return Response({"previewContent": preview})
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(build_draft_workspace(theme, draft))
 
 
 class DesignerThemePreviewSiteView(APIView):
@@ -795,17 +817,20 @@ class DesignerThemePreviewSiteView(APIView):
         serializer = DesignerPreviewSiteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            preview = import_designer_preview_from_site(
+            theme, draft = import_designer_preview_from_site(
                 theme_id,
                 request.tenant,
                 request.user,
                 serializer.validated_data["source_site_id"],
+                serializer.validated_data["draft_version"],
             )
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
         except PageTheme.DoesNotExist:
             return Response({"error": "Theme not found."}, status=status.HTTP_404_NOT_FOUND)
-        return Response({"previewContent": preview})
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(build_draft_workspace(theme, draft))
 
 
 class DesignerThemePreviewPageView(APIView):

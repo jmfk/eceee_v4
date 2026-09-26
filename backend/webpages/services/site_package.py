@@ -3,6 +3,7 @@ Site ZIP package export/import services.
 """
 
 import base64
+import hashlib
 import io
 import json
 import mimetypes
@@ -413,25 +414,57 @@ def build_theme_transfer_package(theme: PageTheme, storage=None) -> str:
     return base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
-def restore_theme_transfer_package(encoded_package: str, theme: PageTheme, storage=None) -> Dict[str, Any]:
-    """Copy packaged files into a theme's library and return rewritten theme data."""
-    storage = storage or S3MediaStorage()
+def _read_theme_transfer_package(encoded_package: str):
     try:
         raw_package = base64.b64decode(encoded_package, validate=True)
         package = zipfile.ZipFile(io.BytesIO(raw_package), "r")
         data = json.loads(package.read("theme.json").decode("utf-8"))
-    except (ValueError, KeyError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
+    except (ValueError, KeyError, UnicodeDecodeError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
         raise ValueError("Invalid theme transfer package.") from exc
+    if not isinstance(data, dict):
+        package.close()
+        raise ValueError("Invalid theme transfer package.")
+    for name in package.namelist():
+        if not name.startswith("assets/") or name.endswith("/"):
+            continue
+        original_path = name[len("assets/") :]
+        if not original_path or original_path.startswith("/") or ".." in original_path.split("/"):
+            package.close()
+            raise ValueError("Invalid asset path in theme transfer package.")
+    return package, data
+
+
+def validate_theme_transfer_package(encoded_package: str):
+    """Validate a package before its caller mutates theme records."""
+    package, _data = _read_theme_transfer_package(encoded_package)
+    try:
+        with package:
+            if package.testzip() is not None:
+                raise ValueError("Invalid theme transfer package.")
+    except zipfile.BadZipFile as exc:
+        raise ValueError("Invalid theme transfer package.") from exc
+
+
+def restore_theme_transfer_package(encoded_package: str, theme: PageTheme, storage=None) -> Dict[str, Any]:
+    """Copy packaged files into a theme's library and return rewritten theme data."""
+    storage = storage or S3MediaStorage()
+    package, data = _read_theme_transfer_package(encoded_package)
 
     replacements = {}
     with package:
-        for name in package.namelist():
-            if not name.startswith("assets/") or name.endswith("/"):
-                continue
-            original_path = name[len("assets/") :]
-            if not original_path or original_path.startswith("/") or ".." in original_path.split("/"):
-                raise ValueError("Invalid asset path in theme transfer package.")
-            new_path = f"theme_images/{theme.id}/library/{os.path.basename(original_path)}"
+        asset_names = [name for name in package.namelist() if name.startswith("assets/") and not name.endswith("/")]
+        original_paths = [name[len("assets/") :] for name in asset_names]
+        basename_counts = {}
+        for original_path in original_paths:
+            basename = os.path.basename(original_path)
+            basename_counts[basename] = basename_counts.get(basename, 0) + 1
+        for name, original_path in zip(asset_names, original_paths):
+            basename = os.path.basename(original_path)
+            if basename_counts[basename] > 1:
+                stem, suffix = os.path.splitext(basename)
+                digest = hashlib.sha256(original_path.encode("utf-8")).hexdigest()[:12]
+                basename = f"{stem}-{digest}{suffix}"
+            new_path = f"theme_images/{theme.id}/library/{basename}"
             storage._save(new_path, ContentFile(package.read(name)))
             replacements[original_path] = new_path
 

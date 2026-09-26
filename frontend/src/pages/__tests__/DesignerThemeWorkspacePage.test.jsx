@@ -131,6 +131,9 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.publish.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4 })
         mocks.undo.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4, canUndo: false })
         mocks.savePreviewContent.mockImplementation(async (_themeId, viewId, texts) => ({
+            ...structuredClone(workspace),
+            draftVersion: 3,
+            hasDraftChanges: true,
             previewContent: { views: previewViews.map((view) => view.id === viewId ? { ...view, texts } : view) },
         }))
         mocks.loadPreviewPage.mockResolvedValue({ page: { id: 42 }, version: { id: 9 }, inheritance: { slots: {} } })
@@ -510,13 +513,13 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByText('Used for theme size: SM.')).toBeInTheDocument()
     })
 
-    it('saves edited demo text as preview content without changing the theme draft', async () => {
+    it('saves edited demo text in the theme draft', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         await selectHeading()
         fireEvent.change(screen.getByLabelText('Preview text'), { target: { value: 'A saved preview headline' } })
         fireEvent.click(screen.getByRole('button', { name: 'Save preview content' }))
-        await waitFor(() => expect(mocks.savePreviewContent).toHaveBeenCalledWith('7', 'page-main', expect.objectContaining({ 'group:0:element:h1': 'A saved preview headline' })))
+        await waitFor(() => expect(mocks.savePreviewContent).toHaveBeenCalledWith('7', 'page-main', expect.objectContaining({ 'group:0:element:h1': 'A saved preview headline' }), 2))
         expect(mocks.save).not.toHaveBeenCalled()
     })
 
