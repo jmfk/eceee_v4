@@ -92,7 +92,7 @@ class UserListQueryTests(TestCase):
         self.assertFalse(user_can_switch_tenant(dev_user))
 
     @override_settings(DEBUG=False)
-    def test_dev_auto_user_cannot_switch_workspace_outside_debug(self):
+    def test_dev_auto_user_cannot_select_workspace_outside_debug(self):
         dev_user = User.objects.create_user("dev_auto_user", password="test")
         workspace = Tenant.objects.create(
             name="Production switch target",
