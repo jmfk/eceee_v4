@@ -1088,7 +1088,8 @@ prod-preflight: ## Run checks required before production deploy (use: make prod-
 	bash deploy/scripts/preflight.sh "$(TAG)"
 
 prod-deploy: ## Run checks, then deploy to production (use: make prod-deploy [TAG=v0.x.x|hash])
-	@DEPLOY_REF=$$(bash deploy/scripts/resolve-deploy-ref.sh "$(TAG)"); \
+	@set -e; \
+	DEPLOY_REF=$$(bash deploy/scripts/resolve-deploy-ref.sh "$(TAG)"); \
 	echo "Resolved deploy ref: $$DEPLOY_REF"; \
 	bash deploy/scripts/preflight.sh "$$DEPLOY_REF"; \
 	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)" --deploy "$$DEPLOY_REF"
