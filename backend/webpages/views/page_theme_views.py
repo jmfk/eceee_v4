@@ -34,6 +34,7 @@ from ..services.style_ai_helper import StyleAIHelper
 from ..services.theme_preview_content import (
     import_theme_preview_document,
     list_theme_preview_sources,
+    normalize_theme_preview_namespaces,
     rewrite_theme_library_image_urls,
 )
 from ..theme_service import ThemeService
@@ -1524,6 +1525,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             # Prepare metadata
             metadata = {
                 "name": theme.name,
+                "source_theme_id": theme.id,
                 "description": theme.description,
                 "created_at": theme.created_at.isoformat(),
                 "updated_at": theme.updated_at.isoformat(),
@@ -1662,7 +1664,9 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     colors=theme_data.get("colors", {}),
                     design_groups=theme_data.get("design_groups", {}),
                     component_styles=theme_data.get("component_styles", {}),
-                    designer_preview=theme_data.get("designer_preview", {}),
+                    designer_preview=normalize_theme_preview_namespaces(
+                        theme_data.get("designer_preview", {}), request.tenant
+                    ),
                     image_styles=theme_data.get("image_styles", {}),
                     gallery_styles=theme_data.get("gallery_styles", {}),
                     carousel_styles=theme_data.get("carousel_styles", {}),
@@ -1751,6 +1755,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                         new_theme.designer_preview = rewrite_theme_library_image_urls(
                             new_theme.designer_preview,
                             url_mapping,
+                            metadata.get("source_theme_id"),
                         )
                         new_theme.save(update_fields=["designer_preview", "updated_at"])
 

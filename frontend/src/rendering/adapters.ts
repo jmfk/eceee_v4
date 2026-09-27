@@ -24,6 +24,15 @@ const layoutSlots: Record<string, string[]> = {
     landing_page: ['header', 'navbar', 'hero', 'landingPage', 'footer'],
 }
 
+const objectWidgetsForPreview = (widgets: Record<string, any[]> = {}, objectType: any = {}) => {
+    const configuredSlots = objectType?.slotConfiguration?.slots || objectType?.slot_configuration?.slots || []
+    const names = [
+        ...configuredSlots.map((slot: any) => typeof slot === 'string' ? slot : slot?.name).filter(Boolean),
+        ...Object.keys(widgets),
+    ]
+    return [...new Set(names)].flatMap((name: string) => Array.isArray(widgets[name]) ? widgets[name] : [])
+}
+
 export const createPageRenderModel = ({
     layout = 'main_layout', widgets = {}, inheritedWidgets = {}, slotInheritanceRules = {}, context = {}, themeCss = '', fontUrl = '',
 }: any): RenderPageModel => {
@@ -54,12 +63,17 @@ export const createDesignerRenderModel = ({
     const layout = sourceModel?.layout || document?.codeLayout || view.layout || 'main_layout'
     const slots: Record<string, RenderWidgetModel[]> = {}
     const catalogLayout = workspace?.catalog?.layouts?.find((candidate: any) => candidate.key === layout)
+    const rawSlots = sourceModel?.slots || documentWidgets || {}
+    const isObjectPreview = Boolean(sourceModel?.context?.objectId || view.kind === 'object')
+    const previewSlots = isObjectPreview
+        ? { main: objectWidgetsForPreview(rawSlots, sourceModel?.context?.objectType || view.objectType) }
+        : rawSlots
     const availableSlots = [...new Set([
         ...(catalogLayout?.slots?.map((slot: any) => slot.name) || layoutSlots[layout] || ['main']),
-        ...Object.keys(sourceModel?.slots || documentWidgets || {}),
+        ...Object.keys(previewSlots),
     ])]
     availableSlots.forEach((slot: string) => {
-        const widgets = sourceModel?.slots?.[slot] || documentWidgets?.[slot] || []
+        const widgets = previewSlots[slot] || []
         slots[slot] = widgets.map((widget: any, index: number) => normalizeWidget(widget, `${slot}-${index}`))
     })
     const primary = availableSlots.find((slot: string) => ['main', 'content', 'body', 'landingPage', 'landing_page'].includes(slot)) || availableSlots[0]
@@ -108,7 +122,7 @@ export const createDesignerRenderModel = ({
             catalog: workspace?.catalog || {},
             texts: sourceModel ? {} : view.texts || {},
             assets: workspace?.assets || [],
-            contentEditable: !sourceModel && !documentWidgets,
+            contentEditable: false,
             guidesEnabled,
         },
     }

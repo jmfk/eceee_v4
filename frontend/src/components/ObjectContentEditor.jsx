@@ -13,7 +13,7 @@ import { copyWidgetsToClipboard, cutWidgetsToClipboard } from '../utils/clipboar
 import ImportDialog from './ImportDialog'
 import WidgetEditorPanel from './WidgetEditorPanel'
 
-const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context }) => {
+const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context, namespace = null }) => {
     // 1. STATE & HOOKS (Top level)
     const [selectedWidgets, setSelectedWidgets] = useState(() => new Set())
     const [cutWidgets, setCutWidgets] = useState(() => new Set())
@@ -32,6 +32,10 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
     const isInitialized = useRef(false)
     const internalWidgetsRef = useRef(internalWidgets)
     const instanceId = context.instanceId
+    const widgetContext = useMemo(() => ({
+        contextType,
+        ...(contextType === 'object' && instanceId ? { objectId: String(instanceId) } : {})
+    }), [contextType, instanceId])
     const componentId = useMemo(() => `object-content-editor-${instanceId || 'new'}`, [instanceId])
     const normalizedWidgets = useMemo(() => internalWidgets, [internalWidgets])
     const normalizedWidgetsRef = useRef(internalWidgets)
@@ -221,9 +225,9 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
         setInternalWidgets(prev => ({ ...prev, [slotName]: [...(prev[slotName] || []), newWidget] }))
         await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
             id: newWidget.id, type: newWidget.type, config: newWidget.config,
-            slot: slotName, contextType, order: currentSlotWidgets.length
+            slot: slotName, ...widgetContext, order: currentSlotWidgets.length
         })
-    }, [objectType, widgetTypes, componentId, contextType, publishUpdate])
+    }, [objectType, widgetTypes, componentId, widgetContext, publishUpdate])
 
     const handleOpenWidgetEditor = useCallback((widgetData) => {
         if (editingWidget?.id === widgetData.id) {
@@ -248,10 +252,10 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
             [slotName]: (prev[slotName] || []).map(widget => widget.id === updatedWidget.id ? updatedWidget : widget),
         }))
         await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-            id: updatedWidget.id, slotName, contextType, config: updatedWidget.config
+            id: updatedWidget.id, slotName, ...widgetContext, config: updatedWidget.config
         })
         handleCloseWidgetEditor()
-    }, [editingWidget, componentId, contextType, handleCloseWidgetEditor, publishUpdate])
+    }, [editingWidget, componentId, widgetContext, handleCloseWidgetEditor, publishUpdate])
 
     const handleDeleteCutWidgets = useCallback(async (cutMetadata) => {
         const sourceInstanceId = cutMetadata.instanceId
@@ -260,7 +264,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
                 for (const widgetPath of cutMetadata.widgetPaths) {
                     const parsed = parseWidgetPath(widgetPath)
                     if (parsed) await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, {
-                        id: parsed.widgetId, contextType, instanceId: sourceInstanceId
+                        id: parsed.widgetId, contextType, objectId: String(sourceInstanceId)
                     })
                 }
             }
@@ -276,7 +280,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
                     updatedWidgets[parsed.slotName] = updatedWidgets[parsed.slotName].filter(w => w.id !== parsed.widgetId)
                     if (updatedWidgets[parsed.slotName].length !== originalLength) {
                         hasChanges = true
-                        await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: parsed.widgetId, contextType })
+                        await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: parsed.widgetId, ...widgetContext })
                     }
                 }
             }
@@ -284,7 +288,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
         if (hasChanges) setInternalWidgets(updatedWidgets)
         setCutWidgets(new Set())
         setSelectedWidgets(new Set())
-    }, [instanceId, publishUpdate, componentId, contextType, parseWidgetPath])
+    }, [instanceId, publishUpdate, componentId, contextType, widgetContext, parseWidgetPath])
 
     const handlePasteAtPosition = useCallback(async (slotName, position, keepClipboard = false) => {
         if (!clipboardData?.data?.length) return
@@ -297,12 +301,12 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
         for (let i = 0; i < pastedWidgets.length; i++) {
             await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
                 id: pastedWidgets[i].id, type: pastedWidgets[i].type, config: pastedWidgets[i].config,
-                slot: slotName, contextType, order: position + i
+                slot: slotName, ...widgetContext, order: position + i
             })
         }
         if (clipboardData.operation === 'cut' && clipboardData.metadata) await handleDeleteCutWidgets(clipboardData.metadata)
         if (!keepClipboard || clipboardData.operation === 'cut') await clearClipboardState()
-    }, [clipboardData, componentId, contextType, handleDeleteCutWidgets, clearClipboardState, publishUpdate])
+    }, [clipboardData, componentId, widgetContext, handleDeleteCutWidgets, clearClipboardState, publishUpdate])
 
     const handleEditWidget = useCallback((slotName, widgetIndex, widget) => {
         handleOpenWidgetEditor({
@@ -317,7 +321,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
             if (next[slotName]) next[slotName] = next[slotName].filter((_, i) => i !== widgetIndex)
             return next
         })
-        if (widget?.id) await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: widget.id, contextType })
+        if (widget?.id) await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: widget.id, ...widgetContext })
         const widgetPath = buildWidgetPath(slotName, widget.id)
         setSelectedWidgets(prev => {
             if (!prev.has(widgetPath)) return prev
@@ -325,7 +329,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
             next.delete(widgetPath)
             return next
         })
-    }, [componentId, contextType, publishUpdate, buildWidgetPath])
+    }, [componentId, widgetContext, publishUpdate, buildWidgetPath])
 
     const handleMoveWidget = useCallback(async (slotName, widgetIndex, widget, direction) => {
         const slotWidgets = [...(internalWidgetsRef.current[slotName] || [])]
@@ -335,20 +339,20 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
         slotWidgets.splice(newIndex, 0, moved)
         setInternalWidgets(prev => ({ ...prev, [slotName]: slotWidgets }))
         await publishUpdate(componentId, OperationTypes.MOVE_WIDGET, {
-            id: widget.id, slotName, fromIndex: widgetIndex, toIndex: newIndex, contextType
+            id: widget.id, slotName, fromIndex: widgetIndex, toIndex: newIndex, ...widgetContext
         })
-    }, [componentId, contextType, publishUpdate])
+    }, [componentId, widgetContext, publishUpdate])
 
     const handleClearSlot = useCallback(async (slotName) => {
         const existing = internalWidgetsRef.current[slotName] || []
         setInternalWidgets(prev => ({ ...prev, [slotName]: [] }))
-        for (const w of existing) await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: w.id, contextType })
+        for (const w of existing) await publishUpdate(componentId, OperationTypes.REMOVE_WIDGET, { id: w.id, ...widgetContext })
         setSelectedWidgets(prev => {
             const next = new Set(prev)
             existing.forEach(w => next.delete(buildWidgetPath(slotName, w.id)))
             return next
         })
-    }, [componentId, contextType, publishUpdate, buildWidgetPath])
+    }, [componentId, widgetContext, publishUpdate, buildWidgetPath])
 
     const handleImportContent = useCallback((slotName) => {
         setImportSlotName(slotName)
@@ -362,13 +366,13 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
         for (let i = 0; i < importedWidgets.length; i++) {
             await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
                 id: importedWidgets[i].id, type: importedWidgets[i].type, config: importedWidgets[i].config,
-                slot: importSlotName, contextType, order: current.length + i
+                slot: importSlotName, ...widgetContext, order: current.length + i
             })
         }
         if (metadata.pageWasUpdated) await publishUpdate(componentId, OperationTypes.RELOAD_DATA, {
             reason: 'Import update', updatedFields: ['title', 'tags']
         })
-    }, [importSlotName, componentId, contextType, publishUpdate])
+    }, [importSlotName, componentId, widgetContext, publishUpdate])
 
     const handleSlotAction = useCallback(async (action, slotName, widget) => {
         if (action === 'duplicate' && widget) {
@@ -380,10 +384,10 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
             setInternalWidgets(prev => ({ ...prev, [slotName]: [...(prev[slotName] || []), newWidget] }))
             await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
                 id: newWidget.id, type: newWidget.type, config: newWidget.config,
-                slot: slotName, contextType, order: current.length
+                slot: slotName, ...widgetContext, order: current.length
             })
         }
-    }, [componentId, contextType, publishUpdate])
+    }, [componentId, widgetContext, publishUpdate])
 
     const stableConfigChangeHandler = useCallback(async (widgetId, slotName, newConfig) => {
         const current = internalWidgetsRef.current[slotName] || []
@@ -399,12 +403,12 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
             await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
                 slotName,
-                contextType,
+                ...widgetContext,
                 config: newConfig
             })
             if (editingWidget?.id === widgetId) setEditingWidget({ ...updated, slotName })
         }
-    }, [componentId, contextType, editingWidget, publishUpdate])
+    }, [componentId, widgetContext, editingWidget, publishUpdate])
 
     const handleShowWidgetModal = useCallback((slot) => {
         setSelectedSlotForModal(slot)
@@ -544,6 +548,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
                 title={editingWidget ? `Edit ${getWidgetDisplayName(editingWidget.type, widgetTypes)}` : 'Edit widget'}
                 autoOpenSpecialEditor
                 context={{ ...context, instanceId }}
+                namespace={namespace}
             />
         </div>
     )

@@ -117,7 +117,7 @@ const selectHeading = async () => {
             data: { source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:h1', kind: 'element', label: 'Heading 1', text: 'A heading with a realistic length' },
             source: iframe.contentWindow,
         }))
-        expect(screen.getByLabelText('Preview text')).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Heading 1' })).toBeInTheDocument()
     })
 }
 
@@ -321,7 +321,7 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         await selectHeading()
         expect(screen.getByRole('heading', { name: 'Heading 1' })).toBeInTheDocument()
-        expect(screen.getByLabelText('Preview text')).toHaveValue('A heading with a realistic length')
+        expect(screen.queryByLabelText('Preview text')).not.toBeInTheDocument()
         expect(screen.getByDisplayValue('32px')).toBeInTheDocument()
         expect(screen.getByDisplayValue('16px')).toBeInTheDocument()
         expect(screen.getByLabelText('brand value')).toBeInTheDocument()
@@ -517,14 +517,13 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByText('Used for theme size: SM.')).toBeInTheDocument()
     })
 
-    it('saves edited demo text in the theme draft', async () => {
+    it('keeps preview content read-only', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         await selectHeading()
-        fireEvent.change(screen.getByLabelText('Preview text'), { target: { value: 'A saved preview headline' } })
-        fireEvent.click(screen.getByRole('button', { name: 'Save preview content' }))
-        await waitFor(() => expect(mocks.savePreviewContent).toHaveBeenCalledWith('7', 'page-main', expect.objectContaining({ 'group:0:element:h1': 'A saved preview headline' }), 2))
-        await waitFor(() => expect(mocks.savePreviewContent).toHaveBeenCalledWith('7', 'object-card', {}, 3))
+        expect(screen.queryByLabelText('Preview text')).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Save preview content' })).not.toBeInTheDocument()
+        expect(mocks.savePreviewContent).not.toHaveBeenCalled()
         expect(mocks.save).not.toHaveBeenCalled()
     })
 

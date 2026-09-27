@@ -13,10 +13,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../api', () => ({ themesApi: mocks }))
 vi.mock('../../../editors/page-editor/PageContentEditor', () => ({
-    default: ({ pageVersionData }) => <div>Page widgets for {pageVersionData.codeLayout}</div>,
+    default: ({ pageVersionData, namespace }) => <div data-testid="page-content-editor" data-namespace={namespace || ''}>Page widgets for {pageVersionData.codeLayout}</div>,
 }))
-vi.mock('../../ObjectContentEditor', () => ({ default: () => <div>Object widgets</div> }))
-vi.mock('../../WidgetEditorPanel', () => ({ default: () => null }))
+vi.mock('../../ObjectContentEditor', () => ({ default: ({ namespace }) => <div data-testid="object-content-editor" data-namespace={namespace || ''}>Object widgets</div> }))
+vi.mock('../../WidgetEditorPanel', () => ({ default: ({ namespace }) => <div data-testid="widget-editor-panel" data-namespace={namespace || ''} /> }))
 vi.mock('../../objectEdit/ObjectDataForm', () => ({ default: () => <div>Object fields</div> }))
 
 const sources = {
@@ -24,6 +24,7 @@ const sources = {
     pages: [{ id: 12, label: 'Conference — Programme' }],
     objects: [{ id: 21, label: 'Article — Welcome' }],
     objectTypes: [{ key: 'article', label: 'Article', schema: { properties: {} }, slotConfiguration: { slots: [] } }],
+    defaultNamespace: { id: 8, slug: 'tenant-default' },
 }
 
 const StateReader = ({ expose }) => {
@@ -56,19 +57,21 @@ describe('PreviewViewsTab', () => {
         let readState
         renderWithStateProviders(<Harness exposeState={(reader) => { readState = reader }} />)
 
+        await screen.findByRole('option', { name: 'Article' })
         fireEvent.click(screen.getByRole('button', { name: 'New page' }))
         expect(screen.getAllByDisplayValue('New preview page')).toHaveLength(2)
         expect(screen.getByText('Page widgets for main_layout')).toBeInTheDocument()
+        expect(screen.getByTestId('page-content-editor')).toHaveAttribute('data-namespace', 'tenant-default')
+        expect(screen.getByTestId('widget-editor-panel')).toHaveAttribute('data-namespace', 'tenant-default')
         await waitFor(() => {
             const state = readState()
             expect(state.pages[state.metadata.currentPageId]).toBeDefined()
             expect(state.versions[state.metadata.currentVersionId]?.pageId).toBe(state.metadata.currentPageId)
         })
-
-        await screen.findByRole('option', { name: 'Article' })
         fireEvent.click(screen.getByRole('button', { name: 'New object' }))
         expect(screen.getByDisplayValue('New Article')).toBeInTheDocument()
         expect(screen.getByText('Object widgets')).toBeInTheDocument()
+        expect(screen.getByTestId('object-content-editor')).toHaveAttribute('data-namespace', 'tenant-default')
         expect(screen.getByText('Object fields')).toBeInTheDocument()
     })
 

@@ -26,7 +26,7 @@ const PreviewViewsTab = ({ designerPreview, onChange, themeId }) => {
     const { publishUpdate } = useUnifiedData()
 
     const canUseSources = Boolean(themeId && themeId !== 'new')
-    const { data: sources = { layouts: [], pages: [], objects: [], objectTypes: [] }, isLoading: sourcesLoading } = useQuery({
+    const { data: sources = { layouts: [], pages: [], objects: [], objectTypes: [], defaultNamespace: null }, isLoading: sourcesLoading } = useQuery({
         queryKey: ['theme-preview-content-sources', themeId],
         queryFn: async () => await themesApi.previewContentSources(themeId),
         enabled: canUseSources,
@@ -128,6 +128,8 @@ const PreviewViewsTab = ({ designerPreview, onChange, themeId }) => {
         metadata: {},
         objectType,
     } : null
+    const defaultNamespace = sources.defaultNamespace?.slug || null
+    const objectNamespace = objectType?.namespace?.slug || defaultNamespace
 
     useEffect(() => {
         if (!selected || selected.kind !== 'page') return
@@ -217,13 +219,13 @@ const PreviewViewsTab = ({ designerPreview, onChange, themeId }) => {
                                 <label className="text-sm font-medium text-gray-700">Layout<select value={pageVersion.codeLayout} onChange={(event) => updateView({ layout: event.target.value, content: { ...selected.content, codeLayout: event.target.value } })} className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2">{sources.layouts?.map((layout) => <option key={layout.key} value={layout.key}>{layout.label}</option>)}{!sources.layouts?.some((layout) => layout.key === pageVersion.codeLayout) && <option value={pageVersion.codeLayout}>{pageVersion.codeLayout}</option>}</select></label>
                             </div>
                             <div className="min-h-[440px] overflow-hidden rounded-lg border border-gray-200">
-                                <PageContentEditor webpageData={pageData} pageVersionData={pageVersion} editable applyPageTheme={false} localWidgets={pageWidgets} onLocalWidgetUpdate={(widgets) => updateContent({ widgets })} onOpenWidgetEditor={(widget) => setWidgetEditor({ open: true, widget })} inheritedWidgets={{}} slotInheritanceRules={{}} context={{ pageId: selected.id, mode: 'theme-preview', contextType: 'page' }} />
+                                <PageContentEditor webpageData={pageData} pageVersionData={pageVersion} editable applyPageTheme={false} localWidgets={pageWidgets} onLocalWidgetUpdate={(widgets) => updateContent({ widgets })} onOpenWidgetEditor={(widget) => setWidgetEditor({ open: true, widget })} inheritedWidgets={{}} slotInheritanceRules={{}} namespace={defaultNamespace} context={{ pageId: selected.id, mode: 'theme-preview', contextType: 'page' }} />
                             </div>
-                            <WidgetEditorPanel isOpen={widgetEditor.open} onClose={() => setWidgetEditor({ open: false, widget: null })} onSave={savePageWidget} onRealTimeUpdate={(widget) => updateContent({ widgets: applyWidgetUpdateToWidgetMap(pageWidgets, widget) })} widgetData={widgetEditor.widget} title={widgetEditor.widget ? `Edit ${widgetEditor.widget.name || widgetEditor.widget.type}` : 'Edit widget'} autoOpenSpecialEditor webpageData={pageData} pageVersionData={pageVersion} context={{ pageId: selected.id, versionId: selected.id, contextType: 'page' }} />
+                            <WidgetEditorPanel isOpen={widgetEditor.open} onClose={() => setWidgetEditor({ open: false, widget: null })} onSave={savePageWidget} onRealTimeUpdate={(widget) => updateContent({ widgets: applyWidgetUpdateToWidgetMap(pageWidgets, widget) })} widgetData={widgetEditor.widget} title={widgetEditor.widget ? `Edit ${widgetEditor.widget.name || widgetEditor.widget.type}` : 'Edit widget'} autoOpenSpecialEditor webpageData={pageData} pageVersionData={pageVersion} namespace={defaultNamespace} context={{ pageId: selected.id, versionId: selected.id, contextType: 'page' }} />
                         </div>}
 
                         {selected.kind === 'object' && objectType && <div className="grid gap-6 xl:grid-cols-2">
-                            <div className="min-w-0 rounded-lg border border-gray-200 p-4"><ObjectContentEditor key={selected.id} objectType={objectType} widgets={selected.content?.widgets || {}} onWidgetChange={(widgets) => updateContent({ widgets })} context={{ instanceId: selected.id, mode: 'theme-preview', contextType: 'object' }} /></div>
+                            <div className="min-w-0 rounded-lg border border-gray-200 p-4"><ObjectContentEditor key={selected.id} objectType={objectType} widgets={selected.content?.widgets || {}} onWidgetChange={(widgets) => updateContent({ widgets })} context={{ instanceId: selected.id, mode: 'theme-preview', contextType: 'object' }} namespace={objectNamespace} /></div>
                             <div className="min-w-0 rounded-lg border border-gray-200 p-4"><ObjectDataForm key={selected.id} ref={objectFormRef} objectType={objectType} instance={objectInstance} isNewInstance={false} onFormChange={(form) => updateContent({ title: form.title, data: form.data })} context={{ instanceId: selected.id, mode: 'theme-preview', contextType: 'object' }} /></div>
                         </div>}
                     </section>}

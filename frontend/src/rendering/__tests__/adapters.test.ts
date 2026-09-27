@@ -29,6 +29,7 @@ describe('render adapters', () => {
         expect(model.slots.main).toHaveLength(1)
         expect(model.slots.main[0].type).toBe('easy_widgets.ContentWidget')
         expect(model.designer?.catalog).toBe(workspace.catalog)
+        expect(model.designer?.contentEditable).toBe(false)
     })
 
     it('renders complete theme-owned preview documents instead of generated fixtures', () => {
@@ -52,5 +53,45 @@ describe('render adapters', () => {
         expect(model.slots.main).toHaveLength(1)
         expect(model.slots.main[0]).toMatchObject({ id: 'copied', type: 'easy_widgets.HeadlineWidget' })
         expect(model.designer?.contentEditable).toBe(false)
+    })
+
+    it('renders every configured slot in a theme-owned object preview', () => {
+        const workspace = {
+            previewContent: { views: [{
+                id: 'copied-object', kind: 'object', layout: 'main_layout',
+                objectType: { slotConfiguration: { slots: [{ name: 'main_content' }, { name: 'content' }] } },
+                content: {
+                    widgets: {
+                        content: [{ id: 'second', type: 'easy_widgets.ContentWidget', config: {} }],
+                        main_content: [{ id: 'first', type: 'easy_widgets.HeadlineWidget', config: {} }],
+                    },
+                },
+            }] },
+            catalog: { layouts: [{ key: 'main_layout', slots: [{ name: 'main' }] }] },
+        }
+
+        const model = createDesignerRenderModel({ workspace, viewId: 'copied-object' })
+
+        expect(model.slots.main.map((widget) => widget.id)).toEqual(['first', 'second'])
+        expect(model.designer?.contentEditable).toBe(false)
+    })
+
+    it('renders every configured slot in a live object preview', () => {
+        const workspace = { catalog: { layouts: [{ key: 'main_layout', slots: [{ name: 'main' }] }] } }
+        const sourceModel = {
+            layout: 'main_layout',
+            slots: {
+                content: [{ id: 'body', type: 'easy_widgets.ContentWidget', config: {} }],
+                teaser: [{ id: 'teaser', type: 'easy_widgets.HeadlineWidget', config: {} }],
+            },
+            context: {
+                objectId: 55,
+                objectType: { slotConfiguration: { slots: [{ name: 'teaser' }, { name: 'content' }] } },
+            },
+        }
+
+        const model = createDesignerRenderModel({ workspace, sourceModel })
+
+        expect(model.slots.main.map((widget) => widget.id)).toEqual(['teaser', 'body'])
     })
 })

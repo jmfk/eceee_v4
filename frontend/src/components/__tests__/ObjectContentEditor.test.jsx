@@ -52,6 +52,10 @@ vi.mock('../WidgetSelectionModal', () => ({
     default: () => null
 }))
 
+vi.mock('../WidgetEditorPanel', () => ({
+    default: ({ namespace }) => <div data-testid="widget-editor-namespace">{namespace || ''}</div>
+}))
+
 vi.mock('../../widgets', () => ({
     getWidgetComponent: () => function MockInlineWidget({ config, onConfigChange }) {
         return (
@@ -115,6 +119,7 @@ describe('ObjectContentEditor widget config updates', () => {
                     objectType={objectType}
                     widgets={widgets}
                     context={{ instanceId: 'object-1' }}
+                    namespace="article-media"
                 />
             </QueryClientProvider>
         )
@@ -131,9 +136,11 @@ describe('ObjectContentEditor widget config updates', () => {
                 id: 'banner-1',
                 slotName: 'hero',
                 contextType: 'object',
+                objectId: 'object-1',
                 config: { title: 'Updated inline title' }
             }
         )
+        expect(screen.getByTestId('widget-editor-namespace')).toHaveTextContent('article-media')
     })
 
     it('prefers the explicit object context over a stale page context', async () => {
@@ -162,7 +169,7 @@ describe('ObjectContentEditor widget config updates', () => {
         expect(publishUpdateMock).toHaveBeenCalledWith(
             'object-content-editor-object-1',
             'UPDATE_WIDGET_CONFIG',
-            expect.objectContaining({ contextType: 'object' })
+            expect.objectContaining({ contextType: 'object', objectId: 'object-1' })
         )
     })
 })

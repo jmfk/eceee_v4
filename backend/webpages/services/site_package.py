@@ -24,6 +24,10 @@ from core.models import Tenant
 from file_manager.models import MediaFile
 from file_manager.storage import S3MediaStorage
 from webpages.models import PageTheme, PageVersion, SitePackageJob, WebPage
+from webpages.services.theme_preview_content import (
+    normalize_theme_preview_namespaces,
+    rewrite_theme_library_image_urls,
+)
 
 PACKAGE_VERSION = "1.0"
 UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
@@ -772,18 +776,21 @@ class SitePackageImporter:
 
     def _import_themes(self, package: zipfile.ZipFile) -> Dict[int, PageTheme]:
         theme_map = {}
+        destination_tenant = self._destination_tenant()
         theme_files = [name for name in package.namelist() if name.startswith("themes/") and name.endswith(".json")]
         for theme_file in theme_files:
             data = json.loads(package.read(theme_file).decode("utf-8"))
             theme = PageTheme.objects.create(
-                tenant=self._destination_tenant(),
+                tenant=destination_tenant,
                 name=_unique_theme_name(data.get("name", "Imported Theme")),
                 description=data.get("description", ""),
                 fonts=data.get("fonts", {}),
                 colors=data.get("colors", {}),
                 design_groups=data.get("design_groups", {}),
                 component_styles=data.get("component_styles", {}),
-                designer_preview=data.get("designer_preview", {}),
+                designer_preview=normalize_theme_preview_namespaces(
+                    data.get("designer_preview", {}), destination_tenant
+                ),
                 image_styles=data.get("image_styles", {}),
                 gallery_styles=data.get("gallery_styles", {}),
                 carousel_styles=data.get("carousel_styles", {}),
@@ -803,6 +810,7 @@ class SitePackageImporter:
     def _restore_theme_assets(self, package, theme: PageTheme, data: Dict[str, Any]):
         prefix = f"themes/assets/{data['source_id']}/"
         asset_replacements = {}
+        preview_url_replacements = {}
         for name in package.namelist():
             if not name.startswith(prefix) or name.endswith("/"):
                 continue
@@ -811,6 +819,7 @@ class SitePackageImporter:
             new_path = f"theme_images/{theme.id}/library/{os.path.basename(original_path)}"
             self.storage._save(new_path, ContentFile(content))
             asset_replacements[original_path] = new_path
+            preview_url_replacements[os.path.basename(original_path)] = self.storage.url(new_path)
             if original_path == data.get("image"):
                 theme.image.name = new_path
             if original_path == data.get("site_icon"):
@@ -822,7 +831,6 @@ class SitePackageImporter:
                 "colors",
                 "design_groups",
                 "component_styles",
-                "designer_preview",
                 "image_styles",
                 "gallery_styles",
                 "carousel_styles",
@@ -837,6 +845,11 @@ class SitePackageImporter:
                     _replace_in_json(getattr(theme, field_name), asset_replacements),
                 )
             theme.custom_css = _replace_in_json(theme.custom_css, asset_replacements)
+            theme.designer_preview = rewrite_theme_library_image_urls(
+                theme.designer_preview,
+                preview_url_replacements,
+                data["source_id"],
+            )
         theme.save()
 
     def _import_media(self, package: zipfile.ZipFile) -> Dict[str, MediaFile]:
