@@ -255,8 +255,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
             )
         queryset = WebPage.objects.filter(tenant=site.tenant, is_deleted=False)
 
-        segments = [segment for segment in slug_path.split("/") if segment]
-        if any(segment in {".", ".."} for segment in segments):
+        requested_segments = [segment for segment in slug_path.split("/") if segment]
+        if any(segment in {".", ".."} for segment in requested_segments):
             return Response(
                 {"path": ["Invalid page path."]},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -275,23 +275,24 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         # Non-hosted roots include their slug in public paths; hosted roots do
         # not. Strip the real root prefix before resolving descendants.
-        if not site.has_silent_slug() and segments and segments[0] == site.slug:
-            segments = segments[1:]
+        lookup_segments = requested_segments
+        if not site.has_silent_slug() and lookup_segments and lookup_segments[0] == site.slug:
+            lookup_segments = lookup_segments[1:]
 
         # Hosted sites prefer an exact same-slug child. If none exists, also
         # accept a copied path that redundantly includes the silent root slug.
-        page, matched_depth = resolve_descendant(segments)
-        if site.has_silent_slug() and matched_depth == 0 and segments and segments[0] == site.slug:
-            segments = segments[1:]
-            page, matched_depth = resolve_descendant(segments)
+        page, matched_depth = resolve_descendant(lookup_segments)
+        if site.has_silent_slug() and matched_depth == 0 and lookup_segments and lookup_segments[0] == site.slug:
+            lookup_segments = lookup_segments[1:]
+            page, matched_depth = resolve_descendant(lookup_segments)
 
-        if segments and matched_depth == 0:
+        if lookup_segments and matched_depth == 0:
             return Response(
                 {"detail": "Page not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        remaining_segments = segments[matched_depth:]
+        remaining_segments = lookup_segments[matched_depth:]
         pattern_path = "/".join(remaining_segments) + ("/" if remaining_segments else "")
         if pattern_path:
             from ..path_pattern_registry import path_pattern_registry
@@ -310,7 +311,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        resolved_path = "/".join(segments)
+        resolved_path = "/".join(requested_segments)
         return Response(
             {
                 "site_id": site.id,

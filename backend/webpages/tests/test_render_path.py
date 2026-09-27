@@ -126,9 +126,16 @@ class RenderPathResolutionTest(TestCase):
         self.assertEqual(root_response.status_code, status.HTTP_200_OK)
         self.assertEqual(root_response.data["page_id"], root.id)
         self.assertEqual(root_response.data["version_id"], root_version.id)
+        self.assertEqual(root_response.data["slug_path"], root.slug)
+        self.assertEqual(root_response.data["render_path"], f"/_render/{root.id}/{root.slug}")
         self.assertEqual(child_response.status_code, status.HTTP_200_OK)
         self.assertEqual(child_response.data["page_id"], child.id)
         self.assertEqual(child_response.data["version_id"], child_version.id)
+        self.assertEqual(child_response.data["slug_path"], f"{root.slug}/{child.slug}")
+        self.assertEqual(
+            child_response.data["render_path"],
+            f"/_render/{root.id}/{root.slug}/{child.slug}",
+        )
 
     def test_resolves_dynamic_path_against_the_longest_page_prefix(self):
         news_page = WebPage.objects.create(

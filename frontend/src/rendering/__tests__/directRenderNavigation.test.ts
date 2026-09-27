@@ -28,4 +28,11 @@ describe('direct render navigation links', () => {
     ])('leaves non-page link %s unchanged', (href) => {
         expect(rewriteDirectRenderHref(href, context)).toBe(href)
     })
+
+    it('compares complete IPv6 hostnames', () => {
+        const ipv6Context = { ...context, siteHostnames: ['[::1]:8443'] }
+
+        expect(rewriteDirectRenderHref('https://[::1]/inside/', ipv6Context)).toBe('/_render/85/inside/')
+        expect(rewriteDirectRenderHref('https://[2001:db8::1]/outside/', ipv6Context)).toBe('https://[2001:db8::1]/outside/')
+    })
 })
