@@ -1,9 +1,10 @@
 import io
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APIClient
 
 from content.models import Namespace
@@ -20,6 +21,21 @@ from webpages.services.theme_preview_content import (
     normalize_theme_preview_namespaces,
     rewrite_theme_library_image_urls,
 )
+
+
+class ThemePreviewContentUnitTests(SimpleTestCase):
+    @patch("webpages.services.theme_preview_content.ObjectVersion.objects.filter")
+    @patch("webpages.services.theme_preview_content.ObjectInstance.objects.filter")
+    def test_object_import_requires_current_version_to_belong_to_object(self, instance_filter, version_filter):
+        instance = SimpleNamespace(current_version_id=17)
+        instance_filter.return_value.select_related.return_value.first.return_value = instance
+        version_filter.return_value.values.return_value.first.return_value = None
+        theme = SimpleNamespace(tenant=object())
+
+        with self.assertRaisesMessage(ValidationError, "That object's current version is invalid."):
+            import_theme_preview_document(theme, "object", 12)
+
+        version_filter.assert_called_once_with(id=17, object_instance=instance)
 
 
 class ThemePreviewContentTests(TestCase):

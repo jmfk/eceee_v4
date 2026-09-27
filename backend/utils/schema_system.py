@@ -19,6 +19,40 @@ from django.core.exceptions import ValidationError
 import re
 
 
+OBJECT_TYPE_RESERVED_FIELD_NAMES = frozenset(
+    {
+        "cached_path",
+        "cached_root_hostnames",
+        "collection_id",
+        "current_version_id",
+        "effective_date",
+        "expiry_date",
+        "file_id",
+        "hostnames",
+        "media_id",
+        "object_id",
+        "page_id",
+        "parent_id",
+        "parent_object_id",
+        "path_pattern_key",
+        "publish_date",
+        "published_version_id",
+        "related_from",
+        "relationships",
+        "root_id",
+        "site_id",
+        "slug_path",
+        "tenant_id",
+        "version_id",
+    }
+)
+
+
+def _canonical_field_name(name: str) -> str:
+    """Normalize camelCase and snake_case names for reserved-name checks."""
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
+
+
 class FieldTypeRegistry:
     """Registry for managing field types across the application"""
 
@@ -678,6 +712,11 @@ class SchemaValidator:
 
         # Validate each property
         for prop_name, prop_def in schema["properties"].items():
+            if (
+                schema_type == "object_type"
+                and _canonical_field_name(prop_name) in OBJECT_TYPE_RESERVED_FIELD_NAMES
+            ):
+                raise ValidationError(f"Property name '{prop_name}' is reserved for system data")
             SchemaValidator._validate_property(prop_name, prop_def)
 
         # Validate references

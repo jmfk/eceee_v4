@@ -55,35 +55,6 @@ python manage.py create_object_demo_data --clear
 
 ---
 
-### `add_field_types_to_schemas`
-
-Add field type information to ObjectTypeDefinition schemas.
-
-**Location:** `object_storage/management/commands/add_field_types_to_schemas.py`
-
-**Usage:**
-```bash
-python manage.py add_field_types_to_schemas
-```
-
----
-
-### `migrate_schema_to_json_schema`
-
-Migrate old schema format to JSON Schema format.
-
-**Location:** `object_storage/management/commands/migrate_schema_to_json_schema.py`
-
----
-
-### `migrate_schema_to_properties`
-
-Migrate old schema format to properties format.
-
-**Location:** `object_storage/management/commands/migrate_schema_to_properties.py`
-
----
-
 ## Common Workflows
 
 ### Initial Project Setup
@@ -115,4 +86,3 @@ python manage.py create_object_demo_data --clear
 - [Object Storage Models](../../object_storage/models.py)
 - [Schema Documentation](/backend/scripts/migration/schemas/)
 - [Import Schemas Command](/backend/scripts/migration/schemas/IMPORT_SCHEMAS_COMMAND.md)
-

@@ -557,7 +557,13 @@ def import_theme_preview_document(theme, source_kind, source_id):
             raise ValidationError("That object is not available in this account.")
         version = None
         if instance.current_version_id:
-            version = ObjectVersion.objects.filter(id=instance.current_version_id).values("data", "widgets").first()
+            version = (
+                ObjectVersion.objects.filter(id=instance.current_version_id, object_instance=instance)
+                .values("data", "widgets")
+                .first()
+            )
+            if not version:
+                raise ValidationError("That object's current version is invalid.")
         schema = copy.deepcopy(instance.object_type.schema or {})
         content, copied_images = _copy_preview_images(
             theme,
