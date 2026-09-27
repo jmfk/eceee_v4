@@ -188,7 +188,12 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
             try {
                 const searchResponse: any = await objectInstancesApi.search(slug, {}, tenantRequestConfig)
                 const candidates = searchResponse?.results || searchResponse?.data?.results || searchResponse?.data || []
-                const match = (Array.isArray(candidates) ? candidates : []).find((candidate: any) => candidate.slug === slug)
+                const configuredTypeIds = Array.isArray(objectTypes) ? objectTypes.map(String) : []
+                const exactMatches = (Array.isArray(candidates) ? candidates : []).filter((candidate: any) => candidate.slug === slug)
+                const match = exactMatches.find((candidate: any) => {
+                    const candidateTypeId = candidate.objectType?.id || candidate.object_type?.id
+                    return !configuredTypeIds.length || configuredTypeIds.includes(String(candidateTypeId))
+                }) || exactMatches.find((candidate: any) => !(candidate.objectType?.id || candidate.object_type?.id))
                 if (!match) {
                     widget.data = { status: 'empty' }
                     return
