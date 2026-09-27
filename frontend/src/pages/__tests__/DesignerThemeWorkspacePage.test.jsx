@@ -231,7 +231,7 @@ describe('DesignerThemeWorkspacePage', () => {
             rawInheritance: { slots: {} },
         })
         expect(screen.getByRole('button', { name: 'Programme' })).toBeInTheDocument()
-        expect(screen.getByText('The selected content is read-only; theme styling remains editable.')).toBeInTheDocument()
+        expect(await screen.findByText('The selected content is read-only; theme styling remains editable.')).toBeInTheDocument()
     })
 
     it('searches pages from every site and excludes pages without content', async () => {
