@@ -363,8 +363,8 @@ docker-compose up backend
 # Frontend  
 docker-compose up frontend
 
-# Create demo data
-docker-compose exec backend python manage.py create_object_demo_data
+# Import canonical object schemas
+docker-compose exec backend python manage.py import_schemas
 ```
 
 ### Production Considerations
