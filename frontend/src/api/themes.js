@@ -31,6 +31,17 @@ export const themesApi = {
         return api.get(endpoints.themes.detail(themeId))
     }, 'themes.get'),
 
+    previewContentSources: wrapApiCall(async (themeId) => {
+        return api.get(`${endpoints.themes.detail(themeId)}preview-content/sources/`)
+    }, 'themes.previewContentSources'),
+
+    importPreviewContent: wrapApiCall(async (themeId, sourceKind, sourceId) => {
+        return api.post(`${endpoints.themes.detail(themeId)}preview-content/import/`, {
+            sourceKind,
+            sourceId,
+        })
+    }, 'themes.importPreviewContent'),
+
     /**
      * Create a new theme
      * @param {Object} themeData - Theme creation data
