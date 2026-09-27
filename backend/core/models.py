@@ -59,6 +59,8 @@ class Tenant(models.Model):
         """Return whether an authenticated user may administer this tenant."""
         if not user or not user.is_authenticated:
             return False
-        if user.is_staff or self.created_by_id == user.id:
+        from .permissions import user_can_switch_tenant
+
+        if user_can_switch_tenant(user) or self.created_by_id == user.id:
             return True
         return self.members.filter(pk=user.pk).exists()
