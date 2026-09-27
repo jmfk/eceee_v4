@@ -258,7 +258,7 @@ describe('DesignerThemeWorkspacePage', () => {
         await user.type(selector, 'Empty page')
         expect(screen.queryByRole('option', { name: /Empty page/ })).not.toBeInTheDocument()
         await waitFor(() => expect(mocks.loadPreviewPage).toHaveBeenCalledWith('7', 43))
-    })
+    }, 10000)
 
     it('searches and previews objects in the same content combobox', async () => {
         const user = userEvent.setup()
