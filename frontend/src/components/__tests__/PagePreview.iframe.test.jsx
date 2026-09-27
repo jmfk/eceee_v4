@@ -1,8 +1,12 @@
 import { act, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '../../test/testUtils'
 import PagePreview from '../PagePreview'
+
+const previewResolver = vi.hoisted(() => ({ resolve: vi.fn(async (model) => model) }))
+
+vi.mock('../resolvePagePreviewModel', () => ({ resolvePagePreviewModel: previewResolver.resolve }))
 
 vi.mock('../../api', () => ({
     previewSizesApi: {
@@ -12,6 +16,10 @@ vi.mock('../../api', () => ({
 }))
 
 describe('PagePreview iframe', () => {
+    beforeEach(() => {
+        previewResolver.resolve.mockClear()
+    })
+
     it('keeps the configured viewport and allows vertical scrolling', async () => {
         renderWithProviders(<PagePreview
             webpageData={{ id: 86, hostnames: [] }}
@@ -48,5 +56,18 @@ describe('PagePreview iframe', () => {
                 slots: expect.objectContaining({ main: [expect.objectContaining({ id: 'draft-heading', config: expect.objectContaining({ content: 'Unsaved heading' }) })] }),
             }),
         }), '*'))
+    })
+
+    it('resolves dynamic preview data again when refreshed', async () => {
+        renderWithProviders(<PagePreview
+            webpageData={{ id: 86, hostnames: [] }}
+            pageVersionData={{ id: 83, widgets: {}, codeLayout: 'main_layout' }}
+        />)
+
+        await waitFor(() => expect(previewResolver.resolve).toHaveBeenCalled())
+        const callsBeforeRefresh = previewResolver.resolve.mock.calls.length
+        act(() => screen.getByRole('button', { name: 'Refresh' }).click())
+
+        await waitFor(() => expect(previewResolver.resolve.mock.calls.length).toBeGreaterThan(callsBeforeRefresh))
     })
 })

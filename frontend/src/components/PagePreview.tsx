@@ -53,6 +53,7 @@ const PagePreview: React.FC<PagePreviewProps> = ({
     const [selectedSizeId, setSelectedSizeId] = useState<number | null>(null);
     const [isManaging, setIsManaging] = useState(false);
     const [iframeKey, setIframeKey] = useState(0);
+    const [refreshGeneration, setRefreshGeneration] = useState(0);
     const [themeCss, setThemeCss] = useState('');
     const [resolvedModel, setResolvedModel] = useState<RenderPageModel | null>(null);
 
@@ -86,6 +87,7 @@ const PagePreview: React.FC<PagePreviewProps> = ({
     // Manual refresh handler
     const handleRefresh = useCallback(() => {
         setIframeKey(prev => prev + 1);
+        setRefreshGeneration(prev => prev + 1);
     }, []);
 
     // Get selected size configuration
@@ -142,7 +144,7 @@ const PagePreview: React.FC<PagePreviewProps> = ({
         setResolvedModel(renderModel);
         resolvePagePreviewModel(renderModel).then((resolved) => { if (current) setResolvedModel(resolved); });
         return () => { current = false; };
-    }, [renderModel]);
+    }, [renderModel, refreshGeneration]);
 
     if (!webpageData || !pageVersionData) {
         return (

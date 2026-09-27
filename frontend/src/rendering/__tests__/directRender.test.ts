@@ -26,6 +26,10 @@ describe('direct render URL', () => {
         expect(parseDirectRenderPath('/_render/85/')).toEqual({ siteId: 85, slugPath: '' })
     })
 
+    it('rejects malformed percent-encoded paths without crashing', () => {
+        expect(parseDirectRenderPath('/_render/85/%E0%A4%A')).toBeNull()
+    })
+
     it('loads the saved page using the resolved tenant', async () => {
         clientApi.get
             .mockResolvedValueOnce({
@@ -46,7 +50,7 @@ describe('direct render URL', () => {
         expect(clientApi.get).toHaveBeenNthCalledWith(
             1,
             expect.stringContaining('site_id=85'),
-            { headers: { 'X-Tenant-ID': 'summer-study' } },
+            { headers: { 'X-Tenant-ID': 'summer-study' }, skipSessionQueue: true },
         )
         expect(clientApi.get).toHaveBeenCalledTimes(4)
         clientApi.get.mock.calls.slice(1).forEach(([, config]) => {

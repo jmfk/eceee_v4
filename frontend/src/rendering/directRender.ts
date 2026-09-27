@@ -23,9 +23,13 @@ export interface ResolvedRenderLocation extends DirectRenderLocation {
 export const parseDirectRenderPath = (pathname: string): DirectRenderLocation | null => {
     const match = pathname.match(/^\/_render\/(\d+)(?:\/(.*))?\/?$/)
     if (!match) return null
-    return {
-        siteId: Number(match[1]),
-        slugPath: decodeURIComponent(match[2] || '').replace(/\/$/, ''),
+    try {
+        return {
+            siteId: Number(match[1]),
+            slugPath: decodeURIComponent(match[2] || '').replace(/\/$/, ''),
+        }
+    } catch {
+        return null
     }
 }
 
@@ -105,7 +109,10 @@ export const loadDirectRenderModel = async ({ siteId, slugPath }: DirectRenderLo
     try {
         const response: any = await api.get(
             `${endpoints.pages.resolveRenderPath}${buildQueryParams({ site_id: siteId, path: slugPath })}`,
-            selectedTenantId ? { headers: { 'X-Tenant-ID': selectedTenantId } } : undefined,
+            {
+                skipSessionQueue: true,
+                ...(selectedTenantId ? { headers: { 'X-Tenant-ID': selectedTenantId } } : {}),
+            },
         )
         return loadResolvedRenderModel(response?.data || response)
     } catch (error: any) {
