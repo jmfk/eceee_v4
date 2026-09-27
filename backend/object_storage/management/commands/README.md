@@ -36,35 +36,13 @@ python manage.py import_schemas \
 
 **Documentation:** See `/backend/scripts/migration/schemas/IMPORT_SCHEMAS_COMMAND.md`
 
----
-
-### `create_object_demo_data`
-
-Create sample ObjectTypeDefinitions and ObjectInstances for testing.
-
-**Location:** `object_storage/management/commands/create_object_demo_data.py`
-
-**Usage:**
-```bash
-# Create demo data
-python manage.py create_object_demo_data
-
-# Clear and recreate
-python manage.py create_object_demo_data --clear
-```
-
----
-
 ## Common Workflows
 
 ### Initial Project Setup
 
 ```bash
-# 1. Import schemas
+# Import canonical object schemas
 python manage.py import_schemas
-
-# 2. Create demo data (optional)
-python manage.py create_object_demo_data
 ```
 
 ### After Updating Schemas
@@ -72,13 +50,6 @@ python manage.py create_object_demo_data
 ```bash
 # Update ObjectTypeDefinitions
 python manage.py import_schemas --force
-```
-
-### Development Testing
-
-```bash
-# Clear and recreate demo data
-python manage.py create_object_demo_data --clear
 ```
 
 ## See Also
