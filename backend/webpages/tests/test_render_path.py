@@ -74,6 +74,27 @@ class RenderPathResolutionTest(TestCase):
         self.assertEqual(response.data["version_id"], version.id)
         self.assertEqual(response.data["slug_path"], "")
 
+    def test_child_with_same_slug_as_hosted_root_takes_precedence(self):
+        child = WebPage.objects.create(
+            title="Site child",
+            slug=self.site.slug,
+            parent=self.site,
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        version = child.create_version(self.user, "Same-slug child version")
+
+        response = self.client.get(
+            self.url,
+            {"site_id": self.site.id, "path": self.site.slug},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["page_id"], child.id)
+        self.assertEqual(response.data["version_id"], version.id)
+        self.assertEqual(response.data["slug_path"], self.site.slug)
+
     def test_resolves_dynamic_path_against_the_longest_page_prefix(self):
         news_page = WebPage.objects.create(
             title="News",

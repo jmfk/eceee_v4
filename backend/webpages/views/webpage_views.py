@@ -262,23 +262,23 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # The site id already identifies the root. Also accept copied public
-        # paths that include the root slug.
-        if segments and segments[0] == site.slug:
-            segments = segments[1:]
+        def resolve_descendant(path_segments):
+            for depth in range(len(path_segments), 0, -1):
+                candidate = site
+                for segment in path_segments[:depth]:
+                    candidate = queryset.filter(parent=candidate, slug=segment).first()
+                    if candidate is None:
+                        break
+                if candidate is not None:
+                    return candidate, depth
+            return site, 0
 
-        page = site
-        matched_depth = 0
-        for depth in range(len(segments), 0, -1):
-            candidate = site
-            for segment in segments[:depth]:
-                candidate = queryset.filter(parent=candidate, slug=segment).first()
-                if candidate is None:
-                    break
-            if candidate is not None:
-                page = candidate
-                matched_depth = depth
-                break
+        # Prefer the exact descendant path. If none exists, also accept a
+        # copied path that redundantly includes the already identified root.
+        page, matched_depth = resolve_descendant(segments)
+        if matched_depth == 0 and segments and segments[0] == site.slug:
+            segments = segments[1:]
+            page, matched_depth = resolve_descendant(segments)
 
         if segments and matched_depth == 0:
             return Response(
