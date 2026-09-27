@@ -94,20 +94,57 @@ const BioRender: WidgetRenderComponent = ({ widget }) => {
     </div>
 }
 
+const MediaView = ({ item, className }: { item: any, className: string }) => {
+    const isVideo = item?.type === 'video' || String(item?.mimeType || item?.mime_type || '').startsWith('video/')
+    const source = isVideo ? item?.url || item?.fileUrl || item?.file_url : imageUrl(item)
+    if (!source) return null
+    if (isVideo) {
+        return <video className={className} controls poster={item.thumbnail || item.thumbnailUrl || item.thumbnail_url}>
+            <source src={source} type={item.mimeType || item.mime_type || 'video/mp4'} />
+        </video>
+    }
+    return <ImageView source={item} alt={item?.altText || item?.alt_text || item?.title || ''} className={className} />
+}
+
 const ImageRender: WidgetRenderComponent = ({ widget }) => {
     const config = widget.config
     const displayType = value(config, 'displayType', 'display_type') || 'single'
     const mediaItems = asArray<any>(value(config, 'mediaItems', 'media_items'))
     const items = mediaItems
+    const [currentIndex, setCurrentIndex] = useState(0)
+    const autoPlay = value(config, 'autoPlay', 'auto_play') === true
+    const autoPlayInterval = Number(value(config, 'autoPlayInterval', 'auto_play_interval')) || 3
+    useEffect(() => {
+        if (currentIndex >= items.length) setCurrentIndex(0)
+    }, [currentIndex, items.length])
+    useEffect(() => {
+        if (displayType !== 'carousel' || !autoPlay || items.length < 2) return undefined
+        const interval = window.setInterval(() => setCurrentIndex((index) => (index + 1) % items.length), autoPlayInterval * 1000)
+        return () => window.clearInterval(interval)
+    }, [autoPlay, autoPlayInterval, displayType, items.length])
     if ((displayType === 'gallery' || displayType === 'carousel') && items.length) {
         return <div className="image-widget widget-type-easy-widgets-imagewidget cms-content" data-widget-type={displayType}>
             <div className={displayType === 'gallery' ? 'gallery-container' : 'carousel-container'}>
-                <div className={displayType === 'gallery' ? 'gallery-grid' : 'carousel-track'} style={displayType === 'gallery' ? { gridTemplateColumns: `repeat(${value(config, 'galleryColumns', 'gallery_columns') || 3}, 1fr)` } : undefined}>
-                    {items.map((item, index) => <div className={displayType === 'gallery' ? 'gallery-item' : 'carousel-slide'} key={item.id || index}>
-                        <div className="image-container"><ImageView source={item.thumbnailUrl || item.thumbnail_url || item} alt={item.altText || item.alt_text || item.title || ''} className={displayType === 'gallery' ? 'gallery-image' : 'carousel-image'} /></div>
+                <div className={displayType === 'gallery' ? 'gallery-grid' : 'carousel-track'} style={displayType === 'gallery'
+                    ? { gridTemplateColumns: `repeat(${value(config, 'galleryColumns', 'gallery_columns') || 3}, 1fr)` }
+                    : { display: 'flex', transform: `translateX(-${currentIndex * 100}%)`, transition: 'transform 300ms ease' }}>
+                    {items.map((item, index) => <div className={displayType === 'gallery' ? 'gallery-item' : 'carousel-slide'} key={item.id || index} style={displayType === 'carousel' ? { flex: '0 0 100%' } : undefined}>
+                        <div className="image-container"><MediaView item={item} className={displayType === 'gallery' ? 'gallery-image' : 'carousel-image'} /></div>
                         {value(config, 'showCaptions', 'show_captions') && (item.caption || item.title) && <div className={displayType === 'gallery' ? 'image-caption' : 'carousel-caption'}>{item.caption || item.title}</div>}
                     </div>)}
                 </div>
+                {displayType === 'carousel' && items.length > 1 && <>
+                    <button type="button" className="carousel-prev" aria-label="Previous slide" onClick={() => setCurrentIndex((index) => (index - 1 + items.length) % items.length)}>←</button>
+                    <button type="button" className="carousel-next" aria-label="Next slide" onClick={() => setCurrentIndex((index) => (index + 1) % items.length)}>→</button>
+                    <div className="carousel-indicators">{items.map((item, index) => <button
+                        type="button"
+                        key={item.id || index}
+                        className={index === currentIndex ? 'active' : ''}
+                        aria-label={`Go to slide ${index + 1}`}
+                        aria-current={index === currentIndex ? 'true' : undefined}
+                        onClick={() => setCurrentIndex(index)}
+                    />)}</div>
+                </>}
             </div>
         </div>
     }
@@ -219,10 +256,11 @@ const TableRender: WidgetRenderComponent = ({ widget }) => {
 const navigationItems = (config: Record<string, any>, secondary = false) => processNavigationItems(value(
     config,
     ...(secondary ? ['secondaryMenuItems', 'secondary_menu_items'] : ['menuItems', 'menu_items', 'items', 'links']),
-)).filter((item) => item.isActive && item.isPublished !== false)
+))
 
-const sameSiteNavigationItems = (config: Record<string, any>, context: WidgetRenderProps['context'], secondary = false) => (
-    navigationItems(config, secondary).filter((item) => {
+const filterNavigationItems = (items: any[], context: WidgetRenderProps['context']): any[] => (
+    items.filter((item) => {
+        if (!item.isActive || item.isPublished === false) return false
         if (item.type !== 'internal') return true
         if (context.siteId && item.siteId) return String(item.siteId) === String(context.siteId)
         const itemHostnames = asArray<string>(item.cachedRootHostnames || item.cached_root_hostnames)
@@ -230,11 +268,18 @@ const sameSiteNavigationItems = (config: Record<string, any>, context: WidgetRen
             return context.siteHostnames.some((hostname) => itemHostnames.includes(hostname))
         }
         return true
-    })
+    }).map((item) => ({
+        ...item,
+        children: filterNavigationItems(processNavigationItems(item.children), context),
+    }))
+)
+
+const sameSiteNavigationItems = (config: Record<string, any>, context: WidgetRenderProps['context'], secondary = false) => (
+    filterNavigationItems(navigationItems(config, secondary), context)
 )
 
 const NavigationList = ({ items, className }: { items: any[], className: string }) => (
-    <ul className={className}>{items.map((item, index) => <li key={item.id || index}><PreviewLink href={item.resolvedUrl || item.path || item.url || item}>{item.label || item.title || item.text || ''}</PreviewLink>{asArray<any>(item.children).length > 0 && <NavigationList items={processNavigationItems(item.children)} className="navigation-children" />}</li>)}</ul>
+    <ul className={className}>{items.map((item, index) => <li key={item.id || index}><PreviewLink href={item.resolvedUrl || item.path || item.url || item}>{item.label || item.title || item.text || ''}</PreviewLink>{asArray<any>(item.children).length > 0 && <NavigationList items={item.children} className="navigation-children" />}</li>)}</ul>
 )
 
 const NavigationRender: WidgetRenderComponent = ({ widget, context }) => {
@@ -421,7 +466,11 @@ const NewsItems = ({ widget, compact = false }: { widget: WidgetRenderProps['wid
     if (widget.data?.status === 'error') return <RenderFailure message={widget.data.error} />
     const items = asArray<any>(widget.data?.items || value(widget.config, 'items'))
     if (!items.length) return <EmptyRender>No news articles available.</EmptyRender>
-    return <div className={compact ? 'news-items compact' : 'news-items'}>{items.map((item, index) => <article className="news-item" key={item.id || index}><ImageView source={item.data?.featured_image || item.image} alt="" /><div className="news-content"><h3><PreviewLink href={item.path || '#'}>{item.title || `Article ${index + 1}`}</PreviewLink></h3>{!compact && <p>{item.data?.excerpt || item.excerpt || item.summary || ''}</p>}</div></article>)}</div>
+    return <div className={compact ? 'news-items compact' : 'news-items'}>{items.map((item, index) => {
+        const objectTypeName = item.objectType?.name || item.object_type?.name
+        const path = item.path || (objectTypeName && item.slug ? `/${objectTypeName}/${item.slug}/` : '#')
+        return <article className="news-item" key={item.id || index}><ImageView source={item.data?.featured_image || item.image} alt="" /><div className="news-content"><h3><PreviewLink href={path}>{item.title || `Article ${index + 1}`}</PreviewLink></h3>{!compact && <p>{item.data?.excerpt || item.excerpt || item.summary || ''}</p>}</div></article>
+    })}</div>
 }
 
 const NewsListRender: WidgetRenderComponent = ({ widget }) => <section className="news-list-widget"><NewsItems widget={widget} /></section>

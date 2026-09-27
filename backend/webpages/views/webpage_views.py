@@ -268,9 +268,31 @@ class WebPageViewSet(viewsets.ModelViewSet):
             segments = segments[1:]
 
         page = site
-        for segment in segments:
-            page = queryset.filter(parent=page, slug=segment).first()
-            if page is None:
+        matched_depth = 0
+        for depth in range(len(segments), 0, -1):
+            candidate = site
+            for segment in segments[:depth]:
+                candidate = queryset.filter(parent=candidate, slug=segment).first()
+                if candidate is None:
+                    break
+            if candidate is not None:
+                page = candidate
+                matched_depth = depth
+                break
+
+        if segments and matched_depth == 0:
+            return Response(
+                {"detail": "Page not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        remaining_segments = segments[matched_depth:]
+        pattern_path = "/".join(remaining_segments) + ("/" if remaining_segments else "")
+        if pattern_path:
+            from ..path_pattern_registry import path_pattern_registry
+
+            pattern = path_pattern_registry.get_pattern(page.path_pattern_key)
+            if pattern is None or pattern.validate_match(pattern_path) is None:
                 return Response(
                     {"detail": "Page not found."},
                     status=status.HTTP_404_NOT_FOUND,
@@ -291,6 +313,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 "page_id": page.id,
                 "version_id": version.id,
                 "slug_path": resolved_path,
+                "path_pattern_path": pattern_path,
                 "render_path": f"/_render/{site.id}/{resolved_path}".rstrip("/"),
             }
         )

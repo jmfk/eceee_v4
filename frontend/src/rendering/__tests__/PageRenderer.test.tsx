@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import PageRenderer from '../PageRenderer'
 import { createPageRenderModel } from '../adapters'
@@ -148,6 +148,62 @@ describe('PageRenderer', () => {
         expect(screen.getByText('Current site')).toBeInTheDocument()
         expect(screen.getByText('External')).toBeInTheDocument()
         expect(screen.queryByText('Other site')).toBeNull()
+    })
+
+    it('filters unpublished and cross-site navigation children', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{ id: 'nav', type: 'easy_widgets.NavigationWidget', config: { menuItems: [{
+                linkData: { type: 'external', label: 'Parent', url: '/parent/' },
+                children: [
+                    { linkData: { type: 'internal', label: 'Current child', resolvedUrl: '/current/', siteId: 85 } },
+                    { linkData: { type: 'internal', label: 'Other child', resolvedUrl: '/other/', siteId: 86 } },
+                    { linkData: { type: 'internal', label: 'Draft child', resolvedUrl: '/draft/', isPublished: false } },
+                ],
+            }] } }] },
+            context: { siteId: 85 },
+        })
+
+        render(<PageRenderer model={model} />)
+
+        expect(screen.getByText('Current child')).toBeInTheDocument()
+        expect(screen.queryByText('Other child')).toBeNull()
+        expect(screen.queryByText('Draft child')).toBeNull()
+    })
+
+    it('builds news links from API object type and slug fields', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{
+                id: 'news',
+                type: 'easy_widgets.NewsListWidget',
+                config: {},
+                data: { status: 'ready', items: [{ id: 1, title: 'Article', slug: 'article', objectType: { name: 'news' } }] },
+            }] },
+        })
+
+        render(<PageRenderer model={model} />)
+
+        expect(screen.getByRole('link', { name: 'Article' })).toHaveAttribute('href', '/news/article/')
+    })
+
+    it('renders video slides and moves the carousel with its controls', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{ id: 'carousel', type: 'easy_widgets.ImageWidget', config: {
+                displayType: 'carousel',
+                mediaItems: [
+                    { id: 1, type: 'video', url: '/intro.mp4', thumbnailUrl: '/intro.jpg' },
+                    { id: 2, type: 'image', url: '/second.jpg' },
+                ],
+            } }] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+        const track = container.querySelector('.carousel-track')
+
+        expect(container.querySelector('video source')).toHaveAttribute('src', '/intro.mp4')
+        expect(track).toHaveStyle({ transform: 'translateX(-0%)' })
+        fireEvent.click(screen.getByRole('button', { name: 'Next slide' }))
+        expect(track).toHaveStyle({ transform: 'translateX(-100%)' })
+        expect(screen.getByRole('button', { name: 'Go to slide 2' })).toHaveAttribute('aria-current', 'true')
     })
 
     it('renders canonical bio fields and Django-compatible structure', () => {
