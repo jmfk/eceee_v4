@@ -103,6 +103,21 @@ def _theme(request, theme_id):
     return theme
 
 
+def _draft_workspace(request, theme, draft):
+    return build_draft_workspace(
+        theme,
+        draft,
+        include_tenant_content=theme.tenant.user_has_access(request.user),
+    )
+
+
+def _require_tenant_content_access(request, theme):
+    if not theme.tenant.user_has_access(request.user):
+        from rest_framework.exceptions import PermissionDenied
+
+        raise PermissionDenied("Tenant administrator access is required to preview tenant content.")
+
+
 def _job_data(job):
     return {
         "id": str(job.id),
@@ -147,7 +162,7 @@ class DesignerThemeWorkspaceView(APIView):
     def get(self, request, theme_id):
         theme = _theme(request, theme_id)
         draft = get_or_create_designer_draft(theme, request.user)
-        return Response(build_draft_workspace(theme, draft))
+        return Response(_draft_workspace(request, theme, draft))
 
     def patch(self, request, theme_id):
         try:
@@ -161,7 +176,7 @@ class DesignerThemeWorkspaceView(APIView):
                 {"error": str(exc)},
                 status=status.HTTP_409_CONFLICT,
             )
-        return Response(build_draft_workspace(theme, draft))
+        return Response(_draft_workspace(request, theme, draft))
 
 
 class DesignerThemePreviewView(APIView):
@@ -201,7 +216,7 @@ class DesignerThemePublishView(APIView):
             return Response({"error": "Theme not found."}, status=status.HTTP_404_NOT_FOUND)
         except DesignerDraftConflict as exc:
             return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
-        return Response(build_draft_workspace(theme, draft))
+        return Response(_draft_workspace(request, theme, draft))
 
 
 class DesignerThemeDiscardView(APIView):
@@ -222,7 +237,7 @@ class DesignerThemeDiscardView(APIView):
             return Response({"error": "Theme not found."}, status=status.HTTP_404_NOT_FOUND)
         except DesignerDraftConflict as exc:
             return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
-        return Response(build_draft_workspace(theme, draft))
+        return Response(_draft_workspace(request, theme, draft))
 
 
 class DesignerThemeUndoView(APIView):
@@ -244,7 +259,7 @@ class DesignerThemeUndoView(APIView):
             return Response({"error": "Theme not found."}, status=status.HTTP_404_NOT_FOUND)
         except DesignerDraftConflict as exc:
             return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
-        return Response(build_draft_workspace(theme, draft))
+        return Response(_draft_workspace(request, theme, draft))
 
 
 class DesignerThemeAssetView(APIView):
@@ -271,7 +286,7 @@ class DesignerThemeAssetView(APIView):
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
         except DesignerDraftConflict as exc:
             return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
-        return Response(build_draft_workspace(theme, draft))
+        return Response(_draft_workspace(request, theme, draft))
 
 
 class DesignerThemePlaceholderView(APIView):
@@ -305,7 +320,7 @@ class DesignerThemePlaceholderView(APIView):
             )
         except DesignerDraftConflict as exc:
             return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
-        return Response(build_draft_workspace(theme, draft))
+        return Response(_draft_workspace(request, theme, draft))
 
 
 class DesignerThemePreviewContentView(APIView):
@@ -330,7 +345,7 @@ class DesignerThemePreviewContentView(APIView):
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
         except DesignerDraftConflict as exc:
             return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
-        return Response(build_draft_workspace(theme, draft))
+        return Response(_draft_workspace(request, theme, draft))
 
 
 class DesignerThemePreviewSiteView(APIView):
@@ -355,7 +370,7 @@ class DesignerThemePreviewSiteView(APIView):
             return Response({"error": "Theme not found."}, status=status.HTTP_404_NOT_FOUND)
         except DesignerDraftConflict as exc:
             return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
-        return Response(build_draft_workspace(theme, draft))
+        return Response(_draft_workspace(request, theme, draft))
 
 
 class DesignerThemePreviewPageView(APIView):
@@ -365,6 +380,7 @@ class DesignerThemePreviewPageView(APIView):
 
     def post(self, request, theme_id):
         theme = _theme(request, theme_id)
+        _require_tenant_content_access(request, theme)
         serializer = DesignerPreviewPageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         page = get_object_or_404(
@@ -404,6 +420,7 @@ class DesignerThemePreviewObjectView(APIView):
 
     def post(self, request, theme_id):
         theme = _theme(request, theme_id)
+        _require_tenant_content_access(request, theme)
         serializer = DesignerPreviewObjectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         instance = get_object_or_404(

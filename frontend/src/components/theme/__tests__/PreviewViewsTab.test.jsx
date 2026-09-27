@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithStateProviders } from '../../../test/testUtils'
+import { useUnifiedData } from '../../../contexts/unified-data/context/UnifiedDataContext'
 import PreviewViewsTab from '../PreviewViewsTab'
 
 const mocks = vi.hoisted(() => ({
@@ -25,9 +26,15 @@ const sources = {
     objectTypes: [{ key: 'article', label: 'Article', schema: { properties: {} }, slotConfiguration: { slots: [] } }],
 }
 
-const Harness = () => {
+const StateReader = ({ expose }) => {
+    const { getState } = useUnifiedData()
+    useEffect(() => { expose?.(getState) }, [expose, getState])
+    return null
+}
+
+const Harness = ({ exposeState }) => {
     const [preview, setPreview] = useState({ views: [] })
-    return <PreviewViewsTab designerPreview={preview} onChange={setPreview} themeId="7" />
+    return <><PreviewViewsTab designerPreview={preview} onChange={setPreview} themeId="7" /><StateReader expose={exposeState} /></>
 }
 
 describe('PreviewViewsTab', () => {
@@ -46,11 +53,17 @@ describe('PreviewViewsTab', () => {
     })
 
     it('creates theme-owned pages and objects with the regular content editors', async () => {
-        renderWithStateProviders(<Harness />)
+        let readState
+        renderWithStateProviders(<Harness exposeState={(reader) => { readState = reader }} />)
 
         fireEvent.click(screen.getByRole('button', { name: 'New page' }))
         expect(screen.getAllByDisplayValue('New preview page')).toHaveLength(2)
         expect(screen.getByText('Page widgets for main_layout')).toBeInTheDocument()
+        await waitFor(() => {
+            const state = readState()
+            expect(state.pages[state.metadata.currentPageId]).toBeDefined()
+            expect(state.versions[state.metadata.currentVersionId]?.pageId).toBe(state.metadata.currentPageId)
+        })
 
         await screen.findByRole('option', { name: 'Article' })
         fireEvent.click(screen.getByRole('button', { name: 'New object' }))

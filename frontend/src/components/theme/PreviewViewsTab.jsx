@@ -7,6 +7,8 @@ import ObjectContentEditor from '../ObjectContentEditor'
 import WidgetEditorPanel from '../WidgetEditorPanel'
 import ObjectDataForm from '../objectEdit/ObjectDataForm'
 import PageContentEditor from '../../editors/page-editor/PageContentEditor'
+import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
+import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { applyWidgetUpdateToWidgetMap } from '../../utils/pageEditorWidgetState'
 
 const newId = (kind) => `${kind}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`
@@ -21,6 +23,7 @@ const PreviewViewsTab = ({ designerPreview, onChange, themeId }) => {
     const [importError, setImportError] = useState('')
     const [widgetEditor, setWidgetEditor] = useState({ open: false, widget: null })
     const objectFormRef = useRef(null)
+    const { publishUpdate } = useUnifiedData()
 
     const canUseSources = Boolean(themeId && themeId !== 'new')
     const { data: sources = { layouts: [], pages: [], objects: [], objectTypes: [] }, isLoading: sourcesLoading } = useQuery({
@@ -125,6 +128,40 @@ const PreviewViewsTab = ({ designerPreview, onChange, themeId }) => {
         metadata: {},
         objectType,
     } : null
+
+    useEffect(() => {
+        if (!selected || selected.kind !== 'page') return
+
+        const pageId = String(selected.id)
+        const versionId = pageId
+        const componentId = `theme-preview-page-${pageId}`
+        const previewPage = {
+            id: pageId,
+            title: selected.content?.title || selected.label,
+        }
+        const previewVersion = {
+            id: versionId,
+            versionId,
+            pageId,
+            versionNumber: 1,
+            codeLayout: selected.content?.codeLayout || selected.layout || 'main_layout',
+            pageData: selected.content?.pageData || {},
+            widgets: selected.content?.widgets || {},
+        }
+
+        const initializePreviewPage = async () => {
+            await publishUpdate(componentId, OperationTypes.INIT_PAGE, {
+                id: pageId,
+                data: previewPage,
+            })
+            await publishUpdate(`${componentId}-version`, OperationTypes.INIT_VERSION, {
+                id: versionId,
+                data: previewVersion,
+            })
+        }
+
+        void initializePreviewPage()
+    }, [publishUpdate, selected])
 
     const savePageWidget = async (updatedWidget) => {
         updateContent({ widgets: applyWidgetUpdateToWidgetMap(pageWidgets, updatedWidget) })

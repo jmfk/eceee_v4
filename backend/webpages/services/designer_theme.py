@@ -642,6 +642,8 @@ def import_designer_preview_from_site(theme_id, tenant, user, source_site_id, dr
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
         if not user_can_design_theme(user, theme):
             raise PermissionError
+        if not tenant.user_has_access(user):
+            raise PermissionError
         draft = get_or_create_designer_draft(theme, user)
         draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
         if draft.base_sync_version != theme.sync_version:
@@ -848,8 +850,11 @@ def get_or_create_designer_draft(theme, user):
     return draft
 
 
-def build_draft_workspace(theme, draft):
-    workspace = build_workspace(theme_from_designer_draft(theme, draft))
+def build_draft_workspace(theme, draft, include_tenant_content=False):
+    workspace = build_workspace(
+        theme_from_designer_draft(theme, draft),
+        include_tenant_content=include_tenant_content,
+    )
     workspace.update(
         {
             "liveSyncVersion": theme.sync_version,
@@ -1081,7 +1086,7 @@ def collect_designer_assets(theme: PageTheme):
     return assets
 
 
-def build_workspace(theme: PageTheme):
+def build_workspace(theme: PageTheme, include_tenant_content=False):
     groups = (theme.design_groups or {}).get("groups", [])
     typography = []
     spacing = []
@@ -1152,9 +1157,9 @@ def build_workspace(theme: PageTheme):
         "breakpoints": theme.get_breakpoints(),
         "catalog": catalog,
         "previewContent": {"views": catalog["previewViews"]},
-        "contentSources": designer_content_sources(theme),
-        "contentPages": designer_page_sources(theme),
-        "contentObjects": designer_object_sources(theme),
+        "contentSources": designer_content_sources(theme) if include_tenant_content else [],
+        "contentPages": designer_page_sources(theme) if include_tenant_content else [],
+        "contentObjects": designer_object_sources(theme) if include_tenant_content else [],
         "canUndo": theme.designer_revisions.exists(),
         "constraints": {
             "editableTypographyProperties": sorted(TYPE_PROPERTIES),

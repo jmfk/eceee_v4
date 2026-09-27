@@ -167,6 +167,51 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(navigation["slots"], ["sidebar"])
         self.assertEqual(navigation["parts"][0]["part"], "nav-container")
 
+    def test_assignment_does_not_grant_access_to_tenant_content(self):
+        page = WebPage.objects.create(
+            title="Private draft",
+            slug="private-draft",
+            tenant=self.tenant,
+            created_by=self.owner,
+            last_modified_by=self.owner,
+        )
+        version = PageVersion.objects.create(
+            page=page,
+            version_number=1,
+            code_layout="main_layout",
+            widgets={"main": [{"type": "easy_widgets.ContentWidget", "config": {"content": "Private"}}]},
+            created_by=self.owner,
+        )
+        page.latest_version = version
+        page.cached_root_id = page.id
+        page.save(update_fields=["latest_version", "cached_root_id"])
+        self.authenticate(self.designer)
+
+        workspace = self.client.get(self.workspace_url).data
+
+        self.assertEqual(workspace["contentSources"], [])
+        self.assertEqual(workspace["contentPages"], [])
+        self.assertEqual(workspace["contentObjects"], [])
+        page_response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/from-page/",
+            {"sourcePageId": page.id},
+            format="json",
+        )
+        object_response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/from-object/",
+            {"sourceObjectId": 1},
+            format="json",
+        )
+        site_response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/from-site/",
+            {"sourceSiteId": page.id, "draftVersion": workspace["draftVersion"]},
+            format="json",
+        )
+
+        self.assertEqual(page_response.status_code, 403)
+        self.assertEqual(object_response.status_code, 403)
+        self.assertEqual(site_response.status_code, 403)
+
     def test_preview_content_can_be_copied_from_a_site_using_the_theme(self):
         root = WebPage.objects.create(
             title="Conference site",
@@ -300,7 +345,7 @@ class DesignerThemeApiTests(TestCase):
         foreign_page.save(
             update_fields=["current_published_version", "latest_version", "is_currently_published", "cached_root_id"]
         )
-        self.authenticate(self.designer)
+        self.authenticate(self.owner)
 
         workspace = self.client.get(self.workspace_url).data
         self.assertEqual({source["id"] for source in workspace["contentSources"]}, {root.id, draft_site.id})
