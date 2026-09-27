@@ -273,10 +273,15 @@ class WebPageViewSet(viewsets.ModelViewSet):
                     return candidate, depth
             return site, 0
 
-        # Prefer the exact descendant path. If none exists, also accept a
-        # copied path that redundantly includes the already identified root.
+        # Non-hosted roots include their slug in public paths; hosted roots do
+        # not. Strip the real root prefix before resolving descendants.
+        if not site.has_silent_slug() and segments and segments[0] == site.slug:
+            segments = segments[1:]
+
+        # Hosted sites prefer an exact same-slug child. If none exists, also
+        # accept a copied path that redundantly includes the silent root slug.
         page, matched_depth = resolve_descendant(segments)
-        if matched_depth == 0 and segments and segments[0] == site.slug:
+        if site.has_silent_slug() and matched_depth == 0 and segments and segments[0] == site.slug:
             segments = segments[1:]
             page, matched_depth = resolve_descendant(segments)
 

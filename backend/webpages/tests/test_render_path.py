@@ -95,6 +95,41 @@ class RenderPathResolutionTest(TestCase):
         self.assertEqual(response.data["version_id"], version.id)
         self.assertEqual(response.data["slug_path"], self.site.slug)
 
+    def test_non_hosted_root_prefix_distinguishes_root_and_same_slug_child(self):
+        root = WebPage.objects.create(
+            title="Non-hosted site",
+            slug="brochure",
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        root_version = root.create_version(self.user, "Non-hosted root version")
+        child = WebPage.objects.create(
+            title="Same-slug child",
+            slug=root.slug,
+            parent=root,
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        child_version = child.create_version(self.user, "Non-hosted child version")
+
+        root_response = self.client.get(
+            self.url,
+            {"site_id": root.id, "path": root.slug},
+        )
+        child_response = self.client.get(
+            self.url,
+            {"site_id": root.id, "path": f"{root.slug}/{child.slug}"},
+        )
+
+        self.assertEqual(root_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(root_response.data["page_id"], root.id)
+        self.assertEqual(root_response.data["version_id"], root_version.id)
+        self.assertEqual(child_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(child_response.data["page_id"], child.id)
+        self.assertEqual(child_response.data["version_id"], child_version.id)
+
     def test_resolves_dynamic_path_against_the_longest_page_prefix(self):
         news_page = WebPage.objects.create(
             title="News",
