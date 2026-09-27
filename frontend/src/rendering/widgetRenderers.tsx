@@ -433,7 +433,9 @@ const ColumnRender = ({ widget, renderWidgets, count }: WidgetRenderProps & { co
     const names = count === 2 ? ['left', 'right'] : ['left', 'center', 'right']
     const base = count === 2 ? 'two-columns-widget' : 'three-columns-widget'
     const slotBase = count === 2 ? 'two-col' : 'three-col'
-    const ratio = value(widget.config, 'ratioClass', 'ratio_class') || (count === 3 && value(widget.config, 'layoutStyle', 'layout_style') ? `three-col-ratio-${value(widget.config, 'layoutStyle', 'layout_style').replaceAll(':', '-')}` : '')
+    const layoutStyle = value(widget.config, 'layoutStyle', 'layout_style')
+    const ratio = value(widget.config, 'ratioClass', 'ratio_class')
+        || (layoutStyle ? `${count === 2 ? 'two' : 'three'}-col-ratio-${layoutStyle.replaceAll(':', '-')}` : '')
     return <div className={`${base} widget-type-easy-widgets-${count === 2 ? 'twocolumnswidget' : 'threecolumnswidget'} ${ratio}`} data-widget-type={count === 2 ? 'two-columns' : 'three-columns'}>
         {names.map((name) => <div key={name} className={`${slotBase}-slot ${name}`} data-slot={name}>{asArray(slots[name]).map((nested, index) => <div className={`${slotBase}-widget-wrapper`} key={nested.id || index}>{renderWidgets([nested])}</div>)}</div>)}
     </div>
@@ -445,14 +447,28 @@ const ThreeColumnsRender: WidgetRenderComponent = (props) => <ColumnRender {...p
 const SectionRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
     const content = asArray<any>(value(widget.config, 'widgets') || value(widget.config, 'slots')?.content || value(widget.config, 'slots')?.main)
     const collapsible = Boolean(value(widget.config, 'enableCollapse', 'enable_collapse'))
+    const accordion = Boolean(value(widget.config, 'accordionMode', 'accordion_mode'))
+    const bordered = Boolean(value(widget.config, 'showBorder', 'show_border'))
     const [expanded, setExpanded] = useState(value(widget.config, 'startExpanded', 'start_expanded') !== false)
+    useEffect(() => {
+        if (!collapsible || !accordion) return undefined
+        const collapseOther = (event: Event) => {
+            if ((event as CustomEvent).detail !== widget.id) setExpanded(false)
+        }
+        window.addEventListener('eceee-section-expand', collapseOther)
+        return () => window.removeEventListener('eceee-section-expand', collapseOther)
+    }, [accordion, collapsible, widget.id])
     if (!content.length) return null
-    if (!collapsible) return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} className="section-content-only-widget">{renderWidgets(content)}</div></div>
-    return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} className={`section-widget${expanded ? '' : ' section-collapsed'}`}>
+    if (!collapsible) return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} className={`section-content-only-widget${bordered ? ' border-enabled' : ''}`}>{renderWidgets(content)}</div></div>
+    const toggleExpanded = () => setExpanded((current) => {
+        if (!current && accordion) window.dispatchEvent(new CustomEvent('eceee-section-expand', { detail: widget.id }))
+        return !current
+    })
+    return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} data-accordion-mode={accordion || undefined} className={`section-widget${bordered ? ' border-enabled' : ''}${expanded ? '' : ' section-collapsed'}`}>
         <div className="slot-section-content">
             {renderWidgets(content.slice(0, 1))}
             {expanded && <div className="section-remaining-content">{renderWidgets(content.slice(1))}</div>}
-            <button type="button" className={expanded ? 'section-banner contract-banner' : 'section-banner expand-banner'} onClick={() => setExpanded((current) => !current)}>{expanded ? value(widget.config, 'contractText', 'contract_text') || 'Show less' : value(widget.config, 'expandText', 'expand_text') || 'Expand to read more'}</button>
+            <button type="button" className={expanded ? 'section-banner contract-banner' : 'section-banner expand-banner'} onClick={toggleExpanded}>{expanded ? value(widget.config, 'contractText', 'contract_text') || 'Show less' : value(widget.config, 'expandText', 'expand_text') || 'Expand to read more'}</button>
         </div>
     </div></div>
 }

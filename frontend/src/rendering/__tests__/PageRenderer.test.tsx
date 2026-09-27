@@ -35,6 +35,41 @@ describe('PageRenderer', () => {
         expect(container.querySelectorAll('[data-widget-type="easy_widgets.ContentWidget"]')).toHaveLength(3)
     })
 
+    it('applies two-column ratios from canonical layout config', () => {
+        const model = createPageRenderModel({ widgets: { main: [{
+            id: 'columns',
+            type: 'easy_widgets.TwoColumnsWidget',
+            config: { layoutStyle: '5:1', slots: { left: [], right: [] } },
+        }] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(container.querySelector('.two-columns-widget')).toHaveClass('two-col-ratio-5-1')
+    })
+
+    it('renders section borders and closes sibling accordion sections', () => {
+        const section = (id: string, title: string) => ({ id, type: 'easy_widgets.SectionWidget', config: {
+            enableCollapse: true,
+            startExpanded: false,
+            accordionMode: true,
+            showBorder: true,
+            slots: { content: [
+                { id: `${id}-title`, type: 'easy_widgets.HeadlineWidget', config: { content: title } },
+                { id: `${id}-body`, type: 'easy_widgets.ContentWidget', config: { content: `<p>${title} body</p>` } },
+            ] },
+        } })
+        const model = createPageRenderModel({ widgets: { main: [section('first', 'First'), section('second', 'Second')] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+        const sections = container.querySelectorAll('.section-widget')
+        expect(sections[0]).toHaveClass('border-enabled', 'section-collapsed')
+        fireEvent.click(screen.getAllByRole('button', { name: 'Expand to read more' })[0])
+        expect(sections[0]).not.toHaveClass('section-collapsed')
+        fireEvent.click(screen.getAllByRole('button', { name: 'Expand to read more' })[0])
+        expect(sections[0]).toHaveClass('section-collapsed')
+        expect(sections[1]).not.toHaveClass('section-collapsed')
+    })
+
     it('sanitizes rich content', () => {
         const model = createPageRenderModel({ layout: 'main_layout', widgets: { main: [{ id: 'unsafe', type: 'easy_widgets.ContentWidget', config: { content: '<p>Safe</p><script>alert(1)</script>' } }] } })
         const { container } = render(<PageRenderer model={model} />)
