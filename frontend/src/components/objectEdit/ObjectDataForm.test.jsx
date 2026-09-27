@@ -14,10 +14,13 @@ vi.mock('../../api', () => ({
 }))
 
 vi.mock('../ObjectSchemaForm', () => ({
-    default: ({ onChange }) => (
-        <button type="button" onClick={() => onChange('summary', 'Updated summary')}>
-            Change schema field
-        </button>
+    default: ({ onChange, schema }) => (
+        <>
+            <div data-testid="schema-fields">{schema.fields.map(field => field.name).join(',')}</div>
+            <button type="button" onClick={() => onChange('summary', 'Updated summary')}>
+                Change schema field
+            </button>
+        </>
     ),
 }))
 
@@ -90,5 +93,30 @@ describe('ObjectDataForm dirty state', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Change schema field' }))
 
         await waitFor(() => expect(screen.getByTestId('dirty-state')).toHaveTextContent('true'))
+    })
+
+    it('does not expose live object-reference fields in theme previews', async () => {
+        const previewType = {
+            ...objectType,
+            schema: {
+                properties: {
+                    summary: { type: 'string', title: 'Summary' },
+                    related: { type: 'array', componentType: 'object_reference' },
+                    reverse: { type: 'array', field_type: 'reverse_object_reference' },
+                },
+            },
+        }
+
+        renderWithStateProviders(
+            <ObjectDataForm
+                objectType={previewType}
+                instance={instance}
+                context={{ mode: 'theme-preview' }}
+            />,
+        )
+
+        expect(await screen.findByTestId('schema-fields')).toHaveTextContent('summary')
+        expect(screen.getByTestId('schema-fields')).not.toHaveTextContent('related')
+        expect(screen.getByTestId('schema-fields')).not.toHaveTextContent('reverse')
     })
 })

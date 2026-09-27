@@ -24,6 +24,9 @@ export interface RenderContext {
     siteHostnames?: string[]
     pageId?: string | number
     versionId?: string | number
+    objectId?: string | number
+    objectData?: Record<string, any>
+    objectType?: Record<string, any>
     pathVariables?: Record<string, string>
     simulatedPath?: string
     renderRoutePrefix?: string

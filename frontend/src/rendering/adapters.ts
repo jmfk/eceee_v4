@@ -77,6 +77,13 @@ export const createDesignerRenderModel = ({
         slots[slot] = widgets.map((widget: any, index: number) => normalizeWidget(widget, `${slot}-${index}`))
     })
     const primary = availableSlots.find((slot: string) => ['main', 'content', 'body', 'landingPage', 'landing_page'].includes(slot)) || availableSlots[0]
+    const objectData = sourceModel?.context?.objectData || document?.data || {}
+    const objectType = sourceModel?.context?.objectType || view.objectType || {}
+
+    if (isObjectPreview && Object.keys(objectData).length) {
+        slots[primary] ||= []
+        slots[primary].unshift({ id: `${view.id || 'live-object'}-data`, type: 'designer.ObjectDataPreview', config: {} })
+    }
 
     const demoText = (element: string) => {
         if (/^h[1-6]$/.test(element)) return 'A heading with realistic length'
@@ -104,6 +111,18 @@ export const createDesignerRenderModel = ({
         slots[slot].push(fixture)
     })
 
+    if (!sourceModel) Object.entries(view.images || {}).forEach(([key, image]: [string, any], index) => {
+        const prefix = `preview:${view.id}:image:`
+        const requestedSlot = key.startsWith(prefix) ? key.slice(prefix.length) : primary
+        const slot = availableSlots.includes(requestedSlot) ? requestedSlot : primary
+        slots[slot] ||= []
+        slots[slot].push(normalizeWidget({
+            id: `${view.id || 'preview'}-image-${index}`,
+            type: 'easy_widgets.ImageWidget',
+            config: { imageUrl: image?.url || image?.fileUrl, altText: image?.filename || '' },
+        }, `${slot}-preview-image-${index}`))
+    })
+
     if (layout === 'landing_page' && !slots.landingPage?.length && slots.landing_page?.length) {
         slots.landingPage = slots.landing_page
     }
@@ -113,6 +132,11 @@ export const createDesignerRenderModel = ({
         slots,
         context: {
             ...(sourceModel?.context || {}),
+            ...(isObjectPreview ? {
+                objectId: sourceModel?.context?.objectId || view.id || 'theme-preview-object',
+                objectData,
+                objectType,
+            } : {}),
             preview: true,
             componentStyles: Object.fromEntries((workspace?.catalog?.componentStyles || []).map((style: any) => [style.key, style])),
         },

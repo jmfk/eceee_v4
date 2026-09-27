@@ -61,6 +61,7 @@ describe('render adapters', () => {
                 id: 'copied-object', kind: 'object', layout: 'main_layout',
                 objectType: { slotConfiguration: { slots: [{ name: 'main_content' }, { name: 'content' }] } },
                 content: {
+                    data: { summary: 'Copied object summary' },
                     widgets: {
                         content: [{ id: 'second', type: 'easy_widgets.ContentWidget', config: {} }],
                         main_content: [{ id: 'first', type: 'easy_widgets.HeadlineWidget', config: {} }],
@@ -72,7 +73,12 @@ describe('render adapters', () => {
 
         const model = createDesignerRenderModel({ workspace, viewId: 'copied-object' })
 
-        expect(model.slots.main.map((widget) => widget.id)).toEqual(['first', 'second'])
+        expect(model.slots.main.map((widget) => widget.id)).toEqual(['copied-object-data', 'first', 'second'])
+        expect(model.context).toMatchObject({
+            objectId: 'copied-object',
+            objectData: { summary: 'Copied object summary' },
+            objectType: workspace.previewContent.views[0].objectType,
+        })
         expect(model.designer?.contentEditable).toBe(false)
     })
 
@@ -93,5 +99,23 @@ describe('render adapters', () => {
         const model = createDesignerRenderModel({ workspace, sourceModel })
 
         expect(model.slots.main.map((widget) => widget.id)).toEqual(['teaser', 'body'])
+    })
+
+    it('materializes imported legacy preview images in their saved slot', () => {
+        const workspace = {
+            previewContent: { views: [{
+                id: 'site-page', layout: 'main_layout', texts: {},
+                images: { 'preview:site-page:image:hero': { url: 'https://storage.test/hero.jpg', filename: 'Hero' } },
+            }] },
+            catalog: { layouts: [{ key: 'main_layout', slots: [{ name: 'main' }, { name: 'hero' }] }], designGroups: [] },
+        }
+
+        const model = createDesignerRenderModel({ workspace, viewId: 'site-page' })
+
+        expect(model.slots.hero).toHaveLength(1)
+        expect(model.slots.hero[0]).toMatchObject({
+            type: 'easy_widgets.ImageWidget',
+            config: { imageUrl: 'https://storage.test/hero.jpg', altText: 'Hero' },
+        })
     })
 })

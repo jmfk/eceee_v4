@@ -296,6 +296,7 @@ class SitePackageServiceTests(TestCase):
         theme_data = {
             "source_id": self.theme.id,
             "name": "Transferred theme",
+            "image": "branding/hero.jpg",
             "designer_preview": {
                 "views": [
                     {
@@ -303,8 +304,12 @@ class SitePackageServiceTests(TestCase):
                         "objectType": {
                             "key": "article",
                             "namespace": {"id": self.namespace.id, "slug": self.namespace.slug},
+                            "schema": {"properties": {"related": {"field_type": "object_reference"}}},
                         },
-                        "content": {"imageUrl": f"https://source.test/theme_images/{self.theme.id}/library/hero.jpg"},
+                        "content": {
+                            "data": {"related": [123]},
+                            "imageUrl": f"https://source.test/theme_images/{self.theme.id}/library/hero.jpg",
+                        },
                     }
                 ]
             },
@@ -312,6 +317,7 @@ class SitePackageServiceTests(TestCase):
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
             package.writestr(f"themes/{self.theme.id}.json", json.dumps(theme_data))
+            package.writestr(f"themes/assets/{self.theme.id}/branding/hero.jpg", b"thumbnail")
             package.writestr(
                 f"themes/assets/{self.theme.id}/theme_images/{self.theme.id}/library/hero.jpg",
                 b"hero",
@@ -323,17 +329,20 @@ class SitePackageServiceTests(TestCase):
             options={"tenant_id": str(destination_tenant.id)},
         )
 
+        storage = MemoryStorage()
         with zipfile.ZipFile(buffer, "r") as package:
-            imported_theme = SitePackageImporter(import_job, storage=MemoryStorage())._import_themes(package)[
-                self.theme.id
-            ]
+            imported_theme = SitePackageImporter(import_job, storage=storage)._import_themes(package)[self.theme.id]
 
         namespace = imported_theme.designer_preview["views"][0]["objectType"]["namespace"]
         self.assertEqual(namespace["slug"], destination_namespace.slug)
+        self.assertEqual(imported_theme.designer_preview["views"][0]["content"]["data"]["related"], [])
         self.assertEqual(
             imported_theme.designer_preview["views"][0]["content"]["imageUrl"],
-            f"https://storage.test/theme_images/{imported_theme.id}/library/hero.jpg",
+            f"https://storage.test/theme_images/{imported_theme.id}/library/hero-2.jpg",
         )
+        self.assertEqual(imported_theme.image.name, f"theme_images/{imported_theme.id}/library/hero.jpg")
+        self.assertEqual(storage.files[imported_theme.image.name], b"thumbnail")
+        self.assertEqual(storage.files[f"theme_images/{imported_theme.id}/library/hero-2.jpg"], b"hero")
 
 
 class FakeMultipartClient:

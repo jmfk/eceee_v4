@@ -143,4 +143,49 @@ describe('RenderFrameRuntime designer overlay', () => {
         fireEvent.mouseOver(heading)
         expect(document.querySelector('.designer-spacing-readout')).toBeNull()
     })
+
+    it('renders copied object data without a live object', async () => {
+        const objectWorkspace = {
+            catalog: { layouts: [{ key: 'main_layout', slots: [{ name: 'main' }] }], componentStyles: [] },
+            previewContent: { views: [{
+                id: 'copied-object', kind: 'object', layout: 'main_layout',
+                objectType: { schema: { properties: {
+                    summary: { title: 'Summary' },
+                    biography: { title: 'Biography', componentType: 'rich_text' },
+                    portrait: { title: 'Portrait', componentType: 'image' },
+                    tags: { title: 'Tags', type: 'array', items: { type: 'string' } },
+                } } },
+                content: { data: {
+                    summary: 'Detached object body',
+                    biography: '<p>Formatted <strong>biography</strong></p>',
+                    portrait: { url: 'https://storage.test/portrait.jpg' },
+                    tags: ['Research', 'Policy'],
+                }, widgets: {} },
+            }] },
+        }
+        render(<RenderFrameRuntime />)
+
+        sendModel(createDesignerRenderModel({ workspace: objectWorkspace, viewId: 'copied-object' }))
+
+        expect(await screen.findByText('Detached object body')).toBeInTheDocument()
+        expect(screen.getByText('Summary')).toBeInTheDocument()
+        expect(screen.getByText('biography', { selector: 'strong' })).toBeInTheDocument()
+        expect(screen.getByRole('img', { name: 'Portrait' })).toHaveAttribute('src', 'https://storage.test/portrait.jpg')
+        expect(screen.getByText('Research', { selector: 'li' })).toBeInTheDocument()
+    })
+
+    it('renders images imported into legacy site preview metadata', async () => {
+        const imageWorkspace = {
+            catalog: { layouts: [{ key: 'main_layout', slots: [{ name: 'hero' }, { name: 'main' }] }], componentStyles: [], designGroups: [] },
+            previewContent: { views: [{
+                id: 'site-page', layout: 'main_layout', texts: {},
+                images: { 'preview:site-page:image:hero': { url: 'https://storage.test/site-hero.jpg', filename: 'Site hero' } },
+            }] },
+        }
+        render(<RenderFrameRuntime />)
+
+        sendModel(createDesignerRenderModel({ workspace: imageWorkspace, viewId: 'site-page' }))
+
+        expect(await screen.findByRole('img', { name: 'Site hero' })).toHaveAttribute('src', 'https://storage.test/site-hero.jpg')
+    })
 })

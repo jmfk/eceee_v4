@@ -17,13 +17,15 @@ vi.mock('../../../editors/page-editor/PageContentEditor', () => ({
 }))
 vi.mock('../../ObjectContentEditor', () => ({ default: ({ namespace }) => <div data-testid="object-content-editor" data-namespace={namespace || ''}>Object widgets</div> }))
 vi.mock('../../WidgetEditorPanel', () => ({ default: ({ namespace }) => <div data-testid="widget-editor-panel" data-namespace={namespace || ''} /> }))
-vi.mock('../../objectEdit/ObjectDataForm', () => ({ default: () => <div>Object fields</div> }))
+vi.mock('../../objectEdit/ObjectDataForm', () => ({
+    default: ({ onFormChange }) => <div>Object fields<button type="button" onClick={() => onFormChange({ title: 'Changed', data: { summary: 'Safe', related: 99 } })}>Change object fields</button></div>,
+}))
 
 const sources = {
     layouts: [{ key: 'main_layout', label: 'Main layout' }],
     pages: [{ id: 12, label: 'Conference — Programme' }],
     objects: [{ id: 21, label: 'Article — Welcome' }],
-    objectTypes: [{ key: 'article', label: 'Article', schema: { properties: {} }, slotConfiguration: { slots: [] } }],
+    objectTypes: [{ key: 'article', label: 'Article', schema: { properties: { summary: { type: 'string' }, related: { componentType: 'object_reference' } } }, slotConfiguration: { slots: [] } }],
     defaultNamespace: { id: 8, slug: 'tenant-default' },
 }
 
@@ -33,8 +35,9 @@ const StateReader = ({ expose }) => {
     return null
 }
 
-const Harness = ({ exposeState }) => {
+const Harness = ({ exposeState, exposePreview }) => {
     const [preview, setPreview] = useState({ views: [] })
+    useEffect(() => { exposePreview?.(preview) }, [exposePreview, preview])
     return <><PreviewViewsTab designerPreview={preview} onChange={setPreview} themeId="7" /><StateReader expose={exposeState} /></>
 }
 
@@ -83,5 +86,16 @@ describe('PreviewViewsTab', () => {
 
         await waitFor(() => expect(mocks.importPreviewContent).toHaveBeenCalledWith('7', 'page', 12))
         expect(await screen.findAllByDisplayValue('Programme')).toHaveLength(2)
+    })
+
+    it('removes object IDs from theme-preview form updates', async () => {
+        let preview
+        renderWithStateProviders(<Harness exposePreview={(value) => { preview = value }} />)
+
+        await screen.findByRole('option', { name: 'Article' })
+        fireEvent.click(screen.getByRole('button', { name: 'New object' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Change object fields' }))
+
+        await waitFor(() => expect(preview.views[0].content.data).toEqual({ summary: 'Safe', related: null }))
     })
 })

@@ -181,11 +181,17 @@ class DesignerThemeApiTests(TestCase):
             version_number=1,
             code_layout="main_layout",
             widgets={"main": [{"type": "easy_widgets.ContentWidget", "config": {"content": "Private"}}]},
+            theme=self.theme,
             created_by=self.owner,
         )
         page.latest_version = version
+        page.current_published_version = version
         page.cached_root_id = page.id
-        page.save(update_fields=["latest_version", "cached_root_id"])
+        page.save(update_fields=["latest_version", "current_published_version", "cached_root_id"])
+        self.theme.designer_preview = {
+            "views": [{"id": "legacy-main", "label": "Legacy", "kind": "page", "layout": "main_layout"}]
+        }
+        self.theme.save(update_fields=["designer_preview"])
         self.authenticate(self.designer)
 
         workspace = self.client.get(self.workspace_url).data
@@ -193,6 +199,10 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(workspace["contentSources"], [])
         self.assertEqual(workspace["contentPages"], [])
         self.assertEqual(workspace["contentObjects"], [])
+        preview_view = workspace["catalog"]["previewViews"][0]
+        self.assertNotIn("referenceHtml", preview_view)
+        self.assertNotIn("sourceSiteId", preview_view)
+        self.assertNotIn("sourcePageId", preview_view)
         page_response = self.client.post(
             f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/from-page/",
             {"sourcePageId": page.id},
