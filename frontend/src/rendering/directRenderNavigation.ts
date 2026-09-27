@@ -5,7 +5,14 @@ interface DirectRenderLinkContext {
     currentPath?: string
     siteHostnames?: string[]
 }
-const normalizedHostname = (hostname: string) => String(hostname || '').toLowerCase().split(':')[0]
+const normalizedHostname = (hostname: string) => {
+    const value = String(hostname || '').trim().toLowerCase()
+    if (value.startsWith('[')) {
+        const bracketEnd = value.indexOf(']')
+        return bracketEnd > 0 ? value.slice(1, bracketEnd) : value
+    }
+    return (value.match(/:/g) || []).length === 1 ? value.split(':')[0] : value
+}
 
 export const rewriteDirectRenderHref = (candidate: string, {
     routePrefix,
