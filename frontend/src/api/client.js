@@ -128,6 +128,20 @@ apiClient.interceptors.response.use(
     async (error) => {
         inspectAppVersionResponse(error.response)
         const originalRequest = error.config;
+        const waitForReauthentication = () => {
+            if (originalRequest?.skipSessionQueue) return Promise.reject(error)
+            return new Promise((resolve, reject) => {
+                const event = new CustomEvent('session-expired', {
+                    detail: {
+                        config: originalRequest,
+                        resolve,
+                        reject,
+                        timestamp: Date.now()
+                    }
+                });
+                window.dispatchEvent(event);
+            });
+        }
 
         // If we get a 401 Unauthorized, try to refresh the token
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -158,53 +172,17 @@ apiClient.interceptors.response.use(
                         localStorage.removeItem('access_token');
                         localStorage.removeItem('refresh_token');
 
-                        // Return a promise that will be resolved when user re-authenticates
-                        return new Promise((resolve, reject) => {
-                            // Dispatch custom event to trigger session expired overlay
-                            const event = new CustomEvent('session-expired', {
-                                detail: {
-                                    config: originalRequest,
-                                    resolve,
-                                    reject,
-                                    timestamp: Date.now()
-                                }
-                            });
-                            window.dispatchEvent(event);
-                        });
+                        return waitForReauthentication();
                     }
                 } catch (refreshError) {
                     console.error('Token refresh failed:', refreshError);
                     localStorage.removeItem('access_token');
                     localStorage.removeItem('refresh_token');
 
-                    // Return a promise that will be resolved when user re-authenticates
-                    return new Promise((resolve, reject) => {
-                        // Dispatch custom event to trigger session expired overlay
-                        const event = new CustomEvent('session-expired', {
-                            detail: {
-                                config: originalRequest,
-                                resolve,
-                                reject,
-                                timestamp: Date.now()
-                            }
-                        });
-                        window.dispatchEvent(event);
-                    });
+                    return waitForReauthentication();
                 }
             } else {
-                // No refresh token, show session expired overlay
-                return new Promise((resolve, reject) => {
-                    // Dispatch custom event to trigger session expired overlay
-                    const event = new CustomEvent('session-expired', {
-                        detail: {
-                            config: originalRequest,
-                            resolve,
-                            reject,
-                            timestamp: Date.now()
-                        }
-                    });
-                    window.dispatchEvent(event);
-                });
+                return waitForReauthentication();
             }
         }
 

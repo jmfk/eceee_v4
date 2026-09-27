@@ -133,6 +133,23 @@ describe('PageRenderer', () => {
         expect(screen.queryByText('Other site')).toBeNull()
     })
 
+    it('keeps Navbar links inside the current standalone site', () => {
+        const model = createPageRenderModel({
+            widgets: { navbar: [{ id: 'navbar', type: 'easy_widgets.NavbarWidget', config: { menuItems: [
+                { linkData: { type: 'internal', label: 'Current site', resolvedUrl: '/current/', siteId: 85 } },
+                { linkData: { type: 'internal', label: 'Other site', resolvedUrl: '/other/', siteId: 86 } },
+                { linkData: { type: 'external', label: 'External', url: 'https://example.com' } },
+            ] } }] },
+            context: { siteId: 85, siteHostnames: ['summerstudy.localhost'] },
+        })
+
+        render(<PageRenderer model={model} />)
+
+        expect(screen.getByText('Current site')).toBeInTheDocument()
+        expect(screen.getByText('External')).toBeInTheDocument()
+        expect(screen.queryByText('Other site')).toBeNull()
+    })
+
     it('renders canonical bio fields and Django-compatible structure', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'bio', type: 'easy_widgets.BioWidget', config: {

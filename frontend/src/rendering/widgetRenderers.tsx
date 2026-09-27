@@ -221,25 +221,31 @@ const navigationItems = (config: Record<string, any>, secondary = false) => proc
     ...(secondary ? ['secondaryMenuItems', 'secondary_menu_items'] : ['menuItems', 'menu_items', 'items', 'links']),
 )).filter((item) => item.isActive && item.isPublished !== false)
 
+const sameSiteNavigationItems = (config: Record<string, any>, context: WidgetRenderProps['context'], secondary = false) => (
+    navigationItems(config, secondary).filter((item) => {
+        if (item.type !== 'internal') return true
+        if (context.siteId && item.siteId) return String(item.siteId) === String(context.siteId)
+        const itemHostnames = asArray<string>(item.cachedRootHostnames || item.cached_root_hostnames)
+        if (context.siteHostnames?.length && itemHostnames.length) {
+            return context.siteHostnames.some((hostname) => itemHostnames.includes(hostname))
+        }
+        return true
+    })
+)
+
 const NavigationList = ({ items, className }: { items: any[], className: string }) => (
     <ul className={className}>{items.map((item, index) => <li key={item.id || index}><PreviewLink href={item.resolvedUrl || item.path || item.url || item}>{item.label || item.title || item.text || ''}</PreviewLink>{asArray<any>(item.children).length > 0 && <NavigationList items={processNavigationItems(item.children)} className="navigation-children" />}</li>)}</ul>
 )
 
 const NavigationRender: WidgetRenderComponent = ({ widget, context }) => {
-    const items = navigationItems(widget.config).filter((item) => {
-        if (item.type !== 'internal') return true
-        if (context.siteId && item.siteId) return String(item.siteId) === String(context.siteId)
-        const itemHostnames = asArray<string>(item.cachedRootHostnames || item.cached_root_hostnames)
-        if (context.siteHostnames?.length && itemHostnames.length) return context.siteHostnames.some((hostname) => itemHostnames.includes(hostname))
-        return true
-    })
+    const items = sameSiteNavigationItems(widget.config, context)
     return <nav className="navigation-widget widget-type-navigation widget-type-easy-widgets-navigationwidget">{items.length ? <NavigationList items={items} className="nav-container" /> : null}</nav>
 }
 
-const NavbarRender: WidgetRenderComponent = ({ widget }) => {
+const NavbarRender: WidgetRenderComponent = ({ widget, context }) => {
     const [open, setOpen] = useState(false)
-    const items = navigationItems(widget.config)
-    const secondaryItems = navigationItems(widget.config, true)
+    const items = sameSiteNavigationItems(widget.config, context)
+    const secondaryItems = sameSiteNavigationItems(widget.config, context, true)
     const breakpoint = Number(value(widget.config, 'hamburgerBreakpoint', 'hamburger_breakpoint') || 768)
     const [mobile, setMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < breakpoint)
     useEffect(() => {
