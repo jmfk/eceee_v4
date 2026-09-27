@@ -8,9 +8,10 @@ from rest_framework.test import APIClient
 
 from content.models import Namespace
 from core.models import Tenant
-from file_manager.models import MediaFile
+from file_manager.models import MediaCollection, MediaFile
 from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
 from webpages.models import PageTheme, PageVersion, WebPage
+from webpages.serializers.theme import PageThemeSerializer
 from webpages.services.theme_preview_content import (
     MAX_IMPORTED_IMAGE_BYTES,
     _copy_preview_images,
@@ -46,7 +47,7 @@ class ThemePreviewContentTests(TestCase):
             created_by=self.user,
             is_default=True,
         )
-        MediaFile.objects.create(
+        self.media_file = MediaFile.objects.create(
             title="Article image",
             slug="article-image",
             original_filename="article.jpg",
@@ -192,8 +193,12 @@ class ThemePreviewContentTests(TestCase):
             "views": [
                 {
                     "kind": "object",
-                    "objectType": {"key": "article", "namespace": {"id": 999, "slug": "foreign"}},
-                    "content": {"widgets": {}},
+                    "objectType": {
+                        "key": "article",
+                        "namespace": {"id": 999, "slug": "foreign"},
+                        "schema": {"properties": {"related": {"componentType": "object_reference"}}},
+                    },
+                    "content": {"data": {"related": 123}, "widgets": {}},
                 }
             ]
         }
@@ -201,7 +206,9 @@ class ThemePreviewContentTests(TestCase):
         normalized = normalize_theme_preview_namespaces(preview, self.tenant)
 
         self.assertEqual(normalized["views"][0]["objectType"]["namespace"]["slug"], self.namespace.slug)
+        self.assertIsNone(normalized["views"][0]["content"]["data"]["related"])
         self.assertEqual(preview["views"][0]["objectType"]["namespace"]["slug"], "foreign")
+        self.assertEqual(preview["views"][0]["content"]["data"]["related"], 123)
 
     @patch("webpages.services.theme_preview_content.system_storage")
     def test_managed_storage_path_rejects_external_origins_and_buckets(self, storage):
@@ -237,6 +244,122 @@ class ThemePreviewContentTests(TestCase):
         self.assertIn("theme_images/1/library/article-copy.jpg", config["imageUrl"])
         self.assertEqual(copied_images, 1)
         storage.save.assert_called_once()
+
+    @patch("webpages.services.theme_preview_content.system_storage")
+    def test_page_import_copies_canonical_and_uuid_media_urls(self, storage):
+        canonical_url = self.media_file.get_absolute_url()
+        uuid_url = f"/api/v1/media/file/{self.media_file.id}/"
+        self.page_version.page_data = {"body": f'<img data-media-id="{self.media_file.id}" src="{canonical_url}">'}
+        self.page_version.widgets = {
+            "main": [
+                {
+                    "id": "image-widget",
+                    "config": {
+                        "mediaItems": [
+                            {
+                                "id": str(self.media_file.id),
+                                "mediaId": str(self.media_file.id),
+                                "fileId": str(self.media_file.id),
+                                "type": "image",
+                                "fileUrl": uuid_url,
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+        self.page_version.save(update_fields=["page_data", "widgets"])
+        copied_path = f"theme_images/{self.theme.id}/library/article-copy.jpg"
+        copied_url = f"https://storage.test/media/{copied_path}"
+        storage.exists.return_value = True
+        storage.open.return_value = io.BytesIO(b"copied-image")
+        storage.save.return_value = copied_path
+        storage.url.return_value = copied_url
+
+        preview, copied_images = import_theme_preview_document(self.theme, "page", self.page.id)
+
+        self.assertIn(copied_url, preview["content"]["pageData"]["body"])
+        self.assertNotIn("data-media-id", preview["content"]["pageData"]["body"])
+        widget = preview["content"]["widgets"]["main"][0]
+        media_item = widget["config"]["mediaItems"][0]
+        self.assertEqual(widget["id"], "image-widget")
+        self.assertEqual(media_item["fileUrl"], copied_url)
+        self.assertNotIn("id", media_item)
+        self.assertNotIn("mediaId", media_item)
+        self.assertNotIn("fileId", media_item)
+        self.assertEqual(copied_images, 1)
+        storage.open.assert_called_once_with(self.media_file.file_path, "rb")
+
+    @patch("webpages.services.theme_preview_content.system_storage")
+    def test_page_import_does_not_copy_another_tenants_canonical_media_url(self, storage):
+        foreign_namespace = Namespace.objects.create(
+            name="Foreign canonical media",
+            slug="foreign-canonical-media",
+            tenant=self.other_tenant,
+            created_by=self.user,
+        )
+        foreign_media = MediaFile.objects.create(
+            title="Foreign image",
+            slug="foreign-image",
+            original_filename="foreign.jpg",
+            file_path="uploads/foreign.jpg",
+            file_size=12,
+            content_type="image/jpeg",
+            file_hash="b" * 64,
+            uploaded_by=self.user,
+            file_type="image",
+            namespace=foreign_namespace,
+            tenant=self.other_tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        foreign_url = foreign_media.get_absolute_url()
+        self.page_version.page_data = {"body": f'<img src="{foreign_url}">'}
+        self.page_version.widgets = {}
+        self.page_version.save(update_fields=["page_data", "widgets"])
+
+        preview, copied_images = import_theme_preview_document(self.theme, "page", self.page.id)
+
+        self.assertEqual(preview["content"]["pageData"]["body"], f'<img src="{foreign_url}">')
+        self.assertEqual(copied_images, 0)
+        storage.open.assert_not_called()
+        storage.save.assert_not_called()
+
+    def test_page_import_materializes_media_navigation_link_before_removing_id(self):
+        document = MediaFile.objects.create(
+            title="Programme PDF",
+            slug="programme",
+            original_filename="programme.pdf",
+            file_path="uploads/programme.pdf",
+            file_size=12,
+            content_type="application/pdf",
+            file_hash="c" * 64,
+            uploaded_by=self.user,
+            file_type="document",
+            namespace=self.namespace,
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        self.page_version.page_data = {}
+        self.page_version.widgets = {
+            "navbar": [
+                {
+                    "id": "navigation-widget",
+                    "config": {"menuItems": [{"type": "media", "mediaId": str(document.id), "label": "Programme"}]},
+                }
+            ]
+        }
+        self.page_version.save(update_fields=["page_data", "widgets"])
+
+        preview, copied_images = import_theme_preview_document(self.theme, "page", self.page.id)
+
+        widget = preview["content"]["widgets"]["navbar"][0]
+        link = widget["config"]["menuItems"][0]
+        self.assertEqual(widget["id"], "navigation-widget")
+        self.assertEqual(link["url"], document.get_absolute_url())
+        self.assertNotIn("mediaId", link)
+        self.assertEqual(copied_images, 0)
 
     @patch("webpages.services.theme_preview_content.system_storage")
     def test_page_import_does_not_copy_another_tenants_theme_image(self, storage):
@@ -285,13 +408,85 @@ class ThemePreviewContentTests(TestCase):
         storage.save.assert_called_once()
         storage.delete.assert_called_once_with(saved_path)
 
+    @patch("webpages.services.theme_preview_content.system_storage")
+    def test_collection_image_widget_is_materialized_without_live_collection_id(self, storage):
+        collection = MediaCollection.objects.create(
+            title="Article gallery",
+            namespace=self.namespace,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        self.media_file.collections.add(collection)
+        self.page_version.page_data = {}
+        self.page_version.widgets = {
+            "main": [
+                {
+                    "id": "gallery",
+                    "type": "easy_widgets.ImageWidget",
+                    "config": {
+                        "image": {"id": str(collection.id), "type": "collection"},
+                        "mediaItems": [{"url": self.media_file.get_absolute_url()}],
+                        "collectionId": str(collection.id),
+                    },
+                }
+            ]
+        }
+        self.page_version.save(update_fields=["page_data", "widgets"])
+        saved_path = f"theme_images/{self.theme.id}/library/article-image.jpg"
+        storage.exists.return_value = True
+        storage.open.return_value = io.BytesIO(b"image")
+        storage.save.return_value = saved_path
+        storage.url.return_value = f"https://storage.test/media/{saved_path}"
+
+        preview, copied_images = import_theme_preview_document(self.theme, "page", self.page.id)
+
+        config = preview["content"]["widgets"]["main"][0]["config"]
+        self.assertNotIn("image", config)
+        self.assertNotIn("collectionId", config)
+        self.assertEqual(copied_images, 1)
+        self.assertEqual(len(config["mediaItems"]), 1)
+        self.assertIn(f"theme_images/{self.theme.id}/library/", config["mediaItems"][0]["url"])
+        self.assertNotIn(str(collection.id), str(config))
+
+    def test_page_import_removes_object_children_parent_but_keeps_widget_id(self):
+        self.page_version.page_data = {}
+        self.page_version.widgets = {
+            "main": [
+                {
+                    "id": "children-widget",
+                    "type": "object_storage.ObjectChildrenWidget",
+                    "config": {"parent_object_id": self.object.id, "limit": 5},
+                }
+            ]
+        }
+        self.page_version.save(update_fields=["page_data", "widgets"])
+
+        preview, copied_images = import_theme_preview_document(self.theme, "page", self.page.id)
+
+        widget = preview["content"]["widgets"]["main"][0]
+        self.assertEqual(widget["id"], "children-widget")
+        self.assertNotIn("parent_object_id", widget["config"])
+        self.assertEqual(widget["config"]["limit"], 5)
+        self.assertEqual(copied_images, 0)
+
     @patch("webpages.services.theme_preview_content.ObjectVersion.objects.filter")
     @patch("webpages.services.theme_preview_content.ObjectInstance.objects.filter")
     def test_object_import_snapshots_schema_and_removes_object_references(self, instance_filter, version_filter):
         self.object.current_version_id = 999
+        self.object_type.schema["properties"].update(
+            {
+                "canonicalRelated": {"type": "integer", "field_type": "object_reference"},
+                "canonicalRelatedList": {"type": "array", "field_type": "object_reference"},
+            }
+        )
         instance_filter.return_value.select_related.return_value.first.return_value = self.object
         version_filter.return_value.values.return_value.first.return_value = {
-            "data": {"summary": "Object body", "related": 999},
+            "data": {
+                "summary": "Object body",
+                "related": 999,
+                "canonicalRelated": 1000,
+                "canonicalRelatedList": [1001, 1002],
+            },
             "widgets": {"main": []},
         }
 
@@ -302,8 +497,39 @@ class ThemePreviewContentTests(TestCase):
         self.assertEqual(preview["objectType"]["namespace"]["slug"], self.namespace.slug)
         self.assertEqual(preview["content"]["data"]["summary"], "Object body")
         self.assertIsNone(preview["content"]["data"]["related"])
+        self.assertIsNone(preview["content"]["data"]["canonicalRelated"])
+        self.assertEqual(preview["content"]["data"]["canonicalRelatedList"], [])
         self.assertNotIn("id", preview["objectType"])
         self.assertEqual(copied_images, 0)
+
+    def test_theme_update_removes_object_references_from_preview_data(self):
+        preview = {
+            "views": [
+                {
+                    "id": "object-preview",
+                    "kind": "object",
+                    "layout": "main_layout",
+                    "objectType": {
+                        "schema": {
+                            "properties": {
+                                "summary": {"type": "string"},
+                                "related": {"componentType": "object_reference"},
+                                "reverse": {"field_type": "reverse_object_reference"},
+                            }
+                        }
+                    },
+                    "content": {"data": {"summary": "Safe", "related": 123, "reverse": [456]}},
+                }
+            ]
+        }
+        serializer = PageThemeSerializer(self.theme, data={"designer_preview": preview}, partial=True)
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+        self.theme.refresh_from_db()
+
+        data = self.theme.designer_preview["views"][0]["content"]["data"]
+        self.assertEqual(data, {"summary": "Safe", "related": None, "reverse": []})
 
     def test_import_endpoint_rejects_page_from_another_tenant(self):
         response = self.client.post(

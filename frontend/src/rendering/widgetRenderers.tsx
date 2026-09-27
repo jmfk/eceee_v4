@@ -7,6 +7,35 @@ const ContentRender: WidgetRenderComponent = ({ widget }) => <div className="wid
     <SafeHtml className={`content-widget${value(widget.config, 'showBorder', 'show_border') ? ' border-enabled' : ''}`} html={value(widget.config, 'content', 'html')} />
 </div>
 
+const ObjectDataPreviewRender: WidgetRenderComponent = ({ context }) => {
+    const data = context.objectData || {}
+    const properties = context.objectType?.schema?.properties || {}
+    const entries = Object.entries(data)
+    if (!entries.length) return null
+    const displayValue = (candidate: any, definition: any): React.ReactNode => {
+        if (candidate === null || candidate === undefined || candidate === '') return '—'
+        const fieldType = definition?.componentType || definition?.component_type || definition?.field_type || definition?.format || definition?.type
+        if (fieldType === 'rich_text') return <SafeHtml html={String(candidate)} />
+        if (fieldType === 'image') return <ImageView source={candidate} alt={definition?.title || definition?.label || ''} />
+        if (['file', 'document', 'audio', 'video'].includes(fieldType)) {
+            const label = candidate?.title || candidate?.filename || candidate?.name || 'Open file'
+            return <PreviewLink href={candidate}>{label}</PreviewLink>
+        }
+        if (Array.isArray(candidate)) {
+            return <ul>{candidate.map((item, index) => <li key={index}>{displayValue(item, definition?.items || {})}</li>)}</ul>
+        }
+        if (typeof candidate === 'object') {
+            return <dl>{Object.entries(candidate).map(([name, item]) => <div key={name}><dt>{name}</dt><dd>{displayValue(item, {})}</dd></div>)}</dl>
+        }
+        if (typeof candidate === 'boolean') return candidate ? 'Yes' : 'No'
+        return String(candidate)
+    }
+    return <dl className="object-data-preview">{entries.map(([name, fieldValue]) => <div key={name} className="object-data-preview-field">
+        <dt>{properties[name]?.title || properties[name]?.label || name}</dt>
+        <dd>{displayValue(fieldValue, properties[name])}</dd>
+    </div>)}</dl>
+}
+
 const HeadlineRender: WidgetRenderComponent = ({ widget }) => {
     const requested = String(value(widget.config, 'headerLevel', 'header_level', 'headingLevel', 'level') || 'h1').toLowerCase()
     const Tag = (/^h[1-6]$/.test(requested) ? requested : `h${Math.min(6, Math.max(1, Number(requested) || 1))}`) as keyof JSX.IntrinsicElements
@@ -605,4 +634,8 @@ export const RENDER_WIDGET_COMPONENTS: Record<string, WidgetRenderComponent> = {
     'easy_widgets.TopNewsPlugWidget': TopNewsPlugRender,
     'easy_widgets.SidebarTopNewsWidget': SidebarTopNewsRender,
     'easy_widgets.SectionWidget': SectionRender,
+}
+
+export const DESIGNER_RENDER_WIDGET_COMPONENTS: Record<string, WidgetRenderComponent> = {
+    'designer.ObjectDataPreview': ObjectDataPreviewRender,
 }

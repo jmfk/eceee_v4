@@ -811,15 +811,25 @@ class SitePackageImporter:
         prefix = f"themes/assets/{data['source_id']}/"
         asset_replacements = {}
         preview_url_replacements = {}
+        used_paths = set()
         for name in package.namelist():
             if not name.startswith(prefix) or name.endswith("/"):
                 continue
             original_path = name[len(prefix) :]
             content = package.read(name)
-            new_path = f"theme_images/{theme.id}/library/{os.path.basename(original_path)}"
+            basename = os.path.basename(original_path)
+            stem, extension = os.path.splitext(basename)
+            new_path = f"theme_images/{theme.id}/library/{basename}"
+            counter = 2
+            while new_path in used_paths:
+                new_path = f"theme_images/{theme.id}/library/{stem}-{counter}{extension}"
+                counter += 1
+            used_paths.add(new_path)
             self.storage._save(new_path, ContentFile(content))
             asset_replacements[original_path] = new_path
-            preview_url_replacements[os.path.basename(original_path)] = self.storage.url(new_path)
+            source_library_prefix = f"theme_images/{data['source_id']}/library/"
+            if original_path.startswith(source_library_prefix):
+                preview_url_replacements[basename] = self.storage.url(new_path)
             if original_path == data.get("image"):
                 theme.image.name = new_path
             if original_path == data.get("site_icon"):

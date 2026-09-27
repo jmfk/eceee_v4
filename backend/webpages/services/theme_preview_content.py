@@ -11,7 +11,7 @@ from django.core.files.base import ContentFile
 from django.utils.text import slugify
 
 from content.models import Namespace
-from file_manager.models import MediaFile
+from file_manager.models import MediaCollection, MediaFile
 from file_manager.storage import system_storage
 from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
 from webpages.layout_autodiscovery import autodiscover_layouts
@@ -24,8 +24,12 @@ MAX_IMPORTED_IMAGES = 100
 MAX_IMPORTED_IMAGE_BYTES = 10 * 1024 * 1024
 IMAGE_EXTENSIONS = {".avif", ".gif", ".jpeg", ".jpg", ".png", ".svg", ".webp"}
 EMBEDDED_IMAGE_PATTERN = re.compile(
-    r"(?:https?://[^\s\"'()<>]+|s3://[^\s\"'()<>]+|/?(?:theme_images|uploads|media|site-package)/[^\s\"'()<>]+)"
+    r"(?:https?://[^\s\"'()<>]+|s3://[^\s\"'()<>]+|/?(?:theme_images|uploads|media|files|site-package)/[^\s\"'()<>]+)"
     r"\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^\s\"'()<>]*)?",
+    re.IGNORECASE,
+)
+MEDIA_ID_ATTRIBUTE_PATTERN = re.compile(
+    r"\sdata-(?:media|file)-id\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>]+)",
     re.IGNORECASE,
 )
 SOURCE_LINK_KEYS = {
@@ -35,9 +39,13 @@ SOURCE_LINK_KEYS = {
     "expiryDate",
     "hostnames",
     "currentVersionId",
+    "collectionId",
+    "fileId",
+    "mediaId",
     "objectId",
     "pageId",
     "parentId",
+    "parentObjectId",
     "pathPatternKey",
     "publishDate",
     "publishedVersionId",
@@ -53,9 +61,13 @@ SOURCE_LINK_KEYS = {
     "effective_date",
     "expiry_date",
     "current_version_id",
+    "collection_id",
+    "file_id",
+    "media_id",
     "object_id",
     "page_id",
     "parent_id",
+    "parent_object_id",
     "path_pattern_key",
     "publish_date",
     "published_version_id",
@@ -93,7 +105,7 @@ def normalize_theme_preview_namespaces(value, tenant):
         source_slug = source_namespace.get("slug") if isinstance(source_namespace, dict) else None
         object_type["namespace"] = _namespace_snapshot(namespaces_by_slug.get(source_slug) or default_namespace)
 
-    return normalized
+    return detach_theme_preview_object_references(normalized)
 
 
 def _object_type_snapshot(object_type, theme, default_namespace=None):
@@ -164,16 +176,88 @@ def _strip_source_links(value):
     return copy.deepcopy(value)
 
 
+def _materialize_media_links(theme, value):
+    """Resolve tenant-owned media navigation links before source IDs are removed."""
+    media_urls = {}
+
+    def resolve(current):
+        if isinstance(current, dict):
+            resolved = {key: resolve(child) for key, child in current.items()}
+            if current.get("type") != "media":
+                return resolved
+            media_id = current.get("mediaId") or current.get("media_id")
+            if not media_id:
+                return resolved
+            if media_id not in media_urls:
+                try:
+                    media_file = MediaFile.objects.filter(id=media_id, tenant=theme.tenant, is_deleted=False).first()
+                except (TypeError, ValueError, ValidationError):
+                    media_file = None
+                media_urls[media_id] = media_file.get_absolute_url() if media_file else None
+            if media_urls[media_id]:
+                resolved["url"] = media_urls[media_id]
+            return resolved
+        if isinstance(current, list):
+            return [resolve(child) for child in current]
+        return copy.deepcopy(current)
+
+    return resolve(value)
+
+
 def _detach_object_references(data, schema):
     detached = _strip_source_links(data if isinstance(data, dict) else {})
     properties = schema.get("properties", {}) if isinstance(schema, dict) else {}
     for name, definition in properties.items():
         if not isinstance(definition, dict) or name not in detached:
             continue
-        component_type = definition.get("componentType") or definition.get("component_type")
-        if component_type in {"object_reference", "object_selector"}:
+        component_type = (
+            definition.get("componentType")
+            or definition.get("component_type")
+            or definition.get("field_type")
+            or definition.get("type")
+        )
+        if component_type in {"object_reference", "object_selector", "reverse_object_reference"}:
             detached[name] = [] if isinstance(detached[name], list) else None
     return detached
+
+
+def detach_theme_preview_object_references(value):
+    """Remove live object IDs from object preview data before it is stored."""
+    detached = copy.deepcopy(value if isinstance(value, dict) else {})
+    for view in detached.get("views", []):
+        if not isinstance(view, dict) or view.get("kind") != "object":
+            continue
+        object_type = view.get("objectType")
+        content = view.get("content")
+        if not isinstance(object_type, dict) or not isinstance(content, dict):
+            continue
+        content["data"] = _detach_object_references(content.get("data", {}), object_type.get("schema", {}))
+    return detached
+
+
+def _media_file_for_reference(theme, reference):
+    if not isinstance(reference, str) or not reference:
+        return None
+
+    path = urlparse(reference).path
+    uuid_match = re.search(
+        r"/(?:media|file|files)/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:/|$)",
+        path,
+        re.IGNORECASE,
+    )
+    if uuid_match:
+        return MediaFile.objects.filter(tenant=theme.tenant, id=uuid_match.group(1)).first()
+
+    canonical_match = re.fullmatch(r"/files/([^/]+)/([^/]+)", path)
+    if not canonical_match:
+        return None
+    namespace_slug, filename = canonical_match.groups()
+    media_slug = os.path.splitext(filename)[0]
+    return MediaFile.objects.filter(
+        tenant=theme.tenant,
+        namespace__slug=namespace_slug,
+        slug=media_slug,
+    ).first()
 
 
 def _managed_storage_path(reference):
@@ -231,9 +315,12 @@ def _copy_preview_images(theme, value):
 
     def copy_reference(reference):
         nonlocal copied_count
-        source_path = _managed_storage_path(reference)
+        media_file = _media_file_for_reference(theme, reference)
+        source_path = media_file.file_path if media_file else _managed_storage_path(reference)
         if not source_path or os.path.splitext(source_path)[1].lower() not in IMAGE_EXTENSIONS:
             return reference
+        if media_file:
+            authorized_paths[source_path] = True
         if not is_tenant_owned(source_path):
             return reference
         if source_path in copied_paths:
@@ -254,9 +341,71 @@ def _copy_preview_images(theme, value):
         copied_count += 1
         return copied_paths[source_path]
 
+    def collection_selector(value):
+        if not isinstance(value, dict) or not value.get("id"):
+            return False
+        if value.get("type") == "collection":
+            return True
+        return any(
+            key in value for key in ("fileCount", "file_count", "sampleImages", "sample_images", "slug")
+        ) and not any(value.get(key) for key in ("url", "fileUrl", "file_url", "imageUrl", "image_url", "src"))
+
+    def collection_media_items(selector):
+        collection = (
+            MediaCollection.objects.filter(
+                id=selector["id"],
+                namespace__tenant=theme.tenant,
+                namespace__is_active=True,
+            )
+            .select_related("namespace")
+            .first()
+        )
+        if not collection:
+            return []
+
+        files = MediaFile.objects.filter(
+            collections=collection,
+            namespace=collection.namespace,
+            tenant=theme.tenant,
+            file_type="image",
+            is_deleted=False,
+        ).order_by("-created_at", "id")
+        items = []
+        for media_file in files:
+            authorized_paths[media_file.file_path] = True
+            copied_url = copy_reference(media_file.file_path)
+            if copied_url == media_file.file_path:
+                continue
+            metadata = media_file.metadata if isinstance(media_file.metadata, dict) else {}
+            items.append(
+                {
+                    "url": copied_url,
+                    "type": "image",
+                    "altText": media_file.title or "Image",
+                    "caption": media_file.description or "",
+                    "annotation": metadata.get("annotation", ""),
+                    "title": media_file.title or "",
+                    "width": media_file.width,
+                    "height": media_file.height,
+                    "thumbnailUrl": copied_url,
+                }
+            )
+        return items
+
     def rewrite(current, parent_key=""):
         if isinstance(current, dict):
-            rewritten = {key: rewrite(child, key) for key, child in current.items()}
+            image_selector = current.get("image")
+            has_collection_selector = collection_selector(image_selector)
+            rewritten = {
+                key: rewrite(child, key)
+                for key, child in current.items()
+                if not (
+                    has_collection_selector
+                    and key in {"image", "mediaItems", "media_items", "collectionId", "collection_id"}
+                )
+            }
+            if has_collection_selector:
+                rewritten["mediaItems"] = collection_media_items(image_selector)
             path_value = current.get("filePath") or current.get("file_path")
             if isinstance(path_value, str):
                 copied_url = copy_reference(path_value)
@@ -268,11 +417,35 @@ def _copy_preview_images(theme, value):
                     rewritten.pop("file_path", None)
                     rewritten["url"] = copied_url
                     rewritten["filename"] = os.path.basename(urlparse(copied_url).path)
+            media_reference_keys = {
+                "filePath",
+                "file_path",
+                "fileUrl",
+                "file_url",
+                "imageUrl",
+                "image_url",
+                "thumbnailUrl",
+                "thumbnail_url",
+                "url",
+                "src",
+            }
+            copied_media_reference = any(
+                isinstance(current.get(key), str) and rewritten.get(key) != current.get(key)
+                for key in media_reference_keys
+            )
+            if copied_media_reference:
+                for key in ("mediaId", "media_id", "fileId", "file_id"):
+                    rewritten.pop(key, None)
+                if current.get("type") in {"image", "media", "file"} or any(
+                    key in current for key in media_reference_keys - {"url", "src"}
+                ):
+                    rewritten.pop("id", None)
             return rewritten
         if isinstance(current, list):
             return [rewrite(child, parent_key) for child in current]
         if isinstance(current, str):
             rewritten_string = EMBEDDED_IMAGE_PATTERN.sub(lambda match: copy_reference(match.group(0)), current)
+            rewritten_string = MEDIA_ID_ATTRIBUTE_PATTERN.sub("", rewritten_string)
             if rewritten_string != current:
                 return rewritten_string
             normalized_key = parent_key.lower().replace("-", "_")
@@ -362,7 +535,7 @@ def import_theme_preview_document(theme, source_kind, source_id):
             {
                 "title": page.title,
                 "pageData": _strip_source_links(version.page_data or {}),
-                "widgets": _strip_source_links(version.widgets or {}),
+                "widgets": _strip_source_links(_materialize_media_links(theme, version.widgets or {})),
                 "codeLayout": layout,
             },
         )
@@ -391,7 +564,7 @@ def import_theme_preview_document(theme, source_kind, source_id):
             {
                 "title": instance.title,
                 "data": _detach_object_references(version["data"] if version else {}, schema),
-                "widgets": _strip_source_links(version["widgets"] if version else {}),
+                "widgets": _strip_source_links(_materialize_media_links(theme, version["widgets"] if version else {})),
             },
         )
         return {

@@ -262,7 +262,7 @@ def normalized_designer_preview(theme, layouts=None):
     return {**preview_config, "views": views}
 
 
-def build_designer_catalog(theme, assets):
+def build_designer_catalog(theme, assets, include_reference_previews=True):
     """Build semantic preview metadata without exposing selectors to the Designer UI."""
     from webpages.layout_autodiscovery import autodiscover_layouts
     from webpages.layout_registry import layout_registry
@@ -355,10 +355,9 @@ def build_designer_catalog(theme, assets):
                 ],
             }
         )
-    preview_views = _designer_reference_previews(
-        theme,
-        normalized_designer_preview(theme, registered_layouts)["views"],
-    )
+    preview_views = normalized_designer_preview(theme, registered_layouts)["views"]
+    if include_reference_previews:
+        preview_views = _designer_reference_previews(theme, preview_views)
     return {
         "designGroups": groups,
         "componentStyles": component_styles,
@@ -1143,7 +1142,7 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
         font["usage"] = _walk_usage(theme.design_groups or {}, font.get("family"))
 
     assets = collect_designer_assets(theme)
-    catalog = build_designer_catalog(theme, assets)
+    catalog = build_designer_catalog(theme, assets, include_reference_previews=include_tenant_content)
     return {
         "id": theme.id,
         "name": theme.name,

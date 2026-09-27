@@ -23,7 +23,7 @@ export const PageRenderer = ({ model }: { model: RenderPageModel }) => {
     const Layout = getRenderLayout(model.layout)
 
     const renderWidgets = (widgets: RenderWidgetModel[]): ReactNode => (widgets || []).map((widget) => {
-        const Widget = getRenderWidget(widget.type)
+        const Widget = getRenderWidget(widget.type, Boolean(model.designer))
         if (!Widget) return <RenderFailure key={widget.id} message={`Unsupported widget: ${widget.type}`} />
         const hidden = widget.config?.is_visible === false
             || widget.config?.isVisible === false

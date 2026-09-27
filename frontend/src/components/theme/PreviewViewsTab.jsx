@@ -13,6 +13,17 @@ import { applyWidgetUpdateToWidgetMap } from '../../utils/pageEditorWidgetState'
 
 const newId = (kind) => `${kind}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`
 
+const detachObjectReferences = (data, schema) => {
+    const detached = { ...(data || {}) }
+    Object.entries(schema?.properties || {}).forEach(([name, definition]) => {
+        const fieldType = definition?.componentType || definition?.component_type || definition?.field_type || definition?.type
+        if (['object_reference', 'object_selector', 'reverse_object_reference'].includes(fieldType) && name in detached) {
+            detached[name] = Array.isArray(detached[name]) ? [] : null
+        }
+    })
+    return detached
+}
+
 const PreviewViewsTab = ({ designerPreview, onChange, themeId }) => {
     const views = useMemo(() => Array.isArray(designerPreview?.views) ? designerPreview.views : [], [designerPreview?.views])
     const [selectedId, setSelectedId] = useState(views[0]?.id || '')
@@ -123,7 +134,7 @@ const PreviewViewsTab = ({ designerPreview, onChange, themeId }) => {
         id: selected.id,
         title: selected.content?.title || selected.label,
         status: 'draft',
-        data: selected.content?.data || {},
+        data: detachObjectReferences(selected.content?.data, objectType?.schema),
         widgets: selected.content?.widgets || {},
         metadata: {},
         objectType,
@@ -226,7 +237,7 @@ const PreviewViewsTab = ({ designerPreview, onChange, themeId }) => {
 
                         {selected.kind === 'object' && objectType && <div className="grid gap-6 xl:grid-cols-2">
                             <div className="min-w-0 rounded-lg border border-gray-200 p-4"><ObjectContentEditor key={selected.id} objectType={objectType} widgets={selected.content?.widgets || {}} onWidgetChange={(widgets) => updateContent({ widgets })} context={{ instanceId: selected.id, mode: 'theme-preview', contextType: 'object' }} namespace={objectNamespace} /></div>
-                            <div className="min-w-0 rounded-lg border border-gray-200 p-4"><ObjectDataForm key={selected.id} ref={objectFormRef} objectType={objectType} instance={objectInstance} isNewInstance={false} onFormChange={(form) => updateContent({ title: form.title, data: form.data })} context={{ instanceId: selected.id, mode: 'theme-preview', contextType: 'object' }} /></div>
+                            <div className="min-w-0 rounded-lg border border-gray-200 p-4"><ObjectDataForm key={selected.id} ref={objectFormRef} objectType={objectType} instance={objectInstance} isNewInstance={false} onFormChange={(form) => updateContent({ title: form.title, data: detachObjectReferences(form.data, objectType.schema) })} context={{ instanceId: selected.id, mode: 'theme-preview', contextType: 'object' }} /></div>
                         </div>}
                     </section>}
                 </div>

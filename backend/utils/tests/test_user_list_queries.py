@@ -91,6 +91,25 @@ class UserListQueryTests(TestCase):
 
         self.assertFalse(user_can_switch_tenant(dev_user))
 
+    @override_settings(DEBUG=False)
+    def test_dev_auto_user_cannot_switch_workspace_outside_debug(self):
+        dev_user = User.objects.create_user("dev_auto_user", password="test")
+        workspace = Tenant.objects.create(
+            name="Production switch target",
+            identifier="production-switch-target",
+            created_by=dev_user,
+        )
+        client = APIClient()
+        client.force_authenticate(dev_user)
+
+        response = client.post(
+            "/api/v1/utils/current-workspace/",
+            {"identifier": workspace.identifier},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
     def test_workspace_switch_rejects_inactive_workspace(self):
         superuser = User.objects.create_superuser("inactive-workspace-superuser", password="test")
         inactive = Tenant.objects.create(

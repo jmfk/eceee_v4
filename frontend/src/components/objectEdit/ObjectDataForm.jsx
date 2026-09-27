@@ -27,6 +27,7 @@ const ObjectDataForm = forwardRef(({
     const { useExternalChanges, publishUpdate, setIsDirty: setUDCDirty } = useUnifiedData()
     const componentId = useMemo(() => `object-data-form-${instance?.id || 'new'}`, [instance?.id])
     const contextType = useEditorContext()
+    const isThemePreview = context?.mode === 'theme-preview'
 
     // Form state management
     const [formData, setFormData] = useState({
@@ -215,6 +216,11 @@ const ObjectDataForm = forwardRef(({
 
             if (properties[propName]) {
                 const property = properties[propName]
+                const fieldType = property.componentType || property.component_type || property.field_type || property.type
+
+                if (isThemePreview && ['object_reference', 'object_selector', 'reverse_object_reference'].includes(fieldType)) {
+                    return null
+                }
 
                 // Filter out schema-specific properties that shouldn't be passed to form components
                 const {
@@ -255,7 +261,7 @@ const ObjectDataForm = forwardRef(({
         }).filter(Boolean)
 
         return { fields }
-    }, [])
+    }, [isThemePreview])
 
     // Form validation
     const validateForm = useCallback(() => {
