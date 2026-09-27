@@ -2610,6 +2610,7 @@ class PageTheme(models.Model):
             logger = logging.getLogger(__name__)
             storage = system_storage
             url_mapping = {}
+            preview_url_mapping = {}
 
             for filename in library_images:
                 try:
@@ -2631,12 +2632,13 @@ class PageTheme(models.Model):
                         old_url = storage.url(old_path)
                         new_url = storage.url(new_path)
                         url_mapping[old_url] = new_url
+                        preview_url_mapping[filename] = new_url
 
                         # Also map any variations of the path
                         url_mapping[old_path] = new_path
-                        url_mapping[f"theme_images/{self.id}/library/{filename}"] = (
-                            f"theme_images/{cloned_theme.id}/library/{filename}"
-                        )
+                        url_mapping[
+                            f"theme_images/{self.id}/library/{filename}"
+                        ] = f"theme_images/{cloned_theme.id}/library/{filename}"
                     else:
                         logger.warning(f"Source image not found during clone: {old_path}")
 
@@ -2645,8 +2647,15 @@ class PageTheme(models.Model):
 
             # Update design_groups JSON with new URLs
             if url_mapping:
+                from webpages.services.theme_preview_content import rewrite_theme_library_image_urls
+
                 cloned_theme.design_groups = self._update_image_urls_in_design_groups(
                     cloned_theme.design_groups, url_mapping
+                )
+                cloned_theme.designer_preview = rewrite_theme_library_image_urls(
+                    cloned_theme.designer_preview,
+                    preview_url_mapping,
+                    self.id,
                 )
                 cloned_theme.save()
 

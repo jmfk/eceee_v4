@@ -154,6 +154,7 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                                         onWidgetEditorStateChange={handleWidgetEditorStateChange}
                                         mode="object"
                                         context={{ ...context, instanceId }}
+                                        namespace={namespace}
                                     />
                                 </div>
                             </div>

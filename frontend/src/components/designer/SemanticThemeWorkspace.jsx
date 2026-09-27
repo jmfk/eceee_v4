@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Box, Check, ChevronDown, Eye, EyeOff, FileText, Image as ImageIcon, Loader2, Save, Settings2, Trash2 } from 'lucide-react'
+import { Box, ChevronDown, Eye, EyeOff, FileText, Image as ImageIcon, Loader2, Settings2, Trash2 } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel } from '../../rendering/adapters'
@@ -112,7 +112,7 @@ const ValueFields = ({ idPrefix, values, defaults, fields, labels, onChange, onR
 
 const SemanticThemeWorkspace = ({
     workspace, preview, viewport, updateWorkspace, replaceAsset, createPlaceholder,
-    placeholderDrafts, setPlaceholderDrafts, savePreviewContent,
+    placeholderDrafts, setPlaceholderDrafts,
     loadPageContent, loadObjectContent, disabled, mobilePane,
 }) => {
     const initialViews = workspace.previewContent?.views || workspace.catalog.previewViews || []
@@ -133,8 +133,6 @@ const SemanticThemeWorkspace = ({
     const [selectionExpanded, setSelectionExpanded] = useState(true)
     const [workspaceView, setWorkspaceView] = useState('preview')
     const [selectedImageAspectKey, setSelectedImageAspectKey] = useState('')
-    const [previewDirty, setPreviewDirty] = useState(false)
-    const [savingPreview, setSavingPreview] = useState(false)
     const [contentMode, setContentMode] = useState(initialViews.length ? 'demo' : initialExternalContent.length ? 'content' : 'none')
     const [sourceContentId, setSourceContentId] = useState('')
     const [sourceContentModel, setSourceContentModel] = useState(null)
@@ -264,13 +262,6 @@ const SemanticThemeWorkspace = ({
                 }
             }
             if (event.data.action === 'contentChange' && target.kind === 'element') {
-                setSelectedTarget((current) => current?.id === target.id ? { ...current, text: target.text } : current)
-                setPreviewContent((current) => ({
-                    views: current.views.map((view) => view.id === viewId
-                        ? { ...view, texts: { ...(view.texts || {}), [target.id]: target.text } }
-                        : view),
-                }))
-                setPreviewDirty(true)
                 return
             }
             setSelectedTarget(target)
@@ -347,10 +338,6 @@ const SemanticThemeWorkspace = ({
         return () => window.clearTimeout(timer)
     }, [addedThemeValues, preview.css, workspace])
     const relevantColors = (selectedGroup?.colorNames || []).map((name) => ({ name, index: workspace.colors.findIndex((color) => color.name === name) })).filter(({ index }) => index >= 0)
-    const previewText = selectedTarget?.kind === 'element'
-        ? selectedView?.texts?.[selectedTarget.id] ?? selectedTarget.text ?? ''
-        : ''
-
     const chooseTargetAlternative = (alternative) => {
         setSelectedTarget((current) => ({ ...alternative, alternatives: current?.alternatives || [] }))
         setSelectionExpanded(true)
@@ -388,35 +375,6 @@ const SemanticThemeWorkspace = ({
         iframeRef.current?.contentWindow?.postMessage({
             source: 'eceee-render-host', action: 'readTargetStyles', targetId: row.targetId,
         }, '*')
-    }
-
-    const updatePreviewText = (value) => {
-        setSelectedTarget((current) => ({ ...current, text: value }))
-        setPreviewContent((current) => ({
-            views: current.views.map((view) => view.id === viewId
-                ? { ...view, texts: { ...(view.texts || {}), [selectedTarget.id]: value } }
-                : view),
-        }))
-        setPreviewDirty(true)
-    }
-
-    const saveCurrentPreview = async () => {
-        if (!selectedView || !previewDirty) return
-        setSavingPreview(true)
-        try {
-            let saved = previewContent
-            let savedWorkspace
-            for (const view of previewContent.views) {
-                const response = await savePreviewContent(view.id, view.texts || {}, savedWorkspace)
-                if (!response) return
-                savedWorkspace = response
-                saved = response.previewContent || saved
-            }
-            setPreviewContent(saved)
-            setPreviewDirty(false)
-        } finally {
-            setSavingPreview(false)
-        }
     }
 
     const themeImageEditor = selectedImageAspect && (
@@ -541,7 +499,6 @@ const SemanticThemeWorkspace = ({
             {selectionExpanded && (
                 <div id="selected-element-editor" className="space-y-5 border-t border-blue-200 p-4">
                     {selectedTarget.alternatives?.length > 1 && <section className="space-y-2"><h3 className="text-sm font-medium text-gray-900">Choose what to edit</h3><p className="text-xs text-gray-500">These elements share the same area.</p><div className="grid gap-2">{selectedTarget.alternatives.map((alternative) => <button key={alternative.id} type="button" aria-pressed={alternative.id === selectedTarget.id} onClick={() => chooseTargetAlternative(alternative)} className={`rounded-md border px-3 py-2 text-left text-sm ${alternative.id === selectedTarget.id ? 'border-blue-500 bg-blue-50 font-medium text-blue-800' : 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50'}`}>{alternative.label}</button>)}</div></section>}
-                    {selectedTarget.kind === 'element' && selectedTarget.editable && <section className="space-y-2"><label className="text-sm font-medium text-gray-900" htmlFor="preview-text">Preview text</label><textarea id="preview-text" value={previewText} onChange={(event) => updatePreviewText(event.target.value)} rows={5} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" /><p className="text-xs text-gray-500">This changes demo content only, not published page content.</p></section>}
                     {targetTypography.map(({ row, index }) => {
                         const fields = activeFields('typography', index, row, workspace.constraints.editableTypographyProperties)
                         return fields.length > 0 && <section key={`type-${index}`} className="space-y-3 border-t border-gray-200 pt-4"><h3 className="font-medium text-gray-900">{sectionLabel('typography', row)}</h3><ValueFields idPrefix={`typography-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={typographyLabels} onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)} /></section>
@@ -561,7 +518,7 @@ const SemanticThemeWorkspace = ({
     return (
         <main className="grid min-h-0 flex-1 lg:grid-cols-[360px_minmax(0,1fr)]">
             <section className={`${mobilePane === 'preview' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-r border-gray-200 bg-white lg:flex`}>
-                <fieldset disabled={disabled || savingPreview} className="min-h-0 flex-1 overflow-y-auto p-4">
+                <fieldset disabled={disabled} className="min-h-0 flex-1 overflow-y-auto p-4">
                     {workspaceView === 'details'
                         ? themeDetailsEditor
                         : workspaceView === 'images' || selectedTarget?.kind === 'asset'
@@ -578,7 +535,6 @@ const SemanticThemeWorkspace = ({
                         <button type="button" onClick={() => { setWorkspaceView('details'); setSelectedTarget(null) }} className={`inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${workspaceView === 'details' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:bg-white/70'}`}><Settings2 className="h-4 w-4" />Theme details</button>
                         <button type="button" onClick={() => { setWorkspaceView('images'); setSelectedTarget(null) }} className={`inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${workspaceView === 'images' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:bg-white/70'}`}><ImageIcon className="h-4 w-4" />Theme images</button>
                     </nav>
-                    {workspaceView === 'preview' && contentMode === 'demo' && previewDirty && <button type="button" onClick={saveCurrentPreview} disabled={savingPreview} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{savingPreview ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}{savingPreview ? 'Saving…' : 'Save preview content'}</button>}
                     {workspaceView === 'preview' && contentMode !== 'none' && <button type="button" aria-pressed={guidesEnabled} onClick={() => setGuidesEnabled((current) => !current)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{guidesEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{guidesEnabled ? 'Hide guides' : 'Show guides'}</button>}
                     <span className="text-xs capitalize text-gray-500">{workspaceView === 'images' ? 'Theme images' : workspaceView === 'details' ? 'Theme details' : viewport}</span>
                 </div>

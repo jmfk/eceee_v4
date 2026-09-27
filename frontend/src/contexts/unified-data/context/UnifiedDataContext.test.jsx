@@ -91,6 +91,34 @@ const ObjectSaveProbe = () => {
     )
 }
 
+const WidgetRoutingProbe = () => {
+    const { getState, publishUpdate } = useUnifiedData()
+    const [counts, setCounts] = useState({ page: 0, object: 0 })
+
+    const addObjectWidget = async () => {
+        await publishUpdate('object-editor', OperationTypes.ADD_WIDGET, {
+            contextType: 'object',
+            id: 'object-widget',
+            type: 'easy_widgets.ContentWidget',
+            config: {},
+            slot: 'main',
+            order: 0,
+        })
+        const state = getState()
+        setCounts({
+            page: state.versions['version-1'].widgets.main.filter((widget) => widget.id === 'object-widget').length,
+            object: state.objects['object-1'].widgets.main.filter((widget) => widget.id === 'object-widget').length,
+        })
+    }
+
+    return (
+        <div>
+            <div data-testid="widget-counts">{counts.page}:{counts.object}</div>
+            <button type="button" onClick={addObjectWidget}>Add object widget</button>
+        </div>
+    )
+}
+
 const objectEditorState = () => createAppState({
     pages: {},
     versions: {},
@@ -168,6 +196,32 @@ describe('UnifiedDataContext test provider', () => {
         await waitFor(() => {
             expect(mocks.updateCurrentObjectVersion).toHaveBeenCalledOnce()
             expect(screen.getByTestId('object-dirty-state')).toHaveTextContent('true')
+        })
+    })
+
+    it('routes an explicit object widget update away from stale page context', async () => {
+        const initialState = createAppState({
+            objects: {
+                'object-1': {
+                    id: 'object-1',
+                    title: 'Object title',
+                    data: {},
+                    widgets: { main: [] },
+                    metadata: {},
+                },
+            },
+            metadata: {
+                currentPageId: 'page-1',
+                currentVersionId: 'version-1',
+                currentObjectId: 'object-1',
+            },
+        })
+        renderWithStateProviders(<WidgetRoutingProbe />, { initialState })
+
+        fireEvent.click(screen.getByRole('button', { name: /add object widget/i }))
+
+        await waitFor(() => {
+            expect(screen.getByTestId('widget-counts')).toHaveTextContent('0:1')
         })
     })
 })

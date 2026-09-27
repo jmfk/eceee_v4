@@ -181,14 +181,17 @@ export function UnifiedDataProvider({
         if (WIDGET_OPS.has(type)) {
             const { currentPageId, currentVersionId, currentObjectId } = (state as any).metadata || {};
             const hasExplicitPageContext = augmentedData.contextType === 'page' && augmentedData.pageId;
-            const hasExplicitObjectContext = augmentedData.contextType === 'object' && augmentedData.objectId;
+            const hasExplicitObjectContext = augmentedData.contextType === 'object';
 
             if (hasExplicitPageContext || hasExplicitObjectContext) {
                 augmentedData = {
                     ...augmentedData,
                     ...(hasExplicitPageContext && augmentedData.versionId == null && currentPageId && String(augmentedData.pageId) === String(currentPageId)
                         ? { versionId: currentVersionId }
-                        : {})
+                        : {}),
+                    ...(hasExplicitObjectContext && augmentedData.objectId == null && currentObjectId
+                        ? { objectId: String(currentObjectId) }
+                        : {}),
                 };
             } else if (currentPageId && currentVersionId) {
                 augmentedData = {

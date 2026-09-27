@@ -10,7 +10,7 @@ import uuid
 import xml.etree.ElementTree as ET
 
 from django.core.files.base import ContentFile
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils.html import strip_tags
 from django.utils.text import slugify
@@ -1381,21 +1381,27 @@ def publish_designer_draft(theme_id, tenant, user, draft_version):
         if PageTheme.objects.filter(tenant=theme.tenant, name=theme.name).exclude(pk=theme.pk).exists():
             raise DesignerDraftConflict("Another theme now uses this name. Choose a different name before publishing.")
         theme.sync_source = "web"
-        theme.save(
-            update_fields=[
-                "name",
-                "description",
-                "colors",
-                "fonts",
-                "design_groups",
-                "designer_preview",
-                "image",
-                "site_icon",
-                "sync_source",
-                "sync_version",
-                "updated_at",
-            ]
-        )
+        try:
+            with transaction.atomic():
+                theme.save(
+                    update_fields=[
+                        "name",
+                        "description",
+                        "colors",
+                        "fonts",
+                        "design_groups",
+                        "designer_preview",
+                        "image",
+                        "site_icon",
+                        "sync_source",
+                        "sync_version",
+                        "updated_at",
+                    ]
+                )
+        except IntegrityError as exc:
+            raise DesignerDraftConflict(
+                "Another theme now uses this name. Choose a different name before publishing."
+            ) from exc
         draft.snapshot = theme_designer_snapshot(theme)
         draft.base_sync_version = theme.sync_version
         draft.version += 1
@@ -1438,22 +1444,28 @@ def undo_designer_publish(theme_id, tenant, user, draft_version, live_sync_versi
 
         replaced_snapshot = theme_designer_snapshot(theme)
         apply_designer_snapshot(theme, revision.snapshot)
+        if PageTheme.objects.filter(tenant=theme.tenant, name=theme.name).exclude(id=theme.id).exists():
+            raise DesignerDraftConflict("Another theme now uses this name. Rename it before restoring.")
         theme.sync_source = "web"
-        theme.save(
-            update_fields=[
-                "name",
-                "description",
-                "colors",
-                "fonts",
-                "design_groups",
-                "designer_preview",
-                "image",
-                "site_icon",
-                "sync_source",
-                "sync_version",
-                "updated_at",
-            ]
-        )
+        try:
+            with transaction.atomic():
+                theme.save(
+                    update_fields=[
+                        "name",
+                        "description",
+                        "colors",
+                        "fonts",
+                        "design_groups",
+                        "designer_preview",
+                        "image",
+                        "site_icon",
+                        "sync_source",
+                        "sync_version",
+                        "updated_at",
+                    ]
+                )
+        except IntegrityError as exc:
+            raise DesignerDraftConflict("Another theme now uses this name. Rename it before restoring.") from exc
         revision.delete()
         draft.snapshot = theme_designer_snapshot(theme)
         draft.base_sync_version = theme.sync_version

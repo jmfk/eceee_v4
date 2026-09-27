@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import IntegrityError
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 from PIL import Image
@@ -562,6 +563,27 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 1)
         self.assertFalse(published.data["hasDraftChanges"])
 
+    def test_publish_reports_a_conflict_for_a_concurrent_name_collision(self):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+        saved = self.client.patch(
+            self.workspace_url,
+            {"draftVersion": workspace["draftVersion"], "name": "Concurrent name"},
+            format="json",
+        )
+
+        with patch.object(PageTheme, "save", side_effect=IntegrityError("name race")):
+            response = self.client.post(
+                f"/api/v1/webpages/designer/themes/{self.theme.id}/publish/",
+                {"draftVersion": saved.data["draftVersion"]},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 409, response.data)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.name, "Editorial")
+        self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 0)
+
     def test_clean_draft_automatically_reloads_when_live_theme_changes(self):
         self.authenticate(self.designer)
         original = self.client.get(self.workspace_url).data
@@ -637,6 +659,35 @@ class DesignerThemeApiTests(TestCase):
         self.assertFalse(restored.data["canUndo"])
         self.assertFalse(restored.data["hasDraftChanges"])
         self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 0)
+
+    def test_undo_reports_a_conflict_when_the_old_theme_name_was_reused(self):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+        saved = self.client.patch(
+            self.workspace_url,
+            {"draftVersion": workspace["draftVersion"], "name": "Editorial renamed"},
+            format="json",
+        )
+        published = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/publish/",
+            {"draftVersion": saved.data["draftVersion"]},
+            format="json",
+        )
+        PageTheme.objects.create(tenant=self.tenant, created_by=self.owner, name="Editorial")
+
+        response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/undo/",
+            {
+                "draftVersion": published.data["draftVersion"],
+                "liveSyncVersion": published.data["liveSyncVersion"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409, response.data)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.name, "Editorial renamed")
+        self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 1)
 
     def test_undo_restores_published_preview_content(self):
         original_preview = {

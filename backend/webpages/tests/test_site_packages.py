@@ -37,6 +37,9 @@ class MemoryStorage:
         self.files[name] = content.read()
         return name
 
+    def url(self, name):
+        return f"https://storage.test/{name}"
+
     def generate_signed_url(self, name, expires=3600, response_filename=None):
         return f"https://storage.test/{name}?expires={expires}"
 
@@ -275,6 +278,61 @@ class SitePackageServiceTests(TestCase):
         self.assertEqual(
             import_job.progress["object_maps"]["pages"][str(self.child.id)],
             imported_child.id,
+        )
+
+    def test_site_package_import_uses_destination_tenant_preview_namespace(self):
+        destination_tenant = Tenant.objects.create(
+            name="Destination tenant",
+            identifier="site-package-destination",
+            created_by=self.user,
+        )
+        destination_namespace = Namespace.objects.create(
+            name="Destination namespace",
+            slug="site-package-destination",
+            tenant=destination_tenant,
+            is_default=True,
+            created_by=self.user,
+        )
+        theme_data = {
+            "source_id": self.theme.id,
+            "name": "Transferred theme",
+            "designer_preview": {
+                "views": [
+                    {
+                        "kind": "object",
+                        "objectType": {
+                            "key": "article",
+                            "namespace": {"id": self.namespace.id, "slug": self.namespace.slug},
+                        },
+                        "content": {"imageUrl": f"https://source.test/theme_images/{self.theme.id}/library/hero.jpg"},
+                    }
+                ]
+            },
+        }
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr(f"themes/{self.theme.id}.json", json.dumps(theme_data))
+            package.writestr(
+                f"themes/assets/{self.theme.id}/theme_images/{self.theme.id}/library/hero.jpg",
+                b"hero",
+            )
+        buffer.seek(0)
+        import_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(destination_tenant.id)},
+        )
+
+        with zipfile.ZipFile(buffer, "r") as package:
+            imported_theme = SitePackageImporter(import_job, storage=MemoryStorage())._import_themes(package)[
+                self.theme.id
+            ]
+
+        namespace = imported_theme.designer_preview["views"][0]["objectType"]["namespace"]
+        self.assertEqual(namespace["slug"], destination_namespace.slug)
+        self.assertEqual(
+            imported_theme.designer_preview["views"][0]["content"]["imageUrl"],
+            f"https://storage.test/theme_images/{imported_theme.id}/library/hero.jpg",
         )
 
 

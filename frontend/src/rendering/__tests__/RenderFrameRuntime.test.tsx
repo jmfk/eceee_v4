@@ -71,12 +71,13 @@ describe('RenderFrameRuntime navigation', () => {
 })
 
 describe('RenderFrameRuntime designer overlay', () => {
-    it('binds catalog targets to rendered DOM while keeping editor chrome out', async () => {
+    it('binds read-only catalog targets to rendered DOM while keeping editor chrome out', async () => {
         render(<RenderFrameRuntime />)
         sendModel(createDesignerRenderModel({ workspace, viewId: 'page-main', themeCss: '.content-widget{color:rgb(1,2,3)}' }))
 
         const heading = await screen.findByRole('heading', { name: 'Overridden heading' })
-        await waitFor(() => expect((heading as HTMLElement).contentEditable).toBe('true'))
+        await waitFor(() => expect(heading).toHaveAttribute('data-designer-target', 'heading'))
+        expect((heading as HTMLElement).contentEditable).not.toBe('true')
         expect(heading).toHaveAttribute('data-designer-target', 'heading')
         expect(document.querySelector('[data-designer-target="article"]')).toBeTruthy()
         expect(document.querySelector('[data-designer-target="layout:main_layout:slot:main"]')).toBeTruthy()
@@ -84,7 +85,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect([...document.querySelectorAll('style')].some((style) => style.textContent?.includes('rgb(1,2,3)'))).toBe(true)
     })
 
-    it('reports selection and content changes and shows spacing guides', async () => {
+    it('reports selection without content changes and shows spacing guides', async () => {
         const postMessage = vi.spyOn(window, 'postMessage')
         render(<RenderFrameRuntime />)
         sendModel(createDesignerRenderModel({ workspace, viewId: 'page-main' }))
@@ -93,13 +94,12 @@ describe('RenderFrameRuntime designer overlay', () => {
         fireEvent.mouseOver(heading)
         expect(document.querySelector('.designer-spacing-readout')).toBeTruthy()
         fireEvent.click(heading)
-        fireEvent.input(heading, { target: { textContent: 'Edited heading' } })
 
         await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'select', targetId: 'heading',
             computedStyles: expect.objectContaining({ fontSize: expect.any(String), marginBottom: expect.any(String) }),
         }), '*'))
-        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+        expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'contentChange', targetId: 'heading',
         }), '*')
         postMessage.mockRestore()

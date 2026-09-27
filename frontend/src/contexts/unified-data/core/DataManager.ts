@@ -82,16 +82,16 @@ export class DataManager {
         }
 
         if (payload.contextType === 'object') {
-            const objectId = String(payload.objectId);
             const currentObjectId = this.state.metadata.currentObjectId as any;
-            if (!currentObjectId) {
+            const objectId = payload.objectId != null ? String(payload.objectId) : currentObjectId ? String(currentObjectId) : '';
+            if (!objectId || !this.state.objects[objectId]) {
                 throw new StateError(
                     ErrorCodes.INVALID_CONTEXT,
-                    'No current object version selected for object widget operation',
+                    'No valid object selected for object widget operation',
                     { objectId }
                 );
             }
-            return { objectId: currentObjectId } as any;
+            return { objectId } as any;
         }
 
         const ctxType = (payload as any)?.contextType;

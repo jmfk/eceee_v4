@@ -443,6 +443,7 @@ class DesignerThemePreviewObjectView(APIView):
                     "key": instance.object_type.name,
                     "label": instance.object_type.label,
                     "schema": instance.object_type.schema or {},
+                    "slotConfiguration": instance.object_type.slot_configuration or {},
                 },
                 "version": version,
             }
