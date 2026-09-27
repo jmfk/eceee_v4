@@ -54,6 +54,23 @@ class TenantAccessPermissionTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_staff_user_cannot_select_an_unrelated_tenant(self):
+        staff = User.objects.create_user("ordinary-staff", password="test", is_staff=True)
+        self.client.force_authenticate(staff)
+
+        response = self.client.get("/api/v1/content-migration/plans/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @override_settings(DEBUG=True)
+    def test_local_dev_user_can_select_an_unrelated_tenant(self):
+        dev_user = User.objects.create_user("dev_auto_user", password="test")
+        self.client.force_authenticate(dev_user)
+
+        response = self.client.get("/api/v1/content-migration/plans/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     def test_jwt_cannot_select_an_unrelated_tenant(self):
         access_token = RefreshToken.for_user(self.outsider).access_token
         self.client.force_authenticate(user=None)
