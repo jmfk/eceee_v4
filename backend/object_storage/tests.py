@@ -3,15 +3,49 @@ Tests for Object Storage System
 """
 
 from django.contrib.auth.models import User
-from django.test import TestCase, override_settings
+from django.core.exceptions import ValidationError
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from core.models import Tenant
+from utils.schema_system import validate_schema
 
 from .models import ObjectInstance, ObjectTypeDefinition
+
+
+class ObjectSchemaValidationTest(SimpleTestCase):
+    def test_object_schema_rejects_legacy_fields_format(self):
+        schema = {
+            "type": "object",
+            "fields": [{"name": "title", "type": "string", "field_type": "text"}],
+        }
+
+        with self.assertRaisesMessage(ValidationError, "Schema must contain a 'properties' object"):
+            validate_schema(schema, "object_type")
+
+    def test_object_schema_rejects_reserved_system_field_names(self):
+        schema = {
+            "type": "object",
+            "properties": {
+                "publishDate": {"type": "string", "field_type": "text"},
+            },
+        }
+
+        with self.assertRaisesMessage(ValidationError, "Property name 'publishDate' is reserved for system data"):
+            validate_schema(schema, "object_type")
+
+    def test_object_schema_allows_similar_content_field_names(self):
+        schema = {
+            "type": "object",
+            "properties": {
+                "publication_date_label": {"type": "string", "field_type": "text"},
+            },
+        }
+
+        validate_schema(schema, "object_type")
 
 
 class ObjectStorageModelTestBase(TestCase):
