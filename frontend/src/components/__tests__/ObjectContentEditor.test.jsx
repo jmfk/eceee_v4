@@ -4,7 +4,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ObjectContentEditor from '../ObjectContentEditor'
 
-const publishUpdateMock = vi.hoisted(() => vi.fn())
+const { publishUpdateMock, useEditorContextMock } = vi.hoisted(() => ({
+    publishUpdateMock: vi.fn(),
+    useEditorContextMock: vi.fn(() => 'object')
+}))
 
 vi.mock('../../contexts/unified-data/context/UnifiedDataContext', () => ({
     useUnifiedData: () => ({
@@ -14,7 +17,7 @@ vi.mock('../../contexts/unified-data/context/UnifiedDataContext', () => ({
 }))
 
 vi.mock('../../contexts/unified-data/hooks', () => ({
-    useEditorContext: () => 'object'
+    useEditorContext: useEditorContextMock
 }))
 
 vi.mock('../../contexts/ClipboardContext', () => ({
@@ -96,6 +99,7 @@ const widgets = {
 describe('ObjectContentEditor widget config updates', () => {
     beforeEach(() => {
         publishUpdateMock.mockReset()
+        useEditorContextMock.mockReturnValue('object')
     })
 
     it('publishes inline object widget config changes to Unified Data', async () => {
@@ -129,6 +133,36 @@ describe('ObjectContentEditor widget config updates', () => {
                 contextType: 'object',
                 config: { title: 'Updated inline title' }
             }
+        )
+    })
+
+    it('prefers the explicit object context over a stale page context', async () => {
+        useEditorContextMock.mockReturnValue('page')
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false }
+            }
+        })
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <ObjectContentEditor
+                    objectType={objectType}
+                    widgets={widgets}
+                    context={{ instanceId: 'object-1', contextType: 'object' }}
+                />
+            </QueryClientProvider>
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: 'Update inline widget' }))
+
+        await waitFor(() => {
+            expect(publishUpdateMock).toHaveBeenCalledOnce()
+        })
+        expect(publishUpdateMock).toHaveBeenCalledWith(
+            'object-content-editor-object-1',
+            'UPDATE_WIDGET_CONFIG',
+            expect.objectContaining({ contextType: 'object' })
         )
     })
 })

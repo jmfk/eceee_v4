@@ -26,7 +26,8 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
     const [selectedSlotForModal, setSelectedSlotForModal] = useState(null)
     const [importDialogOpen, setImportDialogOpen] = useState(false)
     const [importSlotName, setImportSlotName] = useState(null)
-    const contextType = useEditorContext()
+    const editorContextType = useEditorContext()
+    const contextType = context?.contextType || editorContextType
     const [internalWidgets, setInternalWidgets] = useState(widgets)
     const isInitialized = useRef(false)
     const internalWidgetsRef = useRef(internalWidgets)
