@@ -2636,9 +2636,9 @@ class PageTheme(models.Model):
 
                         # Also map any variations of the path
                         url_mapping[old_path] = new_path
-                        url_mapping[
-                            f"theme_images/{self.id}/library/{filename}"
-                        ] = f"theme_images/{cloned_theme.id}/library/{filename}"
+                        url_mapping[f"theme_images/{self.id}/library/{filename}"] = (
+                            f"theme_images/{cloned_theme.id}/library/{filename}"
+                        )
                     else:
                         logger.warning(f"Source image not found during clone: {old_path}")
 

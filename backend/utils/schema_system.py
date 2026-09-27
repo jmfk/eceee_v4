@@ -14,10 +14,10 @@ Features:
 - Easy to add new field types
 """
 
-from typing import Dict, List, Any, Optional, Tuple
-from django.core.exceptions import ValidationError
 import re
+from typing import Any, Dict, List, Optional, Tuple
 
+from django.core.exceptions import ValidationError
 
 OBJECT_TYPE_RESERVED_FIELD_NAMES = frozenset(
     {
@@ -174,9 +174,7 @@ class FieldTypeRegistry:
                 "component": "DateTimeInput",  # Renamed from ui_component
                 "category": "input",
                 "description": "Date and time picker",
-                "validation_rules": {
-                    "format": {"type": "string", "enum": ["date-time"]}
-                },
+                "validation_rules": {"format": {"type": "string", "enum": ["date-time"]}},
                 "ui_props": {
                     "format": "YYYY-MM-DD HH:mm:ss",
                 },
@@ -252,9 +250,7 @@ class FieldTypeRegistry:
                 "config_component": "SelectConfig",
                 "category": "selection",
                 "description": "Single choice from predefined options",
-                "validation_rules": {
-                    "enum": {"type": "array", "items": {"type": "string"}}
-                },
+                "validation_rules": {"enum": {"type": "array", "items": {"type": "string"}}},
                 "ui_props": {
                     "placeholder": "Select an option...",
                 },
@@ -680,9 +676,7 @@ class SchemaValidator:
         return bool(re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name))
 
     @staticmethod
-    def validate_schema_structure(
-        schema: Dict[str, Any], schema_type: str = "general"
-    ) -> None:
+    def validate_schema_structure(schema: Dict[str, Any], schema_type: str = "general") -> None:
         """
         Validate general schema structure
 
@@ -712,10 +706,7 @@ class SchemaValidator:
 
         # Validate each property
         for prop_name, prop_def in schema["properties"].items():
-            if (
-                schema_type == "object_type"
-                and _canonical_field_name(prop_name) in OBJECT_TYPE_RESERVED_FIELD_NAMES
-            ):
+            if schema_type == "object_type" and _canonical_field_name(prop_name) in OBJECT_TYPE_RESERVED_FIELD_NAMES:
                 raise ValidationError(f"Property name '{prop_name}' is reserved for system data")
             SchemaValidator._validate_property(prop_name, prop_def)
 
@@ -740,9 +731,7 @@ class SchemaValidator:
 
         # Check for either field_type or component
         if "field_type" not in prop_def and "component" not in prop_def:
-            raise ValidationError(
-                f"Property '{prop_name}' must have either a 'field_type' or 'component' field"
-            )
+            raise ValidationError(f"Property '{prop_name}' must have either a 'field_type' or 'component' field")
 
         # If field_type is present, validate it
         if "field_type" in prop_def:
@@ -760,14 +749,10 @@ class SchemaValidator:
         # If component is present, validate it
         elif "component" in prop_def:
             if not field_registry.is_valid_component(prop_def["component"]):
-                raise ValidationError(
-                    f"Invalid component '{prop_def['component']}' for property '{prop_name}'"
-                )
+                raise ValidationError(f"Invalid component '{prop_def['component']}' for property '{prop_name}'")
 
             # Get field type info from registry by component
-            field_type_info = field_registry.get_field_type_by_component(
-                prop_def["component"]
-            )
+            field_type_info = field_registry.get_field_type_by_component(prop_def["component"])
             expected_type = field_type_info["json_schema_type"]
 
         # Validate that type matches expected JSON Schema type
@@ -784,16 +769,12 @@ class SchemaValidator:
         # Validate required array
         for req_prop in schema.get("required", []):
             if req_prop not in property_names:
-                raise ValidationError(
-                    f"Required property '{req_prop}' not found in properties"
-                )
+                raise ValidationError(f"Required property '{req_prop}' not found in properties")
 
         # Validate propertyOrder array
         for ordered_prop in schema.get("propertyOrder", []):
             if ordered_prop not in property_names:
-                raise ValidationError(
-                    f"PropertyOrder property '{ordered_prop}' not found in properties"
-                )
+                raise ValidationError(f"PropertyOrder property '{ordered_prop}' not found in properties")
 
 
 def validate_schema(schema: Dict[str, Any], schema_type: str = "general") -> None:
@@ -878,7 +859,7 @@ def validate_object_reference(value: Any, field_config: Dict[str, Any]) -> None:
     Raises:
         ValidationError: If validation fails
     """
-    from object_storage.models import ObjectInstance, ObjectTypeDefinition
+    from object_storage.models import ObjectInstance
 
     # Get configuration
     multiple = field_config.get("multiple", False)
@@ -903,9 +884,7 @@ def validate_object_reference(value: Any, field_config: Dict[str, Any]) -> None:
 
     # Validate max_items
     if max_items and len(value) > max_items:
-        raise ValidationError(
-            f"Cannot have more than {max_items} references (got {len(value)})"
-        )
+        raise ValidationError(f"Cannot have more than {max_items} references (got {len(value)})")
 
     # Validate each reference
     for ref_id in value:
@@ -944,6 +923,4 @@ def validate_reverse_object_reference(value: Any, field_config: Dict[str, Any]) 
     # They should not be validated or set by users
     # If value is present and not None, it means someone tried to set it
     if value is not None and value != []:
-        raise ValidationError(
-            "Reverse object reference fields are read-only and cannot be set directly"
-        )
+        raise ValidationError("Reverse object reference fields are read-only and cannot be set directly")
