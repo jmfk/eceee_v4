@@ -5,8 +5,10 @@ import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
 const objectApi = vi.hoisted(() => ({ search: vi.fn(), get: vi.fn(), getNewsList: vi.fn() }))
 const clientApi = vi.hoisted(() => ({ get: vi.fn() }))
 const imgproxyApi = vi.hoisted(() => ({ getBatch: vi.fn() }))
+const mediaApi = vi.hoisted(() => ({ getFiles: vi.fn() }))
 vi.mock('../../api/objectStorage', () => ({ objectInstancesApi: objectApi }))
 vi.mock('../../api/client', () => ({ api: clientApi }))
+vi.mock('../../api/media', () => ({ mediaCollectionsApi: { getFiles: mediaApi.getFiles } }))
 vi.mock('../../utils/imgproxySecure', () => ({ getBatchImgproxyUrls: imgproxyApi.getBatch }))
 
 describe('page preview model resolution', () => {
@@ -66,5 +68,18 @@ describe('page preview model resolution', () => {
         const resolved = await resolvePagePreviewModel(model)
 
         expect(resolved.slots.hero[0].config).toMatchObject({ backgroundImageUrl: '/hero-1x.jpg', backgroundImageUrl2x: '/hero-2x.jpg' })
+    })
+
+    it('resolves collection-backed image widgets in the preview tenant', async () => {
+        mediaApi.getFiles.mockReturnValue(vi.fn().mockResolvedValue({ results: [{ id: 7, fileType: 'image', imgproxyBaseUrl: '/collection.jpg', title: 'Collection image' }] }))
+        const model = createPageRenderModel({
+            widgets: { main: [{ id: 'images', type: 'easy_widgets.ImageWidget', config: { displayType: 'gallery', image: { id: 3, type: 'collection', namespace: 'press' } } }] },
+            context: { tenantId: 'tenant-b' },
+        })
+
+        const resolved = await resolvePagePreviewModel(model)
+
+        expect(mediaApi.getFiles).toHaveBeenCalledWith(3, { page_size: 100, namespace: 'press' }, { headers: { 'X-Tenant-ID': 'tenant-b' } })
+        expect(resolved.slots.main[0].config.mediaItems).toEqual([expect.objectContaining({ id: '7', url: '/collection.jpg', altText: 'Collection image' })])
     })
 })

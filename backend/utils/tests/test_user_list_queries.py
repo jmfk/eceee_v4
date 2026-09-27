@@ -123,3 +123,19 @@ class UserListQueryTests(TestCase):
             [workspace["identifier"] for workspace in response.data["designer_tenants"]],
             [owned.identifier],
         )
+
+    def test_current_user_replaces_unrelated_middleware_fallback(self):
+        unrelated_owner = User.objects.create_user("unrelated-owner", password="test")
+        user = User.objects.create_user("workspace-member", password="test")
+        unrelated = Tenant.objects.create(
+            name="A unrelated", identifier="unrelated-fallback", created_by=unrelated_owner
+        )
+        accessible = Tenant.objects.create(name="B accessible", identifier="accessible-workspace", created_by=user)
+        request = APIRequestFactory().get("/api/v1/utils/current-user/")
+        request.tenant = unrelated
+        force_authenticate(request, user=user)
+
+        response = CurrentUserView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["current_workspace"]["identifier"], accessible.identifier)

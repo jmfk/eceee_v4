@@ -1,5 +1,6 @@
 import { api } from '../api/client'
 import { endpoints } from '../api/endpoints'
+import { mediaCollectionsApi } from '../api/media'
 import { objectInstancesApi } from '../api/objectStorage'
 import type { RenderPageModel, RenderWidgetModel } from '../rendering/types'
 import { getBatchImgproxyUrls } from '../utils/imgproxySecure'
@@ -12,6 +13,28 @@ const dataDrivenNewsTypes = new Set([
 ])
 
 const linkTypes = new Set(['internal', 'external', 'email', 'phone', 'anchor', 'media'])
+
+const isMediaCollection = (image: any) => image && typeof image === 'object' && Boolean(image.id) && (
+    image.type === 'collection'
+    || ((image.fileCount !== undefined || image.sampleImages !== undefined || image.slug !== undefined)
+        && !(image.url || image.fileUrl || image.imgproxyBaseUrl))
+)
+
+const collectionFileToMediaItem = (file: any) => {
+    const url = file.imgproxyBaseUrl || file.imgproxy_base_url || file.fileUrl || file.file_url || file.url || ''
+    return {
+        id: String(file.id),
+        url,
+        type: (file.fileType || file.file_type) === 'video' ? 'video' : 'image',
+        altText: file.title || file.altText || file.alt_text || 'Image',
+        caption: file.description || file.caption || '',
+        annotation: file.metadata?.annotation || '',
+        title: file.title || '',
+        width: file.width,
+        height: file.height,
+        thumbnailUrl: file.thumbnailUrl || file.thumbnail_url || file.imgproxyBaseUrl || file.imgproxy_base_url || url,
+    }
+}
 
 const decodeHtmlAttribute = (candidate: string) => candidate
     .replace(/&quot;|&#34;/g, '"')
@@ -141,6 +164,18 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
     }
 
     await Promise.all(allWidgets.map(async (widget) => {
+        if (widget.type === 'easy_widgets.ImageWidget' && isMediaCollection(widget.config.image)) {
+            const collection = widget.config.image
+            const params: Record<string, any> = { page_size: 100 }
+            if (collection.namespace) params.namespace = collection.namespace
+            try {
+                const result: any = await mediaCollectionsApi.getFiles(collection.id, params, tenantRequestConfig)()
+                const files = result?.results || result?.data?.results || result?.data || result || []
+                widget.config.mediaItems = (Array.isArray(files) ? files : []).map(collectionFileToMediaItem)
+            } catch {
+                widget.config.mediaItems = []
+            }
+        }
         if (!dataDrivenNewsTypes.has(widget.type)) return
         const objectTypes = widget.config.objectTypes || widget.config.object_types || []
         if (widget.type === 'easy_widgets.NewsDetailWidget') {

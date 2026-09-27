@@ -18,6 +18,7 @@ vi.mock('../../api', () => ({
 describe('PagePreview iframe', () => {
     beforeEach(() => {
         previewResolver.resolve.mockClear()
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => '' }))
     })
 
     it('keeps the configured viewport and allows vertical scrolling', async () => {
@@ -69,5 +70,17 @@ describe('PagePreview iframe', () => {
         act(() => screen.getByRole('button', { name: 'Refresh' }).click())
 
         await waitFor(() => expect(previewResolver.resolve.mock.calls.length).toBeGreaterThan(callsBeforeRefresh))
+    })
+
+    it('versions theme CSS with the theme update timestamp', async () => {
+        renderWithProviders(<PagePreview
+            webpageData={{ id: 86, hostnames: [] }}
+            pageVersionData={{ id: 83, effectiveTheme: { id: 5, updatedAt: '2026-09-27T10:00:00Z' } }}
+        />)
+
+        await waitFor(() => expect(fetch).toHaveBeenCalledWith(
+            '/api/v1/webpages/themes/5/styles.css?v=1790503200000',
+            expect.objectContaining({ credentials: 'same-origin' }),
+        ))
     })
 })

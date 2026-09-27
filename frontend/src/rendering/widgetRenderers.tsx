@@ -461,26 +461,110 @@ const PathDebugRender: WidgetRenderComponent = ({ widget, context }) => (
     <pre className="path-debug-widget">{JSON.stringify({ path: context.simulatedPath || '/', variables: context.pathVariables || {}, config: widget.config }, null, 2)}</pre>
 )
 
-const NewsItems = ({ widget, compact = false }: { widget: WidgetRenderProps['widget'], compact?: boolean }) => {
+const newsState = (widget: WidgetRenderProps['widget']) => {
     if (widget.data?.status === 'loading') return <EmptyRender>Loading news…</EmptyRender>
     if (widget.data?.status === 'error') return <RenderFailure message={widget.data.error} />
     const items = asArray<any>(widget.data?.items || value(widget.config, 'items'))
-    if (!items.length) return <EmptyRender>No news articles available.</EmptyRender>
-    return <div className={compact ? 'news-items compact' : 'news-items'}>{items.map((item, index) => {
-        const objectTypeName = item.objectType?.name || item.object_type?.name
-        const path = item.path || (objectTypeName && item.slug ? `/${objectTypeName}/${item.slug}/` : '#')
-        return <article className="news-item" key={item.id || index}><ImageView source={item.data?.featured_image || item.image} alt="" /><div className="news-content"><h3><PreviewLink href={path}>{item.title || `Article ${index + 1}`}</PreviewLink></h3>{!compact && <p>{item.data?.excerpt || item.excerpt || item.summary || ''}</p>}</div></article>
-    })}</div>
+    return items.length ? items : <EmptyRender>No news articles available.</EmptyRender>
 }
 
-const NewsListRender: WidgetRenderComponent = ({ widget }) => <section className="news-list-widget"><NewsItems widget={widget} /></section>
-const NewsDetailRender: WidgetRenderComponent = ({ widget }) => {
+const newsFields = (item: any) => {
+    const data = item.data || {}
+    const metadata = item.metadata || {}
+    const objectType = item.objectType || item.object_type || {}
+    return {
+        objectType,
+        path: item.path || (objectType.name && item.slug ? `/${objectType.name}/${item.slug}/` : '#'),
+        image: data.featuredImage || data.featured_image || item.featuredImage || item.featured_image || item.image,
+        thumbnail: item.thumbnailUrl || item.thumbnail_url || data.thumbnailUrl || data.thumbnail_url || data.featuredImage || data.featured_image || item.image,
+        excerpt: data.excerpt || item.excerptText || item.excerpt_text || item.excerpt || item.summary || '',
+        publishDate: item.publishDate || item.publish_date || metadata.publishDate || metadata.publish_date,
+        pinned: Boolean(item.isPinned || item.is_pinned || metadata.pinned || metadata.featured),
+        metadata,
+    }
+}
+
+const configEnabled = (config: Record<string, any>, defaultValue: boolean, ...names: string[]) => {
+    const configured = value(config, ...names)
+    return configured === undefined ? defaultValue : configured !== false
+}
+
+const NewsListRender: WidgetRenderComponent = ({ widget, context }) => {
+    if (configEnabled(widget.config, false, 'hideOnDetailView', 'hide_on_detail_view') && Object.keys(context.pathVariables || {}).length) return null
+    const state = newsState(widget)
+    if (!Array.isArray(state)) return <section className="news-list-widget" data-widget-type="news-list">{state}</section>
+    const showImage = configEnabled(widget.config, true, 'showFeaturedImage', 'show_featured_image')
+    const showExcerpt = configEnabled(widget.config, true, 'showExcerpts', 'show_excerpts')
+    const showDate = configEnabled(widget.config, true, 'showPublishDate', 'show_publish_date')
+    return <section className="news-list-widget" data-widget-type="news-list"><div className="news-items-container">{state.map((item, index) => {
+        const fields = newsFields(item)
+        return <article className={`news-item${fields.pinned ? ' pinned' : ''}`} data-object-id={item.id} key={item.id || index}>
+            {showImage && <div className="news-featured-image"><ImageView source={fields.image} alt={item.title || ''} /></div>}
+            <div className="news-content"><div className="news-meta"><span className="news-type">{fields.objectType.label || fields.objectType.name}</span>{fields.pinned && <span className="pinned-badge">Pinned</span>}{showDate && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{fields.publishDate}</time>}</div>
+                <h3 className="news-title"><PreviewLink href={fields.path}>{item.title || `Article ${index + 1}`}</PreviewLink></h3>
+                {showExcerpt && fields.excerpt && <div className="news-excerpt">{fields.excerpt}</div>}
+                <div className="news-footer"><PreviewLink className="read-more" href={fields.path}>Read more →</PreviewLink></div>
+            </div>
+        </article>
+    })}</div></section>
+}
+const NewsDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
     if (widget.data?.status === 'error') return <RenderFailure message={widget.data.error} />
     const item: any = widget.data?.item || value(widget.config, 'item')
-    return <article className="news-detail-widget">{item ? <><h1>{item.title}</h1><ImageView source={item.data?.featured_image || item.image} alt="" /><SafeHtml html={item.data?.content || item.content} /></> : <EmptyRender>No news article selected.</EmptyRender>}</article>
+    if (!item) return <EmptyRender>No news article selected.</EmptyRender>
+    const fields = newsFields(item)
+    const data = item.data || {}
+    const slots = item.widgets && typeof item.widgets === 'object' ? item.widgets : {}
+    return <article className="news-detail-widget" data-widget-type="news-detail" data-object-id={item.id}>
+        <header className="news-header">
+            {configEnabled(widget.config, true, 'showObjectType', 'show_object_type') && <div className="news-type-badge">{fields.objectType.label || fields.objectType.name}</div>}
+            <h1 className="news-title">{item.title}</h1>
+            {configEnabled(widget.config, true, 'showMetadata', 'show_metadata') && <div className="news-metadata">
+                {fields.publishDate && <div className="news-metadata-item"><span className="news-metadata-label">Published:</span> <time dateTime={fields.publishDate}>{fields.publishDate}</time></div>}
+                {fields.metadata.author && <div className="news-metadata-item"><span className="news-metadata-label">Author:</span> <span>{fields.metadata.author}</span></div>}
+            </div>}
+        </header>
+        {configEnabled(widget.config, true, 'showFeaturedImage', 'show_featured_image') && <div className="news-featured-image"><ImageView source={fields.image} alt={item.title || ''} /></div>}
+        <SafeHtml className="news-content" html={data.content || data.body || data.text || item.content} />
+        {configEnabled(widget.config, true, 'renderObjectWidgets', 'render_object_widgets') && Object.keys(slots).length > 0 && <div className="news-object-widgets">{Object.entries(slots).map(([slotName, widgets]) => <div className={`news-widget-slot news-widget-slot-${slotName}`} data-slot={slotName} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)}</div>}
+    </article>
 }
-const TopNewsPlugRender: WidgetRenderComponent = ({ widget }) => <section className="top-news-plug-widget"><NewsItems widget={widget} /></section>
-const SidebarTopNewsRender: WidgetRenderComponent = ({ widget }) => <section className="sidebar-top-news-widget"><h2>{value(widget.config, 'widget_title', 'widgetTitle') || 'Top news'}</h2><NewsItems widget={widget} compact /></section>
+const TopNewsPlugRender: WidgetRenderComponent = ({ widget }) => {
+    const state = newsState(widget)
+    if (!Array.isArray(state)) return <section className="top-news-plug-widget" data-widget-type="top-news-plug">{state}</section>
+    const showExcerpt = configEnabled(widget.config, true, 'showExcerpts', 'show_excerpts')
+    const showDate = configEnabled(widget.config, true, 'showPublishDate', 'show_publish_date')
+    const showType = configEnabled(widget.config, true, 'showObjectType', 'show_object_type')
+    return <section className={`top-news-plug-widget layout-${value(widget.config, 'layout') || '1x3'}`} data-widget-type="top-news-plug"><div className="news-grid">{state.map((item, index) => {
+        const fields = newsFields(item)
+        return <article className={`news-card${fields.pinned ? ' pinned' : ''}`} data-object-id={item.id} key={item.id || index}>
+            {fields.image && <div className="news-image"><ImageView source={fields.image} alt={item.title || ''} /></div>}
+            <div className="news-body"><div className="news-meta">{showType && <span className="news-type-badge">{fields.objectType.label || fields.objectType.name}</span>}{showDate && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{fields.publishDate}</time>}</div>
+                <h3 className="news-title"><PreviewLink href={fields.path}>{item.title || `Article ${index + 1}`}</PreviewLink></h3>
+                {showExcerpt && fields.excerpt && <div className="news-excerpt">{fields.excerpt}</div>}
+                <div className="news-footer"><PreviewLink className="read-more" href={fields.path}>Read more</PreviewLink></div>
+            </div>
+        </article>
+    })}</div></section>
+}
+const SidebarTopNewsRender: WidgetRenderComponent = ({ widget }) => {
+    const state = newsState(widget)
+    const showThumbnails = configEnabled(widget.config, true, 'showThumbnails', 'show_thumbnails')
+    const showDates = configEnabled(widget.config, true, 'showDates', 'show_dates')
+    const showType = configEnabled(widget.config, false, 'showObjectType', 'show_object_type')
+    return <aside className="sidebar-top-news-widget" data-widget-type="sidebar-top-news">
+        {value(widget.config, 'widgetTitle', 'widget_title') && <h3 className="widget-title">{value(widget.config, 'widgetTitle', 'widget_title')}</h3>}
+        {Array.isArray(state) ? <ul className="news-list">{state.map((item, index) => {
+            const fields = newsFields(item)
+            return <li className={`news-item${fields.pinned ? ' pinned' : ''}`} data-object-id={item.id} key={item.id || index}>
+                {showThumbnails && fields.thumbnail && <div className="news-thumbnail"><ImageView source={fields.thumbnail} alt={item.title || ''} /></div>}
+                <div className="news-content"><div className="news-meta">{showType && <span className="news-type-badge">{fields.objectType.label || fields.objectType.name}</span>}{showDates && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{fields.publishDate}</time>}</div>
+                    <h4 className="news-title"><PreviewLink href={fields.path}>{item.title || `Article ${index + 1}`}</PreviewLink></h4>
+                </div>
+            </li>
+        })}</ul> : state}
+    </aside>
+}
 
 export const RENDER_WIDGET_COMPONENTS: Record<string, WidgetRenderComponent> = {
     'easy_widgets.FooterWidget': FooterRender,

@@ -22,4 +22,13 @@ describe('API client session handling', () => {
         expect(sessionExpired).not.toHaveBeenCalled()
         window.removeEventListener('session-expired', sessionExpired)
     })
+
+    it('can bootstrap a standalone route without a stale tenant header', async () => {
+        localStorage.setItem('eceee_tenant_id', 'stale-workspace')
+        const prepareRequest = mockAxiosInstance.interceptors.request.use.mock.calls[0][0]
+
+        const config = await prepareRequest({ headers: {}, method: 'get', skipTenantHeader: true })
+
+        expect(config.headers['X-Tenant-ID']).toBeUndefined()
+    })
 })
