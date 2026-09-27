@@ -8,6 +8,9 @@ Also adds tenant object to request for use in views.
 from django.conf import settings
 from django.db.models import Q
 from django.http import HttpResponseForbidden
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.exceptions import APIException
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from core.models import Tenant
 from core.permissions import user_can_switch_tenant
@@ -36,6 +39,8 @@ class TenantContextMiddleware:
         if any(request.path.startswith(p) for p in self.EXEMPT_PATHS):
             request.tenant = None
             return self.get_response(request)
+
+        self.authenticate_api_user(request)
 
         try:
             tenant = self.get_tenant(request)
@@ -71,6 +76,23 @@ class TenantContextMiddleware:
         clear_tenant_context()
 
         return response
+
+    @staticmethod
+    def authenticate_api_user(request):
+        """Resolve bearer credentials before selecting their tenant."""
+        if request.user.is_authenticated:
+            return
+
+        for authenticator in (JWTAuthentication(), TokenAuthentication()):
+            try:
+                authenticated = authenticator.authenticate(request)
+            except APIException:
+                # DRF will return the authentication error later. An invalid
+                # credential must not be trusted for tenant selection here.
+                return
+            if authenticated:
+                request.user, request.auth = authenticated
+                return
 
     def get_tenant(self, request):
         """

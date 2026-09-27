@@ -1,7 +1,9 @@
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from rest_framework import status
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from config.celery import app
 from core.models import Tenant
@@ -51,6 +53,42 @@ class TenantAccessPermissionTest(TestCase):
         response = self.client.get("/api/v1/content-migration/plans/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_jwt_cannot_select_an_unrelated_tenant(self):
+        access_token = RefreshToken.for_user(self.outsider).access_token
+        self.client.force_authenticate(user=None)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {access_token}",
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+
+        response = self.client.get("/api/v1/content/namespaces/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_jwt_can_select_an_owned_tenant(self):
+        access_token = RefreshToken.for_user(self.owner).access_token
+        self.client.force_authenticate(user=None)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {access_token}",
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+
+        response = self.client.get("/api/v1/content/namespaces/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_api_token_cannot_select_an_unrelated_tenant(self):
+        token = Token.objects.create(user=self.outsider)
+        self.client.force_authenticate(user=None)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Token {token.key}",
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+
+        response = self.client.get("/api/v1/content/namespaces/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_invalid_explicit_tenant_does_not_fall_back(self):
         self.client.force_authenticate(self.owner)

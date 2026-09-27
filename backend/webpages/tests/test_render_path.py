@@ -74,6 +74,78 @@ class RenderPathResolutionTest(TestCase):
         self.assertEqual(response.data["version_id"], version.id)
         self.assertEqual(response.data["slug_path"], "")
 
+    def test_resolves_dynamic_path_against_the_longest_page_prefix(self):
+        news_page = WebPage.objects.create(
+            title="News",
+            slug="news",
+            parent=self.site,
+            tenant=self.tenant,
+            path_pattern_key="news_slug",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        version = news_page.create_version(self.user, "News detail render version")
+
+        response = self.client.get(
+            self.url,
+            {"site_id": self.site.id, "path": "news/my-article"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["page_id"], news_page.id)
+        self.assertEqual(response.data["version_id"], version.id)
+        self.assertEqual(response.data["slug_path"], "news/my-article")
+        self.assertEqual(response.data["path_pattern_path"], "my-article/")
+
+    def test_rejects_a_dynamic_path_that_does_not_match_the_page_pattern(self):
+        news_page = WebPage.objects.create(
+            title="News",
+            slug="news",
+            parent=self.site,
+            tenant=self.tenant,
+            path_pattern_key="news_slug",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        news_page.create_version(self.user, "News detail render version")
+
+        response = self.client.get(
+            self.url,
+            {"site_id": self.site.id, "path": "news/archive/extra"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_exact_child_page_takes_precedence_over_a_parent_pattern(self):
+        news_page = WebPage.objects.create(
+            title="News",
+            slug="news",
+            parent=self.site,
+            tenant=self.tenant,
+            path_pattern_key="news_slug",
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        archive_page = WebPage.objects.create(
+            title="Archive",
+            slug="archive",
+            parent=news_page,
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        version = archive_page.create_version(self.user, "Archive render version")
+
+        response = self.client.get(
+            self.url,
+            {"site_id": self.site.id, "path": "news/archive"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["page_id"], archive_page.id)
+        self.assertEqual(response.data["version_id"], version.id)
+        self.assertEqual(response.data["path_pattern_path"], "")
+
     def test_explicit_site_id_can_bootstrap_an_accessible_tenant(self):
         other_tenant = Tenant.objects.create(
             name="Other accessible tenant",

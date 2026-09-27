@@ -18,6 +18,7 @@ export interface ResolvedRenderLocation extends DirectRenderLocation {
     tenantIdentifier: string
     pageId: number
     versionId: number
+    pathPatternPath?: string
 }
 
 export const parseDirectRenderPath = (pathname: string): DirectRenderLocation | null => {
@@ -45,7 +46,7 @@ export const buildResolvedRenderModel = async ({
     const tenantId = resolved.tenantIdentifier
     const inheritance = transformInheritanceData(rawInheritance?.legacy || rawInheritance)
     const simulatedPath = `/${resolved.slugPath || ''}`
-    const pathVariables = await buildPathVariablesContext(page, simulatedPath)
+    const pathVariables = await buildPathVariablesContext(page, resolved.pathPatternPath || simulatedPath)
     const siteHostnames = page?.hostnames?.length
         ? page.hostnames
         : page?.cachedRootHostnames || page?.cached_root_hostnames || []

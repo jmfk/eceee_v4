@@ -3,15 +3,17 @@ import { loadDirectRenderModel, loadResolvedRenderModel, parseDirectRenderPath }
 
 const clientApi = vi.hoisted(() => ({ get: vi.fn() }))
 const previewResolver = vi.hoisted(() => ({ resolve: vi.fn(async (model) => model) }))
+const pathParser = vi.hoisted(() => ({ build: vi.fn(async () => ({})) }))
 vi.mock('../../api/client', () => ({ api: clientApi }))
 vi.mock('../../components/resolvePagePreviewModel', () => ({ resolvePagePreviewModel: previewResolver.resolve }))
-vi.mock('../../utils/pathParser', () => ({ buildPathVariablesContext: vi.fn(async () => ({})) }))
+vi.mock('../../utils/pathParser', () => ({ buildPathVariablesContext: pathParser.build }))
 vi.mock('../../utils/tenant', () => ({ getCurrentTenantId: () => 'summer-study' }))
 
 describe('direct render URL', () => {
     beforeEach(() => {
         clientApi.get.mockReset()
         previewResolver.resolve.mockClear()
+        pathParser.build.mockClear()
         vi.restoreAllMocks()
     })
 
@@ -84,5 +86,23 @@ describe('direct render URL', () => {
 
         expect(clientApi.get.mock.calls[1][0]).toContain('/pages/42/versions/9/')
         expect(model.context).toMatchObject({ tenantId: 'theme-tenant', siteId: 12, pageId: 42, versionId: 9 })
+    })
+
+    it('parses dynamic variables from the path remainder rather than the page prefix', async () => {
+        clientApi.get
+            .mockResolvedValueOnce({ data: { id: 42, pathPatternKey: 'news_slug' } })
+            .mockResolvedValueOnce({ data: { id: 9, codeLayout: 'main_layout', widgets: {} } })
+            .mockResolvedValueOnce({ data: { slots: {} } })
+
+        await loadResolvedRenderModel({
+            siteId: 12,
+            slugPath: 'news/my-article',
+            pathPatternPath: 'my-article/',
+            tenantIdentifier: 'theme-tenant',
+            pageId: 42,
+            versionId: 9,
+        })
+
+        expect(pathParser.build).toHaveBeenCalledWith(expect.any(Object), 'my-article/')
     })
 })
