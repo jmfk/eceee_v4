@@ -185,6 +185,68 @@ describe('PageRenderer', () => {
         expect(screen.getByRole('link', { name: 'Article' })).toHaveAttribute('href', '/news/article/')
     })
 
+    it('honors news-list display flags and public markup', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{
+                id: 'news',
+                type: 'easy_widgets.NewsListWidget',
+                config: { showFeaturedImage: false, showExcerpts: false, showPublishDate: false },
+                data: { status: 'ready', items: [{ id: 1, title: 'Article', slug: 'article', publishDate: '2026-09-27', objectType: { name: 'news', label: 'News' }, data: { featuredImage: '/news.jpg', excerpt: 'Excerpt' } }] },
+            }] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(container.querySelector('[data-widget-type="news-list"] .news-items-container')).toBeTruthy()
+        expect(container.querySelector('.news-featured-image,.news-excerpt,.news-date')).toBeNull()
+    })
+
+    it('renders top-news and sidebar layouts with their configured fields', () => {
+        const item = { id: 1, title: 'Article', slug: 'article', publishDate: '2026-09-27', objectType: { name: 'news', label: 'News' }, data: { featuredImage: '/news.jpg', excerpt: 'Excerpt' } }
+        const model = createPageRenderModel({
+            widgets: { main: [
+                { id: 'top', type: 'easy_widgets.TopNewsPlugWidget', config: { layout: '1x2', showObjectType: false, showPublishDate: false, showExcerpts: false }, data: { status: 'ready', items: [item] } },
+                { id: 'side', type: 'easy_widgets.SidebarTopNewsWidget', config: { widgetTitle: 'Latest', showThumbnails: false, showDates: false, showObjectType: true }, data: { status: 'ready', items: [item] } },
+            ] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(container.querySelector('.top-news-plug-widget.layout-1x2 .news-grid')).toBeTruthy()
+        expect(container.querySelector('.top-news-plug-widget .news-type-badge,.top-news-plug-widget .news-date,.top-news-plug-widget .news-excerpt')).toBeNull()
+        expect(container.querySelector('.sidebar-top-news-widget .widget-title')).toHaveTextContent('Latest')
+        expect(container.querySelector('.sidebar-top-news-widget .news-type-badge')).toHaveTextContent('News')
+        expect(container.querySelector('.sidebar-top-news-widget .news-thumbnail,.sidebar-top-news-widget .news-date')).toBeNull()
+    })
+
+    it('honors news-detail fields and renders object widgets', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{
+                id: 'detail',
+                type: 'easy_widgets.NewsDetailWidget',
+                config: { showObjectType: false, showMetadata: false, showFeaturedImage: false, renderObjectWidgets: true },
+                data: { status: 'ready', item: { id: 1, title: 'Article', objectType: { label: 'News' }, data: { content: '<p>Body</p>', featuredImage: '/news.jpg' }, widgets: { body: [{ id: 'nested', type: 'easy_widgets.HeadlineWidget', config: { content: 'Nested heading' } }] } } },
+            }] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(container.querySelector('[data-widget-type="news-detail"] .news-content')).toHaveTextContent('Body')
+        expect(container.querySelector('.news-type-badge,.news-metadata,.news-featured-image')).toBeNull()
+        expect(container.querySelector('.news-object-widgets [data-slot="body"]')).toHaveTextContent('Nested heading')
+    })
+
+    it('hides the news list on detail paths when configured', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{ id: 'news', type: 'easy_widgets.NewsListWidget', config: { hideOnDetailView: true }, data: { status: 'ready', items: [{ id: 1, title: 'Article' }] } }] },
+            context: { pathVariables: { news_slug: 'article' } },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(container.querySelector('[data-widget-type="news-list"]')).toBeNull()
+    })
+
     it('renders video slides and moves the carousel with its controls', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'carousel', type: 'easy_widgets.ImageWidget', config: {

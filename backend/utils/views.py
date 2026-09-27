@@ -525,6 +525,18 @@ class CurrentUserView(APIView):
         )
         data = dict(serializer.data)
         current_workspace = getattr(request, "tenant", None)
+        if current_workspace and not user_can_switch_tenant(request.user):
+            accessible_tenants = (
+                Tenant.objects.filter(is_active=True)
+                .filter(
+                    Q(created_by=request.user)
+                    | Q(members=request.user)
+                    | Q(theme_designer_assignments__user=request.user)
+                )
+                .distinct()
+            )
+            if not accessible_tenants.filter(pk=current_workspace.pk).exists():
+                current_workspace = accessible_tenants.order_by("name").first()
         data["current_workspace"] = (
             {
                 "id": str(current_workspace.id),

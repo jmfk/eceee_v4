@@ -513,12 +513,12 @@ export const mediaCollectionsApi = {
      * @param {Object} params - Query parameters (page, page_size, namespace, etc.)
      * @returns {Promise} API response with files in collection
      */
-    getFiles: (id, params = {}) => wrapApiCall(() => {
+    getFiles: (id, params = {}, config = {}) => wrapApiCall(() => {
         // Use our custom buildQueryParams to handle Django-style array parameters
         const queryString = buildQueryParams(params);
         // endpoints.media.collection(id) already ends with a slash; append `files/`
         // to hit the DRF action route `/collections/:id/files/`.
-        return apiClient.get(`${endpoints.media.collection(id)}files/${queryString}`);
+        return apiClient.get(`${endpoints.media.collection(id)}files/${queryString}`, config);
     }),
 
     /**

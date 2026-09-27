@@ -6,7 +6,7 @@ import PreviewSizeManager from './PreviewSizeManager';
 import { resolvePagePreviewModel } from './resolvePagePreviewModel';
 import RenderFrame from '../rendering/RenderFrame';
 import { createPageRenderModel } from '../rendering/adapters';
-import { googleFontsStylesheetUrl } from '../rendering/primitives';
+import { googleFontsStylesheetUrl, themeStylesheetUrl } from '../rendering/primitives';
 import type { RenderPageModel } from '../rendering/types';
 
 interface PreviewSize {
@@ -105,20 +105,24 @@ const PagePreview: React.FC<PagePreviewProps> = ({
         return `/_render/${siteId}${path ? `/${path}` : ''}`;
     }, [webpageData]);
 
-    const themeId = pageVersionData?.effectiveTheme?.id
+    const effectiveTheme = pageVersionData?.effectiveTheme
+        || (typeof pageVersionData?.theme === 'object' ? pageVersionData.theme : null)
+        || webpageData?.effectiveTheme;
+    const themeId = effectiveTheme?.id
         || pageVersionData?.theme?.id
         || pageVersionData?.theme
         || webpageData?.effectiveTheme?.id;
+    const themeUpdatedAt = effectiveTheme?.updatedAt || effectiveTheme?.updated_at;
 
     useEffect(() => {
         if (!themeId) { setThemeCss(''); return; }
         const controller = new AbortController();
-        fetch(`/api/v1/webpages/themes/${themeId}/styles.css`, { credentials: 'same-origin', signal: controller.signal })
+        fetch(themeStylesheetUrl(themeId, effectiveTheme), { credentials: 'same-origin', signal: controller.signal })
             .then((response) => response.ok ? response.text() : '')
             .then(setThemeCss)
             .catch((error) => { if (error.name !== 'AbortError') setThemeCss(''); });
         return () => controller.abort();
-    }, [themeId]);
+    }, [themeId, themeUpdatedAt]);
 
     const layoutName = layoutData?.layout?.name || layoutData?.name || pageVersionData?.codeLayout || 'main_layout';
     const renderModel = useMemo(() => createPageRenderModel({

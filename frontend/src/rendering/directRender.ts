@@ -3,10 +3,9 @@ import { endpoints } from '../api/endpoints'
 import { buildQueryParams } from '../api/utils'
 import { buildPathVariablesContext } from '../utils/pathParser'
 import { transformInheritanceData } from '../utils/widgetMerging'
-import { getCurrentTenantId } from '../utils/tenant'
 import { resolvePagePreviewModel } from '../components/resolvePagePreviewModel'
 import { createPageRenderModel } from './adapters'
-import { googleFontsStylesheetUrl } from './primitives'
+import { googleFontsStylesheetUrl, themeStylesheetUrl } from './primitives'
 import type { RenderPageModel } from './types'
 
 export interface DirectRenderLocation {
@@ -88,9 +87,12 @@ export const loadResolvedRenderModel = async (resolved: ResolvedRenderLocation):
         || version?.theme?.id
         || version?.theme
         || page?.effectiveTheme?.id
+    const theme = version?.effectiveTheme
+        || (typeof version?.theme === 'object' ? version.theme : null)
+        || page?.effectiveTheme
     let themeCss = ''
     if (themeId) {
-        const response = await fetch(`/api/v1/webpages/themes/${themeId}/styles.css`, {
+        const response = await fetch(themeStylesheetUrl(themeId, theme), {
             credentials: 'same-origin',
             headers: { 'X-Tenant-ID': tenantId },
         })
@@ -106,13 +108,12 @@ export const loadResolvedRenderModel = async (resolved: ResolvedRenderLocation):
 }
 
 export const loadDirectRenderModel = async ({ siteId, slugPath }: DirectRenderLocation): Promise<RenderPageModel> => {
-    const selectedTenantId = getCurrentTenantId()
     try {
         const response: any = await api.get(
             `${endpoints.pages.resolveRenderPath}${buildQueryParams({ site_id: siteId, path: slugPath })}`,
             {
                 skipSessionQueue: true,
-                ...(selectedTenantId ? { headers: { 'X-Tenant-ID': selectedTenantId } } : {}),
+                skipTenantHeader: true,
             },
         )
         return loadResolvedRenderModel(response?.data || response)

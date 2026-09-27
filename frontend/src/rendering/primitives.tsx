@@ -49,6 +49,12 @@ export const googleFontsStylesheetUrl = (fonts: any): string => {
     return query ? `https://fonts.googleapis.com/css2?${query}&display=swap` : ''
 }
 
+export const themeStylesheetUrl = (themeId: string | number, theme?: any): string => {
+    const updatedAt = theme?.updatedAt || theme?.updated_at
+    const version = updatedAt ? Date.parse(updatedAt) : Number.NaN
+    return `/api/v1/webpages/themes/${themeId}/styles.css${Number.isNaN(version) ? '' : `?v=${version}`}`
+}
+
 export const ImageView = ({ source, alt = '', className = '' }: { source?: any, alt?: string, className?: string }) => {
     const url = imageUrl(source)
     return url ? <img src={url} alt={alt} className={className} /> : null

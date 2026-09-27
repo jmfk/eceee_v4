@@ -76,7 +76,7 @@ apiClient.interceptors.request.use(
         config.headers['X-Session-ID'] = getSessionId();
         // Explicitly resolved tenant headers, such as those used by the
         // standalone renderer, must not be overwritten by browser state.
-        if (!config.headers['X-Tenant-ID']) {
+        if (!config.skipTenantHeader && !config.headers['X-Tenant-ID']) {
             const currentTenantId = getCurrentTenantId();
             if (currentTenantId) config.headers['X-Tenant-ID'] = currentTenantId;
         }
