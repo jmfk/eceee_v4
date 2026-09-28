@@ -40,15 +40,9 @@ const matchesContentOption = (option, query) => [
     option.objectTypeLabel,
 ].some((value) => String(value || '').toLowerCase().includes(query.toLowerCase()))
 
-const navigationText = (value, maxLength) => {
+const TruncatedNavigationText = ({ value, className = '' }) => {
     const text = String(value || '')
-    return text.length > maxLength ? `${text.slice(0, maxLength).trimEnd()}…` : text
-}
-
-const TruncatedNavigationText = ({ value, maxLength = 48, className = '' }) => {
-    const text = String(value || '')
-    const displayText = navigationText(text, maxLength)
-    return <span title={displayText === text ? undefined : text} className={`block truncate ${className}`}>{displayText}</span>
+    return <span title={text} className={`block min-w-0 truncate ${className}`}>{text}</span>
 }
 
 const contentGroups = (options, sourceMode) => ['page', 'object'].map((kind) => {
@@ -89,7 +83,7 @@ const ContentSourceBrowser = ({ sourceMode, options, value, onChange, onDelete, 
     const groups = contentGroups(filteredOptions, sourceMode)
 
     return (
-        <section aria-label={`Browse ${sourceName}`} className="space-y-3">
+        <section aria-label={`Browse ${sourceName}`} className="min-w-0 space-y-3">
             <div className="flex items-center justify-between gap-2">
                 <h4 className="text-xs font-medium text-gray-700">Page or object</h4>
                 {loading && <Loader2 aria-label="Loading content" className="h-3.5 w-3.5 animate-spin text-gray-500" />}
@@ -117,8 +111,8 @@ const ContentSourceBrowser = ({ sourceMode, options, value, onChange, onDelete, 
                     </select>
                 </label>
             </div>
-            {groups.length ? <ul aria-label={`${sourceName} hierarchy`} className="max-h-72 space-y-3 overflow-y-auto rounded-md border border-gray-200 bg-gray-50 p-2">
-                {groups.map((group) => <li key={group.kind}>
+            {groups.length ? <ul aria-label={`${sourceName} hierarchy`} className="w-full min-w-0 max-h-72 space-y-3 overflow-x-hidden overflow-y-auto rounded-md border border-gray-200 bg-gray-50 p-2">
+                {groups.map((group) => <li key={group.kind} className="min-w-0">
                     <div className="flex items-center gap-2 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
                         {group.kind === 'page' ? <FileText className="h-3.5 w-3.5" /> : <Box className="h-3.5 w-3.5" />}
                         {group.label}
@@ -126,7 +120,7 @@ const ContentSourceBrowser = ({ sourceMode, options, value, onChange, onDelete, 
                     <ul className="space-y-2">
                         {group.subgroups.map((subgroup) => <li key={subgroup.label || group.kind} className="min-w-0">
                             {subgroup.label && <p className="truncate border-l border-gray-300 py-1 pl-4 text-xs font-medium text-gray-600">{subgroup.label}</p>}
-                            <ul className={subgroup.label ? 'ml-3 border-l border-gray-300 pl-2' : ''}>
+                            <ul className={`min-w-0 ${subgroup.label ? 'ml-3 border-l border-gray-300 pl-2' : ''}`}>
                                 {subgroup.options.map((option) => <li key={option.value} className="flex min-w-0 items-center gap-1">
                                     <button
                                         type="button"
@@ -137,7 +131,7 @@ const ContentSourceBrowser = ({ sourceMode, options, value, onChange, onDelete, 
                                         style={option.kind === 'page' && sourceMode === 'content' ? { paddingLeft: `${8 + (option.depth || 0) * 14}px` } : undefined}
                                         className={`flex min-w-0 flex-1 items-start gap-2 rounded px-2 py-1.5 text-left text-sm ${option.value === value ? 'bg-blue-100 font-medium text-blue-800' : 'text-gray-700 hover:bg-white'}`}
                                     >
-                                        <span className="min-w-0 flex-1"><TruncatedNavigationText value={sourceMode === 'content' ? option.kind === 'page' ? option.pageTitle : option.objectTitle : option.label} /><TruncatedNavigationText value={option.description} maxLength={64} className="text-[11px] font-normal opacity-70" /></span>
+                                        <span className="min-w-0 flex-1"><TruncatedNavigationText value={sourceMode === 'content' ? option.kind === 'page' ? option.pageTitle : option.objectTitle : option.label} /><TruncatedNavigationText value={option.description} className="text-[11px] font-normal opacity-70" /></span>
                                     </button>
                                     {onDelete && <button type="button" aria-label={`Delete ${option.label}`} onClick={() => onDelete(option)} disabled={disabled} className="shrink-0 rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>}
                                 </li>)}
@@ -721,7 +715,7 @@ const SemanticThemeWorkspace = ({
     }
 
     const previewOptions = (
-        <div>
+        <div className="min-w-0">
             <section className="space-y-3">
                 <div>
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Preview content source</h3>
@@ -825,8 +819,8 @@ const SemanticThemeWorkspace = ({
             }}
         >
             <section aria-label="Preview navigation" className={`${mobilePane === 'preview' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-r border-gray-200 bg-white lg:flex lg:border-r-0`}>
-                <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                    <fieldset disabled={disabled}>{previewOptions}</fieldset>
+                <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4">
+                    <fieldset disabled={disabled} className="min-w-0">{previewOptions}</fieldset>
                     <nav className="mt-6 space-y-2 border-t border-gray-200 pt-4" aria-label="Designer views">
                         <div><h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Preview pages</h2><p className="mt-1 text-xs text-gray-500">Choose what the center preview displays.</p></div>
                         <div className="grid gap-1">
