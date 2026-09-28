@@ -80,6 +80,30 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
+  publisher-checks:
+    name: Publisher checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: publisher/package-lock.json
+
+      - name: Install publisher dependencies
+        working-directory: publisher
+        run: npm ci
+
+      - name: Audit publisher production dependencies
+        working-directory: publisher
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Test, lint, typecheck, and build publisher
+        working-directory: publisher
+        run: npm test && npm run lint && npm run typecheck && npm run build
+
   backend-tests:
     name: Backend tests
     runs-on: ubuntu-latest
