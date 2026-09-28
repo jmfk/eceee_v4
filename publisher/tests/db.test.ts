@@ -18,19 +18,30 @@ describe('database snapshot', () => {
     mocks.connect.mockClear();
     mocks.query.mockResolvedValue({ rows: [] });
     process.env.PUBLISHER_DATABASE_URL = 'postgresql://publisher.invalid/eceee';
+    delete process.env.PUBLISHER_ALLOW_WILDCARD_HOSTNAMES;
+    delete process.env.PUBLISHER_DEFAULT_HOSTNAMES;
   });
 
-  it('selects the exact host before wildcard/default inside one read-only snapshot', async () => {
+  it('selects exact hosts while fallback routing is denied by default', async () => {
     await database.withSnapshot(reader => reader.root('example.org'));
 
     expect(mocks.query.mock.calls[0][0]).toBe('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
     const [rootSql, parameters] = mocks.query.mock.calls[1];
     expect(rootSql).toContain('hostnames @> ARRAY[$1]::varchar[]');
-    expect(rootSql).toContain("hostnames && ARRAY['*', 'default']::varchar[]");
-    expect(rootSql).toContain('CASE WHEN hostnames @> ARRAY[$1]::varchar[] THEN 0 ELSE 1 END');
-    expect(parameters).toEqual(['example.org']);
+    expect(rootSql).toContain("$2::boolean AND hostnames @> ARRAY['*']::varchar[]");
+    expect(rootSql).toContain("$3::boolean AND hostnames @> ARRAY['default']::varchar[]");
+    expect(parameters).toEqual(['example.org', false, false]);
     expect(mocks.query.mock.calls[2][0]).toBe('COMMIT');
     expect(mocks.release).toHaveBeenCalledOnce();
+  });
+
+  it('enables wildcard and default routing only through explicit configuration', async () => {
+    process.env.PUBLISHER_ALLOW_WILDCARD_HOSTNAMES = 'true';
+    process.env.PUBLISHER_DEFAULT_HOSTNAMES = ' preview.example.org:8443, default, * ';
+
+    await database.withSnapshot(reader => reader.root('preview.example.org'));
+
+    expect(mocks.query.mock.calls[1][1]).toEqual(['preview.example.org', true, true]);
   });
 
   it('rolls back and releases the client when resolution fails', async () => {
