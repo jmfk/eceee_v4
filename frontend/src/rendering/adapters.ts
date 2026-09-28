@@ -146,6 +146,11 @@ export const createDesignerRenderModel = ({
             catalog: workspace?.catalog || {},
             texts: sourceModel ? {} : view.texts || {},
             assets: workspace?.assets || [],
+            editableSpacingTargets: (workspace?.spacing || []).reduce((targets: Record<string, string[]>, row: any) => {
+                const fields = workspace?.constraints?.editableSpacingProperties || Object.keys(row.values || {})
+                targets[row.targetId] = [...new Set([...(targets[row.targetId] || []), ...fields])]
+                return targets
+            }, {}),
             contentEditable,
             guidesEnabled,
         },

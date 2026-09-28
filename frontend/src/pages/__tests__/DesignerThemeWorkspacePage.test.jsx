@@ -307,6 +307,12 @@ describe('DesignerThemeWorkspacePage', () => {
         await waitFor(() => expect(mocks.importPreviewSource).toHaveBeenCalledWith('7', 'page', 42, 2))
         expect(screen.getByRole('tab', { name: 'Theme demo' })).toHaveAttribute('aria-selected', 'true')
         expect(screen.getByRole('button', { name: 'Select Programme' })).toHaveAttribute('aria-current', 'true')
+        expect(screen.queryByRole('heading', { name: 'Images in this element' })).not.toBeInTheDocument()
+        const iframe = screen.getByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'content-image:0', kind: 'previewImage', label: 'Imported image', sourceUrl: 'https://storage.test/theme_images/7/library/imported.jpg' },
+            source: iframe.contentWindow,
+        }))
         expect(screen.getByRole('button', { name: 'Replace example image imported.jpg' })).toBeInTheDocument()
     })
 
@@ -331,6 +337,11 @@ describe('DesignerThemeWorkspacePage', () => {
         const importButton = screen.getByRole('button', { name: 'Import as theme example' })
         await waitFor(() => expect(importButton).toBeEnabled())
         await user.click(importButton)
+        const iframe = screen.getByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'content-image:0', kind: 'previewImage', label: 'Imported image', sourceUrl: 'https://storage.test/theme_images/7/library/imported.jpg' },
+            source: iframe.contentWindow,
+        }))
         const replaceButton = await screen.findByRole('button', { name: 'Replace example image imported.jpg' })
         const upload = new File(['replacement'], 'replacement.png', { type: 'image/png' })
 
@@ -458,6 +469,59 @@ describe('DesignerThemeWorkspacePage', () => {
         ))
     })
 
+    it('collapses and restores both side columns independently', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+
+        fireEvent.click(screen.getAllByRole('button', { name: 'Collapse preview navigation' })[0])
+        expect(screen.getByRole('region', { name: 'Preview navigation' })).toHaveClass('hidden')
+        fireEvent.click(screen.getByRole('button', { name: 'Expand preview navigation' }))
+        expect(screen.getByRole('region', { name: 'Preview navigation' })).not.toHaveClass('hidden')
+
+        fireEvent.click(screen.getAllByRole('button', { name: 'Collapse theme inspector' })[0])
+        expect(screen.getByRole('region', { name: 'Theme inspector' })).toHaveClass('hidden')
+        fireEvent.click(screen.getByRole('button', { name: 'Expand theme inspector' }))
+        expect(screen.getByRole('region', { name: 'Theme inspector' })).not.toHaveClass('hidden')
+    })
+
+    it('offers rich text commands after a preview double-click and lists nested elements as accordions', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'editText', targetId: 'content:0', kind: 'element', label: 'Rich text',
+                text: '<p>Editable copy</p>', editable: true, richText: true,
+                descendants: [{ id: 'group:0:element:h1', kind: 'element', label: 'Heading 1', text: 'Editable copy', editable: false }],
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(screen.getByRole('toolbar', { name: 'Rich text formatting' })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Bold' }))
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ source: 'eceee-render-host', action: 'formatText', targetId: 'content:0', command: 'bold' }), '*')
+        vi.spyOn(window, 'prompt').mockReturnValue('example.com/article')
+        fireEvent.click(screen.getByRole('button', { name: 'Add link' }))
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ source: 'eceee-render-host', action: 'formatText', targetId: 'content:0', command: 'createLink', value: 'https://example.com/article' }), '*')
+        expect(screen.getByText('Elements inside')).toBeInTheDocument()
+        expect(screen.getByText('Heading 1')).toBeInTheDocument()
+    })
+
+    it('applies a clicked preview spacing label to the matching inspector row', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-designer-preview', action: 'spacingChange', targetIds: ['content:0', 'group:0:element:h1'], property: 'marginBottom', value: '24px' },
+            source: iframe.contentWindow,
+        }))
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        expect(mocks.save.mock.calls[0][1].spacing[0].values.marginBottom).toBe('24px')
+    })
+
     it('shows only relevant values after clicking a visible element', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
@@ -487,7 +551,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('heading', { name: 'Preview content source' })).toBeInTheDocument()
     })
 
-    it('hides defaults until added and restores the rendered theme default when an override is removed', async () => {
+    it('shows editable typography and spacing defaults directly and restores the rendered default when an override is removed', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
@@ -499,8 +563,6 @@ describe('DesignerThemeWorkspacePage', () => {
             source: iframe.contentWindow,
         }))
 
-        expect(screen.queryByLabelText('Inner spacing')).not.toBeInTheDocument()
-        fireEvent.change(screen.getByLabelText('Add theme value'), { target: { value: 'spacing:0:padding' } })
         expect(screen.getByLabelText('Inner spacing')).toHaveValue('10px')
         expect(screen.getByText('Theme default')).toBeInTheDocument()
 
@@ -512,7 +574,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(mocks.save.mock.calls[0][1].typography[0].values.fontSize).toBe('')
     })
 
-    it('hides typography and spacing groups that contain only defaults', async () => {
+    it('keeps typography and spacing groups editable when every value uses the theme default', async () => {
         const defaultOnlyWorkspace = structuredClone(workspace)
         defaultOnlyWorkspace.typography[0].values = { fontFamily: '', fontSize: '' }
         defaultOnlyWorkspace.spacing[0].values = { marginBottom: '', padding: '' }
@@ -522,9 +584,11 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         await selectHeading()
 
-        expect(screen.queryByRole('heading', { name: /Typography/ })).not.toBeInTheDocument()
-        expect(screen.queryByRole('heading', { name: /^Spacing/ })).not.toBeInTheDocument()
-        expect(screen.getByLabelText('Add theme value')).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /Typography/ })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /^Spacing/ })).toBeInTheDocument()
+        expect(screen.getByLabelText('Size')).toBeInTheDocument()
+        expect(screen.getByLabelText('Inner spacing')).toBeInTheDocument()
+        expect(screen.queryByLabelText('Add theme value')).not.toBeInTheDocument()
     })
 
     it('offers nested elements as alternatives when they share the clicked area', async () => {

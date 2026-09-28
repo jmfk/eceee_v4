@@ -437,12 +437,16 @@ class DesignerThemeApiTests(TestCase):
         self.theme.refresh_from_db()
         original_sync_version = self.theme.sync_version
         original_draft_version = workspace["draftVersion"]
+        preview_texts = {
+            "group:0:element:h1": "A temporary demo headline",
+            "content:0": '<p onclick="alert(1)">Formatted <strong>copy</strong></p><script>alert(1)</script>',
+        }
 
         response = self.client.patch(
             f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/",
             {
                 "viewId": "article-page",
-                "texts": {"group:0:element:h1": "A temporary demo headline"},
+                "texts": preview_texts,
                 "draftVersion": original_draft_version,
             },
             format="json",
@@ -458,7 +462,10 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(self.theme.designer_preview["developerNote"], "Use realistic editorial copy")
         saved_view = self.theme.designer_draft.snapshot["designer_preview"]["views"][0]
         self.assertEqual(saved_view["objectType"], "article")
-        self.assertEqual(saved_view["texts"], {"group:0:element:h1": "A temporary demo headline"})
+        self.assertEqual(saved_view["texts"]["group:0:element:h1"], "A temporary demo headline")
+        self.assertIn("<strong>copy</strong>", saved_view["texts"]["content:0"])
+        self.assertNotIn("onclick", saved_view["texts"]["content:0"])
+        self.assertNotIn("<script", saved_view["texts"]["content:0"])
         self.assertEqual(response.data["draftVersion"], original_draft_version + 1)
 
         publish = self.client.post(
@@ -469,7 +476,7 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(publish.status_code, 200, publish.data)
         self.theme.refresh_from_db()
         published_view = self.theme.designer_preview["views"][0]
-        self.assertEqual(published_view["texts"], {"group:0:element:h1": "A temporary demo headline"})
+        self.assertEqual(published_view["texts"], saved_view["texts"])
         self.assertGreater(self.theme.sync_version, original_sync_version)
 
     def test_page_can_be_imported_as_detached_example_and_deleted_by_assigned_designer(self):

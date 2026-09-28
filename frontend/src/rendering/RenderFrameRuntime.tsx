@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import DOMPurify from 'dompurify'
 import PageRenderer from './PageRenderer'
 import { RENDER_LAYOUT_CSS } from './layoutRenderers'
 import type { RenderFrameMessage, RenderPageModel } from './types'
@@ -13,6 +14,7 @@ const DESIGNER_STYLE_PROPERTIES: Record<string, string> = {
 }
 
 const EDITABLE_TEXT_SELECTOR = 'a,blockquote,code,em,h1,h2,h3,h4,h5,h6,li,p,pre,span,strong'
+const RICH_TEXT_SELECTOR = '.content-widget,.banner-text,.object-data-preview-field dd'
 const editableTextLabel = (node: HTMLElement) => {
     if (/^H[1-6]$/.test(node.tagName)) return `Heading ${node.tagName.slice(1)} text`
     return ({ A: 'Link text', BLOCKQUOTE: 'Quote text', CODE: 'Code text', LI: 'List item text', P: 'Paragraph text', PRE: 'Preformatted text' } as Record<string, string>)[node.tagName] || 'Text'
@@ -29,7 +31,7 @@ html,body,#root{margin:0;min-height:100%;background:#fff}body{font-family:system
 .news-items{display:grid;gap:18px}.news-item{display:grid;gap:12px}.render-error-state{border:1px solid #fecaca;background:#fef2f2}
 .designer-preview [data-designer-target]{cursor:pointer}.designer-guides [data-designer-target]{outline:1px dashed rgba(100,116,139,.5)!important;outline-offset:-1px}[data-designer-target].designer-selected{outline:3px solid #2563eb!important;outline-offset:-3px!important}.designer-guides .designer-hovered{outline:2px dotted #2563eb!important;outline-offset:-2px!important}
 .designer-context-menu{position:fixed!important;z-index:2147483647!important;min-width:180px!important;max-width:260px!important;padding:6px!important;border:1px solid #d1d5db!important;border-radius:8px!important;background:#fff!important;box-shadow:0 10px 24px rgba(15,23,42,.2)!important;color:#111827!important;font:500 13px/1.35 system-ui,sans-serif!important}.designer-context-menu-title{overflow:hidden!important;padding:5px 8px 7px!important;color:#6b7280!important;font-size:11px!important;font-weight:600!important;text-overflow:ellipsis!important;white-space:nowrap!important}.designer-context-menu button{display:block!important;width:100%!important;padding:7px 8px!important;border:0!important;border-radius:5px!important;background:transparent!important;color:#111827!important;font:inherit!important;text-align:left!important;cursor:pointer!important}.designer-context-menu button:hover,.designer-context-menu button:focus-visible{background:#eff6ff!important;color:#1d4ed8!important;outline:none!important}
-.designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483646!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483647!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483647!important;transform:translate(-50%,-50%);font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,0 0 4px #fff,0 0 7px #fff}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}
+.designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483646!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483647!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483647!important;transform:translate(-50%,-50%);padding:2px 3px!important;border:0!important;border-radius:3px!important;background:#fff!important;font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;box-shadow:0 0 0 1px rgba(255,255,255,.9)!important}.designer-spacing-value[data-editable="true"]{pointer-events:auto!important;cursor:pointer!important;box-shadow:0 0 0 1px currentColor!important}.designer-spacing-value[data-editable="true"]:hover,.designer-spacing-value[data-editable="true"]:focus-visible{outline:2px solid #2563eb!important;outline-offset:1px!important}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}.designer-spacing-editor{position:fixed!important;z-index:2147483647!important;display:flex!important;gap:4px!important;padding:5px!important;border:1px solid #93c5fd!important;border-radius:6px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.22)!important}.designer-spacing-editor input{width:72px!important;padding:5px 6px!important;border:1px solid #d1d5db!important;border-radius:4px!important;font:500 12px/1.2 system-ui,sans-serif!important}.designer-spacing-editor button{padding:5px 7px!important;border:0!important;border-radius:4px!important;background:#2563eb!important;color:#fff!important;font:600 12px/1.2 system-ui,sans-serif!important;cursor:pointer!important}
 @media(max-width:767px){.two-columns-widget,.three-columns-widget{grid-template-columns:1fr}}
 `
 
@@ -38,16 +40,36 @@ const computedThemeValues = (node: HTMLElement) => {
     return Object.fromEntries(Object.entries(DESIGNER_STYLE_PROPERTIES).map(([name, cssName]) => [name, style.getPropertyValue(cssName)]))
 }
 
+const isRichTextNode = (node: HTMLElement) => node.matches(RICH_TEXT_SELECTOR)
+
+const editableValue = (node: HTMLElement, richText = isRichTextNode(node)) => richText ? node.innerHTML : node.innerText || node.textContent || ''
+
+const nodeTargets = (node: HTMLElement) => {
+    try { return JSON.parse(node.dataset.designerTargets || '[]') } catch { return [] }
+}
+
+const descendantTargets = (node: HTMLElement) => {
+    const seen = new Set<string>()
+    return [...node.querySelectorAll<HTMLElement>('[data-designer-target]')].flatMap((descendant) => nodeTargets(descendant).map((target: any) => ({
+        ...target,
+        text: editableValue(descendant, Boolean(target.richText)),
+        sourceUrl: target.sourceUrl || (descendant instanceof HTMLImageElement ? descendant.currentSrc || descendant.src : ''),
+        computedStyles: computedThemeValues(descendant),
+    }))).filter((target: any) => target.id && !seen.has(target.id) && seen.add(target.id)).slice(0, 100)
+}
+
 const postDesignerEvent = (node: HTMLElement, action = 'select', preferredTarget?: any, extra: Record<string, unknown> = {}) => {
     const targets = JSON.parse(node.dataset.designerTargets || '[]')
     const primary = preferredTarget || targets[0]
     if (!primary) return
+    const richText = Boolean(primary.richText || isRichTextNode(node))
     window.parent.postMessage({
         source: 'eceee-designer-preview', action, targetId: primary.id, kind: primary.kind,
-        label: primary.label, text: node.innerText || '', editable: primary.editable,
+        label: primary.label, text: editableValue(node, richText), editable: primary.editable, richText,
         sourceUrl: primary.sourceUrl || '',
         computedStyles: computedThemeValues(node),
-        alternatives: targets.map((target: any) => ({ ...target, text: node.innerText || '', computedStyles: computedThemeValues(node) })),
+        alternatives: targets.map((target: any) => ({ ...target, text: editableValue(node, Boolean(target.richText || richText)), richText: Boolean(target.richText || richText), computedStyles: computedThemeValues(node) })),
+        descendants: descendantTargets(node),
         ...extra,
     }, '*')
 }
@@ -72,7 +94,9 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
     let guides: HTMLElement[] = []
     let hoveredNode: HTMLElement | null = null
     let contextMenu: HTMLElement | null = null
+    let spacingEditor: HTMLElement | null = null
     const closeContextMenu = () => { contextMenu?.remove(); contextMenu = null }
+    const closeSpacingEditor = () => { spacingEditor?.remove(); spacingEditor = null }
     const removeGuides = () => { guides.forEach((guide) => guide.remove()); guides = [] }
     const clearGuides = () => {
         removeGuides()
@@ -137,7 +161,6 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
 
             const label = document.createElement('div')
             label.className = `designer-spacing-value designer-spacing-${spacing}-value`
-            label.setAttribute('aria-hidden', 'true')
             if (side) label.dataset.side = side
             label.textContent = `${value}px`
             const labelWidth = Math.max(20, label.textContent.length * 6)
@@ -165,6 +188,52 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
                 left: `${labelLeft}px`,
                 top: `${labelTop}px`,
             })
+            const property = `${spacing}${side ? side[0].toUpperCase() + side.slice(1) : ''}`
+            const targetIds: string[] = []
+            let targetNode: HTMLElement | null = node
+            while (targetNode && root.contains(targetNode)) {
+                nodeTargets(targetNode).forEach((target: any) => {
+                    if (target.id && !targetIds.includes(target.id)) targetIds.push(target.id)
+                })
+                targetNode = targetNode.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
+            }
+            const editable = targetIds.some((targetId) => designer.editableSpacingTargets?.[targetId]?.includes(property))
+            label.setAttribute('aria-hidden', editable ? 'false' : 'true')
+            if (editable) {
+                label.dataset.editable = 'true'
+                label.tabIndex = 0
+                label.setAttribute('role', 'button')
+                label.setAttribute('aria-label', `Edit ${spacing} ${side}`)
+                const openEditor = (event: Event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    closeSpacingEditor()
+                    const editor = document.createElement('form')
+                    editor.className = 'designer-spacing-editor'
+                    editor.setAttribute('aria-label', `Edit ${spacing} ${side}`)
+                    const input = document.createElement('input')
+                    input.setAttribute('aria-label', `${spacing} ${side} value`)
+                    input.value = `${value}px`
+                    const save = document.createElement('button')
+                    save.type = 'submit'
+                    save.textContent = 'Apply'
+                    editor.append(input, save)
+                    Object.assign(editor.style, { left: `${Math.max(8, labelLeft - 45)}px`, top: `${Math.min(window.innerHeight - 44, labelTop + 12)}px` })
+                    editor.addEventListener('submit', (submitEvent) => {
+                        submitEvent.preventDefault()
+                        window.parent.postMessage({ source: 'eceee-designer-preview', action: 'spacingChange', targetIds, property, value: input.value.trim() }, '*')
+                        closeSpacingEditor()
+                    })
+                    document.body.append(editor)
+                    spacingEditor = editor
+                    input.focus()
+                    input.select()
+                }
+                label.addEventListener('click', openEditor)
+                label.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') openEditor(event)
+                })
+            }
             document.body.append(label)
             guides.push(label)
         }
@@ -229,12 +298,31 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
     })
 
     let editableTextIndex = 0
+    const richTextRoots = designer.contentEditable === true
+        ? [...root.querySelectorAll<HTMLElement>(RICH_TEXT_SELECTOR)].filter((node) => (node.innerText || node.textContent || '').trim())
+        : []
+    richTextRoots.forEach((node) => {
+        const contentId = `content:${editableTextIndex}`
+        editableTextIndex += 1
+        registerTarget(node, { id: contentId, kind: 'element', label: 'Rich text', editable: true, richText: true }, true)
+        if (designer.texts[contentId] !== undefined) {
+            const saved = designer.texts[contentId]
+            if (/<\/?[A-Za-z][^>]*>/.test(saved)) node.innerHTML = DOMPurify.sanitize(saved)
+            else {
+                const textLeaf = [...node.querySelectorAll<HTMLElement>(EDITABLE_TEXT_SELECTOR)].find((candidate) => !candidate.querySelector(EDITABLE_TEXT_SELECTOR))
+                if (textLeaf) textLeaf.textContent = saved
+                else node.textContent = saved
+            }
+        }
+        node.contentEditable = 'false'
+    })
     root.querySelectorAll<HTMLElement>(EDITABLE_TEXT_SELECTOR).forEach((node) => {
         if (!(node.innerText || node.textContent || '').trim()) return
         let targets: any[] = []
         try { targets = JSON.parse(node.dataset.designerTargets || '[]') } catch { targets = [] }
         const legacyTextTarget = targets.find((target) => designer.texts[target.id] !== undefined)
         if (legacyTextTarget) node.textContent = designer.texts[legacyTextTarget.id]
+        if (richTextRoots.some((richRoot) => richRoot === node || richRoot.contains(node))) return
         const hasEditableTextDescendant = [...node.querySelectorAll<HTMLElement>(EDITABLE_TEXT_SELECTOR)]
             .some((descendant) => (descendant.innerText || descendant.textContent || '').trim())
         if (designer.contentEditable !== true || hasEditableTextDescendant) return
@@ -242,7 +330,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
         editableTextIndex += 1
         registerTarget(node, { id: contentId, kind: 'element', label: editableTextLabel(node), editable: true }, true)
         if (designer.texts[contentId] !== undefined) node.textContent = designer.texts[contentId]
-        node.contentEditable = 'true'
+        node.contentEditable = 'false'
     })
 
     if (designer.contentEditable === true) {
@@ -262,17 +350,33 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
     }
 
     root.querySelectorAll<HTMLElement>('[data-designer-target]').forEach((node) => {
-        const click = (event: Event) => { event.preventDefault(); event.stopPropagation(); root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected')); node.classList.add('designer-selected'); postDesignerEvent(node) }
+        const click = (event: Event) => { if (!node.isContentEditable) event.preventDefault(); event.stopPropagation(); root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected')); node.classList.add('designer-selected'); postDesignerEvent(node) }
         let primaryTarget: any = null
         try { primaryTarget = JSON.parse(node.dataset.designerTargets || '[]')[0] } catch { primaryTarget = null }
+        const activateEditing = (event?: Event) => {
+            if (!primaryTarget?.editable) return
+            event?.preventDefault()
+            event?.stopPropagation()
+            root.querySelectorAll<HTMLElement>('[contenteditable="true"]').forEach((editable) => { if (editable !== node) editable.contentEditable = 'false' })
+            node.contentEditable = 'true'
+            node.focus()
+            postDesignerEvent(node, 'editText', primaryTarget)
+        }
         const input = (event: Event) => {
-            if (!primaryTarget?.editable || event.target !== node) return
+            if (!primaryTarget?.editable || !(event.target instanceof Node) || !node.contains(event.target)) return
             event.stopPropagation()
             postDesignerEvent(node, 'contentChange')
         }
+        const blur = (event: FocusEvent) => {
+            if (!primaryTarget?.editable || (event.relatedTarget instanceof Node && node.contains(event.relatedTarget))) return
+            node.contentEditable = 'false'
+        }
+        const doubleClick = (event: Event) => activateEditing(event)
         node.addEventListener('click', click)
         node.addEventListener('input', input)
-        cleanups.push(() => { node.removeEventListener('click', click); node.removeEventListener('input', input) })
+        node.addEventListener('dblclick', doubleClick, true)
+        node.addEventListener('blur', blur)
+        cleanups.push(() => { node.removeEventListener('click', click); node.removeEventListener('input', input); node.removeEventListener('dblclick', doubleClick, true); node.removeEventListener('blur', blur) })
     })
     const openContextMenu = (event: MouseEvent) => {
         const eventNode = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-designer-target]') : null
@@ -321,8 +425,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
 
         const editableTarget = targets.find((target) => target.editable)
         if (editableTarget) addAction('Edit text', editableTarget, 'editText', () => {
-            postDesignerEvent(eventNode, 'contextAction', editableTarget, { command: 'editText' })
-            eventNode.focus()
+            eventNode.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))
             const selection = window.getSelection()
             selection?.selectAllChildren(eventNode)
             selection?.collapseToEnd()
@@ -378,6 +481,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
     window.addEventListener('resize', refreshGuides)
     cleanups.push(() => {
         closeContextMenu()
+        closeSpacingEditor()
         root.removeEventListener('contextmenu', openContextMenu)
         document.removeEventListener('pointerdown', dismissContextMenu)
         document.removeEventListener('keydown', dismissContextMenuWithKeyboard)
@@ -386,7 +490,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
         window.removeEventListener('scroll', refreshGuides, true)
         window.removeEventListener('resize', refreshGuides)
     })
-    return () => { clearGuides(); cleanups.forEach((cleanup) => cleanup()) }
+    return () => { clearGuides(); closeSpacingEditor(); cleanups.forEach((cleanup) => cleanup()) }
 }
 
 export const RenderFrameRuntime = () => {
@@ -421,7 +525,28 @@ export const RenderFrameRuntime = () => {
                 const match = [...document.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => {
                     try { return JSON.parse(node.dataset.designerTargets || '[]')[0]?.id === event.data.targetId } catch { return false }
                 })
-                if (match && match.textContent !== event.data.text) match.textContent = event.data.text
+                const richText = match ? nodeTargets(match)[0]?.richText : false
+                if (match && richText && match.innerHTML !== event.data.text) match.innerHTML = DOMPurify.sanitize(event.data.text)
+                if (match && !richText && match.textContent !== event.data.text) match.textContent = event.data.text
+            }
+            if (event.data.action === 'formatText' && event.data.targetId && event.data.command) {
+                const match = [...document.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => nodeTargets(node)[0]?.id === event.data.targetId)
+                if (!match || !nodeTargets(match)[0]?.richText) return
+                match.contentEditable = 'true'
+                match.focus()
+                const selection = window.getSelection()
+                const selectionInside = Boolean(selection?.rangeCount && match.contains(selection.getRangeAt(0).commonAncestorContainer))
+                if (!selectionInside) {
+                    const range = document.createRange()
+                    range.selectNodeContents(match)
+                    selection?.removeAllRanges()
+                    selection?.addRange(range)
+                }
+                const value = event.data.command === 'formatBlock' && event.data.value
+                    ? `<${event.data.value.replace(/[<>]/g, '')}>`
+                    : event.data.value || undefined
+                document.execCommand(event.data.command, false, value)
+                postDesignerEvent(match, 'contentChange')
             }
         }
         window.addEventListener('message', receive)

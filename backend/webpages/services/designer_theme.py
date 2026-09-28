@@ -19,6 +19,7 @@ from rest_framework.exceptions import ValidationError
 
 from file_manager.storage import system_storage
 from object_storage.models import ObjectInstance
+from utils.templatetags.security_filters import sanitize_html
 from webpages.models import (
     PageTheme,
     ThemeDesignerAssignment,
@@ -1589,7 +1590,7 @@ def save_designer_preview_texts(theme_id, tenant, user, view_id, texts, draft_ve
             raise ValidationError("Preview text target identifiers cannot exceed 300 characters.")
         if not isinstance(value, str) or len(value) > 5000:
             raise ValidationError("Each preview text value must be a string of at most 5000 characters.")
-        cleaned[target_id] = value
+        cleaned[target_id] = str(sanitize_html(value)) if re.search(r"</?[A-Za-z][^>]*>", value) else value
 
     with transaction.atomic():
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)

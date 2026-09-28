@@ -39,6 +39,7 @@ export interface DesignerRenderOptions {
     catalog: Record<string, any>
     texts: Record<string, string>
     assets: Array<Record<string, any>>
+    editableSpacingTargets?: Record<string, string[]>
     contentEditable?: boolean
     guidesEnabled?: boolean
 }
@@ -69,8 +70,10 @@ export type LayoutRenderComponent = ComponentType<LayoutRenderProps>
 
 export interface RenderFrameMessage {
     source: 'eceee-render-host'
-    action: 'render' | 'selectTarget' | 'readTargetStyles' | 'updateText'
+    action: 'render' | 'selectTarget' | 'readTargetStyles' | 'updateText' | 'formatText'
     model?: RenderPageModel
     targetId?: string
     text?: string
+    command?: string
+    value?: string
 }
