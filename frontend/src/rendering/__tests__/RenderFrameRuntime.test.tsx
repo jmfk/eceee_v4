@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import RenderFrameRuntime from '../RenderFrameRuntime'
 import { createDesignerRenderModel, createPageRenderModel } from '../adapters'
@@ -110,6 +110,31 @@ describe('RenderFrameRuntime designer overlay', () => {
             data: { source: 'eceee-render-host', action: 'updateText', targetId: 'content:0', text: 'Inspector update' },
         })))
         expect(heading).toHaveTextContent('Inspector update')
+        postMessage.mockRestore()
+    })
+
+    it('opens element actions at the pointer and starts inline text editing', async () => {
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace, viewId: 'page-main', contentEditable: true }))
+
+        const heading = await screen.findByRole('heading', { name: 'Overridden heading' })
+        const focus = vi.spyOn(heading, 'focus')
+        fireEvent.contextMenu(heading, { clientX: 48, clientY: 64 })
+
+        const menu = screen.getByRole('menu', { name: 'Actions for Heading 1 text' })
+        expect(menu).toHaveStyle({ left: '48px', top: '64px' })
+        expect(within(menu).getByRole('menuitem', { name: 'Edit text' })).toBeInTheDocument()
+        fireEvent.click(within(menu).getByRole('menuitem', { name: 'Edit text' }))
+
+        expect(focus).toHaveBeenCalled()
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview',
+            action: 'contextAction',
+            command: 'editText',
+            targetId: 'content:0',
+        }), '*')
         postMessage.mockRestore()
     })
 
@@ -366,7 +391,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(screen.getByText('Research', { selector: 'li' })).toBeInTheDocument()
     })
 
-    it('renders images imported into legacy site preview metadata', async () => {
+    it('offers direct replacement for images imported into legacy site preview metadata', async () => {
         const imageWorkspace = {
             catalog: { layouts: [{ key: 'main_layout', slots: [{ name: 'hero' }, { name: 'main' }] }], componentStyles: [], designGroups: [] },
             previewContent: { views: [{
@@ -374,10 +399,29 @@ describe('RenderFrameRuntime designer overlay', () => {
                 images: { 'preview:site-page:image:hero': { url: 'https://storage.test/site-hero.jpg', filename: 'Site hero' } },
             }] },
         }
+        const postMessage = vi.spyOn(window, 'postMessage')
         render(<RenderFrameRuntime />)
 
-        sendModel(createDesignerRenderModel({ workspace: imageWorkspace, viewId: 'site-page' }))
+        sendModel(createDesignerRenderModel({ workspace: imageWorkspace, viewId: 'site-page', contentEditable: true }))
 
-        expect(await screen.findByRole('img', { name: 'Site hero' })).toHaveAttribute('src', 'https://storage.test/site-hero.jpg')
+        const image = await screen.findByRole('img', { name: 'Site hero' })
+        expect(image).toHaveAttribute('src', 'https://storage.test/site-hero.jpg')
+        fireEvent.contextMenu(image, { clientX: 30, clientY: 40 })
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Replace image' }))
+        const input = document.querySelector<HTMLInputElement>('input[type="file"][accept*="image/png"]')!
+        const replacement = new File(['replacement'], 'replacement.png', { type: 'image/png' })
+        fireEvent.change(input, { target: { files: [replacement] } })
+
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview',
+            action: 'contextAction',
+            command: 'replaceImage',
+            targetId: 'content-image:0',
+            kind: 'previewImage',
+            sourceUrl: 'https://storage.test/site-hero.jpg',
+            file: replacement,
+        }), '*')
+        expect(input).not.toBeInTheDocument()
+        postMessage.mockRestore()
     })
 })

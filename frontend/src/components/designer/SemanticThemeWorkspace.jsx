@@ -439,6 +439,7 @@ const SemanticThemeWorkspace = ({
                     label: option.label,
                     text: option.text || '',
                     editable: option.editable !== false,
+                    sourceUrl: option.sourceUrl || '',
                     computedStyles: option.computedStyles || {},
                 }))
                 : []
@@ -448,6 +449,7 @@ const SemanticThemeWorkspace = ({
                 label: event.data.label,
                 text: event.data.text || '',
                 editable: event.data.editable !== false,
+                sourceUrl: event.data.sourceUrl || '',
                 computedStyles: event.data.computedStyles || {},
                 alternatives,
             }
@@ -457,6 +459,20 @@ const SemanticThemeWorkspace = ({
                 ...Object.fromEntries(alternatives.map((alternative) => [alternative.id, alternative.computedStyles])),
             }))
             setAddedThemeValues(new Set())
+            if (event.data.action === 'contextAction') {
+                setSelectedTarget(target)
+                setSelectionExpanded(true)
+                setWorkspaceView('preview')
+                if (event.data.command === 'replaceImage' && event.data.file instanceof File) {
+                    if (target.kind === 'asset') {
+                        const asset = workspace.assets.find((candidate) => `asset:${candidate.assetKey}` === target.id)
+                        if (asset) void replaceAsset(asset, event.data.file)
+                    } else if (target.kind === 'previewImage' && viewId && target.sourceUrl) {
+                        void replacePreviewImage?.(viewId, target.sourceUrl, event.data.file)
+                    }
+                }
+                return
+            }
             if (target.kind === 'asset') {
                 const asset = workspace.assets.find((candidate) => `asset:${candidate.assetKey}` === target.id)
                 if (asset) {
@@ -484,7 +500,7 @@ const SemanticThemeWorkspace = ({
         }
         window.addEventListener('message', receive)
         return () => window.removeEventListener('message', receive)
-    }, [contentMode, viewId, workspace.assets])
+    }, [contentMode, replaceAsset, replacePreviewImage, viewId, workspace.assets])
 
     const selectedView = previewContent.views.find((view) => view.id === viewId) || previewContent.views[0] || null
     const selectedViewImages = useMemo(() => previewImagesFor(selectedView), [selectedView])

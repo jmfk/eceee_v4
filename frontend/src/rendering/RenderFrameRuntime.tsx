@@ -28,6 +28,7 @@ html,body,#root{margin:0;min-height:100%;background:#fff}body{font-family:system
 .forms-widget{display:grid;gap:12px}.forms-widget label{display:grid;gap:4px}.table-widget{overflow:auto}.table-widget table{width:100%;border-collapse:collapse}.table-widget th,.table-widget td{padding:8px;border:1px solid #d1d5db;text-align:left}
 .news-items{display:grid;gap:18px}.news-item{display:grid;gap:12px}.render-error-state{border:1px solid #fecaca;background:#fef2f2}
 .designer-preview [data-designer-target]{cursor:pointer}.designer-guides [data-designer-target]{outline:1px dashed rgba(100,116,139,.5)!important;outline-offset:-1px}[data-designer-target].designer-selected{outline:3px solid #2563eb!important;outline-offset:-3px!important}.designer-guides .designer-hovered{outline:2px dotted #2563eb!important;outline-offset:-2px!important}
+.designer-context-menu{position:fixed!important;z-index:2147483647!important;min-width:180px!important;max-width:260px!important;padding:6px!important;border:1px solid #d1d5db!important;border-radius:8px!important;background:#fff!important;box-shadow:0 10px 24px rgba(15,23,42,.2)!important;color:#111827!important;font:500 13px/1.35 system-ui,sans-serif!important}.designer-context-menu-title{overflow:hidden!important;padding:5px 8px 7px!important;color:#6b7280!important;font-size:11px!important;font-weight:600!important;text-overflow:ellipsis!important;white-space:nowrap!important}.designer-context-menu button{display:block!important;width:100%!important;padding:7px 8px!important;border:0!important;border-radius:5px!important;background:transparent!important;color:#111827!important;font:inherit!important;text-align:left!important;cursor:pointer!important}.designer-context-menu button:hover,.designer-context-menu button:focus-visible{background:#eff6ff!important;color:#1d4ed8!important;outline:none!important}
 .designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483646!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483647!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483647!important;transform:translate(-50%,-50%);font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,0 0 4px #fff,0 0 7px #fff}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}
 @media(max-width:767px){.two-columns-widget,.three-columns-widget{grid-template-columns:1fr}}
 `
@@ -37,15 +38,17 @@ const computedThemeValues = (node: HTMLElement) => {
     return Object.fromEntries(Object.entries(DESIGNER_STYLE_PROPERTIES).map(([name, cssName]) => [name, style.getPropertyValue(cssName)]))
 }
 
-const postDesignerEvent = (node: HTMLElement, action = 'select') => {
+const postDesignerEvent = (node: HTMLElement, action = 'select', preferredTarget?: any, extra: Record<string, unknown> = {}) => {
     const targets = JSON.parse(node.dataset.designerTargets || '[]')
-    const primary = targets[0]
+    const primary = preferredTarget || targets[0]
     if (!primary) return
     window.parent.postMessage({
         source: 'eceee-designer-preview', action, targetId: primary.id, kind: primary.kind,
         label: primary.label, text: node.innerText || '', editable: primary.editable,
+        sourceUrl: primary.sourceUrl || '',
         computedStyles: computedThemeValues(node),
         alternatives: targets.map((target: any) => ({ ...target, text: node.innerText || '', computedStyles: computedThemeValues(node) })),
+        ...extra,
     }, '*')
 }
 
@@ -68,6 +71,8 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
     const cleanups: Array<() => void> = []
     let guides: HTMLElement[] = []
     let hoveredNode: HTMLElement | null = null
+    let contextMenu: HTMLElement | null = null
+    const closeContextMenu = () => { contextMenu?.remove(); contextMenu = null }
     const removeGuides = () => { guides.forEach((guide) => guide.remove()); guides = [] }
     const clearGuides = () => {
         removeGuides()
@@ -240,6 +245,22 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
         node.contentEditable = 'true'
     })
 
+    if (designer.contentEditable === true) {
+        let imageIndex = 0
+        root.querySelectorAll<HTMLImageElement>('img[src]').forEach((node) => {
+            const sourceUrl = node.currentSrc || node.src
+            if (!sourceUrl) return
+            registerTarget(node, {
+                id: `content-image:${imageIndex}`,
+                kind: 'previewImage',
+                label: node.alt?.trim() || 'Content image',
+                sourceUrl,
+                editable: false,
+            }, true)
+            imageIndex += 1
+        })
+    }
+
     root.querySelectorAll<HTMLElement>('[data-designer-target]').forEach((node) => {
         const click = (event: Event) => { event.preventDefault(); event.stopPropagation(); root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected')); node.classList.add('designer-selected'); postDesignerEvent(node) }
         let primaryTarget: any = null
@@ -253,6 +274,92 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
         node.addEventListener('input', input)
         cleanups.push(() => { node.removeEventListener('click', click); node.removeEventListener('input', input) })
     })
+    const openContextMenu = (event: MouseEvent) => {
+        const eventNode = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-designer-target]') : null
+        if (!eventNode || !root.contains(eventNode)) return
+        const targets: any[] = []
+        let targetNode: HTMLElement | null = eventNode
+        while (targetNode && root.contains(targetNode)) {
+            try {
+                JSON.parse(targetNode.dataset.designerTargets || '[]').forEach((target: any) => {
+                    if (!targets.some((candidate) => candidate.id === target.id)) targets.push(target)
+                })
+            } catch { /* Invalid target metadata is ignored. */ }
+            targetNode = targetNode.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
+        }
+        const primary = targets[0]
+        if (!primary) return
+        event.preventDefault()
+        event.stopPropagation()
+        closeContextMenu()
+        root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected'))
+        eventNode.classList.add('designer-selected')
+        postDesignerEvent(eventNode, 'select', primary)
+
+        const menu = document.createElement('div')
+        menu.className = 'designer-context-menu'
+        menu.setAttribute('role', 'menu')
+        menu.setAttribute('aria-label', `Actions for ${primary.label}`)
+        const title = document.createElement('div')
+        title.className = 'designer-context-menu-title'
+        title.textContent = primary.label
+        menu.append(title)
+
+        const addAction = (label: string, target: any, command: string, onInvoke?: () => void) => {
+            const button = document.createElement('button')
+            button.type = 'button'
+            button.setAttribute('role', 'menuitem')
+            button.textContent = label
+            button.addEventListener('click', () => {
+                if (onInvoke) onInvoke()
+                else postDesignerEvent(eventNode, 'contextAction', target, { command })
+                closeContextMenu()
+            })
+            menu.append(button)
+            return button
+        }
+
+        const editableTarget = targets.find((target) => target.editable)
+        if (editableTarget) addAction('Edit text', editableTarget, 'editText', () => {
+            postDesignerEvent(eventNode, 'contextAction', editableTarget, { command: 'editText' })
+            eventNode.focus()
+            const selection = window.getSelection()
+            selection?.selectAllChildren(eventNode)
+            selection?.collapseToEnd()
+        })
+
+        const assetTargets = targets.filter((target) => target.kind === 'asset')
+        const imageTargets = assetTargets.length ? assetTargets : targets.filter((target) => target.kind === 'previewImage')
+        imageTargets.forEach((target) => addAction(imageTargets.length > 1 ? `Replace ${target.label}` : 'Replace image', target, 'replaceImage', () => {
+            const input = document.createElement('input')
+            input.type = 'file'
+            input.accept = 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml'
+            input.hidden = true
+            input.addEventListener('change', () => {
+                const file = input.files?.[0]
+                if (file) postDesignerEvent(eventNode, 'contextAction', target, { command: 'replaceImage', file })
+                input.remove()
+            }, { once: true })
+            document.body.append(input)
+            window.addEventListener('focus', () => window.setTimeout(() => input.remove(), 0), { once: true })
+            input.click()
+        }))
+
+        addAction('Edit in inspector', primary, 'inspect')
+        document.body.append(menu)
+        contextMenu = menu
+        const rect = menu.getBoundingClientRect()
+        menu.style.left = `${Math.max(8, Math.min(event.clientX, window.innerWidth - rect.width - 8))}px`
+        menu.style.top = `${Math.max(8, Math.min(event.clientY, window.innerHeight - rect.height - 8))}px`
+        menu.querySelector<HTMLButtonElement>('button')?.focus()
+    }
+    const dismissContextMenu = (event: Event) => {
+        if (contextMenu && !(event.target instanceof Node && contextMenu.contains(event.target))) closeContextMenu()
+    }
+    const dismissContextMenuWithKeyboard = (event: KeyboardEvent) => { if (event.key === 'Escape') closeContextMenu() }
+    root.addEventListener('contextmenu', openContextMenu)
+    document.addEventListener('pointerdown', dismissContextMenu)
+    document.addEventListener('keydown', dismissContextMenuWithKeyboard)
     const findHoveredNode = (target: EventTarget | null) => target instanceof HTMLElement ? target : null
     const over = (event: MouseEvent) => {
         const node = findHoveredNode(event.target)
@@ -270,6 +377,10 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
     window.addEventListener('scroll', refreshGuides, true)
     window.addEventListener('resize', refreshGuides)
     cleanups.push(() => {
+        closeContextMenu()
+        root.removeEventListener('contextmenu', openContextMenu)
+        document.removeEventListener('pointerdown', dismissContextMenu)
+        document.removeEventListener('keydown', dismissContextMenuWithKeyboard)
         root.removeEventListener('mouseover', over)
         root.removeEventListener('mouseout', out)
         window.removeEventListener('scroll', refreshGuides, true)
