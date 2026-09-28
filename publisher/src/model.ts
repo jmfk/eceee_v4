@@ -1,8 +1,10 @@
-export interface Page { id: number; tenant_id: number; parent_id: number | null; slug: string | null; title: string; hostnames: string[]; path_pattern: string }
-export interface Version { id: number; page_id: number; meta_title: string; meta_description: string; code_layout: string; widgets: unknown }
-export interface ReadDb { roots(): Promise<Page[]>; child(parentId: number, tenantId: number, slug: string): Promise<Page | null>; version(pageId: number, at: Date): Promise<Version | null> }
+export type DbId = string;
+export interface Page { id: DbId; tenant_id: DbId; parent_id: DbId | null; slug: string | null; title: string; hostnames: string[]; path_pattern: string }
+export interface Version { id: DbId; page_id: DbId; meta_title: string; meta_description: string; code_layout: string; widgets: unknown }
+export interface PageReader { root(hostname: string): Promise<Page | null>; child(parentId: DbId, tenantId: DbId, slug: string): Promise<Page | null>; version(pageId: DbId, at: Date): Promise<Version | null> }
+export interface ReadDb { withSnapshot<T>(read: (db: PageReader) => Promise<T>): Promise<T> }
 export interface Widget { id: string; type: string; config: Record<string, unknown> }
-export interface PublishedPageModel { layout: string; slots: Record<string, Widget[]>; context: { mode: 'public'; preview: false; tenantId: string; siteId: number; pageId: number; versionId: number }; title: string; description: string; matchedPath: string; remainingPath: string }
+export interface PublishedPageModel { layout: string; slots: Record<string, Widget[]>; context: { mode: 'public'; preview: false; tenantId: DbId; siteId: DbId; pageId: DbId; versionId: DbId }; title: string; description: string; matchedPath: string; remainingPath: string }
 
 export function normalizeHostname(input: string): string | null {
   const host = input.trim().toLowerCase();
@@ -31,21 +33,22 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
   if (!host || !path.startsWith('/') || path.includes('?') || path.includes('#')) return null;
   const segments = path.split('/').filter(Boolean);
   if (segments.some(s => s === '.' || s === '..' || !/^[\p{L}\p{N}_-]+$/u.test(s)) || segments.length > 64) return null;
-  const roots = (await db.roots()).filter(p => p.parent_id === null && p.hostnames.some(h => normalizeHostname(h) === host));
-  if (roots.length !== 1) return null;
-  const root = roots[0];
-  let current = root, consumed = 0;
-  for (const segment of segments) {
-    const child = await db.child(current.id, root.tenant_id, segment);
-    if (!child || child.parent_id !== current.id || child.tenant_id !== root.tenant_id) break;
-    current = child;
-    consumed++;
-  }
-  // Dynamic path-pattern resolution is outside this slice; never serve the prefix as a static page.
-  if (consumed !== segments.length || current.path_pattern) return null;
-  const version = await db.version(current.id, at);
-  if (!version || version.page_id !== current.id) return null;
-  const slots = normalizeWidgets(version.widgets);
-  if (slots.landing_page && !slots.landingPage) slots.landingPage = slots.landing_page;
-  return { layout: version.code_layout || 'main_layout', slots, context: { mode: 'public', preview: false, tenantId: String(root.tenant_id), siteId: root.id, pageId: current.id, versionId: version.id }, title: version.meta_title || current.title, description: version.meta_description || '', matchedPath: '/' + segments.slice(0, consumed).join('/'), remainingPath: '' };
+  return db.withSnapshot(async reader => {
+    const root = await reader.root(host);
+    if (!root || root.parent_id !== null) return null;
+    let current = root, consumed = 0;
+    for (const segment of segments) {
+      const child = await reader.child(current.id, root.tenant_id, segment);
+      if (!child || child.parent_id !== current.id || child.tenant_id !== root.tenant_id) break;
+      current = child;
+      consumed++;
+    }
+    // Dynamic path-pattern resolution is outside this slice; never serve the prefix as a static page.
+    if (consumed !== segments.length || current.path_pattern) return null;
+    const version = await reader.version(current.id, at);
+    if (!version || version.page_id !== current.id) return null;
+    const slots = normalizeWidgets(version.widgets);
+    if (slots.landing_page && !slots.landingPage) slots.landingPage = slots.landing_page;
+    return { layout: version.code_layout || 'main_layout', slots, context: { mode: 'public', preview: false, tenantId: root.tenant_id, siteId: root.id, pageId: current.id, versionId: version.id }, title: version.meta_title || current.title, description: version.meta_description || '', matchedPath: '/' + segments.slice(0, consumed).join('/'), remainingPath: '' };
+  });
 }
