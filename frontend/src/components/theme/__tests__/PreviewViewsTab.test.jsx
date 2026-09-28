@@ -94,7 +94,7 @@ describe('PreviewViewsTab', () => {
 
         await screen.findByRole('option', { name: 'Article' })
         fireEvent.click(screen.getByRole('button', { name: 'New object' }))
-        fireEvent.click(screen.getByRole('button', { name: 'Change object fields' }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Change object fields' }))
 
         await waitFor(() => expect(preview.views[0].content.data).toEqual({ summary: 'Safe', related: null }))
     })
