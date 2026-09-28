@@ -915,7 +915,7 @@ const SemanticThemeWorkspace = ({
                 '--designer-inspector-handle-width': inspectorCollapsed ? '0px' : `${resizeHandleWidth}px`,
             }}
         >
-            <section aria-label="Preview navigation" className={`${mobilePane === 'preview' || sidebarCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-r border-gray-200 bg-white lg:border-r-0`}>
+            <section aria-label="Preview navigation" className={`${mobilePane === 'preview' || sidebarCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-r border-gray-200 bg-white lg:col-start-1 lg:row-start-1 lg:border-r-0`}>
                 <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Navigator</span><button type="button" aria-label="Collapse preview navigation" onClick={() => setSidebarCollapsed(true)} className="hidden rounded p-1 text-gray-500 hover:bg-gray-100 lg:block"><ChevronLeft className="h-4 w-4" /></button></div>
                 <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-3">
                     <fieldset disabled={disabled} className="min-w-0">{previewOptions}</fieldset>
@@ -948,11 +948,11 @@ const SemanticThemeWorkspace = ({
                 onPointerUp={stopSidebarResize}
                 onPointerCancel={stopSidebarResize}
                 onKeyDown={resizeSidebarWithKeyboard}
-                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 ${sidebarCollapsed ? '' : 'lg:flex'} ${isResizingSidebar ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
+                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 lg:col-start-2 lg:row-start-1 ${sidebarCollapsed ? '' : 'lg:flex'} ${isResizingSidebar ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
             >
                 <span className={`h-10 w-0.5 rounded-full ${isResizingSidebar ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-500 group-focus:bg-blue-500'}`} />
             </div>
-            <section className={`${mobilePane === 'edit' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col bg-gray-100 p-2 lg:flex lg:p-3`}>
+            <section className={`${mobilePane === 'edit' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col bg-gray-100 p-2 lg:col-start-3 lg:row-start-1 lg:flex lg:p-3`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1">
                         <button type="button" aria-label={sidebarCollapsed ? 'Expand preview navigation' : 'Collapse preview navigation'} aria-pressed={sidebarCollapsed} onClick={() => setSidebarCollapsed((current) => !current)} className="hidden rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 lg:inline-flex">{sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</button>
@@ -994,11 +994,11 @@ const SemanticThemeWorkspace = ({
                 onPointerUp={stopInspectorResize}
                 onPointerCancel={stopInspectorResize}
                 onKeyDown={resizeInspectorWithKeyboard}
-                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 ${inspectorCollapsed ? '' : 'lg:flex'} ${isResizingInspector ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
+                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 lg:col-start-4 lg:row-start-1 ${inspectorCollapsed ? '' : 'lg:flex'} ${isResizingInspector ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
             >
                 <span className={`h-10 w-0.5 rounded-full ${isResizingInspector ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-500 group-focus:bg-blue-500'}`} />
             </div>
-            <section aria-label="Theme inspector" className={`${mobilePane === 'preview' || inspectorCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-l border-gray-200 bg-white lg:border-l-0`}>
+            <section aria-label="Theme inspector" className={`${mobilePane === 'preview' || inspectorCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-l border-gray-200 bg-white lg:col-start-5 lg:row-start-1 lg:border-l-0`}>
                 <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Inspector</span><button type="button" aria-label="Collapse theme inspector" onClick={() => setInspectorCollapsed(true)} className="hidden rounded p-1 text-gray-500 hover:bg-gray-100 lg:block"><ChevronRight className="h-4 w-4" /></button></div>
                 <fieldset disabled={disabled} className="min-h-0 flex-1 overflow-y-auto p-3">
                     {workspaceView === 'details'

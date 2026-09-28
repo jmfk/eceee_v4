@@ -469,19 +469,29 @@ describe('DesignerThemeWorkspacePage', () => {
         ))
     })
 
-    it('collapses and restores both side columns independently', async () => {
+    it('collapses and restores both side columns without moving the preview grid column', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
 
+        const previewPane = screen.getByTitle('Live theme preview').closest('section')
+        const navigationPane = screen.getByRole('region', { name: 'Preview navigation' })
+        const inspectorPane = screen.getByRole('region', { name: 'Theme inspector' })
+        expect(navigationPane).toHaveClass('lg:col-start-1')
+        expect(previewPane).toHaveClass('lg:col-start-3')
+        expect(inspectorPane).toHaveClass('lg:col-start-5')
+
         fireEvent.click(screen.getAllByRole('button', { name: 'Collapse preview navigation' })[0])
-        expect(screen.getByRole('region', { name: 'Preview navigation' })).toHaveClass('hidden')
+        expect(navigationPane).toHaveClass('hidden')
+        expect(previewPane).toHaveClass('lg:col-start-3')
+        expect(inspectorPane).toHaveClass('lg:col-start-5')
         fireEvent.click(screen.getByRole('button', { name: 'Expand preview navigation' }))
-        expect(screen.getByRole('region', { name: 'Preview navigation' })).not.toHaveClass('hidden')
+        expect(navigationPane).not.toHaveClass('hidden')
 
         fireEvent.click(screen.getAllByRole('button', { name: 'Collapse theme inspector' })[0])
-        expect(screen.getByRole('region', { name: 'Theme inspector' })).toHaveClass('hidden')
+        expect(inspectorPane).toHaveClass('hidden')
+        expect(previewPane).toHaveClass('lg:col-start-3')
         fireEvent.click(screen.getByRole('button', { name: 'Expand theme inspector' }))
-        expect(screen.getByRole('region', { name: 'Theme inspector' })).not.toHaveClass('hidden')
+        expect(inspectorPane).not.toHaveClass('hidden')
     })
 
     it('offers rich text commands after a preview double-click and lists nested elements as accordions', async () => {
