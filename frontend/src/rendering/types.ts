@@ -39,6 +39,7 @@ export interface DesignerRenderOptions {
     catalog: Record<string, any>
     texts: Record<string, string>
     assets: Array<Record<string, any>>
+    editableTypographyTargets?: Record<string, string[]>
     editableSpacingTargets?: Record<string, string[]>
     contentEditable?: boolean
     guidesEnabled?: boolean

@@ -462,6 +462,9 @@ const SemanticThemeWorkspace = ({
             const descendants = Array.isArray(event.data.descendants)
                 ? event.data.descendants.filter((option) => option?.id && option?.label).map(normalizeTarget)
                 : []
+            const ancestors = Array.isArray(event.data.ancestors)
+                ? event.data.ancestors.filter((option) => option?.id && option?.label).map(normalizeTarget)
+                : []
             const target = {
                 id: event.data.targetId,
                 kind: event.data.kind,
@@ -472,12 +475,14 @@ const SemanticThemeWorkspace = ({
                 sourceUrl: event.data.sourceUrl || '',
                 computedStyles: event.data.computedStyles || {},
                 alternatives,
+                ancestors,
                 descendants,
             }
             setThemeDefaults((current) => ({
                 ...current,
                 [target.id]: target.computedStyles,
                 ...Object.fromEntries(alternatives.map((alternative) => [alternative.id, alternative.computedStyles])),
+                ...Object.fromEntries(ancestors.map((ancestor) => [ancestor.id, ancestor.computedStyles])),
             }))
             setAddedThemeValues(new Set())
             if (event.data.action === 'contextAction' || event.data.action === 'editText') {
@@ -576,6 +581,7 @@ const SemanticThemeWorkspace = ({
     const selectedTargetIds = [...new Set([
         selectedTarget?.id,
         ...(selectedTarget?.alternatives || []).map((target) => target.id),
+        ...(selectedTarget?.ancestors || []).map((target) => target.id),
     ].filter(Boolean))]
     const selectedGroupIndex = Number(selectedTargetIds.map((id) => id.match(/^group:(\d+)/)?.[1]).find((value) => value !== undefined))
     const selectedGroup = Number.isInteger(selectedGroupIndex)
@@ -622,7 +628,7 @@ const SemanticThemeWorkspace = ({
     const chooseTargetAlternative = (alternative) => {
         const asset = assetsByTargetId.get(alternative.id)
         if (asset) setSelectedImageAspectKey(imageAspectKey(asset))
-        setSelectedTarget((current) => ({ ...alternative, alternatives: current?.alternatives || [], descendants: current?.descendants || [] }))
+        setSelectedTarget((current) => ({ ...alternative, alternatives: current?.alternatives || [], ancestors: current?.ancestors || [], descendants: current?.descendants || [] }))
         setSelectionExpanded(true)
         iframeRef.current?.contentWindow?.postMessage({
             source: 'eceee-render-host',
@@ -852,7 +858,7 @@ const SemanticThemeWorkspace = ({
                 <ChevronDown className={`h-4 w-4 shrink-0 text-blue-700 transition-transform ${selectionExpanded ? 'rotate-180' : ''}`} />
             </button>
             {selectionExpanded && (
-                <div id="selected-element-editor" className="space-y-4 border-t border-blue-200 p-3">
+                <div id="selected-element-editor" className="space-y-3 border-t border-blue-200 p-2">
                     {contentMode === 'demo' && selectedTarget.kind === 'element' && selectedTarget.editable && <section className="space-y-2">
                         <div><h3 className="text-sm font-medium text-gray-900">Example text</h3><p className="mt-0.5 text-xs text-gray-500">Double-click the text in the preview to edit it directly.</p></div>
                         {selectedTarget.richText ? <div className="flex flex-wrap items-center gap-1" role="toolbar" aria-label="Rich text formatting">
@@ -868,7 +874,7 @@ const SemanticThemeWorkspace = ({
                         </div> : <textarea aria-label="Example text" value={selectedTarget.text || ''} onChange={(event) => updateSelectedExampleText(event.target.value)} rows={3} className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900" />}
                         <button type="button" onClick={persistSelectedExampleText} disabled={disabled} className="rounded bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">Save example text</button>
                     </section>}
-                    {(selectedTarget.alternatives?.length > 1 || selectedTarget.kind === 'asset') && <section className="space-y-2"><h3 className="text-sm font-medium text-gray-900">Choose what to edit</h3><p className="text-xs text-gray-500">These elements share the same area.</p>{(selectedTarget.alternatives || [selectedTarget]).some((alternative) => assetsByTargetId.has(alternative.id)) && <p className="text-xs text-gray-500">Images can be uploaded or replaced directly.</p>}<div className="grid gap-2">{(selectedTarget.alternatives?.length ? selectedTarget.alternatives : [selectedTarget]).map(renderTargetAlternative)}</div></section>}
+                    {(selectedTarget.alternatives?.length > 1 || selectedTarget.kind === 'asset') && <section className="space-y-1.5"><h3 className="text-sm font-medium text-gray-900">Choose what to edit</h3><p className="text-xs text-gray-500">These elements share the same area.</p>{(selectedTarget.alternatives || [selectedTarget]).some((alternative) => assetsByTargetId.has(alternative.id)) && <p className="text-xs text-gray-500">Images can be uploaded or replaced directly.</p>}<div className="grid gap-1">{(selectedTarget.alternatives?.length ? selectedTarget.alternatives : [selectedTarget]).map(renderTargetAlternative)}</div></section>}
                     {targetTypography.map(({ row, index }) => {
                         const fields = activeFields('typography', index, row, workspace.constraints.editableTypographyProperties)
                         return fields.length > 0 && <section key={`type-${index}`} className="space-y-2 border-t border-gray-200 pt-3"><h3 className="text-sm font-medium text-gray-900">{sectionLabel('typography', row)}</h3><ValueFields idPrefix={`typography-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={typographyLabels} onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)} /></section>
@@ -889,10 +895,10 @@ const SemanticThemeWorkspace = ({
     const exampleImageEditor = contentMode === 'demo' && selectedView && selectedElementImages.length > 0 && (
         <section className="space-y-2 border-t border-gray-200 pt-3">
             <div><h2 className="text-sm font-semibold text-gray-900">Images in this element</h2><p className="mt-0.5 text-xs text-gray-500">Only images inside the selected element are shown.</p></div>
-            <div className="grid gap-2">{selectedElementImages.map((url, index) => {
+            <div className="divide-y divide-gray-200 border-y border-gray-200">{selectedElementImages.map((url, index) => {
                 const name = decodeURIComponent(url.split('/').at(-1)?.split('?')[0] || `Image ${index + 1}`)
                 const inputKey = `example:${selectedView.id}:${index}`
-                return <article key={url} className="flex min-w-0 items-center gap-2 rounded-md border border-gray-200 p-2">
+                return <article key={url} className="flex min-w-0 items-center gap-2 py-1.5">
                     <img src={url} alt="" className="h-12 w-16 shrink-0 rounded border border-gray-200 bg-gray-50 object-contain" />
                     <span className="min-w-0 flex-1 truncate text-xs text-gray-600">{name}</span>
                     <input ref={(node) => { uploadRefs.current[inputKey] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => uploadExampleImage(url, event.target.files?.[0])} className="sr-only" />
@@ -1000,12 +1006,12 @@ const SemanticThemeWorkspace = ({
             </div>
             <section aria-label="Theme inspector" className={`${mobilePane === 'preview' || inspectorCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-l border-gray-200 bg-white lg:col-start-5 lg:row-start-1 lg:border-l-0`}>
                 <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Inspector</span><button type="button" aria-label="Collapse theme inspector" onClick={() => setInspectorCollapsed(true)} className="hidden rounded p-1 text-gray-500 hover:bg-gray-100 lg:block"><ChevronRight className="h-4 w-4" /></button></div>
-                <fieldset disabled={disabled} className="min-h-0 flex-1 overflow-y-auto p-3">
+                <fieldset disabled={disabled} className="min-h-0 flex-1 overflow-y-auto p-2">
                     {workspaceView === 'details'
                         ? themeDetailsEditor
                         : workspaceView === 'images'
                             ? <div className="space-y-6">{imageAspectNavigation}{themeImageEditor}</div>
-                            : <div className="space-y-4">{selectedEditor || <div className="flex min-h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 p-5 text-center text-sm text-gray-500">Select an element in the preview to edit its text, images, typography, spacing, and colors.</div>}{exampleImageEditor}</div>}
+                            : <div className="space-y-3">{selectedEditor || <div className="flex min-h-32 items-center justify-center border border-dashed border-gray-300 p-3 text-center text-sm text-gray-500">Select an element in the preview to edit its text, images, typography, spacing, and colors.</div>}{exampleImageEditor}</div>}
                 </fieldset>
             </section>
         </main>

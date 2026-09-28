@@ -108,7 +108,11 @@ const workspace = {
         }],
         previewViews,
     },
-    constraints: { editableTypographyProperties: ['fontFamily', 'fontSize'], editableSpacingProperties: ['marginBottom', 'padding'], maxImageBytes: 10485760 },
+    constraints: {
+        editableTypographyProperties: ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing'],
+        editableSpacingProperties: ['marginBottom', 'padding'],
+        maxImageBytes: 10485760,
+    },
 }
 
 const selectHeading = async () => {
@@ -567,14 +571,20 @@ describe('DesignerThemeWorkspacePage', () => {
         const iframe = screen.getByTitle('Live theme preview')
         fireEvent(window, new MessageEvent('message', {
             data: {
-                source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:h1', kind: 'element', label: 'Heading 1', text: 'Heading',
+                source: 'eceee-designer-preview', action: 'select', targetId: 'content:99', kind: 'element', label: 'Heading 1 text', text: 'Heading', editable: true,
                 computedStyles: { fontSize: '18px', padding: '10px' },
+                ancestors: [{
+                    id: 'group:0:element:h1', kind: 'element', label: 'Heading 1', editable: false,
+                    computedStyles: { fontSize: '18px', fontWeight: '700', lineHeight: '1.2', padding: '10px' },
+                }],
             },
             source: iframe.contentWindow,
         }))
 
         expect(screen.getByLabelText('Inner spacing')).toHaveValue('10px')
-        expect(screen.getByText('Theme default')).toBeInTheDocument()
+        expect(screen.getByLabelText('Weight')).toHaveValue('700')
+        expect(screen.getByLabelText('Line height')).toHaveValue('1.2')
+        expect(screen.getAllByText('Theme default').length).toBeGreaterThan(0)
 
         fireEvent.click(screen.getByRole('button', { name: 'Remove Size' }))
         expect(window.confirm).toHaveBeenCalledWith('Remove Size? It will use the current theme default instead.')
@@ -596,7 +606,12 @@ describe('DesignerThemeWorkspacePage', () => {
 
         expect(screen.getByRole('heading', { name: /Typography/ })).toBeInTheDocument()
         expect(screen.getByRole('heading', { name: /^Spacing/ })).toBeInTheDocument()
+        expect(screen.getByLabelText('Font family')).toBeInTheDocument()
         expect(screen.getByLabelText('Size')).toBeInTheDocument()
+        expect(screen.getByLabelText('Weight')).toBeInTheDocument()
+        expect(screen.getByLabelText('Style')).toBeInTheDocument()
+        expect(screen.getByLabelText('Line height')).toBeInTheDocument()
+        expect(screen.getByLabelText('Letter spacing')).toBeInTheDocument()
         expect(screen.getByLabelText('Inner spacing')).toBeInTheDocument()
         expect(screen.queryByLabelText('Add theme value')).not.toBeInTheDocument()
     })
