@@ -71,7 +71,9 @@ describe('PreviewViewsTab', () => {
             expect(state.pages[state.metadata.currentPageId]).toBeDefined()
             expect(state.versions[state.metadata.currentVersionId]?.pageId).toBe(state.metadata.currentPageId)
         })
-        fireEvent.click(screen.getByRole('button', { name: 'New object' }))
+        const newObjectButton = screen.getByRole('button', { name: 'New object' })
+        await waitFor(() => expect(newObjectButton).toBeEnabled())
+        fireEvent.click(newObjectButton)
         expect(screen.getByDisplayValue('New Article')).toBeInTheDocument()
         expect(screen.getByText('Object widgets')).toBeInTheDocument()
         expect(screen.getByTestId('object-content-editor')).toHaveAttribute('data-namespace', 'tenant-default')
@@ -93,7 +95,9 @@ describe('PreviewViewsTab', () => {
         renderWithStateProviders(<Harness exposePreview={(value) => { preview = value }} />)
 
         await screen.findByRole('option', { name: 'Article' })
-        fireEvent.click(screen.getByRole('button', { name: 'New object' }))
+        const newObjectButton = screen.getByRole('button', { name: 'New object' })
+        await waitFor(() => expect(newObjectButton).toBeEnabled())
+        fireEvent.click(newObjectButton)
         fireEvent.click(await screen.findByRole('button', { name: 'Change object fields' }))
 
         await waitFor(() => expect(preview.views[0].content.data).toEqual({ summary: 'Safe', related: null }))
