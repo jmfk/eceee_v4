@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Box, ChevronDown, Eye, EyeOff, FileText, Image as ImageIcon, Loader2, Search, Settings2, Trash2 } from 'lucide-react'
+import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileText, Image as ImageIcon, Italic, Link2, List, ListOrdered, Loader2, Search, Settings2, Trash2 } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel } from '../../rendering/adapters'
@@ -207,15 +207,15 @@ const imageAspectsFor = (workspace) => {
 }
 
 const ValueFields = ({ idPrefix, values, defaults, fields, labels, onChange, onRemove }) => (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+    <div className="grid grid-cols-2 gap-2">
         {fields.map((field) => (
             <div key={field} className="min-w-0">
                 <div className="flex items-center justify-between gap-2">
                     <label htmlFor={`${idPrefix}-${field}`} className="text-xs font-medium text-gray-700">{labels[field] || field}</label>
                     <button type="button" aria-label={`Remove ${labels[field] || field}`} onClick={() => onRemove(field)} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
-                <input id={`${idPrefix}-${field}`} value={values[field] || defaults?.[field] || ''} onChange={(event) => onChange(field, event.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" placeholder="Reading theme default…" />
-                {!values[field] && defaults?.[field] && <p className="mt-1 text-[11px] text-gray-500">Theme default</p>}
+                <input id={`${idPrefix}-${field}`} value={values[field] || defaults?.[field] || ''} onChange={(event) => onChange(field, event.target.value)} className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1.5 text-xs" placeholder="Theme default" />
+                {!values[field] && defaults?.[field] && <p className="mt-0.5 text-[10px] text-gray-500">Theme default</p>}
             </div>
         ))}
     </div>
@@ -250,6 +250,8 @@ const SemanticThemeWorkspace = ({
     const [sourceContentModel, setSourceContentModel] = useState(null)
     const [loadingContent, setLoadingContent] = useState(false)
     const [guidesEnabled, setGuidesEnabled] = useState(true)
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+    const [inspectorCollapsed, setInspectorCollapsed] = useState(false)
     const [sidebarWidth, setSidebarWidth] = useState(defaultSidebarWidth)
     const [inspectorWidth, setInspectorWidth] = useState(defaultInspectorWidth)
     const [isResizingSidebar, setIsResizingSidebar] = useState(false)
@@ -432,16 +434,33 @@ const SemanticThemeWorkspace = ({
                 setThemeDefaults((current) => ({ ...current, [event.data.targetId]: event.data.computedStyles || {} }))
                 return
             }
+            if (event.data.action === 'spacingChange') {
+                const targetIds = Array.isArray(event.data.targetIds) ? event.data.targetIds : []
+                const index = workspace.spacing.findIndex((row) => targetIds.includes(row.targetId))
+                const property = event.data.property
+                if (index >= 0 && workspace.constraints.editableSpacingProperties.includes(property)) {
+                    updateWorkspace((next) => {
+                        next.spacing[index].values[property] = event.data.value
+                        return next
+                    })
+                }
+                return
+            }
+            const normalizeTarget = (option) => ({
+                id: option.id,
+                kind: option.kind,
+                label: option.label,
+                text: option.text || '',
+                editable: option.editable !== false,
+                richText: option.richText === true,
+                sourceUrl: option.sourceUrl || '',
+                computedStyles: option.computedStyles || {},
+            })
             const alternatives = Array.isArray(event.data.alternatives)
-                ? event.data.alternatives.filter((option) => option?.id && option?.label).map((option) => ({
-                    id: option.id,
-                    kind: option.kind,
-                    label: option.label,
-                    text: option.text || '',
-                    editable: option.editable !== false,
-                    sourceUrl: option.sourceUrl || '',
-                    computedStyles: option.computedStyles || {},
-                }))
+                ? event.data.alternatives.filter((option) => option?.id && option?.label).map(normalizeTarget)
+                : []
+            const descendants = Array.isArray(event.data.descendants)
+                ? event.data.descendants.filter((option) => option?.id && option?.label).map(normalizeTarget)
                 : []
             const target = {
                 id: event.data.targetId,
@@ -449,9 +468,11 @@ const SemanticThemeWorkspace = ({
                 label: event.data.label,
                 text: event.data.text || '',
                 editable: event.data.editable !== false,
+                richText: event.data.richText === true,
                 sourceUrl: event.data.sourceUrl || '',
                 computedStyles: event.data.computedStyles || {},
                 alternatives,
+                descendants,
             }
             setThemeDefaults((current) => ({
                 ...current,
@@ -459,7 +480,7 @@ const SemanticThemeWorkspace = ({
                 ...Object.fromEntries(alternatives.map((alternative) => [alternative.id, alternative.computedStyles])),
             }))
             setAddedThemeValues(new Set())
-            if (event.data.action === 'contextAction') {
+            if (event.data.action === 'contextAction' || event.data.action === 'editText') {
                 setSelectedTarget(target)
                 setSelectionExpanded(true)
                 setWorkspaceView('preview')
@@ -500,7 +521,7 @@ const SemanticThemeWorkspace = ({
         }
         window.addEventListener('message', receive)
         return () => window.removeEventListener('message', receive)
-    }, [contentMode, replaceAsset, replacePreviewImage, viewId, workspace.assets])
+    }, [contentMode, replaceAsset, replacePreviewImage, updateWorkspace, viewId, workspace.assets, workspace.constraints.editableSpacingProperties, workspace.spacing])
 
     const selectedView = previewContent.views.find((view) => view.id === viewId) || previewContent.views[0] || null
     const selectedViewImages = useMemo(() => previewImagesFor(selectedView), [selectedView])
@@ -519,6 +540,15 @@ const SemanticThemeWorkspace = ({
     const assetsByTargetId = useMemo(() => new Map(
         workspace.assets.map((asset) => [`asset:${asset.assetKey}`, asset]),
     ), [workspace.assets])
+    const selectedElementImages = useMemo(() => {
+        if (!selectedTarget) return []
+        const candidates = [selectedTarget, ...(selectedTarget.alternatives || []), ...(selectedTarget.descendants || [])]
+        const urls = candidates.flatMap((target) => {
+            const asset = assetsByTargetId.get(target.id)
+            return [target.sourceUrl, asset?.url].filter(Boolean)
+        })
+        return selectedViewImages.filter((url) => urls.includes(url))
+    }, [assetsByTargetId, selectedTarget, selectedViewImages])
     const selectedImageAspect = imageAspects.find((aspect) => aspect.key === selectedImageAspectKey) || imageAspects[0]
     const previewAsset = workspace.assets.find((asset) => asset.kind === 'preview')
     const siteIconAsset = workspace.assets.find((asset) => asset.kind === 'site-icon')
@@ -543,26 +573,32 @@ const SemanticThemeWorkspace = ({
     const previewScale = Math.min(1, previewFrameWidth / previewCanvasWidth)
     const previewOffset = Math.max(0, (previewFrameWidth - previewCanvasWidth * previewScale) / 2)
 
-    const selectedGroupIndex = Number(selectedTarget?.id?.match(/^group:(\d+)/)?.[1])
+    const selectedTargetIds = [...new Set([
+        selectedTarget?.id,
+        ...(selectedTarget?.alternatives || []).map((target) => target.id),
+    ].filter(Boolean))]
+    const selectedGroupIndex = Number(selectedTargetIds.map((id) => id.match(/^group:(\d+)/)?.[1]).find((value) => value !== undefined))
     const selectedGroup = Number.isInteger(selectedGroupIndex)
         ? workspace.catalog.designGroups.find((group) => group.groupIndex === selectedGroupIndex)
         : null
     const targetTypography = workspace.typography.map((row, index) => ({ row, index })).filter(({ row }) => (
         selectedTarget?.kind === 'group' && selectedGroup
             ? row.groupIndex === selectedGroup.groupIndex
-            : row.targetId === selectedTarget?.id
+            : selectedTargetIds.includes(row.targetId)
     ))
     const targetSpacing = workspace.spacing.map((row, index) => ({ row, index })).filter(({ row }) => (
         selectedTarget?.kind === 'group' && selectedGroup
             ? row.groupIndex === selectedGroup.groupIndex
-            : row.targetId === selectedTarget?.id
+            : selectedTargetIds.includes(row.targetId)
     ))
     const propertyKey = (kind, index, field) => `${kind}:${index}:${field}`
-    const activeFields = (kind, index, row, fields) => fields.filter((field) => row.values[field] || addedThemeValues.has(propertyKey(kind, index, field)))
+    const activeFields = (kind, index, row, fields) => selectedTarget
+        ? fields
+        : fields.filter((field) => row.values[field] || addedThemeValues.has(propertyKey(kind, index, field)))
     const sectionLabel = (kind, row) => kind === 'typography'
         ? `Typography${row.element ? ` · ${selectedGroup?.elements?.find((element) => element.element === row.element)?.label || row.element}` : ''}`
         : `Spacing${row.part ? ` · ${selectedGroup?.parts?.find((part) => part.part === row.part)?.label || row.part}` : ''}${row.breakpoint ? ` · ${row.breakpoint}` : ''}`
-    const addableThemeValues = [
+    const addableThemeValues = selectedTarget ? [] : [
         ...targetTypography.flatMap(({ row, index }) => workspace.constraints.editableTypographyProperties
             .filter((field) => !row.values[field] && !addedThemeValues.has(propertyKey('typography', index, field)))
             .map((field) => ({ kind: 'typography', index, row, field, label: `${sectionLabel('typography', row)} · ${typographyLabels[field] || field}` }))),
@@ -586,7 +622,7 @@ const SemanticThemeWorkspace = ({
     const chooseTargetAlternative = (alternative) => {
         const asset = assetsByTargetId.get(alternative.id)
         if (asset) setSelectedImageAspectKey(imageAspectKey(asset))
-        setSelectedTarget((current) => ({ ...alternative, alternatives: current?.alternatives || [] }))
+        setSelectedTarget((current) => ({ ...alternative, alternatives: current?.alternatives || [], descendants: current?.descendants || [] }))
         setSelectionExpanded(true)
         iframeRef.current?.contentWindow?.postMessage({
             source: 'eceee-render-host',
@@ -605,6 +641,20 @@ const SemanticThemeWorkspace = ({
         iframeRef.current?.contentWindow?.postMessage({
             source: 'eceee-render-host', action: 'updateText', targetId: selectedTarget.id, text,
         }, '*')
+    }
+
+    const formatSelectedRichText = (command, value = '') => {
+        if (!selectedTarget?.richText) return
+        iframeRef.current?.contentWindow?.postMessage({
+            source: 'eceee-render-host', action: 'formatText', targetId: selectedTarget.id, command, value,
+        }, '*')
+    }
+
+    const createSelectedRichTextLink = () => {
+        const value = window.prompt('Link URL')?.trim()
+        if (!value) return
+        const url = /^(https?:\/\/|mailto:|tel:|\/|#)/i.test(value) ? value : `https://${value}`
+        formatSelectedRichText('createLink', url)
     }
 
     const persistSelectedExampleText = async () => {
@@ -782,50 +832,64 @@ const SemanticThemeWorkspace = ({
         </section>
     )
 
+    const childTargets = (selectedTarget?.descendants || []).filter((target) => !selectedTargetIds.includes(target.id))
+    const richTextToolClass = 'inline-flex h-8 min-w-8 items-center justify-center rounded border border-gray-300 bg-white px-2 text-xs text-gray-700 hover:bg-gray-50'
+
     const selectedEditor = selectedTarget && (
-        <section className="overflow-hidden rounded-lg border border-blue-200 bg-white shadow-sm">
+        <section className="border-b border-gray-200 bg-white">
             <button
                 type="button"
                 aria-expanded={selectionExpanded}
                 aria-controls="selected-element-editor"
                 aria-label={`${selectionExpanded ? 'Collapse' : 'Expand'} ${selectedTarget.label} settings`}
                 onClick={() => setSelectionExpanded((current) => !current)}
-                className="flex w-full items-center gap-3 bg-blue-50 px-4 py-3 text-left hover:bg-blue-100"
+                className="flex w-full items-center gap-2 bg-blue-50 px-3 py-2 text-left hover:bg-blue-100"
             >
                 <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Selected element</p>
                     <h2 className="truncate text-base font-semibold text-gray-900">{selectedTarget.label}</h2>
                 </div>
-                <ChevronDown className={`h-5 w-5 shrink-0 text-blue-700 transition-transform ${selectionExpanded ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 shrink-0 text-blue-700 transition-transform ${selectionExpanded ? 'rotate-180' : ''}`} />
             </button>
             {selectionExpanded && (
-                <div id="selected-element-editor" className="space-y-5 border-t border-blue-200 p-4">
+                <div id="selected-element-editor" className="space-y-4 border-t border-blue-200 p-3">
                     {contentMode === 'demo' && selectedTarget.kind === 'element' && selectedTarget.editable && <section className="space-y-2">
-                        <div><h3 className="text-sm font-medium text-gray-900">Example text</h3><p className="mt-1 text-xs text-gray-500">Edit here or type directly in the preview. Only this theme example is changed.</p></div>
-                        <textarea aria-label="Example text" value={selectedTarget.text || ''} onChange={(event) => updateSelectedExampleText(event.target.value)} rows={4} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900" />
-                        <button type="button" onClick={persistSelectedExampleText} disabled={disabled} className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">Save example text</button>
+                        <div><h3 className="text-sm font-medium text-gray-900">Example text</h3><p className="mt-0.5 text-xs text-gray-500">Double-click the text in the preview to edit it directly.</p></div>
+                        {selectedTarget.richText ? <div className="flex flex-wrap items-center gap-1" role="toolbar" aria-label="Rich text formatting">
+                            <select aria-label="Paragraph style" defaultValue="" onChange={(event) => { if (event.target.value) formatSelectedRichText('formatBlock', event.target.value); event.target.value = '' }} className="h-8 rounded border border-gray-300 bg-white px-2 text-xs text-gray-700">
+                                <option value="">Paragraph style</option><option value="p">Paragraph</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="blockquote">Quote</option>
+                            </select>
+                            <button type="button" aria-label="Bold" title="Bold" onClick={() => formatSelectedRichText('bold')} className={richTextToolClass}><Bold className="h-3.5 w-3.5" /></button>
+                            <button type="button" aria-label="Italic" title="Italic" onClick={() => formatSelectedRichText('italic')} className={richTextToolClass}><Italic className="h-3.5 w-3.5" /></button>
+                            <button type="button" aria-label="Bulleted list" title="Bulleted list" onClick={() => formatSelectedRichText('insertUnorderedList')} className={richTextToolClass}><List className="h-3.5 w-3.5" /></button>
+                            <button type="button" aria-label="Numbered list" title="Numbered list" onClick={() => formatSelectedRichText('insertOrderedList')} className={richTextToolClass}><ListOrdered className="h-3.5 w-3.5" /></button>
+                            <button type="button" aria-label="Add link" title="Add link" onClick={createSelectedRichTextLink} className={richTextToolClass}><Link2 className="h-3.5 w-3.5" /></button>
+                            <button type="button" aria-label="Remove link" onClick={() => formatSelectedRichText('unlink')} className={richTextToolClass}>Unlink</button>
+                        </div> : <textarea aria-label="Example text" value={selectedTarget.text || ''} onChange={(event) => updateSelectedExampleText(event.target.value)} rows={3} className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900" />}
+                        <button type="button" onClick={persistSelectedExampleText} disabled={disabled} className="rounded bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">Save example text</button>
                     </section>}
                     {(selectedTarget.alternatives?.length > 1 || selectedTarget.kind === 'asset') && <section className="space-y-2"><h3 className="text-sm font-medium text-gray-900">Choose what to edit</h3><p className="text-xs text-gray-500">These elements share the same area.</p>{(selectedTarget.alternatives || [selectedTarget]).some((alternative) => assetsByTargetId.has(alternative.id)) && <p className="text-xs text-gray-500">Images can be uploaded or replaced directly.</p>}<div className="grid gap-2">{(selectedTarget.alternatives?.length ? selectedTarget.alternatives : [selectedTarget]).map(renderTargetAlternative)}</div></section>}
                     {targetTypography.map(({ row, index }) => {
                         const fields = activeFields('typography', index, row, workspace.constraints.editableTypographyProperties)
-                        return fields.length > 0 && <section key={`type-${index}`} className="space-y-3 border-t border-gray-200 pt-4"><h3 className="font-medium text-gray-900">{sectionLabel('typography', row)}</h3><ValueFields idPrefix={`typography-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={typographyLabels} onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)} /></section>
+                        return fields.length > 0 && <section key={`type-${index}`} className="space-y-2 border-t border-gray-200 pt-3"><h3 className="text-sm font-medium text-gray-900">{sectionLabel('typography', row)}</h3><ValueFields idPrefix={`typography-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={typographyLabels} onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)} /></section>
                     })}
                     {targetSpacing.map(({ row, index }) => {
                         const fields = activeFields('spacing', index, row, workspace.constraints.editableSpacingProperties)
-                        return fields.length > 0 && <section key={`space-${index}`} className="space-y-3 border-t border-gray-200 pt-4"><h3 className="font-medium text-gray-900">{sectionLabel('spacing', row)}</h3><ValueFields idPrefix={`spacing-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={spacingLabels} onChange={(field, value) => updateWorkspace((next) => { next.spacing[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('spacing', index, row, field, spacingLabels[field] || field)} /></section>
+                        return fields.length > 0 && <section key={`space-${index}`} className="space-y-2 border-t border-gray-200 pt-3"><h3 className="text-sm font-medium text-gray-900">{sectionLabel('spacing', row)}</h3><p className="text-xs text-gray-500">Margin and padding can also be changed by clicking their labels in the preview.</p><ValueFields idPrefix={`spacing-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={spacingLabels} onChange={(field, value) => updateWorkspace((next) => { next.spacing[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('spacing', index, row, field, spacingLabels[field] || field)} /></section>
                     })}
                     {addableThemeValues.length > 0 && <section className="border-t border-gray-200 pt-4"><label htmlFor="add-theme-value" className="text-xs font-semibold uppercase tracking-wide text-gray-500">Add theme value</label><select id="add-theme-value" value="" onChange={(event) => addThemeValue(event.target.value)} className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"><option value="">Choose a value…</option>{addableThemeValues.map((value) => <option key={propertyKey(value.kind, value.index, value.field)} value={propertyKey(value.kind, value.index, value.field)}>{value.label}</option>)}</select></section>}
                     {relevantColors.length > 0 && <section className="space-y-3 border-t border-gray-200 pt-4"><h3 className="font-medium text-gray-900">Colors used here</h3>{relevantColors.map(({ name, index }) => <label key={name} className="flex items-center gap-3"><input type="color" value={/^#[0-9a-f]{6}$/i.test(workspace.colors[index].value) ? workspace.colors[index].value : '#000000'} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="h-10 w-12 rounded border border-gray-300" /><span className="min-w-0 flex-1 text-sm font-medium">{name}</span><input aria-label={`${name} value`} value={workspace.colors[index].value} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="w-28 rounded-md border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>)}</section>}
+                    {childTargets.length > 0 && <section className="border-t border-gray-200 pt-3"><h3 className="mb-2 text-sm font-medium text-gray-900">Elements inside</h3><div className="divide-y divide-gray-200 border-y border-gray-200">{childTargets.map((child) => <details key={child.id} className="group py-1"><summary className="flex cursor-pointer list-none items-center gap-2 py-1 text-sm text-gray-800"><ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" /><span className="min-w-0 flex-1 truncate">{child.label}</span></summary><div className="pb-2 pl-5"><button type="button" onClick={() => chooseTargetAlternative(child)} className="text-xs font-medium text-blue-700 hover:underline">Edit this element</button></div></details>)}</div></section>}
                     {!targetTypography.length && !targetSpacing.length && !relevantColors.length && selectedTarget.kind !== 'element' && selectedTarget.kind !== 'asset' && <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500">Choose a more specific text or image inside this area to edit its details.</p>}
                 </div>
             )}
         </section>
     )
 
-    const exampleImageEditor = contentMode === 'demo' && selectedView && (
-        <section className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
-            <div><h2 className="text-sm font-semibold text-gray-900">Example images</h2><p className="mt-1 text-xs text-gray-500">Images imported with this example are stored with the theme.</p></div>
-            {selectedViewImages.length ? <div className="grid gap-2">{selectedViewImages.map((url, index) => {
+    const exampleImageEditor = contentMode === 'demo' && selectedView && selectedElementImages.length > 0 && (
+        <section className="space-y-2 border-t border-gray-200 pt-3">
+            <div><h2 className="text-sm font-semibold text-gray-900">Images in this element</h2><p className="mt-0.5 text-xs text-gray-500">Only images inside the selected element are shown.</p></div>
+            <div className="grid gap-2">{selectedElementImages.map((url, index) => {
                 const name = decodeURIComponent(url.split('/').at(-1)?.split('?')[0] || `Image ${index + 1}`)
                 const inputKey = `example:${selectedView.id}:${index}`
                 return <article key={url} className="flex min-w-0 items-center gap-2 rounded-md border border-gray-200 p-2">
@@ -834,7 +898,7 @@ const SemanticThemeWorkspace = ({
                     <input ref={(node) => { uploadRefs.current[inputKey] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => uploadExampleImage(url, event.target.files?.[0])} className="sr-only" />
                     <button type="button" aria-label={`Replace example image ${name}`} onClick={() => uploadRefs.current[inputKey]?.click()} disabled={disabled} className="shrink-0 rounded-md border border-blue-600 bg-white px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">Replace</button>
                 </article>
-            })}</div> : <p className="rounded-md border border-dashed border-gray-300 p-3 text-xs text-gray-500">This example has no imported images.</p>}
+            })}</div>
         </section>
     )
 
@@ -843,14 +907,17 @@ const SemanticThemeWorkspace = ({
     return (
         <main
             ref={workspaceRef}
-            className={`grid min-h-0 flex-1 grid-cols-1 ${mobilePane === 'preview' ? 'grid-rows-1' : 'grid-rows-[auto_minmax(0,1fr)]'} lg:grid-cols-[var(--designer-sidebar-width)_8px_minmax(0,1fr)_8px_var(--designer-inspector-width)] lg:grid-rows-1`}
+            className={`grid min-h-0 flex-1 grid-cols-1 ${mobilePane === 'preview' ? 'grid-rows-1' : 'grid-rows-[auto_minmax(0,1fr)]'} lg:grid-cols-[var(--designer-sidebar-width)_var(--designer-sidebar-handle-width)_minmax(0,1fr)_var(--designer-inspector-handle-width)_var(--designer-inspector-width)] lg:grid-rows-1`}
             style={{
-                '--designer-sidebar-width': `${sidebarWidth}px`,
-                '--designer-inspector-width': `${inspectorWidth}px`,
+                '--designer-sidebar-width': sidebarCollapsed ? '0px' : `${sidebarWidth}px`,
+                '--designer-sidebar-handle-width': sidebarCollapsed ? '0px' : `${resizeHandleWidth}px`,
+                '--designer-inspector-width': inspectorCollapsed ? '0px' : `${inspectorWidth}px`,
+                '--designer-inspector-handle-width': inspectorCollapsed ? '0px' : `${resizeHandleWidth}px`,
             }}
         >
-            <section aria-label="Preview navigation" className={`${mobilePane === 'preview' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-r border-gray-200 bg-white lg:flex lg:border-r-0`}>
-                <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4">
+            <section aria-label="Preview navigation" className={`${mobilePane === 'preview' || sidebarCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-r border-gray-200 bg-white lg:border-r-0`}>
+                <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Navigator</span><button type="button" aria-label="Collapse preview navigation" onClick={() => setSidebarCollapsed(true)} className="hidden rounded p-1 text-gray-500 hover:bg-gray-100 lg:block"><ChevronLeft className="h-4 w-4" /></button></div>
+                <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-3">
                     <fieldset disabled={disabled} className="min-w-0">{previewOptions}</fieldset>
                     <nav className="mt-6 space-y-2 border-t border-gray-200 pt-4" aria-label="Designer views">
                         <div><h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Preview pages</h2><p className="mt-1 text-xs text-gray-500">Choose what the center preview displays.</p></div>
@@ -881,14 +948,20 @@ const SemanticThemeWorkspace = ({
                 onPointerUp={stopSidebarResize}
                 onPointerCancel={stopSidebarResize}
                 onKeyDown={resizeSidebarWithKeyboard}
-                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 lg:flex ${isResizingSidebar ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
+                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 ${sidebarCollapsed ? '' : 'lg:flex'} ${isResizingSidebar ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
             >
                 <span className={`h-10 w-0.5 rounded-full ${isResizingSidebar ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-500 group-focus:bg-blue-500'}`} />
             </div>
-            <section className={`${mobilePane === 'edit' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col bg-gray-100 p-3 lg:flex lg:p-5`}>
-                <div className="mb-3 flex items-center justify-end gap-2">
+            <section className={`${mobilePane === 'edit' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col bg-gray-100 p-2 lg:flex lg:p-3`}>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1">
+                        <button type="button" aria-label={sidebarCollapsed ? 'Expand preview navigation' : 'Collapse preview navigation'} aria-pressed={sidebarCollapsed} onClick={() => setSidebarCollapsed((current) => !current)} className="hidden rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 lg:inline-flex">{sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</button>
+                        <button type="button" aria-label={inspectorCollapsed ? 'Expand theme inspector' : 'Collapse theme inspector'} aria-pressed={inspectorCollapsed} onClick={() => setInspectorCollapsed((current) => !current)} className="hidden rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 lg:inline-flex">{inspectorCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>
+                    </div>
+                    <div className="flex items-center gap-2">
                     {contentMode !== 'none' && <button type="button" aria-pressed={guidesEnabled} onClick={() => setGuidesEnabled((current) => !current)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{guidesEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{guidesEnabled ? 'Hide guides' : 'Show guides'}</button>}
                     <span className="text-xs capitalize text-gray-500">{viewport}</span>
+                    </div>
                 </div>
                 <div ref={previewFrameRef} className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm">
                     {contentMode === 'none' || (contentMode === 'demo' && !selectedView) ? <div className="flex h-full items-center justify-center p-6 text-sm text-gray-500">There is no page or object to preview.</div> : contentMode === 'content' && !sourceContentModel ? <div className="flex h-full items-center justify-center gap-2 p-6 text-sm text-gray-500">{loadingContent && <Loader2 className="h-4 w-4 animate-spin" />}{loadingContent ? 'Loading the selected content…' : 'The selected content could not be loaded.'}</div> : <RenderFrame
@@ -921,12 +994,13 @@ const SemanticThemeWorkspace = ({
                 onPointerUp={stopInspectorResize}
                 onPointerCancel={stopInspectorResize}
                 onKeyDown={resizeInspectorWithKeyboard}
-                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 lg:flex ${isResizingInspector ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
+                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 ${inspectorCollapsed ? '' : 'lg:flex'} ${isResizingInspector ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
             >
                 <span className={`h-10 w-0.5 rounded-full ${isResizingInspector ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-500 group-focus:bg-blue-500'}`} />
             </div>
-            <section aria-label="Theme inspector" className={`${mobilePane === 'preview' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-l border-gray-200 bg-white lg:flex lg:border-l-0`}>
-                <fieldset disabled={disabled} className="min-h-0 flex-1 overflow-y-auto p-4">
+            <section aria-label="Theme inspector" className={`${mobilePane === 'preview' || inspectorCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-l border-gray-200 bg-white lg:border-l-0`}>
+                <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Inspector</span><button type="button" aria-label="Collapse theme inspector" onClick={() => setInspectorCollapsed(true)} className="hidden rounded p-1 text-gray-500 hover:bg-gray-100 lg:block"><ChevronRight className="h-4 w-4" /></button></div>
+                <fieldset disabled={disabled} className="min-h-0 flex-1 overflow-y-auto p-3">
                     {workspaceView === 'details'
                         ? themeDetailsEditor
                         : workspaceView === 'images'

@@ -16,6 +16,8 @@ const workspace = {
         }],
     },
     assets: [],
+    spacing: [{ targetId: 'heading', values: { marginTop: '10px', marginBottom: '30px', paddingLeft: '8px' } }],
+    constraints: { editableSpacingProperties: ['marginTop', 'marginBottom', 'paddingLeft'] },
 }
 
 const sendModel = (model: ReturnType<typeof createDesignerRenderModel>) => act(() => {
@@ -85,31 +87,36 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect([...document.querySelectorAll('style')].some((style) => style.textContent?.includes('rgb(1,2,3)'))).toBe(true)
     })
 
-    it('gives each visible text element its own editable example target', async () => {
+    it('edits a rich text field as one sanitized HTML value after double-click', async () => {
         const editableWorkspace = structuredClone(workspace)
-        editableWorkspace.previewContent.views[0].texts = { 'content:0': 'Saved example heading' }
+        editableWorkspace.previewContent.views[0].texts = { 'content:0': '<h1>Saved example heading</h1>' }
         const postMessage = vi.spyOn(window, 'postMessage')
         render(<RenderFrameRuntime />)
         sendModel(createDesignerRenderModel({ workspace: editableWorkspace, viewId: 'page-main', contentEditable: true }))
 
         const heading = await screen.findByRole('heading', { name: 'Saved example heading' })
-        expect(heading).toHaveAttribute('data-designer-target', 'content:0')
-        expect((heading as HTMLElement).contentEditable).toBe('true')
-        fireEvent.input(heading, { target: { textContent: 'Changed example heading' } })
+        const richText = heading.closest('.content-widget') as HTMLElement
+        expect(richText).toHaveAttribute('data-designer-target', 'content:0')
+        expect(richText.contentEditable).not.toBe('true')
+        fireEvent.doubleClick(heading)
+        expect(richText.contentEditable).toBe('true')
+        heading.textContent = 'Changed example heading'
+        fireEvent.input(richText)
 
         await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview',
             action: 'contentChange',
             targetId: 'content:0',
-            label: 'Heading 1 text',
+            label: 'Rich text',
             editable: true,
+            richText: true,
         }), '*'))
 
         act(() => window.dispatchEvent(new MessageEvent('message', {
             source: window,
-            data: { source: 'eceee-render-host', action: 'updateText', targetId: 'content:0', text: 'Inspector update' },
+            data: { source: 'eceee-render-host', action: 'updateText', targetId: 'content:0', text: '<h2>Inspector update</h2>' },
         })))
-        expect(heading).toHaveTextContent('Inspector update')
+        expect(richText.querySelector('h2')).toHaveTextContent('Inspector update')
         postMessage.mockRestore()
     })
 
@@ -119,10 +126,11 @@ describe('RenderFrameRuntime designer overlay', () => {
         sendModel(createDesignerRenderModel({ workspace, viewId: 'page-main', contentEditable: true }))
 
         const heading = await screen.findByRole('heading', { name: 'Overridden heading' })
-        const focus = vi.spyOn(heading, 'focus')
+        const richText = heading.closest('.content-widget') as HTMLElement
+        const focus = vi.spyOn(richText, 'focus')
         fireEvent.contextMenu(heading, { clientX: 48, clientY: 64 })
 
-        const menu = screen.getByRole('menu', { name: 'Actions for Heading 1 text' })
+        const menu = screen.getByRole('menu', { name: 'Actions for Heading' })
         expect(menu).toHaveStyle({ left: '48px', top: '64px' })
         expect(within(menu).getByRole('menuitem', { name: 'Edit text' })).toBeInTheDocument()
         fireEvent.click(within(menu).getByRole('menuitem', { name: 'Edit text' }))
@@ -131,10 +139,36 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(screen.queryByRole('menu')).not.toBeInTheDocument()
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview',
-            action: 'contextAction',
-            command: 'editText',
+            action: 'editText',
             targetId: 'content:0',
         }), '*')
+        postMessage.mockRestore()
+    })
+
+    it('runs rich text toolbar commands against the active field', async () => {
+        const execCommand = vi.fn()
+        Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand })
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace, viewId: 'page-main', contentEditable: true }))
+        const heading = await screen.findByRole('heading', { name: 'Overridden heading' })
+        const richText = heading.closest('.content-widget') as HTMLElement
+        fireEvent.doubleClick(heading)
+
+        act(() => window.dispatchEvent(new MessageEvent('message', {
+            source: window,
+            data: { source: 'eceee-render-host', action: 'formatText', targetId: 'content:0', command: 'bold' },
+        })))
+        act(() => window.dispatchEvent(new MessageEvent('message', {
+            source: window,
+            data: { source: 'eceee-render-host', action: 'formatText', targetId: 'content:0', command: 'formatBlock', value: 'h2' },
+        })))
+
+        expect(execCommand).toHaveBeenCalledWith('bold', false, undefined)
+        expect(execCommand).toHaveBeenCalledWith('formatBlock', false, '<h2>')
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ action: 'contentChange', targetId: 'content:0', richText: true }), '*')
+        expect(richText.contentEditable).toBe('true')
+        delete (document as any).execCommand
         postMessage.mockRestore()
     })
 
@@ -151,8 +185,11 @@ describe('RenderFrameRuntime designer overlay', () => {
         sendModel(createDesignerRenderModel({ workspace: unconfiguredWorkspace, viewId: 'plain-page', contentEditable: true }))
 
         const editableParagraph = await screen.findByText('Plain copied text')
-        expect(editableParagraph).toHaveAttribute('data-designer-target', 'content:0')
-        expect((editableParagraph as HTMLElement).contentEditable).toBe('true')
+        const richText = editableParagraph.closest('.content-widget') as HTMLElement
+        expect(richText).toHaveAttribute('data-designer-target', 'content:0')
+        expect(richText.contentEditable).not.toBe('true')
+        fireEvent.doubleClick(editableParagraph)
+        expect(richText.contentEditable).toBe('true')
 
         unmount()
         render(<RenderFrameRuntime />)
@@ -192,17 +229,20 @@ describe('RenderFrameRuntime designer overlay', () => {
 
         const link = await screen.findByRole('link', { name: 'Linked heading' })
         const heading = link.closest('h3')!
-        expect(link).toHaveAttribute('data-designer-target', 'content:0')
-        expect((link as HTMLElement).contentEditable).toBe('true')
+        const richText = link.closest('.content-widget') as HTMLElement
+        expect(richText).toHaveAttribute('data-designer-target', 'content:0')
+        expect(richText.contentEditable).not.toBe('true')
         expect((heading as HTMLElement).contentEditable).not.toBe('true')
 
         postMessage.mockClear()
+        fireEvent.doubleClick(link)
+        expect(richText.contentEditable).toBe('true')
         link.textContent = 'Changed link'
         Object.defineProperty(link, 'innerText', { configurable: true, value: 'Changed link' })
-        fireEvent.input(link)
+        fireEvent.input(richText)
         const changes = postMessage.mock.calls.filter(([message]) => message?.action === 'contentChange')
         expect(changes).toHaveLength(1)
-        expect(changes[0][0]).toEqual(expect.objectContaining({ targetId: 'content:0', text: 'Changed link' }))
+        expect(changes[0][0]).toEqual(expect.objectContaining({ targetId: 'content:0', text: expect.stringContaining('Changed link'), richText: true }))
         expect(heading.querySelector('a')).toBe(link)
         postMessage.mockRestore()
     })
@@ -231,6 +271,13 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(document.querySelector('.designer-spacing-padding-value[data-side="left"]')).toHaveTextContent('8px')
         expect(document.querySelector('.designer-spacing-padding-value[data-side="left"]')).toHaveAttribute('data-placement', 'outside')
         expect(document.querySelector('.designer-spacing-padding-value[data-side="left"]')).toHaveStyle({ left: '69px', top: '199px' })
+        fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
+        fireEvent.change(screen.getByLabelText('margin top value'), { target: { value: '18px' } })
+        fireEvent.submit(screen.getByRole('form', { name: 'Edit margin top' }))
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'spacingChange', property: 'marginTop', value: '18px',
+            targetIds: expect.arrayContaining(['heading']),
+        }), '*')
         expect(document.querySelector('.designer-spacing-margin-measure[data-side="top"]')).toHaveStyle({
             left: '220px', top: '90px', height: '10px',
         })
