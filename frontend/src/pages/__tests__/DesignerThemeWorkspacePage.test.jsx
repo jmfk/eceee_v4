@@ -723,6 +723,63 @@ describe('DesignerThemeWorkspacePage', () => {
         postMessage.mockRestore()
     })
 
+    it('replaces a theme asset from a preview context action', async () => {
+        mocks.replaceAsset.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 3, hasDraftChanges: true })
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+        const replacement = new File(['hero'], 'hero.png', { type: 'image/png' })
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview',
+                action: 'contextAction',
+                command: 'replaceImage',
+                targetId: 'asset:design:0:hero:md:background',
+                kind: 'asset',
+                label: 'Article hero',
+                file: replacement,
+            },
+            source: iframe.contentWindow,
+        }))
+
+        await waitFor(() => expect(mocks.replaceAsset).toHaveBeenCalledWith(
+            '7',
+            'design:0:hero:md:background',
+            replacement,
+            2,
+        ))
+    })
+
+    it('replaces an example image from a preview context action', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+        const replacement = new File(['photo'], 'photo.webp', { type: 'image/webp' })
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview',
+                action: 'contextAction',
+                command: 'replaceImage',
+                targetId: 'content-image:0',
+                kind: 'previewImage',
+                label: 'Article photo',
+                sourceUrl: 'https://storage.test/article-photo.jpg',
+                file: replacement,
+            },
+            source: iframe.contentWindow,
+        }))
+
+        await waitFor(() => expect(mocks.replacePreviewImage).toHaveBeenCalledWith(
+            '7',
+            'page-main',
+            'https://storage.test/article-photo.jpg',
+            replacement,
+            2,
+        ))
+    })
+
     it('saves a theme draft and publishes only after confirmation', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
