@@ -14,9 +14,25 @@ Each run is bound to:
 
 The command refuses to resume if any of those values differ. Start a new run for a changed source snapshot.
 
-## Local production-backup validation
+## One-command production-backup validation from development
 
-Before the production window, create a production backup, transfer it through an approved secure channel, restrict the local file to the operator account, and validate it without displaying its contents:
+After the reviewed version containing this workflow is deployed, run this command from the development checkout:
+
+```bash
+make validate-prod-typed-tags-backup
+```
+
+It creates a fresh production backup, obtains the exact generated filename, transfers it over SSH, restricts the local file to the operator account, compares local and remote checksums without displaying them, and runs the isolated validator. The temporary local backup is deleted when the command exits. Set `PROD_HOST` and `PROD_DIR` as for other production targets when their defaults do not apply.
+
+To retain the fetched file under the ignored `storage/production-backups/` directory, opt in explicitly:
+
+```bash
+make validate-prod-typed-tags-backup KEEP_BACKUP=1
+```
+
+The retained database dump is sensitive production data. The command applies mode `600`, but the operator remains responsible for encryption at rest and timely deletion.
+
+If a backup has already been transferred through an approved secure channel, the lower-level local command remains available:
 
 ```bash
 chmod 600 /absolute/path/eceee_v4_TIMESTAMP.sql.gz
@@ -27,8 +43,8 @@ The validator restores into disposable PostgreSQL 15, applies the current migrat
 
 ## Production deployment sequence
 
-1. Validate a current production backup locally as described above.
-2. Deploy the reviewed commit normally. Deployment now stops if its mandatory backup fails.
+1. Deploy the reviewed commit normally. Deployment stops if its mandatory backup fails.
+2. Run `make validate-prod-typed-tags-backup` from development and require a passing result.
 3. Run the dedicated maintenance-window entry point:
 
    ```bash

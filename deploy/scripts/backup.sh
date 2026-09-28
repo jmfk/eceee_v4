@@ -2,6 +2,7 @@
 # backup.sh - Backup eceee_v4 production database
 # Usage:
 #   bash deploy/scripts/backup.sh            — create a backup
+#   bash deploy/scripts/backup.sh --print-basename — create a backup and print only its basename to stdout
 #   bash deploy/scripts/backup.sh restore FILE  — restore from a backup file
 #
 # Backups are stored in /mnt/data/backups/ (block storage, survives VPS rebuilds).
@@ -22,8 +23,25 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-info()    { echo -e "${BLUE}[backup]${NC} $*"; }
-success() { echo -e "${GREEN}[backup]${NC} $*"; }
+PRINT_BASENAME=false
+if [ "${1:-}" = "--print-basename" ]; then
+    PRINT_BASENAME=true
+fi
+
+info() {
+    if $PRINT_BASENAME; then
+        echo -e "${BLUE}[backup]${NC} $*" >&2
+    else
+        echo -e "${BLUE}[backup]${NC} $*"
+    fi
+}
+success() {
+    if $PRINT_BASENAME; then
+        echo -e "${GREEN}[backup]${NC} $*" >&2
+    else
+        echo -e "${GREEN}[backup]${NC} $*"
+    fi
+}
 error()   { echo -e "${RED}[backup]${NC} $*" >&2; }
 
 if [ "${1:-}" = "restore" ]; then
@@ -85,6 +103,10 @@ trap - EXIT
 
 BACKUP_SIZE=$(du -sh "$OUTFILE" | cut -f1)
 success "Backup complete: $OUTFILE ($BACKUP_SIZE)"
+
+if $PRINT_BASENAME; then
+    basename "$OUTFILE"
+fi
 
 # Prune backups older than 30 days
 PRUNED=$(find "$BACKUP_DIR" -name "eceee_v4_*.sql.gz" -mtime +30 -print -delete | wc -l)

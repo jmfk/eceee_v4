@@ -42,7 +42,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel prepare-frontend-e2e frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test backend-lint frontend-lint lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db configure-local-infra shared-infra-check use-external-infra prepare-test-infra test-infra-down refresh-db-collation prod-preflight prod-deploy prod-rollback prod-backup prod-backfill-typed-tags prod-theme-access-key validate-typed-tags-backup prod-logs prod-status prod-audit-tenant-access prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema test test-build test-parallel backend-test-parallel prepare-frontend-e2e frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test backend-lint frontend-lint lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db configure-local-infra shared-infra-check use-external-infra prepare-test-infra test-infra-down refresh-db-collation prod-preflight prod-deploy prod-rollback prod-backup prod-backfill-typed-tags prod-theme-access-key validate-typed-tags-backup validate-prod-typed-tags-backup prod-logs prod-status prod-audit-tenant-access prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -158,6 +158,7 @@ help: ## Show this help message (use: make help [target])
 		echo "  prod-deploy       Check and deploy latest main, or a specific TAG/ref/hash"; \
 		echo "  prod-rollback     Rollback to previous deployment"; \
 		echo "  prod-backup       Run ad-hoc production DB backup"; \
+		echo "  validate-prod-typed-tags-backup  Create, fetch, and locally validate a fresh production backup"; \
 		echo "  prod-theme-access-key  Create/rotate a workspace-scoped theme key"; \
 		echo "  prod-logs         Tail production logs (SERVICE=backend optional)"; \
 		echo "  prod-status       Show production container status"; \
@@ -1090,6 +1091,8 @@ TAG       ?=
 RUN_ID    ?= typed-tags-v1
 CANARY_SIZE ?= 100
 BACKUP_FILE ?=
+KEEP_BACKUP ?= 0
+LOCAL_BACKUP_DIR ?=
 THEME_WORKSPACE ?=
 THEME_ADMIN ?=
 export RUN_ID CANARY_SIZE THEME_WORKSPACE THEME_ADMIN
@@ -1128,6 +1131,9 @@ prod-backfill-typed-tags: ## Run maintenance-window typed-tag backfill (optional
 validate-typed-tags-backup: ## Restore and validate a local production backup (BACKUP_FILE=/absolute/path.sql.gz)
 	@test -n "$(BACKUP_FILE)" || (echo "BACKUP_FILE is required" >&2; exit 2)
 	bash deploy/scripts/validate-typed-tags-backup.sh "$(BACKUP_FILE)"
+
+validate-prod-typed-tags-backup: ## Create, fetch, validate, and delete a fresh production backup (KEEP_BACKUP=1 to retain)
+	KEEP_BACKUP="$(KEEP_BACKUP)" LOCAL_BACKUP_DIR="$(LOCAL_BACKUP_DIR)" bash deploy/scripts/fetch-and-validate-typed-tags-backup.sh "$(PROD_HOST)" "$(PROD_DIR)"
 
 prod-logs: ## Tail production logs (use: make prod-logs [SERVICE=backend])
 	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env logs -f --tail=100 $(SERVICE)"

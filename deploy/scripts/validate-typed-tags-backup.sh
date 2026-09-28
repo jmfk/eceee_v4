@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+# Backup restores are intentionally isolated from shared development databases.
+export DOCKER_CONTEXT="${DOCKER_CONTEXT:-orbstack}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BACKUP_FILE="${1:-}"

@@ -16,6 +16,7 @@ deploy/
     ├── rollback.sh            re-deploy previous tag
     ├── backup.sh              pg_dump to /mnt/data/backups/
     ├── backfill-typed-tags.sh maintenance → backup → canary → verify
+    ├── fetch-and-validate-typed-tags-backup.sh  fresh prod backup → secure local validation
     ├── validate-typed-tags-backup.sh  disposable local restore validation
     ├── production-operation.sh shared lock → atomic env install → deploy/restart
     └── healthcheck.sh         polls backend /health/ (Host from DOMAIN in deploy/.env)
@@ -161,8 +162,18 @@ verifies the gzip stream, and only then publishes the timestamped backup name.
 
 ### Validate the typed-tag migration against production data
 
-After creating a current backup, transfer it through an approved secure channel,
-make it readable only by the local operator, and run the disposable validator:
+After deploying the reviewed version containing this workflow, create a fresh
+production backup, securely fetch the exact artifact, validate it locally, and
+delete the temporary local copy with one development-side command:
+
+```bash
+make validate-prod-typed-tags-backup
+```
+
+Use `KEEP_BACKUP=1` only when the dump must be retained under the ignored
+`storage/production-backups/` directory. It remains sensitive production data.
+
+For an already transferred backup, run the lower-level validator directly:
 
 ```bash
 chmod 600 /absolute/path/eceee_v4_TIMESTAMP.sql.gz

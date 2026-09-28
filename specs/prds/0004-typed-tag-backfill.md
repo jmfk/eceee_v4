@@ -64,6 +64,7 @@ ECEEE stores content tags, media tags, page-version tag names, widget discovery 
 
 - 2026-09-25: Implementation started with an expand-only schema and database-backed resumable backfill.
 - 2026-09-25: Added the operator runbook at `docs/TYPED_TAG_BACKFILL.md`.
+- 2026-09-28: Added a single development-side command that creates a fresh production backup, securely fetches the exact artifact, validates it locally, and removes the temporary copy by default.
 
 ## Linked ADRs
 
@@ -76,3 +77,5 @@ ECEEE stores content tags, media tags, page-version tag names, widget discovery 
 - PostgreSQL verification: 92 focused taxonomy, content, media-model, and page-version workflow tests passed on 2026-09-25.
 - Django system checks and migration drift checks passed on 2026-09-25.
 - Specs governance validation passed on 2026-09-25.
+- `make validate-prod-typed-tags-backup` automates the pre-window backup acquisition and isolated validation while leaving the production backfill as a separate explicit operation.
+- Shell syntax, ShellCheck, and isolated orchestration tests for cleanup, opt-in retention, checksum failure, and filename validation passed on 2026-09-28.

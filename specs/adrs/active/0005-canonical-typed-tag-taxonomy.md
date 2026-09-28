@@ -23,6 +23,8 @@ Add parallel canonical tag relations to page versions, media files, and media co
 
 Backfill existing content and media tags as `general` tags. Canonical identity is scoped by tenant, namespace, tag type, and slug. Widget discovery keywords and unapproved AI suggestions remain separate because they are not editorial taxonomy assignments.
 
+Keep backup validation and production mutation as separate operator actions. A development-side command may create and securely fetch a fresh production backup for isolated local validation, but it must not start the production backfill.
+
 ## Rationale
 
 A dedicated taxonomy boundary avoids making either the content or file-manager app the owner of a cross-domain concept. Parallel storage supports verification, rollback, and a later read cutover without downtime. Database-backed checkpoints survive process or host interruption and remain colocated with the data being migrated.
