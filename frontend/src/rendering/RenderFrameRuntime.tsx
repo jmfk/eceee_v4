@@ -223,14 +223,18 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
         })
     })
 
-    root.querySelectorAll<HTMLElement>(EDITABLE_TEXT_SELECTOR).forEach((node, index) => {
+    let editableTextIndex = 0
+    root.querySelectorAll<HTMLElement>(EDITABLE_TEXT_SELECTOR).forEach((node) => {
         if (!(node.innerText || node.textContent || '').trim()) return
         let targets: any[] = []
         try { targets = JSON.parse(node.dataset.designerTargets || '[]') } catch { targets = [] }
         const legacyTextTarget = targets.find((target) => designer.texts[target.id] !== undefined)
         if (legacyTextTarget) node.textContent = designer.texts[legacyTextTarget.id]
-        if (designer.contentEditable === false) return
-        const contentId = `content:${index}`
+        const hasEditableTextDescendant = [...node.querySelectorAll<HTMLElement>(EDITABLE_TEXT_SELECTOR)]
+            .some((descendant) => (descendant.innerText || descendant.textContent || '').trim())
+        if (designer.contentEditable !== true || hasEditableTextDescendant) return
+        const contentId = `content:${editableTextIndex}`
+        editableTextIndex += 1
         registerTarget(node, { id: contentId, kind: 'element', label: editableTextLabel(node), editable: true }, true)
         if (designer.texts[contentId] !== undefined) node.textContent = designer.texts[contentId]
         node.contentEditable = 'true'
@@ -238,7 +242,13 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
 
     root.querySelectorAll<HTMLElement>('[data-designer-target]').forEach((node) => {
         const click = (event: Event) => { event.preventDefault(); event.stopPropagation(); root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected')); node.classList.add('designer-selected'); postDesignerEvent(node) }
-        const input = () => postDesignerEvent(node, 'contentChange')
+        let primaryTarget: any = null
+        try { primaryTarget = JSON.parse(node.dataset.designerTargets || '[]')[0] } catch { primaryTarget = null }
+        const input = (event: Event) => {
+            if (!primaryTarget?.editable || event.target !== node) return
+            event.stopPropagation()
+            postDesignerEvent(node, 'contentChange')
+        }
         node.addEventListener('click', click)
         node.addEventListener('input', input)
         cleanups.push(() => { node.removeEventListener('click', click); node.removeEventListener('input', input) })
@@ -295,6 +305,12 @@ export const RenderFrameRuntime = () => {
                     source: 'eceee-designer-preview', action: 'targetStyles', targetId: event.data.targetId,
                     computedStyles: computedThemeValues(match),
                 }, '*')
+            }
+            if (event.data.action === 'updateText' && event.data.targetId && typeof event.data.text === 'string') {
+                const match = [...document.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => {
+                    try { return JSON.parse(node.dataset.designerTargets || '[]')[0]?.id === event.data.targetId } catch { return false }
+                })
+                if (match && match.textContent !== event.data.text) match.textContent = event.data.text
             }
         }
         window.addEventListener('message', receive)

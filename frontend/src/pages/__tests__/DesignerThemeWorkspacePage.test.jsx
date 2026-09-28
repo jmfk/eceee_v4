@@ -694,16 +694,33 @@ describe('DesignerThemeWorkspacePage', () => {
     it('edits and saves visible text only in the selected theme example', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        await selectHeading()
-        fireEvent.change(screen.getByLabelText('Example text'), { target: { value: 'A revised example heading' } })
+        const iframe = screen.getByTitle('Live theme preview')
+        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-frame', action: 'ready' },
+            source: iframe.contentWindow,
+        }))
+        await waitFor(() => expect(postMessage).toHaveBeenCalled())
+        postMessage.mockClear()
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'A revised example heading', editable: true },
+            source: iframe.contentWindow,
+        }))
+        expect(screen.getByLabelText('Example text')).toHaveValue('A revised example heading')
+        expect(postMessage).not.toHaveBeenCalled()
+        fireEvent.change(screen.getByLabelText('Example text'), { target: { value: 'Inspector heading' } })
+        expect(postMessage).toHaveBeenCalledWith({
+            source: 'eceee-render-host', action: 'updateText', targetId: 'content:0', text: 'Inspector heading',
+        }, '*')
         fireEvent.click(screen.getByRole('button', { name: 'Save example text' }))
         await waitFor(() => expect(mocks.savePreviewContent).toHaveBeenCalledWith(
             '7',
             'page-main',
-            { 'group:0:element:h1': 'A revised example heading' },
+            { 'content:0': 'Inspector heading' },
             2,
         ))
         expect(mocks.save).not.toHaveBeenCalled()
+        postMessage.mockRestore()
     })
 
     it('saves a theme draft and publishes only after confirmation', async () => {
