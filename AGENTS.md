@@ -67,24 +67,31 @@ Backend static assets: `cd backend && npm run build` / `npm run watch:css`
   review decision, unresolved review threads when available, and mergeability.
   Do this immediately before the merge even if the PR was inspected earlier.
 - Never merge a pull request unless the user has explicitly instructed the agent
-  to merge that specific PR and the PR has at least one submitted GitHub review
-  in the `APPROVED` state. An empty or missing review decision is not approval.
-  Comments, bot reports, successful checks, branch-protection bypasses, and the
-  agent's own review do not count as an approval.
+  to merge that specific PR after the agent has reported the current head commit,
+  checks, submitted reviews, review decision, unresolved review threads, and
+  mergeability. That instruction is the repository owner's sign-off and may be
+  used instead of a submitted GitHub `APPROVED` review. A submitted approval from
+  another authorized reviewer is still valid supporting evidence, but is not
+  required for an owner-operated repository.
+- Owner sign-off is valid only for the reviewed head commit. Any later code change
+  invalidates it and requires a fresh status/review report followed by a new,
+  explicit instruction to merge that PR. Comments, bot reports, successful checks,
+  branch-protection bypasses, and the agent's own review are not owner sign-off.
 - Do not infer merge authorization from requests to review, fix, commit, push,
   synchronize, rebase, make mergeable, or report which branches can be merged.
 - Treat migrations, data migrations, backfills, tenancy or authorization changes,
   destructive cleanup, and production data-path changes as high-risk. An agent
-  must never merge such a PR without both a verified human GitHub approval and a
-  separate explicit user instruction to merge after the approval exists.
+  must never merge such a PR without a fresh risk review of the current head and
+  a separate explicit owner instruction that names the PR and acknowledges the
+  reported high-risk change. A prior general instruction to merge is insufficient.
 - For migration or backfill PRs, the review must explicitly consider clean-database
   installation, upgrade from existing data, idempotency and resumability, tenant
   isolation, locking and performance, failure recovery, rollback or roll-forward,
   and operational verification. Record gaps instead of treating green tests as
   sufficient evidence.
-- If the required approval or authorization is absent, stop at a merge-ready PR,
-  state exactly what is missing, and leave the merge to the user. Repository rules
-  being bypassable does not weaken this gate.
+- If the required owner sign-off or authorization is absent, stop at a merge-ready
+  PR, state exactly what is missing, and leave the merge to the user. Repository
+  rules being bypassable does not weaken this gate.
 
 ## Testing Expectations
 
