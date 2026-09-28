@@ -24,7 +24,12 @@
     "paths": {
       "@/*": [
         "./*"
-      ]
+      ],
+      "isomorphic-dompurify": ["./node_modules/isomorphic-dompurify"],
+      "mustache": ["./node_modules/mustache"],
+      "react": ["./node_modules/@types/react/index.d.ts"],
+      "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"],
+      "react-dom/server": ["./node_modules/@types/react-dom/server.d.ts"]
     },
     "allowJs": true
   },

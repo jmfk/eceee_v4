@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import type { WidgetRenderComponent, WidgetRenderProps } from './types'
+import type { RenderWidgetModel, WidgetRenderComponent, WidgetRenderProps } from './types'
 import { processNavigationItems } from '../utils/navigationItems'
 import { asArray, EmptyRender, imageUrl, ImageView, PreviewLink, RenderFailure, SafeHtml, TextWithBreaks, value } from './primitives'
 
@@ -38,7 +38,7 @@ const ObjectDataPreviewRender: WidgetRenderComponent = ({ context }) => {
 
 const HeadlineRender: WidgetRenderComponent = ({ widget }) => {
     const requested = String(value(widget.config, 'headerLevel', 'header_level', 'headingLevel', 'level') || 'h1').toLowerCase()
-    const Tag = (/^h[1-6]$/.test(requested) ? requested : `h${Math.min(6, Math.max(1, Number(requested) || 1))}`) as keyof JSX.IntrinsicElements
+    const Tag = (/^h[1-6]$/.test(requested) ? requested : `h${Math.min(6, Math.max(1, Number(requested) || 1))}`) as React.ElementType
     const content = value(widget.config, 'content', 'text', 'headline')
     if (!content) return null
     return <div className={`headline-widget widget-type-easy-widgets-headlinewidget cms-content${value(widget.config, 'showBorder', 'show_border') ? '' : ' border-disabled'}`} id={value(widget.config, 'anchor') || undefined}>
@@ -466,7 +466,7 @@ const ColumnRender = ({ widget, renderWidgets, count }: WidgetRenderProps & { co
     const ratio = value(widget.config, 'ratioClass', 'ratio_class')
         || (layoutStyle ? `${count === 2 ? 'two' : 'three'}-col-ratio-${layoutStyle.replaceAll(':', '-')}` : '')
     return <div className={`${base} widget-type-easy-widgets-${count === 2 ? 'twocolumnswidget' : 'threecolumnswidget'} ${ratio}`} data-widget-type={count === 2 ? 'two-columns' : 'three-columns'}>
-        {names.map((name) => <div key={name} className={`${slotBase}-slot ${name}`} data-slot={name}>{asArray(slots[name]).map((nested, index) => <div className={`${slotBase}-widget-wrapper`} key={nested.id || index}>{renderWidgets([nested])}</div>)}</div>)}
+        {names.map((name) => <div key={name} className={`${slotBase}-slot ${name}`} data-slot={name}>{asArray<RenderWidgetModel>(slots[name]).map((nested, index) => <div className={`${slotBase}-widget-wrapper`} key={nested.id || index}>{renderWidgets([nested])}</div>)}</div>)}
     </div>
 }
 
@@ -559,7 +559,7 @@ const NewsDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
     if (!item) return <EmptyRender>No news article selected.</EmptyRender>
     const fields = newsFields(item)
     const data = item.data || {}
-    const slots = item.widgets && typeof item.widgets === 'object' ? item.widgets : {}
+    const slots: Record<string, unknown> = item.widgets && typeof item.widgets === 'object' ? item.widgets : {}
     return <article className="news-detail-widget" data-widget-type="news-detail" data-object-id={item.id}>
         <header className="news-header">
             {configEnabled(widget.config, true, 'showObjectType', 'show_object_type') && <div className="news-type-badge">{fields.objectType.label || fields.objectType.name}</div>}

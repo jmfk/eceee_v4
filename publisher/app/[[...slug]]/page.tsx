@@ -5,6 +5,7 @@ import { cache } from 'react';
 import { database } from '@/src/db';
 import { buildPublishedPageModel } from '@/src/model';
 import { PublishedPage } from '@/src/render';
+import { RENDER_LAYOUT_CSS } from '../../../frontend/src/rendering/layoutRenderers';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 type Props = { params: Promise<{ slug?: string[] }> };
@@ -22,5 +23,5 @@ export default async function Page(props: Props) {
   const { host, path } = await requestTarget(props);
   const model = await resolve(host, path);
   if (!model) notFound();
-  return <PublishedPage model={model} />;
+  return <><style>{`${RENDER_LAYOUT_CSS}\n${model.themeCss}`}</style><PublishedPage model={model} /></>;
 }
