@@ -54,7 +54,7 @@ export const createPageRenderModel = ({
 }
 
 export const createDesignerRenderModel = ({
-    workspace, viewId, themeCss = '', fontUrl = '', sourceModel = null, guidesEnabled = true,
+    workspace, viewId, themeCss = '', fontUrl = '', sourceModel = null, guidesEnabled = true, contentEditable = false,
 }: any): RenderPageModel => {
     const views = workspace?.previewContent?.views || workspace?.catalog?.previewViews || []
     const view = views.find((candidate: any) => candidate.id === viewId) || views[0] || {}
@@ -146,7 +146,7 @@ export const createDesignerRenderModel = ({
             catalog: workspace?.catalog || {},
             texts: sourceModel ? {} : view.texts || {},
             assets: workspace?.assets || [],
-            contentEditable: false,
+            contentEditable,
             guidesEnabled,
         },
     }

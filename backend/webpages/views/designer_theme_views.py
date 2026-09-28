@@ -3,6 +3,7 @@
 from datetime import timedelta
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -10,6 +11,7 @@ from django.utils import timezone
 from djangorestframework_camel_case.parser import CamelCaseJSONParser
 from djangorestframework_camel_case.render import CamelCaseJSONRenderer
 from rest_framework import permissions, serializers, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
@@ -32,6 +34,7 @@ from webpages.services.designer_theme import (
     DesignerDraftConflict,
     apply_designer_patch,
     build_draft_workspace,
+    delete_designer_preview_view,
     designer_preview_layout,
     designer_preview_version,
     designer_theme_queryset,
@@ -39,8 +42,10 @@ from webpages.services.designer_theme import (
     generate_placeholder_png,
     get_or_create_designer_draft,
     import_designer_preview_from_site,
+    import_designer_preview_source,
     publish_designer_draft,
     replace_designer_asset,
+    replace_designer_preview_image,
     save_designer_draft,
     save_designer_preview_texts,
     theme_from_designer_draft,
@@ -105,6 +110,24 @@ class DesignerPlaceholderSerializer(serializers.Serializer):
 class DesignerPreviewTextSerializer(serializers.Serializer):
     view_id = serializers.CharField(max_length=100)
     texts = serializers.DictField(child=serializers.CharField(max_length=5000, allow_blank=True), allow_empty=True)
+    draft_version = serializers.IntegerField(min_value=1)
+
+
+class DesignerPreviewImportSerializer(serializers.Serializer):
+    source_kind = serializers.ChoiceField(choices=("page", "object"))
+    source_id = serializers.IntegerField(min_value=1)
+    draft_version = serializers.IntegerField(min_value=1)
+
+
+class DesignerPreviewDeleteSerializer(serializers.Serializer):
+    view_id = serializers.CharField(max_length=100)
+    draft_version = serializers.IntegerField(min_value=1)
+
+
+class DesignerPreviewImageSerializer(serializers.Serializer):
+    view_id = serializers.CharField(max_length=100)
+    source_url = serializers.CharField(max_length=2000)
+    image = serializers.FileField()
     draft_version = serializers.IntegerField(min_value=1)
 
 
@@ -814,6 +837,82 @@ class DesignerThemePreviewContentView(APIView):
                 request.user,
                 data["view_id"],
                 data["texts"],
+                data["draft_version"],
+            )
+        except PermissionError:
+            return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(_draft_workspace(request, theme, draft))
+
+    def delete(self, request, theme_id):
+        serializer = DesignerPreviewDeleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            theme, draft = delete_designer_preview_view(
+                theme_id,
+                request.tenant,
+                request.user,
+                data["view_id"],
+                data["draft_version"],
+            )
+        except PermissionError:
+            return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(_draft_workspace(request, theme, draft))
+
+
+class DesignerThemePreviewImportView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [DesignerJSONParser]
+    renderer_classes = [DesignerJSONRenderer]
+
+    def post(self, request, theme_id):
+        serializer = DesignerPreviewImportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            theme, draft, view_id, copied_images = import_designer_preview_source(
+                theme_id,
+                request.tenant,
+                request.user,
+                data["source_kind"],
+                data["source_id"],
+                data["draft_version"],
+            )
+        except PermissionError:
+            return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except (DjangoValidationError, ValidationError) as exc:
+            detail = getattr(exc, "detail", None) or getattr(exc, "messages", None) or str(exc)
+            message = detail[0] if isinstance(detail, list) else str(detail)
+            return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
+        response = _draft_workspace(request, theme, draft)
+        response["importedViewId"] = view_id
+        response["copiedImages"] = copied_images
+        return Response(response)
+
+
+class DesignerThemePreviewImageView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+    renderer_classes = [DesignerJSONRenderer]
+
+    def post(self, request, theme_id):
+        serializer = DesignerPreviewImageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            theme, draft = replace_designer_preview_image(
+                theme_id,
+                request.tenant,
+                request.user,
+                data["view_id"],
+                data["source_url"],
+                data["image"],
                 data["draft_version"],
             )
         except PermissionError:
