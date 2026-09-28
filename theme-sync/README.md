@@ -263,7 +263,17 @@ Designer can use several saved remote-site connections per workspace, with one c
 On the remote installation:
 
 1. Enable the sync API with `THEME_SYNC_ENABLED=True`.
-2. Create or rotate a theme-only access key. The command prints the key once:
+2. Create or rotate a theme-only access key from the local repository. The command prints the key once:
+
+   ```bash
+   make prod-theme-access-key \
+     THEME_WORKSPACE=WORKSPACE_IDENTIFIER \
+     THEME_ADMIN=ADMIN_USERNAME
+   ```
+
+   The wrapper verifies that production sync is enabled, serializes the operation
+   with deploys, and runs the underlying Django command. On the production host,
+   the equivalent command is:
 
    ```bash
    python manage.py setup_theme_remote_access \
