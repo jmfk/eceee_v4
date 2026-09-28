@@ -104,6 +104,12 @@ describe('RenderFrameRuntime designer overlay', () => {
             label: 'Heading 1 text',
             editable: true,
         }), '*'))
+
+        act(() => window.dispatchEvent(new MessageEvent('message', {
+            source: window,
+            data: { source: 'eceee-render-host', action: 'updateText', targetId: 'content:0', text: 'Inspector update' },
+        })))
+        expect(heading).toHaveTextContent('Inspector update')
         postMessage.mockRestore()
     })
 
@@ -129,6 +135,51 @@ describe('RenderFrameRuntime designer overlay', () => {
         const readOnlyParagraph = await screen.findByText('Plain copied text')
         expect(readOnlyParagraph).not.toHaveAttribute('data-designer-target')
         expect((readOnlyParagraph as HTMLElement).contentEditable).not.toBe('true')
+    })
+
+    it('requires an explicit editable flag for render models outside the Designer adapter', async () => {
+        const model = createDesignerRenderModel({ workspace, viewId: 'page-main', contentEditable: true })
+        delete model.designer?.contentEditable
+        render(<RenderFrameRuntime />)
+        sendModel(model)
+
+        const heading = await screen.findByRole('heading', { name: 'Overridden heading' })
+        await waitFor(() => expect(heading).toHaveAttribute('data-designer-target', 'heading'))
+        expect(heading).not.toHaveAttribute('data-designer-target', 'content:0')
+        expect((heading as HTMLElement).contentEditable).not.toBe('true')
+    })
+
+    it('uses one non-overlapping editable target for nested text markup', async () => {
+        const nestedWorkspace = {
+            ...structuredClone(workspace),
+            previewContent: { views: [{
+                id: 'nested-page', layout: 'main_layout', texts: {},
+                content: { widgets: { main: [{
+                    id: 'nested', type: 'easy_widgets.ContentWidget',
+                    config: { content: '<h3><a href="#details">Linked heading</a></h3>' },
+                }] } },
+            }] },
+            catalog: { ...structuredClone(workspace.catalog), designGroups: [] },
+        }
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: nestedWorkspace, viewId: 'nested-page', contentEditable: true }))
+
+        const link = await screen.findByRole('link', { name: 'Linked heading' })
+        const heading = link.closest('h3')!
+        expect(link).toHaveAttribute('data-designer-target', 'content:0')
+        expect((link as HTMLElement).contentEditable).toBe('true')
+        expect((heading as HTMLElement).contentEditable).not.toBe('true')
+
+        postMessage.mockClear()
+        link.textContent = 'Changed link'
+        Object.defineProperty(link, 'innerText', { configurable: true, value: 'Changed link' })
+        fireEvent.input(link)
+        const changes = postMessage.mock.calls.filter(([message]) => message?.action === 'contentChange')
+        expect(changes).toHaveLength(1)
+        expect(changes[0][0]).toEqual(expect.objectContaining({ targetId: 'content:0', text: 'Changed link' }))
+        expect(heading.querySelector('a')).toBe(link)
+        postMessage.mockRestore()
     })
 
     it('reports selection without content changes and shows spacing guides', async () => {

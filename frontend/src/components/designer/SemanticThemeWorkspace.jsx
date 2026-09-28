@@ -260,6 +260,7 @@ const SemanticThemeWorkspace = ({
     const iframeRef = useRef(null)
     const previewFrameRef = useRef(null)
     const uploadRefs = useRef({})
+    const pendingPreviewTextsRef = useRef({})
     const [previewFrameWidth, setPreviewFrameWidth] = useState(1280)
 
     const clampSidebarWidth = (width) => {
@@ -468,12 +469,10 @@ const SemanticThemeWorkspace = ({
             }
             if (event.data.action === 'contentChange' && target.kind === 'element') {
                 if (contentMode === 'demo') {
-                    setPreviewContent((current) => ({
-                        ...current,
-                        views: current.views.map((view) => view.id === viewId
-                            ? { ...view, texts: { ...(view.texts || {}), [target.id]: target.text } }
-                            : view),
-                    }))
+                    pendingPreviewTextsRef.current[viewId] = {
+                        ...(pendingPreviewTextsRef.current[viewId] || {}),
+                        [target.id]: target.text,
+                    }
                     setSelectedTarget(target)
                     setSelectionExpanded(true)
                 }
@@ -490,7 +489,16 @@ const SemanticThemeWorkspace = ({
     const selectedView = previewContent.views.find((view) => view.id === viewId) || previewContent.views[0] || null
     const selectedViewImages = useMemo(() => previewImagesFor(selectedView), [selectedView])
     const selectedSourceContent = externalContentOptions.find((source) => source.value === sourceContentId) || null
-    const previewWorkspace = useMemo(() => ({ ...workspace, previewContent }), [workspace, previewContent])
+    const previewWorkspace = useMemo(() => ({
+        ...workspace,
+        previewContent: {
+            ...previewContent,
+            views: previewContent.views.map((view) => ({
+                ...view,
+                texts: { ...(view.texts || {}), ...(pendingPreviewTextsRef.current[view.id] || {}) },
+            })),
+        },
+    }), [workspace, previewContent])
     const imageAspects = useMemo(() => imageAspectsFor(workspace), [workspace])
     const assetsByTargetId = useMemo(() => new Map(
         workspace.assets.map((asset) => [`asset:${asset.assetKey}`, asset]),
@@ -573,18 +581,24 @@ const SemanticThemeWorkspace = ({
 
     const updateSelectedExampleText = (text) => {
         if (!selectedView || !selectedTarget) return
+        pendingPreviewTextsRef.current[selectedView.id] = {
+            ...(pendingPreviewTextsRef.current[selectedView.id] || {}),
+            [selectedTarget.id]: text,
+        }
         setSelectedTarget((current) => ({ ...current, text }))
-        setPreviewContent((current) => ({
-            ...current,
-            views: current.views.map((view) => view.id === selectedView.id
-                ? { ...view, texts: { ...(view.texts || {}), [selectedTarget.id]: text } }
-                : view),
-        }))
+        iframeRef.current?.contentWindow?.postMessage({
+            source: 'eceee-render-host', action: 'updateText', targetId: selectedTarget.id, text,
+        }, '*')
     }
 
     const persistSelectedExampleText = async () => {
         const view = previewContent.views.find((candidate) => candidate.id === selectedView?.id)
-        if (view) await savePreviewText?.(view.id, view.texts || {})
+        if (!view) return
+        const result = await savePreviewText?.(view.id, {
+            ...(view.texts || {}),
+            ...(pendingPreviewTextsRef.current[view.id] || {}),
+        })
+        if (result) delete pendingPreviewTextsRef.current[view.id]
     }
 
     const importSelectedSource = async () => {
@@ -600,6 +614,7 @@ const SemanticThemeWorkspace = ({
         const view = option.view || previewContent.views.find((candidate) => String(candidate.id) === String(option.value))
         const result = await deletePreviewContent?.(view)
         if (!result?.previewContent?.views) return
+        delete pendingPreviewTextsRef.current[view.id]
         setPreviewContent(result.previewContent)
         setViewId((current) => result.previewContent.views.some((candidate) => candidate.id === current)
             ? current
