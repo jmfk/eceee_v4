@@ -607,7 +607,14 @@ frontend-admin-e2e-test: prepare-frontend-e2e
 
 # Run public browser regression tests against the Django public renderer
 frontend-public-e2e-test: prepare-test-infra prepare-frontend-e2e
-	$(COMPOSE_DEV) up -d backend
+	DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test \
+	POSTGRES_DB=eceee_v4_test POSTGRES_USER=postgres POSTGRES_PASSWORD=test-only \
+	POSTGRES_HOST=test-db POSTGRES_PORT=5432 \
+	REDIS_URL=redis://test-redis:6379/0 \
+	AWS_ACCESS_KEY_ID=test-eceee AWS_SECRET_ACCESS_KEY=test-eceee-secret \
+	AWS_S3_ENDPOINT_URL=http://test-minio:9000 \
+	AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
+	$(COMPOSE_DEV) up -d --force-recreate backend
 	@BP=$${BACKEND_PORT:-10101}; \
 	echo "Waiting for backend on http://127.0.0.1:$$BP..."; \
 	i=0; \
