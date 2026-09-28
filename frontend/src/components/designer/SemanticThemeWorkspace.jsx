@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Box, ChevronDown, Eye, EyeOff, FileText, Image as ImageIcon, Loader2, Settings2, Trash2 } from 'lucide-react'
+import { Box, ChevronDown, Eye, EyeOff, FileText, Image as ImageIcon, Loader2, Search, Settings2, Trash2 } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel } from '../../rendering/adapters'
-import ComboboxSelect from '../theme/ComboboxSelect'
-
 const typographyLabels = {
     fontFamily: 'Font family', fontSize: 'Size', fontWeight: 'Weight', fontStyle: 'Style',
     lineHeight: 'Line height', letterSpacing: 'Letter spacing',
@@ -16,6 +14,15 @@ const spacingLabels = {
 }
 
 const defaultBreakpoints = { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 }
+const defaultSidebarWidth = 360
+const minSidebarWidth = 280
+const maxSidebarWidth = 640
+const defaultInspectorWidth = 380
+const minInspectorWidth = 320
+const maxInspectorWidth = 720
+const minPreviewWidth = 480
+const resizeHandleWidth = 8
+const previewImagePattern = /(?:https?:\/\/[^\s"'()<>]+|s3:\/\/[^\s"'()<>]+|\/(?:theme_images|uploads|media|files|site-package)\/[^\s"'()<>]+)\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^\s"'()<>]*)?/gi
 
 const assetProperty = (asset) => asset.property || asset.assetKey?.split(':').at(-1)
 
@@ -32,6 +39,116 @@ const matchesContentOption = (option, query) => [
     option.objectTitle,
     option.objectTypeLabel,
 ].some((value) => String(value || '').toLowerCase().includes(query.toLowerCase()))
+
+const navigationText = (value, maxLength) => {
+    const text = String(value || '')
+    return text.length > maxLength ? `${text.slice(0, maxLength).trimEnd()}…` : text
+}
+
+const TruncatedNavigationText = ({ value, maxLength = 48, className = '' }) => {
+    const text = String(value || '')
+    const displayText = navigationText(text, maxLength)
+    return <span title={displayText === text ? undefined : text} className={`block truncate ${className}`}>{displayText}</span>
+}
+
+const contentGroups = (options, sourceMode) => ['page', 'object'].map((kind) => {
+    const kindOptions = options.filter((option) => option.kind === kind)
+    const subgroupKey = sourceMode === 'content'
+        ? kind === 'page' ? 'siteLabel' : 'objectTypeLabel'
+        : null
+    const subgroups = subgroupKey
+        ? [...new Set(kindOptions.map((option) => option[subgroupKey] || (kind === 'page' ? 'Other site' : 'Other type')))].map((label) => ({
+            label,
+            options: kindOptions.filter((option) => (option[subgroupKey] || (kind === 'page' ? 'Other site' : 'Other type')) === label),
+        }))
+        : [{ label: '', options: kindOptions }]
+    return { kind, label: kind === 'page' ? 'Pages' : 'Objects', subgroups }
+}).filter((group) => group.subgroups.some((subgroup) => subgroup.options.length))
+
+const previewImagesFor = (view) => {
+    const images = new Set()
+    const visit = (value) => {
+        if (typeof value === 'string') {
+            for (const match of value.matchAll(previewImagePattern)) images.add(match[0])
+        } else if (Array.isArray(value)) value.forEach(visit)
+        else if (value && typeof value === 'object') Object.values(value).forEach(visit)
+    }
+    visit(view?.content)
+    visit(view?.images)
+    return [...images]
+}
+
+const ContentSourceBrowser = ({ sourceMode, options, value, onChange, onDelete, disabled, loading }) => {
+    const [query, setQuery] = useState('')
+    const [kindFilter, setKindFilter] = useState('all')
+    const sourceName = sourceMode === 'demo' ? 'theme demo content' : 'site content'
+    const filteredOptions = options.filter((option) => (
+        (kindFilter === 'all' || option.kind === kindFilter)
+        && matchesContentOption(option, query)
+    ))
+    const groups = contentGroups(filteredOptions, sourceMode)
+
+    return (
+        <section aria-label={`Browse ${sourceName}`} className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+                <h4 className="text-xs font-medium text-gray-700">Page or object</h4>
+                {loading && <Loader2 aria-label="Loading content" className="h-3.5 w-3.5 animate-spin text-gray-500" />}
+            </div>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                <label className="relative min-w-0">
+                    <span className="sr-only">Search {sourceName}</span>
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                        type="search"
+                        aria-label={`Search ${sourceName}`}
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        disabled={disabled}
+                        placeholder="Search…"
+                        className="w-full rounded-md border border-gray-300 bg-white py-2 pl-8 pr-3 text-sm text-gray-700 placeholder:text-gray-400"
+                    />
+                </label>
+                <label>
+                    <span className="sr-only">Filter {sourceName}</span>
+                    <select aria-label={`Filter ${sourceName}`} value={kindFilter} onChange={(event) => setKindFilter(event.target.value)} disabled={disabled} className="h-full rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700">
+                        <option value="all">All</option>
+                        <option value="page">Pages</option>
+                        <option value="object">Objects</option>
+                    </select>
+                </label>
+            </div>
+            {groups.length ? <ul aria-label={`${sourceName} hierarchy`} className="max-h-72 space-y-3 overflow-y-auto rounded-md border border-gray-200 bg-gray-50 p-2">
+                {groups.map((group) => <li key={group.kind}>
+                    <div className="flex items-center gap-2 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        {group.kind === 'page' ? <FileText className="h-3.5 w-3.5" /> : <Box className="h-3.5 w-3.5" />}
+                        {group.label}
+                    </div>
+                    <ul className="space-y-2">
+                        {group.subgroups.map((subgroup) => <li key={subgroup.label || group.kind} className="min-w-0">
+                            {subgroup.label && <p className="truncate border-l border-gray-300 py-1 pl-4 text-xs font-medium text-gray-600">{subgroup.label}</p>}
+                            <ul className={subgroup.label ? 'ml-3 border-l border-gray-300 pl-2' : ''}>
+                                {subgroup.options.map((option) => <li key={option.value} className="flex min-w-0 items-center gap-1">
+                                    <button
+                                        type="button"
+                                        aria-label={`Select ${option.label}`}
+                                        aria-current={option.value === value ? 'true' : undefined}
+                                        onClick={() => onChange(option.value)}
+                                        disabled={disabled || loading}
+                                        style={option.kind === 'page' && sourceMode === 'content' ? { paddingLeft: `${8 + (option.depth || 0) * 14}px` } : undefined}
+                                        className={`flex min-w-0 flex-1 items-start gap-2 rounded px-2 py-1.5 text-left text-sm ${option.value === value ? 'bg-blue-100 font-medium text-blue-800' : 'text-gray-700 hover:bg-white'}`}
+                                    >
+                                        <span className="min-w-0 flex-1"><TruncatedNavigationText value={sourceMode === 'content' ? option.kind === 'page' ? option.pageTitle : option.objectTitle : option.label} /><TruncatedNavigationText value={option.description} maxLength={64} className="text-[11px] font-normal opacity-70" /></span>
+                                    </button>
+                                    {onDelete && <button type="button" aria-label={`Delete ${option.label}`} onClick={() => onDelete(option)} disabled={disabled} className="shrink-0 rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>}
+                                </li>)}
+                            </ul>
+                        </li>)}
+                    </ul>
+                </li>)}
+            </ul> : <p className="rounded-md border border-dashed border-gray-300 p-3 text-sm text-gray-500">No pages or objects match the current search and filter.</p>}
+        </section>
+    )
+}
 
 const listNames = (names) => names.length < 2
     ? names.join('')
@@ -113,7 +230,8 @@ const ValueFields = ({ idPrefix, values, defaults, fields, labels, onChange, onR
 const SemanticThemeWorkspace = ({
     workspace, preview, viewport, updateWorkspace, replaceAsset, createPlaceholder,
     placeholderDrafts, setPlaceholderDrafts,
-    loadPageContent, loadObjectContent, disabled, mobilePane,
+    loadPageContent, loadObjectContent, importPreviewSource, deletePreviewContent,
+    savePreviewText, replacePreviewImage, disabled, mobilePane,
 }) => {
     const initialViews = workspace.previewContent?.views || workspace.catalog.previewViews || []
     const initialExternalContent = [
@@ -138,10 +256,97 @@ const SemanticThemeWorkspace = ({
     const [sourceContentModel, setSourceContentModel] = useState(null)
     const [loadingContent, setLoadingContent] = useState(false)
     const [guidesEnabled, setGuidesEnabled] = useState(true)
+    const [sidebarWidth, setSidebarWidth] = useState(defaultSidebarWidth)
+    const [inspectorWidth, setInspectorWidth] = useState(defaultInspectorWidth)
+    const [isResizingSidebar, setIsResizingSidebar] = useState(false)
+    const [isResizingInspector, setIsResizingInspector] = useState(false)
+    const workspaceRef = useRef(null)
+    const sidebarResizeRef = useRef(null)
+    const inspectorResizeRef = useRef(null)
     const iframeRef = useRef(null)
     const previewFrameRef = useRef(null)
     const uploadRefs = useRef({})
     const [previewFrameWidth, setPreviewFrameWidth] = useState(1280)
+
+    const clampSidebarWidth = (width) => {
+        const workspaceWidth = workspaceRef.current?.getBoundingClientRect().width || window.innerWidth
+        const availableMaximum = workspaceWidth - inspectorWidth - minPreviewWidth - resizeHandleWidth * 2
+        return Math.min(Math.max(minSidebarWidth, availableMaximum), maxSidebarWidth, Math.max(minSidebarWidth, width))
+    }
+
+    const clampInspectorWidth = (width) => {
+        const workspaceWidth = workspaceRef.current?.getBoundingClientRect().width || window.innerWidth
+        const availableMaximum = workspaceWidth - sidebarWidth - minPreviewWidth - resizeHandleWidth * 2
+        return Math.min(Math.max(minInspectorWidth, availableMaximum), maxInspectorWidth, Math.max(minInspectorWidth, width))
+    }
+
+    const startSidebarResize = (event) => {
+        if (event.button !== 0) return
+        event.preventDefault()
+        sidebarResizeRef.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: sidebarWidth }
+        event.currentTarget.setPointerCapture?.(event.pointerId)
+        setIsResizingSidebar(true)
+    }
+
+    const moveSidebarResize = (event) => {
+        const resize = sidebarResizeRef.current
+        if (!resize || event.pointerId !== resize.pointerId) return
+        setSidebarWidth(clampSidebarWidth(resize.startWidth + event.clientX - resize.startX))
+    }
+
+    const stopSidebarResize = (event) => {
+        const resize = sidebarResizeRef.current
+        if (!resize || event.pointerId !== resize.pointerId) return
+        sidebarResizeRef.current = null
+        event.currentTarget.releasePointerCapture?.(event.pointerId)
+        setIsResizingSidebar(false)
+    }
+
+    const resizeSidebarWithKeyboard = (event) => {
+        if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return
+        event.preventDefault()
+        setSidebarWidth((current) => clampSidebarWidth(current + (event.key === 'ArrowRight' ? 16 : -16)))
+    }
+
+    const startInspectorResize = (event) => {
+        if (event.button !== 0) return
+        event.preventDefault()
+        inspectorResizeRef.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: inspectorWidth }
+        event.currentTarget.setPointerCapture?.(event.pointerId)
+        setIsResizingInspector(true)
+    }
+
+    const moveInspectorResize = (event) => {
+        const resize = inspectorResizeRef.current
+        if (!resize || event.pointerId !== resize.pointerId) return
+        setInspectorWidth(clampInspectorWidth(resize.startWidth - (event.clientX - resize.startX)))
+    }
+
+    const stopInspectorResize = (event) => {
+        const resize = inspectorResizeRef.current
+        if (!resize || event.pointerId !== resize.pointerId) return
+        inspectorResizeRef.current = null
+        event.currentTarget.releasePointerCapture?.(event.pointerId)
+        setIsResizingInspector(false)
+    }
+
+    const resizeInspectorWithKeyboard = (event) => {
+        if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return
+        event.preventDefault()
+        setInspectorWidth((current) => clampInspectorWidth(current + (event.key === 'ArrowLeft' ? 16 : -16)))
+    }
+
+    useEffect(() => {
+        if (!isResizingSidebar && !isResizingInspector) return undefined
+        const previousCursor = document.body.style.cursor
+        const previousUserSelect = document.body.style.userSelect
+        document.body.style.cursor = 'col-resize'
+        document.body.style.userSelect = 'none'
+        return () => {
+            document.body.style.cursor = previousCursor
+            document.body.style.userSelect = previousUserSelect
+        }
+    }, [isResizingInspector, isResizingSidebar])
 
     useEffect(() => {
         const views = workspace.previewContent?.views || workspace.catalog.previewViews || []
@@ -157,6 +362,10 @@ const SemanticThemeWorkspace = ({
     const demoOptions = useMemo(() => previewContent.views.map((view) => ({
         value: String(view.id),
         label: view.label,
+        kind: view.kind,
+        view,
+        pageTitle: view.kind === 'page' ? view.label : '',
+        objectTitle: view.kind === 'object' ? view.label : '',
         description: view.kind === 'object' ? 'Theme object' : 'Theme page',
     })), [previewContent.views])
     const externalContentOptions = useMemo(() => [
@@ -165,7 +374,8 @@ const SemanticThemeWorkspace = ({
             value: `page:${source.id}`,
             kind: 'page',
             label: source.label,
-            description: `Page · ${source.versionStatus === 'draft' ? 'Draft' : 'Published'}`,
+            depth: Math.max(0, String(source.slugPath || '').split('/').filter(Boolean).length),
+            description: `Page · /${source.slugPath || ''} · ${source.versionStatus === 'draft' ? 'Draft' : 'Published'}`,
         })),
         ...(workspace.contentObjects || []).filter((source) => source.versionId).map((source) => ({
             ...source,
@@ -258,23 +468,39 @@ const SemanticThemeWorkspace = ({
                     setSelectedImageAspectKey(imageAspectKey(asset))
                     setSelectedTarget(target)
                     setSelectionExpanded(true)
+                    setWorkspaceView('preview')
                     return
                 }
             }
             if (event.data.action === 'contentChange' && target.kind === 'element') {
+                if (contentMode === 'demo') {
+                    setPreviewContent((current) => ({
+                        ...current,
+                        views: current.views.map((view) => view.id === viewId
+                            ? { ...view, texts: { ...(view.texts || {}), [target.id]: target.text } }
+                            : view),
+                    }))
+                    setSelectedTarget(target)
+                    setSelectionExpanded(true)
+                }
                 return
             }
             setSelectedTarget(target)
             setSelectionExpanded(true)
+            setWorkspaceView('preview')
         }
         window.addEventListener('message', receive)
         return () => window.removeEventListener('message', receive)
-    }, [viewId, workspace.assets])
+    }, [contentMode, viewId, workspace.assets])
 
     const selectedView = previewContent.views.find((view) => view.id === viewId) || previewContent.views[0] || null
+    const selectedViewImages = useMemo(() => previewImagesFor(selectedView), [selectedView])
     const selectedSourceContent = externalContentOptions.find((source) => source.value === sourceContentId) || null
     const previewWorkspace = useMemo(() => ({ ...workspace, previewContent }), [workspace, previewContent])
     const imageAspects = useMemo(() => imageAspectsFor(workspace), [workspace])
+    const assetsByTargetId = useMemo(() => new Map(
+        workspace.assets.map((asset) => [`asset:${asset.assetKey}`, asset]),
+    ), [workspace.assets])
     const selectedImageAspect = imageAspects.find((aspect) => aspect.key === selectedImageAspectKey) || imageAspects[0]
     const previewAsset = workspace.assets.find((asset) => asset.kind === 'preview')
     const siteIconAsset = workspace.assets.find((asset) => asset.kind === 'site-icon')
@@ -291,6 +517,7 @@ const SemanticThemeWorkspace = ({
         themeCss: preview.css,
         fontUrl: preview.fontUrl,
         sourceModel: contentMode === 'content' ? sourceContentModel : null,
+        contentEditable: contentMode === 'demo',
         guidesEnabled,
     }), [contentMode, guidesEnabled, previewWorkspace, preview, sourceContentModel, viewId])
 
@@ -339,6 +566,8 @@ const SemanticThemeWorkspace = ({
     }, [addedThemeValues, preview.css, workspace])
     const relevantColors = (selectedGroup?.colorNames || []).map((name) => ({ name, index: workspace.colors.findIndex((color) => color.name === name) })).filter(({ index }) => index >= 0)
     const chooseTargetAlternative = (alternative) => {
+        const asset = assetsByTargetId.get(alternative.id)
+        if (asset) setSelectedImageAspectKey(imageAspectKey(asset))
         setSelectedTarget((current) => ({ ...alternative, alternatives: current?.alternatives || [] }))
         setSelectionExpanded(true)
         iframeRef.current?.contentWindow?.postMessage({
@@ -346,6 +575,48 @@ const SemanticThemeWorkspace = ({
             action: 'selectTarget',
             targetId: alternative.id,
         }, '*')
+    }
+
+    const updateSelectedExampleText = (text) => {
+        if (!selectedView || !selectedTarget) return
+        setSelectedTarget((current) => ({ ...current, text }))
+        setPreviewContent((current) => ({
+            ...current,
+            views: current.views.map((view) => view.id === selectedView.id
+                ? { ...view, texts: { ...(view.texts || {}), [selectedTarget.id]: text } }
+                : view),
+        }))
+    }
+
+    const persistSelectedExampleText = async () => {
+        const view = previewContent.views.find((candidate) => candidate.id === selectedView?.id)
+        if (view) await savePreviewText?.(view.id, view.texts || {})
+    }
+
+    const importSelectedSource = async () => {
+        const result = await importPreviewSource?.(selectedSourceContent)
+        if (!result?.previewContent?.views) return
+        setPreviewContent(result.previewContent)
+        setContentMode('demo')
+        setViewId(result.importedViewId || result.previewContent.views.at(-1)?.id || '')
+        setSelectedTarget(null)
+    }
+
+    const deleteExample = async (option) => {
+        const view = option.view || previewContent.views.find((candidate) => String(candidate.id) === String(option.value))
+        const result = await deletePreviewContent?.(view)
+        if (!result?.previewContent?.views) return
+        setPreviewContent(result.previewContent)
+        setViewId((current) => result.previewContent.views.some((candidate) => candidate.id === current)
+            ? current
+            : result.previewContent.views[0]?.id || '')
+        setSelectedTarget(null)
+    }
+
+    const uploadExampleImage = async (sourceUrl, file) => {
+        if (!selectedView || !file) return
+        const result = await replacePreviewImage?.(selectedView.id, sourceUrl, file)
+        if (result?.previewContent?.views) setPreviewContent(result.previewContent)
     }
 
     const addThemeValue = (encoded) => {
@@ -391,7 +662,7 @@ const SemanticThemeWorkspace = ({
                         <p className="text-xs text-gray-600">{asset.requiredWidth || asset.recommendedWidth || '?'} × {asset.requiredHeight || '?'} px · {asset.dpr || 2}x</p>
                         {asset.kind === 'design-group' && !asset.url && <div className="grid gap-2"><input aria-label={`${asset.displayName} placeholder name`} value={placeholderDrafts[asset.assetKey]?.displayName ?? asset.displayName} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], displayName: event.target.value } }))} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /><div className="grid grid-cols-2 gap-2"><input aria-label={`${asset.displayName} placeholder width`} type="number" min="16" max="8000" value={placeholderDrafts[asset.assetKey]?.width ?? asset.requiredWidth ?? ''} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], width: event.target.value } }))} placeholder="Width px" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /><input aria-label={`${asset.displayName} placeholder height`} type="number" min="16" max="8000" value={placeholderDrafts[asset.assetKey]?.height ?? asset.requiredHeight ?? ''} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], height: event.target.value } }))} placeholder="Height px" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></div><button type="button" onClick={() => createPlaceholder(asset)} className="rounded-md border border-gray-300 px-3 py-2 text-sm">Create placeholder</button></div>}
                         <input ref={(node) => { uploadRefs.current[asset.assetKey] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" />
-                        <button type="button" aria-label={`Replace ${asset.displayName}`} onClick={() => uploadRefs.current[asset.assetKey]?.click()} className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white">Replace theme image</button>
+                        <button type="button" aria-label={`${asset.url ? 'Replace' : 'Upload'} ${asset.displayName}`} onClick={() => uploadRefs.current[asset.assetKey]?.click()} className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white">{asset.url ? 'Replace theme image' : 'Upload theme image'}</button>
                     </article>
                     )
                 })}
@@ -401,7 +672,7 @@ const SemanticThemeWorkspace = ({
 
     const themeDetailsEditor = (
         <section className="space-y-5">
-            <div><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Theme details</p><h2 className="mt-1 text-lg font-semibold text-gray-900">Name and identity</h2><p className="mt-2 text-sm text-gray-600">These changes stay in the Designer draft until you publish them.</p></div>
+            <div><h2 className="text-xs font-semibold uppercase tracking-wide text-blue-700">Theme details</h2><h3 className="mt-1 text-lg font-semibold text-gray-900">Name and identity</h3><p className="mt-2 text-sm text-gray-600">These changes stay in the Designer draft until you publish them.</p></div>
             <label className="block text-sm font-medium text-gray-800" htmlFor="theme-name">
                 Name
                 <input id="theme-name" value={workspace.name} maxLength={255} required onChange={(event) => updateWorkspace((next) => { next.name = event.target.value; return next })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
@@ -423,60 +694,66 @@ const SemanticThemeWorkspace = ({
         </section>
     )
 
+    const renderTargetAlternative = (alternative) => {
+        const asset = assetsByTargetId.get(alternative.id)
+        if (!asset) return <button key={alternative.id} type="button" aria-pressed={alternative.id === selectedTarget.id} onClick={() => chooseTargetAlternative(alternative)} className={`rounded-md border px-3 py-2 text-left text-sm ${alternative.id === selectedTarget.id ? 'border-blue-500 bg-blue-50 font-medium text-blue-800' : 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50'}`}>{alternative.label}</button>
+
+        const width = asset.width || asset.requiredWidth || asset.recommendedWidth
+        const height = asset.height || asset.requiredHeight
+        return (
+            <article key={alternative.id} className={`rounded-md border p-2 ${alternative.id === selectedTarget.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                    <button type="button" aria-label={`Select ${asset.displayName}`} aria-pressed={alternative.id === selectedTarget.id} onClick={() => chooseTargetAlternative(alternative)} className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        {asset.url
+                            ? <img src={asset.url} alt="" className="h-10 w-14 shrink-0 rounded border border-gray-200 bg-gray-50 object-contain" />
+                            : <span className="flex h-10 w-14 shrink-0 items-center justify-center rounded border border-dashed border-gray-300 bg-gray-50 text-gray-400"><ImageIcon className="h-4 w-4" /></span>}
+                        <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-gray-900">{asset.displayName}</span>
+                            <span className="block truncate text-xs text-gray-500">{asset.filename || 'No file uploaded'}</span>
+                            <span className="block text-[11px] text-gray-500">{width || '?'} × {height || '?'} px · {asset.dpr || 2}x</span>
+                        </span>
+                    </button>
+                    <input ref={(node) => { uploadRefs.current[`inline:${asset.assetKey}`] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" />
+                    <button type="button" aria-label={`${asset.url ? 'Replace' : 'Upload'} ${asset.displayName}`} onClick={() => uploadRefs.current[`inline:${asset.assetKey}`]?.click()} className="shrink-0 rounded-md border border-blue-600 bg-white px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50">{asset.url ? 'Replace' : 'Upload'}</button>
+                </div>
+            </article>
+        )
+    }
+
     const previewOptions = (
-        <div className="space-y-6">
-            <section className="space-y-3 border-t border-gray-200 pt-4">
+        <div>
+            <section className="space-y-3">
                 <div>
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Preview content source</h3>
                     <p className="mt-1 text-xs text-gray-500">Use editable content saved with this theme, or inspect the theme against a real page or object from your sites.</p>
                 </div>
-                <label className="block text-xs font-medium text-gray-700" htmlFor="preview-content-mode">
-                    Source
-                    <select id="preview-content-mode" value={contentMode} onChange={(event) => { setContentMode(event.target.value); setSelectedTarget(null) }} disabled={disabled} className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700">
-                        {demoOptions.length > 0 && <option value="demo">Theme demo content</option>}
-                        {externalContentOptions.length > 0 && <option value="content">Page or object from your sites</option>}
-                        {!demoOptions.length && !externalContentOptions.length && <option value="none">No preview content</option>}
-                    </select>
-                </label>
-                {contentMode === 'demo' && <label className="block text-xs font-medium text-gray-700" htmlFor="preview-demo-content">
-                    Page or object
-                    <ComboboxSelect id="preview-demo-content" ariaLabel="Theme demo page or object" value={viewId} onChange={(value) => { setViewId(value); setSelectedTarget(null) }} options={demoOptions} filterFunction={matchesContentOption} disabled={disabled} placeholder="Search theme demo content…" noOptionsText="No theme demo content" className="mt-1" renderOption={(option) => <span className="block min-w-0"><span className="block truncate">{option.label}</span><span className="block truncate text-xs opacity-75">{option.description}</span></span>} />
-                </label>}
-                {contentMode === 'content' && <label className="block text-xs font-medium text-gray-700" htmlFor="preview-source-content">
-                    Page or object
-                    <ComboboxSelect id="preview-source-content" ariaLabel="Page or object from your sites" value={sourceContentId} onChange={(value) => { setSourceContentId(value); setSelectedTarget(null) }} options={externalContentOptions} filterFunction={matchesContentOption} disabled={disabled || loadingContent} placeholder="Search pages and objects…" noOptionsText="No pages or objects found" className="mt-1" renderOption={(option) => <span className="block min-w-0"><span className="block truncate">{option.label}</span><span className="block truncate text-xs opacity-75">{option.description}</span></span>} />
-                </label>}
-                {contentMode === 'content' && <p className="flex items-center gap-2 text-xs text-gray-500">{loadingContent && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{loadingContent ? 'Loading the selected content…' : 'The selected content is read-only; theme styling remains editable.'}</p>}
+                <div role="tablist" aria-label="Preview content source" className="grid grid-cols-2 rounded-md border border-gray-300 bg-gray-100 p-1">
+                    <button type="button" role="tab" aria-selected={contentMode === 'demo'} aria-controls="preview-source-demo" disabled={disabled || !demoOptions.length} onClick={() => { setContentMode('demo'); setSelectedTarget(null) }} className={`rounded px-2 py-1.5 text-xs font-medium ${contentMode === 'demo' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'} disabled:cursor-not-allowed disabled:opacity-50`}>Theme demo</button>
+                    <button type="button" role="tab" aria-selected={contentMode === 'content'} aria-controls="preview-source-content" disabled={disabled || !externalContentOptions.length} onClick={() => { setContentMode('content'); setSelectedTarget(null) }} className={`rounded px-2 py-1.5 text-xs font-medium ${contentMode === 'content' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'} disabled:cursor-not-allowed disabled:opacity-50`}>Your sites</button>
+                </div>
+                {contentMode === 'demo' && <div id="preview-source-demo" role="tabpanel"><ContentSourceBrowser sourceMode="demo" options={demoOptions} value={String(viewId)} onChange={(value) => { setViewId(value); setSelectedTarget(null) }} onDelete={deleteExample} disabled={disabled} /></div>}
+                {contentMode === 'content' && <div id="preview-source-content" role="tabpanel"><ContentSourceBrowser sourceMode="content" options={externalContentOptions} value={sourceContentId} onChange={(value) => { setSourceContentId(value); setSelectedTarget(null) }} disabled={disabled} loading={loadingContent} /></div>}
+                {contentMode === 'content' && <div className="space-y-2">
+                    <p className="flex items-center gap-2 text-xs text-gray-500">{loadingContent && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{loadingContent ? 'Loading the selected content…' : 'The selected content is read-only until it is imported as a theme example.'}</p>
+                    <button type="button" onClick={importSelectedSource} disabled={disabled || loadingContent || !selectedSourceContent || !sourceContentModel} className="w-full rounded-md border border-blue-600 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">Import as theme example</button>
+                </div>}
                 {contentMode === 'none' && <p className="rounded-md border border-dashed border-gray-300 p-3 text-sm text-gray-500">There is no page or object to preview.</p>}
             </section>
         </div>
     )
 
-    const imageAspectOverview = (
+    const imageAspectNavigation = (
         <section className="space-y-5">
-            <div><h2 className="text-xl font-semibold text-gray-900">Theme images</h2><p className="mt-1 text-sm text-gray-600">Choose an image to see and replace all of its sizes in the left panel.</p></div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div><h2 className="text-xl font-semibold text-gray-900">Theme images</h2><p className="mt-1 text-sm text-gray-600">Choose an image family to inspect and replace every size.</p></div>
+            <div className="grid gap-2">
                 {imageAspects.map((aspect) => {
                     const previewAsset = aspect.assets.find((asset) => asset.url) || aspect.assets[0]
-                    return <button type="button" key={aspect.key} aria-label={`Select image aspect ${aspect.label}${aspect.details ? ` ${aspect.details}` : ''}`} aria-pressed={aspect.key === selectedImageAspect?.key} onClick={() => setSelectedImageAspectKey(aspect.key)} className={`overflow-hidden rounded-lg border bg-white text-left shadow-sm transition ${aspect.key === selectedImageAspect?.key ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300 hover:shadow'}`}>
-                        {previewAsset?.url ? <img src={previewAsset.url} alt="" className="h-36 w-full border-b border-gray-200 bg-gray-50 object-contain" /> : <div className="flex h-36 items-center justify-center border-b border-dashed border-gray-300 bg-gray-50 text-sm text-gray-500">Placeholder image</div>}
-                        <span className="block p-4"><span className="block text-sm font-semibold text-gray-900">{aspect.label}</span>{aspect.details && <span className="mt-1 block text-xs text-gray-500">{aspect.details}</span>}<span className="mt-2 block text-xs text-gray-500">{aspect.assets.length} {aspect.assets.length === 1 ? 'version' : 'versions'}</span></span>
+                    return <button type="button" key={aspect.key} aria-label={`Select image aspect ${aspect.label}${aspect.details ? ` ${aspect.details}` : ''}`} aria-pressed={aspect.key === selectedImageAspect?.key} onClick={() => setSelectedImageAspectKey(aspect.key)} className={`flex min-w-0 items-center gap-3 rounded-lg border p-2 text-left transition ${aspect.key === selectedImageAspect?.key ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200' : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'}`}>
+                        {previewAsset?.url ? <img src={previewAsset.url} alt="" className="h-12 w-16 shrink-0 rounded border border-gray-200 bg-gray-50 object-contain" /> : <span className="flex h-12 w-16 shrink-0 items-center justify-center rounded border border-dashed border-gray-300 bg-gray-50 text-gray-400"><ImageIcon className="h-4 w-4" /></span>}
+                        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-gray-900">{aspect.label}</span>{aspect.details && <span className="mt-0.5 block truncate text-xs text-gray-500">{aspect.details}</span>}<span className="mt-1 block text-xs text-gray-500">{aspect.assets.length} {aspect.assets.length === 1 ? 'version' : 'versions'}</span></span>
                     </button>
                 })}
             </div>
-        </section>
-    )
-
-    const themeDetailsOverview = (
-        <section className="mx-auto max-w-3xl space-y-6">
-            <div><h2 className="text-xl font-semibold text-gray-900">Theme details</h2><p className="mt-1 text-sm text-gray-600">The name, description and identity images published with this theme.</p></div>
-            <article className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                {previewAsset?.url ? <img src={previewAsset.url} alt="" className="h-64 w-full border-b border-gray-200 bg-gray-50 object-contain" /> : <div className="flex h-64 items-center justify-center border-b border-dashed border-gray-300 bg-gray-50 text-sm text-gray-500">No theme preview image</div>}
-                <div className="flex items-start gap-4 p-5">
-                    {siteIconAsset?.url ? <img src={siteIconAsset.url} alt="" className="h-16 w-16 shrink-0 rounded-lg border border-gray-200 bg-gray-50 object-contain" /> : <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-[10px] text-gray-500">No icon</div>}
-                    <div className="min-w-0"><h3 className="break-words text-lg font-semibold text-gray-900">{workspace.name || 'Untitled theme'}</h3><p className="mt-1 whitespace-pre-wrap text-sm text-gray-600">{workspace.description || 'No description yet.'}</p></div>
-                </div>
-            </article>
         </section>
     )
 
@@ -498,7 +775,12 @@ const SemanticThemeWorkspace = ({
             </button>
             {selectionExpanded && (
                 <div id="selected-element-editor" className="space-y-5 border-t border-blue-200 p-4">
-                    {selectedTarget.alternatives?.length > 1 && <section className="space-y-2"><h3 className="text-sm font-medium text-gray-900">Choose what to edit</h3><p className="text-xs text-gray-500">These elements share the same area.</p><div className="grid gap-2">{selectedTarget.alternatives.map((alternative) => <button key={alternative.id} type="button" aria-pressed={alternative.id === selectedTarget.id} onClick={() => chooseTargetAlternative(alternative)} className={`rounded-md border px-3 py-2 text-left text-sm ${alternative.id === selectedTarget.id ? 'border-blue-500 bg-blue-50 font-medium text-blue-800' : 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50'}`}>{alternative.label}</button>)}</div></section>}
+                    {contentMode === 'demo' && selectedTarget.kind === 'element' && selectedTarget.editable && <section className="space-y-2">
+                        <div><h3 className="text-sm font-medium text-gray-900">Example text</h3><p className="mt-1 text-xs text-gray-500">Edit here or type directly in the preview. Only this theme example is changed.</p></div>
+                        <textarea aria-label="Example text" value={selectedTarget.text || ''} onChange={(event) => updateSelectedExampleText(event.target.value)} rows={4} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900" />
+                        <button type="button" onClick={persistSelectedExampleText} disabled={disabled} className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">Save example text</button>
+                    </section>}
+                    {(selectedTarget.alternatives?.length > 1 || selectedTarget.kind === 'asset') && <section className="space-y-2"><h3 className="text-sm font-medium text-gray-900">Choose what to edit</h3><p className="text-xs text-gray-500">These elements share the same area.</p>{(selectedTarget.alternatives || [selectedTarget]).some((alternative) => assetsByTargetId.has(alternative.id)) && <p className="text-xs text-gray-500">Images can be uploaded or replaced directly.</p>}<div className="grid gap-2">{(selectedTarget.alternatives?.length ? selectedTarget.alternatives : [selectedTarget]).map(renderTargetAlternative)}</div></section>}
                     {targetTypography.map(({ row, index }) => {
                         const fields = activeFields('typography', index, row, workspace.constraints.editableTypographyProperties)
                         return fields.length > 0 && <section key={`type-${index}`} className="space-y-3 border-t border-gray-200 pt-4"><h3 className="font-medium text-gray-900">{sectionLabel('typography', row)}</h3><ValueFields idPrefix={`typography-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={typographyLabels} onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)} /></section>
@@ -509,37 +791,82 @@ const SemanticThemeWorkspace = ({
                     })}
                     {addableThemeValues.length > 0 && <section className="border-t border-gray-200 pt-4"><label htmlFor="add-theme-value" className="text-xs font-semibold uppercase tracking-wide text-gray-500">Add theme value</label><select id="add-theme-value" value="" onChange={(event) => addThemeValue(event.target.value)} className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"><option value="">Choose a value…</option>{addableThemeValues.map((value) => <option key={propertyKey(value.kind, value.index, value.field)} value={propertyKey(value.kind, value.index, value.field)}>{value.label}</option>)}</select></section>}
                     {relevantColors.length > 0 && <section className="space-y-3 border-t border-gray-200 pt-4"><h3 className="font-medium text-gray-900">Colors used here</h3>{relevantColors.map(({ name, index }) => <label key={name} className="flex items-center gap-3"><input type="color" value={/^#[0-9a-f]{6}$/i.test(workspace.colors[index].value) ? workspace.colors[index].value : '#000000'} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="h-10 w-12 rounded border border-gray-300" /><span className="min-w-0 flex-1 text-sm font-medium">{name}</span><input aria-label={`${name} value`} value={workspace.colors[index].value} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="w-28 rounded-md border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>)}</section>}
-                    {!targetTypography.length && !targetSpacing.length && !relevantColors.length && selectedTarget.kind !== 'element' && <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500">Choose a more specific text or image inside this area to edit its details.</p>}
+                    {!targetTypography.length && !targetSpacing.length && !relevantColors.length && selectedTarget.kind !== 'element' && selectedTarget.kind !== 'asset' && <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500">Choose a more specific text or image inside this area to edit its details.</p>}
                 </div>
             )}
         </section>
     )
 
+    const exampleImageEditor = contentMode === 'demo' && selectedView && (
+        <section className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+            <div><h2 className="text-sm font-semibold text-gray-900">Example images</h2><p className="mt-1 text-xs text-gray-500">Images imported with this example are stored with the theme.</p></div>
+            {selectedViewImages.length ? <div className="grid gap-2">{selectedViewImages.map((url, index) => {
+                const name = decodeURIComponent(url.split('/').at(-1)?.split('?')[0] || `Image ${index + 1}`)
+                const inputKey = `example:${selectedView.id}:${index}`
+                return <article key={url} className="flex min-w-0 items-center gap-2 rounded-md border border-gray-200 p-2">
+                    <img src={url} alt="" className="h-12 w-16 shrink-0 rounded border border-gray-200 bg-gray-50 object-contain" />
+                    <span className="min-w-0 flex-1 truncate text-xs text-gray-600">{name}</span>
+                    <input ref={(node) => { uploadRefs.current[inputKey] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => uploadExampleImage(url, event.target.files?.[0])} className="sr-only" />
+                    <button type="button" aria-label={`Replace example image ${name}`} onClick={() => uploadRefs.current[inputKey]?.click()} disabled={disabled} className="shrink-0 rounded-md border border-blue-600 bg-white px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">Replace</button>
+                </article>
+            })}</div> : <p className="rounded-md border border-dashed border-gray-300 p-3 text-xs text-gray-500">This example has no imported images.</p>}
+        </section>
+    )
+
+    const navigationButtonClass = (active) => `flex w-full min-w-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium ${active ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' : 'text-gray-700 hover:bg-gray-50'}`
+
     return (
-        <main className="grid min-h-0 flex-1 lg:grid-cols-[360px_minmax(0,1fr)]">
-            <section className={`${mobilePane === 'preview' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-r border-gray-200 bg-white lg:flex`}>
-                <fieldset disabled={disabled} className="min-h-0 flex-1 overflow-y-auto p-4">
-                    {workspaceView === 'details'
-                        ? themeDetailsEditor
-                        : workspaceView === 'images' || selectedTarget?.kind === 'asset'
-                            ? themeImageEditor
-                            : <div className="space-y-6">{selectedEditor}{previewOptions}</div>}
-                </fieldset>
-            </section>
-            <section className={`${mobilePane === 'edit' ? 'hidden' : 'flex'} min-h-0 flex-col bg-gray-100 p-3 lg:flex lg:p-5`}>
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <nav className="flex min-w-0 flex-1 gap-1 overflow-x-auto" aria-label="Designer views">
-                        {contentMode === 'content'
-                            ? selectedSourceContent && <button type="button" onClick={() => { setWorkspaceView('preview'); setSelectedTarget(null) }} className={`inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${workspaceView === 'preview' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:bg-white/70'}`}>{selectedSourceContent.kind === 'object' ? <Box className="h-4 w-4" /> : <FileText className="h-4 w-4" />}{selectedSourceContent.kind === 'object' ? selectedSourceContent.objectTitle : selectedSourceContent.pageTitle}</button>
-                            : contentMode === 'demo' && previewContent.views.map((view) => <button type="button" key={view.id} onClick={() => { setWorkspaceView('preview'); setViewId(view.id); setSelectedTarget(null) }} className={`inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${workspaceView === 'preview' && view.id === viewId ? 'bg-white text-blue-700 shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:bg-white/70'}`}>{view.kind === 'object' ? <Box className="h-4 w-4" /> : <FileText className="h-4 w-4" />}{view.label}</button>)}
-                        <button type="button" onClick={() => { setWorkspaceView('details'); setSelectedTarget(null) }} className={`inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${workspaceView === 'details' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:bg-white/70'}`}><Settings2 className="h-4 w-4" />Theme details</button>
-                        <button type="button" onClick={() => { setWorkspaceView('images'); setSelectedTarget(null) }} className={`inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${workspaceView === 'images' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:bg-white/70'}`}><ImageIcon className="h-4 w-4" />Theme images</button>
+        <main
+            ref={workspaceRef}
+            className={`grid min-h-0 flex-1 grid-cols-1 ${mobilePane === 'preview' ? 'grid-rows-1' : 'grid-rows-[auto_minmax(0,1fr)]'} lg:grid-cols-[var(--designer-sidebar-width)_8px_minmax(0,1fr)_8px_var(--designer-inspector-width)] lg:grid-rows-1`}
+            style={{
+                '--designer-sidebar-width': `${sidebarWidth}px`,
+                '--designer-inspector-width': `${inspectorWidth}px`,
+            }}
+        >
+            <section aria-label="Preview navigation" className={`${mobilePane === 'preview' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-r border-gray-200 bg-white lg:flex lg:border-r-0`}>
+                <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                    <fieldset disabled={disabled}>{previewOptions}</fieldset>
+                    <nav className="mt-6 space-y-2 border-t border-gray-200 pt-4" aria-label="Designer views">
+                        <div><h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Preview pages</h2><p className="mt-1 text-xs text-gray-500">Choose what the center preview displays.</p></div>
+                        <div className="grid gap-1">
+                            {contentMode === 'content'
+                                ? selectedSourceContent && <button type="button" aria-label={selectedSourceContent.kind === 'object' ? selectedSourceContent.objectTitle : selectedSourceContent.pageTitle} onClick={() => { setWorkspaceView('preview'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'preview')}>
+                                    {selectedSourceContent.kind === 'object' ? <Box className="h-4 w-4 shrink-0" /> : <FileText className="h-4 w-4 shrink-0" />}<TruncatedNavigationText value={selectedSourceContent.kind === 'object' ? selectedSourceContent.objectTitle : selectedSourceContent.pageTitle} />
+                                </button>
+                                : contentMode === 'demo' && previewContent.views.map((view) => <button type="button" key={view.id} aria-label={view.label} onClick={() => { setWorkspaceView('preview'); setViewId(view.id); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'preview' && view.id === viewId)}>{view.kind === 'object' ? <Box className="h-4 w-4 shrink-0" /> : <FileText className="h-4 w-4 shrink-0" />}<TruncatedNavigationText value={view.label} /></button>)}
+                            <button type="button" onClick={() => { setWorkspaceView('details'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'details')}><Settings2 className="h-4 w-4 shrink-0" />Theme details</button>
+                            <button type="button" onClick={() => { setWorkspaceView('images'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'images')}><ImageIcon className="h-4 w-4 shrink-0" />Theme images</button>
+                        </div>
                     </nav>
-                    {workspaceView === 'preview' && contentMode !== 'none' && <button type="button" aria-pressed={guidesEnabled} onClick={() => setGuidesEnabled((current) => !current)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{guidesEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{guidesEnabled ? 'Hide guides' : 'Show guides'}</button>}
-                    <span className="text-xs capitalize text-gray-500">{workspaceView === 'images' ? 'Theme images' : workspaceView === 'details' ? 'Theme details' : viewport}</span>
                 </div>
-                <div ref={previewFrameRef} className={`relative min-h-0 flex-1 rounded-lg border border-gray-300 bg-white shadow-sm ${workspaceView === 'images' || workspaceView === 'details' ? 'overflow-y-auto p-4 lg:p-6' : 'overflow-hidden'}`}>
-                    {workspaceView === 'images' ? imageAspectOverview : workspaceView === 'details' ? themeDetailsOverview : contentMode === 'none' || (contentMode === 'demo' && !selectedView) ? <div className="flex h-full items-center justify-center p-6 text-sm text-gray-500">There is no page or object to preview.</div> : contentMode === 'content' && !sourceContentModel ? <div className="flex h-full items-center justify-center gap-2 p-6 text-sm text-gray-500">{loadingContent && <Loader2 className="h-4 w-4 animate-spin" />}{loadingContent ? 'Loading the selected content…' : 'The selected content could not be loaded.'}</div> : <RenderFrame
+            </section>
+            <div
+                role="separator"
+                aria-label="Resize preview navigation"
+                aria-orientation="vertical"
+                aria-valuemin={minSidebarWidth}
+                aria-valuemax={maxSidebarWidth}
+                aria-valuenow={sidebarWidth}
+                aria-valuetext={`${sidebarWidth} pixels`}
+                tabIndex={0}
+                title="Drag to resize preview navigation"
+                onPointerDown={startSidebarResize}
+                onPointerMove={moveSidebarResize}
+                onPointerUp={stopSidebarResize}
+                onPointerCancel={stopSidebarResize}
+                onKeyDown={resizeSidebarWithKeyboard}
+                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 lg:flex ${isResizingSidebar ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
+            >
+                <span className={`h-10 w-0.5 rounded-full ${isResizingSidebar ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-500 group-focus:bg-blue-500'}`} />
+            </div>
+            <section className={`${mobilePane === 'edit' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col bg-gray-100 p-3 lg:flex lg:p-5`}>
+                <div className="mb-3 flex items-center justify-end gap-2">
+                    {contentMode !== 'none' && <button type="button" aria-pressed={guidesEnabled} onClick={() => setGuidesEnabled((current) => !current)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{guidesEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{guidesEnabled ? 'Hide guides' : 'Show guides'}</button>}
+                    <span className="text-xs capitalize text-gray-500">{viewport}</span>
+                </div>
+                <div ref={previewFrameRef} className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm">
+                    {contentMode === 'none' || (contentMode === 'demo' && !selectedView) ? <div className="flex h-full items-center justify-center p-6 text-sm text-gray-500">There is no page or object to preview.</div> : contentMode === 'content' && !sourceContentModel ? <div className="flex h-full items-center justify-center gap-2 p-6 text-sm text-gray-500">{loadingContent && <Loader2 className="h-4 w-4 animate-spin" />}{loadingContent ? 'Loading the selected content…' : 'The selected content could not be loaded.'}</div> : <RenderFrame
                         frameRef={iframeRef}
                         model={previewModel}
                         title="Live theme preview"
@@ -553,6 +880,34 @@ const SemanticThemeWorkspace = ({
                         }}
                     />}
                 </div>
+            </section>
+            <div
+                role="separator"
+                aria-label="Resize theme inspector"
+                aria-orientation="vertical"
+                aria-valuemin={minInspectorWidth}
+                aria-valuemax={maxInspectorWidth}
+                aria-valuenow={inspectorWidth}
+                aria-valuetext={`${inspectorWidth} pixels`}
+                tabIndex={0}
+                title="Drag to resize the theme inspector"
+                onPointerDown={startInspectorResize}
+                onPointerMove={moveInspectorResize}
+                onPointerUp={stopInspectorResize}
+                onPointerCancel={stopInspectorResize}
+                onKeyDown={resizeInspectorWithKeyboard}
+                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 lg:flex ${isResizingInspector ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
+            >
+                <span className={`h-10 w-0.5 rounded-full ${isResizingInspector ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-500 group-focus:bg-blue-500'}`} />
+            </div>
+            <section aria-label="Theme inspector" className={`${mobilePane === 'preview' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-l border-gray-200 bg-white lg:flex lg:border-l-0`}>
+                <fieldset disabled={disabled} className="min-h-0 flex-1 overflow-y-auto p-4">
+                    {workspaceView === 'details'
+                        ? themeDetailsEditor
+                        : workspaceView === 'images'
+                            ? <div className="space-y-6">{imageAspectNavigation}{themeImageEditor}</div>
+                            : <div className="space-y-4">{selectedEditor || <div className="flex min-h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 p-5 text-center text-sm text-gray-500">Select an element in the preview to edit its text, images, typography, spacing, and colors.</div>}{exampleImageEditor}</div>}
+                </fieldset>
             </section>
         </main>
     )

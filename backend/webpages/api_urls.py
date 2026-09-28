@@ -52,6 +52,8 @@ from .views.designer_theme_views import (
     DesignerThemeListView,
     DesignerThemePlaceholderView,
     DesignerThemePreviewContentView,
+    DesignerThemePreviewImageView,
+    DesignerThemePreviewImportView,
     DesignerThemePreviewObjectView,
     DesignerThemePreviewPageView,
     DesignerThemePreviewSiteView,
@@ -183,6 +185,16 @@ urlpatterns = [
         "designer/themes/<int:theme_id>/preview-content/",
         DesignerThemePreviewContentView.as_view(),
         name="designer-theme-preview-content",
+    ),
+    path(
+        "designer/themes/<int:theme_id>/preview-content/import/",
+        DesignerThemePreviewImportView.as_view(),
+        name="designer-theme-preview-import",
+    ),
+    path(
+        "designer/themes/<int:theme_id>/preview-content/image/",
+        DesignerThemePreviewImageView.as_view(),
+        name="designer-theme-preview-image",
     ),
     path(
         "designer/themes/<int:theme_id>/preview-content/from-site/",

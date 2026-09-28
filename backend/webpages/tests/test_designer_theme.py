@@ -472,6 +472,112 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(published_view["texts"], {"group:0:element:h1": "A temporary demo headline"})
         self.assertGreater(self.theme.sync_version, original_sync_version)
 
+    def test_page_can_be_imported_as_detached_example_and_deleted_by_assigned_designer(self):
+        page = WebPage.objects.create(
+            title="Imported programme",
+            slug="imported-programme",
+            tenant=self.tenant,
+            created_by=self.owner,
+            last_modified_by=self.owner,
+        )
+        version = PageVersion.objects.create(
+            page=page,
+            version_number=1,
+            code_layout="main_layout",
+            page_data={"intro": "Text copied into the theme example"},
+            widgets={"main": [{"type": "easy_widgets.ContentWidget", "config": {"content": "Visible copy"}}]},
+            created_by=self.owner,
+        )
+        page.latest_version = version
+        page.cached_root_id = page.id
+        page.save(update_fields=["latest_version", "cached_root_id"])
+        self.authenticate(self.owner)
+        workspace = self.client.get(self.workspace_url).data
+
+        imported = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/import/",
+            {
+                "sourceKind": "page",
+                "sourceId": page.id,
+                "draftVersion": workspace["draftVersion"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(imported.status_code, 200, imported.data)
+        imported_view = next(
+            view for view in imported.data["previewContent"]["views"] if view["id"] == imported.data["importedViewId"]
+        )
+        self.assertEqual(imported_view["label"], "Imported programme")
+        self.assertNotIn("sourcePageId", imported_view)
+        self.assertEqual(imported_view["content"]["pageData"]["intro"], "Text copied into the theme example")
+        self.assertNotIn("pageId", imported_view["content"])
+
+        self.authenticate(self.designer)
+        deleted = self.client.delete(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/",
+            {
+                "viewId": imported.data["importedViewId"],
+                "draftVersion": imported.data["draftVersion"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(deleted.status_code, 200, deleted.data)
+        self.assertEqual(deleted.data["previewContent"]["views"], [])
+
+    @patch("webpages.services.designer_theme.system_storage")
+    def test_assigned_designer_can_replace_an_image_in_an_example(self, storage):
+        source_url = "https://storage.test/theme_images/example/original.png"
+        self.theme.designer_preview = {
+            "views": [
+                {
+                    "id": "example-page",
+                    "label": "Example page",
+                    "kind": "page",
+                    "layout": "main_layout",
+                    "content": {
+                        "widgets": {
+                            "main": [
+                                {
+                                    "type": "easy_widgets.ImageWidget",
+                                    "config": {"imageUrl": source_url},
+                                }
+                            ]
+                        }
+                    },
+                }
+            ]
+        }
+        self.theme.save(update_fields=["designer_preview"])
+        storage.save.return_value = f"theme_images/{self.theme.id}/designer_drafts/1/replacement.png"
+        replacement_url = "https://storage.test/theme_images/example/replacement.png"
+        storage.url.return_value = replacement_url
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+        upload = SimpleUploadedFile(
+            "replacement.png",
+            generate_placeholder_png("Replacement", "Theme example", 32, 32),
+            content_type="image/png",
+        )
+
+        response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/image/",
+            {
+                "view_id": "example-page",
+                "source_url": source_url,
+                "image": upload,
+                "draft_version": workspace["draftVersion"],
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        saved_view = response.data["previewContent"]["views"][0]
+        self.assertEqual(saved_view["content"]["widgets"]["main"][0]["config"]["imageUrl"], replacement_url)
+        self.assertEqual(saved_view["imageMetadata"][replacement_url]["width"], 32)
+        self.assertTrue(storage.save.call_args.args[0].startswith(f"theme_images/{self.theme.id}/designer_drafts/"))
+
     def test_advanced_theme_editor_preserves_preview_ids_and_metadata(self):
         self.authenticate(self.owner)
         designer_preview = {
@@ -927,6 +1033,39 @@ class DesignerPlaceholderTests(SimpleTestCase):
 
         self.assertEqual(asset["url"], "/media/current-theme/header.png")
         storage_url.assert_any_call("theme_images/3/library/header.png")
+
+    def test_designer_assets_include_empty_image_slots(self):
+        theme = SimpleNamespace(
+            id=3,
+            image=None,
+            site_icon=None,
+            design_groups={
+                "groups": [
+                    {
+                        "name": "Navbar",
+                        "layoutProperties": {
+                            "navbar-widget": {
+                                "xs": {"backgroundImage": {}},
+                                "md": {"background_image": {"displayName": "Navbar desktop"}},
+                            }
+                        },
+                    }
+                ]
+            },
+            get_breakpoints=lambda: {"xs": 0, "md": 768},
+            list_library_images=lambda: [],
+        )
+
+        assets = [item for item in collect_designer_assets(theme) if item["kind"] == "design-group"]
+
+        self.assertEqual(
+            [asset["assetKey"] for asset in assets],
+            [
+                "design:0:navbar-widget:xs:backgroundImage",
+                "design:0:navbar-widget:md:background_image",
+            ],
+        )
+        self.assertTrue(all(asset["url"] is None for asset in assets))
 
     def test_reference_preview_html_removes_executable_markup(self):
         markup = _safe_reference_preview_html(

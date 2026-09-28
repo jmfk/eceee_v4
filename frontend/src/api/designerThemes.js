@@ -22,6 +22,18 @@ export const designerThemesApi = {
     workspace: async (themeId) => unwrap(await api.get(`${base}/themes/${themeId}/workspace/`)),
     preview: async (themeId, patch) => unwrap(await api.post(`${base}/themes/${themeId}/preview/`, patch)),
     savePreviewContent: async (themeId, viewId, texts, draftVersion) => unwrap(await api.patch(`${base}/themes/${themeId}/preview-content/`, { viewId, texts, draftVersion })),
+    importPreviewSource: async (themeId, sourceKind, sourceId, draftVersion) => unwrap(await api.post(`${base}/themes/${themeId}/preview-content/import/`, { sourceKind, sourceId, draftVersion })),
+    deletePreviewContent: async (themeId, viewId, draftVersion) => unwrap(await api.delete(`${base}/themes/${themeId}/preview-content/`, { data: { viewId, draftVersion } })),
+    replacePreviewImage: async (themeId, viewId, sourceUrl, image, draftVersion) => {
+        const form = new FormData()
+        form.append('view_id', viewId)
+        form.append('source_url', sourceUrl)
+        form.append('image', image)
+        form.append('draft_version', draftVersion)
+        return unwrap(await api.post(`${base}/themes/${themeId}/preview-content/image/`, form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        }))
+    },
     importPreviewFromSite: async (themeId, sourceSiteId, draftVersion) => unwrap(await api.post(`${base}/themes/${themeId}/preview-content/from-site/`, { sourceSiteId, draftVersion })),
     loadPreviewPage: async (themeId, sourcePageId) => unwrap(await api.post(`${base}/themes/${themeId}/preview-content/from-page/`, { sourcePageId })),
     loadPreviewObject: async (themeId, sourceObjectId) => unwrap(await api.post(`${base}/themes/${themeId}/preview-content/from-object/`, { sourceObjectId })),

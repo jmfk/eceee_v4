@@ -12,6 +12,12 @@ const DESIGNER_STYLE_PROPERTIES: Record<string, string> = {
     padding: 'padding', paddingTop: 'padding-top', paddingRight: 'padding-right', paddingBottom: 'padding-bottom', paddingLeft: 'padding-left',
 }
 
+const EDITABLE_TEXT_SELECTOR = 'a,blockquote,code,em,h1,h2,h3,h4,h5,h6,li,p,pre,span,strong'
+const editableTextLabel = (node: HTMLElement) => {
+    if (/^H[1-6]$/.test(node.tagName)) return `Heading ${node.tagName.slice(1)} text`
+    return ({ A: 'Link text', BLOCKQUOTE: 'Quote text', CODE: 'Code text', LI: 'List item text', P: 'Paragraph text', PRE: 'Preformatted text' } as Record<string, string>)[node.tagName] || 'Text'
+}
+
 const FRAME_CSS = `
 html,body,#root{margin:0;min-height:100%;background:#fff}body{font-family:system-ui,sans-serif}
 *,*::before,*::after{box-sizing:border-box}.site-renderer{min-height:100vh}.widget-item{position:relative}
@@ -21,8 +27,8 @@ html,body,#root{margin:0;min-height:100%;background:#fff}body{font-family:system
 .hero-widget,.banner-widget,.content-card-widget,.bio-widget{position:relative}.hero-background,.image-widget img,.content-card-widget img,.bio-widget img{max-width:100%;height:auto}.navbar-widget{min-height:28px}.navbar-desktop-menu{display:flex;position:relative;justify-content:space-between;align-items:center;height:28px;width:100%}.navbar-menu-list{display:flex;gap:1.5rem;list-style:none;margin:0;padding:0 0 0 20px;align-items:center}.navbar-secondary-menu{margin-left:auto;padding-left:0}.navbar-mobile-menu{position:absolute;top:100%;left:0;width:16rem;background:#fff;box-shadow:0 10px 15px -3px rgba(0,0,0,.1);z-index:50;border:1px solid #e5e7eb;padding:.5rem 0}.navbar-mobile-menu a{display:block;padding:.5rem 1rem;font-size:.875rem;color:#374151;text-decoration:none}
 .forms-widget{display:grid;gap:12px}.forms-widget label{display:grid;gap:4px}.table-widget{overflow:auto}.table-widget table{width:100%;border-collapse:collapse}.table-widget th,.table-widget td{padding:8px;border:1px solid #d1d5db;text-align:left}
 .news-items{display:grid;gap:18px}.news-item{display:grid;gap:12px}.render-error-state{border:1px solid #fecaca;background:#fef2f2}
-.designer-preview [data-designer-target]{cursor:pointer}.designer-guides [data-designer-target]{outline:1px dashed rgba(100,116,139,.5)!important;outline-offset:-1px}.designer-guides [data-designer-target]:hover{outline:2px dashed #2563eb!important}[data-designer-target].designer-selected{outline:3px solid #2563eb!important;outline-offset:-3px!important}
-.designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483646!important}.designer-spacing-margin{border:1px dashed rgba(217,119,6,.7)!important;background:rgba(245,158,11,.04)!important}.designer-spacing-padding{border:1px dashed rgba(8,145,178,.75)!important;box-shadow:inset 0 0 0 1px rgba(6,182,212,.08)!important}.designer-spacing-readout{position:fixed!important;z-index:2147483647!important;max-width:420px;padding:5px 7px;border:1px solid rgba(15,23,42,.18);border-radius:5px;background:rgba(255,255,255,.97);color:#334155;font:600 10px/1.35 system-ui,sans-serif;pointer-events:none!important}
+.designer-preview [data-designer-target]{cursor:pointer}.designer-guides [data-designer-target]{outline:1px dashed rgba(100,116,139,.5)!important;outline-offset:-1px}[data-designer-target].designer-selected{outline:3px solid #2563eb!important;outline-offset:-3px!important}.designer-guides .designer-hovered{outline:2px dotted #2563eb!important;outline-offset:-2px!important}
+.designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483646!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483647!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483647!important;transform:translate(-50%,-50%);font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,0 0 4px #fff,0 0 7px #fff}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}
 @media(max-width:767px){.two-columns-widget,.three-columns-widget{grid-template-columns:1fr}}
 `
 
@@ -43,10 +49,13 @@ const postDesignerEvent = (node: HTMLElement, action = 'select') => {
     }, '*')
 }
 
-const registerTarget = (node: HTMLElement, target: any) => {
+const registerTarget = (node: HTMLElement, target: any, primary = false) => {
     let targets: any[] = []
     try { targets = JSON.parse(node.dataset.designerTargets || '[]') } catch { targets = [] }
-    if (!targets.some((candidate) => candidate.id === target.id)) targets.push(target)
+    if (!targets.some((candidate) => candidate.id === target.id)) {
+        if (primary) targets.unshift(target)
+        else targets.push(target)
+    }
     node.dataset.designerTargets = JSON.stringify(targets)
     node.dataset.designerTarget = targets[0].id
     node.dataset.designerKind = targets[0].kind
@@ -58,27 +67,127 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
     if (!designer) return () => undefined
     const cleanups: Array<() => void> = []
     let guides: HTMLElement[] = []
-    const clearGuides = () => { guides.forEach((guide) => guide.remove()); guides = [] }
+    let hoveredNode: HTMLElement | null = null
+    const removeGuides = () => { guides.forEach((guide) => guide.remove()); guides = [] }
+    const clearGuides = () => {
+        removeGuides()
+        hoveredNode?.classList.remove('designer-hovered')
+        hoveredNode = null
+    }
     const showSpacing = (node: HTMLElement) => {
-        clearGuides()
+        removeGuides()
+        hoveredNode?.classList.remove('designer-hovered')
+        hoveredNode = node
+        node.classList.add('designer-hovered')
         if (designer.guidesEnabled === false) return
         const rect = node.getBoundingClientRect()
         const style = getComputedStyle(node)
         const number = (name: string) => Number.parseFloat(style.getPropertyValue(name)) || 0
         const margin = { top: number('margin-top'), right: number('margin-right'), bottom: number('margin-bottom'), left: number('margin-left') }
         const padding = { top: number('padding-top'), right: number('padding-right'), bottom: number('padding-bottom'), left: number('padding-left') }
-        const marginGuide = document.createElement('div')
-        marginGuide.className = 'designer-spacing-guide designer-spacing-margin'
-        Object.assign(marginGuide.style, { left: `${rect.left - margin.left}px`, top: `${rect.top - margin.top}px`, width: `${rect.width + margin.left + margin.right}px`, height: `${rect.height + margin.top + margin.bottom}px` })
-        const paddingGuide = document.createElement('div')
-        paddingGuide.className = 'designer-spacing-guide designer-spacing-padding'
-        Object.assign(paddingGuide.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` })
-        const readout = document.createElement('div')
-        readout.className = 'designer-spacing-readout'
-        readout.textContent = `Margin: ${margin.top}px ${margin.right}px ${margin.bottom}px ${margin.left}px · Padding: ${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`
-        Object.assign(readout.style, { left: `${Math.max(6, rect.left)}px`, top: `${Math.max(6, rect.top - 28)}px` })
-        document.body.append(marginGuide, paddingGuide, readout)
-        guides = [marginGuide, paddingGuide, readout]
+        const border = { top: number('border-top-width'), right: number('border-right-width'), bottom: number('border-bottom-width'), left: number('border-left-width') }
+        const addGuide = (
+            className: string,
+            left: number,
+            top: number,
+            width: number,
+            height: number,
+            side?: string,
+            spacing?: 'margin' | 'padding',
+            value?: number,
+        ) => {
+            if (width <= 0 || height <= 0) return
+            const guide = document.createElement('div')
+            guide.className = `designer-spacing-guide ${className}`
+            guide.setAttribute('aria-hidden', 'true')
+            if (side) guide.dataset.side = side
+            Object.assign(guide.style, { left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px` })
+            document.body.append(guide)
+            guides.push(guide)
+
+            const viewportWidth = window.innerWidth
+            const viewportHeight = window.innerHeight
+            const visibleLeft = Math.max(0, left)
+            const visibleRight = Math.min(viewportWidth, left + width)
+            const visibleTop = Math.max(0, top)
+            const visibleBottom = Math.min(viewportHeight, top + height)
+            if (!spacing || value === undefined || visibleRight <= visibleLeft || visibleBottom <= visibleTop) return
+
+            const measure = document.createElement('div')
+            const horizontalMeasure = side === 'left' || side === 'right'
+            measure.className = `designer-spacing-measure designer-spacing-measure-${horizontalMeasure ? 'horizontal' : 'vertical'} designer-spacing-${spacing}-measure`
+            measure.setAttribute('aria-hidden', 'true')
+            if (side) measure.dataset.side = side
+            Object.assign(measure.style, horizontalMeasure ? {
+                left: `${visibleLeft}px`,
+                top: `${(visibleTop + visibleBottom) / 2}px`,
+                width: `${visibleRight - visibleLeft}px`,
+            } : {
+                left: `${(visibleLeft + visibleRight) / 2}px`,
+                top: `${visibleTop}px`,
+                height: `${visibleBottom - visibleTop}px`,
+            })
+            document.body.append(measure)
+            guides.push(measure)
+
+            const label = document.createElement('div')
+            label.className = `designer-spacing-value designer-spacing-${spacing}-value`
+            label.setAttribute('aria-hidden', 'true')
+            if (side) label.dataset.side = side
+            label.textContent = `${value}px`
+            const labelWidth = Math.max(20, label.textContent.length * 6)
+            const labelHeight = 14
+            const labelGap = 3
+            const halfWidth = labelWidth / 2
+            const halfHeight = labelHeight / 2
+            let labelLeft = (visibleLeft + visibleRight) / 2
+            let labelTop = (visibleTop + visibleBottom) / 2
+            const keepOutsidePositionVisible = (preferred: number, halfSize: number, viewportSize: number) => Math.min(viewportSize - halfSize, Math.max(halfSize, preferred))
+            if ((side === 'top' || side === 'bottom') && visibleBottom - visibleTop < labelHeight + 4) {
+                const above = visibleTop - halfHeight - labelGap
+                const below = visibleBottom + halfHeight + labelGap
+                labelTop = keepOutsidePositionVisible(side === 'top' ? above : below, halfHeight, viewportHeight)
+                label.dataset.placement = 'outside'
+            } else if ((side === 'left' || side === 'right') && visibleRight - visibleLeft < labelWidth + 4) {
+                const before = visibleLeft - halfWidth - labelGap
+                const after = visibleRight + halfWidth + labelGap
+                labelLeft = keepOutsidePositionVisible(side === 'left' ? before : after, halfWidth, viewportWidth)
+                label.dataset.placement = 'outside'
+            }
+            labelLeft = Math.min(viewportWidth - halfWidth, Math.max(halfWidth, labelLeft))
+            labelTop = Math.min(viewportHeight - halfHeight, Math.max(halfHeight, labelTop))
+            Object.assign(label.style, {
+                left: `${labelLeft}px`,
+                top: `${labelTop}px`,
+            })
+            document.body.append(label)
+            guides.push(label)
+        }
+
+        const marginLeft = Math.max(0, margin.left)
+        const marginRight = Math.max(0, margin.right)
+        const marginTop = Math.max(0, margin.top)
+        const marginBottom = Math.max(0, margin.bottom)
+        const outerLeft = rect.left - marginLeft
+        const outerWidth = rect.width + marginLeft + marginRight
+        addGuide('designer-spacing-margin', outerLeft, rect.top - marginTop, outerWidth, marginTop, 'top', 'margin', marginTop)
+        addGuide('designer-spacing-margin', rect.right, rect.top, marginRight, rect.height, 'right', 'margin', marginRight)
+        addGuide('designer-spacing-margin', outerLeft, rect.bottom, outerWidth, marginBottom, 'bottom', 'margin', marginBottom)
+        addGuide('designer-spacing-margin', outerLeft, rect.top, marginLeft, rect.height, 'left', 'margin', marginLeft)
+
+        const innerLeft = rect.left + border.left
+        const innerTop = rect.top + border.top
+        const innerWidth = Math.max(0, rect.width - border.left - border.right)
+        const innerHeight = Math.max(0, rect.height - border.top - border.bottom)
+        const contentLeft = innerLeft + padding.left
+        const contentTop = innerTop + padding.top
+        const contentWidth = Math.max(0, innerWidth - padding.left - padding.right)
+        const contentHeight = Math.max(0, innerHeight - padding.top - padding.bottom)
+        addGuide('designer-spacing-padding', innerLeft, innerTop, innerWidth, Math.max(0, padding.top), 'top', 'padding', Math.max(0, padding.top))
+        addGuide('designer-spacing-padding', contentLeft + contentWidth, contentTop, Math.max(0, padding.right), contentHeight, 'right', 'padding', Math.max(0, padding.right))
+        addGuide('designer-spacing-padding', innerLeft, contentTop + contentHeight, innerWidth, Math.max(0, padding.bottom), 'bottom', 'padding', Math.max(0, padding.bottom))
+        addGuide('designer-spacing-padding', innerLeft, contentTop, Math.max(0, padding.left), contentHeight, 'left', 'padding', Math.max(0, padding.left))
+        addGuide('designer-spacing-content', contentLeft, contentTop, contentWidth, contentHeight)
     }
     const groups = designer.catalog?.designGroups || []
     const layouts = designer.catalog?.layouts || []
@@ -107,26 +216,54 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
                 const selector = element.element === 'a:hover' ? 'a' : element.element
                 try {
                     groupRoot.querySelectorAll<HTMLElement>(selector).forEach((node) => {
-                        const editable = designer.contentEditable !== false
-                            && ['A', 'BLOCKQUOTE', 'CODE', 'EM', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'P', 'PRE', 'SPAN', 'STRONG'].includes(node.tagName)
-                        registerTarget(node, { id: element.id, kind: 'element', label: element.label, editable })
-                        if (designer.texts[element.id] !== undefined) node.textContent = designer.texts[element.id]
-                        if (editable) node.contentEditable = 'true'
+                        registerTarget(node, { id: element.id, kind: 'element', label: element.label, editable: false })
                     })
                 } catch { /* Invalid theme selector metadata is ignored in preview. */ }
             })
         })
     })
 
+    root.querySelectorAll<HTMLElement>(EDITABLE_TEXT_SELECTOR).forEach((node, index) => {
+        if (!(node.innerText || node.textContent || '').trim()) return
+        let targets: any[] = []
+        try { targets = JSON.parse(node.dataset.designerTargets || '[]') } catch { targets = [] }
+        const legacyTextTarget = targets.find((target) => designer.texts[target.id] !== undefined)
+        if (legacyTextTarget) node.textContent = designer.texts[legacyTextTarget.id]
+        if (designer.contentEditable === false) return
+        const contentId = `content:${index}`
+        registerTarget(node, { id: contentId, kind: 'element', label: editableTextLabel(node), editable: true }, true)
+        if (designer.texts[contentId] !== undefined) node.textContent = designer.texts[contentId]
+        node.contentEditable = 'true'
+    })
+
     root.querySelectorAll<HTMLElement>('[data-designer-target]').forEach((node) => {
         const click = (event: Event) => { event.preventDefault(); event.stopPropagation(); root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected')); node.classList.add('designer-selected'); postDesignerEvent(node) }
         const input = () => postDesignerEvent(node, 'contentChange')
-        const over = (event: Event) => { event.stopPropagation(); showSpacing(node) }
         node.addEventListener('click', click)
         node.addEventListener('input', input)
-        node.addEventListener('mouseover', over)
-        node.addEventListener('mouseout', clearGuides)
-        cleanups.push(() => { node.removeEventListener('click', click); node.removeEventListener('input', input); node.removeEventListener('mouseover', over); node.removeEventListener('mouseout', clearGuides) })
+        cleanups.push(() => { node.removeEventListener('click', click); node.removeEventListener('input', input) })
+    })
+    const findHoveredNode = (target: EventTarget | null) => target instanceof HTMLElement ? target : null
+    const over = (event: MouseEvent) => {
+        const node = findHoveredNode(event.target)
+        if (node && root.contains(node) && node !== hoveredNode) showSpacing(node)
+    }
+    const out = (event: MouseEvent) => {
+        if (!hoveredNode || (event.relatedTarget instanceof Node && hoveredNode.contains(event.relatedTarget))) return
+        const next = findHoveredNode(event.relatedTarget)
+        if (next && root.contains(next)) showSpacing(next)
+        else clearGuides()
+    }
+    const refreshGuides = () => { if (hoveredNode) showSpacing(hoveredNode) }
+    root.addEventListener('mouseover', over)
+    root.addEventListener('mouseout', out)
+    window.addEventListener('scroll', refreshGuides, true)
+    window.addEventListener('resize', refreshGuides)
+    cleanups.push(() => {
+        root.removeEventListener('mouseover', over)
+        root.removeEventListener('mouseout', out)
+        window.removeEventListener('scroll', refreshGuides, true)
+        window.removeEventListener('resize', refreshGuides)
     })
     return () => { clearGuides(); cleanups.forEach((cleanup) => cleanup()) }
 }

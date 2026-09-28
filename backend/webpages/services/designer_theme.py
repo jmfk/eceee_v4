@@ -900,6 +900,11 @@ def _asset_spec(value):
     }
 
 
+def _is_image_property(property_name):
+    normalized = re.sub(r"[^a-z0-9]", "", str(property_name or "").lower())
+    return normalized.endswith("image") or normalized.endswith("imageurl")
+
+
 def _walk_usage(value, needle, path=""):
     usages = []
     if isinstance(value, dict):
@@ -980,7 +985,11 @@ def collect_designer_assets(theme: PageTheme):
                 if property_name == "images" and isinstance(value, dict):
                     candidates.extend(value.items())
                 elif isinstance(value, dict) and (
-                    _image_url(value) or value.get("isPlaceholder") or value.get("requiredWidth")
+                    _is_image_property(property_name)
+                    or _image_url(value)
+                    or value.get("isPlaceholder")
+                    or value.get("requiredWidth")
+                    or value.get("requiredHeight")
                 ):
                     candidates.append((property_name, value))
             for property_name, value in candidates:
@@ -1605,6 +1614,137 @@ def save_designer_preview_texts(theme_id, tenant, user, view_id, texts, draft_ve
         draft.updated_by = user
         draft.save(update_fields=["snapshot", "version", "has_changes", "updated_by", "updated_at"])
         return theme, draft
+
+
+def _locked_designer_preview_draft(theme_id, tenant, user, draft_version, *, require_tenant_access=False):
+    theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
+    if not user_can_design_theme(user, theme):
+        raise PermissionError
+    if require_tenant_access and not tenant.user_has_access(user):
+        raise PermissionError
+    draft = get_or_create_designer_draft(theme, user)
+    draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
+    if draft.base_sync_version != theme.sync_version:
+        raise DesignerDraftConflict("The live theme changed after this draft was started.")
+    if draft.version != _integer(draft_version, "draftVersion"):
+        raise DesignerDraftConflict("The Designer draft changed after you opened it.")
+    return theme, draft, theme_from_designer_draft(theme, draft)
+
+
+def _save_designer_preview_draft(draft, draft_theme, user):
+    draft.snapshot = theme_designer_snapshot(draft_theme)
+    draft.version += 1
+    draft.has_changes = True
+    draft.updated_by = user
+    draft.save(update_fields=["snapshot", "version", "has_changes", "updated_by", "updated_at"])
+
+
+def import_designer_preview_source(theme_id, tenant, user, source_kind, source_id, draft_version):
+    """Append one detached, non-blank page or object to the Designer draft."""
+    from webpages.services.theme_preview_content import import_theme_preview_document
+
+    with transaction.atomic():
+        theme, draft, draft_theme = _locked_designer_preview_draft(
+            theme_id, tenant, user, draft_version, require_tenant_access=True
+        )
+        view, copied_images = import_theme_preview_document(draft_theme, source_kind, source_id)
+        preview = normalized_designer_preview(draft_theme)
+        preview["views"].append(view)
+        draft_theme.designer_preview = preview
+        _save_designer_preview_draft(draft, draft_theme, user)
+        return theme, draft, view["id"], copied_images
+
+
+def delete_designer_preview_view(theme_id, tenant, user, view_id, draft_version):
+    """Delete one saved example page or object from the Designer draft."""
+    with transaction.atomic():
+        theme, draft, draft_theme = _locked_designer_preview_draft(theme_id, tenant, user, draft_version)
+        previous_snapshot = draft.snapshot
+        preview = normalized_designer_preview(draft_theme)
+        remaining = [view for view in preview["views"] if view["id"] != view_id]
+        if len(remaining) == len(preview["views"]):
+            raise ValidationError("Unknown preview view.")
+        preview["views"] = remaining
+        draft_theme.designer_preview = preview
+        _save_designer_preview_draft(draft, draft_theme, user)
+        _cleanup_designer_assets_after_commit(theme.id, [previous_snapshot])
+        return theme, draft
+
+
+def _replace_preview_image_reference(value, source_url, replacement_url):
+    replacements = 0
+    if isinstance(value, dict):
+        rewritten = {}
+        for key, child in value.items():
+            rewritten[key], count = _replace_preview_image_reference(child, source_url, replacement_url)
+            replacements += count
+        return rewritten, replacements
+    if isinstance(value, list):
+        rewritten = []
+        for child in value:
+            next_child, count = _replace_preview_image_reference(child, source_url, replacement_url)
+            replacements += count
+            rewritten.append(next_child)
+        return rewritten, replacements
+    if isinstance(value, str) and source_url in value:
+        return value.replace(source_url, replacement_url), value.count(source_url)
+    return value, 0
+
+
+def replace_designer_preview_image(theme_id, tenant, user, view_id, source_url, upload, draft_version):
+    """Replace an image already present in a detached example document."""
+    if not isinstance(source_url, str) or not source_url or len(source_url) > 2000:
+        raise ValidationError("Choose a valid example image.")
+    content, (width, height) = validate_image_upload(upload)
+    saved_path = None
+    try:
+        with transaction.atomic():
+            theme, draft, draft_theme = _locked_designer_preview_draft(theme_id, tenant, user, draft_version)
+            previous_snapshot = draft.snapshot
+            preview = normalized_designer_preview(draft_theme)
+            view = next((item for item in preview["views"] if item["id"] == view_id), None)
+            if not view:
+                raise ValidationError("Unknown preview view.")
+
+            extension = {
+                "image/jpeg": ".jpg",
+                "image/png": ".png",
+                "image/gif": ".gif",
+                "image/webp": ".webp",
+                "image/svg+xml": ".svg",
+            }[upload.content_type]
+            safe_name = slugify(os.path.splitext(upload.name)[0]) or "example-image"
+            filename = f"{safe_name}-{uuid.uuid4().hex[:10]}{extension}"
+            path = f"theme_images/{theme.id}/designer_drafts/{draft.id}/{filename}"
+            saved_path = system_storage.save(path, ContentFile(content))
+            replacement_url = system_storage.url(saved_path)
+            view["content"], content_replacements = _replace_preview_image_reference(
+                view.get("content", {}), source_url, replacement_url
+            )
+            view["images"], image_replacements = _replace_preview_image_reference(
+                view.get("images", {}), source_url, replacement_url
+            )
+            replacements = content_replacements + image_replacements
+            if not replacements:
+                raise ValidationError("That image is not part of this example.")
+            view.setdefault("imageMetadata", {})[replacement_url] = {
+                "filename": filename,
+                "width": width,
+                "height": height,
+                "size": len(content),
+            }
+            draft_theme.designer_preview = preview
+            _save_designer_preview_draft(draft, draft_theme, user)
+            _cleanup_designer_assets_after_commit(theme.id, [previous_snapshot])
+            return theme, draft
+    except Exception:
+        if saved_path:
+            try:
+                if system_storage.exists(saved_path):
+                    system_storage.delete(saved_path)
+            except Exception:
+                logger.exception("Could not remove rolled-back example image %s", saved_path)
+        raise
 
 
 def _find_asset(theme, asset_key):

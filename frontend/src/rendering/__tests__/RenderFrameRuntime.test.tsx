@@ -85,14 +85,92 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect([...document.querySelectorAll('style')].some((style) => style.textContent?.includes('rgb(1,2,3)'))).toBe(true)
     })
 
+    it('gives each visible text element its own editable example target', async () => {
+        const editableWorkspace = structuredClone(workspace)
+        editableWorkspace.previewContent.views[0].texts = { 'content:0': 'Saved example heading' }
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: editableWorkspace, viewId: 'page-main', contentEditable: true }))
+
+        const heading = await screen.findByRole('heading', { name: 'Saved example heading' })
+        expect(heading).toHaveAttribute('data-designer-target', 'content:0')
+        expect((heading as HTMLElement).contentEditable).toBe('true')
+        fireEvent.input(heading, { target: { textContent: 'Changed example heading' } })
+
+        await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview',
+            action: 'contentChange',
+            targetId: 'content:0',
+            label: 'Heading 1 text',
+            editable: true,
+        }), '*'))
+        postMessage.mockRestore()
+    })
+
+    it('makes unconfigured visible text editable without making live content editable', async () => {
+        const unconfiguredWorkspace = {
+            ...structuredClone(workspace),
+            previewContent: { views: [{
+                id: 'plain-page', layout: 'main_layout', texts: {},
+                content: { widgets: { main: [{ id: 'plain', type: 'easy_widgets.ContentWidget', config: { content: '<p>Plain copied text</p>' } }] } },
+            }] },
+            catalog: { ...structuredClone(workspace.catalog), designGroups: [] },
+        }
+        const { unmount } = render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: unconfiguredWorkspace, viewId: 'plain-page', contentEditable: true }))
+
+        const editableParagraph = await screen.findByText('Plain copied text')
+        expect(editableParagraph).toHaveAttribute('data-designer-target', 'content:0')
+        expect((editableParagraph as HTMLElement).contentEditable).toBe('true')
+
+        unmount()
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: unconfiguredWorkspace, viewId: 'plain-page', contentEditable: false }))
+        const readOnlyParagraph = await screen.findByText('Plain copied text')
+        expect(readOnlyParagraph).not.toHaveAttribute('data-designer-target')
+        expect((readOnlyParagraph as HTMLElement).contentEditable).not.toBe('true')
+    })
+
     it('reports selection without content changes and shows spacing guides', async () => {
         const postMessage = vi.spyOn(window, 'postMessage')
         render(<RenderFrameRuntime />)
-        sendModel(createDesignerRenderModel({ workspace, viewId: 'page-main' }))
+        sendModel(createDesignerRenderModel({
+            workspace,
+            viewId: 'page-main',
+            themeCss: 'h1{margin:10px 20px 30px 40px;padding:5px 6px 7px 8px;border:2px solid transparent}',
+        }))
         const heading = await screen.findByRole('heading', { name: 'Overridden heading' })
+        vi.spyOn(heading, 'getBoundingClientRect').mockReturnValue({
+            x: 80, y: 100, left: 80, top: 100, right: 380, bottom: 300, width: 300, height: 200,
+            toJSON: () => ({}),
+        })
 
         fireEvent.mouseOver(heading)
-        expect(document.querySelector('.designer-spacing-readout')).toBeTruthy()
+        expect(document.querySelector('.designer-spacing-readout')).toBeNull()
+        expect(document.querySelector('.designer-spacing-margin-value[data-side="top"]')).toHaveTextContent('10px')
+        expect(document.querySelector('.designer-spacing-margin-value[data-side="top"]')).toHaveAttribute('data-placement', 'outside')
+        expect(document.querySelector('.designer-spacing-margin-value[data-side="top"]')).toHaveStyle({ left: '220px', top: '80px' })
+        expect(document.querySelector('.designer-spacing-margin-value[data-side="bottom"]')).toHaveTextContent('30px')
+        expect(document.querySelector('.designer-spacing-margin-value[data-side="bottom"]')).toHaveStyle({ left: '220px', top: '315px' })
+        expect(document.querySelector('.designer-spacing-padding-value[data-side="left"]')).toHaveTextContent('8px')
+        expect(document.querySelector('.designer-spacing-padding-value[data-side="left"]')).toHaveAttribute('data-placement', 'outside')
+        expect(document.querySelector('.designer-spacing-padding-value[data-side="left"]')).toHaveStyle({ left: '69px', top: '199px' })
+        expect(document.querySelector('.designer-spacing-margin-measure[data-side="top"]')).toHaveStyle({
+            left: '220px', top: '90px', height: '10px',
+        })
+        expect(document.querySelector('.designer-spacing-padding-measure[data-side="left"]')).toHaveStyle({
+            left: '82px', top: '199px', width: '8px',
+        })
+        expect(heading).toHaveClass('designer-hovered')
+        expect(document.querySelector('.designer-spacing-margin[data-side="bottom"]')).toHaveStyle({
+            left: '40px', top: '300px', width: '360px', height: '30px',
+        })
+        expect(document.querySelector('.designer-spacing-padding[data-side="left"]')).toHaveStyle({
+            left: '82px', top: '107px', width: '8px', height: '184px',
+        })
+        expect(document.querySelector('.designer-spacing-content')).toHaveStyle({
+            left: '90px', top: '107px', width: '282px', height: '184px',
+        })
         fireEvent.click(heading)
 
         await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
@@ -103,6 +181,69 @@ describe('RenderFrameRuntime designer overlay', () => {
             source: 'eceee-designer-preview', action: 'contentChange', targetId: 'heading',
         }), '*')
         postMessage.mockRestore()
+    })
+
+    it('shows spacing for structural layout elements without designer targets', async () => {
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace, viewId: 'page-main' }))
+        await screen.findByRole('heading', { name: 'Overridden heading' })
+        const grid = document.querySelector<HTMLElement>('.main-layout-grid')!
+        grid.style.padding = '30px 40px'
+        vi.spyOn(grid, 'getBoundingClientRect').mockReturnValue({
+            x: 0, y: 100, left: 0, top: 100, right: 600, bottom: 500, width: 600, height: 400,
+            toJSON: () => ({}),
+        })
+
+        fireEvent.mouseOver(grid)
+
+        expect(grid).not.toHaveAttribute('data-designer-target')
+        expect(grid).toHaveClass('designer-hovered')
+        expect(document.querySelector('.designer-spacing-padding[data-side="top"]')).toHaveStyle({
+            left: '0px', top: '100px', width: '600px', height: '30px',
+        })
+        expect(document.querySelector('.designer-spacing-padding[data-side="left"]')).toHaveStyle({
+            left: '0px', top: '130px', width: '40px', height: '340px',
+        })
+    })
+
+    it('centers a spacing value in the visible part of an offscreen region', async () => {
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace, viewId: 'page-main' }))
+        await screen.findByRole('heading', { name: 'Overridden heading' })
+        const grid = document.querySelector<HTMLElement>('.main-layout-grid')!
+        grid.style.paddingTop = '30px'
+        vi.spyOn(grid, 'getBoundingClientRect').mockReturnValue({
+            x: -200, y: 100, left: -200, top: 100, right: 300, bottom: 500, width: 500, height: 400,
+            toJSON: () => ({}),
+        })
+
+        fireEvent.mouseOver(grid)
+
+        expect(document.querySelector('.designer-spacing-padding-value[data-side="top"]')).toHaveTextContent('30px')
+        expect(document.querySelector('.designer-spacing-padding-value[data-side="top"]')).toHaveStyle({
+            left: '150px', top: '115px',
+        })
+    })
+
+    it('keeps a tight spacing label on the true exterior side at a viewport edge', async () => {
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace, viewId: 'page-main' }))
+        await screen.findByRole('heading', { name: 'Overridden heading' })
+        const grid = document.querySelector<HTMLElement>('.main-layout-grid')!
+        grid.style.paddingLeft = '20px'
+        vi.spyOn(grid, 'getBoundingClientRect').mockReturnValue({
+            x: 0, y: 100, left: 0, top: 100, right: 300, bottom: 300, width: 300, height: 200,
+            toJSON: () => ({}),
+        })
+
+        fireEvent.mouseOver(grid)
+
+        expect(document.querySelector('.designer-spacing-padding-value[data-side="left"]')).toHaveStyle({
+            left: '12px', top: '200px',
+        })
+        expect(document.querySelector('.designer-spacing-padding-measure[data-side="left"]')).toHaveStyle({
+            left: '0px', top: '200px', width: '20px',
+        })
     })
 
     it('returns current computed theme values for a requested target', async () => {
