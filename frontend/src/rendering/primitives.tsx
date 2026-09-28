@@ -1,4 +1,4 @@
-import DOMPurify from 'dompurify'
+import DOMPurify from 'isomorphic-dompurify'
 import React from 'react'
 
 export const value = (config: Record<string, any>, ...names: string[]) => {
@@ -8,13 +8,13 @@ export const value = (config: Record<string, any>, ...names: string[]) => {
     return undefined
 }
 
-export const asArray = <T,>(candidate: T[] | null | undefined): T[] => Array.isArray(candidate) ? candidate : []
+export const asArray = <T,>(candidate: unknown): T[] => Array.isArray(candidate) ? candidate as T[] : []
 
 export const normalizeCssName = (candidate: string) => String(candidate || '')
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, '-')
 
-export const SafeHtml = ({ html, className = '', as: Tag = 'div' }: { html?: string, className?: string, as?: keyof JSX.IntrinsicElements }) => (
+export const SafeHtml = ({ html, className = '', as: Tag = 'div' }: { html?: string, className?: string, as?: React.ElementType }) => (
     <Tag className={className} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(String(html || '')) }} />
 )
 

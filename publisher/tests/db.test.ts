@@ -44,6 +44,20 @@ describe('database snapshot', () => {
     expect(mocks.query.mock.calls[1][1]).toEqual(['preview.example.org', true, true]);
   });
 
+  it('keeps explicit and default theme reads tenant-scoped', async () => {
+    await database.withSnapshot(async reader => {
+      await reader.theme('20', '7');
+      await reader.defaultTheme('7');
+    });
+
+    const [themeSql, themeParameters] = mocks.query.mock.calls[1];
+    const [defaultSql, defaultParameters] = mocks.query.mock.calls[2];
+    expect(themeSql).toContain('id = $1 AND tenant_id = $2');
+    expect(themeParameters).toEqual(['20', '7']);
+    expect(defaultSql).toContain('tenant_id = $1 AND is_default = true AND is_active = true');
+    expect(defaultParameters).toEqual(['7']);
+  });
+
   it('rolls back and releases the client when resolution fails', async () => {
     const failure = new Error('resolution failed');
     await expect(database.withSnapshot(async () => { throw failure; })).rejects.toBe(failure);

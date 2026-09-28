@@ -31,7 +31,8 @@ export interface RenderContext {
     simulatedPath?: string
     renderRoutePrefix?: string
     componentStyles?: Record<string, Record<string, any>>
-    preview: true
+    mode?: 'preview' | 'public'
+    preview: boolean
 }
 
 export interface DesignerRenderOptions {
