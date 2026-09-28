@@ -16,8 +16,9 @@ const workspace = {
         }],
     },
     assets: [],
+    typography: [{ targetId: 'article-body', values: { fontSize: '16px' } }],
     spacing: [{ targetId: 'heading', values: { marginTop: '10px', marginBottom: '30px', paddingLeft: '8px' } }],
-    constraints: { editableSpacingProperties: ['marginTop', 'marginBottom', 'paddingLeft'] },
+    constraints: { editableTypographyProperties: ['fontSize'], editableSpacingProperties: ['marginTop', 'marginBottom', 'paddingLeft'] },
 }
 
 const sendModel = (model: ReturnType<typeof createDesignerRenderModel>) => act(() => {
@@ -299,10 +300,15 @@ describe('RenderFrameRuntime designer overlay', () => {
         await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'select', targetId: 'heading',
             computedStyles: expect.objectContaining({ fontSize: expect.any(String), marginBottom: expect.any(String) }),
+            ancestors: expect.arrayContaining([expect.objectContaining({ id: 'article-body' })]),
         }), '*'))
         expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'contentChange', targetId: 'heading',
         }), '*')
+        fireEvent.mouseOut(heading, { relatedTarget: document.body })
+        expect(heading).toHaveClass('designer-selected')
+        expect(heading).toHaveClass('designer-hovered')
+        expect(document.querySelector('.designer-spacing-margin-value[data-side="top"]')).toHaveTextContent('10px')
         postMessage.mockRestore()
     })
 

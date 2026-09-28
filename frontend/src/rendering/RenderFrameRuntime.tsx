@@ -58,7 +58,29 @@ const descendantTargets = (node: HTMLElement) => {
     }))).filter((target: any) => target.id && !seen.has(target.id) && seen.add(target.id)).slice(0, 100)
 }
 
-const postDesignerEvent = (node: HTMLElement, action = 'select', preferredTarget?: any, extra: Record<string, unknown> = {}) => {
+const ancestorTargets = (node: HTMLElement, designer: NonNullable<RenderPageModel['designer']>) => {
+    const seen = new Set<string>()
+    const ancestors: any[] = []
+    let foundTypography = false
+    let foundSpacing = false
+    let ancestor = node.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
+    while (ancestor) {
+        nodeTargets(ancestor).forEach((target: any) => {
+            const typographyTarget = Boolean(designer.editableTypographyTargets?.[target.id])
+            const spacingTarget = Boolean(designer.editableSpacingTargets?.[target.id])
+            if (!target.id || seen.has(target.id) || (!typographyTarget || foundTypography) && (!spacingTarget || foundSpacing)) return
+            seen.add(target.id)
+            ancestors.push({ ...target, computedStyles: computedThemeValues(ancestor) })
+            if (typographyTarget) foundTypography = true
+            if (spacingTarget) foundSpacing = true
+        })
+        if (foundTypography && foundSpacing) break
+        ancestor = ancestor.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
+    }
+    return ancestors.slice(0, 100)
+}
+
+const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['designer'], action = 'select', preferredTarget?: any, extra: Record<string, unknown> = {}) => {
     const targets = JSON.parse(node.dataset.designerTargets || '[]')
     const primary = preferredTarget || targets[0]
     if (!primary) return
@@ -69,6 +91,7 @@ const postDesignerEvent = (node: HTMLElement, action = 'select', preferredTarget
         sourceUrl: primary.sourceUrl || '',
         computedStyles: computedThemeValues(node),
         alternatives: targets.map((target: any) => ({ ...target, text: editableValue(node, Boolean(target.richText || richText)), richText: Boolean(target.richText || richText), computedStyles: computedThemeValues(node) })),
+        ancestors: designer ? ancestorTargets(node, designer) : [],
         descendants: descendantTargets(node),
         ...extra,
     }, '*')
@@ -93,6 +116,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
     const cleanups: Array<() => void> = []
     let guides: HTMLElement[] = []
     let hoveredNode: HTMLElement | null = null
+    let selectedNode: HTMLElement | null = null
     let contextMenu: HTMLElement | null = null
     let spacingEditor: HTMLElement | null = null
     const closeContextMenu = () => { contextMenu?.remove(); contextMenu = null }
@@ -350,7 +374,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
     }
 
     root.querySelectorAll<HTMLElement>('[data-designer-target]').forEach((node) => {
-        const click = (event: Event) => { if (!node.isContentEditable) event.preventDefault(); event.stopPropagation(); root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected')); node.classList.add('designer-selected'); postDesignerEvent(node) }
+        const click = (event: Event) => { if (!node.isContentEditable) event.preventDefault(); event.stopPropagation(); root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected')); node.classList.add('designer-selected'); selectedNode = node; showSpacing(node); postDesignerEvent(node, designer) }
         let primaryTarget: any = null
         try { primaryTarget = JSON.parse(node.dataset.designerTargets || '[]')[0] } catch { primaryTarget = null }
         const activateEditing = (event?: Event) => {
@@ -360,12 +384,12 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
             root.querySelectorAll<HTMLElement>('[contenteditable="true"]').forEach((editable) => { if (editable !== node) editable.contentEditable = 'false' })
             node.contentEditable = 'true'
             node.focus()
-            postDesignerEvent(node, 'editText', primaryTarget)
+            postDesignerEvent(node, designer, 'editText', primaryTarget)
         }
         const input = (event: Event) => {
             if (!primaryTarget?.editable || !(event.target instanceof Node) || !node.contains(event.target)) return
             event.stopPropagation()
-            postDesignerEvent(node, 'contentChange')
+            postDesignerEvent(node, designer, 'contentChange')
         }
         const blur = (event: FocusEvent) => {
             if (!primaryTarget?.editable || (event.relatedTarget instanceof Node && node.contains(event.relatedTarget))) return
@@ -398,7 +422,9 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
         closeContextMenu()
         root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected'))
         eventNode.classList.add('designer-selected')
-        postDesignerEvent(eventNode, 'select', primary)
+        selectedNode = eventNode
+        showSpacing(eventNode)
+        postDesignerEvent(eventNode, designer, 'select', primary)
 
         const menu = document.createElement('div')
         menu.className = 'designer-context-menu'
@@ -416,7 +442,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
             button.textContent = label
             button.addEventListener('click', () => {
                 if (onInvoke) onInvoke()
-                else postDesignerEvent(eventNode, 'contextAction', target, { command })
+                else postDesignerEvent(eventNode, designer, 'contextAction', target, { command })
                 closeContextMenu()
             })
             menu.append(button)
@@ -440,7 +466,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
             input.hidden = true
             input.addEventListener('change', () => {
                 const file = input.files?.[0]
-                if (file) postDesignerEvent(eventNode, 'contextAction', target, { command: 'replaceImage', file })
+                if (file) postDesignerEvent(eventNode, designer, 'contextAction', target, { command: 'replaceImage', file })
                 input.remove()
             }, { once: true })
             document.body.append(input)
@@ -472,11 +498,19 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
         if (!hoveredNode || (event.relatedTarget instanceof Node && hoveredNode.contains(event.relatedTarget))) return
         const next = findHoveredNode(event.relatedTarget)
         if (next && root.contains(next)) showSpacing(next)
+        else if (selectedNode && root.contains(selectedNode)) showSpacing(selectedNode)
         else clearGuides()
+    }
+    const selectFromInspector = (event: Event) => {
+        const node = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-designer-target]') : null
+        if (!node || !root.contains(node)) return
+        selectedNode = node
+        showSpacing(node)
     }
     const refreshGuides = () => { if (hoveredNode) showSpacing(hoveredNode) }
     root.addEventListener('mouseover', over)
     root.addEventListener('mouseout', out)
+    root.addEventListener('designerselect', selectFromInspector)
     window.addEventListener('scroll', refreshGuides, true)
     window.addEventListener('resize', refreshGuides)
     cleanups.push(() => {
@@ -487,6 +521,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
         document.removeEventListener('keydown', dismissContextMenuWithKeyboard)
         root.removeEventListener('mouseover', over)
         root.removeEventListener('mouseout', out)
+        root.removeEventListener('designerselect', selectFromInspector)
         window.removeEventListener('scroll', refreshGuides, true)
         window.removeEventListener('resize', refreshGuides)
     })
@@ -495,6 +530,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
 
 export const RenderFrameRuntime = () => {
     const [model, setModel] = useState<RenderPageModel | null>(null)
+    const modelRef = useRef<RenderPageModel | null>(null)
     const rootRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -502,6 +538,7 @@ export const RenderFrameRuntime = () => {
             if (event.source !== window.parent) return
             if (event.data?.source !== 'eceee-render-host') return
             if (event.data.action === 'render' && event.data.model) {
+                modelRef.current = event.data.model
                 setModel(event.data.model)
             }
             if (event.data.action === 'selectTarget' && event.data.targetId) {
@@ -510,6 +547,7 @@ export const RenderFrameRuntime = () => {
                     try { return JSON.parse(node.dataset.designerTargets || '[]').some((target: any) => target.id === event.data.targetId) } catch { return false }
                 })
                 match?.classList.add('designer-selected')
+                match?.dispatchEvent(new CustomEvent('designerselect', { bubbles: true }))
                 match?.scrollIntoView({ block: 'nearest' })
             }
             if (event.data.action === 'readTargetStyles' && event.data.targetId) {
@@ -546,7 +584,7 @@ export const RenderFrameRuntime = () => {
                     ? `<${event.data.value.replace(/[<>]/g, '')}>`
                     : event.data.value || undefined
                 document.execCommand(event.data.command, false, value)
-                postDesignerEvent(match, 'contentChange')
+                postDesignerEvent(match, modelRef.current?.designer, 'contentChange')
             }
         }
         window.addEventListener('message', receive)
