@@ -373,7 +373,7 @@ describe('DesignerThemeWorkspacePage', () => {
         await waitFor(() => expect(mocks.loadPreviewPage).toHaveBeenCalledWith('7', 43))
     }, 10000)
 
-    it('limits long navigation labels and exposes the full text on hover', async () => {
+    it('lets long navigation labels follow the pane width and exposes the full text on hover', async () => {
         const longTitle = 'Panel 6. Energy-efficient and low-carbon mobility and transport systems'
         const longWorkspace = structuredClone(workspace)
         longWorkspace.contentPages.push({
@@ -396,8 +396,9 @@ describe('DesignerThemeWorkspacePage', () => {
         await user.click(screen.getByRole('tab', { name: 'Your sites' }))
 
         const navigationItem = screen.getByRole('button', { name: `Select conference.example — ${longTitle}` })
-        const shortenedLabel = within(navigationItem).getByTitle(longTitle)
-        expect(shortenedLabel).toHaveTextContent(`${longTitle.slice(0, 48)}…`)
+        const adaptiveLabel = within(navigationItem).getByTitle(longTitle)
+        expect(adaptiveLabel).toHaveTextContent(longTitle)
+        expect(adaptiveLabel).toHaveClass('min-w-0', 'truncate')
     })
 
     it('searches and filters objects in the site content hierarchy', async () => {
