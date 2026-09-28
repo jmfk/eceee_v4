@@ -45,9 +45,10 @@ const versions: Record<string, Version> = {
   }),
 };
 const theme: Theme = {
-  id: '20', tenant_id: '7', name: 'Public', fonts: {}, colors: { primary: '#123456' }, css_variables: {},
-  component_styles: { card: { template: '<article>{{{content}}}</article>', css: '.card { padding: 1rem; }' } },
-  image_styles: {}, gallery_styles: {}, carousel_styles: {}, custom_css: 'body { margin: 0; }',
+  id: '20', tenant_id: '7', name: 'Public', fonts: { google_fonts: [{ family: 'Open Sans', variants: ['400', '700'], display: 'swap' }] },
+  colors: { primary: '#123456' }, css_variables: {},
+  component_styles: { card: { template: '<article>{{{content}}}</article>', css: { default: '.card { padding: 1rem; }', sm: '.card { padding: 2rem; }' } } },
+  image_styles: {}, gallery_styles: {}, carousel_styles: {}, breakpoints: { sm: 700 }, custom_css: 'body { margin: 0; }',
 };
 const reader: PageReader = {
   root: async hostname => hostname === 'example.org' ? root : null,
@@ -73,6 +74,8 @@ describe('public resolution', () => {
     expect(model?.themeCss).toContain('--primary: #123456');
     expect(model?.themeCss).toContain('--spacing: 2rem');
     expect(model?.themeCss).toContain('.card { padding: 1rem; }');
+    expect(model?.themeCss).toContain("family=Open+Sans:wght@400;700&display=swap");
+    expect(model?.themeCss).toContain('@media (min-width: 700px)');
     expect(JSON.parse(JSON.stringify(model))).toEqual(model);
   });
 

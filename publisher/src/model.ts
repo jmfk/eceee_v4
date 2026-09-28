@@ -37,6 +37,7 @@ export interface Theme {
   image_styles: Record<string, Record<string, unknown>>;
   gallery_styles: Record<string, Record<string, unknown>>;
   carousel_styles: Record<string, Record<string, unknown>>;
+  breakpoints: Record<string, unknown>;
   custom_css: string;
 }
 
@@ -189,12 +190,33 @@ function cssRecord(input: Record<string, unknown>): string {
     .join('\n');
 }
 
-function styleCss(styles: Record<string, Record<string, unknown>>): string {
+function fontImports(fonts: Record<string, unknown>): string {
+  const configured = fonts.google_fonts ?? fonts.googleFonts;
+  if (!Array.isArray(configured)) return '';
+  return configured.flatMap(font => {
+    const definition = object(font);
+    const family = String(definition.family ?? '').trim().replace(/\s+/g, '+');
+    if (!family) return [];
+    const variants = Array.isArray(definition.variants)
+      ? definition.variants.map(String).filter(variant => /^\d+$/.test(variant))
+      : [];
+    const display = /^(auto|block|fallback|optional|swap)$/.test(String(definition.display))
+      ? String(definition.display)
+      : 'swap';
+    return [`@import url('https://fonts.googleapis.com/css2?family=${family}${variants.length ? `:wght@${variants.join(';')}` : ''}&display=${display}');`];
+  }).join('\n');
+}
+
+function styleCss(styles: Record<string, Record<string, unknown>>, configuredBreakpoints: Record<string, unknown>): string {
+  const breakpoints: Record<string, number> = { sm: 640, md: 768, lg: 1024, xl: 1280 };
+  for (const [name, candidate] of Object.entries(configuredBreakpoints)) {
+    const pixels = Number(candidate);
+    if (name in breakpoints && Number.isFinite(pixels) && pixels > 0) breakpoints[name] = pixels;
+  }
   return Object.values(styles).flatMap(style => {
     const css = style.css;
     if (typeof css === 'string') return css;
     const responsive = object(css);
-    const breakpoints: Record<string, number> = { sm: 640, md: 768, lg: 1024, xl: 1280 };
     return Object.entries(responsive).flatMap(([key, block]) => {
       if (typeof block !== 'string') return [];
       if (key === 'default') return [block];
@@ -209,12 +231,13 @@ function compileThemeCss(theme: Theme | null, page: Page, version: Version): str
   if (version.enable_css_injection) Object.assign(variables, version.page_css_variables);
   const variableCss = cssRecord(variables);
   return [
+    theme ? fontImports(theme.fonts) : '',
     variableCss ? `:root {\n${variableCss}\n}` : '',
     theme?.custom_css ?? '',
-    theme ? styleCss(theme.component_styles) : '',
-    theme ? styleCss(theme.image_styles) : '',
-    theme ? styleCss(theme.gallery_styles) : '',
-    theme ? styleCss(theme.carousel_styles) : '',
+    theme ? styleCss(theme.component_styles, theme.breakpoints) : '',
+    theme ? styleCss(theme.image_styles, theme.breakpoints) : '',
+    theme ? styleCss(theme.gallery_styles, theme.breakpoints) : '',
+    theme ? styleCss(theme.carousel_styles, theme.breakpoints) : '',
     page.enable_css_injection ? page.page_custom_css : '',
     version.enable_css_injection ? version.page_custom_css : '',
   ].filter(Boolean).join('\n\n');
