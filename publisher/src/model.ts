@@ -73,6 +73,11 @@ export interface PublishedPageModel {
     pageId: DbId;
     versionId: DbId;
     componentStyles: Record<string, Record<string, unknown>>;
+    publicForms: {
+      endpointBase: string;
+      pagePath: string;
+      result?: { widgetId: string; status: 'success' | 'error' };
+    };
   };
   fontCss: string;
   themeCss: string;
@@ -335,6 +340,7 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
       ? await reader.theme(explicitThemeId, root.tenant_id)
       : await reader.defaultTheme(root.tenant_id);
 
+    const matchedPath = '/' + segments.join('/');
     return {
       layout,
       slots,
@@ -347,12 +353,16 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
         pageId: current.id,
         versionId: currentVersion.id,
         componentStyles: theme?.component_styles ?? {},
+        publicForms: {
+          endpointBase: `/api/forms/${encodeURIComponent(current.id)}`,
+          pagePath: matchedPath,
+        },
       },
       fontCss: theme ? fontImports(theme.fonts) : '',
       themeCss: compileThemeCss(theme, current, currentVersion),
       title: currentVersion.meta_title || current.title,
       description: currentVersion.meta_description || '',
-      matchedPath: '/' + segments.join('/'),
+      matchedPath,
       remainingPath: '',
     };
   });

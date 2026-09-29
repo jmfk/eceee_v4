@@ -13,6 +13,7 @@
 | ADR-0008 | [Encrypted workspace-scoped remote theme connections](active/0008-encrypted-workspace-remote-connections.md) | accepted | PRD-0005, PRD-0007 |
 | ADR-0009 | [Store preview documents in the theme snapshot](active/0009-theme-preview-documents.md) | accepted | PRD-0008 |
 | ADR-0010 | [Numbered snapshots with mutable display names](active/0010-named-theme-version-checkpoints.md) | accepted | PRD-0009 |
+| ADR-0011 | [Validate published forms and write through a dedicated PostgreSQL role](active/0011-public-form-write-boundary.md) | accepted | PRD-0010 |
 
 ## Archived Decisions
 

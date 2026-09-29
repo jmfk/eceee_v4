@@ -406,6 +406,55 @@ describe('PageRenderer', () => {
         expect(container.querySelector('form')).toBeNull()
         expect(container.querySelector('[data-form-status="submission-unavailable"]')).toBeTruthy()
         expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled()
+        expect(screen.getByLabelText('Email')).toBeDisabled()
+        expect(screen.getByRole('alert')).toHaveTextContent('Form submission is currently unavailable.')
+    })
+
+    it('posts enabled public forms only to the publisher endpoint', () => {
+        const model = createPageRenderModel({
+            context: {
+                mode: 'public',
+                preview: false,
+                publicForms: {
+                    endpointBase: '/api/forms/42',
+                    pagePath: '/contact',
+                    result: { widgetId: 'form', status: 'success' },
+                },
+            },
+            widgets: { main: [{ id: 'form', type: 'easy_widgets.FormsWidget', config: {
+                submitUrl: 'https://collector.invalid/submit',
+                storeSubmissions: true,
+                successMessage: 'Stored safely',
+                fields: [{ name: 'email', label: 'Email', type: 'email', required: true }],
+            } }] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+        const form = container.querySelector('form')
+
+        expect(form).toHaveAttribute('action', '/api/forms/42/form')
+        expect(form).toHaveAttribute('method', 'post')
+        expect(form).not.toHaveAttribute('action', expect.stringContaining('collector.invalid'))
+        expect(container.querySelector('input[name="__page_path"]')).toHaveValue('/contact')
+        expect(container.querySelector('input[name="__website"]')).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
+        expect(screen.getByRole('status')).toHaveTextContent('Stored safely')
+        expect(screen.getByLabelText(/^Email/)).toHaveAttribute('id', 'form_form_field_email')
+    })
+
+    it('keeps public forms with file fields unavailable', () => {
+        const model = createPageRenderModel({
+            context: { mode: 'public', preview: false, publicForms: { endpointBase: '/api/forms/42', pagePath: '/contact' } },
+            widgets: { main: [{ id: 'form', type: 'easy_widgets.FormsWidget', config: {
+                fields: [{ name: 'attachment', label: 'Attachment', type: 'file' }],
+            } }] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(container.querySelector('form')).toBeNull()
+        expect(container.querySelector('[data-form-status="submission-unavailable"]')).toBeTruthy()
+        expect(screen.getByLabelText('Attachment')).toBeDisabled()
     })
 
     it('renders content-card image1 with canonical theme classes', () => {

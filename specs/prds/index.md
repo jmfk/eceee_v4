@@ -11,3 +11,4 @@
 | PRD-0007 | [Saved remote theme connections](0007-saved-remote-theme-connections.md) | completed | [ADR-0008](../adrs/active/0008-encrypted-workspace-remote-connections.md) |
 | PRD-0008 | [Theme-owned preview content](0008-theme-owned-preview-content.md) | started | [ADR-0009](../adrs/active/0009-theme-preview-documents.md) |
 | PRD-0009 | [Named theme versions](0009-named-theme-versions.md) | completed | [ADR-0010](../adrs/active/0010-named-theme-version-checkpoints.md) |
+| PRD-0010 | [Public form submissions](0010-public-form-submissions.md) | started | [ADR-0011](../adrs/active/0011-public-form-write-boundary.md) |
