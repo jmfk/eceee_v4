@@ -22,7 +22,7 @@ export const formSubmissions: FormSubmissionStore = {
       await client.query('BEGIN');
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [lockKey]);
       const recent = await client.query<{ count: number }>(
-        `SELECT COUNT(*)::int AS count
+        `SELECT COUNT(submitted_at)::int AS count
            FROM webpages_publicformsubmission
           WHERE tenant_id = $1 AND page_id = $2 AND widget_id = $3
             AND submitted_at >= CURRENT_TIMESTAMP - INTERVAL '1 minute'`,

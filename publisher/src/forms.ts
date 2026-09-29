@@ -1,9 +1,11 @@
 import { buildPublishedPageModel, type DbId, type ReadDb, type Widget } from './model';
+import { RE2JS } from 're2js';
 
 const FORM_WIDGET_TYPE = 'easy_widgets.FormsWidget';
 const FIELD_NAME = /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/;
 const MAX_FIELDS = 64;
 const MAX_OPTIONS = 100;
+const MAX_PATTERN_LENGTH = 512;
 const MAX_VALUE_LENGTH = 10_000;
 const CONTROL_FIELDS = new Set(['__page_path', '__website']);
 
@@ -134,6 +136,16 @@ function validateFormValues(
     const minLength = integerRule(validation.min_length ?? validation.minLength, 0);
     const maxLength = integerRule(validation.max_length ?? validation.maxLength, MAX_VALUE_LENGTH);
     if (value.length < minLength || value.length > Math.min(maxLength, MAX_VALUE_LENGTH)) return null;
+
+    const pattern = validation.pattern;
+    if (pattern !== undefined && pattern !== null) {
+      if (typeof pattern !== 'string' || pattern.length > MAX_PATTERN_LENGTH) return null;
+      try {
+        if (!RE2JS.compile(pattern).testExact(value)) return null;
+      } catch {
+        return null;
+      }
+    }
 
     if (['select', 'radio'].includes(type) && (!options.length || !options.includes(value))) return null;
     if (type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return null;

@@ -19,20 +19,13 @@ class Migration(migrations.Migration):
                 ("form_title", models.CharField(blank=True, default="", max_length=255)),
                 ("data", models.JSONField(default=dict)),
                 ("submitted_at", models.DateTimeField(auto_now_add=True)),
+                ("page_version_id", models.PositiveBigIntegerField()),
                 (
                     "page",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="public_form_submissions",
                         to="webpages.webpage",
-                    ),
-                ),
-                (
-                    "page_version",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        related_name="public_form_submissions",
-                        to="webpages.pageversion",
                     ),
                 ),
                 (

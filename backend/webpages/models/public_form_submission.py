@@ -17,11 +17,9 @@ class PublicFormSubmission(models.Model):
         on_delete=models.CASCADE,
         related_name="public_form_submissions",
     )
-    page_version = models.ForeignKey(
-        "webpages.PageVersion",
-        on_delete=models.CASCADE,
-        related_name="public_form_submissions",
-    )
+    # Keep the published version identity even when routine version compaction
+    # deletes the corresponding PageVersion row.
+    page_version_id = models.PositiveBigIntegerField()
     widget_id = models.CharField(max_length=255)
     form_title = models.CharField(max_length=255, blank=True, default="")
     data = models.JSONField(default=dict)
