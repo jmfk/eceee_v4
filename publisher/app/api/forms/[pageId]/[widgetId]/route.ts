@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { database } from '@/src/db';
 import { formSubmissions } from '@/src/form-db';
 import { submitPublishedForm } from '@/src/forms';
+import { contentHostname } from '../../../../../src/hostname';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -67,7 +68,7 @@ export async function POST(request: Request, context: RouteContext) {
     const result = await submitPublishedForm({
       readDb: database,
       store: formSubmissions,
-      hostname: request.headers.get('host') || '',
+      hostname: contentHostname(request.headers.get('host') || ''),
       pageId,
       widgetId,
       pagePath: pagePaths[0],

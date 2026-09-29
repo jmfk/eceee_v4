@@ -14,6 +14,7 @@
 | ADR-0009 | [Store preview documents in the theme snapshot](active/0009-theme-preview-documents.md) | accepted | PRD-0008 |
 | ADR-0010 | [Numbered snapshots with mutable display names](active/0010-named-theme-version-checkpoints.md) | accepted | PRD-0009 |
 | ADR-0011 | [Validate published forms and write through a dedicated PostgreSQL role](active/0011-public-form-write-boundary.md) | accepted | PRD-0010 |
+| ADR-0012 | [Validate the publisher through an isolated hostname alias](active/0012-isolated-publisher-test-host.md) | accepted | PRD-0010, PRD-0011 |
 
 ## Archived Decisions
 

@@ -10,6 +10,7 @@ services:
     environment:
       DOMAIN: ${DOMAIN}
       EMAIL: ${EMAIL:-noreply@example.com}
+      PUBLISHER_TEST_DOMAIN: ${PUBLISHER_TEST_DOMAIN:-publisher-test-eceee.colliberty.com}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -57,6 +58,26 @@ services:
         VITE_GIT_COMMIT_HASH: ${IMAGE_TAG:-unknown}
     image: eceee-frontend:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    networks: [eceee_prod]
+    logging:
+      driver: json-file
+      options: {max-size: "50m", max-file: "5"}
+
+  publisher:
+    build:
+      context: ..
+      dockerfile: publisher/Dockerfile
+    image: eceee-publisher:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PUBLISHER_DATABASE_URL: postgresql://eceee_publisher:${PUBLISHER_DB_PASSWORD}@db:5432/${POSTGRES_DB}
+      PUBLISHER_FORM_DATABASE_URL: postgresql://eceee_publisher_forms:${PUBLISHER_FORM_DB_PASSWORD}@db:5432/${POSTGRES_DB}
+      PUBLISHER_TEST_DOMAIN: ${PUBLISHER_TEST_DOMAIN:-publisher-test-eceee.colliberty.com}
+      PUBLISHER_TEST_SOURCE_HOST: ${PUBLISHER_TEST_SOURCE_HOST:-summerstudy.eceee.org}
+    depends_on:
+      db:
+        condition: service_healthy
     networks: [eceee_prod]
     logging:
       driver: json-file

@@ -6,6 +6,7 @@ locked: true
 created: 2026-09-29
 related_adrs:
   - ADR-0011
+  - ADR-0012
 ---
 
 # PRD-0010: Public Form Submissions
@@ -71,6 +72,7 @@ The TypeScript public publisher can render configured forms but cannot safely ac
 ## Linked ADRs
 
 - [ADR-0011: Validate published forms and write through a dedicated PostgreSQL role](../adrs/active/0011-public-form-write-boundary.md)
+- [ADR-0012: Validate the publisher through an isolated hostname alias](../adrs/active/0012-isolated-publisher-test-host.md)
 
 ## Completion Evidence
 

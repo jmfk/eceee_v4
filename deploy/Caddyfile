@@ -6,6 +6,15 @@
     email {$EMAIL:noreply@eceee.org}
 }
 
+# Parallel TypeScript publisher. The application maps this browser-facing test
+# hostname to PUBLISHER_TEST_SOURCE_HOST only for content lookup, so redirects
+# and form submissions stay on the isolated test hostname.
+{$PUBLISHER_TEST_DOMAIN:publisher-test-eceee.colliberty.com} {
+    encode gzip
+    header X-Robots-Tag "noindex, nofollow, noarchive"
+    reverse_proxy publisher:3000
+}
+
 # Public Content Sites - Django backend serving public pages
 summerstudy.{$DOMAIN}, industry.{$DOMAIN} {
     encode gzip

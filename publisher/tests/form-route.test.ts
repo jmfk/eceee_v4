@@ -25,6 +25,18 @@ describe('public form route', () => {
   beforeEach(() => {
     mocks.submit.mockReset();
     mocks.submit.mockResolvedValue({ status: 'success', redirectPath: '/contact' });
+    delete process.env.PUBLISHER_TEST_DOMAIN;
+    delete process.env.PUBLISHER_TEST_SOURCE_HOST;
+  });
+
+  it('resolves test content through the source host without changing the browser redirect host', async () => {
+    process.env.PUBLISHER_TEST_DOMAIN = 'example.org';
+    process.env.PUBLISHER_TEST_SOURCE_HOST = 'summerstudy.eceee.org';
+
+    const response = await POST(request('__page_path=%2Fcontact&email=visitor%40example.org'), context);
+
+    expect(mocks.submit).toHaveBeenCalledWith(expect.objectContaining({ hostname: 'summerstudy.eceee.org' }));
+    expect(response.headers.get('location')).toBe('https://example.org/contact?form_status=success&form_widget=contact-form');
   });
 
   it('passes urlencoded values to the server-owned form service and redirects after success', async () => {
