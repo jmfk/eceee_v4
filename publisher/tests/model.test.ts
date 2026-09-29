@@ -74,7 +74,8 @@ describe('public resolution', () => {
     expect(model?.themeCss).toContain('--primary: #123456');
     expect(model?.themeCss).toContain('--spacing: 2rem');
     expect(model?.themeCss).toContain('.card { padding: 1rem; }');
-    expect(model?.themeCss).toContain("family=Open+Sans:wght@400;700&display=swap");
+    expect(model?.fontCss).toContain("family=Open+Sans:wght@400;700&display=swap");
+    expect(model?.themeCss).not.toContain('@import');
     expect(model?.themeCss).toContain('@media (min-width: 700px)');
     expect(JSON.parse(JSON.stringify(model))).toEqual(model);
   });
@@ -100,6 +101,111 @@ describe('public resolution', () => {
     };
     const model = await buildPublishedPageModel({ withSnapshot: async read => read(scheduledReader) }, 'example.org', '/news/story', new Date('2026-06-01'));
     expect(model?.slots.header).toEqual([]);
+  });
+
+  it('keeps page CSS disabled when the published version enables it', async () => {
+    const disabledArticle = page({
+      ...article,
+      enable_css_injection: false,
+      page_css_variables: { pageOnly: 'red' },
+      page_custom_css: '.page-only { color: red; }',
+    });
+    const disabledReader = {
+      ...reader,
+      child: async (parent: string, tenant: string, slug: string) => {
+        const selected = await reader.child(parent, tenant, slug);
+        return selected?.id === article.id ? disabledArticle : selected;
+      },
+      version: async (id: string, at: Date) => {
+        const selected = await reader.version(id, at);
+        return id === article.id && selected ? version({
+          ...selected,
+          enable_css_injection: true,
+          page_css_variables: { versionOnly: 'blue' },
+          page_custom_css: '.version-only { color: blue; }',
+        }) : selected;
+      },
+    };
+
+    const model = await buildPublishedPageModel(
+      { withSnapshot: async read => read(disabledReader) },
+      'example.org',
+      '/news/story',
+      new Date('2026-06-01'),
+    );
+
+    expect(model?.themeCss).not.toContain('--pageOnly');
+    expect(model?.themeCss).not.toContain('--versionOnly');
+    expect(model?.themeCss).not.toContain('.page-only');
+    expect(model?.themeCss).not.toContain('.version-only');
+  });
+
+  it('uses published-version CSS values instead of merging their page fallbacks', async () => {
+    const cssArticle = page({
+      ...article,
+      page_css_variables: { pageOnly: 'red' },
+      page_custom_css: '.page-only { color: red; }',
+    });
+    const cssReader = {
+      ...reader,
+      child: async (parent: string, tenant: string, slug: string) => {
+        const selected = await reader.child(parent, tenant, slug);
+        return selected?.id === article.id ? cssArticle : selected;
+      },
+      version: async (id: string, at: Date) => {
+        const selected = await reader.version(id, at);
+        return id === article.id && selected ? version({
+          ...selected,
+          page_css_variables: { versionOnly: 'blue' },
+          page_custom_css: '.version-only { color: blue; }',
+        }) : selected;
+      },
+    };
+
+    const model = await buildPublishedPageModel(
+      { withSnapshot: async read => read(cssReader) },
+      'example.org',
+      '/news/story',
+      new Date('2026-06-01'),
+    );
+
+    expect(model?.themeCss).toContain('--versionOnly: blue');
+    expect(model?.themeCss).toContain('.version-only');
+    expect(model?.themeCss).not.toContain('--pageOnly');
+    expect(model?.themeCss).not.toContain('.page-only');
+  });
+
+  it('falls back to page CSS when the published version has no overrides', async () => {
+    const cssArticle = page({
+      ...article,
+      page_css_variables: { pageFallback: 'green' },
+      page_custom_css: '.page-fallback { color: green; }',
+    });
+    const fallbackReader = {
+      ...reader,
+      child: async (parent: string, tenant: string, slug: string) => {
+        const selected = await reader.child(parent, tenant, slug);
+        return selected?.id === article.id ? cssArticle : selected;
+      },
+      version: async (id: string, at: Date) => {
+        const selected = await reader.version(id, at);
+        return id === article.id && selected ? version({
+          ...selected,
+          page_css_variables: {},
+          page_custom_css: '',
+        }) : selected;
+      },
+    };
+
+    const model = await buildPublishedPageModel(
+      { withSnapshot: async read => read(fallbackReader) },
+      'example.org',
+      '/news/story',
+      new Date('2026-06-01'),
+    );
+
+    expect(model?.themeCss).toContain('--pageFallback: green');
+    expect(model?.themeCss).toContain('.page-fallback');
   });
 
   it('lets a local override hide all inherited widgets', async () => {

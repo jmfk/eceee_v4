@@ -23,5 +23,5 @@ export default async function Page(props: Props) {
   const { host, path } = await requestTarget(props);
   const model = await resolve(host, path);
   if (!model) notFound();
-  return <><style>{`${RENDER_LAYOUT_CSS}\n${model.themeCss}`}</style><PublishedPage model={model} /></>;
+  return <><style>{`${model.fontCss}\n${RENDER_LAYOUT_CSS}\n${model.themeCss}`}</style><PublishedPage model={model} /></>;
 }
