@@ -139,6 +139,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.save.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 3, hasDraftChanges: true })
         mocks.publish.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4 })
         mocks.undo.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4, canUndo: false })
+        mocks.discard.mockResolvedValue(structuredClone(workspace))
         let savedPreviewViews = structuredClone(previewViews)
         mocks.savePreviewContent.mockImplementation(async (_themeId, viewId, texts, draftVersion) => {
             savedPreviewViews = savedPreviewViews.map((view) => view.id === viewId ? { ...view, texts } : view)
@@ -877,6 +878,73 @@ describe('DesignerThemeWorkspacePage', () => {
         ))
         expect(mocks.save).not.toHaveBeenCalled()
         postMessage.mockRestore()
+    })
+
+    it('includes inline example text in the global draft lifecycle', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'Pending heading', editable: true },
+            source: iframe.contentWindow,
+        }))
+
+        expect(screen.getByText('Unsaved local draft changes')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Discard draft' })).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Publish changes' })).toBeEnabled()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+        await waitFor(() => expect(mocks.savePreviewContent).toHaveBeenCalledWith(
+            '7',
+            'page-main',
+            { 'content:0': 'Pending heading' },
+            2,
+        ))
+        expect(mocks.save).not.toHaveBeenCalled()
+        expect(await screen.findByText('Draft saved · not published')).toBeInTheDocument()
+    })
+
+    it('clears pending example text when the draft is discarded', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'Discard me', editable: true },
+            source: iframe.contentWindow,
+        }))
+        expect(screen.getByLabelText('Example text')).toHaveValue('Discard me')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }))
+        await waitFor(() => expect(mocks.discard).toHaveBeenCalledWith('7', 2))
+        expect(await screen.findByText('Draft matches the live theme')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled()
+        await waitFor(() => expect(screen.queryByLabelText('Example text')).not.toBeInTheDocument())
+    })
+
+    it('does not save selected example text twice when theme settings are also dirty', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        await selectHeading()
+        fireEvent.change(screen.getByDisplayValue('32px'), { target: { value: '40px' } })
+        const iframe = screen.getByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'One write only', editable: true },
+            source: iframe.contentWindow,
+        }))
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save example text' }))
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
+        await waitFor(() => expect(mocks.savePreviewContent).toHaveBeenCalledTimes(1))
+        expect(mocks.savePreviewContent).toHaveBeenCalledWith(
+            '7',
+            'page-main',
+            { 'content:0': 'One write only' },
+            3,
+        )
     })
 
     it('replaces a theme asset from a preview context action', async () => {

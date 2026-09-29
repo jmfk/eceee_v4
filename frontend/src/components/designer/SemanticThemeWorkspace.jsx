@@ -256,7 +256,8 @@ const SemanticThemeWorkspace = ({
     workspace, preview, viewport, updateWorkspace, replaceAsset, createPlaceholder,
     placeholderDrafts, setPlaceholderDrafts,
     loadPageContent, loadObjectContent, importPreviewSource, deletePreviewContent,
-    savePreviewText, replacePreviewImage, disabled, mobilePane,
+    savePreviewText, replacePreviewImage, pendingPreviewTextsRef, onPendingPreviewTextsChange,
+    previewTextResetVersion, disabled, mobilePane,
 }) => {
     const initialViews = workspace.previewContent?.views || workspace.catalog.previewViews || []
     const initialExternalContent = [
@@ -294,7 +295,6 @@ const SemanticThemeWorkspace = ({
     const iframeRef = useRef(null)
     const previewFrameRef = useRef(null)
     const uploadRefs = useRef({})
-    const pendingPreviewTextsRef = useRef({})
     const [previewFrameWidth, setPreviewFrameWidth] = useState(1280)
 
     const clampSidebarWidth = (width) => {
@@ -411,6 +411,10 @@ const SemanticThemeWorkspace = ({
                 || views[0]?.id
                 || '')
     }, [workspace.previewContent, workspace.catalog.previewViews])
+
+    useEffect(() => {
+        setSelectedTarget(null)
+    }, [previewTextResetVersion])
 
     const demoOptions = useMemo(() => previewContent.views.map((view) => ({
         value: String(view.id),
@@ -582,6 +586,7 @@ const SemanticThemeWorkspace = ({
                         ...(pendingPreviewTextsRef.current[viewId] || {}),
                         [target.id]: target.text,
                     }
+                    onPendingPreviewTextsChange()
                     setSelectedTarget(target)
                     setSelectionExpanded(true)
                 }
@@ -593,7 +598,7 @@ const SemanticThemeWorkspace = ({
         }
         window.addEventListener('message', receive)
         return () => window.removeEventListener('message', receive)
-    }, [contentMode, replaceAsset, replacePreviewImage, updateWorkspace, viewId, workspace.assets, workspace.breakpoints, workspace.constraints.editableSpacingProperties, workspace.spacing])
+    }, [contentMode, onPendingPreviewTextsChange, pendingPreviewTextsRef, replaceAsset, replacePreviewImage, updateWorkspace, viewId, workspace.assets, workspace.breakpoints, workspace.constraints.editableSpacingProperties, workspace.spacing])
 
     const selectedView = previewContent.views.find((view) => view.id === viewId) || previewContent.views[0] || null
     const selectedViewImages = useMemo(() => designerPreviewImageReferences(selectedView), [selectedView])
@@ -607,7 +612,7 @@ const SemanticThemeWorkspace = ({
                 texts: { ...(view.texts || {}), ...(pendingPreviewTextsRef.current[view.id] || {}) },
             })),
         },
-    }), [workspace, previewContent])
+    }), [pendingPreviewTextsRef, previewContent, workspace])
     const imageAspects = useMemo(() => imageAspectsFor(workspace), [workspace])
     const assetsByTargetId = useMemo(() => new Map(
         workspace.assets.map((asset) => [`asset:${asset.assetKey}`, asset]),
@@ -718,6 +723,7 @@ const SemanticThemeWorkspace = ({
             ...(pendingPreviewTextsRef.current[selectedView.id] || {}),
             [selectedTarget.id]: text,
         }
+        onPendingPreviewTextsChange()
         setSelectedTarget((current) => ({ ...current, text }))
         iframeRef.current?.contentWindow?.postMessage({
             source: 'eceee-render-host', action: 'updateText', targetId: selectedTarget.id, text,
@@ -745,7 +751,10 @@ const SemanticThemeWorkspace = ({
             ...(view.texts || {}),
             ...(pendingPreviewTextsRef.current[view.id] || {}),
         })
-        if (result) delete pendingPreviewTextsRef.current[view.id]
+        if (result) {
+            delete pendingPreviewTextsRef.current[view.id]
+            onPendingPreviewTextsChange()
+        }
     }
 
     const importSelectedSource = async () => {
@@ -762,6 +771,7 @@ const SemanticThemeWorkspace = ({
         const result = await deletePreviewContent?.(view)
         if (!result?.previewContent?.views) return
         delete pendingPreviewTextsRef.current[view.id]
+        onPendingPreviewTextsChange()
         setPreviewContent(result.previewContent)
         setViewId((current) => result.previewContent.views.some((candidate) => candidate.id === current)
             ? current
