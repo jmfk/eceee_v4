@@ -240,13 +240,13 @@ const DesignerThemeWorkspacePage = () => {
         }
     }
 
-    const replacePreviewImage = async (viewId, sourceUrl, sourceOccurrence, file) => {
+    const replacePreviewImage = async (viewId, sourceUrl, sourcePath, sourceMatchIndex, file) => {
         if (!file) return null
         setSaving(true)
         try {
             const current = dirty ? await saveDraft({ silent: true }) : workspace
             if (!current) return null
-            const result = await designerThemesApi.replacePreviewImage(themeId, viewId, sourceUrl, sourceOccurrence, file, current.draftVersion)
+            const result = await designerThemesApi.replacePreviewImage(themeId, viewId, sourceUrl, sourcePath, sourceMatchIndex, file, current.draftVersion)
             setWorkspace(result)
             setDirty(false)
             addNotification({ type: 'success', message: 'Example image replaced' })
@@ -335,7 +335,7 @@ const DesignerThemeWorkspacePage = () => {
                 </div>
             </header>
             {workspace.draftIsStale && <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:px-6">The live theme changed after this draft was started. Discard the draft to reload the current live version before making or publishing more changes.</div>}
-            <div className="flex border-b border-gray-200 bg-white lg:hidden"><button type="button" onClick={() => setMobilePane('edit')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'edit' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Edit</button><button type="button" onClick={() => setMobilePane('preview')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'preview' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Preview</button></div>
+            <div className="flex border-b border-gray-200 bg-white xl:hidden"><button type="button" onClick={() => setMobilePane('edit')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'edit' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Edit</button><button type="button" onClick={() => setMobilePane('preview')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'preview' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Preview</button></div>
             <SemanticThemeWorkspace workspace={workspace} preview={preview} viewport={viewport} mobilePane={mobilePane} updateWorkspace={updateWorkspace} replaceAsset={replaceAsset} createPlaceholder={createPlaceholder} placeholderDrafts={placeholderDrafts} setPlaceholderDrafts={setPlaceholderDrafts} loadPageContent={loadPageContent} loadObjectContent={loadObjectContent} importPreviewSource={importPreviewSource} deletePreviewContent={deletePreviewContent} savePreviewText={savePreviewText} replacePreviewImage={replacePreviewImage} disabled={controlsDisabled} />
             <StatusBar customStatusContent={<span>{workspace.draftIsStale ? 'Draft is stale · discard to reload' : dirty ? 'Unsaved local draft changes' : workspace.hasDraftChanges ? 'Draft saved · not published' : 'Draft matches the live theme'}</span>} />
         </div>

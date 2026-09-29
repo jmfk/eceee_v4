@@ -57,6 +57,11 @@ RASTER_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 IMAGE_TYPES = RASTER_TYPES | {"image/svg+xml"}
 CSS_VALUE_FORBIDDEN = re.compile(r"[;{}<>]|url\s*\(|expression\s*\(|@import", re.IGNORECASE)
 COLOR_VALUE = re.compile(r"^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\([0-9.%+,\-\s/]+\)|[a-zA-Z]+)$")
+PREVIEW_IMAGE_PATTERN = re.compile(
+    r"(?:https?://[^\s\"'()<>]+|s3://[^\s\"'()<>]+|/(?:theme_images|uploads|media|files|site-package)/[^\s\"'()<>]+)"
+    r"\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^\s\"'()<>]*)?",
+    re.IGNORECASE,
+)
 logger = logging.getLogger(__name__)
 
 PREVIEW_TEXT_KEYS = {
@@ -1672,42 +1677,64 @@ def delete_designer_preview_view(theme_id, tenant, user, view_id, draft_version)
         return theme, draft
 
 
-def _replace_preview_image_reference(value, source_url, source_occurrence, replacement_url):
-    """Replace exactly one occurrence while preserving the document traversal order."""
-    seen = 0
-    replacements = 0
+def _replace_preview_image_reference(value, source_url, source_path, source_match_index, replacement_url):
+    """Replace one validated image URL at its persisted document path."""
+    rewritten = copy.deepcopy(value)
+    current = rewritten
+    for segment in source_path[:-1]:
+        if isinstance(current, dict) and isinstance(segment, str) and segment in current:
+            current = current[segment]
+        elif isinstance(current, list) and isinstance(segment, int) and segment < len(current):
+            current = current[segment]
+        else:
+            return rewritten, 0
 
-    def rewrite(current):
-        nonlocal seen, replacements
-        if isinstance(current, dict):
-            return {key: rewrite(child) for key, child in current.items()}
-        if isinstance(current, list):
-            return [rewrite(child) for child in current]
-        if not isinstance(current, str) or source_url not in current:
-            return current
+    final_segment = source_path[-1]
+    if isinstance(current, dict) and isinstance(final_segment, str) and final_segment in current:
+        target = current[final_segment]
+    elif isinstance(current, list) and isinstance(final_segment, int) and final_segment < len(current):
+        target = current[final_segment]
+    else:
+        return rewritten, 0
+    if not isinstance(target, str):
+        return rewritten, 0
 
-        def replace(match):
-            nonlocal seen, replacements
-            should_replace = seen == source_occurrence
-            seen += 1
-            if should_replace:
-                replacements += 1
-                return replacement_url
-            return match.group(0)
-
-        return re.sub(re.escape(source_url), replace, current)
-
-    return rewrite(value), replacements
+    matches = [match for match in PREVIEW_IMAGE_PATTERN.finditer(target) if match.group(0) == source_url]
+    if source_match_index >= len(matches):
+        return rewritten, 0
+    match = matches[source_match_index]
+    current[final_segment] = f"{target[:match.start()]}{replacement_url}{target[match.end():]}"
+    return rewritten, 1
 
 
 def replace_designer_preview_image(
-    theme_id, tenant, user, view_id, source_url, source_occurrence, upload, draft_version
+    theme_id, tenant, user, view_id, source_url, source_path, source_match_index, upload, draft_version
 ):
     """Replace an image already present in a detached example document."""
     if not isinstance(source_url, str) or not source_url or len(source_url) > 2000:
         raise ValidationError("Choose a valid example image.")
-    if not isinstance(source_occurrence, int) or source_occurrence < 0:
-        raise ValidationError("Choose a valid example image occurrence.")
+    invalid_path = (
+        not isinstance(source_path, list)
+        or not source_path
+        or len(source_path) > 100
+        or source_path[0] not in {"content", "images"}
+        or any(
+            isinstance(segment, bool)
+            or not isinstance(segment, (str, int))
+            or isinstance(segment, str)
+            and (not segment or len(segment) > 300)
+            or isinstance(segment, int)
+            and segment < 0
+            for segment in source_path
+        )
+    )
+    if (
+        invalid_path
+        or isinstance(source_match_index, bool)
+        or not isinstance(source_match_index, int)
+        or source_match_index < 0
+    ):
+        raise ValidationError("Choose a valid example image path.")
     content, (width, height) = validate_image_upload(upload)
     saved_path = None
     try:
@@ -1734,7 +1761,8 @@ def replace_designer_preview_image(
             rewritten, replacements = _replace_preview_image_reference(
                 {"content": view.get("content", {}), "images": view.get("images", {})},
                 source_url,
-                source_occurrence,
+                source_path,
+                source_match_index,
                 replacement_url,
             )
             view["content"] = rewritten["content"]

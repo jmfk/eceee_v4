@@ -1,42 +1,57 @@
 import { getSlotWidgetsForMode } from '../utils/widgetMerging'
 import { getRenderFixture } from './fixtures'
-import type { RenderPageModel, RenderWidgetModel } from './types'
+import type { DesignerPreviewImageReference, RenderPageModel, RenderWidgetModel } from './types'
 
 const previewImagePattern = /(?:https?:\/\/[^\s"'()<>]+|s3:\/\/[^\s"'()<>]+|\/(?:theme_images|uploads|media|files|site-package)\/[^\s"'()<>]+)\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^\s"'()<>]*)?/gi
 
+const imageReferenceKey = /(?:background|file|image|media|poster|src|thumbnail|url)/i
+const nonImageReferenceKey = /(?:caption|description|href|label|link|summary|text|title)/i
+
+const isRenderedImageReference = (value: string, key: string, matchIndex: number) => {
+    const before = value.slice(Math.max(0, matchIndex - 500), matchIndex)
+    const openImageTag = before.toLowerCase().lastIndexOf('<img')
+    const closedTag = before.lastIndexOf('>')
+    if (openImageTag > closedTag) return true
+    return imageReferenceKey.test(key) && !nonImageReferenceKey.test(key)
+}
+
 const collectDesignerPreviewImageReferences = (view: any) => {
-    const references: Array<{ sourceUrl: string, sourceOccurrence: number }> = []
-    const referencesByObject = new WeakMap<object, Array<{ sourceUrl: string, sourceOccurrence: number }>>()
+    const references: DesignerPreviewImageReference[] = []
+    const referencesByObject = new WeakMap<object, DesignerPreviewImageReference[]>()
     const occurrences = new Map<string, number>()
-    const visit = (value: any, owner: object | null = null) => {
+    const visit = (value: any, owner: object | null = null, path: Array<string | number> = [], key = '') => {
         if (typeof value === 'string') {
+            const matchesByUrl = new Map<string, number>()
             for (const match of value.matchAll(previewImagePattern)) {
                 const sourceUrl = match[0]
+                const sourceMatchIndex = matchesByUrl.get(sourceUrl) || 0
+                matchesByUrl.set(sourceUrl, sourceMatchIndex + 1)
+                if (!isRenderedImageReference(value, key, match.index || 0)) continue
                 const sourceOccurrence = occurrences.get(sourceUrl) || 0
-                const reference = { sourceUrl, sourceOccurrence }
+                const reference = { sourceUrl, sourceOccurrence, sourcePath: path, sourceMatchIndex }
                 references.push(reference)
                 if (owner) referencesByObject.set(owner, [...(referencesByObject.get(owner) || []), reference])
                 occurrences.set(sourceUrl, sourceOccurrence + 1)
             }
-        } else if (Array.isArray(value)) value.forEach((child) => visit(child, owner))
+        } else if (Array.isArray(value)) value.forEach((child, index) => visit(child, owner, [...path, index], key))
         else if (value && typeof value === 'object') {
             const nextOwner = value.type || value.widget_type ? value : owner
             Object.entries(value).forEach(([key, child]) => {
                 const childOwner = !nextOwner && key === 'data' && child && typeof child === 'object' ? child : nextOwner
-                visit(child, childOwner)
+                visit(child, childOwner, [...path, key], key)
             })
         }
     }
-    visit(view?.content)
-    if (view?.images && typeof view.images === 'object') Object.values(view.images).forEach((image) => {
-        visit(image, image && typeof image === 'object' ? image : null)
+    visit(view?.content, null, ['content'])
+    if (view?.images && typeof view.images === 'object') Object.entries(view.images).forEach(([imageKey, image]) => {
+        visit(image, image && typeof image === 'object' ? image : null, ['images', imageKey])
     })
     return { references, referencesByObject }
 }
 
 export const designerPreviewImageReferences = (view: any) => collectDesignerPreviewImageReferences(view).references
 
-const normalizeWidget = (widget: any, fallbackId: string, referencesByObject?: WeakMap<object, Array<{ sourceUrl: string, sourceOccurrence: number }>>): RenderWidgetModel => {
+const normalizeWidget = (widget: any, fallbackId: string, referencesByObject?: WeakMap<object, DesignerPreviewImageReference[]>): RenderWidgetModel => {
     const config = widget?.config && typeof widget.config === 'object' ? structuredClone(widget.config) : {}
     const normalizeList = (items: unknown, prefix: string) => Array.isArray(items)
         ? items.map((item, index) => normalizeWidget(item, `${prefix}-${index}`, referencesByObject))

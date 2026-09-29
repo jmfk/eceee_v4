@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createDesignerRenderModel, createPageRenderModel } from '../adapters'
+import { createDesignerRenderModel, createPageRenderModel, designerPreviewImageReferences } from '../adapters'
 
 describe('render adapters', () => {
     it('uses the current in-memory widgets for page previews', () => {
@@ -117,5 +117,27 @@ describe('render adapters', () => {
             type: 'easy_widgets.ImageWidget',
             config: { imageUrl: 'https://storage.test/hero.jpg', altText: 'Hero' },
         })
+    })
+
+    it('identifies rendered images by their persisted path instead of matching image-looking caption text', () => {
+        const imageUrl = 'https://storage.test/repeated.jpg'
+        const view = {
+            content: {
+                widgets: {
+                    main: [{
+                        id: 'image',
+                        type: 'easy_widgets.ImageWidget',
+                        config: { caption: imageUrl, imageUrl },
+                    }],
+                },
+            },
+        }
+
+        expect(designerPreviewImageReferences(view)).toEqual([{
+            sourceUrl: imageUrl,
+            sourceOccurrence: 0,
+            sourcePath: ['content', 'widgets', 'main', 0, 'config', 'imageUrl'],
+            sourceMatchIndex: 0,
+        }])
     })
 })

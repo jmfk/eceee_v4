@@ -529,6 +529,8 @@ describe('RenderFrameRuntime designer overlay', () => {
             kind: 'previewImage',
             sourceUrl: '/theme_images/site-hero.jpg',
             sourceOccurrence: 1,
+            sourcePath: ['images', 'preview:site-page:image:hero', 'url'],
+            sourceMatchIndex: 0,
             file: replacement,
         }), '*')
         expect(input).not.toBeInTheDocument()
