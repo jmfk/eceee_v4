@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileText, Image as ImageIcon, Italic, Link2, List, ListOrdered, Loader2, Search, Settings2, Trash2 } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
-import { createDesignerRenderModel } from '../../rendering/adapters'
+import { createDesignerRenderModel, designerPreviewImageReferences } from '../../rendering/adapters'
 const typographyLabels = {
     fontFamily: 'Font family', fontSize: 'Size', fontWeight: 'Weight', fontStyle: 'Style',
     lineHeight: 'Line height', letterSpacing: 'Letter spacing',
@@ -22,7 +22,6 @@ const minInspectorWidth = 320
 const maxInspectorWidth = 720
 const minPreviewWidth = 480
 const resizeHandleWidth = 8
-const previewImagePattern = /(?:https?:\/\/[^\s"'()<>]+|s3:\/\/[^\s"'()<>]+|\/(?:theme_images|uploads|media|files|site-package)\/[^\s"'()<>]+)\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^\s"'()<>]*)?/gi
 
 const assetProperty = (asset) => asset.property || asset.assetKey?.split(':').at(-1)
 
@@ -59,17 +58,22 @@ const contentGroups = (options, sourceMode) => ['page', 'object'].map((kind) => 
     return { kind, label: kind === 'page' ? 'Pages' : 'Objects', subgroups }
 }).filter((group) => group.subgroups.some((subgroup) => subgroup.options.length))
 
-const previewImagesFor = (view) => {
-    const images = new Set()
-    const visit = (value) => {
-        if (typeof value === 'string') {
-            for (const match of value.matchAll(previewImagePattern)) images.add(match[0])
-        } else if (Array.isArray(value)) value.forEach(visit)
-        else if (value && typeof value === 'object') Object.values(value).forEach(visit)
-    }
-    visit(view?.content)
-    visit(view?.images)
-    return [...images]
+const spacingRowIndexForChange = (rows, targetIds, breakpoints, viewportWidth) => {
+    const targetId = targetIds.find((candidate) => rows.some((row) => row.targetId === candidate))
+    if (!targetId) return -1
+    const candidates = rows
+        .map((row, index) => ({ row, index }))
+        .filter(({ row }) => row.targetId === targetId)
+    if (candidates.length < 2) return candidates[0]?.index ?? -1
+
+    const width = Number(viewportWidth)
+    if (!Number.isFinite(width)) return candidates[0].index
+    const configuredBreakpoints = { ...defaultBreakpoints, ...(breakpoints || {}) }
+    const active = candidates
+        .map((candidate) => ({ ...candidate, width: Number(configuredBreakpoints[candidate.row.breakpoint]) }))
+        .filter((candidate) => Number.isFinite(candidate.width) && candidate.width <= width)
+        .sort((left, right) => right.width - left.width)[0]
+    return active?.index ?? candidates[0].index
 }
 
 const ContentSourceBrowser = ({ sourceMode, options, value, onChange, onDelete, disabled, loading }) => {
@@ -436,7 +440,12 @@ const SemanticThemeWorkspace = ({
             }
             if (event.data.action === 'spacingChange') {
                 const targetIds = Array.isArray(event.data.targetIds) ? event.data.targetIds : []
-                const index = workspace.spacing.findIndex((row) => targetIds.includes(row.targetId))
+                const index = spacingRowIndexForChange(
+                    workspace.spacing,
+                    targetIds,
+                    workspace.breakpoints,
+                    event.data.viewportWidth,
+                )
                 const property = event.data.property
                 if (index >= 0 && workspace.constraints.editableSpacingProperties.includes(property)) {
                     updateWorkspace((next) => {
@@ -454,6 +463,7 @@ const SemanticThemeWorkspace = ({
                 editable: option.editable !== false,
                 richText: option.richText === true,
                 sourceUrl: option.sourceUrl || '',
+                sourceOccurrence: option.sourceOccurrence ?? 0,
                 computedStyles: option.computedStyles || {},
             })
             const alternatives = Array.isArray(event.data.alternatives)
@@ -473,6 +483,7 @@ const SemanticThemeWorkspace = ({
                 editable: event.data.editable !== false,
                 richText: event.data.richText === true,
                 sourceUrl: event.data.sourceUrl || '',
+                sourceOccurrence: event.data.sourceOccurrence ?? 0,
                 computedStyles: event.data.computedStyles || {},
                 alternatives,
                 ancestors,
@@ -494,7 +505,7 @@ const SemanticThemeWorkspace = ({
                         const asset = workspace.assets.find((candidate) => `asset:${candidate.assetKey}` === target.id)
                         if (asset) void replaceAsset(asset, event.data.file)
                     } else if (target.kind === 'previewImage' && viewId && target.sourceUrl) {
-                        void replacePreviewImage?.(viewId, target.sourceUrl, event.data.file)
+                        void replacePreviewImage?.(viewId, target.sourceUrl, target.sourceOccurrence, event.data.file)
                     }
                 }
                 return
@@ -526,10 +537,10 @@ const SemanticThemeWorkspace = ({
         }
         window.addEventListener('message', receive)
         return () => window.removeEventListener('message', receive)
-    }, [contentMode, replaceAsset, replacePreviewImage, updateWorkspace, viewId, workspace.assets, workspace.constraints.editableSpacingProperties, workspace.spacing])
+    }, [contentMode, replaceAsset, replacePreviewImage, updateWorkspace, viewId, workspace.assets, workspace.breakpoints, workspace.constraints.editableSpacingProperties, workspace.spacing])
 
     const selectedView = previewContent.views.find((view) => view.id === viewId) || previewContent.views[0] || null
-    const selectedViewImages = useMemo(() => previewImagesFor(selectedView), [selectedView])
+    const selectedViewImages = useMemo(() => designerPreviewImageReferences(selectedView), [selectedView])
     const selectedSourceContent = externalContentOptions.find((source) => source.value === sourceContentId) || null
     const previewWorkspace = useMemo(() => ({
         ...workspace,
@@ -550,9 +561,9 @@ const SemanticThemeWorkspace = ({
         const candidates = [selectedTarget, ...(selectedTarget.alternatives || []), ...(selectedTarget.descendants || [])]
         const urls = candidates.flatMap((target) => {
             const asset = assetsByTargetId.get(target.id)
-            return [target.sourceUrl, asset?.url].filter(Boolean)
+            return [target.sourceUrl && { sourceUrl: target.sourceUrl, sourceOccurrence: target.sourceOccurrence ?? 0 }, asset?.url && { sourceUrl: asset.url }].filter(Boolean)
         })
-        return selectedViewImages.filter((url) => urls.includes(url))
+        return selectedViewImages.filter((image) => urls.some((candidate) => candidate.sourceUrl === image.sourceUrl && (candidate.sourceOccurrence === undefined || candidate.sourceOccurrence === image.sourceOccurrence)))
     }, [assetsByTargetId, selectedTarget, selectedViewImages])
     const selectedImageAspect = imageAspects.find((aspect) => aspect.key === selectedImageAspectKey) || imageAspects[0]
     const previewAsset = workspace.assets.find((asset) => asset.kind === 'preview')
@@ -628,7 +639,7 @@ const SemanticThemeWorkspace = ({
     const chooseTargetAlternative = (alternative) => {
         const asset = assetsByTargetId.get(alternative.id)
         if (asset) setSelectedImageAspectKey(imageAspectKey(asset))
-        setSelectedTarget((current) => ({ ...alternative, alternatives: current?.alternatives || [], ancestors: current?.ancestors || [], descendants: current?.descendants || [] }))
+        setSelectedTarget({ ...alternative, alternatives: [alternative], ancestors: [], descendants: [] })
         setSelectionExpanded(true)
         iframeRef.current?.contentWindow?.postMessage({
             source: 'eceee-render-host',
@@ -694,9 +705,9 @@ const SemanticThemeWorkspace = ({
         setSelectedTarget(null)
     }
 
-    const uploadExampleImage = async (sourceUrl, file) => {
+    const uploadExampleImage = async (sourceUrl, sourceOccurrence, file) => {
         if (!selectedView || !file) return
-        const result = await replacePreviewImage?.(selectedView.id, sourceUrl, file)
+        const result = await replacePreviewImage?.(selectedView.id, sourceUrl, sourceOccurrence, file)
         if (result?.previewContent?.views) setPreviewContent(result.previewContent)
     }
 
@@ -895,13 +906,14 @@ const SemanticThemeWorkspace = ({
     const exampleImageEditor = contentMode === 'demo' && selectedView && selectedElementImages.length > 0 && (
         <section className="space-y-2 border-t border-gray-200 pt-3">
             <div><h2 className="text-sm font-semibold text-gray-900">Images in this element</h2><p className="mt-0.5 text-xs text-gray-500">Only images inside the selected element are shown.</p></div>
-            <div className="divide-y divide-gray-200 border-y border-gray-200">{selectedElementImages.map((url, index) => {
+            <div className="divide-y divide-gray-200 border-y border-gray-200">{selectedElementImages.map(({ sourceUrl, sourceOccurrence }, index) => {
+                const url = sourceUrl
                 const name = decodeURIComponent(url.split('/').at(-1)?.split('?')[0] || `Image ${index + 1}`)
                 const inputKey = `example:${selectedView.id}:${index}`
-                return <article key={url} className="flex min-w-0 items-center gap-2 py-1.5">
+                return <article key={`${url}:${sourceOccurrence}`} className="flex min-w-0 items-center gap-2 py-1.5">
                     <img src={url} alt="" className="h-12 w-16 shrink-0 rounded border border-gray-200 bg-gray-50 object-contain" />
                     <span className="min-w-0 flex-1 truncate text-xs text-gray-600">{name}</span>
-                    <input ref={(node) => { uploadRefs.current[inputKey] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => uploadExampleImage(url, event.target.files?.[0])} className="sr-only" />
+                    <input ref={(node) => { uploadRefs.current[inputKey] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => uploadExampleImage(url, sourceOccurrence, event.target.files?.[0])} className="sr-only" />
                     <button type="button" aria-label={`Replace example image ${name}`} onClick={() => uploadRefs.current[inputKey]?.click()} disabled={disabled} className="shrink-0 rounded-md border border-blue-600 bg-white px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">Replace</button>
                 </article>
             })}</div>

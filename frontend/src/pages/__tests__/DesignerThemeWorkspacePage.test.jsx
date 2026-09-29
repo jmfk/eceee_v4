@@ -155,7 +155,7 @@ describe('DesignerThemeWorkspacePage', () => {
             return { ...structuredClone(workspace), draftVersion: draftVersion + 1, hasDraftChanges: true, importedViewId: imported.id, previewContent: { views: [...structuredClone(previewViews), imported] } }
         })
         mocks.deletePreviewContent.mockImplementation(async (_themeId, viewId, draftVersion) => ({ ...structuredClone(workspace), draftVersion: draftVersion + 1, hasDraftChanges: true, previewContent: { views: structuredClone(previewViews).filter((view) => view.id !== viewId) } }))
-        mocks.replacePreviewImage.mockImplementation(async (_themeId, viewId, _sourceUrl, _image, draftVersion) => ({ ...structuredClone(workspace), draftVersion: draftVersion + 1, hasDraftChanges: true, previewContent: { views: structuredClone(previewViews).map((view) => view.id === viewId ? { ...view, content: { image: { url: 'https://storage.test/theme_images/7/designer_drafts/replaced.jpg' } } } : view) } }))
+        mocks.replacePreviewImage.mockImplementation(async (_themeId, viewId, _sourceUrl, _sourceOccurrence, _image, draftVersion) => ({ ...structuredClone(workspace), draftVersion: draftVersion + 1, hasDraftChanges: true, previewContent: { views: structuredClone(previewViews).map((view) => view.id === viewId ? { ...view, content: { image: { url: 'https://storage.test/theme_images/7/designer_drafts/replaced.jpg' } } } : view) } }))
         mocks.loadPreviewPage.mockResolvedValue({ page: { id: 42 }, version: { id: 9 }, inheritance: { slots: {} } })
         mocks.loadPreviewObject.mockResolvedValue({
             object: { id: 55, title: 'Welcome article' },
@@ -314,7 +314,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByRole('heading', { name: 'Images in this element' })).not.toBeInTheDocument()
         const iframe = screen.getByTitle('Live theme preview')
         fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'content-image:0', kind: 'previewImage', label: 'Imported image', sourceUrl: 'https://storage.test/theme_images/7/library/imported.jpg' },
+            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'content-image:0', kind: 'previewImage', label: 'Imported image', sourceUrl: 'https://storage.test/theme_images/7/library/imported.jpg', sourceOccurrence: 0 },
             source: iframe.contentWindow,
         }))
         expect(screen.getByRole('button', { name: 'Replace example image imported.jpg' })).toBeInTheDocument()
@@ -343,7 +343,7 @@ describe('DesignerThemeWorkspacePage', () => {
         await user.click(importButton)
         const iframe = screen.getByTitle('Live theme preview')
         fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'content-image:0', kind: 'previewImage', label: 'Imported image', sourceUrl: 'https://storage.test/theme_images/7/library/imported.jpg' },
+            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'content-image:0', kind: 'previewImage', label: 'Imported image', sourceUrl: 'https://storage.test/theme_images/7/library/imported.jpg', sourceOccurrence: 0 },
             source: iframe.contentWindow,
         }))
         const replaceButton = await screen.findByRole('button', { name: 'Replace example image imported.jpg' })
@@ -355,6 +355,7 @@ describe('DesignerThemeWorkspacePage', () => {
             '7',
             'page-imported',
             'https://storage.test/theme_images/7/library/imported.jpg',
+            0,
             upload,
             3,
         ))
@@ -523,17 +524,30 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByText('Heading 1')).toBeInTheDocument()
     })
 
-    it('applies a clicked preview spacing label to the matching inspector row', async () => {
+    it('applies a clicked preview spacing label to the nearest target and active breakpoint', async () => {
+        const responsiveWorkspace = structuredClone(workspace)
+        responsiveWorkspace.spacing = [
+            responsiveWorkspace.spacing[0],
+            { ...responsiveWorkspace.spacing[1], breakpoint: 'xs', values: { padding: '8px' } },
+            { ...responsiveWorkspace.spacing[1], breakpoint: 'md', values: { padding: '24px' } },
+        ]
+        mocks.workspace.mockResolvedValue(responsiveWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
         fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', action: 'spacingChange', targetIds: ['content:0', 'group:0:element:h1'], property: 'marginBottom', value: '24px' },
+            data: {
+                source: 'eceee-designer-preview', action: 'spacingChange',
+                targetIds: ['group:0:part:content-widget', 'group:0:element:h1'],
+                property: 'padding', value: '32px', viewportWidth: 1280,
+            },
             source: iframe.contentWindow,
         }))
         fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
         await waitFor(() => expect(mocks.save).toHaveBeenCalled())
-        expect(mocks.save.mock.calls[0][1].spacing[0].values.marginBottom).toBe('24px')
+        expect(mocks.save.mock.calls[0][1].spacing[0].values.padding).toBeUndefined()
+        expect(mocks.save.mock.calls[0][1].spacing[1].values.padding).toBe('8px')
+        expect(mocks.save.mock.calls[0][1].spacing[2].values.padding).toBe('32px')
     })
 
     it('shows only relevant values after clicking a visible element', async () => {
@@ -760,6 +774,12 @@ describe('DesignerThemeWorkspacePage', () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
+        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-frame', action: 'ready' },
+            source: iframe.contentWindow,
+        }))
+        await waitFor(() => expect(postMessage).toHaveBeenCalled())
         fireEvent(window, new MessageEvent('message', {
             data: {
                 source: 'eceee-designer-preview',
@@ -778,6 +798,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('button', { name: 'Select Callout background' })).toHaveAttribute('aria-pressed', 'true')
         fireEvent.click(screen.getByRole('button', { name: 'Theme images' }))
         expect(screen.getByRole('heading', { name: 'Callout' })).toBeInTheDocument()
+        postMessage.mockRestore()
     })
 
     it('edits and saves visible text only in the selected theme example', async () => {
@@ -817,6 +838,13 @@ describe('DesignerThemeWorkspacePage', () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
+        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-frame', action: 'ready' },
+            source: iframe.contentWindow,
+        }))
+        await waitFor(() => expect(postMessage).toHaveBeenCalled())
+        postMessage.mockRestore()
         const replacement = new File(['hero'], 'hero.png', { type: 'image/png' })
 
         fireEvent(window, new MessageEvent('message', {
@@ -844,6 +872,13 @@ describe('DesignerThemeWorkspacePage', () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
+        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-frame', action: 'ready' },
+            source: iframe.contentWindow,
+        }))
+        await waitFor(() => expect(postMessage).toHaveBeenCalled())
+        postMessage.mockRestore()
         const replacement = new File(['photo'], 'photo.webp', { type: 'image/webp' })
 
         fireEvent(window, new MessageEvent('message', {
@@ -855,6 +890,7 @@ describe('DesignerThemeWorkspacePage', () => {
                 kind: 'previewImage',
                 label: 'Article photo',
                 sourceUrl: 'https://storage.test/article-photo.jpg',
+                sourceOccurrence: 0,
                 file: replacement,
             },
             source: iframe.contentWindow,
@@ -864,6 +900,7 @@ describe('DesignerThemeWorkspacePage', () => {
             '7',
             'page-main',
             'https://storage.test/article-photo.jpg',
+            0,
             replacement,
             2,
         ))

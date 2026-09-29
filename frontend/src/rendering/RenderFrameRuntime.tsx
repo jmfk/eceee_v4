@@ -31,7 +31,7 @@ html,body,#root{margin:0;min-height:100%;background:#fff}body{font-family:system
 .news-items{display:grid;gap:18px}.news-item{display:grid;gap:12px}.render-error-state{border:1px solid #fecaca;background:#fef2f2}
 .designer-preview [data-designer-target]{cursor:pointer}.designer-guides [data-designer-target]{outline:1px dashed rgba(100,116,139,.5)!important;outline-offset:-1px}[data-designer-target].designer-selected{outline:3px solid #2563eb!important;outline-offset:-3px!important}.designer-guides .designer-hovered{outline:2px dotted #2563eb!important;outline-offset:-2px!important}
 .designer-context-menu{position:fixed!important;z-index:2147483647!important;min-width:180px!important;max-width:260px!important;padding:6px!important;border:1px solid #d1d5db!important;border-radius:8px!important;background:#fff!important;box-shadow:0 10px 24px rgba(15,23,42,.2)!important;color:#111827!important;font:500 13px/1.35 system-ui,sans-serif!important}.designer-context-menu-title{overflow:hidden!important;padding:5px 8px 7px!important;color:#6b7280!important;font-size:11px!important;font-weight:600!important;text-overflow:ellipsis!important;white-space:nowrap!important}.designer-context-menu button{display:block!important;width:100%!important;padding:7px 8px!important;border:0!important;border-radius:5px!important;background:transparent!important;color:#111827!important;font:inherit!important;text-align:left!important;cursor:pointer!important}.designer-context-menu button:hover,.designer-context-menu button:focus-visible{background:#eff6ff!important;color:#1d4ed8!important;outline:none!important}
-.designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483646!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483647!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483647!important;transform:translate(-50%,-50%);padding:2px 3px!important;border:0!important;border-radius:3px!important;background:#fff!important;font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;box-shadow:0 0 0 1px rgba(255,255,255,.9)!important}.designer-spacing-value[data-editable="true"]{pointer-events:auto!important;cursor:pointer!important;box-shadow:0 0 0 1px currentColor!important}.designer-spacing-value[data-editable="true"]:hover,.designer-spacing-value[data-editable="true"]:focus-visible{outline:2px solid #2563eb!important;outline-offset:1px!important}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}.designer-spacing-editor{position:fixed!important;z-index:2147483647!important;display:flex!important;gap:4px!important;padding:5px!important;border:1px solid #93c5fd!important;border-radius:6px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.22)!important}.designer-spacing-editor input{width:72px!important;padding:5px 6px!important;border:1px solid #d1d5db!important;border-radius:4px!important;font:500 12px/1.2 system-ui,sans-serif!important}.designer-spacing-editor button{padding:5px 7px!important;border:0!important;border-radius:4px!important;background:#2563eb!important;color:#fff!important;font:600 12px/1.2 system-ui,sans-serif!important;cursor:pointer!important}
+.designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483644!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483645!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483645!important;transform:translate(-50%,-50%);padding:2px 3px!important;border:0!important;border-radius:3px!important;background:#fff!important;font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;box-shadow:0 0 0 1px rgba(255,255,255,.9)!important}.designer-spacing-value[data-editable="true"]{pointer-events:auto!important;cursor:pointer!important;box-shadow:0 0 0 1px currentColor!important}.designer-spacing-value[data-editable="true"]:hover,.designer-spacing-value[data-editable="true"]:focus-visible{outline:2px solid #2563eb!important;outline-offset:1px!important}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}.designer-spacing-editor{position:fixed!important;z-index:2147483647!important;display:flex!important;gap:4px!important;padding:5px!important;border:1px solid #93c5fd!important;border-radius:6px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.22)!important}.designer-spacing-editor input{width:72px!important;padding:5px 6px!important;border:1px solid #d1d5db!important;border-radius:4px!important;font:500 12px/1.2 system-ui,sans-serif!important}.designer-spacing-editor button{padding:5px 7px!important;border:0!important;border-radius:4px!important;background:#2563eb!important;color:#fff!important;font:600 12px/1.2 system-ui,sans-serif!important;cursor:pointer!important}
 @media(max-width:767px){.two-columns-widget,.three-columns-widget{grid-template-columns:1fr}}
 `
 
@@ -89,6 +89,7 @@ const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['design
         source: 'eceee-designer-preview', action, targetId: primary.id, kind: primary.kind,
         label: primary.label, text: editableValue(node, richText), editable: primary.editable, richText,
         sourceUrl: primary.sourceUrl || '',
+        sourceOccurrence: primary.sourceOccurrence ?? 0,
         computedStyles: computedThemeValues(node),
         alternatives: targets.map((target: any) => ({ ...target, text: editableValue(node, Boolean(target.richText || richText)), richText: Boolean(target.richText || richText), computedStyles: computedThemeValues(node) })),
         ancestors: designer ? ancestorTargets(node, designer) : [],
@@ -118,9 +119,20 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
     let hoveredNode: HTMLElement | null = null
     let selectedNode: HTMLElement | null = null
     let contextMenu: HTMLElement | null = null
-    let spacingEditor: HTMLElement | null = null
+    let spacingEditor: { element: HTMLFormElement, node: HTMLElement, property: string } | null = null
     const closeContextMenu = () => { contextMenu?.remove(); contextMenu = null }
-    const closeSpacingEditor = () => { spacingEditor?.remove(); spacingEditor = null }
+    const closeSpacingEditor = () => { spacingEditor?.element.remove(); spacingEditor = null }
+    const positionSpacingEditor = (editor: HTMLFormElement, labelLeft: number, labelTop: number) => {
+        const gap = 12
+        const width = editor.offsetWidth || 164
+        const height = editor.offsetHeight || 44
+        const left = Math.max(8, Math.min(window.innerWidth - width - 8, labelLeft - width / 2))
+        const preferredTop = labelTop + gap
+        const top = preferredTop + height <= window.innerHeight - 8
+            ? preferredTop
+            : Math.max(8, labelTop - height - gap)
+        Object.assign(editor.style, { left: `${left}px`, top: `${top}px` })
+    }
     const removeGuides = () => { guides.forEach((guide) => guide.remove()); guides = [] }
     const clearGuides = () => {
         removeGuides()
@@ -242,14 +254,48 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
                     save.type = 'submit'
                     save.textContent = 'Apply'
                     editor.append(input, save)
-                    Object.assign(editor.style, { left: `${Math.max(8, labelLeft - 45)}px`, top: `${Math.min(window.innerHeight - 44, labelTop + 12)}px` })
+                    const applyValue = () => {
+                        if (!editor.isConnected) return
+                        window.parent.postMessage({
+                            source: 'eceee-designer-preview', action: 'spacingChange', targetIds, property,
+                            value: input.value.trim(), viewportWidth: window.innerWidth,
+                        }, '*')
+                        closeSpacingEditor()
+                    }
                     editor.addEventListener('submit', (submitEvent) => {
                         submitEvent.preventDefault()
-                        window.parent.postMessage({ source: 'eceee-designer-preview', action: 'spacingChange', targetIds, property, value: input.value.trim() }, '*')
-                        closeSpacingEditor()
+                        applyValue()
+                    })
+                    save.addEventListener('click', (clickEvent) => {
+                        clickEvent.preventDefault()
+                        applyValue()
+                    })
+                    input.addEventListener('keydown', (keyEvent) => {
+                        if (keyEvent.key === 'Escape') {
+                            keyEvent.preventDefault()
+                            keyEvent.stopPropagation()
+                            closeSpacingEditor()
+                            showSpacing(node)
+                            return
+                        }
+                        if (keyEvent.key === 'Enter') {
+                            keyEvent.preventDefault()
+                            applyValue()
+                            return
+                        }
+                        if (keyEvent.key !== 'ArrowUp' && keyEvent.key !== 'ArrowDown') return
+                        const match = input.value.match(/^\s*(-?(?:\d+(?:\.\d*)?|\.\d+))\s*([a-z%]*)\s*$/i)
+                        if (!match) return
+                        keyEvent.preventDefault()
+                        const direction = keyEvent.key === 'ArrowUp' ? 1 : -1
+                        const step = keyEvent.shiftKey ? 10 : 1
+                        const nextValue = Math.round((Number(match[1]) + direction * step) * 1000) / 1000
+                        input.value = `${nextValue}${match[2] || 'px'}`
+                        input.select()
                     })
                     document.body.append(editor)
-                    spacingEditor = editor
+                    spacingEditor = { element: editor, node, property }
+                    positionSpacingEditor(editor, labelLeft, labelTop)
                     input.focus()
                     input.select()
                 }
@@ -260,6 +306,9 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
             }
             document.body.append(label)
             guides.push(label)
+            if (spacingEditor?.node === node && spacingEditor.property === property) {
+                positionSpacingEditor(spacingEditor.element, labelLeft, labelTop)
+            }
         }
 
         const marginLeft = Math.max(0, margin.left)
@@ -359,14 +408,36 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
 
     if (designer.contentEditable === true) {
         let imageIndex = 0
+        const remainingReferences = [...(designer.previewImageReferences || [])]
+        const referencesByWidgetId = new Map<string, Array<{ sourceUrl: string, sourceOccurrence: number }>>()
+        const collectWidgetReferences = (widgets: any[]) => widgets.forEach((widget) => {
+            referencesByWidgetId.set(widget.id, widget.previewImageReferences || [])
+            Object.values(widget.config?.slots || {}).forEach((children) => {
+                if (Array.isArray(children)) collectWidgetReferences(children)
+            })
+        })
+        Object.values(model.slots).forEach(collectWidgetReferences)
+        const resolvedUrl = (value: string) => {
+            try { return new URL(value, document.baseURI).href } catch { return value }
+        }
         root.querySelectorAll<HTMLImageElement>('img[src]').forEach((node) => {
             const sourceUrl = node.currentSrc || node.src
             if (!sourceUrl) return
+            const widgetId = node.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId
+            const widgetReferences = widgetId ? referencesByWidgetId.get(widgetId) || [] : []
+            const preferredReferences = widgetReferences.length ? widgetReferences : remainingReferences
+            const preferredReference = preferredReferences.find((reference) => resolvedUrl(reference.sourceUrl) === resolvedUrl(sourceUrl))
+            const referenceIndex = preferredReference
+                ? remainingReferences.findIndex((reference) => reference.sourceUrl === preferredReference.sourceUrl && reference.sourceOccurrence === preferredReference.sourceOccurrence)
+                : remainingReferences.findIndex((reference) => resolvedUrl(reference.sourceUrl) === resolvedUrl(sourceUrl))
+            const reference = referenceIndex >= 0 ? remainingReferences.splice(referenceIndex, 1)[0] : null
+            if (reference && widgetId) referencesByWidgetId.set(widgetId, widgetReferences.filter((candidate) => candidate !== preferredReference))
             registerTarget(node, {
                 id: `content-image:${imageIndex}`,
                 kind: 'previewImage',
                 label: node.alt?.trim() || 'Content image',
-                sourceUrl,
+                sourceUrl: reference?.sourceUrl || sourceUrl,
+                sourceOccurrence: reference?.sourceOccurrence ?? 0,
                 editable: false,
             }, true)
             imageIndex += 1
@@ -485,16 +556,35 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
     const dismissContextMenu = (event: Event) => {
         if (contextMenu && !(event.target instanceof Node && contextMenu.contains(event.target))) closeContextMenu()
     }
-    const dismissContextMenuWithKeyboard = (event: KeyboardEvent) => { if (event.key === 'Escape') closeContextMenu() }
+    const dismissSpacingEditor = (event: Event) => {
+        if (spacingEditor && !(event.target instanceof Node && spacingEditor.element.contains(event.target))) {
+            closeSpacingEditor()
+        }
+    }
+    const dismissSpacingEditorOnBlur = () => closeSpacingEditor()
+    const dismissOverlaysWithKeyboard = (event: KeyboardEvent) => {
+        if (event.key !== 'Escape') return
+        closeContextMenu()
+        const pinnedNode = spacingEditor?.node
+        closeSpacingEditor()
+        if (pinnedNode && root.contains(pinnedNode)) showSpacing(pinnedNode)
+    }
     root.addEventListener('contextmenu', openContextMenu)
     document.addEventListener('pointerdown', dismissContextMenu)
-    document.addEventListener('keydown', dismissContextMenuWithKeyboard)
+    document.addEventListener('pointerdown', dismissSpacingEditor)
+    document.addEventListener('keydown', dismissOverlaysWithKeyboard)
+    window.addEventListener('blur', dismissSpacingEditorOnBlur)
     const findHoveredNode = (target: EventTarget | null) => target instanceof HTMLElement ? target : null
     const over = (event: MouseEvent) => {
+        if (spacingEditor) return
         const node = findHoveredNode(event.target)
         if (node && root.contains(node) && node !== hoveredNode) showSpacing(node)
     }
     const out = (event: MouseEvent) => {
+        if (spacingEditor) {
+            showSpacing(spacingEditor.node)
+            return
+        }
         if (!hoveredNode || (event.relatedTarget instanceof Node && hoveredNode.contains(event.relatedTarget))) return
         const next = findHoveredNode(event.relatedTarget)
         if (next && root.contains(next)) showSpacing(next)
@@ -507,7 +597,10 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
         selectedNode = node
         showSpacing(node)
     }
-    const refreshGuides = () => { if (hoveredNode) showSpacing(hoveredNode) }
+    const refreshGuides = () => {
+        const node = spacingEditor?.node || hoveredNode || selectedNode
+        if (node && root.contains(node)) showSpacing(node)
+    }
     root.addEventListener('mouseover', over)
     root.addEventListener('mouseout', out)
     root.addEventListener('designerselect', selectFromInspector)
@@ -518,7 +611,9 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
         closeSpacingEditor()
         root.removeEventListener('contextmenu', openContextMenu)
         document.removeEventListener('pointerdown', dismissContextMenu)
-        document.removeEventListener('keydown', dismissContextMenuWithKeyboard)
+        document.removeEventListener('pointerdown', dismissSpacingEditor)
+        document.removeEventListener('keydown', dismissOverlaysWithKeyboard)
+        window.removeEventListener('blur', dismissSpacingEditorOnBlur)
         root.removeEventListener('mouseover', over)
         root.removeEventListener('mouseout', out)
         root.removeEventListener('designerselect', selectFromInspector)
@@ -548,7 +643,9 @@ export const RenderFrameRuntime = () => {
                 })
                 match?.classList.add('designer-selected')
                 match?.dispatchEvent(new CustomEvent('designerselect', { bubbles: true }))
-                match?.scrollIntoView({ block: 'nearest' })
+                const preferredTarget = match ? nodeTargets(match).find((target: any) => target.id === event.data.targetId) : null
+                if (match && preferredTarget) postDesignerEvent(match, modelRef.current?.designer, 'select', preferredTarget)
+                match?.scrollIntoView?.({ block: 'nearest' })
             }
             if (event.data.action === 'readTargetStyles' && event.data.targetId) {
                 const match = [...document.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => {

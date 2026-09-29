@@ -1672,30 +1672,42 @@ def delete_designer_preview_view(theme_id, tenant, user, view_id, draft_version)
         return theme, draft
 
 
-def _replace_preview_image_reference(value, source_url, replacement_url):
+def _replace_preview_image_reference(value, source_url, source_occurrence, replacement_url):
+    """Replace exactly one occurrence while preserving the document traversal order."""
+    seen = 0
     replacements = 0
-    if isinstance(value, dict):
-        rewritten = {}
-        for key, child in value.items():
-            rewritten[key], count = _replace_preview_image_reference(child, source_url, replacement_url)
-            replacements += count
-        return rewritten, replacements
-    if isinstance(value, list):
-        rewritten = []
-        for child in value:
-            next_child, count = _replace_preview_image_reference(child, source_url, replacement_url)
-            replacements += count
-            rewritten.append(next_child)
-        return rewritten, replacements
-    if isinstance(value, str) and source_url in value:
-        return value.replace(source_url, replacement_url), value.count(source_url)
-    return value, 0
+
+    def rewrite(current):
+        nonlocal seen, replacements
+        if isinstance(current, dict):
+            return {key: rewrite(child) for key, child in current.items()}
+        if isinstance(current, list):
+            return [rewrite(child) for child in current]
+        if not isinstance(current, str) or source_url not in current:
+            return current
+
+        def replace(match):
+            nonlocal seen, replacements
+            should_replace = seen == source_occurrence
+            seen += 1
+            if should_replace:
+                replacements += 1
+                return replacement_url
+            return match.group(0)
+
+        return re.sub(re.escape(source_url), replace, current)
+
+    return rewrite(value), replacements
 
 
-def replace_designer_preview_image(theme_id, tenant, user, view_id, source_url, upload, draft_version):
+def replace_designer_preview_image(
+    theme_id, tenant, user, view_id, source_url, source_occurrence, upload, draft_version
+):
     """Replace an image already present in a detached example document."""
     if not isinstance(source_url, str) or not source_url or len(source_url) > 2000:
         raise ValidationError("Choose a valid example image.")
+    if not isinstance(source_occurrence, int) or source_occurrence < 0:
+        raise ValidationError("Choose a valid example image occurrence.")
     content, (width, height) = validate_image_upload(upload)
     saved_path = None
     try:
@@ -1719,13 +1731,14 @@ def replace_designer_preview_image(theme_id, tenant, user, view_id, source_url, 
             path = f"theme_images/{theme.id}/designer_drafts/{draft.id}/{filename}"
             saved_path = system_storage.save(path, ContentFile(content))
             replacement_url = system_storage.url(saved_path)
-            view["content"], content_replacements = _replace_preview_image_reference(
-                view.get("content", {}), source_url, replacement_url
+            rewritten, replacements = _replace_preview_image_reference(
+                {"content": view.get("content", {}), "images": view.get("images", {})},
+                source_url,
+                source_occurrence,
+                replacement_url,
             )
-            view["images"], image_replacements = _replace_preview_image_reference(
-                view.get("images", {}), source_url, replacement_url
-            )
-            replacements = content_replacements + image_replacements
+            view["content"] = rewritten["content"]
+            view["images"] = rewritten["images"]
             if not replacements:
                 raise ValidationError("That image is not part of this example.")
             view.setdefault("imageMetadata", {})[replacement_url] = {

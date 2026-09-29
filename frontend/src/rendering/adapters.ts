@@ -2,10 +2,44 @@ import { getSlotWidgetsForMode } from '../utils/widgetMerging'
 import { getRenderFixture } from './fixtures'
 import type { RenderPageModel, RenderWidgetModel } from './types'
 
-const normalizeWidget = (widget: any, fallbackId: string): RenderWidgetModel => {
+const previewImagePattern = /(?:https?:\/\/[^\s"'()<>]+|s3:\/\/[^\s"'()<>]+|\/(?:theme_images|uploads|media|files|site-package)\/[^\s"'()<>]+)\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^\s"'()<>]*)?/gi
+
+const collectDesignerPreviewImageReferences = (view: any) => {
+    const references: Array<{ sourceUrl: string, sourceOccurrence: number }> = []
+    const referencesByObject = new WeakMap<object, Array<{ sourceUrl: string, sourceOccurrence: number }>>()
+    const occurrences = new Map<string, number>()
+    const visit = (value: any, owner: object | null = null) => {
+        if (typeof value === 'string') {
+            for (const match of value.matchAll(previewImagePattern)) {
+                const sourceUrl = match[0]
+                const sourceOccurrence = occurrences.get(sourceUrl) || 0
+                const reference = { sourceUrl, sourceOccurrence }
+                references.push(reference)
+                if (owner) referencesByObject.set(owner, [...(referencesByObject.get(owner) || []), reference])
+                occurrences.set(sourceUrl, sourceOccurrence + 1)
+            }
+        } else if (Array.isArray(value)) value.forEach((child) => visit(child, owner))
+        else if (value && typeof value === 'object') {
+            const nextOwner = value.type || value.widget_type ? value : owner
+            Object.entries(value).forEach(([key, child]) => {
+                const childOwner = !nextOwner && key === 'data' && child && typeof child === 'object' ? child : nextOwner
+                visit(child, childOwner)
+            })
+        }
+    }
+    visit(view?.content)
+    if (view?.images && typeof view.images === 'object') Object.values(view.images).forEach((image) => {
+        visit(image, image && typeof image === 'object' ? image : null)
+    })
+    return { references, referencesByObject }
+}
+
+export const designerPreviewImageReferences = (view: any) => collectDesignerPreviewImageReferences(view).references
+
+const normalizeWidget = (widget: any, fallbackId: string, referencesByObject?: WeakMap<object, Array<{ sourceUrl: string, sourceOccurrence: number }>>): RenderWidgetModel => {
     const config = widget?.config && typeof widget.config === 'object' ? structuredClone(widget.config) : {}
     const normalizeList = (items: unknown, prefix: string) => Array.isArray(items)
-        ? items.map((item, index) => normalizeWidget(item, `${prefix}-${index}`))
+        ? items.map((item, index) => normalizeWidget(item, `${prefix}-${index}`, referencesByObject))
         : items
     if (config.slots && typeof config.slots === 'object') {
         config.slots = Object.fromEntries(Object.entries(config.slots).map(([name, items]) => [name, normalizeList(items, `${fallbackId}-${name}`)]))
@@ -16,6 +50,7 @@ const normalizeWidget = (widget: any, fallbackId: string): RenderWidgetModel => 
         config,
         data: widget?.data || widget?.resolvedData,
         inheritedFrom: widget?.inheritedFrom || widget?.inherited_from || null,
+        previewImageReferences: widget?.previewImageReferences || referencesByObject?.get(widget) || [],
     }
 }
 
@@ -58,6 +93,7 @@ export const createDesignerRenderModel = ({
 }: any): RenderPageModel => {
     const views = workspace?.previewContent?.views || workspace?.catalog?.previewViews || []
     const view = views.find((candidate: any) => candidate.id === viewId) || views[0] || {}
+    const imageReferenceCollection = collectDesignerPreviewImageReferences(view)
     const document = view.content && typeof view.content === 'object' ? view.content : null
     const documentWidgets = document?.widgets && typeof document.widgets === 'object' ? document.widgets : null
     const layout = sourceModel?.layout || document?.codeLayout || view.layout || 'main_layout'
@@ -74,7 +110,7 @@ export const createDesignerRenderModel = ({
     ])]
     availableSlots.forEach((slot: string) => {
         const widgets = previewSlots[slot] || []
-        slots[slot] = widgets.map((widget: any, index: number) => normalizeWidget(widget, `${slot}-${index}`))
+        slots[slot] = widgets.map((widget: any, index: number) => normalizeWidget(widget, `${slot}-${index}`, imageReferenceCollection.referencesByObject))
     })
     const primary = availableSlots.find((slot: string) => ['main', 'content', 'body', 'landingPage', 'landing_page'].includes(slot)) || availableSlots[0]
     const objectData = sourceModel?.context?.objectData || document?.data || {}
@@ -82,7 +118,14 @@ export const createDesignerRenderModel = ({
 
     if (isObjectPreview && Object.keys(objectData).length) {
         slots[primary] ||= []
-        slots[primary].unshift({ id: `${view.id || 'live-object'}-data`, type: 'designer.ObjectDataPreview', config: {} })
+        slots[primary].unshift({
+            id: `${view.id || 'live-object'}-data`,
+            type: 'designer.ObjectDataPreview',
+            config: {},
+            previewImageReferences: document?.data && typeof document.data === 'object'
+                ? imageReferenceCollection.referencesByObject.get(document.data) || []
+                : [],
+        })
     }
 
     const demoText = (element: string) => {
@@ -120,6 +163,9 @@ export const createDesignerRenderModel = ({
             id: `${view.id || 'preview'}-image-${index}`,
             type: 'easy_widgets.ImageWidget',
             config: { imageUrl: image?.url || image?.fileUrl, altText: image?.filename || '' },
+            previewImageReferences: image && typeof image === 'object'
+                ? imageReferenceCollection.referencesByObject.get(image) || []
+                : [],
         }, `${slot}-preview-image-${index}`))
     })
 
@@ -156,6 +202,7 @@ export const createDesignerRenderModel = ({
                 targets[row.targetId] = [...new Set([...(targets[row.targetId] || []), ...fields])]
                 return targets
             }, {}),
+            previewImageReferences: sourceModel ? [] : imageReferenceCollection.references,
             contentEditable,
             guidesEnabled,
         },

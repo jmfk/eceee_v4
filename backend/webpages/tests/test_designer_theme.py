@@ -549,7 +549,11 @@ class DesignerThemeApiTests(TestCase):
                                 {
                                     "type": "easy_widgets.ImageWidget",
                                     "config": {"imageUrl": source_url},
-                                }
+                                },
+                                {
+                                    "type": "easy_widgets.ImageWidget",
+                                    "config": {"imageUrl": source_url},
+                                },
                             ]
                         }
                     },
@@ -573,6 +577,7 @@ class DesignerThemeApiTests(TestCase):
             {
                 "view_id": "example-page",
                 "source_url": source_url,
+                "source_occurrence": 1,
                 "image": upload,
                 "draft_version": workspace["draftVersion"],
             },
@@ -581,7 +586,8 @@ class DesignerThemeApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200, response.data)
         saved_view = response.data["previewContent"]["views"][0]
-        self.assertEqual(saved_view["content"]["widgets"]["main"][0]["config"]["imageUrl"], replacement_url)
+        self.assertEqual(saved_view["content"]["widgets"]["main"][0]["config"]["imageUrl"], source_url)
+        self.assertEqual(saved_view["content"]["widgets"]["main"][1]["config"]["imageUrl"], replacement_url)
         self.assertEqual(saved_view["imageMetadata"][replacement_url]["width"], 32)
         self.assertTrue(storage.save.call_args.args[0].startswith(f"theme_images/{self.theme.id}/designer_drafts/"))
 

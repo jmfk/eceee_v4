@@ -13,18 +13,21 @@ interface RenderFrameProps {
 
 export const RenderFrame = ({ model, title, className = '', style, onMessage, frameRef, src = '/__render-frame' }: RenderFrameProps) => {
     const ref = useRef<HTMLIFrameElement>(null)
+    const onMessageRef = useRef(onMessage)
     const [ready, setReady] = useState(false)
     const send = useCallback(() => ref.current?.contentWindow?.postMessage({ source: 'eceee-render-host', action: 'render', model }, '*'), [model])
+
+    useEffect(() => { onMessageRef.current = onMessage }, [onMessage])
 
     useEffect(() => {
         const receive = (event: MessageEvent) => {
             if (event.source !== ref.current?.contentWindow) return
             if (event.data?.source === 'eceee-render-frame' && event.data.action === 'ready') setReady(true)
-            onMessage?.(event)
+            onMessageRef.current?.(event)
         }
         window.addEventListener('message', receive)
         return () => window.removeEventListener('message', receive)
-    }, [onMessage])
+    }, [])
 
     useEffect(() => { if (ready) send() }, [ready, send])
 
