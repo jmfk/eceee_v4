@@ -61,6 +61,11 @@ Backend static assets: `cd backend && npm run build` / `npm run watch:css`
 
 ## Pull Request Review And Merge Gate
 
+- After addressing review feedback on an existing pull request, run the relevant
+  local verification, commit the completed review fixes, and push them to that
+  pull request's branch before handing the work back. Do not leave completed
+  review fixes only in the local working tree unless the user explicitly asks
+  for that.
 - Never equate passing CI with code review or approval. Report CI status,
   submitted reviews, and GitHub's `reviewDecision` as separate facts.
 - Before merging any pull request, fetch its current checks, submitted reviews,
