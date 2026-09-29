@@ -26,7 +26,7 @@ describe('form submission database', () => {
     mocks.query.mockReset();
     mocks.release.mockReset();
     mocks.connect.mockClear();
-    mocks.query.mockImplementation(async (sql: string) => sql.includes('COUNT(*)')
+    mocks.query.mockImplementation(async (sql: string) => sql.includes('COUNT(submitted_at)')
       ? { rows: [{ count: 0 }] }
       : { rows: [] });
   });
@@ -42,6 +42,7 @@ describe('form submission database', () => {
       'COMMIT',
     ]);
     expect(mocks.query.mock.calls[1][0]).toContain('pg_advisory_xact_lock');
+    expect(mocks.query.mock.calls[2][0]).toContain('COUNT(submitted_at)');
     expect(mocks.query.mock.calls[2][1]).toEqual([submission.tenantId, submission.pageId, submission.widgetId]);
     const insertParameters = mocks.query.mock.calls[3][1];
     expect(insertParameters.slice(1)).toEqual([
@@ -56,7 +57,7 @@ describe('form submission database', () => {
   });
 
   it('does not insert after the per-form minute limit is reached', async () => {
-    mocks.query.mockImplementation(async (sql: string) => sql.includes('COUNT(*)')
+    mocks.query.mockImplementation(async (sql: string) => sql.includes('COUNT(submitted_at)')
       ? { rows: [{ count: 30 }] }
       : { rows: [] });
 
@@ -68,7 +69,7 @@ describe('form submission database', () => {
 
   it('rolls back and releases the client when insertion fails', async () => {
     mocks.query.mockImplementation(async (sql: string) => {
-      if (sql.includes('COUNT(*)')) return { rows: [{ count: 0 }] };
+      if (sql.includes('COUNT(submitted_at)')) return { rows: [{ count: 0 }] };
       if (sql.includes('INSERT INTO')) throw new Error('insert failed');
       return { rows: [] };
     });

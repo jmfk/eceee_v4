@@ -116,6 +116,59 @@ describe('public form submissions', () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
+  it('enforces configured patterns with a linear-time regular expression engine', async () => {
+    const patternedWidget: Widget = {
+      ...formWidget,
+      config: {
+        ...formWidget.config,
+        fields: [
+          { name: 'code', label: 'Code', type: 'text', required: true, validation: { pattern: '[A-Z]{3}-[0-9]{2}' } },
+        ],
+      },
+    };
+    const patternedReadDb: ReadDb = {
+      withSnapshot: async read => read({
+        ...reader,
+        version: async () => ({ ...publishedVersion, widgets: { main: [patternedWidget] } }),
+      }),
+    };
+    const input = { ...validInput(), readDb: patternedReadDb, values: { code: ['ABC-12'] } };
+
+    await expect(submitPublishedForm(input)).resolves.toEqual({ status: 'success', redirectPath: '/' });
+    expect(insert).toHaveBeenCalledOnce();
+
+    insert.mockClear();
+    await expect(submitPublishedForm({ ...input, values: { code: ['ABC-123'] } })).resolves.toEqual({ status: 'invalid', redirectPath: '/' });
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported patterns without evaluating them through native RegExp', async () => {
+    const unsafeWidget: Widget = {
+      ...formWidget,
+      config: {
+        ...formWidget.config,
+        fields: [
+          { name: 'value', label: 'Value', type: 'text', validation: { pattern: '(?=a)a' } },
+        ],
+      },
+    };
+    const unsafeReadDb: ReadDb = {
+      withSnapshot: async read => read({
+        ...reader,
+        version: async () => ({ ...publishedVersion, widgets: { main: [unsafeWidget] } }),
+      }),
+    };
+
+    const result = await submitPublishedForm({
+      ...validInput(),
+      readDb: unsafeReadDb,
+      values: { value: ['a'] },
+    });
+
+    expect(result).toEqual({ status: 'invalid', redirectPath: '/' });
+    expect(insert).not.toHaveBeenCalled();
+  });
+
   it('silently accepts a tripped honeypot without storing data', async () => {
     const result = await submitPublishedForm({ ...validInput(), honeypot: 'spam' });
 

@@ -66,6 +66,7 @@ The TypeScript public publisher can render configured forms but cannot safely ac
 ## Implementation Notes
 
 - 2026-09-29: Implementation started on `codex/publisher-public-forms`.
+- 2026-09-29: Review fixes preserve submissions across page-version compaction, restrict writer-role reads to non-payload rate-limit columns, and enforce configured patterns with a linear-time engine.
 
 ## Linked ADRs
 
