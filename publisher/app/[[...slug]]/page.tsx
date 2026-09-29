@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { cache } from 'react';
 import { database } from '@/src/db';
+import { contentHostname } from '@/src/hostname';
 import { buildPublishedPageModel } from '@/src/model';
 import { PublishedPage } from '@/src/render';
 import { RENDER_LAYOUT_CSS } from '../../../frontend/src/rendering/layoutRenderers';
@@ -13,7 +14,7 @@ type Props = { params: Promise<{ slug?: string[] }>; searchParams: Promise<Query
 const resolve = cache((host: string, path: string) => buildPublishedPageModel(database, host, path));
 async function requestTarget({ params }: Props) {
   const [requestHeaders, route] = await Promise.all([headers(), params]);
-  return { host: requestHeaders.get('host') || '', path: '/' + (route.slug || []).join('/') };
+  return { host: contentHostname(requestHeaders.get('host') || ''), path: '/' + (route.slug || []).join('/') };
 }
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const { host, path } = await requestTarget(props);

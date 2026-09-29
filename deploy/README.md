@@ -6,8 +6,8 @@ Simple production deployment for eceee_v4 on a Linode VPS.
 
 ```
 deploy/
-├── docker-compose.prod.yml    9 services: caddy, backend, frontend, db, redis,
-│                              imgproxy, playwright, celery-worker, celery-beat
+├── docker-compose.prod.yml    10 services: caddy, backend, frontend, publisher,
+│                              db, redis, imgproxy, playwright, celery-worker, celery-beat
 ├── Caddyfile                  Reverse proxy config (HTTPS handled automatically)
 ├── .env.production.example    Template → copy to deploy/.env on server (gitignored)
 ├── .env                       Secrets only — create on server, never commit
@@ -66,6 +66,8 @@ nano /opt/eceee/app/deploy/.env
 
 Fill in all values — especially `DOMAIN`, `SECRET_KEY`, `POSTGRES_PASSWORD`, `POSTGRES_HOST=db`, Redis, Linode Object Storage, Postmark, imgproxy signing keys, and optional AI keys. The full variable set is documented in `deploy/.env.production.example`.
 
+For the isolated TypeScript publisher, also generate independent values for `PUBLISHER_DB_PASSWORD` and `PUBLISHER_FORM_DB_PASSWORD` with `openssl rand -hex 32`. Deployment creates or rotates the fixed least-privilege PostgreSQL roles without printing either password. `PUBLISHER_TEST_DOMAIN` defaults to `publisher-test-eceee.colliberty.com` and resolves the content owned by `PUBLISHER_TEST_SOURCE_HOST`, which defaults to `summerstudy.eceee.org`.
+
 ### Secrets
 
 - Keep real secrets **only** in `deploy/.env` on the server (not in git, not in tickets or chat). Copy from `deploy/.env.production.example` and replace every placeholder.
@@ -79,6 +81,8 @@ Add these A records pointing to your VPS IP (match `DOMAIN` and `deploy/Caddyfil
 - `admin.eceee.org`
 - `app.eceee.org`
 - `imgproxy.eceee.org`
+
+The parallel Publisher additionally needs an A/AAAA record for `publisher-test-eceee.colliberty.com` pointing to the same VPS. This hostname is isolated from the existing public routes, which continue to use Django until their Caddy routes are deliberately changed. Caddy sends `X-Robots-Tag: noindex, nofollow, noarchive` on the test hostname to keep the mirrored pages out of search indexes.
 
 ### 6. First deploy
 

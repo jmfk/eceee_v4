@@ -71,6 +71,23 @@ if [ "${#_sk}" -lt 50 ]; then
 fi
 unset _sk
 
+publisher_password_is_valid() {
+    local variable_name="$1"
+    local value
+    value=$(grep -E "^${variable_name}=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '\r' || true)
+    value="${value#\"}"; value="${value%\"}"
+    value="${value#\'}"; value="${value%\'}"
+    [[ "$value" =~ ^[A-Za-z0-9._~-]{24,128}$ ]] && [[ "$value" != replace-with-* ]]
+}
+if ! publisher_password_is_valid PUBLISHER_DB_PASSWORD; then
+    error "deploy/.env must set PUBLISHER_DB_PASSWORD to a generated 24-128 character URL-safe value."
+    exit 1
+fi
+if ! publisher_password_is_valid PUBLISHER_FORM_DB_PASSWORD; then
+    error "deploy/.env must set PUBLISHER_FORM_DB_PASSWORD to a generated 24-128 character URL-safe value."
+    exit 1
+fi
+
 acquire_production_operation_lock "deploy"
 
 # ── 2. Determine REF ─────────────────────────────────────────────────────────
@@ -93,7 +110,7 @@ git -C "$REPO" checkout --force "$REF" --quiet
 
 # ── 5. Build images ───────────────────────────────────────────────────────────
 info "Building images ($IMAGE_TAG)..."
-IMAGE_TAG="$IMAGE_TAG" docker_compose build backend frontend playwright
+IMAGE_TAG="$IMAGE_TAG" docker_compose build backend frontend publisher playwright
 
 # ── 6. Migration check ────────────────────────────────────────────────────────
 info "Checking for unapplied migrations..."
@@ -104,6 +121,9 @@ fi
 # ── 7. Apply migrations ───────────────────────────────────────────────────────
 info "Running migrations..."
 IMAGE_TAG="$IMAGE_TAG" docker_compose run --rm backend python manage.py migrate --noinput
+
+info "Provisioning least-privilege publisher database roles..."
+IMAGE_TAG="$IMAGE_TAG" docker_compose run --rm backend python manage.py provision_publisher_roles
 
 # ── 8. Collect static files ───────────────────────────────────────────────────
 info "Collecting static files..."
