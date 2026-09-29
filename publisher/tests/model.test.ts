@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPublishedPageModel, normalizeHostname, type Page, type PageReader, type ReadDb, type Theme, type Version } from '../src/model';
+import { buildPublishedPageModel, normalizeHostname, type Page, type PageReader, type ReadDb, type Theme, type Version, type Widget } from '../src/model';
 
 const page = (values: Partial<Page> & Pick<Page, 'id' | 'tenant_id' | 'parent_id' | 'slug' | 'title'>): Page => ({
   hostnames: [],
@@ -101,6 +101,54 @@ describe('public resolution', () => {
     };
     const model = await buildPublishedPageModel({ withSnapshot: async read => read(scheduledReader) }, 'example.org', '/news/story', new Date('2026-06-01'));
     expect(model?.slots.header).toEqual([]);
+  });
+
+  it('filters unpublished and scheduled widgets inside recursive container slots', async () => {
+    const nestedReader = {
+      ...reader,
+      version: async (id: string, at: Date) => {
+        const selected = await reader.version(id, at);
+        if (id !== article.id || !selected) return selected;
+        return version({ ...selected, widgets: { main: [{
+          id: 'section',
+          type: 'easy_widgets.SectionWidget',
+          config: { slots: { content: [
+            { id: 'visible', type: 'easy_widgets.HeadlineWidget', config: { content: 'Visible' } },
+            { id: 'draft', type: 'easy_widgets.HeadlineWidget', isPublished: false, config: { content: 'Draft' } },
+            { id: 'future', type: 'easy_widgets.HeadlineWidget', publishEffectiveDate: '2026-07-01T00:00:00Z', config: { content: 'Future' } },
+            { id: 'expired', type: 'easy_widgets.HeadlineWidget', publishExpireDate: '2026-05-01T00:00:00Z', config: { content: 'Expired' } },
+            { id: 'columns', type: 'easy_widgets.TwoColumnsWidget', config: { slots: { left: [
+              { id: 'deep-draft', type: 'easy_widgets.ContentWidget', is_published: false, config: { content: 'Deep draft' } },
+            ], right: [
+              { id: 'deep-visible', type: 'easy_widgets.ContentWidget', config: { content: 'Deep visible' } },
+            ] } } },
+          ] } },
+        }, {
+          id: 'detail',
+          type: 'easy_widgets.NewsDetailWidget',
+          config: {},
+          data: { status: 'ready', item: { widgets: { body: [
+            { id: 'object-draft', type: 'easy_widgets.ContentWidget', isPublished: false, config: { content: 'Object draft' } },
+            { id: 'object-visible', type: 'easy_widgets.ContentWidget', config: { content: 'Object visible' } },
+          ] } } },
+        }] } });
+      },
+    };
+
+    const model = await buildPublishedPageModel(
+      { withSnapshot: async read => read(nestedReader) },
+      'example.org',
+      '/news/story',
+      new Date('2026-06-01'),
+    );
+    const section = model?.slots.main[0];
+    const nested = section?.config.slots as Record<string, Widget[]>;
+
+    expect(nested.content.map(widget => widget.id)).toEqual(['visible', 'columns']);
+    expect((nested.content[1].config.slots as Record<string, Widget[]>).left).toEqual([]);
+    expect((nested.content[1].config.slots as Record<string, Widget[]>).right.map(widget => widget.id)).toEqual(['deep-visible']);
+    const detailItem = model?.slots.main[1].data?.item as { widgets: Record<string, Widget[]> };
+    expect(detailItem.widgets.body.map(widget => widget.id)).toEqual(['object-visible']);
   });
 
   it('keeps page CSS disabled when the published version enables it', async () => {
