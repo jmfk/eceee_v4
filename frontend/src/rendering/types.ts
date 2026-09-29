@@ -16,7 +16,14 @@ export interface RenderWidgetModel {
     config: Record<string, any>
     data?: ResolvedRenderData
     inheritedFrom?: Record<string, unknown> | null
-    previewImageReferences?: Array<{ sourceUrl: string, sourceOccurrence: number }>
+    previewImageReferences?: DesignerPreviewImageReference[]
+}
+
+export interface DesignerPreviewImageReference {
+    sourceUrl: string
+    sourceOccurrence: number
+    sourcePath: Array<string | number>
+    sourceMatchIndex: number
 }
 
 export interface RenderContext {
@@ -42,7 +49,7 @@ export interface DesignerRenderOptions {
     assets: Array<Record<string, any>>
     editableTypographyTargets?: Record<string, string[]>
     editableSpacingTargets?: Record<string, string[]>
-    previewImageReferences?: Array<{ sourceUrl: string, sourceOccurrence: number }>
+    previewImageReferences?: DesignerPreviewImageReference[]
     contentEditable?: boolean
     guidesEnabled?: boolean
 }

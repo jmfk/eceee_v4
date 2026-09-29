@@ -58,6 +58,10 @@ const workspace = {
         requiredWidth: 800, requiredHeight: 300, requirementSource: 'explicit', dpr: 2, isPlaceholder: false, replaceable: true,
         filename: 'callout-background.png', url: 'https://storage.test/callout-background.png',
         groupIndex: 1, part: 'menu', breakpoint: 'xs', property: 'background',
+    }, {
+        assetKey: 'library:imported-example.jpg', displayName: 'imported-example.jpg', filename: 'imported-example.jpg',
+        url: 'https://storage.test/theme_images/7/library/imported-example.jpg', kind: 'library', usage: ['Unused theme library asset'],
+        width: 1200, height: 630, size: 24576, isPlaceholder: false, replaceable: false,
     }],
     canUndo: true,
     breakpoints: { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 },
@@ -155,7 +159,7 @@ describe('DesignerThemeWorkspacePage', () => {
             return { ...structuredClone(workspace), draftVersion: draftVersion + 1, hasDraftChanges: true, importedViewId: imported.id, previewContent: { views: [...structuredClone(previewViews), imported] } }
         })
         mocks.deletePreviewContent.mockImplementation(async (_themeId, viewId, draftVersion) => ({ ...structuredClone(workspace), draftVersion: draftVersion + 1, hasDraftChanges: true, previewContent: { views: structuredClone(previewViews).filter((view) => view.id !== viewId) } }))
-        mocks.replacePreviewImage.mockImplementation(async (_themeId, viewId, _sourceUrl, _sourceOccurrence, _image, draftVersion) => ({ ...structuredClone(workspace), draftVersion: draftVersion + 1, hasDraftChanges: true, previewContent: { views: structuredClone(previewViews).map((view) => view.id === viewId ? { ...view, content: { image: { url: 'https://storage.test/theme_images/7/designer_drafts/replaced.jpg' } } } : view) } }))
+        mocks.replacePreviewImage.mockImplementation(async (_themeId, viewId, _sourceUrl, _sourcePath, _sourceMatchIndex, _image, draftVersion) => ({ ...structuredClone(workspace), draftVersion: draftVersion + 1, hasDraftChanges: true, previewContent: { views: structuredClone(previewViews).map((view) => view.id === viewId ? { ...view, content: { image: { url: 'https://storage.test/theme_images/7/designer_drafts/replaced.jpg' } } } : view) } }))
         mocks.loadPreviewPage.mockResolvedValue({ page: { id: 42 }, version: { id: 9 }, inheritance: { slots: {} } })
         mocks.loadPreviewObject.mockResolvedValue({
             object: { id: 55, title: 'Welcome article' },
@@ -225,6 +229,42 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(inspectorSeparator).toHaveAttribute('aria-valuenow', '496')
         expect(workspaceLayout.style.getPropertyValue('--designer-inspector-width')).toBe('496px')
         Object.defineProperty(window, 'PointerEvent', { configurable: true, value: originalPointerEvent })
+    })
+
+    it('reclaims side-pane width when the desktop workspace becomes narrower', async () => {
+        const originalResizeObserver = global.ResizeObserver
+        const observers = []
+        global.ResizeObserver = class ResizeObserver {
+            constructor(callback) {
+                this.callback = callback
+                observers.push(this)
+            }
+
+            observe(target) { this.target = target }
+            disconnect() {}
+        }
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const separator = screen.getByRole('separator', { name: 'Resize preview navigation' })
+        const inspectorSeparator = screen.getByRole('separator', { name: 'Resize theme inspector' })
+        const workspaceLayout = separator.closest('main')
+        const workspaceObserver = observers.find((observer) => observer.target === workspaceLayout)
+        vi.spyOn(workspaceLayout, 'getBoundingClientRect').mockReturnValue({
+            x: 0, y: 0, left: 0, top: 0, right: 1800, bottom: 800, width: 1800, height: 800,
+            toJSON: () => ({}),
+        })
+        for (let index = 0; index < 20; index += 1) fireEvent.keyDown(separator, { key: 'ArrowRight' })
+        for (let index = 0; index < 24; index += 1) fireEvent.keyDown(inspectorSeparator, { key: 'ArrowLeft' })
+
+        act(() => workspaceObserver.callback([{ contentRect: { width: 1280 } }]))
+
+        const fittedSidebar = Number(separator.getAttribute('aria-valuenow'))
+        const fittedInspector = Number(inspectorSeparator.getAttribute('aria-valuenow'))
+        expect(fittedSidebar).toBeGreaterThanOrEqual(280)
+        expect(fittedInspector).toBeGreaterThanOrEqual(320)
+        expect(fittedSidebar + fittedInspector).toBeLessThanOrEqual(784)
+        expect(workspaceLayout).toHaveClass('xl:grid-cols-[var(--designer-sidebar-width)_var(--designer-sidebar-handle-width)_minmax(0,1fr)_var(--designer-inspector-handle-width)_var(--designer-inspector-width)]')
+        global.ResizeObserver = originalResizeObserver
     })
 
     it('selects a matching source view but renders deterministic fixtures', async () => {
@@ -314,7 +354,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByRole('heading', { name: 'Images in this element' })).not.toBeInTheDocument()
         const iframe = screen.getByTitle('Live theme preview')
         fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'content-image:0', kind: 'previewImage', label: 'Imported image', sourceUrl: 'https://storage.test/theme_images/7/library/imported.jpg', sourceOccurrence: 0 },
+            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'content-image:0', kind: 'previewImage', label: 'Imported image', sourceUrl: 'https://storage.test/theme_images/7/library/imported.jpg', sourcePath: ['content', 'image', 'url'], sourceMatchIndex: 0 },
             source: iframe.contentWindow,
         }))
         expect(screen.getByRole('button', { name: 'Replace example image imported.jpg' })).toBeInTheDocument()
@@ -343,7 +383,7 @@ describe('DesignerThemeWorkspacePage', () => {
         await user.click(importButton)
         const iframe = screen.getByTitle('Live theme preview')
         fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'content-image:0', kind: 'previewImage', label: 'Imported image', sourceUrl: 'https://storage.test/theme_images/7/library/imported.jpg', sourceOccurrence: 0 },
+            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'content-image:0', kind: 'previewImage', label: 'Imported image', sourceUrl: 'https://storage.test/theme_images/7/library/imported.jpg', sourcePath: ['content', 'image', 'url'], sourceMatchIndex: 0 },
             source: iframe.contentWindow,
         }))
         const replaceButton = await screen.findByRole('button', { name: 'Replace example image imported.jpg' })
@@ -355,6 +395,7 @@ describe('DesignerThemeWorkspacePage', () => {
             '7',
             'page-imported',
             'https://storage.test/theme_images/7/library/imported.jpg',
+            ['content', 'image', 'url'],
             0,
             upload,
             3,
@@ -481,20 +522,20 @@ describe('DesignerThemeWorkspacePage', () => {
         const previewPane = screen.getByTitle('Live theme preview').closest('section')
         const navigationPane = screen.getByRole('region', { name: 'Preview navigation' })
         const inspectorPane = screen.getByRole('region', { name: 'Theme inspector' })
-        expect(navigationPane).toHaveClass('lg:col-start-1')
-        expect(previewPane).toHaveClass('lg:col-start-3')
-        expect(inspectorPane).toHaveClass('lg:col-start-5')
+        expect(navigationPane).toHaveClass('xl:col-start-1')
+        expect(previewPane).toHaveClass('xl:col-start-3')
+        expect(inspectorPane).toHaveClass('xl:col-start-5')
 
         fireEvent.click(screen.getAllByRole('button', { name: 'Collapse preview navigation' })[0])
         expect(navigationPane).toHaveClass('hidden')
-        expect(previewPane).toHaveClass('lg:col-start-3')
-        expect(inspectorPane).toHaveClass('lg:col-start-5')
+        expect(previewPane).toHaveClass('xl:col-start-3')
+        expect(inspectorPane).toHaveClass('xl:col-start-5')
         fireEvent.click(screen.getByRole('button', { name: 'Expand preview navigation' }))
         expect(navigationPane).not.toHaveClass('hidden')
 
         fireEvent.click(screen.getAllByRole('button', { name: 'Collapse theme inspector' })[0])
         expect(inspectorPane).toHaveClass('hidden')
-        expect(previewPane).toHaveClass('lg:col-start-3')
+        expect(previewPane).toHaveClass('xl:col-start-3')
         fireEvent.click(screen.getByRole('button', { name: 'Expand theme inspector' }))
         expect(inspectorPane).not.toHaveClass('hidden')
     })
@@ -707,6 +748,11 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByText('All sizes')).toBeInTheDocument()
         expect(screen.getByText('Used for all theme sizes: XS, SM, MD, LG and XL.')).toBeInTheDocument()
         expect(screen.getByText('Shown at every screen width.')).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Select image aspect imported-example.jpg' }))
+        expect(screen.getByText('1200 × 630 px · 24 KB')).toBeInTheDocument()
+        expect(screen.getByText(/Stored in the theme image library/)).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Replace imported-example.jpg' })).not.toBeInTheDocument()
     })
 
     it('edits theme identity and uploads preview and favicon images from Theme details', async () => {
@@ -890,7 +936,8 @@ describe('DesignerThemeWorkspacePage', () => {
                 kind: 'previewImage',
                 label: 'Article photo',
                 sourceUrl: 'https://storage.test/article-photo.jpg',
-                sourceOccurrence: 0,
+                sourcePath: ['content', 'widgets', 'main', 0, 'config', 'imageUrl'],
+                sourceMatchIndex: 0,
                 file: replacement,
             },
             source: iframe.contentWindow,
@@ -900,6 +947,7 @@ describe('DesignerThemeWorkspacePage', () => {
             '7',
             'page-main',
             'https://storage.test/article-photo.jpg',
+            ['content', 'widgets', 'main', 0, 'config', 'imageUrl'],
             0,
             replacement,
             2,

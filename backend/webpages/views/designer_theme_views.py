@@ -1,5 +1,6 @@
 """Restricted API surface for the theme Designer workspace."""
 
+import json
 from datetime import timedelta
 
 from django.contrib.auth.models import User
@@ -127,9 +128,29 @@ class DesignerPreviewDeleteSerializer(serializers.Serializer):
 class DesignerPreviewImageSerializer(serializers.Serializer):
     view_id = serializers.CharField(max_length=100)
     source_url = serializers.CharField(max_length=2000)
-    source_occurrence = serializers.IntegerField(min_value=0)
+    source_path = serializers.CharField(max_length=5000)
+    source_match_index = serializers.IntegerField(min_value=0)
     image = serializers.FileField()
     draft_version = serializers.IntegerField(min_value=1)
+
+    def validate_source_path(self, value):
+        try:
+            path = json.loads(value)
+        except (TypeError, ValueError) as exc:
+            raise serializers.ValidationError("Choose a valid example image path.") from exc
+        if not isinstance(path, list) or not path or len(path) > 100:
+            raise serializers.ValidationError("Choose a valid example image path.")
+        if any(
+            isinstance(segment, bool)
+            or not isinstance(segment, (str, int))
+            or isinstance(segment, str)
+            and (not segment or len(segment) > 300)
+            or isinstance(segment, int)
+            and segment < 0
+            for segment in path
+        ):
+            raise serializers.ValidationError("Choose a valid example image path.")
+        return path
 
 
 class DesignerPreviewSiteSerializer(serializers.Serializer):
@@ -913,7 +934,8 @@ class DesignerThemePreviewImageView(APIView):
                 request.user,
                 data["view_id"],
                 data["source_url"],
-                data["source_occurrence"],
+                data["source_path"],
+                data["source_match_index"],
                 data["image"],
                 data["draft_version"],
             )

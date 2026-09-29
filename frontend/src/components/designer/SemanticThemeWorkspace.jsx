@@ -22,6 +22,33 @@ const minInspectorWidth = 320
 const maxInspectorWidth = 720
 const minPreviewWidth = 480
 const resizeHandleWidth = 8
+const desktopPaneBreakpoint = 1280
+
+const fitPaneWidths = (workspaceWidth, sidebarWidth, inspectorWidth, sidebarCollapsed, inspectorCollapsed) => {
+    if (workspaceWidth < desktopPaneBreakpoint) return { sidebarWidth, inspectorWidth }
+    const visibleHandles = Number(!sidebarCollapsed) + Number(!inspectorCollapsed)
+    const available = workspaceWidth - minPreviewWidth - visibleHandles * resizeHandleWidth
+    if (sidebarCollapsed && inspectorCollapsed) return { sidebarWidth, inspectorWidth }
+    if (sidebarCollapsed) return {
+        sidebarWidth,
+        inspectorWidth: Math.min(inspectorWidth, Math.max(minInspectorWidth, available)),
+    }
+    if (inspectorCollapsed) return {
+        sidebarWidth: Math.min(sidebarWidth, Math.max(minSidebarWidth, available)),
+        inspectorWidth,
+    }
+    if (sidebarWidth + inspectorWidth <= available) return { sidebarWidth, inspectorWidth }
+
+    const flexibleSpace = Math.max(0, available - minSidebarWidth - minInspectorWidth)
+    const sidebarExtra = Math.max(0, sidebarWidth - minSidebarWidth)
+    const inspectorExtra = Math.max(0, inspectorWidth - minInspectorWidth)
+    const extraTotal = sidebarExtra + inspectorExtra
+    const nextSidebar = minSidebarWidth + (extraTotal ? flexibleSpace * sidebarExtra / extraTotal : flexibleSpace / 2)
+    return {
+        sidebarWidth: Math.min(maxSidebarWidth, Math.round(nextSidebar)),
+        inspectorWidth: Math.min(maxInspectorWidth, Math.round(available - nextSidebar)),
+    }
+}
 
 const assetProperty = (asset) => asset.property || asset.assetKey?.split(':').at(-1)
 
@@ -187,7 +214,7 @@ const imageAspectKey = (asset) => asset.kind === 'design-group'
 const imageAspectsFor = (workspace) => {
     const aspects = new Map()
     ;(workspace.assets || [])
-        .filter((asset) => asset.replaceable !== false && ['design-group', 'preview', 'site-icon'].includes(asset.kind))
+        .filter((asset) => ['design-group', 'preview', 'site-icon', 'library'].includes(asset.kind))
         .forEach((asset) => {
             const key = imageAspectKey(asset)
             if (!aspects.has(key)) {
@@ -261,6 +288,7 @@ const SemanticThemeWorkspace = ({
     const [isResizingSidebar, setIsResizingSidebar] = useState(false)
     const [isResizingInspector, setIsResizingInspector] = useState(false)
     const workspaceRef = useRef(null)
+    const paneWidthsRef = useRef({ sidebarWidth, inspectorWidth })
     const sidebarResizeRef = useRef(null)
     const inspectorResizeRef = useRef(null)
     const iframeRef = useRef(null)
@@ -271,13 +299,15 @@ const SemanticThemeWorkspace = ({
 
     const clampSidebarWidth = (width) => {
         const workspaceWidth = workspaceRef.current?.getBoundingClientRect().width || window.innerWidth
-        const availableMaximum = workspaceWidth - inspectorWidth - minPreviewWidth - resizeHandleWidth * 2
+        const visibleHandles = 1 + Number(!inspectorCollapsed)
+        const availableMaximum = workspaceWidth - (inspectorCollapsed ? 0 : inspectorWidth) - minPreviewWidth - resizeHandleWidth * visibleHandles
         return Math.min(Math.max(minSidebarWidth, availableMaximum), maxSidebarWidth, Math.max(minSidebarWidth, width))
     }
 
     const clampInspectorWidth = (width) => {
         const workspaceWidth = workspaceRef.current?.getBoundingClientRect().width || window.innerWidth
-        const availableMaximum = workspaceWidth - sidebarWidth - minPreviewWidth - resizeHandleWidth * 2
+        const visibleHandles = 1 + Number(!sidebarCollapsed)
+        const availableMaximum = workspaceWidth - (sidebarCollapsed ? 0 : sidebarWidth) - minPreviewWidth - resizeHandleWidth * visibleHandles
         return Math.min(Math.max(minInspectorWidth, availableMaximum), maxInspectorWidth, Math.max(minInspectorWidth, width))
     }
 
@@ -336,6 +366,28 @@ const SemanticThemeWorkspace = ({
         event.preventDefault()
         setInspectorWidth((current) => clampInspectorWidth(current + (event.key === 'ArrowLeft' ? 16 : -16)))
     }
+
+    useEffect(() => {
+        paneWidthsRef.current = { sidebarWidth, inspectorWidth }
+    }, [inspectorWidth, sidebarWidth])
+
+    useEffect(() => {
+        if (!workspaceRef.current || typeof ResizeObserver === 'undefined') return undefined
+        const observer = new ResizeObserver(([entry]) => {
+            const fitted = fitPaneWidths(
+                entry.contentRect.width,
+                paneWidthsRef.current.sidebarWidth,
+                paneWidthsRef.current.inspectorWidth,
+                sidebarCollapsed,
+                inspectorCollapsed,
+            )
+            paneWidthsRef.current = fitted
+            setSidebarWidth(fitted.sidebarWidth)
+            setInspectorWidth(fitted.inspectorWidth)
+        })
+        observer.observe(workspaceRef.current)
+        return () => observer.disconnect()
+    }, [inspectorCollapsed, sidebarCollapsed])
 
     useEffect(() => {
         if (!isResizingSidebar && !isResizingInspector) return undefined
@@ -464,6 +516,8 @@ const SemanticThemeWorkspace = ({
                 richText: option.richText === true,
                 sourceUrl: option.sourceUrl || '',
                 sourceOccurrence: option.sourceOccurrence ?? 0,
+                sourcePath: Array.isArray(option.sourcePath) ? option.sourcePath : [],
+                sourceMatchIndex: option.sourceMatchIndex ?? 0,
                 computedStyles: option.computedStyles || {},
             })
             const alternatives = Array.isArray(event.data.alternatives)
@@ -484,6 +538,8 @@ const SemanticThemeWorkspace = ({
                 richText: event.data.richText === true,
                 sourceUrl: event.data.sourceUrl || '',
                 sourceOccurrence: event.data.sourceOccurrence ?? 0,
+                sourcePath: Array.isArray(event.data.sourcePath) ? event.data.sourcePath : [],
+                sourceMatchIndex: event.data.sourceMatchIndex ?? 0,
                 computedStyles: event.data.computedStyles || {},
                 alternatives,
                 ancestors,
@@ -505,7 +561,7 @@ const SemanticThemeWorkspace = ({
                         const asset = workspace.assets.find((candidate) => `asset:${candidate.assetKey}` === target.id)
                         if (asset) void replaceAsset(asset, event.data.file)
                     } else if (target.kind === 'previewImage' && viewId && target.sourceUrl) {
-                        void replacePreviewImage?.(viewId, target.sourceUrl, target.sourceOccurrence, event.data.file)
+                        void replacePreviewImage?.(viewId, target.sourceUrl, target.sourcePath, target.sourceMatchIndex, event.data.file)
                     }
                 }
                 return
@@ -561,9 +617,17 @@ const SemanticThemeWorkspace = ({
         const candidates = [selectedTarget, ...(selectedTarget.alternatives || []), ...(selectedTarget.descendants || [])]
         const urls = candidates.flatMap((target) => {
             const asset = assetsByTargetId.get(target.id)
-            return [target.sourceUrl && { sourceUrl: target.sourceUrl, sourceOccurrence: target.sourceOccurrence ?? 0 }, asset?.url && { sourceUrl: asset.url }].filter(Boolean)
+            return [target.sourceUrl && {
+                sourceUrl: target.sourceUrl,
+                sourcePath: target.sourcePath || [],
+                sourceMatchIndex: target.sourceMatchIndex ?? 0,
+            }, asset?.url && { sourceUrl: asset.url }].filter(Boolean)
         })
-        return selectedViewImages.filter((image) => urls.some((candidate) => candidate.sourceUrl === image.sourceUrl && (candidate.sourceOccurrence === undefined || candidate.sourceOccurrence === image.sourceOccurrence)))
+        return selectedViewImages.filter((image) => urls.some((candidate) => candidate.sourceUrl === image.sourceUrl && (
+            candidate.sourcePath === undefined
+            || JSON.stringify(candidate.sourcePath) === JSON.stringify(image.sourcePath)
+                && candidate.sourceMatchIndex === image.sourceMatchIndex
+        )))
     }, [assetsByTargetId, selectedTarget, selectedViewImages])
     const selectedImageAspect = imageAspects.find((aspect) => aspect.key === selectedImageAspectKey) || imageAspects[0]
     const previewAsset = workspace.assets.find((asset) => asset.kind === 'preview')
@@ -705,9 +769,9 @@ const SemanticThemeWorkspace = ({
         setSelectedTarget(null)
     }
 
-    const uploadExampleImage = async (sourceUrl, sourceOccurrence, file) => {
+    const uploadExampleImage = async (sourceUrl, sourcePath, sourceMatchIndex, file) => {
         if (!selectedView || !file) return
-        const result = await replacePreviewImage?.(selectedView.id, sourceUrl, sourceOccurrence, file)
+        const result = await replacePreviewImage?.(selectedView.id, sourceUrl, sourcePath, sourceMatchIndex, file)
         if (result?.previewContent?.views) setPreviewContent(result.previewContent)
     }
 
@@ -742,7 +806,7 @@ const SemanticThemeWorkspace = ({
 
     const themeImageEditor = selectedImageAspect && (
         <section className="space-y-4">
-            <div><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Theme image</p><h2 className="mt-1 text-lg font-semibold text-gray-900">{selectedImageAspect.label}</h2>{selectedImageAspect.details && <p className="mt-1 text-sm text-gray-500">{selectedImageAspect.details}</p>}<p className="mt-2 text-sm text-gray-600">View and replace every size and variation used here.</p></div>
+            <div><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Theme image</p><h2 className="mt-1 text-lg font-semibold text-gray-900">{selectedImageAspect.label}</h2>{selectedImageAspect.details && <p className="mt-1 text-sm text-gray-500">{selectedImageAspect.details}</p>}<p className="mt-2 text-sm text-gray-600">View every stored image and replace editable theme images here.</p></div>
             <div className="grid gap-4">
                 {selectedImageAspect.assets.map((asset) => {
                     const usage = imageBreakpointUsage(asset, selectedImageAspect.assets, workspace.breakpoints)
@@ -751,10 +815,11 @@ const SemanticThemeWorkspace = ({
                         <div className="flex items-start justify-between gap-2"><div className="min-w-0"><h4 className="truncate text-sm font-medium text-gray-900">{asset.displayName}</h4><p className="truncate text-xs text-gray-500">{asset.filename || 'No file yet'}</p></div>{usage && <span className="shrink-0 rounded bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{usage.badge}</span>}</div>
                         {asset.url ? <img src={asset.url} alt="" className="h-32 w-full rounded-md border border-gray-200 bg-gray-50 object-contain" /> : <div className="flex h-32 items-center justify-center rounded-md border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-500">Placeholder image</div>}
                         {usage && <div className="rounded-md bg-gray-50 px-3 py-2"><p className="text-sm font-medium text-gray-800">{usage.summary}</p><p className="mt-0.5 text-xs text-gray-600">{usage.range}</p></div>}
-                        <p className="text-xs text-gray-600">{asset.requiredWidth || asset.recommendedWidth || '?'} × {asset.requiredHeight || '?'} px · {asset.dpr || 2}x</p>
+                        <p className="text-xs text-gray-600">{asset.width || asset.requiredWidth || asset.recommendedWidth || '?'} × {asset.height || asset.requiredHeight || '?'} px{asset.kind === 'library' ? asset.size ? ` · ${Math.ceil(asset.size / 1024)} KB` : '' : ` · ${asset.dpr || 2}x`}</p>
                         {asset.kind === 'design-group' && !asset.url && <div className="grid gap-2"><input aria-label={`${asset.displayName} placeholder name`} value={placeholderDrafts[asset.assetKey]?.displayName ?? asset.displayName} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], displayName: event.target.value } }))} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /><div className="grid grid-cols-2 gap-2"><input aria-label={`${asset.displayName} placeholder width`} type="number" min="16" max="8000" value={placeholderDrafts[asset.assetKey]?.width ?? asset.requiredWidth ?? ''} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], width: event.target.value } }))} placeholder="Width px" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /><input aria-label={`${asset.displayName} placeholder height`} type="number" min="16" max="8000" value={placeholderDrafts[asset.assetKey]?.height ?? asset.requiredHeight ?? ''} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], height: event.target.value } }))} placeholder="Height px" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></div><button type="button" onClick={() => createPlaceholder(asset)} className="rounded-md border border-gray-300 px-3 py-2 text-sm">Create placeholder</button></div>}
-                        <input ref={(node) => { uploadRefs.current[asset.assetKey] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" />
-                        <button type="button" aria-label={`${asset.url ? 'Replace' : 'Upload'} ${asset.displayName}`} onClick={() => uploadRefs.current[asset.assetKey]?.click()} className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white">{asset.url ? 'Replace theme image' : 'Upload theme image'}</button>
+                        {asset.replaceable === false
+                            ? <p className="text-xs text-gray-500">Stored in the theme image library. Select an element that uses it to replace that occurrence.</p>
+                            : <><input ref={(node) => { uploadRefs.current[asset.assetKey] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" /><button type="button" aria-label={`${asset.url ? 'Replace' : 'Upload'} ${asset.displayName}`} onClick={() => uploadRefs.current[asset.assetKey]?.click()} className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white">{asset.url ? 'Replace theme image' : 'Upload theme image'}</button></>}
                     </article>
                     )
                 })}
@@ -906,14 +971,14 @@ const SemanticThemeWorkspace = ({
     const exampleImageEditor = contentMode === 'demo' && selectedView && selectedElementImages.length > 0 && (
         <section className="space-y-2 border-t border-gray-200 pt-3">
             <div><h2 className="text-sm font-semibold text-gray-900">Images in this element</h2><p className="mt-0.5 text-xs text-gray-500">Only images inside the selected element are shown.</p></div>
-            <div className="divide-y divide-gray-200 border-y border-gray-200">{selectedElementImages.map(({ sourceUrl, sourceOccurrence }, index) => {
+            <div className="divide-y divide-gray-200 border-y border-gray-200">{selectedElementImages.map(({ sourceUrl, sourcePath, sourceMatchIndex }, index) => {
                 const url = sourceUrl
                 const name = decodeURIComponent(url.split('/').at(-1)?.split('?')[0] || `Image ${index + 1}`)
                 const inputKey = `example:${selectedView.id}:${index}`
-                return <article key={`${url}:${sourceOccurrence}`} className="flex min-w-0 items-center gap-2 py-1.5">
+                return <article key={`${url}:${JSON.stringify(sourcePath)}:${sourceMatchIndex}`} className="flex min-w-0 items-center gap-2 py-1.5">
                     <img src={url} alt="" className="h-12 w-16 shrink-0 rounded border border-gray-200 bg-gray-50 object-contain" />
                     <span className="min-w-0 flex-1 truncate text-xs text-gray-600">{name}</span>
-                    <input ref={(node) => { uploadRefs.current[inputKey] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => uploadExampleImage(url, sourceOccurrence, event.target.files?.[0])} className="sr-only" />
+                    <input ref={(node) => { uploadRefs.current[inputKey] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => uploadExampleImage(url, sourcePath, sourceMatchIndex, event.target.files?.[0])} className="sr-only" />
                     <button type="button" aria-label={`Replace example image ${name}`} onClick={() => uploadRefs.current[inputKey]?.click()} disabled={disabled} className="shrink-0 rounded-md border border-blue-600 bg-white px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">Replace</button>
                 </article>
             })}</div>
@@ -925,7 +990,7 @@ const SemanticThemeWorkspace = ({
     return (
         <main
             ref={workspaceRef}
-            className={`grid min-h-0 flex-1 grid-cols-1 ${mobilePane === 'preview' ? 'grid-rows-1' : 'grid-rows-[auto_minmax(0,1fr)]'} lg:grid-cols-[var(--designer-sidebar-width)_var(--designer-sidebar-handle-width)_minmax(0,1fr)_var(--designer-inspector-handle-width)_var(--designer-inspector-width)] lg:grid-rows-1`}
+            className={`grid min-h-0 flex-1 grid-cols-1 ${mobilePane === 'preview' ? 'grid-rows-1' : 'grid-rows-[auto_minmax(0,1fr)]'} xl:grid-cols-[var(--designer-sidebar-width)_var(--designer-sidebar-handle-width)_minmax(0,1fr)_var(--designer-inspector-handle-width)_var(--designer-inspector-width)] xl:grid-rows-1`}
             style={{
                 '--designer-sidebar-width': sidebarCollapsed ? '0px' : `${sidebarWidth}px`,
                 '--designer-sidebar-handle-width': sidebarCollapsed ? '0px' : `${resizeHandleWidth}px`,
@@ -933,8 +998,8 @@ const SemanticThemeWorkspace = ({
                 '--designer-inspector-handle-width': inspectorCollapsed ? '0px' : `${resizeHandleWidth}px`,
             }}
         >
-            <section aria-label="Preview navigation" className={`${mobilePane === 'preview' || sidebarCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-r border-gray-200 bg-white lg:col-start-1 lg:row-start-1 lg:border-r-0`}>
-                <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Navigator</span><button type="button" aria-label="Collapse preview navigation" onClick={() => setSidebarCollapsed(true)} className="hidden rounded p-1 text-gray-500 hover:bg-gray-100 lg:block"><ChevronLeft className="h-4 w-4" /></button></div>
+            <section aria-label="Preview navigation" className={`${mobilePane === 'preview' || sidebarCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-r border-gray-200 bg-white xl:col-start-1 xl:row-start-1 xl:border-r-0`}>
+                <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Navigator</span><button type="button" aria-label="Collapse preview navigation" onClick={() => setSidebarCollapsed(true)} className="hidden rounded p-1 text-gray-500 hover:bg-gray-100 xl:block"><ChevronLeft className="h-4 w-4" /></button></div>
                 <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-3">
                     <fieldset disabled={disabled} className="min-w-0">{previewOptions}</fieldset>
                     <nav className="mt-6 space-y-2 border-t border-gray-200 pt-4" aria-label="Designer views">
@@ -966,15 +1031,15 @@ const SemanticThemeWorkspace = ({
                 onPointerUp={stopSidebarResize}
                 onPointerCancel={stopSidebarResize}
                 onKeyDown={resizeSidebarWithKeyboard}
-                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 lg:col-start-2 lg:row-start-1 ${sidebarCollapsed ? '' : 'lg:flex'} ${isResizingSidebar ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
+                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 xl:col-start-2 xl:row-start-1 ${sidebarCollapsed ? '' : 'xl:flex'} ${isResizingSidebar ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
             >
                 <span className={`h-10 w-0.5 rounded-full ${isResizingSidebar ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-500 group-focus:bg-blue-500'}`} />
             </div>
-            <section className={`${mobilePane === 'edit' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col bg-gray-100 p-2 lg:col-start-3 lg:row-start-1 lg:flex lg:p-3`}>
+            <section className={`${mobilePane === 'edit' ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col bg-gray-100 p-2 xl:col-start-3 xl:row-start-1 xl:flex xl:p-3`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1">
-                        <button type="button" aria-label={sidebarCollapsed ? 'Expand preview navigation' : 'Collapse preview navigation'} aria-pressed={sidebarCollapsed} onClick={() => setSidebarCollapsed((current) => !current)} className="hidden rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 lg:inline-flex">{sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</button>
-                        <button type="button" aria-label={inspectorCollapsed ? 'Expand theme inspector' : 'Collapse theme inspector'} aria-pressed={inspectorCollapsed} onClick={() => setInspectorCollapsed((current) => !current)} className="hidden rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 lg:inline-flex">{inspectorCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>
+                        <button type="button" aria-label={sidebarCollapsed ? 'Expand preview navigation' : 'Collapse preview navigation'} aria-pressed={sidebarCollapsed} onClick={() => setSidebarCollapsed((current) => !current)} className="hidden rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 xl:inline-flex">{sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</button>
+                        <button type="button" aria-label={inspectorCollapsed ? 'Expand theme inspector' : 'Collapse theme inspector'} aria-pressed={inspectorCollapsed} onClick={() => setInspectorCollapsed((current) => !current)} className="hidden rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 xl:inline-flex">{inspectorCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>
                     </div>
                     <div className="flex items-center gap-2">
                     {contentMode !== 'none' && <button type="button" aria-pressed={guidesEnabled} onClick={() => setGuidesEnabled((current) => !current)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{guidesEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{guidesEnabled ? 'Hide guides' : 'Show guides'}</button>}
@@ -1012,12 +1077,12 @@ const SemanticThemeWorkspace = ({
                 onPointerUp={stopInspectorResize}
                 onPointerCancel={stopInspectorResize}
                 onKeyDown={resizeInspectorWithKeyboard}
-                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 lg:col-start-4 lg:row-start-1 ${inspectorCollapsed ? '' : 'lg:flex'} ${isResizingInspector ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
+                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 xl:col-start-4 xl:row-start-1 ${inspectorCollapsed ? '' : 'xl:flex'} ${isResizingInspector ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
             >
                 <span className={`h-10 w-0.5 rounded-full ${isResizingInspector ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-500 group-focus:bg-blue-500'}`} />
             </div>
-            <section aria-label="Theme inspector" className={`${mobilePane === 'preview' || inspectorCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-l border-gray-200 bg-white lg:col-start-5 lg:row-start-1 lg:border-l-0`}>
-                <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Inspector</span><button type="button" aria-label="Collapse theme inspector" onClick={() => setInspectorCollapsed(true)} className="hidden rounded p-1 text-gray-500 hover:bg-gray-100 lg:block"><ChevronRight className="h-4 w-4" /></button></div>
+            <section aria-label="Theme inspector" className={`${mobilePane === 'preview' || inspectorCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-l border-gray-200 bg-white xl:col-start-5 xl:row-start-1 xl:border-l-0`}>
+                <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Inspector</span><button type="button" aria-label="Collapse theme inspector" onClick={() => setInspectorCollapsed(true)} className="hidden rounded p-1 text-gray-500 hover:bg-gray-100 xl:block"><ChevronRight className="h-4 w-4" /></button></div>
                 <fieldset disabled={disabled} className="min-h-0 flex-1 overflow-y-auto p-2">
                     {workspaceView === 'details'
                         ? themeDetailsEditor

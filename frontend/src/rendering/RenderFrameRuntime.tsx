@@ -90,6 +90,8 @@ const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['design
         label: primary.label, text: editableValue(node, richText), editable: primary.editable, richText,
         sourceUrl: primary.sourceUrl || '',
         sourceOccurrence: primary.sourceOccurrence ?? 0,
+        sourcePath: primary.sourcePath || [],
+        sourceMatchIndex: primary.sourceMatchIndex ?? 0,
         computedStyles: computedThemeValues(node),
         alternatives: targets.map((target: any) => ({ ...target, text: editableValue(node, Boolean(target.richText || richText)), richText: Boolean(target.richText || richText), computedStyles: computedThemeValues(node) })),
         ancestors: designer ? ancestorTargets(node, designer) : [],
@@ -409,7 +411,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
     if (designer.contentEditable === true) {
         let imageIndex = 0
         const remainingReferences = [...(designer.previewImageReferences || [])]
-        const referencesByWidgetId = new Map<string, Array<{ sourceUrl: string, sourceOccurrence: number }>>()
+        const referencesByWidgetId = new Map<string, NonNullable<RenderPageModel['designer']>['previewImageReferences']>()
         const collectWidgetReferences = (widgets: any[]) => widgets.forEach((widget) => {
             referencesByWidgetId.set(widget.id, widget.previewImageReferences || [])
             Object.values(widget.config?.slots || {}).forEach((children) => {
@@ -438,6 +440,8 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
                 label: node.alt?.trim() || 'Content image',
                 sourceUrl: reference?.sourceUrl || sourceUrl,
                 sourceOccurrence: reference?.sourceOccurrence ?? 0,
+                sourcePath: reference?.sourcePath || [],
+                sourceMatchIndex: reference?.sourceMatchIndex ?? 0,
                 editable: false,
             }, true)
             imageIndex += 1
