@@ -557,6 +557,9 @@ class DesignerThemeApiTests(TestCase):
                             ]
                         }
                     },
+                    "imageMetadata": {
+                        source_url: {"filename": "original.png", "width": 64, "height": 64, "size": 1024}
+                    },
                 }
             ]
         }
@@ -590,6 +593,7 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(saved_view["content"]["widgets"]["main"][0]["config"]["caption"], source_url)
         self.assertEqual(saved_view["content"]["widgets"]["main"][0]["config"]["imageUrl"], source_url)
         self.assertEqual(saved_view["content"]["widgets"]["main"][1]["config"]["imageUrl"], replacement_url)
+        self.assertEqual(saved_view["imageMetadata"][source_url]["filename"], "original.png")
         self.assertEqual(saved_view["imageMetadata"][replacement_url]["width"], 32)
         self.assertTrue(storage.save.call_args.args[0].startswith(f"theme_images/{self.theme.id}/designer_drafts/"))
 
