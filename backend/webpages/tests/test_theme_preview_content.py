@@ -24,6 +24,16 @@ from webpages.services.theme_preview_content import (
 
 
 class ThemePreviewContentUnitTests(SimpleTestCase):
+    @patch("webpages.services.theme_preview_content.ObjectInstance.objects.filter")
+    def test_object_import_requires_content(self, instance_filter):
+        instance_filter.return_value.select_related.return_value.first.return_value = SimpleNamespace(
+            current_version_id=None
+        )
+        theme = SimpleNamespace(tenant=object())
+
+        with self.assertRaisesMessage(ValidationError, "That object has no content to copy."):
+            import_theme_preview_document(theme, "object", 12)
+
     @patch("webpages.services.theme_preview_content.ObjectVersion.objects.filter")
     @patch("webpages.services.theme_preview_content.ObjectInstance.objects.filter")
     def test_object_import_requires_current_version_to_belong_to_object(self, instance_filter, version_filter):

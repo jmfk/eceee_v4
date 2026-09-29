@@ -257,10 +257,11 @@ describe('RenderFrameRuntime designer overlay', () => {
             themeCss: 'h1{margin:10px 20px 30px 40px;padding:5px 6px 7px 8px;border:2px solid transparent}',
         }))
         const heading = await screen.findByRole('heading', { name: 'Overridden heading' })
-        vi.spyOn(heading, 'getBoundingClientRect').mockReturnValue({
+        let headingRect = {
             x: 80, y: 100, left: 80, top: 100, right: 380, bottom: 300, width: 300, height: 200,
             toJSON: () => ({}),
-        })
+        }
+        vi.spyOn(heading, 'getBoundingClientRect').mockImplementation(() => headingRect)
 
         fireEvent.mouseOver(heading)
         expect(document.querySelector('.designer-spacing-readout')).toBeNull()
@@ -273,12 +274,54 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(document.querySelector('.designer-spacing-padding-value[data-side="left"]')).toHaveAttribute('data-placement', 'outside')
         expect(document.querySelector('.designer-spacing-padding-value[data-side="left"]')).toHaveStyle({ left: '69px', top: '199px' })
         fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
-        fireEvent.change(screen.getByLabelText('margin top value'), { target: { value: '18px' } })
-        fireEvent.submit(screen.getByRole('form', { name: 'Edit margin top' }))
+        const spacingInput = screen.getByLabelText('margin top value')
+        const spacingEditor = screen.getByRole('form', { name: 'Edit margin top' })
+        expect(window.getComputedStyle(spacingEditor).zIndex).toBe('2147483647')
+        expect(window.getComputedStyle(document.querySelector('.designer-spacing-measure')! as HTMLElement).zIndex).toBe('2147483645')
+        expect(spacingEditor).toHaveStyle({ top: '92px' })
+        fireEvent.keyDown(spacingInput, { key: 'ArrowUp' })
+        expect(spacingInput).toHaveValue('11px')
+        fireEvent.keyDown(spacingInput, { key: 'ArrowDown', shiftKey: true })
+        expect(spacingInput).toHaveValue('1px')
+
+        headingRect = { ...headingRect, y: 140, top: 140, bottom: 340 }
+        fireEvent.scroll(window)
+        expect(spacingEditor).toHaveStyle({ top: '132px' })
+
+        fireEvent.change(spacingInput, { target: { value: '18px' } })
+        fireEvent.keyDown(spacingInput, { key: 'Enter' })
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'spacingChange', property: 'marginTop', value: '18px',
-            targetIds: expect.arrayContaining(['heading']),
+            targetIds: expect.arrayContaining(['heading']), viewportWidth: window.innerWidth,
         }), '*')
+        expect(screen.queryByRole('form', { name: 'Edit margin top' })).not.toBeInTheDocument()
+
+        const appliedChanges = () => postMessage.mock.calls.filter(([message]) => message?.action === 'spacingChange')
+        fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
+        fireEvent.change(screen.getByLabelText('margin top value'), { target: { value: '19px' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+        expect(appliedChanges().at(-1)?.[0]).toEqual(expect.objectContaining({ value: '19px' }))
+
+        const appliedCount = appliedChanges().length
+        fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
+        fireEvent.change(screen.getByLabelText('margin top value'), { target: { value: '20px' } })
+        fireEvent.keyDown(screen.getByLabelText('margin top value'), { key: 'Escape' })
+        expect(screen.queryByRole('form', { name: 'Edit margin top' })).not.toBeInTheDocument()
+        expect(appliedChanges()).toHaveLength(appliedCount)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
+        fireEvent.change(screen.getByLabelText('margin top value'), { target: { value: '21px' } })
+        fireEvent.pointerDown(document.body)
+        expect(screen.queryByRole('form', { name: 'Edit margin top' })).not.toBeInTheDocument()
+        expect(appliedChanges()).toHaveLength(appliedCount)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
+        fireEvent.change(screen.getByLabelText('margin top value'), { target: { value: '22px' } })
+        fireEvent.blur(window)
+        expect(screen.queryByRole('form', { name: 'Edit margin top' })).not.toBeInTheDocument()
+        expect(appliedChanges()).toHaveLength(appliedCount)
+        headingRect = { ...headingRect, y: 100, top: 100, bottom: 300 }
+        fireEvent.scroll(window)
         expect(document.querySelector('.designer-spacing-margin-measure[data-side="top"]')).toHaveStyle({
             left: '220px', top: '90px', height: '10px',
         })
@@ -305,6 +348,16 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'contentChange', targetId: 'heading',
         }), '*')
+
+        postMessage.mockClear()
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-host', action: 'selectTarget', targetId: 'heading' },
+            source: window.parent,
+        }))
+        await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'select', targetId: 'heading',
+            alternatives: expect.any(Array), ancestors: expect.any(Array), descendants: expect.any(Array),
+        }), '*'))
         fireEvent.mouseOut(heading, { relatedTarget: document.body })
         expect(heading).toHaveClass('designer-selected')
         expect(heading).toHaveClass('designer-hovered')
@@ -444,12 +497,15 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(screen.getByText('Research', { selector: 'li' })).toBeInTheDocument()
     })
 
-    it('offers direct replacement for images imported into legacy site preview metadata', async () => {
+    it('identifies the exact repeated image imported into legacy site preview metadata', async () => {
         const imageWorkspace = {
             catalog: { layouts: [{ key: 'main_layout', slots: [{ name: 'hero' }, { name: 'main' }] }], componentStyles: [], designGroups: [] },
             previewContent: { views: [{
                 id: 'site-page', layout: 'main_layout', texts: {},
-                images: { 'preview:site-page:image:hero': { url: 'https://storage.test/site-hero.jpg', filename: 'Site hero' } },
+                images: {
+                    'preview:site-page:image:main': { url: '/theme_images/site-hero.jpg', filename: 'Site hero repeated' },
+                    'preview:site-page:image:hero': { url: '/theme_images/site-hero.jpg', filename: 'Site hero' },
+                },
             }] },
         }
         const postMessage = vi.spyOn(window, 'postMessage')
@@ -458,7 +514,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         sendModel(createDesignerRenderModel({ workspace: imageWorkspace, viewId: 'site-page', contentEditable: true }))
 
         const image = await screen.findByRole('img', { name: 'Site hero' })
-        expect(image).toHaveAttribute('src', 'https://storage.test/site-hero.jpg')
+        expect(image).toHaveAttribute('src', '/theme_images/site-hero.jpg')
         fireEvent.contextMenu(image, { clientX: 30, clientY: 40 })
         fireEvent.click(screen.getByRole('menuitem', { name: 'Replace image' }))
         const input = document.querySelector<HTMLInputElement>('input[type="file"][accept*="image/png"]')!
@@ -471,7 +527,8 @@ describe('RenderFrameRuntime designer overlay', () => {
             command: 'replaceImage',
             targetId: 'content-image:0',
             kind: 'previewImage',
-            sourceUrl: 'https://storage.test/site-hero.jpg',
+            sourceUrl: '/theme_images/site-hero.jpg',
+            sourceOccurrence: 1,
             file: replacement,
         }), '*')
         expect(input).not.toBeInTheDocument()

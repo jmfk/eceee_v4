@@ -240,13 +240,13 @@ const DesignerThemeWorkspacePage = () => {
         }
     }
 
-    const replacePreviewImage = async (viewId, sourceUrl, file) => {
+    const replacePreviewImage = async (viewId, sourceUrl, sourceOccurrence, file) => {
         if (!file) return null
         setSaving(true)
         try {
             const current = dirty ? await saveDraft({ silent: true }) : workspace
             if (!current) return null
-            const result = await designerThemesApi.replacePreviewImage(themeId, viewId, sourceUrl, file, current.draftVersion)
+            const result = await designerThemesApi.replacePreviewImage(themeId, viewId, sourceUrl, sourceOccurrence, file, current.draftVersion)
             setWorkspace(result)
             setDirty(false)
             addNotification({ type: 'success', message: 'Example image replaced' })

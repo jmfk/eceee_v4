@@ -127,6 +127,7 @@ class DesignerPreviewDeleteSerializer(serializers.Serializer):
 class DesignerPreviewImageSerializer(serializers.Serializer):
     view_id = serializers.CharField(max_length=100)
     source_url = serializers.CharField(max_length=2000)
+    source_occurrence = serializers.IntegerField(min_value=0)
     image = serializers.FileField()
     draft_version = serializers.IntegerField(min_value=1)
 
@@ -912,6 +913,7 @@ class DesignerThemePreviewImageView(APIView):
                 request.user,
                 data["view_id"],
                 data["source_url"],
+                data["source_occurrence"],
                 data["image"],
                 data["draft_version"],
             )

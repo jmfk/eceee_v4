@@ -555,22 +555,22 @@ def import_theme_preview_document(theme, source_kind, source_id):
         )
         if not instance:
             raise ValidationError("That object is not available in this account.")
-        version = None
-        if instance.current_version_id:
-            version = (
-                ObjectVersion.objects.filter(id=instance.current_version_id, object_instance=instance)
-                .values("data", "widgets")
-                .first()
-            )
-            if not version:
-                raise ValidationError("That object's current version is invalid.")
+        if not instance.current_version_id:
+            raise ValidationError("That object has no content to copy.")
+        version = (
+            ObjectVersion.objects.filter(id=instance.current_version_id, object_instance=instance)
+            .values("data", "widgets")
+            .first()
+        )
+        if not version:
+            raise ValidationError("That object's current version is invalid.")
         schema = copy.deepcopy(instance.object_type.schema or {})
         content, copied_images = _copy_preview_images(
             theme,
             {
                 "title": instance.title,
-                "data": _detach_object_references(version["data"] if version else {}, schema),
-                "widgets": _strip_source_links(_materialize_media_links(theme, version["widgets"] if version else {})),
+                "data": _detach_object_references(version["data"], schema),
+                "widgets": _strip_source_links(_materialize_media_links(theme, version["widgets"])),
             },
         )
         return {

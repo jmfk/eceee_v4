@@ -24,10 +24,11 @@ export const designerThemesApi = {
     savePreviewContent: async (themeId, viewId, texts, draftVersion) => unwrap(await api.patch(`${base}/themes/${themeId}/preview-content/`, { viewId, texts, draftVersion })),
     importPreviewSource: async (themeId, sourceKind, sourceId, draftVersion) => unwrap(await api.post(`${base}/themes/${themeId}/preview-content/import/`, { sourceKind, sourceId, draftVersion })),
     deletePreviewContent: async (themeId, viewId, draftVersion) => unwrap(await api.delete(`${base}/themes/${themeId}/preview-content/`, { data: { viewId, draftVersion } })),
-    replacePreviewImage: async (themeId, viewId, sourceUrl, image, draftVersion) => {
+    replacePreviewImage: async (themeId, viewId, sourceUrl, sourceOccurrence, image, draftVersion) => {
         const form = new FormData()
         form.append('view_id', viewId)
         form.append('source_url', sourceUrl)
+        form.append('source_occurrence', String(sourceOccurrence))
         form.append('image', image)
         form.append('draft_version', draftVersion)
         return unwrap(await api.post(`${base}/themes/${themeId}/preview-content/image/`, form, {
