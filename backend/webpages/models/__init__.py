@@ -16,6 +16,7 @@ from .page_data_schema import PageDataSchema
 from .page_theme import PageTheme
 from .page_version import PageVersion, PageVersionTag
 from .preview_size import PreviewSize
+from .public_form_submission import PublicFormSubmission
 from .site_package_job import SitePackageJob
 from .theme_designer import ThemeDesignerAssignment, ThemeDesignerDraft, ThemeDesignerExportJob, ThemeDesignerRevision
 from .theme_remote import ThemeRemoteAccessKey, ThemeRemoteConnection
@@ -29,6 +30,7 @@ __all__ = [
     "PageVersionTag",
     "PageDataSchema",
     "PreviewSize",
+    "PublicFormSubmission",
     "DuplicatePageLog",
     "SitePackageJob",
     "ThemeDesignerAssignment",

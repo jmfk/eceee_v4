@@ -15,6 +15,7 @@ const model: PublishedPageModel = {
   context: {
     mode: 'public', preview: false, tenantId: '7', siteId: '1', siteHostnames: ['example.org'],
     pageId: '2', versionId: '3', componentStyles: {},
+    publicForms: { endpointBase: '/api/forms/2', pagePath: '/' },
   },
   fontCss: '', themeCss: '', title: 'Page', description: '', matchedPath: '/', remainingPath: '',
 };
@@ -26,10 +27,10 @@ describe('public renderer', () => {
     expect(html).toContain('<p>Safe body</p>');
     expect(html).not.toContain('<script>');
     expect(html).toContain('data-render-layout="main_layout"');
-    expect(html).not.toContain('<form');
+    expect(html).toContain('<form');
     expect(html).not.toContain('collector.invalid');
-    expect(html).toContain('data-form-status="submission-unavailable"');
-    expect(html).toContain('type="button"');
-    expect(html).toContain('disabled=""');
+    expect(html).toContain('action="/api/forms/2/form"');
+    expect(html).toContain('name="__page_path" value="/"');
+    expect(html).toContain('type="submit"');
   });
 });

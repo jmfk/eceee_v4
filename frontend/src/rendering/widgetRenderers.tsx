@@ -389,14 +389,15 @@ const SidebarRender: WidgetRenderComponent = ({ widget }) => {
     </aside>
 }
 
-const FormFieldRender = ({ field, index }: { field: Record<string, any>, index: number }) => {
-    const fieldId = `field_${field.name || index}`
+const FormFieldRender = ({ field, index, idPrefix, disabled }: { field: Record<string, any>, index: number, idPrefix: string, disabled?: boolean }) => {
+    const fieldId = `${idPrefix}_field_${field.name || index}`
     const fieldType = field.type || 'text'
     const options = asArray<string>(field.options)
     const common = {
         id: fieldId,
         name: field.name || `field-${index}`,
         required: Boolean(field.required),
+        disabled,
     }
     let control: React.ReactNode
     if (fieldType === 'textarea') {
@@ -408,14 +409,14 @@ const FormFieldRender = ({ field, index }: { field: Record<string, any>, index: 
         </select>
     } else if (fieldType === 'checkbox' && options.length) {
         control = <div className="checkbox-options">{options.map((option, optionIndex) => <label className="checkbox-label" key={option}>
-            <input id={optionIndex === 0 ? fieldId : `${fieldId}_${optionIndex}`} type="checkbox" name={`${common.name}[]`} value={option} className="form-checkbox" defaultChecked={value(field, 'defaultValue', 'default_value') === option} />
+            <input id={optionIndex === 0 ? fieldId : `${fieldId}_${optionIndex}`} type="checkbox" name={`${common.name}[]`} value={option} className="form-checkbox" defaultChecked={value(field, 'defaultValue', 'default_value') === option} disabled={disabled} />
             <span className="checkbox-text">{option}</span>
         </label>)}</div>
     } else if (fieldType === 'checkbox') {
         control = <input {...common} type="checkbox" className="form-checkbox" defaultChecked={Boolean(value(field, 'defaultValue', 'default_value'))} />
     } else if (fieldType === 'radio') {
         control = <div className="radio-options">{options.map((option, optionIndex) => <label className="radio-label" key={option}>
-            <input type="radio" id={`${fieldId}_${optionIndex}`} name={common.name} value={option} required={common.required && optionIndex === 0} className="form-radio" defaultChecked={value(field, 'defaultValue', 'default_value') === option} />
+            <input type="radio" id={`${fieldId}_${optionIndex}`} name={common.name} value={option} required={common.required && optionIndex === 0} className="form-radio" defaultChecked={value(field, 'defaultValue', 'default_value') === option} disabled={disabled} />
             <span className="radio-text">{option}</span>
         </label>)}</div>
     } else {
@@ -435,20 +436,38 @@ const FormFieldRender = ({ field, index }: { field: Record<string, any>, index: 
         <label htmlFor={fieldId} className="field-label">{field.label || field.name}{field.required && <span className="required-indicator" aria-label="Required">*</span>}</label>
         {value(field, 'helpText', 'help_text') && <div className="form-help">{value(field, 'helpText', 'help_text')}</div>}
         {control}
-        <div className="field-error" id={`error_${index + 1}`} hidden />
+        <div className="field-error" id={`${idPrefix}_error_${index + 1}`} hidden />
     </div>
 }
 
 const FormRender: WidgetRenderComponent = ({ widget, context }) => {
     const fields = asArray<any>(value(widget.config, 'fields'))
     const config = widget.config
-    const publicWithoutHandler = context.mode === 'public'
+    const publicForms = context.publicForms
+    const hasUnsupportedFile = fields.some((field) => String(field?.type || '').toLowerCase() === 'file')
+    const publicSubmissionEnabled = context.mode === 'public'
+        && Boolean(publicForms?.endpointBase && publicForms.pagePath)
+        && value(config, 'storeSubmissions', 'store_submissions') !== false
+        && fields.length > 0
+        && !hasUnsupportedFile
+    const publicWithoutHandler = context.mode === 'public' && !publicSubmissionEnabled
+    const result = publicForms?.result?.widgetId === widget.id ? publicForms.result.status : undefined
     const contents = <>
-        <div className="form-fields">{fields.map((field, index) => <FormFieldRender field={field} index={index} key={field.name || index} />)}</div>
+        {publicSubmissionEnabled && <>
+            <input type="hidden" name="__page_path" value={publicForms?.pagePath || ''} />
+            {value(config, 'honeypotProtection', 'honeypot_protection') !== false && <div className="form-honeypot" aria-hidden="true" hidden>
+                <label htmlFor={`form_${widget.id}_website`}>Leave this field empty</label>
+                <input id={`form_${widget.id}_website`} type="text" name="__website" tabIndex={-1} autoComplete="off" />
+            </div>}
+        </>}
+        <div className="form-fields">{fields.map((field, index) => <FormFieldRender field={field} index={index} idPrefix={`form_${widget.id}`} disabled={publicWithoutHandler} key={field.name || index} />)}</div>
         <div className="form-actions">
             <button type={publicWithoutHandler ? 'button' : 'submit'} className="submit-btn" disabled={publicWithoutHandler}>{value(config, 'submitButtonText', 'submit_button_text') || 'Submit'}</button>
             {value(config, 'resetButton', 'reset_button') && <button type={publicWithoutHandler ? 'button' : 'reset'} className="reset-btn" disabled={publicWithoutHandler}>Reset</button>}
         </div>
+        {result === 'success' && <div className="form-success" role="status">{value(config, 'successMessage', 'success_message') || 'Thank you for your submission!'}</div>}
+        {result === 'error' && <div className="form-error" role="alert">{value(config, 'errorMessage', 'error_message') || 'There was an error submitting the form. Please try again.'}</div>}
+        {publicWithoutHandler && <div className="form-error" role="alert">Form submission is currently unavailable.</div>}
     </>
     return <div className="widget-type-easy-widgets-formswidget" data-widget-type="forms">
         {value(config, 'title', 'formTitle', 'form_title') && <header className="form-header">
@@ -457,7 +476,9 @@ const FormRender: WidgetRenderComponent = ({ widget, context }) => {
         </header>}
         {publicWithoutHandler
             ? <div className="dynamic-form forms-widget" data-form-status="submission-unavailable">{contents}</div>
-            : <form className="dynamic-form forms-widget" action={value(config, 'submitUrl', 'submit_url') || '#'} method={String(value(config, 'submitMethod', 'submit_method') || 'POST').toLowerCase()} onSubmit={(event) => event.preventDefault()}>{contents}</form>}
+            : publicSubmissionEnabled
+                ? <form className="dynamic-form forms-widget" action={`${publicForms!.endpointBase}/${encodeURIComponent(widget.id)}`} method="post" encType="application/x-www-form-urlencoded">{contents}</form>
+                : <form className="dynamic-form forms-widget" action={value(config, 'submitUrl', 'submit_url') || '#'} method={String(value(config, 'submitMethod', 'submit_method') || 'POST').toLowerCase()} onSubmit={(event) => event.preventDefault()}>{contents}</form>}
     </div>
 }
 

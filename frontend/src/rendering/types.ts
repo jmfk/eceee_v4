@@ -39,6 +39,14 @@ export interface RenderContext {
     simulatedPath?: string
     renderRoutePrefix?: string
     componentStyles?: Record<string, Record<string, any>>
+    publicForms?: {
+        endpointBase: string
+        pagePath: string
+        result?: {
+            widgetId: string
+            status: 'success' | 'error'
+        }
+    }
     mode?: 'preview' | 'public'
     preview: boolean
 }
