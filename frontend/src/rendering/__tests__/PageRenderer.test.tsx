@@ -391,6 +391,23 @@ describe('PageRenderer', () => {
         expect(screen.getByLabelText('Time')).toHaveAttribute('type', 'time')
     })
 
+    it('removes native form submission semantics in public mode', () => {
+        const model = createPageRenderModel({
+            context: { mode: 'public', preview: false },
+            widgets: { main: [{ id: 'form', type: 'easy_widgets.FormsWidget', config: {
+                submitUrl: 'https://collector.invalid/submit',
+                submitMethod: 'POST',
+                fields: [{ name: 'email', label: 'Email', type: 'email' }],
+            } }] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(container.querySelector('form')).toBeNull()
+        expect(container.querySelector('[data-form-status="submission-unavailable"]')).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled()
+    })
+
     it('renders content-card image1 with canonical theme classes', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'card', type: 'easy_widgets.ContentCardWidget', config: {

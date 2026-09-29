@@ -131,28 +131,74 @@ function rawSlot(version: Version, slot: string, at: Date, depth: number): RawWi
     : [];
 }
 
-function normalizeWidget(input: RawWidget, id: string, inheritedFrom: Page | null, depth: number): Widget | null {
+function normalizeNestedWidgets(input: unknown, at: Date, idPrefix: string): Widget[] {
+  if (!Array.isArray(input)) return [];
+  return input.flatMap((candidate, index) => {
+    const raw = object(candidate);
+    if (!dateVisible(raw, at)) return [];
+    const normalized = normalizeWidget(raw, `${idPrefix}-${index}`, null, 0, at);
+    return normalized ? [normalized] : [];
+  });
+}
+
+function normalizeNestedItem(input: unknown, at: Date, idPrefix: string): Record<string, unknown> {
+  const item = object(input);
+  const widgets = object(item.widgets);
+  if (!Object.keys(widgets).length) return item;
+  return {
+    ...item,
+    widgets: Object.fromEntries(Object.entries(widgets).map(([slot, nested]) => [
+      slot,
+      normalizeNestedWidgets(nested, at, `${idPrefix}-${slot}`),
+    ])),
+  };
+}
+
+function normalizeWidgetConfig(type: string, input: unknown, at: Date, idPrefix: string): Record<string, unknown> {
+  const config = object(input);
+  const slots = object(config.slots);
+  const configuredItem = object(config.item);
+  const normalized = { ...config };
+  if (Object.keys(slots).length) {
+    normalized.slots = Object.fromEntries(Object.entries(slots).map(([slot, widgets]) => [
+      slot,
+      normalizeNestedWidgets(widgets, at, `${idPrefix}-${slot}`),
+    ]));
+  }
+  if (type === 'easy_widgets.SectionWidget' && Array.isArray(config.widgets)) {
+    normalized.widgets = normalizeNestedWidgets(config.widgets, at, `${idPrefix}-widgets`);
+  }
+  if (Object.keys(object(configuredItem.widgets)).length) {
+    normalized.item = normalizeNestedItem(config.item, at, `${idPrefix}-item`);
+  }
+  return normalized;
+}
+
+function normalizeWidget(input: RawWidget, id: string, inheritedFrom: Page | null, depth: number, at: Date): Widget | null {
   const type = input.type || input.widget_type;
   if (typeof type !== 'string') return null;
   const rawData = object(input.data || input.resolvedData);
+  const normalizedData = rawData.item
+    ? { ...rawData, item: normalizeNestedItem(rawData.item, at, `${String(input.id ?? id)}-data-item`) }
+    : rawData;
   const status = ['ready', 'loading', 'empty', 'error'].includes(String(rawData.status))
     ? rawData.status as 'ready' | 'loading' | 'empty' | 'error'
     : 'ready';
   return {
     id: String(input.id ?? id),
     type,
-    config: object(input.config),
-    ...(Object.keys(rawData).length ? { data: { ...rawData, status } } : {}),
+    config: normalizeWidgetConfig(type, input.config, at, String(input.id ?? id)),
+    ...(Object.keys(normalizedData).length ? { data: { ...normalizedData, status } } : {}),
     ...(inheritedFrom ? { inheritedFrom: { id: inheritedFrom.id, title: inheritedFrom.title, depth } } : {}),
   };
 }
 
-export function normalizeWidgets(input: unknown): Record<string, Widget[]> {
+export function normalizeWidgets(input: unknown, at = new Date()): Record<string, Widget[]> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
   return Object.fromEntries(Object.entries(input).map(([slot, items]) => [
     slot,
     Array.isArray(items)
-      ? items.map((item, index) => normalizeWidget(object(item), `${slot}-${index}`, null, 0)).filter((item): item is Widget => item !== null)
+      ? items.map((item, index) => normalizeWidget(object(item), `${slot}-${index}`, null, 0, at)).filter((item): item is Widget => item !== null)
       : [],
   ]));
 }
@@ -181,7 +227,7 @@ function mergeSlot(
   const override = visible.filter(candidate => candidate.behavior === 'override_parent').sort((left, right) => left.depth - right.depth);
   const after = visible.filter(candidate => candidate.behavior === 'insert_after_parent').sort((left, right) => right.depth - left.depth);
   const selected = [...before, ...override, ...after];
-  return selected.map(({ item, page, depth }, index) => normalizeWidget(item, `${slot}-${index}`, page, depth)).filter((item): item is Widget => item !== null);
+  return selected.map(({ item, page, depth }, index) => normalizeWidget(item, `${slot}-${index}`, page, depth, at)).filter((item): item is Widget => item !== null);
 }
 
 function cssRecord(input: Record<string, unknown>): string {

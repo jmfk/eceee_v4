@@ -439,21 +439,25 @@ const FormFieldRender = ({ field, index }: { field: Record<string, any>, index: 
     </div>
 }
 
-const FormRender: WidgetRenderComponent = ({ widget }) => {
+const FormRender: WidgetRenderComponent = ({ widget, context }) => {
     const fields = asArray<any>(value(widget.config, 'fields'))
     const config = widget.config
+    const publicWithoutHandler = context.mode === 'public'
+    const contents = <>
+        <div className="form-fields">{fields.map((field, index) => <FormFieldRender field={field} index={index} key={field.name || index} />)}</div>
+        <div className="form-actions">
+            <button type={publicWithoutHandler ? 'button' : 'submit'} className="submit-btn" disabled={publicWithoutHandler}>{value(config, 'submitButtonText', 'submit_button_text') || 'Submit'}</button>
+            {value(config, 'resetButton', 'reset_button') && <button type={publicWithoutHandler ? 'button' : 'reset'} className="reset-btn" disabled={publicWithoutHandler}>Reset</button>}
+        </div>
+    </>
     return <div className="widget-type-easy-widgets-formswidget" data-widget-type="forms">
         {value(config, 'title', 'formTitle', 'form_title') && <header className="form-header">
             <h2 className="form-title">{value(config, 'title', 'formTitle', 'form_title')}</h2>
             {value(config, 'description', 'formDescription', 'form_description') && <div className="form-description">{value(config, 'description', 'formDescription', 'form_description')}</div>}
         </header>}
-        <form className="dynamic-form forms-widget" action={value(config, 'submitUrl', 'submit_url') || '#'} method={String(value(config, 'submitMethod', 'submit_method') || 'POST').toLowerCase()} onSubmit={(event) => event.preventDefault()}>
-            <div className="form-fields">{fields.map((field, index) => <FormFieldRender field={field} index={index} key={field.name || index} />)}</div>
-            <div className="form-actions">
-                <button type="submit" className="submit-btn">{value(config, 'submitButtonText', 'submit_button_text') || 'Submit'}</button>
-                {value(config, 'resetButton', 'reset_button') && <button type="reset" className="reset-btn">Reset</button>}
-            </div>
-        </form>
+        {publicWithoutHandler
+            ? <div className="dynamic-form forms-widget" data-form-status="submission-unavailable">{contents}</div>
+            : <form className="dynamic-form forms-widget" action={value(config, 'submitUrl', 'submit_url') || '#'} method={String(value(config, 'submitMethod', 'submit_method') || 'POST').toLowerCase()} onSubmit={(event) => event.preventDefault()}>{contents}</form>}
     </div>
 }
 

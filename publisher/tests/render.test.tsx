@@ -9,6 +9,7 @@ const model: PublishedPageModel = {
     main: [
       { id: 'headline', type: 'easy_widgets.HeadlineWidget', config: { content: 'Server rendered' } },
       { id: 'content', type: 'easy_widgets.ContentWidget', config: { content: '<p>Safe body</p><script>alert(1)</script>' } },
+      { id: 'form', type: 'easy_widgets.FormsWidget', config: { submitUrl: 'https://collector.invalid/submit', submitMethod: 'POST', fields: [{ name: 'email', label: 'Email', type: 'email' }] } },
     ],
   },
   context: {
@@ -25,5 +26,10 @@ describe('public renderer', () => {
     expect(html).toContain('<p>Safe body</p>');
     expect(html).not.toContain('<script>');
     expect(html).toContain('data-render-layout="main_layout"');
+    expect(html).not.toContain('<form');
+    expect(html).not.toContain('collector.invalid');
+    expect(html).toContain('data-form-status="submission-unavailable"');
+    expect(html).toContain('type="button"');
+    expect(html).toContain('disabled=""');
   });
 });
