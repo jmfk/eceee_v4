@@ -68,7 +68,7 @@ PREFLIGHT_TARGETS="${PREFLIGHT_TARGETS:-lint test regression-test}"
 NEEDS_FRONTEND_DEPS=0
 for target in $PREFLIGHT_TARGETS; do
     case "$target" in
-        lint|regression-test|frontend-e2e-test|frontend-admin-e2e-test)
+        lint|test|test-build|test-parallel|frontend-test|regression-test|frontend-e2e-test|frontend-admin-e2e-test)
             NEEDS_FRONTEND_DEPS=1
             ;;
     esac
@@ -77,6 +77,9 @@ done
 if [ "$NEEDS_FRONTEND_DEPS" -eq 1 ] && [ -f "$WORKTREE/frontend/package-lock.json" ]; then
     info "Installing frontend dependencies for checked commit..."
     npm --prefix "$WORKTREE/frontend" ci
+    info "Installing frontend dependencies in the Docker test volume..."
+    docker compose --project-directory "$WORKTREE" -f "$WORKTREE/docker-compose.dev.yml" \
+        run --rm --no-deps -T frontend npm ci
 fi
 
 for target in $PREFLIGHT_TARGETS; do
