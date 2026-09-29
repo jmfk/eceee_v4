@@ -74,6 +74,7 @@ export interface PublishedPageModel {
     versionId: DbId;
     componentStyles: Record<string, Record<string, unknown>>;
   };
+  fontCss: string;
   themeCss: string;
   title: string;
   description: string;
@@ -225,21 +226,28 @@ function styleCss(styles: Record<string, Record<string, unknown>>, configuredBre
   }).join('\n');
 }
 
+function effectivePageCss(page: Page, version: Version): { variables: Record<string, unknown>; customCss: string } {
+  // Match WebPage.get_effective_css_data(): either level can disable page CSS,
+  // while non-empty published-version values replace their page-level fallback.
+  if (!page.enable_css_injection || !version.enable_css_injection) return { variables: {}, customCss: '' };
+  return {
+    variables: Object.keys(version.page_css_variables).length ? version.page_css_variables : page.page_css_variables,
+    customCss: version.page_custom_css || page.page_custom_css || '',
+  };
+}
+
 function compileThemeCss(theme: Theme | null, page: Page, version: Version): string {
-  const variables = { ...(theme?.css_variables ?? {}), ...(theme?.colors ?? {}) };
-  if (page.enable_css_injection) Object.assign(variables, page.page_css_variables);
-  if (version.enable_css_injection) Object.assign(variables, version.page_css_variables);
+  const pageCss = effectivePageCss(page, version);
+  const variables = { ...(theme?.css_variables ?? {}), ...(theme?.colors ?? {}), ...pageCss.variables };
   const variableCss = cssRecord(variables);
   return [
-    theme ? fontImports(theme.fonts) : '',
     variableCss ? `:root {\n${variableCss}\n}` : '',
     theme?.custom_css ?? '',
     theme ? styleCss(theme.component_styles, theme.breakpoints) : '',
     theme ? styleCss(theme.image_styles, theme.breakpoints) : '',
     theme ? styleCss(theme.gallery_styles, theme.breakpoints) : '',
     theme ? styleCss(theme.carousel_styles, theme.breakpoints) : '',
-    page.enable_css_injection ? page.page_custom_css : '',
-    version.enable_css_injection ? version.page_custom_css : '',
+    pageCss.customCss,
   ].filter(Boolean).join('\n\n');
 }
 
@@ -294,6 +302,7 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
         versionId: currentVersion.id,
         componentStyles: theme?.component_styles ?? {},
       },
+      fontCss: theme ? fontImports(theme.fonts) : '',
       themeCss: compileThemeCss(theme, current, currentVersion),
       title: currentVersion.meta_title || current.title,
       description: currentVersion.meta_description || '',

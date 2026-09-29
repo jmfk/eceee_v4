@@ -15,7 +15,7 @@ const model: PublishedPageModel = {
     mode: 'public', preview: false, tenantId: '7', siteId: '1', siteHostnames: ['example.org'],
     pageId: '2', versionId: '3', componentStyles: {},
   },
-  themeCss: '', title: 'Page', description: '', matchedPath: '/', remainingPath: '',
+  fontCss: '', themeCss: '', title: 'Page', description: '', matchedPath: '/', remainingPath: '',
 };
 
 describe('public renderer', () => {
