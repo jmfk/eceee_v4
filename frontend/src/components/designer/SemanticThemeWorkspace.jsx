@@ -603,16 +603,6 @@ const SemanticThemeWorkspace = ({
     const selectedView = previewContent.views.find((view) => view.id === viewId) || previewContent.views[0] || null
     const selectedViewImages = useMemo(() => designerPreviewImageReferences(selectedView), [selectedView])
     const selectedSourceContent = externalContentOptions.find((source) => source.value === sourceContentId) || null
-    const previewWorkspace = useMemo(() => ({
-        ...workspace,
-        previewContent: {
-            ...previewContent,
-            views: previewContent.views.map((view) => ({
-                ...view,
-                texts: { ...(view.texts || {}), ...(pendingPreviewTextsRef.current[view.id] || {}) },
-            })),
-        },
-    }), [pendingPreviewTextsRef, previewContent, workspace])
     const imageAspects = useMemo(() => imageAspectsFor(workspace), [workspace])
     const assetsByTargetId = useMemo(() => new Map(
         workspace.assets.map((asset) => [`asset:${asset.assetKey}`, asset]),
@@ -644,15 +634,29 @@ const SemanticThemeWorkspace = ({
         }
     }, [selectedImageAspect, selectedImageAspectKey])
 
-    const previewModel = useMemo(() => createDesignerRenderModel({
-        workspace: previewWorkspace,
-        viewId,
-        themeCss: preview.css,
-        fontUrl: preview.fontUrl,
-        sourceModel: contentMode === 'content' ? sourceContentModel : null,
-        contentEditable: contentMode === 'demo',
-        guidesEnabled,
-    }), [contentMode, guidesEnabled, previewWorkspace, preview, sourceContentModel, viewId])
+    const previewModel = useMemo(() => {
+        // Pending text lives in a ref so inline typing does not rebuild the frame and
+        // disturb selection. Read it whenever another model dependency does rebuild.
+        const previewWorkspace = {
+            ...workspace,
+            previewContent: {
+                ...previewContent,
+                views: previewContent.views.map((view) => ({
+                    ...view,
+                    texts: { ...(view.texts || {}), ...(pendingPreviewTextsRef.current[view.id] || {}) },
+                })),
+            },
+        }
+        return createDesignerRenderModel({
+            workspace: previewWorkspace,
+            viewId,
+            themeCss: preview.css,
+            fontUrl: preview.fontUrl,
+            sourceModel: contentMode === 'content' ? sourceContentModel : null,
+            contentEditable: contentMode === 'demo',
+            guidesEnabled,
+        })
+    }, [contentMode, guidesEnabled, pendingPreviewTextsRef, previewContent, preview, sourceContentModel, viewId, workspace])
 
     const previewCanvasWidth = viewport === 'mobile' ? 390 : viewport === 'tablet' ? 768 : 1280
     const previewScale = Math.min(1, previewFrameWidth / previewCanvasWidth)

@@ -1769,7 +1769,9 @@ def replace_designer_preview_image(
             view["images"] = rewritten["images"]
             if not replacements:
                 raise ValidationError("That image is not part of this example.")
-            view.setdefault("imageMetadata", {})[replacement_url] = {
+            image_metadata = view.setdefault("imageMetadata", {})
+            image_metadata.pop(source_url, None)
+            image_metadata[replacement_url] = {
                 "filename": filename,
                 "width": width,
                 "height": height,

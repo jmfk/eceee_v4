@@ -593,6 +593,66 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(saved_view["imageMetadata"][replacement_url]["width"], 32)
         self.assertTrue(storage.save.call_args.args[0].startswith(f"theme_images/{self.theme.id}/designer_drafts/"))
 
+    @patch("webpages.services.designer_theme.system_storage")
+    def test_replacing_an_example_image_twice_removes_superseded_metadata(self, storage):
+        source_url = "https://storage.test/theme_images/example/original.png"
+        first_url = f"https://storage.test/theme_images/{self.theme.id}/designer_drafts/1/first.png"
+        second_url = f"https://storage.test/theme_images/{self.theme.id}/designer_drafts/1/second.png"
+        self.theme.designer_preview = {
+            "views": [
+                {
+                    "id": "example-page",
+                    "label": "Example page",
+                    "kind": "page",
+                    "layout": "main_layout",
+                    "content": {"image": {"url": source_url}},
+                }
+            ]
+        }
+        self.theme.save(update_fields=["designer_preview"])
+        storage.save.side_effect = [
+            f"theme_images/{self.theme.id}/designer_drafts/1/first.png",
+            f"theme_images/{self.theme.id}/designer_drafts/1/second.png",
+        ]
+        storage.url.side_effect = lambda path: (
+            second_url
+            if path.endswith("second.png")
+            else first_url if path.endswith("first.png") else f"https://storage.test/{path}"
+        )
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+
+        def replace(url, draft_version):
+            return self.client.post(
+                f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/image/",
+                {
+                    "view_id": "example-page",
+                    "source_url": url,
+                    "source_path": '["content", "image", "url"]',
+                    "source_match_index": 0,
+                    "image": SimpleUploadedFile(
+                        "replacement.png",
+                        generate_placeholder_png("Replacement", "Theme example", 32, 32),
+                        content_type="image/png",
+                    ),
+                    "draft_version": draft_version,
+                },
+                format="multipart",
+            )
+
+        first = replace(source_url, workspace["draftVersion"])
+        self.assertEqual(first.status_code, 200, first.data)
+        storage.exists.return_value = True
+        with self.captureOnCommitCallbacks(execute=True):
+            second = replace(first_url, first.data["draftVersion"])
+        self.assertEqual(second.status_code, 200, second.data)
+
+        saved_view = second.data["previewContent"]["views"][0]
+        self.assertEqual(saved_view["content"]["image"]["url"], second_url)
+        self.assertNotIn(first_url, saved_view["imageMetadata"])
+        self.assertIn(second_url, saved_view["imageMetadata"])
+        storage.delete.assert_called_with(f"theme_images/{self.theme.id}/designer_drafts/1/first.png")
+
     def test_advanced_theme_editor_preserves_preview_ids_and_metadata(self):
         self.authenticate(self.owner)
         designer_preview = {

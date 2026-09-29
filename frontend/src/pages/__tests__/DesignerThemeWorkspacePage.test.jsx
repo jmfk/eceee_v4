@@ -906,6 +906,33 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(await screen.findByText('Draft saved · not published')).toBeInTheDocument()
     })
 
+    it('keeps pending example text when the preview model is rebuilt', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-frame', action: 'ready' },
+            source: iframe.contentWindow,
+        }))
+        await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ action: 'render' }), '*'))
+
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'Pending across views', editable: true },
+            source: iframe.contentWindow,
+        }))
+        postMessage.mockClear()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Select Article card' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Select Article page' }))
+
+        await waitFor(() => {
+            const renderCalls = postMessage.mock.calls.filter(([message]) => message?.action === 'render')
+            expect(renderCalls.at(-1)?.[0].model.designer.texts).toEqual({ 'content:0': 'Pending across views' })
+        })
+        postMessage.mockRestore()
+    })
+
     it('clears pending example text when the draft is discarded', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
