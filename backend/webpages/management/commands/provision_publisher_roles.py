@@ -42,6 +42,23 @@ class Command(BaseCommand):
                     [password],
                 )
                 cursor.execute(
+                    """
+                    SELECT granted_role.rolname
+                    FROM pg_auth_members AS membership
+                    JOIN pg_roles AS granted_role ON granted_role.oid = membership.roleid
+                    JOIN pg_roles AS member_role ON member_role.oid = membership.member
+                    WHERE member_role.rolname = %s
+                    """,
+                    [role],
+                )
+                for (granted_role,) in cursor.fetchall():
+                    cursor.execute(
+                        sql.SQL("REVOKE {} FROM {}").format(
+                            sql.Identifier(granted_role),
+                            sql.Identifier(role),
+                        )
+                    )
+                cursor.execute(
                     sql.SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM {}").format(
                         sql.Identifier(database_name), sql.Identifier(role)
                     )

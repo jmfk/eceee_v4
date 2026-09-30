@@ -11,6 +11,7 @@ class ProvisionPublisherRolesTests(SimpleTestCase):
     def test_provisions_both_roles_without_printing_credentials(self, connection, atomic):
         cursor = MagicMock()
         cursor.fetchone.side_effect = [None, (1,)]
+        cursor.fetchall.side_effect = [[], []]
         connection.cursor.return_value.__enter__.return_value = cursor
         connection.settings_dict = {"NAME": "eceee_v4"}
         atomic.return_value.__enter__.return_value = None
@@ -35,6 +36,37 @@ class ProvisionPublisherRolesTests(SimpleTestCase):
         self.assertIn("webpages_webpage", statements)
         self.assertIn("tenant_id, page_id, widget_id, submitted_at", statements)
         self.assertIn("form_title, data, submitted_at", statements)
+
+    @patch("webpages.management.commands.provision_publisher_roles.transaction.atomic")
+    @patch("webpages.management.commands.provision_publisher_roles.connection")
+    def test_revokes_preexisting_role_memberships(self, connection, atomic):
+        cursor = MagicMock()
+        cursor.fetchone.side_effect = [(1,), (1,)]
+        cursor.fetchall.side_effect = [[("legacy_reader",), ("legacy_writer",)], []]
+        connection.cursor.return_value.__enter__.return_value = cursor
+        connection.settings_dict = {"NAME": "eceee_v4"}
+        atomic.return_value.__enter__.return_value = None
+
+        with patch.dict(
+            "os.environ",
+            {"PUBLISHER_DB_PASSWORD": "a" * 32, "PUBLISHER_FORM_DB_PASSWORD": "b" * 32},
+            clear=False,
+        ):
+            call_command("provision_publisher_roles")
+
+        statements = "\n".join(repr(call.args[0]) for call in cursor.execute.call_args_list)
+        self.assertIn(
+            "SQL('REVOKE '), Identifier('legacy_reader'), SQL(' FROM '), Identifier('eceee_publisher')",
+            statements,
+        )
+        self.assertIn(
+            "SQL('REVOKE '), Identifier('legacy_writer'), SQL(' FROM '), Identifier('eceee_publisher')",
+            statements,
+        )
+        self.assertNotIn(
+            "SQL('REVOKE '), Identifier('legacy_reader'), SQL(' FROM '), Identifier('eceee_publisher_forms')",
+            statements,
+        )
 
     def test_rejects_missing_or_placeholder_passwords(self):
         with patch.dict(

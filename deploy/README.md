@@ -66,7 +66,7 @@ nano /opt/eceee/app/deploy/.env
 
 Fill in all values — especially `DOMAIN`, `SECRET_KEY`, `POSTGRES_PASSWORD`, `POSTGRES_HOST=db`, Redis, Linode Object Storage, Postmark, imgproxy signing keys, and optional AI keys. The full variable set is documented in `deploy/.env.production.example`.
 
-For the isolated TypeScript publisher, also generate independent values for `PUBLISHER_DB_PASSWORD` and `PUBLISHER_FORM_DB_PASSWORD` with `openssl rand -hex 32`. Deployment creates or rotates the fixed least-privilege PostgreSQL roles without printing either password. `PUBLISHER_TEST_HOST_MAPPINGS` defaults to the three comma-separated `test-host=source-host` mappings used below.
+For the isolated TypeScript publisher, also generate independent values for `PUBLISHER_DB_PASSWORD` and `PUBLISHER_FORM_DB_PASSWORD` with `openssl rand -hex 32`. Deployment rejects equal values before backup or migration, then creates or rotates the fixed least-privilege PostgreSQL roles without printing either password. The three `test-host=source-host` mappings are fixed in `docker-compose.prod.yml` and kept alongside the explicit Caddy routes so operators cannot configure the two surfaces apart.
 
 ### Secrets
 
