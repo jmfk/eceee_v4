@@ -46,10 +46,12 @@ The system centers on page management, publishing workflows, code-based layouts/
 
 ## Production Rules
 
-- Do not SSH into production to inspect state, edit files, run Docker commands, or execute Django commands.
-- Do not run `docker exec`, `docker logs`, `docker compose`, or similar commands on the production server.
+- Do not use ad hoc SSH sessions to inspect or change production, edit files on the server, run Docker commands, execute Django commands, or issue database commands.
+- Do not run `docker exec`, `docker logs`, `docker compose`, or similar production commands directly. Production access must remain encapsulated by the reviewed repository targets and scripts.
 - Production changes must go through local code/config changes, commit/push, and the scripts in `deploy/scripts/`.
-- For deployment, ask the user to run `make prod-deploy` or `make prod-deploy TAG=v0.x.x`.
+- Codex may run `make prod-deploy TAG=<exact-full-commit>` only after a human deployment gate. Immediately before requesting that gate, report the production environment, exact commit, current CI/review status, expected operational and data-path impact, and known residual risks. The owner must then explicitly authorize deploying that exact commit to production in a new message. Review, merge, preparation, prior risk acknowledgement, or a general request to continue is not deployment authorization.
+- Deployment authorization is valid only for the reported commit and production environment. Any commit change, failed preflight requiring code/config changes, or materially changed risk invalidates it and requires a fresh report and new explicit authorization. Never infer approval from an ambiguous keypad signal or short response.
+- After the human gate, use only the reviewed `make prod-deploy` target and its repository scripts. Do not replace or bypass their preflight, backup, locking, migration, credential-provisioning, or health-check steps. Stop and report if they request interactive credentials, expose secrets, or require an unreviewed manual server action.
 - For production debugging, ask the user to run `make prod-logs` or `make prod-status` and share the output.
 - For production data restoration, create or update a script in `deploy/scripts/` and ask the user to run it.
 
