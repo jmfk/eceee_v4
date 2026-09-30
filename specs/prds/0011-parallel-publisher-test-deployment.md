@@ -44,7 +44,7 @@ The standalone TypeScript publisher cannot be validated with production-shaped c
 - Existing Django public routes remain unchanged.
 - Deployment applies migrations before idempotently provisioning separate rendering and form PostgreSQL roles.
 - Deployment fails before backup or migration if either generated publisher password is absent or malformed.
-- Readiness verifies the Django backend, publisher liveness, and a rendered root page for every configured test host.
+- Readiness verifies the Django backend, publisher liveness, direct rendering, and the public HTTPS route through Caddy for every configured test host.
 
 ## Acceptance Criteria
 
@@ -53,6 +53,7 @@ The standalone TypeScript publisher cannot be validated with production-shaped c
 - Requests for other hostnames are not aliased.
 - The rendering role can select the three required publishing tables and cannot insert.
 - The form role can select only rate-limit metadata, insert submission columns, and cannot select payload data or page tables.
+- Re-provisioning removes stale direct column and sequence grants plus role memberships in either direction before applying the intended grants.
 - Running role provisioning more than once preserves the same privilege boundary.
 - Production Compose and shell configuration pass local parsing and static checks.
 

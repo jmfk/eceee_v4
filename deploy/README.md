@@ -20,7 +20,7 @@ deploy/
     ├── validate-typed-tags-backup.sh  disposable local restore validation
     ├── production-operation.sh shared lock → atomic env install → deploy/restart
     ├── validate-deploy-control-ref.sh  require deploy-control changes on main
-    └── healthcheck.sh         polls backend /health/ (Host from DOMAIN in deploy/.env)
+    └── healthcheck.sh         checks backend, publisher, and all public test-host HTTPS routes
 ```
 
 ## One-Time Server Setup
@@ -271,11 +271,11 @@ Edit `deploy/.env` on the server, then run `make prod-deploy` (the containers wi
 1. Pre-flight check (`deploy/.env` exists, repo is present)
 2. Mandatory verified backup (`pg_dump` → `/mnt/data/backups/`); abort on failure
 3. `git fetch --tags && git checkout TAG`
-4. `docker compose build backend frontend playwright`
-5. `python manage.py migrate` (fail fast if unapplied migrations exist)
+4. Build the target's application services, including `publisher` when configured
+5. Run migrations and provision convergent least-privilege publisher roles when configured
 6. `python manage.py collectstatic`
 7. `docker compose up -d --remove-orphans`
-8. Health check (polls `/health/` for up to 60s)
+8. Health check for up to 90s (backend, publisher liveness, direct rendered pages, and every public test-host HTTPS route through Caddy)
 9. Log the deploy to `/opt/eceee/app/deploy.log`
 
 There is ~30-60s of downtime during step 7. That is acceptable for this deployment.
