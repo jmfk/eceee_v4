@@ -24,6 +24,7 @@
     "howto:video:voice": "node scripts/generate-howto-video.mjs --format mp4 --voice elevenlabs",
     "howto:video:all": "node scripts/generate-howto-video.mjs --all --format mp4 --voice elevenlabs",
     "howto:voices": "node scripts/generate-howto-video.mjs --list-voices --language sv",
+    "legacy-news:capture": "node scripts/capture-legacy-news-samples.mjs",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "prepare": "husky"

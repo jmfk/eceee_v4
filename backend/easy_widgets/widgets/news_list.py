@@ -2,8 +2,9 @@
 News List Widget - Display a list of news from selected ObjectTypes
 """
 
-from typing import Type, List
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from typing import List, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
@@ -200,9 +201,7 @@ class NewsListWidget(BaseWidget):
                 item.published_version = published_version
 
                 if config.show_excerpts:
-                    item.excerpt_text = self._get_excerpt(
-                        published_version.data, config.excerpt_length
-                    )
+                    item.excerpt_text = self._get_excerpt(published_version.data, config.excerpt_length)
                 else:
                     item.excerpt_text = None
 
@@ -229,12 +228,7 @@ class NewsListWidget(BaseWidget):
     def _get_excerpt(self, data: dict, max_length: int) -> str:
         """Extract excerpt from published version data"""
         # Try to find excerpt field
-        excerpt = (
-            data.get("excerpt")
-            or data.get("summary")
-            or data.get("description")
-            or data.get("content", "")
-        )
+        excerpt = data.get("summary") or data.get("excerpt") or data.get("description") or data.get("content", "")
 
         # Clean and truncate
         if isinstance(excerpt, str):

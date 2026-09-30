@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <rect width="1200" height="675" fill="#eef5f2"/>
+  <circle cx="340" cy="338" r="180" fill="#83b59d"/>
+  <path d="M570 430h380v42H570zm0-112h280v42H570zm0-112h180v42H570z" fill="#274e3b"/>
+  <title>Synthetic migration test diagram</title>
+</svg>

@@ -2,10 +2,11 @@
 Sidebar Top News Widget - Compact vertical list for sidebar placement
 """
 
-from typing import Type, List
-from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Type
+
+from django.db.models import BooleanField, Case, Q, Value, When
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
-from django.db.models import Case, When, Value, BooleanField, Q
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 
@@ -53,6 +54,20 @@ class SidebarTopNewsConfig(BaseModel):
             "component": "BooleanInput",
             "variant": "toggle",
         },
+    )
+
+    show_excerpts: bool = Field(
+        default=False,
+        description="Show a compact article summary",
+        json_schema_extra={"component": "BooleanInput", "variant": "toggle"},
+    )
+
+    excerpt_length: int = Field(
+        default=120,
+        ge=40,
+        le=300,
+        description="Maximum excerpt length",
+        json_schema_extra={"component": "NumberInput"},
     )
 
     show_object_type: bool = Field(
@@ -112,7 +127,7 @@ class SidebarTopNewsWidget(BaseWidget):
         border-radius: 0.5rem;
         padding: 1.5rem;
     }
-    
+
     .sidebar-top-news-widget .widget-title {
         font-size: 1.25rem;
         font-weight: 700;
@@ -121,13 +136,13 @@ class SidebarTopNewsWidget(BaseWidget):
         padding-bottom: 0.75rem;
         border-bottom: 2px solid #3b82f6;
     }
-    
+
     .sidebar-top-news-widget .news-list {
         list-style: none;
         margin: 0;
         padding: 0;
     }
-    
+
     .sidebar-top-news-widget .news-item {
         display: flex;
         gap: 1rem;
@@ -135,16 +150,16 @@ class SidebarTopNewsWidget(BaseWidget):
         border-bottom: 1px solid #e5e7eb;
         transition: background-color 0.2s ease;
     }
-    
+
     .sidebar-top-news-widget .news-item:last-child {
         border-bottom: none;
         padding-bottom: 0;
     }
-    
+
     .sidebar-top-news-widget .news-item:first-child {
         padding-top: 0;
     }
-    
+
     .sidebar-top-news-widget .news-item:hover {
         background-color: #f9fafb;
         margin: 0 -0.5rem;
@@ -152,12 +167,12 @@ class SidebarTopNewsWidget(BaseWidget):
         padding-right: 0.5rem;
         border-radius: 0.375rem;
     }
-    
+
     .sidebar-top-news-widget .news-item.pinned .news-title::before {
         content: "📌 ";
         font-size: 0.75rem;
     }
-    
+
     .sidebar-top-news-widget .news-thumbnail {
         flex-shrink: 0;
         width: 80px;
@@ -166,18 +181,18 @@ class SidebarTopNewsWidget(BaseWidget):
         border-radius: 0.375rem;
         background: #f3f4f6;
     }
-    
+
     .sidebar-top-news-widget .news-thumbnail img {
         width: 100%;
         height: 100%;
         object-fit: cover;
     }
-    
+
     .sidebar-top-news-widget .news-content {
         flex: 1;
         min-width: 0;
     }
-    
+
     .sidebar-top-news-widget .news-meta {
         display: flex;
         gap: 0.5rem;
@@ -185,7 +200,7 @@ class SidebarTopNewsWidget(BaseWidget):
         font-size: 0.75rem;
         flex-wrap: wrap;
     }
-    
+
     .sidebar-top-news-widget .news-type-badge {
         padding: 0.125rem 0.5rem;
         background: #3b82f6;
@@ -196,12 +211,12 @@ class SidebarTopNewsWidget(BaseWidget):
         font-size: 0.625rem;
         line-height: 1.5;
     }
-    
+
     .sidebar-top-news-widget .news-date {
         color: #6b7280;
         font-size: 0.75rem;
     }
-    
+
     .sidebar-top-news-widget .news-title {
         font-size: 0.9375rem;
         font-weight: 600;
@@ -209,16 +224,23 @@ class SidebarTopNewsWidget(BaseWidget):
         margin: 0;
         line-height: 1.4;
     }
-    
+
     .sidebar-top-news-widget .news-title a {
         color: inherit;
         text-decoration: none;
     }
-    
+
     .sidebar-top-news-widget .news-title a:hover {
         color: #3b82f6;
     }
-    
+
+    .sidebar-top-news-widget .news-excerpt {
+        margin-top: 0.375rem;
+        color: #4b5563;
+        font-size: 0.8125rem;
+        line-height: 1.35;
+    }
+
     .sidebar-top-news-widget .view-all-link {
         display: block;
         margin-top: 1.25rem;
@@ -230,22 +252,22 @@ class SidebarTopNewsWidget(BaseWidget):
         font-size: 0.875rem;
         text-decoration: none;
     }
-    
+
     .sidebar-top-news-widget .view-all-link:hover {
         text-decoration: underline;
     }
-    
+
     /* Mobile adjustments */
     @media (max-width: 768px) {
         .sidebar-top-news-widget {
             padding: 1rem;
         }
-        
+
         .sidebar-top-news-widget .news-thumbnail {
             width: 60px;
             height: 60px;
         }
-        
+
         .sidebar-top-news-widget .news-title {
             font-size: 0.875rem;
         }
@@ -317,14 +339,27 @@ class SidebarTopNewsWidget(BaseWidget):
                 # Get thumbnail from current version data
                 if config.show_thumbnails and item.current_version:
                     item.thumbnail_url = (
-                        item.data.get("thumbnail")
-                        or item.data.get("featured_image")
-                        or item.data.get("featuredImage")
+                        item.data.get("thumbnail") or item.data.get("featured_image") or item.data.get("featuredImage")
                     )
                 else:
                     item.thumbnail_url = None
+                item.excerpt_text = (
+                    self._get_excerpt(item.data, config.excerpt_length)
+                    if config.show_excerpts and item.current_version
+                    else ""
+                )
 
             return items
 
         except Exception:
             return []
+
+    @staticmethod
+    def _get_excerpt(data, max_length):
+        import re
+
+        excerpt = data.get("summary") or data.get("excerpt") or data.get("description") or ""
+        excerpt = re.sub(r"<[^>]+>", "", excerpt) if isinstance(excerpt, str) else ""
+        if len(excerpt) > max_length:
+            excerpt = excerpt[:max_length].rsplit(" ", 1)[0] + "..."
+        return excerpt

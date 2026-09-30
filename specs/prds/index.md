@@ -13,3 +13,4 @@
 | PRD-0009 | [Named theme versions](0009-named-theme-versions.md) | completed | [ADR-0010](../adrs/active/0010-named-theme-version-checkpoints.md) |
 | PRD-0010 | [Public form submissions](0010-public-form-submissions.md) | completed | [ADR-0011](../adrs/active/0011-public-form-write-boundary.md), [ADR-0012](../adrs/active/0012-isolated-publisher-test-host.md) |
 | PRD-0011 | [Parallel publisher test deployment](0011-parallel-publisher-test-deployment.md) | started | [ADR-0011](../adrs/active/0011-public-form-write-boundary.md), [ADR-0012](../adrs/active/0012-isolated-publisher-test-host.md) |
+| PRD-0012 | [Legacy News golden samples and migration](0012-legacy-news-migration.md) | started | [ADR-0013](../adrs/active/0013-legacy-news-golden-sample-gate.md) |

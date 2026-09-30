@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "crawlDelaySeconds": 10,
+  "samples": [
+    {
+      "id": "legacy-2004",
+      "url": "https://www.eceee.org/all-news/news/news-2004/2004-01-22b/",
+      "slug": "2004-01-22b",
+      "synthetic": false,
+      "expected": {"sourceMayBeEmpty": true, "hasExternalUrl": false, "minimumBodyCharacters": 500}
+    },
+    {
+      "id": "reuters-2012",
+      "url": "https://www.eceee.org/all-news/news/news-2012/2012-09-21d/",
+      "slug": "2012-09-21d",
+      "synthetic": false,
+      "expected": {"source": "Reuters", "hasSourceDate": true, "hasExternalUrl": true}
+    },
+    {
+      "id": "copied-markup-2019",
+      "url": "https://www.eceee.org/all-news/news/news-2019/what-does-greta-thunbergs-call-for-equity-mean/",
+      "slug": "what-does-greta-thunbergs-call-for-equity-mean",
+      "synthetic": false,
+      "expected": {"hasLinks": true, "forbiddenAttributes": ["class", "id", "style"]}
+    },
+    {
+      "id": "current-2026",
+      "url": "https://www.eceee.org/all-news/news/commission-enhances-energy-efficiency-and-sustainability-of-data-centres-in-the-eu/",
+      "slug": "commission-enhances-energy-efficiency-and-sustainability-of-data-centres-in-the-eu",
+      "synthetic": false,
+      "expected": {"hasSourceDate": true, "currentPublicStructure": true}
+    },
+    {
+      "id": "synthetic-edge-case",
+      "fixture": "synthetic-edge-case.html",
+      "sourceUrl": "https://www.eceee.org/__migration-fixtures__/synthetic-edge-case/",
+      "slug": "synthetic-legacy-news-edge-case",
+      "synthetic": true,
+      "expected": {"hasHeadings": true, "hasLists": true, "hasTable": true, "imageCount": 2}
+    }
+  ]
+}
