@@ -10,8 +10,154 @@ function connection(): Pool {
   return pool ??= new Pool({
     connectionString: process.env.PUBLISHER_FORM_DATABASE_URL,
     max: 3,
+    connectionTimeoutMillis: 5000,
     options: '-c statement_timeout=5000',
   });
+}
+
+export async function checkFormSubmissionStore(): Promise<void> {
+  const client = await connection().connect();
+  try {
+    const result = await client.query<{ ready: boolean }>(`
+      WITH current_role AS (
+        SELECT oid, rolcanlogin, rolsuper, rolinherit, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls
+        FROM pg_roles
+        WHERE rolname = current_user
+      ), application_schemas AS (
+        SELECT oid, nspname, nspowner
+        FROM pg_namespace
+        WHERE nspname NOT IN ('pg_catalog', 'information_schema')
+          AND nspname NOT LIKE 'pg_toast%'
+          AND nspname NOT LIKE 'pg_temp_%'
+      ), form_table AS (
+        SELECT 'public.webpages_publicformsubmission'::regclass AS oid
+      )
+      SELECT
+        current_user = 'eceee_publisher_forms'
+        AND EXISTS (
+          SELECT 1
+          FROM current_role
+          WHERE rolcanlogin
+            AND NOT rolsuper
+            AND NOT rolinherit
+            AND NOT rolcreatedb
+            AND NOT rolcreaterole
+            AND NOT rolreplication
+            AND NOT rolbypassrls
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pg_auth_members AS membership, current_role
+          WHERE membership.member = current_role.oid OR membership.roleid = current_role.oid
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM pg_database AS database, current_role
+          WHERE database.datname = current_database() AND database.datdba = current_role.oid
+          UNION ALL
+          SELECT 1 FROM application_schemas AS namespace, current_role
+          WHERE namespace.nspowner = current_role.oid
+          UNION ALL
+          SELECT 1
+          FROM pg_class AS relation, application_schemas AS namespace, current_role
+          WHERE relation.relnamespace = namespace.oid AND relation.relowner = current_role.oid
+          UNION ALL
+          SELECT 1
+          FROM pg_proc AS routine, application_schemas AS namespace, current_role
+          WHERE routine.pronamespace = namespace.oid AND routine.proowner = current_role.oid
+        )
+        AND has_database_privilege(current_user, current_database(), 'CONNECT')
+        -- TEMP remains a PostgreSQL PUBLIC default; database CREATE must never be effective.
+        AND NOT has_database_privilege(current_user, current_database(), 'CREATE')
+        AND has_schema_privilege(current_user, 'public', 'USAGE')
+        AND NOT has_schema_privilege(current_user, 'public', 'CREATE')
+        AND NOT EXISTS (
+          SELECT 1
+          FROM application_schemas
+          WHERE nspname <> 'public'
+            AND has_schema_privilege(current_user, oid, 'USAGE, CREATE')
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pg_class AS relation, application_schemas AS namespace, form_table
+          WHERE relation.relnamespace = namespace.oid
+            AND relation.oid <> form_table.oid
+            AND relation.relkind IN ('r', 'p', 'v', 'm', 'f')
+            AND (
+              has_table_privilege(
+                current_user,
+                relation.oid,
+                'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+              )
+              OR has_any_column_privilege(current_user, relation.oid, 'SELECT, INSERT, UPDATE, REFERENCES')
+            )
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pg_class AS sequence, application_schemas AS namespace
+          WHERE sequence.relnamespace = namespace.oid
+            AND sequence.relkind = 'S'
+            AND has_sequence_privilege(current_user, sequence.oid, 'USAGE, SELECT, UPDATE')
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pg_proc AS routine, application_schemas AS namespace
+          WHERE routine.pronamespace = namespace.oid
+            AND has_function_privilege(current_user, routine.oid, 'EXECUTE')
+        )
+        AND NOT has_table_privilege(current_user, 'public.webpages_publicformsubmission', 'SELECT')
+        AND NOT has_table_privilege(current_user, 'public.webpages_publicformsubmission', 'INSERT')
+        AND NOT has_table_privilege(
+          current_user,
+          'public.webpages_publicformsubmission',
+          'UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+        )
+        AND NOT has_any_column_privilege(
+          current_user,
+          'public.webpages_publicformsubmission',
+          'UPDATE, REFERENCES'
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pg_attribute AS attribute, form_table
+          WHERE attribute.attrelid = form_table.oid
+            AND attribute.attnum > 0
+            AND NOT attribute.attisdropped
+            AND attribute.attname <> ALL (ARRAY['tenant_id', 'page_id', 'widget_id', 'submitted_at'])
+            AND has_column_privilege(current_user, form_table.oid, attribute.attname, 'SELECT')
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pg_attribute AS attribute, form_table
+          WHERE attribute.attrelid = form_table.oid
+            AND attribute.attnum > 0
+            AND NOT attribute.attisdropped
+            AND attribute.attname <> ALL (
+              ARRAY['id', 'tenant_id', 'page_id', 'page_version_id', 'widget_id', 'form_title', 'data', 'submitted_at']
+            )
+            AND has_column_privilege(current_user, form_table.oid, attribute.attname, 'INSERT')
+        )
+        AND has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'tenant_id', 'SELECT')
+        AND has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'page_id', 'SELECT')
+        AND has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'widget_id', 'SELECT')
+        AND has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'submitted_at', 'SELECT')
+        AND NOT has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'id', 'SELECT')
+        AND NOT has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'page_version_id', 'SELECT')
+        AND NOT has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'form_title', 'SELECT')
+        AND NOT has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'data', 'SELECT')
+        AND has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'id', 'INSERT')
+        AND has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'tenant_id', 'INSERT')
+        AND has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'page_id', 'INSERT')
+        AND has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'page_version_id', 'INSERT')
+        AND has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'widget_id', 'INSERT')
+        AND has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'form_title', 'INSERT')
+        AND has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'data', 'INSERT')
+        AND has_column_privilege(current_user, 'public.webpages_publicformsubmission', 'submitted_at', 'INSERT')
+        AS ready
+    `);
+    if (result.rows[0]?.ready !== true) throw new Error('Form submission database privileges are not ready');
+  } finally {
+    client.release();
+  }
 }
 
 export const formSubmissions: FormSubmissionStore = {

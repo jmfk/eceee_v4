@@ -27,6 +27,13 @@ success() { echo -e "${GREEN}[deploy]${NC} $*"; }
 warn()    { echo -e "${YELLOW}[deploy]${NC} $*"; }
 error()   { echo -e "${RED}[deploy]${NC} $*" >&2; }
 
+commit_installed_environment() {
+    if [ -n "${ECEEE_ENV_COMMIT_MARKER:-}" ]; then
+        : > "$ECEEE_ENV_COMMIT_MARKER"
+        chmod 600 "$ECEEE_ENV_COMMIT_MARKER"
+    fi
+}
+
 # ── 1. Pre-flight ─────────────────────────────────────────────────────────────
 info "Starting deployment..."
 
@@ -40,66 +47,7 @@ if [ ! -d "$REPO/.git" ]; then
     exit 1
 fi
 
-# Reject dev-style hosts / missing DOMAIN (wrong cwd used to mask this before env.sh fix)
-if ! grep -qE '^DOMAIN=[^[:space:]]' "$ENV_FILE"; then
-    error "deploy/.env must set DOMAIN=your-domain.org (non-empty)."
-    exit 1
-fi
-if grep -qE '^POSTGRES_HOST=eceee-v4-' "$ENV_FILE" 2>/dev/null; then
-    error "deploy/.env uses dev POSTGRES_HOST (eceee-v4-*). Use POSTGRES_HOST=db for production compose."
-    exit 1
-fi
-POSTGRES_HOST_VAL=$(grep '^POSTGRES_HOST=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '\r' | tr -d '[:space:]')
-if [ "$POSTGRES_HOST_VAL" != "db" ]; then
-    error "deploy/.env POSTGRES_HOST must be db (compose service name); got: ${POSTGRES_HOST_VAL:-empty}"
-    exit 1
-fi
-if grep -qE '^REDIS_URL=.*eceee-v4-redis' "$ENV_FILE" 2>/dev/null; then
-    error "deploy/.env REDIS_URL must use host redis, not eceee-v4-redis (use redis://redis:6379/0)."
-    exit 1
-fi
-if grep -qE '^SECRET_KEY=dev-secret-key-change-in-production' "$ENV_FILE" 2>/dev/null; then
-    error "deploy/.env must not use the dev SECRET_KEY. Copy deploy/.env.production.example and set a strong key."
-    exit 1
-fi
-_sk=$(grep '^SECRET_KEY=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '\r')
-_sk="${_sk#\"}"; _sk="${_sk%\"}"
-_sk="${_sk#\'}"; _sk="${_sk%\'}"
-if [ "${#_sk}" -lt 50 ]; then
-    error "deploy/.env SECRET_KEY must be at least 50 characters (length: ${#_sk}). Use: openssl rand -hex 32"
-    exit 1
-fi
-unset _sk
-
-read_publisher_password() {
-    local variable_name="$1"
-    local value
-    value=$(grep -E "^${variable_name}=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '\r' || true)
-    value="${value#\"}"; value="${value%\"}"
-    value="${value#\'}"; value="${value%\'}"
-    printf '%s' "$value"
-}
-
-publisher_password_is_valid() {
-    local value="$1"
-    [[ "$value" =~ ^[A-Za-z0-9._~-]{24,128}$ ]] && [[ "$value" != replace-with-* ]]
-}
-
-publisher_db_password=$(read_publisher_password PUBLISHER_DB_PASSWORD)
-publisher_form_db_password=$(read_publisher_password PUBLISHER_FORM_DB_PASSWORD)
-if ! publisher_password_is_valid "$publisher_db_password"; then
-    error "deploy/.env must set PUBLISHER_DB_PASSWORD to a generated 24-128 character URL-safe value."
-    exit 1
-fi
-if ! publisher_password_is_valid "$publisher_form_db_password"; then
-    error "deploy/.env must set PUBLISHER_FORM_DB_PASSWORD to a generated 24-128 character URL-safe value."
-    exit 1
-fi
-if [ "$publisher_db_password" = "$publisher_form_db_password" ]; then
-    error "deploy/.env must use independent values for PUBLISHER_DB_PASSWORD and PUBLISHER_FORM_DB_PASSWORD."
-    exit 1
-fi
-unset publisher_db_password publisher_form_db_password
+bash "$SCRIPT_DIR/validate-production-env.sh" "$ENV_FILE"
 
 acquire_production_operation_lock "deploy"
 
@@ -147,16 +95,18 @@ fi
 info "Running migrations..."
 IMAGE_TAG="$IMAGE_TAG" docker_compose run --rm backend python manage.py migrate --noinput
 
-if [ "$PUBLISHER_DEPLOY_ENABLED" -eq 1 ]; then
-    info "Provisioning least-privilege publisher database roles..."
-    IMAGE_TAG="$IMAGE_TAG" docker_compose run --rm backend python manage.py provision_publisher_roles
-fi
-
 # ── 8. Collect static files ───────────────────────────────────────────────────
 info "Collecting static files..."
 IMAGE_TAG="$IMAGE_TAG" docker_compose run --rm backend python manage.py collectstatic --noinput --clear
 
+if [ "$PUBLISHER_DEPLOY_ENABLED" -eq 1 ]; then
+    info "Provisioning least-privilege publisher database roles..."
+    IMAGE_TAG="$IMAGE_TAG" docker_compose run --rm backend python manage.py provision_publisher_roles
+    commit_installed_environment
+fi
+
 # ── 9. Start/restart containers ───────────────────────────────────────────────
+commit_installed_environment
 info "Stopping existing containers..."
 docker_compose down --timeout 30 2>/dev/null || true
 # Remove any stale containers not managed by compose (e.g. from manual runs)

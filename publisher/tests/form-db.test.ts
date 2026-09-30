@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('pg', () => ({ Pool: class { connect = mocks.connect; } }));
 
-import { formSubmissions } from '../src/form-db';
+import { checkFormSubmissionStore, formSubmissions } from '../src/form-db';
 
 const submission = {
   tenantId: 'b62c7810-cdde-4dc4-b255-64ce51daf465',
@@ -77,6 +77,42 @@ describe('form submission database', () => {
     await expect(formSubmissions.insert(submission)).rejects.toThrow('insert failed');
 
     expect(mocks.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK');
+    expect(mocks.release).toHaveBeenCalledOnce();
+  });
+
+  it('accepts an available writer with the exact effective privileges', async () => {
+    mocks.query.mockResolvedValueOnce({ rows: [{ ready: true }] });
+
+    await expect(checkFormSubmissionStore()).resolves.toBeUndefined();
+
+    expect(mocks.query).toHaveBeenCalledOnce();
+    expect(mocks.query.mock.calls[0][0]).toContain("current_user = 'eceee_publisher_forms'");
+    expect(mocks.query.mock.calls[0][0]).toContain('has_column_privilege');
+    expect(mocks.query.mock.calls[0][0]).toContain('TRUNCATE, REFERENCES, TRIGGER');
+    expect(mocks.query.mock.calls[0][0]).toContain('has_any_column_privilege');
+    expect(mocks.query.mock.calls[0][0]).toContain('UPDATE, REFERENCES');
+    expect(mocks.query.mock.calls[0][0]).toContain('rolbypassrls');
+    expect(mocks.query.mock.calls[0][0]).toContain('pg_auth_members');
+    expect(mocks.query.mock.calls[0][0]).toContain('has_function_privilege');
+    expect(mocks.query.mock.calls[0][0]).toContain('has_sequence_privilege');
+    expect(mocks.query.mock.calls[0][0]).toContain("current_database(), 'CREATE'");
+    expect(mocks.query.mock.calls[0][0]).toContain('FROM pg_attribute AS attribute, form_table');
+    expect(mocks.release).toHaveBeenCalledOnce();
+  });
+
+  it('rejects writer privilege drift and releases the connection', async () => {
+    mocks.query.mockResolvedValueOnce({ rows: [{ ready: false }] });
+
+    await expect(checkFormSubmissionStore()).rejects.toThrow('privileges are not ready');
+
+    expect(mocks.release).toHaveBeenCalledOnce();
+  });
+
+  it('releases the writer connection when the readiness query fails', async () => {
+    mocks.query.mockRejectedValueOnce(new Error('connection lost'));
+
+    await expect(checkFormSubmissionStore()).rejects.toThrow('connection lost');
+
     expect(mocks.release).toHaveBeenCalledOnce();
   });
 });

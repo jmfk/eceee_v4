@@ -11,6 +11,7 @@ READ_ROLE = "eceee_publisher"
 FORM_ROLE = "eceee_publisher_forms"
 PASSWORD_PATTERN = re.compile(r"^[A-Za-z0-9._~-]{24,128}$")
 COLUMN_PRIVILEGES = {"SELECT", "INSERT", "UPDATE", "REFERENCES"}
+PUBLISHER_ROLES = [READ_ROLE, FORM_ROLE]
 
 
 def publisher_password(name):
@@ -42,6 +43,120 @@ class Command(BaseCommand):
                     ).format(sql.Identifier(role)),
                     [password],
                 )
+
+            cursor.execute(
+                """
+                WITH publisher_roles AS (
+                    SELECT oid
+                    FROM pg_roles
+                    WHERE rolname = ANY(%s)
+                )
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_database
+                    WHERE datname = current_database()
+                      AND datdba IN (SELECT oid FROM publisher_roles)
+                    UNION ALL
+                    SELECT 1
+                    FROM pg_namespace
+                    WHERE nspname NOT IN ('pg_catalog', 'information_schema')
+                      AND nspname NOT LIKE 'pg_toast%%'
+                      AND nspname NOT LIKE 'pg_temp_%%'
+                      AND nspowner IN (SELECT oid FROM publisher_roles)
+                    UNION ALL
+                    SELECT 1
+                    FROM pg_class AS relation
+                    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+                    WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
+                      AND namespace.nspname NOT LIKE 'pg_toast%%'
+                      AND namespace.nspname NOT LIKE 'pg_temp_%%'
+                      AND relation.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
+                      AND relation.relowner IN (SELECT oid FROM publisher_roles)
+                    UNION ALL
+                    SELECT 1
+                    FROM pg_proc AS routine
+                    JOIN pg_namespace AS namespace ON namespace.oid = routine.pronamespace
+                    WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
+                      AND namespace.nspname NOT LIKE 'pg_toast%%'
+                      AND namespace.nspname NOT LIKE 'pg_temp_%%'
+                      AND routine.proowner IN (SELECT oid FROM publisher_roles)
+                )
+                """,
+                [PUBLISHER_ROLES],
+            )
+            if cursor.fetchone()[0]:
+                raise CommandError("Publisher roles own database objects and cannot be constrained to least privilege.")
+
+            cursor.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_database AS database
+                    CROSS JOIN LATERAL aclexplode(
+                        COALESCE(database.datacl, acldefault('d', database.datdba))
+                    ) AS acl
+                    WHERE database.datname = current_database()
+                      AND acl.grantee = 0
+                      AND acl.privilege_type = 'CREATE'
+                    UNION ALL
+                    SELECT 1
+                    FROM pg_namespace AS namespace
+                    CROSS JOIN LATERAL aclexplode(
+                        COALESCE(namespace.nspacl, acldefault('n', namespace.nspowner))
+                    ) AS acl
+                    WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
+                      AND namespace.nspname NOT LIKE 'pg_toast%%'
+                      AND namespace.nspname NOT LIKE 'pg_temp_%%'
+                      AND acl.grantee = 0
+                      AND (namespace.nspname <> 'public' OR acl.privilege_type <> 'USAGE')
+                    UNION ALL
+                    SELECT 1
+                    FROM pg_class AS relation
+                    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+                    CROSS JOIN LATERAL aclexplode(
+                        COALESCE(
+                            relation.relacl,
+                            acldefault(CASE WHEN relation.relkind = 'S' THEN 's'::"char" ELSE 'r'::"char" END,
+                                       relation.relowner)
+                        )
+                    ) AS acl
+                    WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
+                      AND namespace.nspname NOT LIKE 'pg_toast%%'
+                      AND namespace.nspname NOT LIKE 'pg_temp_%%'
+                      AND relation.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
+                      AND acl.grantee = 0
+                    UNION ALL
+                    SELECT 1
+                    FROM pg_attribute AS attribute
+                    JOIN pg_class AS relation ON relation.oid = attribute.attrelid
+                    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+                    CROSS JOIN LATERAL aclexplode(attribute.attacl) AS acl
+                    WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
+                      AND namespace.nspname NOT LIKE 'pg_toast%%'
+                      AND namespace.nspname NOT LIKE 'pg_temp_%%'
+                      AND relation.relkind IN ('r', 'p', 'v', 'm', 'f')
+                      AND attribute.attnum > 0
+                      AND NOT attribute.attisdropped
+                      AND acl.grantee = 0
+                    UNION ALL
+                    SELECT 1
+                    FROM pg_proc AS routine
+                    JOIN pg_namespace AS namespace ON namespace.oid = routine.pronamespace
+                    CROSS JOIN LATERAL aclexplode(
+                        COALESCE(routine.proacl, acldefault('f', routine.proowner))
+                    ) AS acl
+                    WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
+                      AND namespace.nspname NOT LIKE 'pg_toast%%'
+                      AND namespace.nspname NOT LIKE 'pg_temp_%%'
+                      AND acl.grantee = 0
+                      AND acl.privilege_type = 'EXECUTE'
+                )
+                """
+            )
+            if cursor.fetchone()[0]:
+                raise CommandError("PUBLIC grants exceed the publisher least-privilege boundary.")
+
+            for role in PUBLISHER_ROLES:
                 cursor.execute(
                     """
                     SELECT granted_role.rolname
@@ -81,15 +196,36 @@ class Command(BaseCommand):
                         sql.Identifier(database_name), sql.Identifier(role)
                     )
                 )
-                cursor.execute(sql.SQL("REVOKE ALL ON SCHEMA public FROM {}").format(sql.Identifier(role)))
                 cursor.execute(
-                    sql.SQL("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM {}").format(sql.Identifier(role))
+                    """
+                    SELECT nspname
+                    FROM pg_namespace
+                    WHERE nspname NOT IN ('pg_catalog', 'information_schema')
+                      AND nspname NOT LIKE 'pg_toast%%'
+                      AND nspname NOT LIKE 'pg_temp_%%'
+                    """
                 )
-                cursor.execute(
-                    sql.SQL("REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM {}").format(
-                        sql.Identifier(role)
+                for (schema_name,) in cursor.fetchall():
+                    cursor.execute(
+                        sql.SQL("REVOKE ALL ON SCHEMA {} FROM {}").format(
+                            sql.Identifier(schema_name), sql.Identifier(role)
+                        )
                     )
-                )
+                    cursor.execute(
+                        sql.SQL("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA {} FROM {}").format(
+                            sql.Identifier(schema_name), sql.Identifier(role)
+                        )
+                    )
+                    cursor.execute(
+                        sql.SQL("REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA {} FROM {}").format(
+                            sql.Identifier(schema_name), sql.Identifier(role)
+                        )
+                    )
+                    cursor.execute(
+                        sql.SQL("REVOKE ALL PRIVILEGES ON ALL ROUTINES IN SCHEMA {} FROM {}").format(
+                            sql.Identifier(schema_name), sql.Identifier(role)
+                        )
+                    )
                 cursor.execute(
                     """
                     SELECT namespace.nspname, table_class.relname, attribute.attname, acl.privilege_type
@@ -99,7 +235,9 @@ class Command(BaseCommand):
                     CROSS JOIN LATERAL aclexplode(attribute.attacl) AS acl
                     JOIN pg_roles AS grantee ON grantee.oid = acl.grantee
                     WHERE grantee.rolname = %s
-                      AND namespace.nspname = 'public'
+                      AND namespace.nspname NOT IN ('pg_catalog', 'information_schema')
+                      AND namespace.nspname NOT LIKE 'pg_toast%%'
+                      AND namespace.nspname NOT LIKE 'pg_temp_%%'
                       AND attribute.attnum > 0
                       AND NOT attribute.attisdropped
                     """,
