@@ -51,13 +51,27 @@ while [ "$SECONDS" -lt "$deadline" ]; do
         [ "$remaining" -gt 0 ] || break
         publisher_timeout_ms=$(((remaining < 5 ? remaining : 5) * 1000))
         PUBLISHER_STATUS=$(docker_compose exec -T publisher node -e "fetch('http://127.0.0.1:3000/api/health',{signal:AbortSignal.timeout(${publisher_timeout_ms})}).then(async r=>{process.stdout.write(String(r.status)); if(!r.ok)process.exit(1)}).catch(()=>{process.stdout.write('000');process.exit(1)})" 2>/dev/null || true)
-        remaining=$((deadline - SECONDS))
-        [ "$remaining" -gt 0 ] || break
-        publisher_timeout_ms=$(((remaining < 5 ? remaining : 5) * 1000))
-        PUBLISHER_PAGE_STATUS=$(docker_compose exec -T publisher node -e "Promise.all((process.env.PUBLISHER_TEST_HOST_MAPPINGS??'').split(',').map(entry=>entry.split('=',1)[0]).filter(Boolean).map(host=>fetch('http://127.0.0.1:3000/',{headers:{host},signal:AbortSignal.timeout(${publisher_timeout_ms})}))).then(responses=>{if(responses.length===0||responses.some(response=>!response.ok))throw new Error('unhealthy test page');process.stdout.write('200')}).catch(()=>{process.stdout.write('000');process.exit(1)})" 2>/dev/null || true)
-        PUBLISHER_PUBLIC_STATUS="000"
         PUBLISHER_TEST_HOSTS=$(docker_compose exec -T publisher node -e "process.stdout.write((process.env.PUBLISHER_TEST_HOST_MAPPINGS??'').split(',').map(entry=>entry.split('=',1)[0]).filter(Boolean).join('\n'))" 2>/dev/null || true)
+        PUBLISHER_PAGE_STATUS="000"
+        PUBLISHER_PUBLIC_STATUS="000"
         if [ -n "$PUBLISHER_TEST_HOSTS" ]; then
+            PUBLISHER_PAGE_STATUS="200"
+            while IFS= read -r test_host; do
+                remaining=$((deadline - SECONDS))
+                if [ "$remaining" -le 0 ]; then
+                    PUBLISHER_PAGE_STATUS="${test_host}:timeout"
+                    break
+                fi
+                page_timeout=$((remaining < 5 ? remaining : 5))
+                page_status=$(docker_compose exec -T backend curl --silent --show-error \
+                    --output /dev/null --write-out '%{http_code}' --max-time "$page_timeout" \
+                    --header "Host: ${test_host}" http://publisher:3000/ 2>/dev/null || true)
+                if [ "$page_status" != "200" ]; then
+                    PUBLISHER_PAGE_STATUS="${test_host}:${page_status:-000}"
+                    break
+                fi
+            done <<< "$PUBLISHER_TEST_HOSTS"
+
             PUBLISHER_PUBLIC_STATUS="200"
             while IFS= read -r test_host; do
                 remaining=$((deadline - SECONDS))
