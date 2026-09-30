@@ -180,7 +180,8 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         const objectTypes = widget.config.objectTypes || widget.config.object_types || []
         if (widget.type === 'easy_widgets.NewsDetailWidget') {
             const variableName = widget.config.slugVariableName || widget.config.slug_variable_name || 'news_slug'
-            const slug = next.context.pathVariables?.[variableName]
+            const camelVariableName = variableName.replace(/_([a-z])/g, (_match: string, letter: string) => letter.toUpperCase())
+            const slug = next.context.pathVariables?.[variableName] || next.context.pathVariables?.[camelVariableName]
             if (!slug) {
                 widget.data = { status: 'empty' }
                 return

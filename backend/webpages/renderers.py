@@ -404,7 +404,7 @@ class WebPageRenderer:
         # Render using the widget's template
         context = {
             "widget": mock_widget,
-            "config": template_config,
+            "config": template_config.get("config", template_config),
             "widget_id": widget_data.get("id", "unknown"),
             "widget_type": widget_type,
             "widget_data": widget_data,  # Full widget data access

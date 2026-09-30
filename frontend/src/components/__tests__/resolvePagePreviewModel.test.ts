@@ -30,6 +30,20 @@ describe('page preview model resolution', () => {
         expect(resolved.slots.main[0].data).toMatchObject({ status: 'ready', item: { title: 'Selected story' } })
     })
 
+    it('resolves snake-case widget variables from camel-case API path variables', async () => {
+        objectApi.search.mockResolvedValue({ data: { results: [{ id: 17, slug: 'selected-story' }] } })
+        objectApi.get.mockResolvedValue({ data: { id: 17, slug: 'selected-story', title: 'Selected story', objectType: { id: 4 } } })
+        const model = createPageRenderModel({
+            widgets: { main: [{ id: 'detail', type: 'easy_widgets.NewsDetailWidget', config: { objectTypes: [4], slugVariableName: 'news_slug' } }] },
+            context: { pathVariables: { newsSlug: 'selected-story' } },
+        })
+
+        const resolved = await resolvePagePreviewModel(model)
+
+        expect(objectApi.search).toHaveBeenCalledWith('selected-story', {}, undefined)
+        expect(resolved.slots.main[0].data).toMatchObject({ status: 'ready', item: { title: 'Selected story' } })
+    })
+
     it('selects a detail result from the configured object type when slugs overlap', async () => {
         objectApi.search.mockResolvedValue({ data: { results: [
             { id: 17, slug: 'shared-story', objectType: { id: 3 } },

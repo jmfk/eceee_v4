@@ -7,6 +7,7 @@ from django.test import SimpleTestCase
 
 from easy_widgets.widgets.news_detail import NewsDetailWidget
 from easy_widgets.widgets.sidebar_top_news import SidebarTopNewsWidget
+from webpages.renderers import WebPageRenderer
 
 
 class NewsDetailWidgetRenderTests(SimpleTestCase):
@@ -72,6 +73,50 @@ class NewsDetailWidgetRenderTests(SimpleTestCase):
             )
         html = render_to_string("easy_widgets/widgets/news_detail.html", {**context, "widget_type": widget})
         self.assertIn("Fallback body", html)
+
+    def test_page_renderer_preserves_the_prepared_news_config(self):
+        now = datetime(2026, 9, 30, tzinfo=timezone.utc)
+        article = SimpleNamespace(
+            id=9,
+            title="Rendered article",
+            object_type=SimpleNamespace(label="News"),
+            created_at=now,
+            updated_at=now,
+        )
+        version = SimpleNamespace(
+            data={"summary": "Lead text"},
+            widgets={"main": [{"id": "body"}]},
+            effective_date=now,
+        )
+        renderer = WebPageRenderer()
+        with (
+            patch(
+                "webpages.widget_registry.widget_type_registry.get_widget_type_flexible",
+                return_value=NewsDetailWidget(),
+            ),
+            patch.object(NewsDetailWidget, "_get_news_object", return_value=(article, version)),
+            patch.object(
+                NewsDetailWidget,
+                "_render_object_widgets_from_version",
+                return_value={"main": ["<p>Canonical widget body</p>"]},
+            ),
+        ):
+            html = renderer.render_widget_json(
+                {
+                    "id": "detail",
+                    "type": "easy_widgets.NewsDetailWidget",
+                    "config": {"objectTypes": [1], "renderObjectWidgets": True},
+                },
+                {
+                    "path_variables": {"news_slug": "rendered-article"},
+                    "renderer": renderer,
+                },
+            )
+
+        self.assertIn("News", html)
+        self.assertIn("Published:", html)
+        self.assertNotIn("Updated:", html)
+        self.assertIn("Canonical widget body", html)
 
 
 class NewsExcerptNormalizationTests(SimpleTestCase):
