@@ -267,6 +267,9 @@ describe('DesignerThemeWorkspacePage', () => {
         const separator = screen.getByRole('separator', { name: 'Resize preview navigation' })
         const inspectorSeparator = screen.getByRole('separator', { name: 'Resize theme inspector' })
         const workspaceLayout = separator.closest('main')
+        await waitFor(() => {
+            expect(observers.some((observer) => observer.target === workspaceLayout)).toBe(true)
+        })
         const workspaceObserver = observers.find((observer) => observer.target === workspaceLayout)
         vi.spyOn(workspaceLayout, 'getBoundingClientRect').mockReturnValue({
             x: 0, y: 0, left: 0, top: 0, right: 1800, bottom: 800, width: 1800, height: 800,
@@ -590,7 +593,8 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.workspace.mockResolvedValue(responsiveWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe, postMessage } = await readyPreview()
+        postMessage.mockRestore()
         fireEvent(window, new MessageEvent('message', {
             data: {
                 source: 'eceee-designer-preview', action: 'spacingChange',
