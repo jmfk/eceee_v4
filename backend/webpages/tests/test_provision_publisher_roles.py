@@ -12,8 +12,8 @@ class ProvisionPublisherRolesTests(SimpleTestCase):
     @patch("webpages.management.commands.provision_publisher_roles.connection")
     def test_provisions_both_roles_without_printing_credentials(self, connection, atomic):
         cursor = MagicMock()
-        cursor.fetchone.side_effect = [None, (1,)]
-        cursor.fetchall.side_effect = [[], [], [], [], [], []]
+        cursor.fetchone.side_effect = [None, (1,), (False,), (False,)]
+        cursor.fetchall.side_effect = [[], [], [("public",)], [], [], [], [("public",)], []]
         connection.cursor.return_value.__enter__.return_value = cursor
         connection.settings_dict = {"NAME": "eceee_v4"}
         atomic.return_value.__enter__.return_value = None
@@ -39,18 +39,21 @@ class ProvisionPublisherRolesTests(SimpleTestCase):
         self.assertIn("webpages_webpage", statements)
         self.assertIn("tenant_id, page_id, widget_id, submitted_at", statements)
         self.assertIn("form_title, data, submitted_at", statements)
+        self.assertIn("ALL ROUTINES IN SCHEMA", statements)
 
     @patch("webpages.management.commands.provision_publisher_roles.transaction.atomic")
     @patch("webpages.management.commands.provision_publisher_roles.connection")
     def test_revokes_preexisting_role_memberships(self, connection, atomic):
         cursor = MagicMock()
-        cursor.fetchone.side_effect = [(1,), (1,)]
+        cursor.fetchone.side_effect = [(1,), (1,), (False,), (False,)]
         cursor.fetchall.side_effect = [
             [("legacy_reader",), ("legacy_writer",)],
             [("legacy_consumer",)],
+            [("public",)],
             [],
             [],
             [],
+            [("public",)],
             [],
         ]
         connection.cursor.return_value.__enter__.return_value = cursor
@@ -86,11 +89,13 @@ class ProvisionPublisherRolesTests(SimpleTestCase):
     @patch("webpages.management.commands.provision_publisher_roles.connection")
     def test_revokes_preexisting_column_privileges(self, connection, atomic):
         cursor = MagicMock()
-        cursor.fetchone.side_effect = [(1,), (1,)]
+        cursor.fetchone.side_effect = [(1,), (1,), (False,), (False,)]
         cursor.fetchall.side_effect = [
             [],
             [],
+            [],
             [("public", "webpages_publicformsubmission", "data", "SELECT")],
+            [],
             [],
             [],
             [],
@@ -132,6 +137,40 @@ class ProvisionPublisherRolesTests(SimpleTestCase):
             clear=False,
         ):
             with self.assertRaisesMessage(CommandError, "independent passwords"):
+                call_command("provision_publisher_roles")
+
+    @patch("webpages.management.commands.provision_publisher_roles.transaction.atomic")
+    @patch("webpages.management.commands.provision_publisher_roles.connection")
+    def test_rejects_role_ownership_drift(self, connection, atomic):
+        cursor = MagicMock()
+        cursor.fetchone.side_effect = [(1,), (1,), (True,)]
+        connection.cursor.return_value.__enter__.return_value = cursor
+        connection.settings_dict = {"NAME": "eceee_v4"}
+        atomic.return_value.__enter__.return_value = None
+
+        with patch.dict(
+            "os.environ",
+            {"PUBLISHER_DB_PASSWORD": "a" * 32, "PUBLISHER_FORM_DB_PASSWORD": "b" * 32},
+            clear=False,
+        ):
+            with self.assertRaisesMessage(CommandError, "own database objects"):
+                call_command("provision_publisher_roles")
+
+    @patch("webpages.management.commands.provision_publisher_roles.transaction.atomic")
+    @patch("webpages.management.commands.provision_publisher_roles.connection")
+    def test_rejects_public_privilege_drift(self, connection, atomic):
+        cursor = MagicMock()
+        cursor.fetchone.side_effect = [(1,), (1,), (False,), (True,)]
+        connection.cursor.return_value.__enter__.return_value = cursor
+        connection.settings_dict = {"NAME": "eceee_v4"}
+        atomic.return_value.__enter__.return_value = None
+
+        with patch.dict(
+            "os.environ",
+            {"PUBLISHER_DB_PASSWORD": "a" * 32, "PUBLISHER_FORM_DB_PASSWORD": "b" * 32},
+            clear=False,
+        ):
+            with self.assertRaisesMessage(CommandError, "PUBLIC grants"):
                 call_command("provision_publisher_roles")
 
 
@@ -218,3 +257,183 @@ class ProvisionPublisherRolesPostgresTests(TestCase):
                 """
             )
             self.assertIsNone(cursor.fetchone())
+
+    def test_rejects_public_table_grants(self):
+        if database_connection.vendor != "postgresql":
+            self.skipTest("PostgreSQL role ACL semantics required")
+
+        role_names = ["eceee_publisher", "eceee_publisher_forms"]
+        with database_connection.cursor() as cursor:
+            cursor.execute("SELECT rolname FROM pg_roles WHERE rolname = ANY(%s)", [role_names])
+            existing_roles = [row[0] for row in cursor.fetchall()]
+            if existing_roles:
+                self.skipTest(f"isolated PostgreSQL roles required; already present: {', '.join(existing_roles)}")
+            cursor.execute("GRANT SELECT (data) ON webpages_publicformsubmission TO PUBLIC")
+
+        with patch.dict(
+            "os.environ",
+            {"PUBLISHER_DB_PASSWORD": "a" * 32, "PUBLISHER_FORM_DB_PASSWORD": "b" * 32},
+            clear=False,
+        ):
+            with self.assertRaisesMessage(CommandError, "PUBLIC grants"):
+                call_command("provision_publisher_roles")
+
+    def test_rejects_publisher_owned_relations(self):
+        if database_connection.vendor != "postgresql":
+            self.skipTest("PostgreSQL role ACL semantics required")
+
+        role_names = ["eceee_publisher", "eceee_publisher_forms"]
+        with database_connection.cursor() as cursor:
+            cursor.execute("SELECT rolname FROM pg_roles WHERE rolname = ANY(%s)", [role_names])
+            existing_roles = [row[0] for row in cursor.fetchall()]
+            if existing_roles:
+                self.skipTest(f"isolated PostgreSQL roles required; already present: {', '.join(existing_roles)}")
+            cursor.execute(sql.SQL("CREATE ROLE {}").format(sql.Identifier("eceee_publisher")))
+            cursor.execute("CREATE TABLE eceee_publisher_owned_test (id integer)")
+            cursor.execute(
+                sql.SQL("ALTER TABLE eceee_publisher_owned_test OWNER TO {}").format(sql.Identifier("eceee_publisher"))
+            )
+
+        with patch.dict(
+            "os.environ",
+            {"PUBLISHER_DB_PASSWORD": "a" * 32, "PUBLISHER_FORM_DB_PASSWORD": "b" * 32},
+            clear=False,
+        ):
+            with self.assertRaisesMessage(CommandError, "own database objects"):
+                call_command("provision_publisher_roles")
+
+    def test_rejects_publisher_owned_non_public_schema(self):
+        if database_connection.vendor != "postgresql":
+            self.skipTest("PostgreSQL role ACL semantics required")
+
+        role_names = ["eceee_publisher", "eceee_publisher_forms"]
+        with database_connection.cursor() as cursor:
+            cursor.execute("SELECT rolname FROM pg_roles WHERE rolname = ANY(%s)", [role_names])
+            existing_roles = [row[0] for row in cursor.fetchall()]
+            if existing_roles:
+                self.skipTest(f"isolated PostgreSQL roles required; already present: {', '.join(existing_roles)}")
+            cursor.execute(sql.SQL("CREATE ROLE {}").format(sql.Identifier("eceee_publisher_forms")))
+            cursor.execute(
+                sql.SQL("CREATE SCHEMA publisher_private AUTHORIZATION {}").format(
+                    sql.Identifier("eceee_publisher_forms")
+                )
+            )
+
+        with patch.dict(
+            "os.environ",
+            {"PUBLISHER_DB_PASSWORD": "a" * 32, "PUBLISHER_FORM_DB_PASSWORD": "b" * 32},
+            clear=False,
+        ):
+            with self.assertRaisesMessage(CommandError, "own database objects"):
+                call_command("provision_publisher_roles")
+
+    def test_rejects_publisher_owned_non_public_relation(self):
+        if database_connection.vendor != "postgresql":
+            self.skipTest("PostgreSQL role ACL semantics required")
+
+        role_names = ["eceee_publisher", "eceee_publisher_forms"]
+        with database_connection.cursor() as cursor:
+            cursor.execute("SELECT rolname FROM pg_roles WHERE rolname = ANY(%s)", [role_names])
+            existing_roles = [row[0] for row in cursor.fetchall()]
+            if existing_roles:
+                self.skipTest(f"isolated PostgreSQL roles required; already present: {', '.join(existing_roles)}")
+            cursor.execute(sql.SQL("CREATE ROLE {}").format(sql.Identifier("eceee_publisher")))
+            cursor.execute("CREATE SCHEMA publisher_test")
+            cursor.execute("CREATE TABLE publisher_test.owned_relation (id integer)")
+            cursor.execute(
+                sql.SQL("ALTER TABLE publisher_test.owned_relation OWNER TO {}").format(
+                    sql.Identifier("eceee_publisher")
+                )
+            )
+
+        with patch.dict(
+            "os.environ",
+            {"PUBLISHER_DB_PASSWORD": "a" * 32, "PUBLISHER_FORM_DB_PASSWORD": "b" * 32},
+            clear=False,
+        ):
+            with self.assertRaisesMessage(CommandError, "own database objects"):
+                call_command("provision_publisher_roles")
+
+    def test_rejects_public_grants_outside_public_schema(self):
+        if database_connection.vendor != "postgresql":
+            self.skipTest("PostgreSQL role ACL semantics required")
+
+        role_names = ["eceee_publisher", "eceee_publisher_forms"]
+        with database_connection.cursor() as cursor:
+            cursor.execute("SELECT rolname FROM pg_roles WHERE rolname = ANY(%s)", [role_names])
+            existing_roles = [row[0] for row in cursor.fetchall()]
+            if existing_roles:
+                self.skipTest(f"isolated PostgreSQL roles required; already present: {', '.join(existing_roles)}")
+            cursor.execute("CREATE SCHEMA publisher_shared")
+            cursor.execute("CREATE TABLE publisher_shared.shared_relation (id integer)")
+            cursor.execute("GRANT USAGE ON SCHEMA publisher_shared TO PUBLIC")
+            cursor.execute("GRANT SELECT ON publisher_shared.shared_relation TO PUBLIC")
+
+        with patch.dict(
+            "os.environ",
+            {"PUBLISHER_DB_PASSWORD": "a" * 32, "PUBLISHER_FORM_DB_PASSWORD": "b" * 32},
+            clear=False,
+        ):
+            with self.assertRaisesMessage(CommandError, "PUBLIC grants"):
+                call_command("provision_publisher_roles")
+
+    def test_revokes_direct_grants_outside_public_schema(self):
+        if database_connection.vendor != "postgresql":
+            self.skipTest("PostgreSQL role ACL semantics required")
+
+        role_names = ["eceee_publisher", "eceee_publisher_forms"]
+        with database_connection.cursor() as cursor:
+            cursor.execute("SELECT rolname FROM pg_roles WHERE rolname = ANY(%s)", [role_names])
+            existing_roles = [row[0] for row in cursor.fetchall()]
+            if existing_roles:
+                self.skipTest(f"isolated PostgreSQL roles required; already present: {', '.join(existing_roles)}")
+            for role_name in role_names:
+                cursor.execute(sql.SQL("CREATE ROLE {}").format(sql.Identifier(role_name)))
+            cursor.execute("CREATE SCHEMA publisher_grants")
+            cursor.execute("CREATE TABLE publisher_grants.granted_relation (id integer)")
+            cursor.execute(
+                sql.SQL("GRANT CREATE ON SCHEMA publisher_grants TO {}").format(sql.Identifier("eceee_publisher_forms"))
+            )
+            cursor.execute(
+                sql.SQL("GRANT SELECT ON publisher_grants.granted_relation TO {}").format(
+                    sql.Identifier("eceee_publisher_forms")
+                )
+            )
+
+        with patch.dict(
+            "os.environ",
+            {"PUBLISHER_DB_PASSWORD": "a" * 32, "PUBLISHER_FORM_DB_PASSWORD": "b" * 32},
+            clear=False,
+        ):
+            call_command("provision_publisher_roles")
+
+        with database_connection.cursor() as cursor:
+            cursor.execute("SELECT has_schema_privilege('eceee_publisher_forms', 'publisher_grants', 'CREATE')")
+            self.assertFalse(cursor.fetchone()[0])
+            cursor.execute(
+                "SELECT has_table_privilege('eceee_publisher_forms', " "'publisher_grants.granted_relation', 'SELECT')"
+            )
+            self.assertFalse(cursor.fetchone()[0])
+
+    def test_rejects_public_routine_execution(self):
+        if database_connection.vendor != "postgresql":
+            self.skipTest("PostgreSQL role ACL semantics required")
+
+        role_names = ["eceee_publisher", "eceee_publisher_forms"]
+        with database_connection.cursor() as cursor:
+            cursor.execute("SELECT rolname FROM pg_roles WHERE rolname = ANY(%s)", [role_names])
+            existing_roles = [row[0] for row in cursor.fetchall()]
+            if existing_roles:
+                self.skipTest(f"isolated PostgreSQL roles required; already present: {', '.join(existing_roles)}")
+            cursor.execute("CREATE SCHEMA publisher_routines")
+            cursor.execute(
+                "CREATE FUNCTION publisher_routines.public_function() RETURNS integer " "LANGUAGE sql AS 'SELECT 1'"
+            )
+
+        with patch.dict(
+            "os.environ",
+            {"PUBLISHER_DB_PASSWORD": "a" * 32, "PUBLISHER_FORM_DB_PASSWORD": "b" * 32},
+            clear=False,
+        ):
+            with self.assertRaisesMessage(CommandError, "PUBLIC grants"):
+                call_command("provision_publisher_roles")

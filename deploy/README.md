@@ -123,6 +123,11 @@ the remote preflight rejects the target before installing the staged environment
 file or changing application state. Ordinary application-only refs remain
 deployable by commit hash.
 
+Publisher database passwords may only be rotated through `make prod-deploy`,
+which provisions the matching PostgreSQL roles before replacing containers.
+Restart-only and environment-install-only operations reject publisher password
+changes so the installed environment cannot diverge from database credentials.
+
 ### Rollback
 
 ```bash
@@ -272,8 +277,8 @@ Edit `deploy/.env` on the server, then run `make prod-deploy` (the containers wi
 2. Mandatory verified backup (`pg_dump` → `/mnt/data/backups/`); abort on failure
 3. `git fetch --tags && git checkout TAG`
 4. Build the target's application services, including `publisher` when configured
-5. Run migrations and provision convergent least-privilege publisher roles when configured
-6. `python manage.py collectstatic`
+5. Run migrations
+6. `python manage.py collectstatic`, then provision convergent least-privilege publisher roles when configured
 7. `docker compose up -d --remove-orphans`
 8. Health check for up to 90s (backend, publisher liveness, direct rendered pages, and every public test-host HTTPS route through Caddy)
 9. Log the deploy to `/opt/eceee/app/deploy.log`

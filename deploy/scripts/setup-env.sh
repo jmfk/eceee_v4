@@ -51,11 +51,8 @@ if [ ! -f "$LOCAL_ENV" ]; then
     fi
 fi
 
-# ── 2. Validate .env (basic check) ────────────────────────────────────────────
-if grep -q "your-long-random-secret-key" "$LOCAL_ENV" || grep -q "your-secure-postgres-password" "$LOCAL_ENV"; then
-    error "Local $LOCAL_ENV still contains placeholder values. Please update it."
-    exit 1
-fi
+# ── 2. Validate .env without printing secret values ──────────────────────────
+bash deploy/scripts/validate-production-env.sh "$LOCAL_ENV"
 
 # ── 3. Push to server ─────────────────────────────────────────────────────────
 info "Staging $LOCAL_ENV on $PROD_HOST..."

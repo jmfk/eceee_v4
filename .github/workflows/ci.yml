@@ -107,6 +107,7 @@ jobs:
       - name: Test publisher deployment health gate
         run: |
           bash deploy/scripts/tests/test-healthcheck.sh
+          bash deploy/scripts/tests/test-production-operation.sh
           bash deploy/scripts/tests/test-validate-deploy-control-ref.sh
 
   backend-tests:
