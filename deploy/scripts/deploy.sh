@@ -71,22 +71,35 @@ if [ "${#_sk}" -lt 50 ]; then
 fi
 unset _sk
 
-publisher_password_is_valid() {
+read_publisher_password() {
     local variable_name="$1"
     local value
     value=$(grep -E "^${variable_name}=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '\r' || true)
     value="${value#\"}"; value="${value%\"}"
     value="${value#\'}"; value="${value%\'}"
+    printf '%s' "$value"
+}
+
+publisher_password_is_valid() {
+    local value="$1"
     [[ "$value" =~ ^[A-Za-z0-9._~-]{24,128}$ ]] && [[ "$value" != replace-with-* ]]
 }
-if ! publisher_password_is_valid PUBLISHER_DB_PASSWORD; then
+
+publisher_db_password=$(read_publisher_password PUBLISHER_DB_PASSWORD)
+publisher_form_db_password=$(read_publisher_password PUBLISHER_FORM_DB_PASSWORD)
+if ! publisher_password_is_valid "$publisher_db_password"; then
     error "deploy/.env must set PUBLISHER_DB_PASSWORD to a generated 24-128 character URL-safe value."
     exit 1
 fi
-if ! publisher_password_is_valid PUBLISHER_FORM_DB_PASSWORD; then
+if ! publisher_password_is_valid "$publisher_form_db_password"; then
     error "deploy/.env must set PUBLISHER_FORM_DB_PASSWORD to a generated 24-128 character URL-safe value."
     exit 1
 fi
+if [ "$publisher_db_password" = "$publisher_form_db_password" ]; then
+    error "deploy/.env must use independent values for PUBLISHER_DB_PASSWORD and PUBLISHER_FORM_DB_PASSWORD."
+    exit 1
+fi
+unset publisher_db_password publisher_form_db_password
 
 acquire_production_operation_lock "deploy"
 
