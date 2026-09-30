@@ -176,14 +176,17 @@ class ProvisionPublisherRolesPostgresTests(TestCase):
             call_command("provision_publisher_roles")
 
         with database_connection.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT rolbypassrls
                 FROM pg_roles
                 WHERE rolname IN ('eceee_publisher', 'eceee_publisher_forms')
                 ORDER BY rolname
-                """)
+                """
+            )
             self.assertEqual(cursor.fetchall(), [(False,), (False,)])
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT 1
                 FROM information_schema.column_privileges
                 WHERE grantee = 'eceee_publisher_forms'
@@ -191,22 +194,27 @@ class ProvisionPublisherRolesPostgresTests(TestCase):
                   AND table_name = 'webpages_publicformsubmission'
                   AND column_name = 'data'
                   AND privilege_type = 'SELECT'
-                """)
+                """
+            )
             self.assertIsNone(cursor.fetchone())
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT has_sequence_privilege(
                     'eceee_publisher_forms',
                     'eceee_publisher_test_sequence',
                     'USAGE, SELECT, UPDATE'
                 )
-                """)
+                """
+            )
             self.assertFalse(cursor.fetchone()[0])
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT 1
                 FROM pg_auth_members AS membership
                 JOIN pg_roles AS granted_role ON granted_role.oid = membership.roleid
                 JOIN pg_roles AS member_role ON member_role.oid = membership.member
                 WHERE granted_role.rolname = 'eceee_publisher_forms'
                   AND member_role.rolname = 'eceee_publisher_test_consumer'
-                """)
+                """
+            )
             self.assertIsNone(cursor.fetchone())
