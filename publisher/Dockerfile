@@ -16,7 +16,9 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     PORT=3000
 
-WORKDIR /app
+# Keep the build and runtime paths identical. Turbopack emits relative aliases
+# under .next/node_modules for server-external packages such as pg.
+WORKDIR /app/publisher
 
 COPY --from=build --chown=node:node /app/publisher/package*.json ./
 COPY --from=build --chown=node:node /app/publisher/node_modules ./node_modules
