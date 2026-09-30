@@ -10,6 +10,7 @@ from psycopg2 import sql
 READ_ROLE = "eceee_publisher"
 FORM_ROLE = "eceee_publisher_forms"
 PASSWORD_PATTERN = re.compile(r"^[A-Za-z0-9._~-]{24,128}$")
+COLUMN_PRIVILEGES = {"SELECT", "INSERT", "UPDATE", "REFERENCES"}
 
 
 def publisher_password(name):
@@ -37,7 +38,7 @@ class Command(BaseCommand):
                 cursor.execute(
                     sql.SQL(
                         "ALTER ROLE {} WITH LOGIN PASSWORD %s NOSUPERUSER NOCREATEDB NOCREATEROLE "
-                        "NOREPLICATION NOINHERIT"
+                        "NOREPLICATION NOBYPASSRLS NOINHERIT"
                     ).format(sql.Identifier(role)),
                     [password],
                 )
@@ -59,6 +60,23 @@ class Command(BaseCommand):
                         )
                     )
                 cursor.execute(
+                    """
+                    SELECT member_role.rolname
+                    FROM pg_auth_members AS membership
+                    JOIN pg_roles AS granted_role ON granted_role.oid = membership.roleid
+                    JOIN pg_roles AS member_role ON member_role.oid = membership.member
+                    WHERE granted_role.rolname = %s
+                    """,
+                    [role],
+                )
+                for (member_role,) in cursor.fetchall():
+                    cursor.execute(
+                        sql.SQL("REVOKE {} FROM {}").format(
+                            sql.Identifier(role),
+                            sql.Identifier(member_role),
+                        )
+                    )
+                cursor.execute(
                     sql.SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM {}").format(
                         sql.Identifier(database_name), sql.Identifier(role)
                     )
@@ -67,6 +85,38 @@ class Command(BaseCommand):
                 cursor.execute(
                     sql.SQL("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM {}").format(sql.Identifier(role))
                 )
+                cursor.execute(
+                    sql.SQL("REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM {}").format(
+                        sql.Identifier(role)
+                    )
+                )
+                cursor.execute(
+                    """
+                    SELECT namespace.nspname, table_class.relname, attribute.attname, acl.privilege_type
+                    FROM pg_attribute AS attribute
+                    JOIN pg_class AS table_class ON table_class.oid = attribute.attrelid
+                    JOIN pg_namespace AS namespace ON namespace.oid = table_class.relnamespace
+                    CROSS JOIN LATERAL aclexplode(attribute.attacl) AS acl
+                    JOIN pg_roles AS grantee ON grantee.oid = acl.grantee
+                    WHERE grantee.rolname = %s
+                      AND namespace.nspname = 'public'
+                      AND attribute.attnum > 0
+                      AND NOT attribute.attisdropped
+                    """,
+                    [role],
+                )
+                for table_schema, table_name, column_name, privilege_type in cursor.fetchall():
+                    if privilege_type not in COLUMN_PRIVILEGES:
+                        raise CommandError(f"Unsupported publisher column privilege: {privilege_type}")
+                    cursor.execute(
+                        sql.SQL("REVOKE {} ({}) ON TABLE {}.{} FROM {}").format(
+                            sql.SQL(privilege_type),
+                            sql.Identifier(column_name),
+                            sql.Identifier(table_schema),
+                            sql.Identifier(table_name),
+                            sql.Identifier(role),
+                        )
+                    )
                 cursor.execute(
                     sql.SQL("GRANT CONNECT ON DATABASE {} TO {}").format(
                         sql.Identifier(database_name), sql.Identifier(role)

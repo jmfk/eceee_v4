@@ -12,12 +12,17 @@ if ! TARGET_COMMIT=$(git -C "$REPO" rev-parse --verify --quiet "${REF}^{commit}"
     exit 2
 fi
 
-if ! git -C "$REPO" merge-base --is-ancestor "$TARGET_COMMIT" origin/main \
-    && ! git -C "$REPO" diff --quiet origin/main "$TARGET_COMMIT" -- \
+if ! git -C "$REPO" merge-base --is-ancestor "$TARGET_COMMIT" origin/main; then
+    if ! MERGE_BASE=$(git -C "$REPO" merge-base origin/main "$TARGET_COMMIT"); then
+        echo "[deploy-control] Deploy ref has no merge base with origin/main." >&2
+        exit 2
+    fi
+    if ! git -C "$REPO" diff --quiet "$MERGE_BASE" "$TARGET_COMMIT" -- \
         deploy/scripts/ deploy/docker-compose.prod.yml deploy/Caddyfile; then
-    echo "[deploy-control] Target contains deployment-control changes that are not on origin/main." >&2
-    echo "[deploy-control] Merge those changes to main, then deploy the merged commit." >&2
-    exit 1
+        echo "[deploy-control] Target contains deployment-control changes that are not on origin/main." >&2
+        echo "[deploy-control] Merge those changes to main, then deploy the merged commit." >&2
+        exit 1
+    fi
 fi
 
 printf '%s\n' "$TARGET_COMMIT"

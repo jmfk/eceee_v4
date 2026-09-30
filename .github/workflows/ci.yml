@@ -104,6 +104,11 @@ jobs:
         working-directory: publisher
         run: npm test && npm run lint && npm run typecheck && npm run build
 
+      - name: Test publisher deployment health gate
+        run: |
+          bash deploy/scripts/tests/test-healthcheck.sh
+          bash deploy/scripts/tests/test-validate-deploy-control-ref.sh
+
   backend-tests:
     name: Backend tests
     runs-on: ubuntu-latest
