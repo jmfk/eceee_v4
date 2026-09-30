@@ -76,7 +76,10 @@ done
 
 if [ "$NEEDS_FRONTEND_DEPS" -eq 1 ] && [ -f "$WORKTREE/frontend/package-lock.json" ]; then
     info "Installing frontend dependencies for checked commit..."
-    npm --prefix "$WORKTREE/frontend" ci
+    (
+        cd "$WORKTREE/frontend"
+        npm ci
+    )
     info "Installing frontend dependencies in the Docker test volume..."
     docker compose --project-directory "$WORKTREE" -f "$WORKTREE/docker-compose.dev.yml" \
         run --rm --no-deps -T frontend npm ci
