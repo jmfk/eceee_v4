@@ -109,21 +109,33 @@ git -C "$REPO" fetch origin --tags --prune --quiet
 if [ -z "$REF" ]; then
     REF="origin/main"
 fi
+TARGET_COMMIT=$(bash "$SCRIPT_DIR/validate-deploy-control-ref.sh" "$REPO" "$REF")
 # Resolve short SHA for Docker image tag (slashes are invalid in image tags)
-IMAGE_TAG=$(git -C "$REPO" rev-parse --short "${REF}^{commit}")
-info "Deploying: $REF (image tag: $IMAGE_TAG)"
+IMAGE_TAG=$(git -C "$REPO" rev-parse --short "$TARGET_COMMIT")
+info "Deploying: $TARGET_COMMIT (image tag: $IMAGE_TAG)"
 
 # ── 3. Backup ─────────────────────────────────────────────────────────────────
 info "Running pre-deploy backup..."
 bash "$SCRIPT_DIR/backup.sh"
 
 # ── 4. Git pull + checkout ────────────────────────────────────────────────────
-info "Checking out $REF..."
-git -C "$REPO" checkout --force "$REF" --quiet
+info "Checking out $TARGET_COMMIT..."
+git -C "$REPO" checkout --force "$TARGET_COMMIT" --quiet
+# Keep the reviewed main-branch deployment control plane in place even when the
+# application/Compose target is an older rollback commit.
+git -C "$REPO" checkout --no-overlay --force origin/main -- deploy/scripts/
 
 # ── 5. Build images ───────────────────────────────────────────────────────────
 info "Building images ($IMAGE_TAG)..."
-IMAGE_TAG="$IMAGE_TAG" docker_compose build backend frontend publisher playwright
+BUILD_SERVICES=(backend frontend playwright)
+PUBLISHER_DEPLOY_ENABLED=0
+COMPOSE_SERVICES=$(IMAGE_TAG="$IMAGE_TAG" docker_compose config --services)
+if grep -Fxq publisher <<< "$COMPOSE_SERVICES"; then
+    BUILD_SERVICES+=(publisher)
+    PUBLISHER_DEPLOY_ENABLED=1
+fi
+unset COMPOSE_SERVICES
+IMAGE_TAG="$IMAGE_TAG" docker_compose build "${BUILD_SERVICES[@]}"
 
 # ── 6. Migration check ────────────────────────────────────────────────────────
 info "Checking for unapplied migrations..."
@@ -135,8 +147,10 @@ fi
 info "Running migrations..."
 IMAGE_TAG="$IMAGE_TAG" docker_compose run --rm backend python manage.py migrate --noinput
 
-info "Provisioning least-privilege publisher database roles..."
-IMAGE_TAG="$IMAGE_TAG" docker_compose run --rm backend python manage.py provision_publisher_roles
+if [ "$PUBLISHER_DEPLOY_ENABLED" -eq 1 ]; then
+    info "Provisioning least-privilege publisher database roles..."
+    IMAGE_TAG="$IMAGE_TAG" docker_compose run --rm backend python manage.py provision_publisher_roles
+fi
 
 # ── 8. Collect static files ───────────────────────────────────────────────────
 info "Collecting static files..."
@@ -169,5 +183,5 @@ docker image prune -af --filter "until=24h" 2>/dev/null || true
 docker builder prune -af --filter "until=24h" 2>/dev/null || true
 
 # ── 12. Record deployment ─────────────────────────────────────────────────────
-echo "$REF ($IMAGE_TAG) $(date '+%Y-%m-%d %H:%M:%S')" >> "$DEPLOY_LOG"
-success "Deployed $REF ($IMAGE_TAG) successfully."
+echo "$TARGET_COMMIT ($IMAGE_TAG) $(date '+%Y-%m-%d %H:%M:%S')" >> "$DEPLOY_LOG"
+success "Deployed $TARGET_COMMIT ($IMAGE_TAG) successfully."
