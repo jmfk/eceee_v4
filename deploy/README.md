@@ -66,7 +66,7 @@ nano /opt/eceee/app/deploy/.env
 
 Fill in all values — especially `DOMAIN`, `SECRET_KEY`, `POSTGRES_PASSWORD`, `POSTGRES_HOST=db`, Redis, Linode Object Storage, Postmark, imgproxy signing keys, and optional AI keys. The full variable set is documented in `deploy/.env.production.example`.
 
-For the isolated TypeScript publisher, also generate independent values for `PUBLISHER_DB_PASSWORD` and `PUBLISHER_FORM_DB_PASSWORD` with `openssl rand -hex 32`. Deployment creates or rotates the fixed least-privilege PostgreSQL roles without printing either password. `PUBLISHER_TEST_DOMAIN` defaults to `publisher-test-eceee.colliberty.com` and resolves the content owned by `PUBLISHER_TEST_SOURCE_HOST`, which defaults to `summerstudy.eceee.org`.
+For the isolated TypeScript publisher, also generate independent values for `PUBLISHER_DB_PASSWORD` and `PUBLISHER_FORM_DB_PASSWORD` with `openssl rand -hex 32`. Deployment creates or rotates the fixed least-privilege PostgreSQL roles without printing either password. `PUBLISHER_TEST_HOST_MAPPINGS` defaults to the three comma-separated `test-host=source-host` mappings used below.
 
 ### Secrets
 
@@ -82,7 +82,13 @@ Add these A records pointing to your VPS IP (match `DOMAIN` and `deploy/Caddyfil
 - `app.eceee.org`
 - `imgproxy.eceee.org`
 
-The parallel Publisher additionally needs an A/AAAA record for `publisher-test-eceee.colliberty.com` pointing to the same VPS. This hostname is isolated from the existing public routes, which continue to use Django until their Caddy routes are deliberately changed. Caddy sends `X-Robots-Tag: noindex, nofollow, noarchive` on the test hostname to keep the mirrored pages out of search indexes.
+The parallel Publisher additionally needs A/AAAA records for these test hostnames pointing to the same VPS:
+
+- `eceee-test.colliberty.com` (content from `eceee.org`)
+- `summerstudy-test.colliberty.com` (content from `summerstudy.eceee.org`)
+- `industry-test.colliberty.com` (content from `industry.eceee.org`)
+
+These hostnames are isolated from the existing public routes, which continue to use Django until their Caddy routes are deliberately changed. Caddy sends `X-Robots-Tag: noindex, nofollow, noarchive` on every test hostname to keep the mirrored pages out of search indexes.
 
 ### 6. First deploy
 

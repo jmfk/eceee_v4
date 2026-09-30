@@ -6,10 +6,10 @@
     email {$EMAIL:noreply@eceee.org}
 }
 
-# Parallel TypeScript publisher. The application maps this browser-facing test
-# hostname to PUBLISHER_TEST_SOURCE_HOST only for content lookup, so redirects
-# and form submissions stay on the isolated test hostname.
-{$PUBLISHER_TEST_DOMAIN:publisher-test-eceee.colliberty.com} {
+# Parallel TypeScript publisher. The application maps these browser-facing test
+# hostnames to their public source hosts only for content lookup, so redirects
+# and form submissions stay on the isolated test hostnames.
+eceee-test.colliberty.com, summerstudy-test.colliberty.com, industry-test.colliberty.com {
     encode gzip
     header X-Robots-Tag "noindex, nofollow, noarchive"
     reverse_proxy publisher:3000

@@ -3,23 +3,30 @@ import { contentHostname } from '../src/hostname';
 
 describe('publisher test hostname mapping', () => {
   afterEach(() => {
-    delete process.env.PUBLISHER_TEST_DOMAIN;
-    delete process.env.PUBLISHER_TEST_SOURCE_HOST;
+    delete process.env.PUBLISHER_TEST_HOST_MAPPINGS;
   });
 
-  it('maps only the configured test hostname to the published source host', () => {
-    process.env.PUBLISHER_TEST_DOMAIN = 'Publisher-Test-Eceee.Colliberty.com';
-    process.env.PUBLISHER_TEST_SOURCE_HOST = 'summerstudy.eceee.org';
+  it('maps each configured test hostname to its published source host', () => {
+    process.env.PUBLISHER_TEST_HOST_MAPPINGS = [
+      'Eceee-Test.Colliberty.com=eceee.org',
+      'summerstudy-test.colliberty.com=summerstudy.eceee.org',
+      'industry-test.colliberty.com=industry.eceee.org',
+    ].join(',');
 
-    expect(contentHostname('publisher-test-eceee.colliberty.com:443')).toBe('summerstudy.eceee.org');
+    expect(contentHostname('eceee-test.colliberty.com:443')).toBe('eceee.org');
+    expect(contentHostname('summerstudy-test.colliberty.com')).toBe('summerstudy.eceee.org');
+    expect(contentHostname('industry-test.colliberty.com')).toBe('industry.eceee.org');
     expect(contentHostname('industry.eceee.org')).toBe('industry.eceee.org');
   });
 
-  it('fails closed when either side of the mapping is invalid or missing', () => {
-    process.env.PUBLISHER_TEST_DOMAIN = 'publisher-test-eceee.colliberty.com';
-    process.env.PUBLISHER_TEST_SOURCE_HOST = 'https://summerstudy.eceee.org';
+  it('ignores malformed mappings and fails closed for unconfigured hosts', () => {
+    process.env.PUBLISHER_TEST_HOST_MAPPINGS = [
+      'eceee-test.colliberty.com=https://eceee.org',
+      'missing-source.colliberty.com=',
+      'too=many=parts',
+    ].join(',');
 
-    expect(contentHostname('publisher-test-eceee.colliberty.com')).toBe('publisher-test-eceee.colliberty.com');
+    expect(contentHostname('eceee-test.colliberty.com')).toBe('eceee-test.colliberty.com');
+    expect(contentHostname('missing-source.colliberty.com')).toBe('missing-source.colliberty.com');
   });
 });
-

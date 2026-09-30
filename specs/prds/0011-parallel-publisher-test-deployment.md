@@ -18,8 +18,8 @@ The standalone TypeScript publisher cannot be validated with production-shaped c
 ## Goals
 
 - Run the TypeScript publisher as an independently health-checked production service.
-- Expose one isolated test hostname without changing existing public traffic.
-- Render the content currently owned by an existing public hostname while keeping browser navigation and form redirects on the test hostname.
+- Expose three isolated test hostnames without changing existing public traffic.
+- Render the content currently owned by the three public sites while keeping browser navigation and form redirects on their test hostnames.
 - Provision and verify the publisher's read-only and form-write database boundaries repeatably.
 
 ## Non-Goals
@@ -31,25 +31,25 @@ The standalone TypeScript publisher cannot be validated with production-shaped c
 
 ## Users and Use Cases
 
-- A site owner compares the same published paths through Django and the TypeScript publisher.
+- A site owner compares the same published paths for ECEEE, Summer Study, and Industry through Django and the TypeScript publisher.
 - An operator deploys or rolls back the parallel publisher with the existing production workflow.
 - A developer verifies native public form behavior through the real reverse proxy and database roles.
 
 ## Requirements
 
 - The production Compose stack builds and runs the publisher as a non-root Node service.
-- Caddy routes only the configured test hostname to the publisher and marks its responses as non-indexable.
-- The application maps the exact configured test hostname to one configured source hostname for content lookup only.
+- Caddy routes only the three configured test hostnames to the publisher and marks their responses as non-indexable.
+- The application maps each exact configured test hostname to its configured source hostname for content lookup only.
 - The browser-facing host remains unchanged for relative links, form actions, and redirects.
 - Existing Django public routes remain unchanged.
 - Deployment applies migrations before idempotently provisioning separate rendering and form PostgreSQL roles.
 - Deployment fails before backup or migration if either generated publisher password is absent or malformed.
-- Readiness verifies the Django backend, publisher liveness, and a rendered test-host root page.
+- Readiness verifies the Django backend, publisher liveness, and a rendered root page for every configured test host.
 
 ## Acceptance Criteria
 
 - The publisher image builds from a clean repository Docker context and its health endpoint returns HTTP 200.
-- Requests for `publisher-test-eceee.colliberty.com` resolve content from `summerstudy.eceee.org` without changing the response host.
+- Requests for `eceee-test.colliberty.com`, `summerstudy-test.colliberty.com`, and `industry-test.colliberty.com` resolve content from `eceee.org`, `summerstudy.eceee.org`, and `industry.eceee.org` respectively without changing the response host.
 - Requests for other hostnames are not aliased.
 - The rendering role can select the three required publishing tables and cannot insert.
 - The form role can select only rate-limit metadata, insert submission columns, and cannot select payload data or page tables.
@@ -58,7 +58,7 @@ The standalone TypeScript publisher cannot be validated with production-shaped c
 
 ## Constraints
 
-- DNS for `publisher-test-eceee.colliberty.com` is controlled outside this repository and must point to the existing VPS before Caddy can obtain a certificate.
+- DNS for all three `*-test.colliberty.com` hostnames is controlled outside this repository and must point to the existing VPS before Caddy can obtain certificates.
 - Django remains the CMS, schema migration owner, and current public renderer for all existing production hostnames.
 - Real credentials stay in the protected production `deploy/.env` file.
 
@@ -66,6 +66,7 @@ The standalone TypeScript publisher cannot be validated with production-shaped c
 
 - 2026-09-29: Implementation started on `codex/publisher-test-deploy`, stacked on the public-form branch until PR #167 is merged.
 - 2026-09-29: The test host is mapped inside the application instead of rewriting the upstream Host header, preserving same-origin form redirects.
+- 2026-09-30: Scope expanded to three site-specific test hosts; their Linode DNS A records point to the existing VPS.
 
 ## Linked ADRs
 
@@ -76,5 +77,4 @@ The standalone TypeScript publisher cannot be validated with production-shaped c
 
 - 2026-09-29: Publisher unit tests, lint, typecheck, production build, clean Docker build, container health probe, Compose parsing, shell parsing, ShellCheck, and Python formatting/lint checks pass locally.
 - 2026-09-29: PostgreSQL 17 clean migration through `0077`, first and repeated role provisioning, and privilege probes passed in an isolated no-host-port test container.
-- DNS, merge, deployment, TLS issuance, and browser parity inspection remain operational completion steps.
-
+- Merge, deployment, TLS issuance, and browser parity inspection remain operational completion steps.
