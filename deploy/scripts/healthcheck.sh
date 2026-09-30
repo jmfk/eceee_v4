@@ -30,12 +30,25 @@ error()   { echo -e "${RED}[health]${NC} $*" >&2; }
 
 info "Polling backend and publisher health (timeout: ${TIMEOUT}s, host: $DOMAIN)..."
 
+PUBLISHER_DEPLOY_ENABLED=0
+COMPOSE_SERVICES=$(docker_compose config --services)
+if grep -Fxq publisher <<< "$COMPOSE_SERVICES"; then
+    PUBLISHER_DEPLOY_ENABLED=1
+fi
+unset COMPOSE_SERVICES
+
 elapsed=0
 while [ "$elapsed" -lt "$TIMEOUT" ]; do
     BACKEND_STATUS=$(docker_compose exec -T backend curl -s --max-time 5 -H "Host: $DOMAIN" -o /dev/null -w '%{http_code}' http://localhost:8000/health/ 2>/dev/null || echo "000")
-    PUBLISHER_STATUS=$(docker_compose exec -T publisher node -e "fetch('http://127.0.0.1:3000/api/health').then(async r=>{process.stdout.write(String(r.status)); if(!r.ok)process.exit(1)}).catch(()=>{process.stdout.write('000');process.exit(1)})" 2>/dev/null || true)
-    PUBLISHER_PAGE_STATUS=$(docker_compose exec -T publisher node -e "Promise.all((process.env.PUBLISHER_TEST_HOST_MAPPINGS??'').split(',').map(entry=>entry.split('=',1)[0]).filter(Boolean).map(host=>fetch('http://127.0.0.1:3000/',{headers:{host}}))).then(responses=>{if(responses.length===0||responses.some(response=>!response.ok))throw new Error('unhealthy test page');process.stdout.write('200')}).catch(()=>{process.stdout.write('000');process.exit(1)})" 2>/dev/null || true)
-    if [ "$BACKEND_STATUS" = "200" ] && [ "$PUBLISHER_STATUS" = "200" ] && [ "$PUBLISHER_PAGE_STATUS" = "200" ]; then
+    PUBLISHER_STATUS="not-configured"
+    PUBLISHER_PAGE_STATUS="not-configured"
+    if [ "$PUBLISHER_DEPLOY_ENABLED" -eq 1 ]; then
+        PUBLISHER_STATUS=$(docker_compose exec -T publisher node -e "fetch('http://127.0.0.1:3000/api/health').then(async r=>{process.stdout.write(String(r.status)); if(!r.ok)process.exit(1)}).catch(()=>{process.stdout.write('000');process.exit(1)})" 2>/dev/null || true)
+        PUBLISHER_PAGE_STATUS=$(docker_compose exec -T publisher node -e "Promise.all((process.env.PUBLISHER_TEST_HOST_MAPPINGS??'').split(',').map(entry=>entry.split('=',1)[0]).filter(Boolean).map(host=>fetch('http://127.0.0.1:3000/',{headers:{host}}))).then(responses=>{if(responses.length===0||responses.some(response=>!response.ok))throw new Error('unhealthy test page');process.stdout.write('200')}).catch(()=>{process.stdout.write('000');process.exit(1)})" 2>/dev/null || true)
+    fi
+    if [ "$BACKEND_STATUS" = "200" ] \
+        && { [ "$PUBLISHER_DEPLOY_ENABLED" -eq 0 ] \
+            || { [ "$PUBLISHER_STATUS" = "200" ] && [ "$PUBLISHER_PAGE_STATUS" = "200" ]; }; }; then
         success "Health checks passed after ${elapsed}s (backend: $BACKEND_STATUS, publisher: $PUBLISHER_STATUS, test pages: $PUBLISHER_PAGE_STATUS)."
         exit 0
     fi

@@ -19,6 +19,7 @@ deploy/
     ├── fetch-and-validate-typed-tags-backup.sh  fresh prod backup → secure local validation
     ├── validate-typed-tags-backup.sh  disposable local restore validation
     ├── production-operation.sh shared lock → atomic env install → deploy/restart
+    ├── validate-deploy-control-ref.sh  require deploy-control changes on main
     └── healthcheck.sh         polls backend /health/ (Host from DOMAIN in deploy/.env)
 ```
 
@@ -66,7 +67,7 @@ nano /opt/eceee/app/deploy/.env
 
 Fill in all values — especially `DOMAIN`, `SECRET_KEY`, `POSTGRES_PASSWORD`, `POSTGRES_HOST=db`, Redis, Linode Object Storage, Postmark, imgproxy signing keys, and optional AI keys. The full variable set is documented in `deploy/.env.production.example`.
 
-For the isolated TypeScript publisher, also generate independent values for `PUBLISHER_DB_PASSWORD` and `PUBLISHER_FORM_DB_PASSWORD` with `openssl rand -hex 32`. Deployment rejects equal values before backup or migration, then creates or rotates the fixed least-privilege PostgreSQL roles without printing either password. The three `test-host=source-host` mappings are fixed in `docker-compose.prod.yml` and kept alongside the explicit Caddy routes so operators cannot configure the two surfaces apart.
+For the isolated TypeScript publisher, also generate independent values for `PUBLISHER_DB_PASSWORD` and `PUBLISHER_FORM_DB_PASSWORD` with `openssl rand -hex 32`. Deployment rejects equal values before backup or migration, then creates or rotates the fixed least-privilege PostgreSQL roles without printing either password. The publisher container receives only its two dedicated database URLs and the non-secret hostname mapping; it does not inherit the rest of `deploy/.env`. The three `test-host=source-host` mappings are fixed in `docker-compose.prod.yml` and kept alongside the explicit Caddy routes so operators cannot configure the two surfaces apart.
 
 ### Secrets
 
@@ -115,6 +116,12 @@ make prod-deploy TAG=abc1234  # deploys a specific commit hash
 
 `prod-deploy` resolves the requested ref to a commit hash first, runs preflight
 checks from a temporary worktree at that exact commit, then deploys the same hash.
+Production orchestration itself is loaded from `origin/main`. If the requested
+commit changes `deploy/scripts/`, `deploy/docker-compose.prod.yml`, or
+`deploy/Caddyfile`, those control-plane changes must be merged to `main` first;
+the remote preflight rejects the target before installing the staged environment
+file or changing application state. Ordinary application-only refs remain
+deployable by commit hash.
 
 ### Rollback
 
@@ -122,8 +129,12 @@ checks from a temporary worktree at that exact commit, then deploys the same has
 make prod-rollback            # rolls back to the previous deploy
 ```
 
-This re-runs deploy.sh with the previous tag. It does **not** automatically
-revert database migrations — see [Database Restore](#database-restore) if needed.
+This re-runs deploy.sh with the previous tag. Deploy derives optional services
+from the checked-out target, so the first rollback to a release without the
+publisher does not try to build, provision, or health-check it. The target's
+application and Compose files remain checked out, while `deploy/scripts/` stays
+on the reviewed `origin/main` control plane for the next operation. Rollback does
+**not** automatically revert database migrations — see [Database Restore](#database-restore) if needed.
 
 ### View logs
 

@@ -49,6 +49,18 @@ if ! flock -n 200; then
 fi
 export ECEEE_PRODUCTION_LOCK_FD=200
 
+TARGET_COMMIT=""
+if [ "$OPERATION" = "deploy" ]; then
+    if [ -z "$REF" ]; then
+        echo "[production-operation] Deploy ref is required." >&2
+        exit 2
+    fi
+
+    git -C "$REPO" fetch origin --tags --prune --quiet
+    git -C "$REPO" checkout --no-overlay --force origin/main -- deploy/scripts/validate-deploy-control-ref.sh
+    TARGET_COMMIT=$(bash "$SCRIPT_DIR/validate-deploy-control-ref.sh" "$REPO" "$REF")
+fi
+
 chmod 600 "$STAGED_ENV"
 mv -f "$STAGED_ENV" "$ENV_FILE"
 STAGED_ENV=""
@@ -65,12 +77,7 @@ case "$OPERATION" in
         bash "$SCRIPT_DIR/healthcheck.sh"
         ;;
     deploy)
-        if [ -z "$REF" ]; then
-            echo "[production-operation] Deploy ref is required." >&2
-            exit 2
-        fi
-        git -C "$REPO" fetch origin --tags --prune --quiet
-        git -C "$REPO" checkout --force origin/main -- deploy/scripts/
-        bash "$SCRIPT_DIR/deploy.sh" "$REF"
+        git -C "$REPO" checkout --no-overlay --force origin/main -- deploy/scripts/
+        bash "$SCRIPT_DIR/deploy.sh" "$TARGET_COMMIT"
         ;;
 esac
