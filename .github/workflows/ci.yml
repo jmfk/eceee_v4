@@ -104,6 +104,27 @@ jobs:
         working-directory: publisher
         run: npm test && npm run lint && npm run typecheck && npm run build
 
+      - name: Smoke-test publisher production image
+        run: |
+          docker build -f publisher/Dockerfile -t eceee-publisher-ci .
+          docker run --rm -d --name eceee-publisher-ci eceee-publisher-ci
+          trap 'docker rm -f eceee-publisher-ci >/dev/null 2>&1 || true' EXIT
+          for attempt in {1..30}; do
+            response=$(docker exec eceee-publisher-ci node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.stdout.write(r.status + ':' + (r.headers.get('x-eceee-publisher') || ''))).catch(()=>process.stdout.write('000:'))" 2>/dev/null || true)
+            if [ "$response" = "503:nextjs" ]; then
+              exit 0
+            fi
+            if [ "$response" != "000:" ] && [ -n "$response" ]; then
+              echo "Unexpected publisher health response: $response" >&2
+              docker logs --tail=50 eceee-publisher-ci >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "Publisher production image did not become ready." >&2
+          docker logs --tail=50 eceee-publisher-ci >&2
+          exit 1
+
       - name: Test publisher deployment health gate
         run: |
           bash deploy/scripts/tests/test-healthcheck.sh
