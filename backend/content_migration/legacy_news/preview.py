@@ -8,21 +8,62 @@ from django.utils import timezone
 from webpages.models import PageVersion, WebPage
 
 
+PREVIEW_HOSTNAME = "migration-preview.localhost"
+
+
 @transaction.atomic
 def ensure_news_preview_page(*, tenant, user, news_object_type_id: int) -> WebPage:
-    root, _ = WebPage.objects.get_or_create(
+    site_root, _ = WebPage.objects.get_or_create(
         tenant=tenant,
         parent=None,
-        slug="migration-preview",
+        slug="migration-preview-site",
         is_deleted=False,
         defaults={
-            "title": "Migration preview",
-            "description": "Local-only migration review pages",
+            "title": "Migration preview site",
+            "description": "Local-only migration review site",
             "created_by": user,
             "last_modified_by": user,
-            "hostnames": [],
+            "hostnames": [PREVIEW_HOSTNAME],
         },
     )
+    site_hostnames = site_root.hostnames or []
+    if PREVIEW_HOSTNAME not in site_hostnames:
+        site_root.hostnames = [*site_hostnames, PREVIEW_HOSTNAME]
+        site_root.last_modified_by = user
+        site_root.save(update_fields=["hostnames", "last_modified_by", "updated_at"])
+
+    root = WebPage.objects.filter(
+        tenant=tenant,
+        parent=site_root,
+        slug="migration-preview",
+        is_deleted=False,
+    ).first()
+    if root is None:
+        # PR #170 originally created this page as an unreachable hostname-less
+        # site root. Reparent it when a dev database already contains samples.
+        root = WebPage.objects.filter(
+            tenant=tenant,
+            parent=None,
+            slug="migration-preview",
+            is_deleted=False,
+        ).first()
+    if root is None:
+        root = WebPage.objects.create(
+            tenant=tenant,
+            parent=site_root,
+            slug="migration-preview",
+            title="Migration preview",
+            description="Local-only migration review pages",
+            created_by=user,
+            last_modified_by=user,
+            hostnames=[],
+        )
+    elif root.parent_id != site_root.id or root.hostnames:
+        root.parent = site_root
+        root.hostnames = []
+        root.last_modified_by = user
+        root.save(update_fields=["parent", "hostnames", "last_modified_by", "updated_at"])
+
     detail, _ = WebPage.objects.get_or_create(
         tenant=tenant,
         parent=root,
@@ -41,6 +82,7 @@ def ensure_news_preview_page(*, tenant, user, news_object_type_id: int) -> WebPa
         detail.last_modified_by = user
         detail.save(update_fields=["path_pattern_key", "last_modified_by", "updated_at"])
 
+    _ensure_version(site_root, user, widgets={})
     _ensure_version(root, user, widgets={})
     _ensure_version(
         detail,

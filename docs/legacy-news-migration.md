@@ -31,7 +31,7 @@ cd backend
 python manage.py migrate_legacy_news --sample-manifest --tenant eceee --resume
 ```
 
-The non-dry run creates or updates the preview page and canonical sample objects after the definition preflight passes. Repeating it does not create duplicate objects, versions, media, tags, or taxonomy terms. `--resume` retries original URLs represented by placeholders.
+The non-dry run creates or updates the dedicated local preview site at `http://migration-preview.localhost:10101/migration-preview/news/<slug>/` and the canonical sample objects after the definition preflight passes. Repeating it does not create duplicate objects, versions, media, tags, or taxonomy terms. `--resume` retries original URLs represented by placeholders.
 
 After the Django public, standalone React, and editor/Designer desktop and mobile captures have passed review, record that explicit gate:
 
@@ -42,7 +42,7 @@ python manage.py migrate_legacy_news --sample-manifest --tenant eceee --resume -
 
 Database mode refuses to import while this gate is absent or pending review. Any later sample content change invalidates the gate until it is accepted again.
 
-With the Django and React development servers running, capture every sample at mobile and desktop sizes. `NEWS_MIGRATION_SITE_ID` is the numeric ID of the `migration-preview` root page:
+With the Django and React development servers running, capture every sample at mobile and desktop sizes. `NEWS_MIGRATION_SITE_ID` is the numeric ID of the dedicated `migration-preview-site` root page (the page whose hostname is `migration-preview.localhost`):
 
 ```sh
 cd frontend

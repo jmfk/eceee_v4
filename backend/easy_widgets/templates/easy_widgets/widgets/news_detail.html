@@ -32,14 +32,6 @@
                     </div>
                 {% endif %}
 
-                {% if metadata.updated_at and metadata.updated_at != metadata.created_at %}
-                    <div class="news-metadata-item">
-                        <span class="news-metadata-label">Updated:</span>
-                        <time datetime="{{ metadata.updated_at|date:'c' }}">
-                            {{ metadata.updated_at|date:"F j, Y" }}
-                        </time>
-                    </div>
-                {% endif %}
             </div>
         {% endif %}
     </header>

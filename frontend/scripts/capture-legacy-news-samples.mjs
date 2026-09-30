@@ -7,12 +7,12 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(scriptDir, '../..')
 const manifestPath = path.join(repoRoot, 'backend/content_migration/legacy_news/samples/manifest.json')
 const outputRoot = path.join(repoRoot, 'artifacts/legacy-news-migration')
-const djangoBase = (process.env.NEWS_MIGRATION_DJANGO_BASE_URL || 'http://127.0.0.1:10101').replace(/\/$/, '')
+const djangoBase = (process.env.NEWS_MIGRATION_DJANGO_BASE_URL || 'http://migration-preview.localhost:10101').replace(/\/$/, '')
 const reactBase = (process.env.NEWS_MIGRATION_REACT_BASE_URL || 'http://127.0.0.1:10100').replace(/\/$/, '')
 const siteId = process.env.NEWS_MIGRATION_SITE_ID
 
 if (!siteId || !/^\d+$/.test(siteId)) {
-  throw new Error('Set NEWS_MIGRATION_SITE_ID to the migration-preview root page ID.')
+  throw new Error('Set NEWS_MIGRATION_SITE_ID to the migration-preview-site root page ID.')
 }
 
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
