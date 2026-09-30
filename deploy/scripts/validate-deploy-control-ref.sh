@@ -18,7 +18,7 @@ if ! git -C "$REPO" merge-base --is-ancestor "$TARGET_COMMIT" origin/main; then
         exit 2
     fi
     if ! git -C "$REPO" diff --quiet "$MERGE_BASE" "$TARGET_COMMIT" -- \
-        deploy/scripts/ deploy/docker-compose.prod.yml deploy/Caddyfile; then
+        .dockerignore deploy/scripts/ deploy/docker-compose.prod.yml deploy/Caddyfile; then
         echo "[deploy-control] Target contains deployment-control changes that are not on origin/main." >&2
         echo "[deploy-control] Merge those changes to main, then deploy the merged commit." >&2
         exit 1
