@@ -34,6 +34,9 @@
                         <h4 class="news-title">
                             <a href="/{{ item.object_type.name }}/{{ item.slug }}/">{{ item.title }}</a>
                         </h4>
+                        {% if config.show_excerpts and item.excerpt_text %}
+                            <p class="news-excerpt">{{ item.excerpt_text }}</p>
+                        {% endif %}
                     </div>
                 </li>
             {% endfor %}
@@ -44,4 +47,3 @@
         </div>
     {% endif %}
 </aside>
-

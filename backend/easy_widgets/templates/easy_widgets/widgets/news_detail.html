@@ -2,7 +2,7 @@
 {% load security_filters %}
 
 
-{% if should_render and config.news_object %}
+{% if should_render and news_object %}
 <article class="widget-type-{{ widget_type.css_class_name }}" data-widget-type="news-detail" data-object-id="{{ news_object.id }}">
     
     <header class="news-header">
@@ -50,9 +50,15 @@
         </div>
     {% endif %}
 
-    <div class="news-content">
-        {{ content_html|sanitize_html }}
-    </div>
+    {% if summary %}
+        <p class="news-summary">{{ summary }}</p>
+    {% endif %}
+
+    {% if content_html and not has_structured_widgets %}
+        <div class="news-content">
+            {{ content_html|sanitize_html }}
+        </div>
+    {% endif %}
 
     {% if config.render_object_widgets and rendered_widgets %}
         <div class="news-object-widgets">
@@ -65,6 +71,12 @@
             {% endfor %}
         </div>
     {% endif %}
+
+    {% if external_url %}
+        <div class="news-external-source">
+            <a href="{{ external_url }}" rel="noopener noreferrer">Read the original source</a>
+        </div>
+    {% endif %}
 </article>
 {% elif should_render == False %}
     <!-- Widget not rendering: slug not in path_variables or doesn't match configured ObjectTypes -->
@@ -75,4 +87,3 @@
     </div>
 </div>
 {% endif %}
-

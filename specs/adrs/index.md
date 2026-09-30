@@ -15,6 +15,7 @@
 | ADR-0010 | [Numbered snapshots with mutable display names](active/0010-named-theme-version-checkpoints.md) | accepted | PRD-0009 |
 | ADR-0011 | [Validate published forms and write through a dedicated PostgreSQL role](active/0011-public-form-write-boundary.md) | accepted | PRD-0010 |
 | ADR-0012 | [Validate the publisher through an isolated hostname alias](active/0012-isolated-publisher-test-host.md) | accepted | PRD-0010, PRD-0011 |
+| ADR-0013 | [Gate the legacy News migration through canonical golden samples](active/0013-legacy-news-golden-sample-gate.md) | accepted | PRD-0012 |
 
 ## Archived Decisions
 

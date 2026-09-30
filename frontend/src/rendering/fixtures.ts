@@ -1,8 +1,8 @@
 import type { RenderWidgetModel } from './types'
 
 const news = [
-    { id: 'news-1', title: 'A representative news story', path: '#news-1', data: { excerpt: 'A short summary that makes typography and spacing visible.' } },
-    { id: 'news-2', title: 'A second example story', path: '#news-2', data: { excerpt: 'Another predictable item for list and grid previews.' } },
+    { id: 'news-1', title: 'A representative news story', path: '#news-1', data: { summary: 'A short summary that makes typography and spacing visible.' } },
+    { id: 'news-2', title: 'A second example story', path: '#news-2', data: { summary: 'Another predictable item for list and grid previews.' } },
 ]
 
 const widget = (type: string, config: Record<string, any>, data?: Record<string, any>): RenderWidgetModel => ({
@@ -31,9 +31,9 @@ export const RENDER_WIDGET_FIXTURES: Record<string, RenderWidgetModel> = {
     'easy_widgets.ThreeColumnsWidget': widget('easy_widgets.ThreeColumnsWidget', { slots: { left: [widget('easy_widgets.ContentWidget', { content: '<p>First</p>' })], center: [widget('easy_widgets.ContentWidget', { content: '<p>Second</p>' })], right: [widget('easy_widgets.ContentWidget', { content: '<p>Third</p>' })] } }),
     'easy_widgets.PathDebugWidget': widget('easy_widgets.PathDebugWidget', {}),
     'easy_widgets.NewsListWidget': widget('easy_widgets.NewsListWidget', { objectTypes: ['news'] }, { status: 'ready', items: news }),
-    'easy_widgets.NewsDetailWidget': widget('easy_widgets.NewsDetailWidget', {}, { status: 'ready', item: { title: 'Example article', content: '<p>Detailed article content for the preview.</p>' } }),
+    'easy_widgets.NewsDetailWidget': widget('easy_widgets.NewsDetailWidget', {}, { status: 'ready', item: { title: 'Example article', data: { summary: 'The article lead is distinct from its body.', externalUrl: 'https://example.org/source' }, widgets: { main: [widget('easy_widgets.ContentWidget', { content: '<p>Detailed article content for the preview.</p>' })] } } }),
     'easy_widgets.TopNewsPlugWidget': widget('easy_widgets.TopNewsPlugWidget', { layout: '1x2' }, { status: 'ready', items: news }),
-    'easy_widgets.SidebarTopNewsWidget': widget('easy_widgets.SidebarTopNewsWidget', { widget_title: 'Top news' }, { status: 'ready', items: news }),
+    'easy_widgets.SidebarTopNewsWidget': widget('easy_widgets.SidebarTopNewsWidget', { widget_title: 'Top news', showExcerpts: true }, { status: 'ready', items: news }),
     'easy_widgets.SectionWidget': widget('easy_widgets.SectionWidget', { enableCollapse: false, slots: { content: [widget('easy_widgets.ContentWidget', { content: '<p>Nested section content.</p>' })] } }),
 }
 

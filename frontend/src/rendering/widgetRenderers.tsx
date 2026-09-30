@@ -547,8 +547,8 @@ const newsFields = (item: any) => {
         path: item.path || (objectType.name && item.slug ? `/${objectType.name}/${item.slug}/` : '#'),
         image: data.featuredImage || data.featured_image || item.featuredImage || item.featured_image || item.image,
         thumbnail: item.thumbnailUrl || item.thumbnail_url || data.thumbnailUrl || data.thumbnail_url || data.featuredImage || data.featured_image || item.image,
-        excerpt: data.excerpt || item.excerptText || item.excerpt_text || item.excerpt || item.summary || '',
-        publishDate: item.publishDate || item.publish_date || metadata.publishDate || metadata.publish_date,
+        excerpt: data.summary || item.summary || data.excerpt || item.excerptText || item.excerpt_text || item.excerpt || '',
+        publishDate: data.presentationalPublishingDate || data.presentational_publishing_date || item.publishDate || item.publish_date || metadata.publishDate || metadata.publish_date,
         pinned: Boolean(item.isPinned || item.is_pinned || metadata.pinned || metadata.featured),
         metadata,
     }
@@ -585,6 +585,9 @@ const NewsDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
     const fields = newsFields(item)
     const data = item.data || {}
     const slots: Record<string, unknown> = item.widgets && typeof item.widgets === 'object' ? item.widgets : {}
+    const hasStructuredWidgets = Object.values(slots).some((widgets) => asArray<any>(widgets).length > 0)
+    const summary = data.summary || item.summary || ''
+    const externalUrl = data.externalUrl || data.external_url || ''
     return <article className="news-detail-widget" data-widget-type="news-detail" data-object-id={item.id}>
         <header className="news-header">
             {configEnabled(widget.config, true, 'showObjectType', 'show_object_type') && <div className="news-type-badge">{fields.objectType.label || fields.objectType.name}</div>}
@@ -595,8 +598,10 @@ const NewsDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
             </div>}
         </header>
         {configEnabled(widget.config, true, 'showFeaturedImage', 'show_featured_image') && <div className="news-featured-image"><ImageView source={fields.image} alt={item.title || ''} /></div>}
-        <SafeHtml className="news-content" html={data.content || data.body || data.text || item.content} />
+        {summary && <p className="news-summary">{summary}</p>}
+        {!hasStructuredWidgets && <SafeHtml className="news-content" html={data.content || data.body || data.text || item.content} />}
         {configEnabled(widget.config, true, 'renderObjectWidgets', 'render_object_widgets') && Object.keys(slots).length > 0 && <div className="news-object-widgets">{Object.entries(slots).map(([slotName, widgets]) => <div className={`news-widget-slot news-widget-slot-${slotName}`} data-slot={slotName} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)}</div>}
+        {externalUrl && <div className="news-external-source"><PreviewLink href={externalUrl} rel="noopener noreferrer">Read the original source</PreviewLink></div>}
     </article>
 }
 const TopNewsPlugRender: WidgetRenderComponent = ({ widget }) => {
@@ -622,6 +627,7 @@ const SidebarTopNewsRender: WidgetRenderComponent = ({ widget }) => {
     const showThumbnails = configEnabled(widget.config, true, 'showThumbnails', 'show_thumbnails')
     const showDates = configEnabled(widget.config, true, 'showDates', 'show_dates')
     const showType = configEnabled(widget.config, false, 'showObjectType', 'show_object_type')
+    const showExcerpt = configEnabled(widget.config, false, 'showExcerpts', 'show_excerpts')
     return <aside className="sidebar-top-news-widget" data-widget-type="sidebar-top-news">
         {value(widget.config, 'widgetTitle', 'widget_title') && <h3 className="widget-title">{value(widget.config, 'widgetTitle', 'widget_title')}</h3>}
         {Array.isArray(state) ? <ul className="news-list">{state.map((item, index) => {
@@ -630,6 +636,7 @@ const SidebarTopNewsRender: WidgetRenderComponent = ({ widget }) => {
                 {showThumbnails && fields.thumbnail && <div className="news-thumbnail"><ImageView source={fields.thumbnail} alt={item.title || ''} /></div>}
                 <div className="news-content"><div className="news-meta">{showType && <span className="news-type-badge">{fields.objectType.label || fields.objectType.name}</span>}{showDates && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{fields.publishDate}</time>}</div>
                     <h4 className="news-title"><PreviewLink href={fields.path}>{item.title || `Article ${index + 1}`}</PreviewLink></h4>
+                    {showExcerpt && fields.excerpt && <p className="news-excerpt">{fields.excerpt}</p>}
                 </div>
             </li>
         })}</ul> : state}

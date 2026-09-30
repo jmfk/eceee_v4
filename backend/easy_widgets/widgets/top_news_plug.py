@@ -2,10 +2,11 @@
 Top News Plug Widget - Display top news in various grid layouts
 """
 
-from typing import Type, List
-from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Type
+
+from django.db.models import BooleanField, Case, Q, Value, When
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
-from django.db.models import Case, When, Value, BooleanField, Q
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 
@@ -138,39 +139,39 @@ class TopNewsPlugWidget(BaseWidget):
     .top-news-plug-widget:last-child {
         margin-bottom: 0;
     }
-     
+
     /* Layout: 1x3 - Three columns */
     .top-news-plug-widget.layout-1x3 .news-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 2rem;
     }
-    
+
     /* Layout: 1x2 - Two columns */
     .top-news-plug-widget.layout-1x2 .news-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
         gap: 2rem;
     }
-    
+
     /* Layout: 2x3_2 - First row 3 cols, second row 2 cols */
     .top-news-plug-widget.layout-2x3_2 .news-grid {
         display: grid;
         grid-template-columns: repeat(6, 1fr);
         gap: 2rem;
     }
-    
+
     .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(1),
     .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(2),
     .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(3) {
         grid-column: span 2;
     }
-    
+
     .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(4),
     .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(5) {
         grid-column: span 3;
     }
-    
+
     /* Layout: 2x1 - Two rows, one column */
     .top-news-plug-widget.layout-2x1 .news-grid {
         display: grid;
@@ -179,14 +180,14 @@ class TopNewsPlugWidget(BaseWidget):
         max-width: 800px;
         margin: 0 auto;
     }
-    
+
     /* Layout: 2x2 - Four items in 2x2 grid */
     .top-news-plug-widget.layout-2x2 .news-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
         gap: 2rem;
     }
-    
+
     /* News card styling */
     .top-news-plug-widget .news-card {
         position: relative;
@@ -198,12 +199,12 @@ class TopNewsPlugWidget(BaseWidget):
         display: flex;
         flex-direction: column;
     }
-    
+
     .top-news-plug-widget .news-card:hover {
         transform: translateY(-4px);
         box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
     }
-    
+
     .top-news-plug-widget .news-card.pinned::before {
         content: "📌";
         position: absolute;
@@ -220,32 +221,32 @@ class TopNewsPlugWidget(BaseWidget):
         font-size: 0.875rem;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
-    
+
     .top-news-plug-widget .news-image {
         width: 100%;
         height: 200px;
         overflow: hidden;
         background: #f3f4f6;
     }
-    
+
     .top-news-plug-widget .news-image img {
         width: 100%;
         height: 100%;
         object-fit: cover;
         transition: transform 0.3s ease;
     }
-    
+
     .top-news-plug-widget .news-card:hover .news-image img {
         transform: scale(1.05);
     }
-    
+
     .top-news-plug-widget .news-body {
         padding: 1.5rem;
         flex: 1;
         display: flex;
         flex-direction: column;
     }
-    
+
     .top-news-plug-widget .news-meta {
         display: flex;
         gap: 0.75rem;
@@ -253,7 +254,7 @@ class TopNewsPlugWidget(BaseWidget):
         font-size: 0.75rem;
         align-items: center;
     }
-    
+
     .top-news-plug-widget .news-type-badge {
         padding: 0.25rem 0.625rem;
         background: #3b82f6;
@@ -263,12 +264,12 @@ class TopNewsPlugWidget(BaseWidget):
         border-radius: 0.25rem;
         letter-spacing: 0.025em;
     }
-    
+
     .top-news-plug-widget .news-date {
         color: #6b7280;
         font-size: 0.875rem;
     }
-    
+
     .top-news-plug-widget .news-title {
         font-size: 1.25rem;
         font-weight: 700;
@@ -276,29 +277,29 @@ class TopNewsPlugWidget(BaseWidget):
         margin: 0 0 0.75rem 0;
         line-height: 1.3;
     }
-    
+
     .top-news-plug-widget .news-title a {
         color: inherit;
         text-decoration: none;
     }
-    
+
     .top-news-plug-widget .news-title a:hover {
         color: #3b82f6;
     }
-    
+
     .top-news-plug-widget .news-excerpt {
         color: #4b5563;
         line-height: 1.6;
         font-size: 0.9375rem;
         flex: 1;
     }
-    
+
     .top-news-plug-widget .news-footer {
         margin-top: 1rem;
         padding-top: 1rem;
         border-top: 1px solid #e5e7eb;
     }
-    
+
     .top-news-plug-widget .read-more {
         color: #3b82f6;
         font-weight: 600;
@@ -308,21 +309,21 @@ class TopNewsPlugWidget(BaseWidget):
         align-items: center;
         gap: 0.25rem;
     }
-    
+
     .top-news-plug-widget .read-more:hover {
         text-decoration: underline;
     }
-    
+
     /* Tablet responsiveness */
     @media (max-width: 1024px) {
         .top-news-plug-widget.layout-1x3 .news-grid {
             grid-template-columns: repeat(2, 1fr);
         }
-        
+
         .top-news-plug-widget.layout-2x3_2 .news-grid {
             grid-template-columns: repeat(2, 1fr);
         }
-        
+
         .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(1),
         .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(2),
         .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(3),
@@ -331,14 +332,14 @@ class TopNewsPlugWidget(BaseWidget):
             grid-column: span 1;
         }
     }
-    
+
     /* Mobile responsiveness - all layouts become single column */
     @media (max-width: 768px) {
         .top-news-plug-widget .news-grid {
             grid-template-columns: 1fr !important;
             gap: 1.5rem;
         }
-        
+
         .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(1),
         .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(2),
         .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(3),
@@ -346,7 +347,7 @@ class TopNewsPlugWidget(BaseWidget):
         .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(5) {
             grid-column: span 1 !important;
         }
-        
+
         .top-news-plug-widget .news-title {
             font-size: 1.125rem;
         }
@@ -437,9 +438,7 @@ class TopNewsPlugWidget(BaseWidget):
 
                 # Get featured image from current version data
                 if item.current_version:
-                    item.featured_image_url = item.data.get(
-                        "featured_image"
-                    ) or item.data.get("featuredImage")
+                    item.featured_image_url = item.data.get("featured_image") or item.data.get("featuredImage")
                 else:
                     item.featured_image_url = None
 
@@ -456,12 +455,7 @@ class TopNewsPlugWidget(BaseWidget):
         data = obj.data
 
         # Try to find excerpt field
-        excerpt = (
-            data.get("excerpt")
-            or data.get("summary")
-            or data.get("description")
-            or data.get("content", "")
-        )
+        excerpt = data.get("summary") or data.get("excerpt") or data.get("description") or data.get("content", "")
 
         # Clean and truncate
         if isinstance(excerpt, str):

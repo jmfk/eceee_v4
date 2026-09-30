@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithStateProviders } from '../../test/testUtils'
 import DesignerThemeWorkspacePage from '../DesignerThemeWorkspacePage'
@@ -133,7 +133,6 @@ const selectHeading = async () => {
 const readyPreview = async () => {
     const iframe = await screen.findByTitle('Live theme preview')
     const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
-
     await waitFor(() => {
         fireEvent(window, new MessageEvent('message', {
             data: { source: 'eceee-render-frame', action: 'ready' },
@@ -149,6 +148,10 @@ const readyPreview = async () => {
 }
 
 describe('DesignerThemeWorkspacePage', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals()
+    })
+
     beforeEach(() => {
         vi.clearAllMocks()
         mocks.workspace.mockResolvedValue(structuredClone(workspace))
@@ -251,9 +254,8 @@ describe('DesignerThemeWorkspacePage', () => {
     })
 
     it('reclaims side-pane width when the desktop workspace becomes narrower', async () => {
-        const originalResizeObserver = global.ResizeObserver
         const observers = []
-        global.ResizeObserver = class ResizeObserver {
+        vi.stubGlobal('ResizeObserver', class ResizeObserver {
             constructor(callback) {
                 this.callback = callback
                 observers.push(this)
@@ -261,7 +263,7 @@ describe('DesignerThemeWorkspacePage', () => {
 
             observe(target) { this.target = target }
             disconnect() {}
-        }
+        })
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const separator = screen.getByRole('separator', { name: 'Resize preview navigation' })
@@ -286,7 +288,6 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(fittedInspector).toBeGreaterThanOrEqual(320)
         expect(fittedSidebar + fittedInspector).toBeLessThanOrEqual(784)
         expect(workspaceLayout).toHaveClass('xl:grid-cols-[var(--designer-sidebar-width)_var(--designer-sidebar-handle-width)_minmax(0,1fr)_var(--designer-inspector-handle-width)_var(--designer-inspector-width)]')
-        global.ResizeObserver = originalResizeObserver
     })
 
     it('selects a matching source view but renders deterministic fixtures', async () => {
@@ -564,16 +565,17 @@ describe('DesignerThemeWorkspacePage', () => {
         const iframe = screen.getByTitle('Live theme preview')
         const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
 
-        fireEvent(window, new MessageEvent('message', {
-            data: {
-                source: 'eceee-designer-preview', action: 'editText', targetId: 'content:0', kind: 'element', label: 'Rich text',
-                text: '<p>Editable copy</p>', editable: true, richText: true,
-                descendants: [{ id: 'group:0:element:h1', kind: 'element', label: 'Heading 1', text: 'Editable copy', editable: false }],
-            },
-            source: iframe.contentWindow,
-        }))
-
-        expect(screen.getByRole('toolbar', { name: 'Rich text formatting' })).toBeInTheDocument()
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: {
+                    source: 'eceee-designer-preview', action: 'editText', targetId: 'content:0', kind: 'element', label: 'Rich text',
+                    text: '<p>Editable copy</p>', editable: true, richText: true,
+                    descendants: [{ id: 'group:0:element:h1', kind: 'element', label: 'Heading 1', text: 'Editable copy', editable: false }],
+                },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByRole('toolbar', { name: 'Rich text formatting' })).toBeInTheDocument()
+        })
         fireEvent.click(screen.getByRole('button', { name: 'Bold' }))
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ source: 'eceee-render-host', action: 'formatText', targetId: 'content:0', command: 'bold' }), '*')
         vi.spyOn(window, 'prompt').mockReturnValue('example.com/article')
@@ -595,14 +597,17 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         const { iframe, postMessage } = await readyPreview()
         postMessage.mockRestore()
-        fireEvent(window, new MessageEvent('message', {
-            data: {
-                source: 'eceee-designer-preview', action: 'spacingChange',
-                targetIds: ['group:0:part:content-widget', 'group:0:element:h1'],
-                property: 'padding', value: '32px', viewportWidth: 1280,
-            },
-            source: iframe.contentWindow,
-        }))
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: {
+                    source: 'eceee-designer-preview', action: 'spacingChange',
+                    targetIds: ['group:0:part:content-widget', 'group:0:element:h1'],
+                    property: 'padding', value: '32px', viewportWidth: 1280,
+                },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByRole('button', { name: /save draft/i })).toBeEnabled()
+        })
         fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
         await waitFor(() => expect(mocks.save).toHaveBeenCalled())
         expect(mocks.save.mock.calls[0][1].spacing[0].values.padding).toBeUndefined()
@@ -629,11 +634,13 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('button', { name: 'Expand Heading 1 settings' })).toHaveAttribute('aria-expanded', 'false')
 
         const iframe = screen.getByTitle('Live theme preview')
-        fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'group:0:element:li', kind: 'element', label: 'List item', text: 'Changed nested text' },
-            source: iframe.contentWindow,
-        }))
-        expect(screen.getByRole('heading', { name: 'List item' })).toBeInTheDocument()
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'group:0:element:li', kind: 'element', label: 'List item', text: 'Changed nested text' },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByRole('heading', { name: 'List item' })).toBeInTheDocument()
+        })
         expect(screen.getByRole('button', { name: 'Collapse List item settings' })).toHaveAttribute('aria-expanded', 'true')
         expect(screen.getByLabelText('Example text')).toHaveValue('Changed nested text')
         expect(screen.getByRole('heading', { name: 'Preview content source' })).toBeInTheDocument()
@@ -643,19 +650,20 @@ describe('DesignerThemeWorkspacePage', () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
-        fireEvent(window, new MessageEvent('message', {
-            data: {
-                source: 'eceee-designer-preview', action: 'select', targetId: 'content:99', kind: 'element', label: 'Heading 1 text', text: 'Heading', editable: true,
-                computedStyles: { fontSize: '18px', padding: '10px' },
-                ancestors: [{
-                    id: 'group:0:element:h1', kind: 'element', label: 'Heading 1', editable: false,
-                    computedStyles: { fontSize: '18px', fontWeight: '700', lineHeight: '1.2', padding: '10px' },
-                }],
-            },
-            source: iframe.contentWindow,
-        }))
-
-        expect(screen.getByLabelText('Inner spacing')).toHaveValue('10px')
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: {
+                    source: 'eceee-designer-preview', action: 'select', targetId: 'content:99', kind: 'element', label: 'Heading 1 text', text: 'Heading', editable: true,
+                    computedStyles: { fontSize: '18px', padding: '10px' },
+                    ancestors: [{
+                        id: 'group:0:element:h1', kind: 'element', label: 'Heading 1', editable: false,
+                        computedStyles: { fontSize: '18px', fontWeight: '700', lineHeight: '1.2', padding: '10px' },
+                    }],
+                },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByLabelText('Inner spacing')).toHaveValue('10px')
+        })
         expect(screen.getByLabelText('Weight')).toHaveValue('700')
         expect(screen.getByLabelText('Line height')).toHaveValue('1.2')
         expect(screen.getAllByText('Theme default').length).toBeGreaterThan(0)
@@ -865,11 +873,13 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         const { iframe, postMessage } = await readyPreview()
         postMessage.mockClear()
-        fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'A revised example heading', editable: true },
-            source: iframe.contentWindow,
-        }))
-        expect(screen.getByLabelText('Example text')).toHaveValue('A revised example heading')
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'A revised example heading', editable: true },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByLabelText('Example text')).toHaveValue('A revised example heading')
+        })
         expect(postMessage).not.toHaveBeenCalled()
         fireEvent.change(screen.getByLabelText('Example text'), { target: { value: 'Inspector heading' } })
         expect(postMessage).toHaveBeenCalledWith({
@@ -892,12 +902,13 @@ describe('DesignerThemeWorkspacePage', () => {
         const { iframe, postMessage } = await readyPreview()
         postMessage.mockRestore()
 
-        fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'Pending heading', editable: true },
-            source: iframe.contentWindow,
-        }))
-
-        expect(screen.getByText('Unsaved local draft changes')).toBeInTheDocument()
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'Pending heading', editable: true },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByText('Unsaved local draft changes')).toBeInTheDocument()
+        })
         expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled()
         expect(screen.getByRole('button', { name: 'Discard draft' })).toBeEnabled()
         expect(screen.getByRole('button', { name: 'Publish changes' })).toBeEnabled()
@@ -940,11 +951,13 @@ describe('DesignerThemeWorkspacePage', () => {
         const { iframe, postMessage } = await readyPreview()
         postMessage.mockRestore()
 
-        fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'Discard me', editable: true },
-            source: iframe.contentWindow,
-        }))
-        expect(screen.getByLabelText('Example text')).toHaveValue('Discard me')
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'Discard me', editable: true },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByLabelText('Example text')).toHaveValue('Discard me')
+        })
 
         fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }))
         await waitFor(() => expect(mocks.discard).toHaveBeenCalledWith('7', 2))
@@ -959,10 +972,13 @@ describe('DesignerThemeWorkspacePage', () => {
         await selectHeading()
         fireEvent.change(screen.getByDisplayValue('32px'), { target: { value: '40px' } })
         const iframe = screen.getByTitle('Live theme preview')
-        fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'One write only', editable: true },
-            source: iframe.contentWindow,
-        }))
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'One write only', editable: true },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByLabelText('Example text')).toHaveValue('One write only')
+        })
 
         fireEvent.click(screen.getByRole('button', { name: 'Save example text' }))
 

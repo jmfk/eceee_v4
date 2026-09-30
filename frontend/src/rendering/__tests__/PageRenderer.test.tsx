@@ -241,7 +241,7 @@ describe('PageRenderer', () => {
         const model = createPageRenderModel({
             widgets: { main: [
                 { id: 'top', type: 'easy_widgets.TopNewsPlugWidget', config: { layout: '1x2', showObjectType: false, showPublishDate: false, showExcerpts: false }, data: { status: 'ready', items: [item] } },
-                { id: 'side', type: 'easy_widgets.SidebarTopNewsWidget', config: { widgetTitle: 'Latest', showThumbnails: false, showDates: false, showObjectType: true }, data: { status: 'ready', items: [item] } },
+                { id: 'side', type: 'easy_widgets.SidebarTopNewsWidget', config: { widgetTitle: 'Latest', showThumbnails: false, showDates: false, showObjectType: true, showExcerpts: true }, data: { status: 'ready', items: [item] } },
             ] },
         })
 
@@ -251,6 +251,7 @@ describe('PageRenderer', () => {
         expect(container.querySelector('.top-news-plug-widget .news-type-badge,.top-news-plug-widget .news-date,.top-news-plug-widget .news-excerpt')).toBeNull()
         expect(container.querySelector('.sidebar-top-news-widget .widget-title')).toHaveTextContent('Latest')
         expect(container.querySelector('.sidebar-top-news-widget .news-type-badge')).toHaveTextContent('News')
+        expect(container.querySelector('.sidebar-top-news-widget .news-excerpt')).toHaveTextContent('Excerpt')
         expect(container.querySelector('.sidebar-top-news-widget .news-thumbnail,.sidebar-top-news-widget .news-date')).toBeNull()
     })
 
@@ -260,15 +261,29 @@ describe('PageRenderer', () => {
                 id: 'detail',
                 type: 'easy_widgets.NewsDetailWidget',
                 config: { showObjectType: false, showMetadata: false, showFeaturedImage: false, renderObjectWidgets: true },
-                data: { status: 'ready', item: { id: 1, title: 'Article', objectType: { label: 'News' }, data: { content: '<p>Body</p>', featuredImage: '/news.jpg' }, widgets: { body: [{ id: 'nested', type: 'easy_widgets.HeadlineWidget', config: { content: 'Nested heading' } }] } } },
+                data: { status: 'ready', item: { id: 1, title: 'Article', objectType: { label: 'News' }, data: { summary: 'Lead text', content: '<p>Duplicate legacy body</p>', externalUrl: 'https://example.org/source', featuredImage: '/news.jpg' }, widgets: { body: [{ id: 'nested', type: 'easy_widgets.HeadlineWidget', config: { content: 'Nested heading' } }] } } },
             }] },
         })
 
         const { container } = render(<PageRenderer model={model} />)
 
-        expect(container.querySelector('[data-widget-type="news-detail"] .news-content')).toHaveTextContent('Body')
+        expect(container.querySelector('[data-widget-type="news-detail"] .news-summary')).toHaveTextContent('Lead text')
+        expect(container.querySelector('[data-widget-type="news-detail"] .news-content')).toBeNull()
         expect(container.querySelector('.news-type-badge,.news-metadata,.news-featured-image')).toBeNull()
         expect(container.querySelector('.news-object-widgets [data-slot="body"]')).toHaveTextContent('Nested heading')
+        expect(screen.getByRole('link', { name: 'Read the original source' })).toHaveAttribute('href', 'https://example.org/source')
+    })
+
+    it('uses scalar News content only when structured widgets are absent', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{
+                id: 'detail', type: 'easy_widgets.NewsDetailWidget', config: {},
+                data: { status: 'ready', item: { id: 1, title: 'Legacy fallback', data: { content: '<p>Fallback body</p>' } } },
+            }] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+        expect(container.querySelector('.news-content')).toHaveTextContent('Fallback body')
     })
 
     it('hides the news list on detail paths when configured', () => {

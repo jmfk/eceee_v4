@@ -2,8 +2,10 @@
 News Detail Widget - Display a single news article from ObjectTypes
 """
 
-from typing import Type, List, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from datetime import date, datetime
+from typing import List, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
@@ -85,9 +87,7 @@ class NewsDetailWidget(BaseWidget):
     """Display a single news article if slug exists in context and matches configured ObjectTypes"""
 
     name = "News Detail"
-    description = (
-        "Display a single news article based on slug in URL path (multi-type support)"
-    )
+    description = "Display a single news article based on slug in URL path (multi-type support)"
     template_name = "easy_widgets/widgets/news_detail.html"
 
     layout_parts = {
@@ -149,24 +149,30 @@ class NewsDetailWidget(BaseWidget):
         # Prepare object data
         featured_image = None
         if news_config.show_featured_image:
-            featured_image = published_version.data.get(
-                "featured_image"
-            ) or published_version.data.get("featuredImage")
+            featured_image = published_version.data.get("featured_image") or published_version.data.get("featuredImage")
 
-        # Get content from published version
-        content_html = (
-            published_version.data.get("content")
-            or published_version.data.get("body")
-            or published_version.data.get("text")
-            or ""
-        )
+        data = published_version.data or {}
+        summary = data.get("summary") or ""
+        external_url = data.get("externalUrl") or data.get("external_url") or ""
+
+        # Structured object widgets are canonical. Legacy scalar content is only a fallback.
+        content_html = data.get("content") or data.get("body") or data.get("text") or ""
 
         # Get metadata
         metadata = {}
         if news_config.show_metadata:
+            presentation_date = data.get("presentationalPublishingDate") or data.get("presentational_publishing_date")
+            if isinstance(presentation_date, str):
+                try:
+                    presentation_date = datetime.fromisoformat(presentation_date.replace("Z", "+00:00"))
+                except ValueError:
+                    try:
+                        presentation_date = date.fromisoformat(presentation_date)
+                    except ValueError:
+                        presentation_date = None
             metadata = {
-                "author": published_version.data.get("author"),
-                "publish_date": published_version.effective_date,
+                "author": data.get("author"),
+                "publish_date": presentation_date or published_version.effective_date,
                 "created_at": obj.created_at,
                 "updated_at": obj.updated_at,
             }
@@ -174,9 +180,7 @@ class NewsDetailWidget(BaseWidget):
         # Render object widgets if enabled
         rendered_widgets = None
         if news_config.render_object_widgets and published_version.widgets:
-            rendered_widgets = self._render_object_widgets_from_version(
-                published_version, context
-            )
+            rendered_widgets = self._render_object_widgets_from_version(published_version, context)
 
         template_config.update(
             {
@@ -186,8 +190,11 @@ class NewsDetailWidget(BaseWidget):
                 "config": news_config,
                 "featured_image": featured_image,
                 "content_html": content_html,
+                "summary": summary,
+                "external_url": external_url,
                 "metadata": metadata,
                 "rendered_widgets": rendered_widgets,
+                "has_structured_widgets": bool(rendered_widgets),
             }
         )
 
@@ -200,9 +207,7 @@ class NewsDetailWidget(BaseWidget):
         try:
             # Step 1: Get the object - don't filter by status, use date-based publishing
             obj = (
-                ObjectInstance.objects.filter(
-                    slug=slug, object_type_id__in=object_type_ids
-                )
+                ObjectInstance.objects.filter(slug=slug, object_type_id__in=object_type_ids)
                 .select_related("object_type")
                 .first()
             )
@@ -220,9 +225,7 @@ class NewsDetailWidget(BaseWidget):
         except Exception:
             return None, None
 
-    def _render_object_widgets_from_version(
-        self, published_version, context: dict
-    ) -> dict:
+    def _render_object_widgets_from_version(self, published_version, context: dict) -> dict:
         """Render widgets from the published version's widget configuration"""
         if not published_version.widgets or not context.get("renderer"):
             return {}
@@ -237,16 +240,12 @@ class NewsDetailWidget(BaseWidget):
                 try:
                     # Filter out hidden widgets (check both config.isVisible and config.is_visible)
                     widget_config = widget_data.get("config", {})
-                    is_visible = widget_config.get(
-                        "isVisible", widget_config.get("is_visible", True)
-                    )
+                    is_visible = widget_config.get("isVisible", widget_config.get("is_visible", True))
                     if not is_visible:
                         continue  # Skip hidden widgets
 
                     # Filter out inactive widgets (check both config.isActive and config.is_active)
-                    is_active = widget_config.get(
-                        "isActive", widget_config.get("is_active", True)
-                    )
+                    is_active = widget_config.get("isActive", widget_config.get("is_active", True))
                     if not is_active:
                         continue  # Skip inactive widgets
 
