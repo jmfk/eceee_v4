@@ -21,6 +21,13 @@ docker_compose() {
         return
     fi
     if [ "$1" = "exec" ] && [ "$3" = "backend" ]; then
+        if [[ "$*" == *"http://publisher:3000/"* ]]; then
+            printf '%s\n' "$*" >> "$DIRECT_PAGE_LOG"
+            if [ "${DIRECT_PAGE_MODE:-success}" = "failure" ] && [[ "$*" == *"summerstudy-test.colliberty.com"* ]]; then
+                printf '404'
+                return
+            fi
+        fi
         printf '200'
         return
     fi
@@ -29,7 +36,7 @@ docker_compose() {
             *"PUBLISHER_TEST_HOST_MAPPINGS"*"join"*)
                 printf '%s\n' eceee-test.colliberty.com summerstudy-test.colliberty.com industry-test.colliberty.com
                 ;;
-            *"api/health"*|*"unhealthy test page"*)
+            *"api/health"*)
                 [[ "$*" == *"AbortSignal.timeout("* ]] || return 1
                 printf '200'
                 ;;
@@ -62,13 +69,24 @@ EOF
 chmod +x "$TEST_DIR/bin/curl"
 
 CURL_LOG="$TEST_DIR/curl.log"
-export CURL_LOG
+DIRECT_PAGE_LOG="$TEST_DIR/direct-page.log"
+export CURL_LOG DIRECT_PAGE_LOG
 PATH="$TEST_DIR/bin:$PATH" HEALTHCHECK_TIMEOUT=5 HEALTHCHECK_INTERVAL=1 \
     PUBLIC_HEALTH_MODE=success bash "$TEST_DIR/healthcheck.sh"
 
 for host in eceee-test.colliberty.com summerstudy-test.colliberty.com industry-test.colliberty.com; do
     grep -Fxq "https://${host}/api/health" "$CURL_LOG"
+    grep -Fq -- "--header Host: ${host} http://publisher:3000/" "$DIRECT_PAGE_LOG"
 done
+
+: > "$DIRECT_PAGE_LOG"
+DIRECT_FAILURE_LOG="$TEST_DIR/direct-failure.log"
+if PATH="$TEST_DIR/bin:$PATH" HEALTHCHECK_TIMEOUT=2 HEALTHCHECK_INTERVAL=1 \
+    DIRECT_PAGE_MODE=failure PUBLIC_HEALTH_MODE=success bash "$TEST_DIR/healthcheck.sh" >"$DIRECT_FAILURE_LOG" 2>&1; then
+    echo "healthcheck unexpectedly accepted a failing direct publisher page" >&2
+    exit 1
+fi
+grep -Fq "direct test pages: summerstudy-test.colliberty.com:404" "$DIRECT_FAILURE_LOG"
 
 : > "$CURL_LOG"
 if PATH="$TEST_DIR/bin:$PATH" HEALTHCHECK_TIMEOUT=1 HEALTHCHECK_INTERVAL=1 \
