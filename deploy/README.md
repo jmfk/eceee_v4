@@ -20,7 +20,7 @@ deploy/
     ├── validate-typed-tags-backup.sh  disposable local restore validation
     ├── production-operation.sh shared lock → atomic env install → deploy/restart
     ├── validate-deploy-control-ref.sh  require deploy-control changes on main
-    └── healthcheck.sh         checks backend, publisher, and all public test-host HTTPS routes
+    └── healthcheck.sh         checks backend and publisher service health
 ```
 
 ## One-Time Server Setup
@@ -67,7 +67,7 @@ nano /opt/eceee/app/deploy/.env
 
 Fill in all values — especially `DOMAIN`, `SECRET_KEY`, `POSTGRES_PASSWORD`, `POSTGRES_HOST=db`, Redis, Linode Object Storage, Postmark, imgproxy signing keys, and optional AI keys. The full variable set is documented in `deploy/.env.production.example`.
 
-For the isolated TypeScript publisher, also generate independent values for `PUBLISHER_DB_PASSWORD` and `PUBLISHER_FORM_DB_PASSWORD` with `openssl rand -hex 32`. Deployment rejects equal values before backup or migration, then creates or rotates the fixed least-privilege PostgreSQL roles without printing either password. The publisher container receives only its two dedicated database URLs and the non-secret test-host list; it does not inherit the rest of `deploy/.env`. The three test hosts are fixed in `docker-compose.prod.yml` and kept alongside the explicit Caddy routes so operators cannot configure the two surfaces apart.
+For the isolated TypeScript publisher, also generate independent values for `PUBLISHER_DB_PASSWORD` and `PUBLISHER_FORM_DB_PASSWORD` with `openssl rand -hex 32`. Deployment rejects equal values before backup or migration, then creates or rotates the fixed least-privilege PostgreSQL roles without printing either password. The publisher container receives only its two dedicated database URLs; it does not inherit the rest of `deploy/.env`.
 
 ### Secrets
 
@@ -93,7 +93,7 @@ These hostnames are isolated from the existing public routes, which continue to 
 
 Before deploying publisher direct-host lookup, identify the three intended **ECEEE v4** root pages in the CMS. On each root page, use Settings → Hostnames to add its corresponding `*-test.colliberty.com` hostname alongside its existing hostnames; do not replace the existing entries. The editor presents one hostname per list item and also accepts scoped wildcards such as `*.colliberty.com`; use exact test hostnames here to avoid assigning unrelated subdomains to one root. A scoped wildcard matches subdomains, not its base domain, and does not create DNS records or HTTPS/Caddy routes. Confirm the root is published and that the same hostname is not assigned to another root. Save, reload, and verify the hostname is still present. These are production data changes and must be performed or explicitly approved by the operator; deploying code alone does not create aliases. The `eceee-test` root must be identified from v4 data, not inferred from `eceee.org` or `www.eceee.org`.
 
-After all three aliases are verified, deploy the code and require `make prod-deploy` to pass its direct-page and public HTTPS health checks for all three test hosts. Check the rendered page and form flow on each test host. Do not relax the healthcheck if an alias or published root is missing.
+Hostname aliases are CMS content configuration and are deliberately not part of the deployment healthcheck. After configuring or changing an alias, verify the rendered page and form flow on that host separately. `make prod-deploy` only requires the backend and publisher services themselves to become healthy.
 
 ### 6. First deploy
 
