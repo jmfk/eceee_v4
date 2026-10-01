@@ -1084,8 +1084,12 @@ class PageVersionWorkflowTest(TestCase):
             last_modified_by=self.user,
         )
 
-        with self.assertLogs("webpages.tasks", level="ERROR"):
-            updated_count = refresh_publication_caches(now=scheduled_at + timedelta(seconds=1))
+        activation_time = scheduled_at + timedelta(seconds=1)
+        with (
+            patch("webpages.models.page_version.timezone.now", return_value=activation_time),
+            self.assertLogs("webpages.tasks", level="ERROR"),
+        ):
+            updated_count = refresh_publication_caches(now=activation_time)
 
         self.page.refresh_from_db()
         draft.refresh_from_db()

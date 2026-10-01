@@ -484,10 +484,16 @@ class PageVersionWorkflowService:
             "reason": str(reason),
             "failed_at": timezone.now().isoformat(),
         }
-        version.change_summary = summary
-        version.effective_date = None
-        version.expiry_date = None
-        version.save(update_fields=["effective_date", "expiry_date", "change_summary", "updated_at"])
+        # The schedule boundary has already passed, but validation failed before
+        # this version became a valid published snapshot. Keep content untouched
+        # and perform only this narrow workflow-state rollback.
+        PageVersion.objects.filter(pk=version.pk).update(
+            effective_date=None,
+            expiry_date=None,
+            change_summary=summary,
+            updated_at=timezone.now(),
+        )
+        version.refresh_from_db()
         return version
 
     @transaction.atomic
