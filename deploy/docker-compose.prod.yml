@@ -73,9 +73,9 @@ services:
       # Compose interpolates only the two dedicated publisher credentials below.
       PUBLISHER_DATABASE_URL: postgresql://eceee_publisher:${PUBLISHER_DB_PASSWORD}@db:5432/${POSTGRES_DB}
       PUBLISHER_FORM_DATABASE_URL: postgresql://eceee_publisher_forms:${PUBLISHER_FORM_DB_PASSWORD}@db:5432/${POSTGRES_DB}
-      # Keep this fixed mapping in lockstep with the explicit Caddy site block.
-      # A separately overridable value could make Caddy and the publisher disagree.
-      PUBLISHER_TEST_HOST_MAPPINGS: eceee-test.colliberty.com=eceee.org,summerstudy-test.colliberty.com=summerstudy.eceee.org,industry-test.colliberty.com=industry.eceee.org
+      # Keep this fixed list in lockstep with Caddy and the deploy healthcheck.
+      # Each hostname must also be an alias on its own published root page.
+      PUBLISHER_TEST_HOSTS: eceee-test.colliberty.com,summerstudy-test.colliberty.com,industry-test.colliberty.com
     depends_on:
       db:
         condition: service_healthy

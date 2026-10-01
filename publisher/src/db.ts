@@ -10,6 +10,11 @@ function defaultAllowed(hostname: string): boolean {
     return configured !== null && configured !== '*' && configured !== 'default' && configured === hostname;
   });
 }
+function scopedWildcardCandidates(hostname: string): string[] {
+  if (!/^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/.test(hostname)) return [];
+  const labels = hostname.split('.');
+  return labels.slice(1, -1).map((_, index) => `*.${labels.slice(index + 1).join('.')}`);
+}
 function connection(): Pool {
   if (!process.env.PUBLISHER_DATABASE_URL) throw new Error('PUBLISHER_DATABASE_URL is required');
   return pool ??= new Pool({ connectionString: process.env.PUBLISHER_DATABASE_URL, max: 5, options: '-c default_transaction_read_only=on' });
@@ -17,15 +22,21 @@ function connection(): Pool {
 function reader(client: PoolClient): PageReader {
   return {
     async root(hostname) {
+      const scopedWildcards = scopedWildcardCandidates(hostname);
       const result = await client.query<Page>(`SELECT id, tenant_id, parent_id, slug, title, hostnames, path_pattern,
           enable_css_injection, page_css_variables, page_custom_css
         FROM webpages_webpage
         WHERE parent_id IS NULL AND is_deleted = false
           AND (hostnames @> ARRAY[$1]::varchar[]
-            OR ($2::boolean AND hostnames @> ARRAY['*']::varchar[])
-            OR ($3::boolean AND hostnames @> ARRAY['default']::varchar[]))
-        ORDER BY CASE WHEN hostnames @> ARRAY[$1]::varchar[] THEN 0 ELSE 1 END, sort_order, id
-        LIMIT 1`, [hostname, wildcardAllowed(), defaultAllowed(hostname)]);
+            OR hostnames && $2::varchar[]
+            OR ($3::boolean AND hostnames @> ARRAY['*']::varchar[])
+            OR ($4::boolean AND hostnames @> ARRAY['default']::varchar[]))
+        ORDER BY CASE WHEN hostnames @> ARRAY[$1]::varchar[] THEN 0
+                      WHEN hostnames && $2::varchar[] THEN 1 ELSE 2 END,
+          (SELECT MIN(array_position($2::varchar[], candidate))
+             FROM unnest(hostnames) AS matching_host(candidate) WHERE candidate = ANY($2::varchar[])),
+          sort_order, id
+        LIMIT 1`, [hostname, scopedWildcards, wildcardAllowed(), defaultAllowed(hostname)]);
       return result.rows[0] ?? null;
     },
     async child(parentId, tenantId, slug) {

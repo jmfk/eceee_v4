@@ -3,6 +3,7 @@ import LayoutSelector from './LayoutSelector'
 import PageTagWidget from './PageTagWidget'
 import PathPatternSelector from './PathPatternSelector'
 import PathPreviewInput from './PathPreviewInput'
+import HostnameListEditor from './HostnameListEditor'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
 
@@ -303,23 +304,10 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Hostnames
-                            </label>
-                            <input
-                                type="text"
-                                value={localValues.hostnames.join(', ')}
-                                onChange={(e) => handlePageFieldChange('hostnames',
-                                    e.target.value.split(',').map(h => h.trim()).filter(h => h)
-                                )}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="example.com, www.example.com"
-                            />
-                            <div className="text-sm text-gray-500 mt-1">
-                                Enter hostnames separated by commas
-                            </div>
-                        </div>
+                        {!webpageData?.parent && <HostnameListEditor
+                            value={localValues.hostnames}
+                            onChange={hostnames => handlePageFieldChange('hostnames', hostnames)}
+                        />}
                     </div>
                 </div>
             </div>

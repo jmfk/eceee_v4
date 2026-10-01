@@ -51,7 +51,7 @@ while [ "$SECONDS" -lt "$deadline" ]; do
         [ "$remaining" -gt 0 ] || break
         publisher_timeout_ms=$(((remaining < 5 ? remaining : 5) * 1000))
         PUBLISHER_STATUS=$(docker_compose exec -T publisher node -e "fetch('http://127.0.0.1:3000/api/health',{signal:AbortSignal.timeout(${publisher_timeout_ms})}).then(async r=>{process.stdout.write(String(r.status)); if(!r.ok)process.exit(1)}).catch(()=>{process.stdout.write('000');process.exit(1)})" 2>/dev/null || true)
-        PUBLISHER_TEST_HOSTS=$(docker_compose exec -T publisher node -e "process.stdout.write((process.env.PUBLISHER_TEST_HOST_MAPPINGS??'').split(',').map(entry=>entry.split('=',1)[0]).filter(Boolean).join('\n'))" 2>/dev/null || true)
+        PUBLISHER_TEST_HOSTS=$(docker_compose exec -T publisher node -e "process.stdout.write((process.env.PUBLISHER_TEST_HOSTS??'').split(',').map(host=>host.trim()).filter(Boolean).join('\n'))" 2>/dev/null || true)
         PUBLISHER_PAGE_STATUS="000"
         PUBLISHER_PUBLIC_STATUS="000"
         if [ -n "$PUBLISHER_TEST_HOSTS" ]; then

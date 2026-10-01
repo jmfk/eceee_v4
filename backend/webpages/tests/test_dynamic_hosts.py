@@ -75,6 +75,12 @@ class DynamicHostValidationTest(TestCase):
         # Should reject unknown hostnames
         self.assertFalse(self.middleware.is_host_allowed("unknown.com"))
 
+    def test_scoped_wildcard_matching_excludes_apex_and_unrelated_hosts(self):
+        self.assertTrue(WebPage.hostname_matches("*.colliberty.com", "news.colliberty.com"))
+        self.assertTrue(WebPage.hostname_matches("*.colliberty.com", "a.b.colliberty.com"))
+        self.assertFalse(WebPage.hostname_matches("*.colliberty.com", "colliberty.com"))
+        self.assertFalse(WebPage.hostname_matches("*.colliberty.com", "evilcolliberty.com"))
+
     @override_settings(ALLOW_WILDCARD_HOSTNAMES=True)
     def test_wildcard_hostname(self):
         """Test wildcard hostname functionality."""
@@ -94,6 +100,27 @@ class DynamicHostValidationTest(TestCase):
         # Should allow any hostname
         self.assertTrue(self.middleware.is_host_allowed("anything.com"))
         self.assertTrue(self.middleware.is_host_allowed("random.example.org"))
+
+    @override_settings(STATIC_ALLOWED_HOSTS=[])
+    def test_scoped_wildcard_matches_subdomains_but_not_apex_or_other_domains(self):
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest("ArrayField not supported on SQLite")
+        wildcard_root = WebPage.objects.create(
+            title="Scoped wildcard", slug="scoped", hostnames=["*.colliberty.com"],
+            created_by=self.user, last_modified_by=self.user, tenant=self.tenant,
+        )
+        exact_root = WebPage.objects.create(
+            title="Exact host", slug="exact", hostnames=["summerstudy-test.colliberty.com"],
+            created_by=self.user, last_modified_by=self.user, tenant=self.tenant,
+        )
+
+        self.assertTrue(self.middleware.is_host_allowed("news.colliberty.com"))
+        self.assertFalse(self.middleware.is_host_allowed("colliberty.com"))
+        self.assertFalse(self.middleware.is_host_allowed("evilcolliberty.com"))
+        self.assertEqual(WebPage.get_root_page_for_hostname("news.colliberty.com"), wildcard_root)
+        self.assertEqual(WebPage.get_root_page_for_hostname("summerstudy-test.colliberty.com"), exact_root)
+        self.assertIsNone(WebPage.get_root_page_for_hostname("colliberty.com"))
 
     def test_hostname_normalization(self):
         """Test hostname normalization."""

@@ -154,6 +154,8 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
                         continue
                 if normalized_host == db_host:
                     return True
+                if db_host.startswith("*.") and WebPage.hostname_matches(db_host, normalized_host):
+                    return True
 
             # Additional logging if wildcard was found but blocked
             if wildcard_found:
