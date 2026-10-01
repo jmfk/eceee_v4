@@ -28,9 +28,10 @@ describe('database snapshot', () => {
     expect(mocks.query.mock.calls[0][0]).toBe('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
     const [rootSql, parameters] = mocks.query.mock.calls[1];
     expect(rootSql).toContain('hostnames @> ARRAY[$1]::varchar[]');
-    expect(rootSql).toContain("$2::boolean AND hostnames @> ARRAY['*']::varchar[]");
-    expect(rootSql).toContain("$3::boolean AND hostnames @> ARRAY['default']::varchar[]");
-    expect(parameters).toEqual(['example.org', false, false]);
+    expect(rootSql).toContain('hostnames && $2::varchar[]');
+    expect(rootSql).toContain("$3::boolean AND hostnames @> ARRAY['*']::varchar[]");
+    expect(rootSql).toContain("$4::boolean AND hostnames @> ARRAY['default']::varchar[]");
+    expect(parameters).toEqual(['example.org', [], false, false]);
     expect(mocks.query.mock.calls[2][0]).toBe('COMMIT');
     expect(mocks.release).toHaveBeenCalledOnce();
   });
@@ -41,7 +42,16 @@ describe('database snapshot', () => {
 
     await database.withSnapshot(reader => reader.root('preview.example.org'));
 
-    expect(mocks.query.mock.calls[1][1]).toEqual(['preview.example.org', true, true]);
+    expect(mocks.query.mock.calls[1][1]).toEqual(['preview.example.org', ['*.example.org'], true, true]);
+  });
+
+  it('orders scoped wildcard aliases from the most specific suffix, after exact matches', async () => {
+    await database.withSnapshot(reader => reader.root('news.preview.example.org'));
+
+    const [rootSql, parameters] = mocks.query.mock.calls[1];
+    expect(parameters).toEqual(['news.preview.example.org', ['*.preview.example.org', '*.example.org'], false, false]);
+    expect(rootSql).toContain('MIN(array_position($2::varchar[], candidate))');
+    expect(rootSql).toContain('WHEN hostnames && $2::varchar[] THEN 1 ELSE 2');
   });
 
   it('keeps explicit and default theme reads tenant-scoped', async () => {

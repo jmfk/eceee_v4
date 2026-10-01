@@ -9,7 +9,7 @@ import { POST } from '../app/api/forms/[pageId]/[widgetId]/route';
 
 const context = { params: Promise.resolve({ pageId: '42', widgetId: 'contact-form' }) };
 const request = (body: string, headers: Record<string, string> = {}) => new Request(
-  'https://example.org/api/forms/42/contact-form',
+  `https://${headers.host || 'example.org'}/api/forms/42/contact-form`,
   {
     method: 'POST',
     headers: {
@@ -25,16 +25,15 @@ describe('public form route', () => {
   beforeEach(() => {
     mocks.submit.mockReset();
     mocks.submit.mockResolvedValue({ status: 'success', redirectPath: '/contact' });
-    delete process.env.PUBLISHER_TEST_HOST_MAPPINGS;
   });
 
-  it('resolves test content through the source host without changing the browser redirect host', async () => {
-    process.env.PUBLISHER_TEST_HOST_MAPPINGS = 'example.org=summerstudy.eceee.org';
+  it('resolves test content through the test-host alias without changing the redirect host', async () => {
+    const response = await POST(request('__page_path=%2Fcontact&email=visitor%40example.org', {
+      host: 'summerstudy-test.colliberty.com',
+    }), context);
 
-    const response = await POST(request('__page_path=%2Fcontact&email=visitor%40example.org'), context);
-
-    expect(mocks.submit).toHaveBeenCalledWith(expect.objectContaining({ hostname: 'summerstudy.eceee.org' }));
-    expect(response.headers.get('location')).toBe('https://example.org/contact?form_status=success&form_widget=contact-form');
+    expect(mocks.submit).toHaveBeenCalledWith(expect.objectContaining({ hostname: 'summerstudy-test.colliberty.com' }));
+    expect(response.headers.get('location')).toBe('https://summerstudy-test.colliberty.com/contact?form_status=success&form_widget=contact-form');
   });
 
   it('passes urlencoded values to the server-owned form service and redirects after success', async () => {

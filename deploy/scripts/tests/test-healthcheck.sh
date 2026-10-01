@@ -88,7 +88,7 @@ docker_compose() {
     fi
     if [ "$1" = "exec" ] && [ "$3" = "publisher" ]; then
         case "$*" in
-            *"PUBLISHER_TEST_HOST_MAPPINGS"*"join"*)
+            *"PUBLISHER_TEST_HOSTS"*"join"*)
                 printf '%s\n' eceee-test.colliberty.com summerstudy-test.colliberty.com industry-test.colliberty.com
                 ;;
             *"api/health"*)

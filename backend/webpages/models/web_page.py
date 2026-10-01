@@ -460,7 +460,16 @@ class WebPage(models.Model):
 
         # Normalize for comparison
         normalized_hostname = self.normalize_hostname(hostname)
-        return normalized_hostname in [self.normalize_hostname(h) for h in self.hostnames]
+        return any(self.hostname_matches(pattern, normalized_hostname) for pattern in self.hostnames)
+
+    @classmethod
+    def hostname_matches(cls, pattern, hostname):
+        """Match an exact hostname or a scoped wildcard, never the wildcard apex."""
+        pattern = cls.normalize_hostname(pattern)
+        hostname = cls.normalize_hostname(hostname)
+        if pattern.startswith("*."):
+            return hostname.endswith(pattern[1:]) and hostname != pattern[2:]
+        return hostname == pattern
 
     @classmethod
     def get_root_page_for_hostname(cls, hostname):
@@ -485,6 +494,16 @@ class WebPage(models.Model):
         # and vice-versa, as the user wants to ignore ports globally.
         for page in cls.objects.filter(parent__isnull=True, is_deleted=False).select_related("parent"):
             if any(cls.normalize_hostname(h) == normalized_hostname for h in page.hostnames):
+                return page
+
+        # Prefer the most specific scoped wildcard after every exact match.
+        labels = normalized_hostname.split(".")
+        for index in range(1, len(labels) - 1):
+            pattern = "*." + ".".join(labels[index:])
+            page = cls.objects.filter(
+                parent__isnull=True, hostnames__contains=[pattern], is_deleted=False
+            ).first()
+            if page:
                 return page
 
         # 3. Last fallback: look for wildcard or default patterns
@@ -712,6 +731,8 @@ class WebPage(models.Model):
 
         # Validate hostname format
         if self.hostnames:
+            import re
+
             for hostname in self.hostnames:
                 if not isinstance(hostname, str) or not hostname.strip():
                     raise ValidationError("All hostnames must be non-empty strings.")
@@ -732,10 +753,19 @@ class WebPage(models.Model):
                         f"Consider using specific hostnames for production environments."
                     )
 
-                if normalized_hostname not in ["*", "default"]:
-                    # Hostname validation supporting domains, IPv6, and optional ports
-                    import re
+                if normalized_hostname.startswith("*."):
+                    # A scoped wildcard must include a registrable-looking suffix.
+                    # It covers subdomains only; the apex requires its own alias.
+                    suffix = normalized_hostname[2:]
+                    if not re.fullmatch(
+                        r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+                        r"(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+",
+                        suffix,
+                    ):
+                        raise ValidationError(f"Invalid wildcard hostname: {hostname}")
 
+                elif normalized_hostname not in ["*", "default"]:
+                    # Hostname validation supporting domains, IPv6, and optional ports
                     # Pattern allows:
                     # - Domain names: example.com, localhost:8000, sub.domain.com:3000
                     # - IPv6 addresses: [::1], [::1]:8080, [2001:db8::1]:443
