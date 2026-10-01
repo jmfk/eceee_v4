@@ -1120,6 +1120,13 @@ prod-deploy: ## Run checks, then deploy to production (use: make prod-deploy [TA
 	bash deploy/scripts/preflight.sh "$$DEPLOY_REF"; \
 	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)" --deploy "$$DEPLOY_REF"
 
+prod-bootstrap-editor: ## Update only CMS frontend so root aliases can be entered before full deploy (requires TAG)
+	@test -n "$(TAG)" || { echo "TAG must identify the reviewed main commit" >&2; exit 2; }
+	@set -e; \
+	DEPLOY_REF=$$(bash deploy/scripts/resolve-deploy-ref.sh "$(TAG)"); \
+	git merge-base --is-ancestor "$$DEPLOY_REF" origin/main || { echo "TAG must be on origin/main" >&2; exit 2; }; \
+	bash deploy/scripts/bootstrap-editor.sh "$(PROD_HOST)" "$(PROD_DIR)" "$$DEPLOY_REF"
+
 prod-restart: ## Sync deploy/.env and restart production containers
 	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)" --restart
 
