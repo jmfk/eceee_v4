@@ -9,11 +9,11 @@ This middleware provides secure fallback behavior during database outages:
 
 import hashlib
 import logging
+
+from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpResponseBadRequest
-from django.conf import settings
 from django.utils.deprecation import MiddlewareMixin
-
 
 logger = logging.getLogger(__name__)
 
@@ -124,9 +124,7 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
                     raise Exception("Database error loading hostnames")
                 return hostnames
 
-            allowed_hosts = cache.get_or_set(
-                self.get_cache_key(), load_hostnames, self.CACHE_TIMEOUT
-            )
+            allowed_hosts = cache.get_or_set(self.get_cache_key(), load_hostnames, self.CACHE_TIMEOUT)
 
             # Normalize host for comparison
             from webpages.models import WebPage
@@ -182,9 +180,7 @@ class DynamicHostValidationMiddleware(MiddlewareMixin):
             from webpages.models import WebPage
 
             hostnames = WebPage.get_all_hostnames()
-            logger.debug(
-                f"Loaded {len(hostnames)} hostname(s) from database: {hostnames}"
-            )
+            logger.debug(f"Loaded {len(hostnames)} hostname(s) from database: {hostnames}")
             return hostnames
         except Exception as e:
             logger.error(f"Error loading hostnames from database: {e}")
@@ -262,9 +258,7 @@ def get_dynamic_allowed_hosts():
         list: Combined list of static and database hostnames
     """
     # Get static hosts (use STATIC_ALLOWED_HOSTS if available)
-    static_hosts = getattr(
-        settings, "STATIC_ALLOWED_HOSTS", getattr(settings, "ALLOWED_HOSTS", [])
-    )
+    static_hosts = getattr(settings, "STATIC_ALLOWED_HOSTS", getattr(settings, "ALLOWED_HOSTS", []))
 
     # Get database hosts with caching
     cache_key = DynamicHostValidationMiddleware.get_cache_key()
@@ -275,9 +269,7 @@ def get_dynamic_allowed_hosts():
             from webpages.models import WebPage
 
             db_hosts = WebPage.get_all_hostnames()
-            cache.set(
-                cache_key, db_hosts, DynamicHostValidationMiddleware.CACHE_TIMEOUT
-            )
+            cache.set(cache_key, db_hosts, DynamicHostValidationMiddleware.CACHE_TIMEOUT)
         except Exception as e:
             logger.error(f"Error loading database hostnames: {e}")
             db_hosts = []

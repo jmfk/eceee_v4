@@ -500,9 +500,7 @@ class WebPage(models.Model):
         labels = normalized_hostname.split(".")
         for index in range(1, len(labels) - 1):
             pattern = "*." + ".".join(labels[index:])
-            page = cls.objects.filter(
-                parent__isnull=True, hostnames__contains=[pattern], is_deleted=False
-            ).first()
+            page = cls.objects.filter(parent__isnull=True, hostnames__contains=[pattern], is_deleted=False).first()
             if page:
                 return page
 
@@ -758,8 +756,7 @@ class WebPage(models.Model):
                     # It covers subdomains only; the apex requires its own alias.
                     suffix = normalized_hostname[2:]
                     if not re.fullmatch(
-                        r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
-                        r"(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+",
+                        r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" r"(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+",
                         suffix,
                     ):
                         raise ValidationError(f"Invalid wildcard hostname: {hostname}")
