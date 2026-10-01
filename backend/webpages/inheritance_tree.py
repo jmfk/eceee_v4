@@ -37,7 +37,12 @@ class InheritanceTreeBuilder:
         self._target_version = None
         self._as_of = None
 
-    def build_tree(self, page: WebPage, target_version: Optional[PageVersion] = None) -> InheritanceTreeNode:
+    def build_tree(
+        self,
+        page: WebPage,
+        target_version: Optional[PageVersion] = None,
+        as_of=None,
+    ) -> InheritanceTreeNode:
         """
         Build complete inheritance tree for the given page.
 
@@ -52,7 +57,7 @@ class InheritanceTreeBuilder:
         """
         self._generation_start_time = time.time()
         self._target_version = target_version
-        self._as_of = (target_version.effective_date or target_version.created_at) if target_version else timezone.now()
+        self._as_of = as_of
 
         try:
             # Detect circular references
@@ -80,15 +85,18 @@ class InheritanceTreeBuilder:
         if depth == 0 and self._target_version is not None:
             return self._target_version
 
-        published = (
-            page.versions.filter(effective_date__isnull=False, effective_date__lte=self._as_of)
-            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=self._as_of))
-            .order_by("-effective_date", "-version_number")
-            .first()
-        )
-        if published:
-            return published
-        return page.versions.filter(created_at__lte=self._as_of).order_by("-created_at", "-version_number").first()
+        if self._as_of is not None:
+            published = (
+                page.versions.filter(effective_date__isnull=False, effective_date__lte=self._as_of)
+                .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=self._as_of))
+                .order_by("-effective_date", "-version_number")
+                .first()
+            )
+            if published:
+                return published
+            return page.versions.filter(created_at__lte=self._as_of).order_by("-created_at", "-version_number").first()
+
+        return page.get_current_published_version() or page.get_latest_version()
 
     def _layout_for_page(self, page: WebPage, depth: int):
         version = self._version_for_page(page, depth)

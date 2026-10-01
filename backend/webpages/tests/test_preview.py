@@ -2,9 +2,6 @@
 Tests for webpage preview functionality.
 """
 
-import json
-import re
-
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -76,6 +73,8 @@ class WebPagePreviewTest(TestCase):
         self.assertEqual(response.status_code, 200, response.content.decode())
         self.assertIn(b"<!DOCTYPE html>", response.content)
         self.assertIn(b"eceee-preview-nav-link-menu", response.content)
+        self.assertIn(b"preview-grant", response.content)
+        self.assertNotIn(b"eceeePreviewNavigation", response.content)
         self.assertIn(b"overflow: hidden !important", response.content)
 
     def test_preview_scoped_grant_auth_succeeds(self):
@@ -124,126 +123,6 @@ class WebPagePreviewTest(TestCase):
         )
 
         self.assertEqual(response.status_code, 401)
-
-    def test_preview_grant_navigation_mints_target_scoped_grant(self):
-        child_page = WebPage.objects.create(
-            title="Child page",
-            slug="child",
-            parent=self.root_page,
-            created_by=self.user,
-            last_modified_by=self.user,
-            tenant=self.tenant,
-        )
-        child_version = PageVersion.objects.create(
-            page=child_page,
-            version_number=1,
-            version_title="Published child",
-            created_by=self.user,
-            code_layout="main_layout",
-            effective_date=timezone.now(),
-        )
-        child_page.cached_path = "/child/"
-        child_page.current_published_version = child_version
-        child_page.latest_version = child_version
-        child_page.save(update_fields=["cached_path", "current_published_version", "latest_version"])
-
-        self.client.force_authenticate(self.user)
-        grant_response = self.client.post(
-            reverse(
-                "api:page-version-preview-grant",
-                kwargs={"page_id": self.root_page.id, "version_id": self.version.id},
-            )
-        )
-        source_grant = grant_response.data["preview_token"]
-        self.client.force_authenticate(None)
-
-        source_preview_response = self.client.get(f"{self.preview_url}?preview_token={source_grant}&standalone=1")
-        navigation_context_match = re.search(
-            rb"window\.eceeePreviewNavigation = (\{.*?\});",
-            source_preview_response.content,
-        )
-        self.assertIsNotNone(navigation_context_match)
-        navigation_context = json.loads(navigation_context_match.group(1))
-
-        navigation_response = self.client.post(
-            navigation_context["endpoint"],
-            {"path": "/child/", "hostname": "summerstudy"},
-            format="json",
-            HTTP_X_PREVIEW_NAVIGATION_GRANT=navigation_context["grant"],
-        )
-
-        self.assertEqual(navigation_response.status_code, 200)
-        self.assertEqual(navigation_response.data["pageId"], child_page.id)
-        self.assertEqual(navigation_response.data["latestVersionId"], child_version.id)
-        self.assertTrue(navigation_response.data["isPublished"])
-        self.assertNotIn(source_grant, navigation_response.data["previewUrl"])
-
-        mismatched_source_response = self.client.post(
-            reverse(
-                "api:page-version-preview-navigation",
-                kwargs={"page_id": child_page.id, "version_id": child_version.id},
-            ),
-            {"path": "/", "hostname": "summerstudy"},
-            format="json",
-            HTTP_X_PREVIEW_NAVIGATION_GRANT=navigation_context["grant"],
-        )
-        self.assertEqual(mismatched_source_response.status_code, 401)
-
-        target_response = self.client.get(navigation_response.data["previewUrl"])
-        self.assertEqual(target_response.status_code, 200)
-
-    def test_preview_grant_navigation_stays_within_source_tenant(self):
-        other_tenant = Tenant.objects.create(name="Other Tenant", identifier="other", created_by=self.user)
-        other_root = WebPage.objects.create(
-            title="Other root",
-            slug="other",
-            cached_path="/private/",
-            hostnames=["other.example"],
-            created_by=self.user,
-            last_modified_by=self.user,
-            tenant=other_tenant,
-        )
-        other_version = PageVersion.objects.create(
-            page=other_root,
-            version_number=1,
-            version_title="Other version",
-            created_by=self.user,
-            code_layout="main_layout",
-            effective_date=timezone.now(),
-        )
-        other_root.current_published_version = other_version
-        other_root.latest_version = other_version
-        other_root.save(update_fields=["current_published_version", "latest_version"])
-
-        self.client.force_authenticate(self.user)
-        grant_response = self.client.post(
-            reverse(
-                "api:page-version-preview-grant",
-                kwargs={"page_id": self.root_page.id, "version_id": self.version.id},
-            )
-        )
-        self.client.force_authenticate(None)
-
-        source_preview_response = self.client.get(
-            f"{self.preview_url}?preview_token={grant_response.data['preview_token']}&standalone=1"
-        )
-        navigation_context_match = re.search(
-            rb"window\.eceeePreviewNavigation = (\{.*?\});",
-            source_preview_response.content,
-        )
-        self.assertIsNotNone(navigation_context_match)
-        navigation_context = json.loads(navigation_context_match.group(1))
-
-        response = self.client.post(
-            navigation_context["endpoint"],
-            {"path": "/private/", "hostname": "other.example"},
-            format="json",
-            HTTP_X_PREVIEW_NAVIGATION_GRANT=navigation_context["grant"],
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIsNone(response.data["pageId"])
-        self.assertEqual(response.data["previewUrl"], "")
 
     def test_preview_renders_selected_snapshot_instead_of_current_page(self):
         self.version.page_data = {"page_attributes": {"title": "Historical title"}}
