@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from django.db import transaction
-from django.utils import timezone
 
 from webpages.models import PageVersion, WebPage
+from webpages.services.page_version_workflow import PageVersionWorkflowService
 
 PREVIEW_HOSTNAME = "migration-preview.localhost"
 
@@ -105,6 +105,7 @@ def ensure_news_preview_page(*, tenant, user, news_object_type_id: int) -> WebPa
             ]
         },
     )
+    detail.refresh_from_db()
     return detail
 
 
@@ -130,8 +131,6 @@ def _ensure_version(page, user, *, widgets):
             }
         },
         widgets=widgets,
-        effective_date=timezone.now(),
         created_by=user,
     )
-    version.publish(user)
-    return version
+    return PageVersionWorkflowService(page, user).publish(version)
