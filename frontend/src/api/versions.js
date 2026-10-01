@@ -216,6 +216,10 @@ export const versionsApi = {
         return response
     }, 'versions.getPageVersionsList'),
 
+    createPreviewGrant: wrapApiCall(async (pageId, versionId) => {
+        return api.post(endpoints.previewSizes.previewGrant(pageId, versionId))
+    }, 'versions.createPreviewGrant'),
+
     /**
      * Get versions for a page using consistent path-based API  
      * @param {number} pageId - Page ID

@@ -10,14 +10,6 @@ const statusStyles = {
     draft: 'bg-amber-50 text-amber-700 border-amber-200',
 }
 
-const openVersionPreview = (pageId, versionId) => {
-    const previewUrl = new URL(endpoints.previewSizes.preview(pageId, versionId), window.location.origin)
-    previewUrl.searchParams.set('standalone', '1')
-    const accessToken = localStorage.getItem('access_token')
-    if (accessToken) previewUrl.searchParams.set('token', accessToken)
-    window.open(previewUrl.toString(), '_blank', 'noopener,noreferrer')
-}
-
 const PageVersionHistoryPanel = ({ pageId, workflow, onRestored, onRestoreError, confirmRestore }) => {
     const [versions, setVersions] = useState([])
     const [loading, setLoading] = useState(true)
@@ -69,6 +61,25 @@ const PageVersionHistoryPanel = ({ pageId, workflow, onRestored, onRestoreError,
             ])
         } finally {
             setRestoringId(null)
+        }
+    }
+
+    const openVersionPreview = async (versionId) => {
+        const previewWindow = window.open('about:blank', '_blank')
+        if (!previewWindow) {
+            await onRestoreError?.(new Error('The preview window was blocked by the browser.'))
+            return
+        }
+        previewWindow.opener = null
+        try {
+            const grant = await versionsApi.createPreviewGrant(pageId, versionId)
+            const previewUrl = new URL(endpoints.previewSizes.preview(pageId, versionId), window.location.origin)
+            previewUrl.searchParams.set('standalone', '1')
+            previewUrl.searchParams.set('preview_token', grant.previewToken)
+            previewWindow.location.replace(previewUrl.toString())
+        } catch (error) {
+            previewWindow.close()
+            await onRestoreError?.(error)
         }
     }
 
@@ -128,7 +139,7 @@ const PageVersionHistoryPanel = ({ pageId, workflow, onRestored, onRestoreError,
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
-                                    onClick={() => openVersionPreview(pageId, version.id)}
+                                    onClick={() => openVersionPreview(version.id)}
                                     className="flex items-center gap-1 rounded border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                                 >
                                     <Eye className="h-3.5 w-3.5" /> Preview

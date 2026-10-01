@@ -5,46 +5,54 @@ Preview-related views for page editor
 import os
 
 from django.conf import settings
-from django.http import HttpRequest, HttpResponse
+from django.contrib.auth import get_user_model
+from django.core import signing
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.clickjacking import xframe_options_exempt
 from rest_framework import permissions, viewsets
-from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from rest_framework.authentication import BaseAuthentication, SessionAuthentication, TokenAuthentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
+from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
 from ..models import PageVersion, PreviewSize, WebPage
 from ..renderers import WebPageRenderer
 from ..serializers import PreviewSizeSerializer
 
+PREVIEW_GRANT_SALT = "webpages.version-preview"
+PREVIEW_GRANT_MAX_AGE_SECONDS = 60
 
-class PreviewTokenAuthentication(JWTAuthentication):
-    """
-    Custom authentication class for webpage previews.
-    Allows JWT token to be provided via 'token' query parameter.
-    """
+
+class PreviewGrantAuthentication(BaseAuthentication):
+    """Authenticate a short-lived grant scoped to one page-version preview."""
+
+    def authenticate_header(self, request):
+        return "PreviewGrant"
 
     def authenticate(self, request):
-        # First try standard Authorization header via superclass
-        header = self.get_header(request)
-        if header is not None:
-            return super().authenticate(request)
-
-        # Fallback to 'token' query parameter
-        token = request.query_params.get("token")
-        if not token:
+        token = request.query_params.get("preview_token")
+        if token is None:
             return None
 
-        # Create a mock request with the token in the header for JWTAuthentication to process
-        mock_request = HttpRequest()
-        mock_request.META = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
-
         try:
-            return super().authenticate(mock_request)
-        except (InvalidToken, TokenError):
-            # Let DRF handle the error
-            raise
+            payload = signing.loads(token, salt=PREVIEW_GRANT_SALT, max_age=PREVIEW_GRANT_MAX_AGE_SECONDS)
+        except signing.SignatureExpired as error:
+            raise AuthenticationFailed("Preview grant has expired.") from error
+        except signing.BadSignature as error:
+            raise AuthenticationFailed("Invalid preview grant.") from error
+
+        route = request.resolver_match.kwargs
+        if str(payload.get("page_id")) != str(route.get("page_id")) or str(payload.get("version_id")) != str(
+            route.get("version_id")
+        ):
+            raise AuthenticationFailed("Preview grant does not match this page version.")
+
+        user = get_user_model().objects.filter(pk=payload.get("user_id"), is_active=True).first()
+        if not user:
+            raise AuthenticationFailed("Preview user is unavailable.")
+        return user, token
 
 
 class PreviewSizeViewSet(viewsets.ModelViewSet):
@@ -70,16 +78,8 @@ PREVIEW_NAVIGATION_MENU_SCRIPT = r"""
             const MENU_ID = 'eceee-preview-nav-link-menu';
             let activeLink = null;
 
-            function getPreviewToken() {
-                return new URLSearchParams(window.location.search).get('token');
-            }
-
             async function fetchJson(url) {
                 const headers = { Accept: 'application/json' };
-                const token = getPreviewToken();
-                if (token) {
-                    headers.Authorization = `Bearer ${token}`;
-                }
 
                 const response = await fetch(url, {
                     credentials: 'same-origin',
@@ -395,10 +395,29 @@ PREVIEW_NAVIGATION_MENU_SCRIPT = r"""
 """
 
 
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication, SessionAuthentication, TokenAuthentication])
+@permission_classes([permissions.IsAuthenticated])
+def create_version_preview_grant(request, page_id, version_id):
+    """Issue a short-lived grant that cannot authorize anything except one preview."""
+    page = get_object_or_404(WebPage.objects.select_related("tenant"), id=page_id)
+    get_object_or_404(PageVersion, id=version_id, page=page)
+    if not page.tenant.user_has_access(request.user):
+        raise PermissionDenied("You do not have access to this page.")
+
+    token = signing.dumps(
+        {"user_id": request.user.pk, "page_id": page.pk, "version_id": version_id},
+        salt=PREVIEW_GRANT_SALT,
+        compress=True,
+    )
+    return Response({"preview_token": token, "expires_in": PREVIEW_GRANT_MAX_AGE_SECONDS})
+
+
 @api_view(["GET"])
 @authentication_classes(
     [
-        PreviewTokenAuthentication,
+        PreviewGrantAuthentication,
+        JWTAuthentication,
         SessionAuthentication,
         TokenAuthentication,
     ]
@@ -413,9 +432,8 @@ def render_version_preview(request, page_id, version_id):
     for display in an iframe. Only authenticated users with page editing
     permissions can access this endpoint.
 
-    Authentication can be provided via:
-    - Standard Authorization header (for API calls)
-    - Query parameter 'token' with JWT access token (for iframe src)
+    Authentication can be provided via a standard authenticated request or a
+    short-lived, page/version-scoped preview grant.
 
     Args:
         request: HTTP request
@@ -426,25 +444,17 @@ def render_version_preview(request, page_id, version_id):
         HttpResponse with complete HTML page including CSS and meta tags
     """
 
-    # Check if user has permission to edit pages
-    # For now, we'll allow any authenticated user. In production, you might
-    # want to check for specific permissions like is_staff or has page editing permission
     if not request.user.is_authenticated:
         return HttpResponse(
             "<html><body><h1>Unauthorized</h1><p>You must be logged in to preview pages.</p></body></html>",
             status=401,
         )
 
-    # Optional: Add stricter permission check
-    # if not (request.user.is_staff or request.user.has_perm('webpages.change_webpage')):
-    #     return HttpResponse(
-    #         '<html><body><h1>Forbidden</h1><p>You do not have permission to preview pages.</p></body></html>',
-    #         status=403
-    #     )
-
     # Get the page and version
     page = get_object_or_404(WebPage, id=page_id)
     version = get_object_or_404(PageVersion, id=version_id, page=page)
+    if not page.tenant.user_has_access(request.user):
+        raise PermissionDenied("You do not have access to this page.")
 
     # Get the root page to access hostnames
     root_page = page

@@ -354,23 +354,21 @@ class PageDebugExportTests(APITestCase):
     def test_debug_export_preserves_keys_inside_stored_json(self):
         self.page.page_css_variables = {"snake_key": "page value"}
         self.page.save(update_fields=["page_css_variables"])
-        self.version.page_data = {"snake_key": "page data value"}
-        self.version.change_summary = {"snake_key": "change value"}
-        self.version.page_css_variables = {"snake_key": "version value"}
-        self.version.widgets = {"main": [{"config": {"snake_key": "widget value"}}]}
-        self.version.save(
-            update_fields=[
-                "page_data",
-                "change_summary",
-                "page_css_variables",
-                "widgets",
-            ]
+        draft = PageVersion.objects.create(
+            page=self.page,
+            version_number=2,
+            version_title="JSON preservation draft",
+            page_data={"snake_key": "page data value"},
+            change_summary={"snake_key": "change value"},
+            page_css_variables={"snake_key": "version value"},
+            widgets={"main": [{"config": {"snake_key": "widget value"}}]},
+            created_by=self.editor,
         )
         self.import_log.stats = {"snake_key": 1}
         self.import_log.save(update_fields=["stats"])
         self.client.force_authenticate(user=self.admin)
 
-        response = self.client.get(self.url, {"version_id": self.version.id})
+        response = self.client.get(self.url, {"version_id": draft.id})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         rendered = json.loads(response.content)

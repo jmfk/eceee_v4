@@ -651,7 +651,7 @@ class PageVersionViewSet(
         permission_classes=[permissions.IsAdminUser],
     )
     def pack_aggressive(self, request):
-        """Remove all superseded and draft versions older than current published"""
+        """Remove old drafts while retaining every version that was ever published."""
         page_id = request.data.get("page_id")
         if not page_id:
             return Response(
@@ -675,10 +675,11 @@ class PageVersionViewSet(
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Find versions to delete (superseded and drafts older than current published)
-            versions_to_delete = page.versions.filter(version_number__lt=current_published.version_number).exclude(
-                id=current_published.id
-            )
+            # Published snapshots remain historical records even after they expire.
+            versions_to_delete = page.versions.filter(
+                version_number__lt=current_published.version_number,
+                effective_date__isnull=True,
+            ).exclude(id=current_published.id)
 
             # Count for response
             deleted_count = versions_to_delete.count()

@@ -2,11 +2,15 @@
 Backend page and widget rendering system
 """
 
+from copy import copy
+
+from django.db.models import Q
 from django.template.loader import get_template
-from django.template import Context
-from django.utils.safestring import mark_safe
-from .inheritance_tree import InheritanceTreeBuilder
+
 from .inheritance_helpers import InheritanceTreeHelpers
+from .inheritance_tree import InheritanceTreeBuilder
+
+_UNSET = object()
 
 
 class WebPageRenderer:
@@ -22,28 +26,28 @@ class WebPageRenderer:
     def _is_mustache_wrapper_template(self, template_name):
         """
         Check if a Django template is just a wrapper for render_mustache tag.
-        
+
         Args:
             template_name: Path to template file
-            
+
         Returns:
             True if template is a Mustache wrapper, False otherwise
         """
         try:
             template = get_template(template_name)
             template_source = template.template.source
-            
+
             # Get non-empty lines
-            lines = [line.strip() for line in template_source.strip().split('\n') if line.strip()]
-            
+            lines = [line.strip() for line in template_source.strip().split("\n") if line.strip()]
+
             # Wrapper templates should have only 2-3 lines
             if len(lines) > 3:
                 return False
-            
+
             # Check for characteristic tags
-            has_load_tag = any('{% load' in line and 'webpages_tags' in line for line in lines)
-            has_render_mustache = any('{% render_mustache' in line for line in lines)
-            
+            has_load_tag = any("{% load" in line and "webpages_tags" in line for line in lines)
+            has_render_mustache = any("{% render_mustache" in line for line in lines)
+
             return has_load_tag and has_render_mustache
         except Exception:
             return False
@@ -81,11 +85,11 @@ class WebPageRenderer:
             # Generate media queries for larger breakpoints (mobile-first)
             # Filter out the key that was used as base styles to avoid duplicate CSS
             base_key = next((k for k in ["xs", "sm", "default"] if css_content.get(k)), None)
-            
+
             for bp_key in ["sm", "md", "lg", "xl"]:
                 if bp_key == base_key:
                     continue
-                    
+
                 bp_css = css_content.get(bp_key)
                 if bp_css and bp_css.strip():
                     bp_value = breakpoints.get(bp_key)
@@ -112,47 +116,57 @@ class WebPageRenderer:
             dict: Contains 'html', 'css', 'meta', and 'debug_info'
         """
         from django.template.loader import render_to_string
-        from django.template import Context, Template
 
         # Get the appropriate version
         page_version = version or page.get_current_published_version()
         if not page_version:
             raise ValueError(f"No published version found for page: {page.title}")
 
-        # Build base context
-        render_context = self._build_base_context(page, page_version, context)
+        snapshot_page = self._page_snapshot(page, page_version)
+        effective_layout = self._effective_layout(page, page_version)
+        effective_theme = self._effective_theme(page, page_version)
 
-        # Get effective layout
-        effective_layout = page.get_effective_layout()
+        # Build base context
+        render_context = self._build_base_context(
+            snapshot_page,
+            page_version,
+            context,
+            effective_layout=effective_layout,
+            effective_theme=effective_theme,
+        )
+
         if not effective_layout:
-            raise ValueError(f"No layout found for page: {page.title}")
+            raise ValueError(f"No layout found for page: {snapshot_page.title}")
 
         # Render widgets by slot
-        widgets_by_slot = self._render_widgets_by_slot(
-            page, page_version, render_context
-        )
+        widgets_by_slot = self._render_widgets_by_slot(snapshot_page, page_version, render_context)
         render_context["widgets_by_slot"] = widgets_by_slot
 
         # Get layout template name
         template_name = self._get_layout_template_name(effective_layout)
 
         # Render the page HTML
-        page_html = render_to_string(
-            template_name, render_context, request=self.request
-        )
+        page_html = render_to_string(template_name, render_context, request=self.request)
 
         # Collect CSS
-        page_css = self._collect_page_css(page, effective_layout, widgets_by_slot)
+        page_css = self._collect_page_css(
+            snapshot_page,
+            page_version,
+            effective_layout,
+            effective_theme,
+            widgets_by_slot,
+        )
 
         # Generate site icons (favicons) from theme
         site_icons = ""
         effective_theme = render_context.get("theme")
         if effective_theme and effective_theme.site_icon:
             from .templatetags.webpages_tags import render_site_icons
-            site_icons = render_site_icons(render_context, root_page=page)
+
+            site_icons = render_site_icons(render_context, root_page=snapshot_page)
 
         # Generate meta tags
-        meta_tags = self._generate_meta_tags(page, page_version)
+        meta_tags = self._generate_meta_tags(snapshot_page, page_version)
         if site_icons:
             meta_tags = f"{site_icons}\n{meta_tags}"
 
@@ -160,10 +174,75 @@ class WebPageRenderer:
             "html": page_html,
             "css": page_css,
             "meta": meta_tags,
-            "debug_info": self._generate_debug_info(
-                page, page_version, effective_layout
-            ),
+            "debug_info": self._generate_debug_info(snapshot_page, page_version, effective_layout, effective_theme),
         }
+
+    @staticmethod
+    def _page_snapshot(page, page_version):
+        """Overlay versioned page attributes without mutating the live WebPage."""
+        snapshot = copy(page)
+        page_data = page_version.page_data.copy() if isinstance(page_version.page_data, dict) else {}
+        attributes = page_data.pop("page_attributes", page_data.pop("pageAttributes", {}))
+        attributes = attributes.copy() if isinstance(attributes, dict) else {}
+        attribute_map = {
+            "title": "title",
+            "description": "description",
+            "slug": "slug",
+            "path_pattern_key": "path_pattern_key",
+            "pathPatternKey": "path_pattern_key",
+            "hostnames": "hostnames",
+        }
+        for field in attribute_map:
+            if field in page_data and field not in attributes:
+                attributes[field] = page_data[field]
+        for source, target in attribute_map.items():
+            if source in attributes:
+                setattr(snapshot, target, attributes[source])
+        return snapshot
+
+    @staticmethod
+    def _version_at(page, as_of):
+        published = (
+            page.versions.filter(effective_date__isnull=False, effective_date__lte=as_of)
+            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=as_of))
+            .order_by("-effective_date", "-version_number")
+            .first()
+        )
+        if published:
+            return published
+        return page.versions.filter(created_at__lte=as_of).order_by("-created_at", "-version_number").first()
+
+    def _effective_layout(self, page, page_version):
+        from .layout_registry import layout_registry
+
+        if page_version.code_layout:
+            layout = layout_registry.get_layout(page_version.code_layout)
+            if layout:
+                return layout
+        as_of = page_version.effective_date or page_version.created_at
+        parent = page.parent
+        while parent:
+            parent_version = self._version_at(parent, as_of)
+            if parent_version and parent_version.code_layout:
+                layout = layout_registry.get_layout(parent_version.code_layout)
+                if layout:
+                    return layout
+            parent = parent.parent
+        return None
+
+    def _effective_theme(self, page, page_version):
+        from .models import PageTheme
+
+        if page_version.theme_id:
+            return page_version.theme
+        as_of = page_version.effective_date or page_version.created_at
+        parent = page.parent
+        while parent:
+            parent_version = self._version_at(parent, as_of)
+            if parent_version and parent_version.theme_id:
+                return parent_version.theme
+            parent = parent.parent
+        return PageTheme.get_default_theme(tenant=page.tenant)
 
     def render_widget_json(self, widget_data, context=None):
         """
@@ -176,25 +255,24 @@ class WebPageRenderer:
         Returns:
             str: Rendered widget HTML
         """
-        from django.template.loader import render_to_string
-        from .widget_registry import widget_type_registry
         import logging
+
+        from django.template.loader import render_to_string
+
+        from .widget_registry import widget_type_registry
 
         logger = logging.getLogger(__name__)
 
         # Get widget type from registry - support both old and new formats
         widget_type_name = widget_data.get("widget_type") or widget_data.get("type")
-        widget_type = (
-            widget_type_registry.get_widget_type_flexible(widget_type_name)
-            if widget_type_name
-            else None
-        )
+        widget_type = widget_type_registry.get_widget_type_flexible(widget_type_name) if widget_type_name else None
 
         if not widget_type:
             return f'<!-- Widget type "{widget_type_name}" not found -->'
 
         # Get base configuration and resolve links
         from .services.link_resolver import resolve_links_in_config
+
         base_config = widget_data.get("config", {})
         base_config = resolve_links_in_config(base_config, self.request)
 
@@ -205,22 +283,16 @@ class WebPageRenderer:
         if "inherited_from" in widget_data:
             enhanced_context["widget_inherited_from"] = widget_data["inherited_from"]
         if "inheritance_depth" in widget_data:
-            enhanced_context["widget_inheritance_depth"] = widget_data[
-                "inheritance_depth"
-            ]
+            enhanced_context["widget_inheritance_depth"] = widget_data["inheritance_depth"]
 
         # Prepare template context with widget-specific logic (e.g., collection resolution)
         # All widgets now have prepare_template_context (default implementation in BaseWidget)
         template_config = base_config
         try:
-            template_config = widget_type.prepare_template_context(
-                base_config, enhanced_context
-            )
+            template_config = widget_type.prepare_template_context(base_config, enhanced_context)
         except Exception as e:
             # Log error but continue with base config to prevent crashes
-            logger.error(
-                f"Error preparing template context for {widget_type.name}: {e}"
-            )
+            logger.error(f"Error preparing template context for {widget_type.name}: {e}")
 
         # Create a mock widget object for template rendering
         class MockWidget:
@@ -241,9 +313,7 @@ class WebPageRenderer:
             theme_obj = enhanced_context.get("theme")
             if theme_obj:
                 try:
-                    style_result = widget_type.render_with_style(
-                        template_config, theme_obj
-                    )
+                    style_result = widget_type.render_with_style(template_config, theme_obj)
                     if style_result:
                         html_part, css_part = style_result
                         # Check for passthru mode (None html but has css)
@@ -262,37 +332,30 @@ class WebPageRenderer:
         if custom_style_html is not None:
             if custom_style_css:
                 # Process CSS to handle breakpoint dictionaries
-                processed_css = self._process_component_css(
-                    custom_style_css, enhanced_context.get("theme")
-                )
+                processed_css = self._process_component_css(custom_style_css, enhanced_context.get("theme"))
                 return f"<style>{processed_css}</style>\n{custom_style_html}"
             return custom_style_html
 
         # Check for Mustache-only widgets (no Django template or wrapper template)
-        if hasattr(widget_type, 'mustache_template_name') and widget_type.mustache_template_name:
+        if hasattr(widget_type, "mustache_template_name") and widget_type.mustache_template_name:
             # Check if template_name is None or is a wrapper template
-            is_mustache_only = (
-                widget_type.template_name is None or 
-                self._is_mustache_wrapper_template(widget_type.template_name)
+            is_mustache_only = widget_type.template_name is None or self._is_mustache_wrapper_template(
+                widget_type.template_name
             )
-            
+
             if is_mustache_only:
                 try:
-                    from webpages.utils.mustache_renderer import (
-                        load_mustache_template,
-                        render_mustache
-                    )
+                    from webpages.utils.mustache_renderer import load_mustache_template, render_mustache
+
                     # Load and render Mustache template directly
                     template_str = load_mustache_template(widget_type.mustache_template_name)
                     widget_html = render_mustache(template_str, {**template_config, **enhanced_context})
-                    
+
                     # Inject custom CSS in passthru mode
                     if custom_style_css:
-                        processed_css = self._process_component_css(
-                            custom_style_css, enhanced_context.get("theme")
-                        )
+                        processed_css = self._process_component_css(custom_style_css, enhanced_context.get("theme"))
                         widget_html = f"<style>{processed_css}</style>\n{widget_html}"
-                    
+
                     return widget_html
                 except Exception as e:
                     logger.error(f"Error rendering Mustache template for {widget_type.name}: {e}")
@@ -304,20 +367,14 @@ class WebPageRenderer:
 
         # Split template_name into base and extension
         template_name = widget_type.template_name
-        base_name, ext = (
-            template_name.rsplit(".", 1)
-            if "." in template_name
-            else (template_name, "html")
-        )
+        base_name, ext = template_name.rsplit(".", 1) if "." in template_name else (template_name, "html")
 
         # Build list of template names to try (in order of specificity)
         template_names = []
 
         # Most specific: theme + layout + slot
         if theme and layout_name and slot_name:
-            template_names.append(
-                f"{base_name}_{theme}_{layout_name}_{slot_name}.{ext}"
-            )
+            template_names.append(f"{base_name}_{theme}_{layout_name}_{slot_name}.{ext}")
 
         # Layout + slot specific
         if layout_name and slot_name:
@@ -352,18 +409,25 @@ class WebPageRenderer:
             # Inject custom CSS in passthru mode (when custom_style_css exists but custom_style_html doesn't)
             if custom_style_css:
                 # Process CSS to handle breakpoint dictionaries
-                processed_css = self._process_component_css(
-                    custom_style_css, enhanced_context.get("theme")
-                )
+                processed_css = self._process_component_css(custom_style_css, enhanced_context.get("theme"))
                 widget_html = f"<style>{processed_css}</style>\n{widget_html}"
             return widget_html
         except Exception as e:
             return f"<!-- Error rendering widget: {e} -->"
 
-    def _build_base_context(self, page, page_version, extra_context=None):
+    def _build_base_context(
+        self,
+        page,
+        page_version,
+        extra_context=None,
+        effective_layout=_UNSET,
+        effective_theme=_UNSET,
+    ):
         """Build the base template context for page rendering."""
-        # Get effective theme
-        effective_theme = page.get_effective_theme()
+        if effective_layout is _UNSET:
+            effective_layout = page.get_effective_layout()
+        if effective_theme is _UNSET:
+            effective_theme = page.get_effective_theme()
 
         # Build theme CSS URL if theme exists
         theme_css_url = None
@@ -377,7 +441,7 @@ class WebPageRenderer:
         while current.parent:
             depth += 1
             current = current.parent
-        
+
         # Extract shortTitle from page_data if available
         short_title = None
         if page_version.page_data:
@@ -385,7 +449,7 @@ class WebPageRenderer:
             # Guard against responsive breakpoint objects
             if short_title and not isinstance(short_title, str):
                 short_title = None
-        
+
         # Serialize page data for widgets (matches frontend pageData structure)
         webpage_data = {
             "id": page.id,
@@ -396,7 +460,7 @@ class WebPageRenderer:
             "cached_path": page.cached_path,
             "depth": depth,
         }
-        
+
         context = {
             "page": page,
             "current_page": page,
@@ -409,7 +473,7 @@ class WebPageRenderer:
             "is_current_published": page_version.is_current_published(),
             "effective_date": page_version.effective_date,
             "created_by": page_version.created_by,
-            "layout": page.get_effective_layout(),
+            "layout": effective_layout,
             "theme": effective_theme,
             "theme_css_url": theme_css_url,
             "parent": page.parent,
@@ -418,7 +482,6 @@ class WebPageRenderer:
         }
 
         # Add effective layout slots
-        effective_layout = page.get_effective_layout()
         if effective_layout and hasattr(effective_layout, "slot_configuration"):
             context["slots"] = effective_layout.slot_configuration.get("slots", [])
         else:
@@ -479,11 +542,11 @@ class WebPageRenderer:
         # NEW: Build inheritance tree (replaces complex slot-by-slot inheritance logic)
         try:
             builder = InheritanceTreeBuilder()
-            tree = builder.build_tree(page)
+            tree = builder.build_tree(page, target_version=page_version)
             helpers = InheritanceTreeHelpers(tree)
 
             # Get effective layout for slot configuration
-            effective_layout = page.get_effective_layout()
+            effective_layout = context.get("layout")
             layout_slots = []
             if effective_layout and effective_layout.slot_configuration:
                 layout_slots = effective_layout.slot_configuration.get("slots", [])
@@ -549,11 +612,8 @@ class WebPageRenderer:
                         {
                             "html": widget_html,
                             "widget_data": widget_data,
-                            "inherited_from": (
-                                None if widget.is_local else f"depth-{widget.depth}"
-                            ),
-                            "is_override": widget.inheritance_behavior.value
-                            == "override_parent",
+                            "inherited_from": (None if widget.is_local else f"depth-{widget.depth}"),
+                            "is_override": widget.inheritance_behavior.value == "override_parent",
                         }
                     )
 
@@ -603,14 +663,13 @@ class WebPageRenderer:
             layout_name = getattr(layout, "name", "default")
             return f"webpages/layouts/{layout_name.lower()}.html"
 
-    def _collect_page_css(self, page, layout, widgets_by_slot):
+    def _collect_page_css(self, page, page_version, layout, theme, widgets_by_slot):
         """Collect all CSS for the page including theme, layout, and widgets."""
         from .services.theme_css_generator import ThemeCSSGenerator
 
         css_parts = []
 
         # Theme CSS - use ThemeCSSGenerator for complete CSS including fonts
-        theme = page.get_effective_theme()
         if theme:
             generator = ThemeCSSGenerator()
             theme_css = generator.generate_complete_css(theme, frontend_scoped=False)
@@ -624,9 +683,9 @@ class WebPageRenderer:
             css_parts.append(layout.css_content)
 
         # Page-specific CSS
-        if page.page_custom_css:
+        if page_version.page_custom_css:
             css_parts.append("/* Page Custom CSS */")
-            css_parts.append(page.page_custom_css)
+            css_parts.append(page_version.page_custom_css)
 
         # Widget CSS
         widget_css = self._collect_widget_css(widgets_by_slot)
@@ -635,7 +694,8 @@ class WebPageRenderer:
             css_parts.append(widget_css)
 
         # CSS Variables
-        css_variables = page.get_effective_css_data().get("merged_css_variables", {})
+        css_variables = theme.css_variables.copy() if theme and theme.css_variables else {}
+        css_variables.update(page_version.page_css_variables or {})
         if css_variables:
             css_parts.append("/* CSS Variables */")
             variables_css = ":root {\n"
@@ -653,24 +713,16 @@ class WebPageRenderer:
         for slot_name, slot_widgets in widgets_by_slot.items():
             for widget_info in slot_widgets:
                 widget_data = widget_info["widget_data"]
-                widget_type_name = widget_data.get("widget_type") or widget_data.get(
-                    "type"
-                )
+                widget_type_name = widget_data.get("widget_type") or widget_data.get("type")
 
                 # Try to get CSS from widget type
                 from .widget_registry import widget_type_registry
 
                 widget_type = (
-                    widget_type_registry.get_widget_type_flexible(widget_type_name)
-                    if widget_type_name
-                    else None
+                    widget_type_registry.get_widget_type_flexible(widget_type_name) if widget_type_name else None
                 )
 
-                if (
-                    widget_type
-                    and hasattr(widget_type, "css_content")
-                    and widget_type.css_content
-                ):
+                if widget_type and hasattr(widget_type, "css_content") and widget_type.css_content:
                     css_id = f'{widget_type_name}_{widget_data.get("id", "")}'
                     if css_id not in self._rendered_css:
                         css_parts.append(f"/* Widget: {widget_type_name} */")
@@ -684,25 +736,15 @@ class WebPageRenderer:
         meta_tags = []
 
         # Title - prefer version's meta_title, fallback to page title
-        if (
-            page_version
-            and hasattr(page_version, "meta_title")
-            and page_version.meta_title
-        ):
+        if page_version and hasattr(page_version, "meta_title") and page_version.meta_title:
             title = page_version.meta_title
         else:
             title = page.title
         meta_tags.append(f"<title>{title}</title>")
 
         # Description - prefer version's meta_description
-        if (
-            page_version
-            and hasattr(page_version, "meta_description")
-            and page_version.meta_description
-        ):
-            meta_tags.append(
-                f'<meta name="description" content="{page_version.meta_description}">'
-            )
+        if page_version and hasattr(page_version, "meta_description") and page_version.meta_description:
+            meta_tags.append(f'<meta name="description" content="{page_version.meta_description}">')
         elif page.description:
             meta_tags.append(f'<meta name="description" content="{page.description}">')
 
@@ -715,23 +757,17 @@ class WebPageRenderer:
 
         # Use version's meta_description for OG tags
         og_description = None
-        if (
-            page_version
-            and hasattr(page_version, "meta_description")
-            and page_version.meta_description
-        ):
+        if page_version and hasattr(page_version, "meta_description") and page_version.meta_description:
             og_description = page_version.meta_description
         elif page.description:
             og_description = page.description
 
         if og_description:
-            meta_tags.append(
-                f'<meta property="og:description" content="{og_description}">'
-            )
+            meta_tags.append(f'<meta property="og:description" content="{og_description}">')
 
         return "\n".join(meta_tags)
 
-    def _generate_debug_info(self, page, page_version, layout):
+    def _generate_debug_info(self, page, page_version, layout, theme):
         """Generate debug information for development."""
         return {
             "page_id": page.id,
@@ -740,14 +776,8 @@ class WebPageRenderer:
             "version_id": page_version.id if page_version else None,
             "version_number": page_version.version_number if page_version else None,
             "layout_name": layout.name if layout else None,
-            "layout_type": page.get_layout_type(),
-            "theme_name": (
-                page.get_effective_theme().name if page.get_effective_theme() else None
-            ),
-            "widget_count": (
-                len(page_version.widgets)
-                if page_version and page_version.widgets
-                else 0
-            ),
-            "css_injection_enabled": page.enable_css_injection,
+            "layout_type": "code" if page_version.code_layout else "inherited",
+            "theme_name": theme.name if theme else None,
+            "widget_count": (len(page_version.widgets) if page_version and page_version.widgets else 0),
+            "css_injection_enabled": page_version.enable_css_injection,
         }
