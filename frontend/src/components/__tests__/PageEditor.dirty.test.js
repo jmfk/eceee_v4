@@ -14,6 +14,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
     analyzeChanges,
+    buildWorkingCopyPayload,
     buildVersionedPageData,
     canPublishWorkingCopy,
     mergeVersionedPageAttributes,
@@ -149,6 +150,47 @@ describe('working-copy page attributes', () => {
 
         expect(page).toEqual({ title: 'Draft title', slug: 'draft-slug' })
     })
+
+    it('builds an allowlisted save payload without response metadata', () => {
+        const payload = buildWorkingCopyPayload(
+            {
+                ...baseVersion,
+                page: 1,
+                pageId: 1,
+                page_id: 1,
+                versionId: 10,
+                versionNumber: 3,
+                createdAt: '2026-09-22T09:00:00Z',
+                publicationStatus: 'notPublished',
+                effectiveTheme: { id: 7 },
+                codeLayout: 'landing_page',
+                theme: { id: 7, name: 'Theme' },
+                metaTitle: 'Draft metadata',
+            },
+            { ...baseWebpage, hostnames: ['summerstudy-test.colliberty.com'] },
+        )
+
+        expect(payload).toEqual({
+            pageData: {
+                pageAttributes: {
+                    title: 'Page',
+                    slug: 'page',
+                    hostnames: ['summerstudy-test.colliberty.com'],
+                },
+            },
+            widgets: baseVersion.widgets,
+            codeLayout: 'landing_page',
+            theme: 7,
+            metaTitle: 'Draft metadata',
+        })
+        expect(payload).not.toHaveProperty('page')
+        expect(payload).not.toHaveProperty('pageId')
+        expect(payload).not.toHaveProperty('page_id')
+        expect(payload).not.toHaveProperty('id')
+        expect(payload).not.toHaveProperty('updatedAt')
+        expect(payload).not.toHaveProperty('publicationStatus')
+        expect(payload).not.toHaveProperty('effectiveTheme')
+    })
 })
 
 describe('smartSave working-copy workflow', () => {
@@ -257,6 +299,11 @@ describe('smartSave working-copy workflow', () => {
     it('saves version changes through the canonical working-copy endpoint', async () => {
         const editedVersion = {
             ...baseVersion,
+            page: 1,
+            pageId: 1,
+            versionId: baseVersion.id,
+            versionNumber: 2,
+            publicationStatus: 'notPublished',
             updatedAt: '2026-09-22T10:00:00Z',
             widgets: {
                 main: [{ id: 'w1', type: 'easy_widgets.ContentWidget', config: { content: '<p>Updated</p>' } }]
@@ -281,6 +328,13 @@ describe('smartSave working-copy workflow', () => {
             expect.objectContaining({ widgets: editedVersion.widgets }),
             editedVersion.updatedAt,
         )
+        const payload = versionsApi.savePageWorkingCopy.mock.calls[0][2]
+        expect(payload).not.toHaveProperty('page')
+        expect(payload).not.toHaveProperty('pageId')
+        expect(payload).not.toHaveProperty('versionId')
+        expect(payload).not.toHaveProperty('versionNumber')
+        expect(payload).not.toHaveProperty('updatedAt')
+        expect(payload).not.toHaveProperty('publicationStatus')
         expect(result.versionResult).toBe(editedVersion)
     })
 

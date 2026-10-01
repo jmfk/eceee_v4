@@ -54,27 +54,6 @@ const METADATA_FIELDS = new Set([
 ]);
 
 /**
- * Prepare version data for saving by converting frontend camelCase to backend snake_case
- * @param {Object} versionData - Version data to prepare
- * @returns {Object} Prepared version data with proper field names for backend
- */
-function prepareVersionDataForSave(versionData) {
-    const prepared = { ...versionData };
-
-    // Convert camelCase meta fields to snake_case for backend
-    if (prepared.metaTitle !== undefined) {
-        prepared.meta_title = prepared.metaTitle;
-        delete prepared.metaTitle;
-    }
-    if (prepared.metaDescription !== undefined) {
-        prepared.meta_description = prepared.metaDescription;
-        delete prepared.metaDescription;
-    }
-
-    return prepared;
-}
-
-/**
  * Process loaded version data by converting backend snake_case to frontend camelCase
  * @param {Object} versionData - Raw version data from API
  * @returns {Object} Processed version data with camelCase field names for frontend
@@ -126,6 +105,42 @@ export function buildVersionedPageData(pageData = {}, webpageData = {}) {
         ...contentData,
         pageAttributes,
     }
+}
+
+const WRITABLE_VERSION_FIELDS = [
+    'widgets',
+    'codeLayout',
+    'theme',
+    'versionTitle',
+    'changeSummary',
+    'metaTitle',
+    'metaDescription',
+    'tags',
+    'pageCssVariables',
+    'pageCustomCss',
+    'enableCssInjection',
+]
+
+/** Build the complete, allowlisted request body for a working-copy save. */
+export function buildWorkingCopyPayload(versionData = {}, webpageData = {}) {
+    const payload = {
+        pageData: buildVersionedPageData(
+            versionData.pageData || versionData.page_data || {},
+            webpageData,
+        ),
+    }
+
+    for (const field of WRITABLE_VERSION_FIELDS) {
+        if (versionData[field] !== undefined) {
+            payload[field] = versionData[field]
+        }
+    }
+
+    if (payload.theme && typeof payload.theme === 'object') {
+        payload.theme = payload.theme.id
+    }
+
+    return payload
 }
 
 /** Show saved working-copy attributes in the editor without mutating WebPage. */
@@ -363,13 +378,10 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
         // through the one optimistic-locking working-copy endpoint; WebPage itself is
         // only changed by the publish workflow.
         if (strategy.strategy !== 'none') {
-            const versionDataForSave = prepareVersionDataForSave({
-                ...currentPageVersionData,
-                pageData: buildVersionedPageData(
-                    currentPageVersionData.pageData || currentPageVersionData.page_data,
-                    currentWebpageData,
-                ),
-            });
+            const versionDataForSave = buildWorkingCopyPayload(
+                currentPageVersionData,
+                currentWebpageData,
+            );
             results.versionResult = await versionsApi.savePageWorkingCopy(
                 options.pageId,
                 options.expectedVersionId || versionId,

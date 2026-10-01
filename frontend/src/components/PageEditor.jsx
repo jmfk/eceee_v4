@@ -39,6 +39,7 @@ import {
     determineSaveStrategy,
     generateChangeSummary,
     processLoadedVersionData,
+    buildWorkingCopyPayload,
     buildVersionedPageData,
     canPublishWorkingCopy,
     mergeVersionedPageAttributes,
@@ -1586,18 +1587,13 @@ const PageEditor = () => {
         try {
             const clientUpdatedAt = originalPageVersionData?.updatedAt || pageVersionData?.updatedAt;
 
-            const versionPayload = {
-                pageData: buildVersionedPageData(pageVersionData?.pageData || {}, webpageData || {}),
-                widgets: localWidgets || pageVersionData?.widgets || {},
-                codeLayout: pageVersionData?.codeLayout || '',
-                theme: pageVersionData?.theme?.id || pageVersionData?.theme || null,
-                metaTitle: pageVersionData?.metaTitle || '',
-                metaDescription: pageVersionData?.metaDescription || '',
-                pageCssVariables: pageVersionData?.pageCssVariables || {},
-                pageCustomCss: pageVersionData?.pageCustomCss || '',
-                enableCssInjection: pageVersionData?.enableCssInjection !== false,
-                tags: pageVersionData?.tags || [],
-            };
+            const versionPayload = buildWorkingCopyPayload(
+                {
+                    ...pageVersionData,
+                    widgets: localWidgets || pageVersionData?.widgets || {},
+                },
+                webpageData || {},
+            );
             const saved = await versionsApi.savePageWorkingCopy(
                 pageId,
                 pageVersionData.id,
