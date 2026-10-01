@@ -71,9 +71,10 @@ const PublishingEditor = ({
     }, [workflow?.scheduledAt])
 
     const refresh = async () => {
-        await refetch()
+        const result = await refetch()
         await onWorkflowChange?.()
         await queryClient.invalidateQueries({ queryKey: ['pages'] })
+        return result.data
     }
 
     const workingVersion = async () => {
@@ -101,13 +102,24 @@ const PublishingEditor = ({
         })
         if (!confirmed) return
         setBusyAction('publish')
+        let version: WorkflowVersion | undefined
         try {
-            const version = await workingVersion()
+            version = await workingVersion()
             await versionsApi.publish(version.id, version.updatedAt)
-            addNotification('Changes published', 'success')
             await refresh()
+            addNotification('Changes published', 'success')
         } catch (error: any) {
-            addNotification(error.message || 'Publishing failed', 'error')
+            let refreshedWorkflow: Workflow | undefined
+            try {
+                refreshedWorkflow = await refresh()
+            } catch {
+                // Preserve the original publication error when refresh also fails.
+            }
+            if (version?.id && String(refreshedWorkflow?.liveVersion?.id) === String(version.id)) {
+                addNotification('Changes published', 'success')
+            } else {
+                addNotification(error.message || 'Publishing failed', 'error')
+            }
         } finally {
             setBusyAction(null)
         }

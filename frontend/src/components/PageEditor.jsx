@@ -1672,8 +1672,9 @@ const PageEditor = () => {
     }, [webpage, webpageData, pageId, publishUpdate, queryClient, setIsDirty, loadVersionsPreserveCurrent, addNotification]);
 
     const handlePublishWorkingCopy = useCallback(async () => {
+        let targetVersion;
         try {
-            let targetVersion = workflow?.editableVersion;
+            targetVersion = workflow?.editableVersion;
             if (isDirty || !targetVersion?.id) {
                 targetVersion = await handleSave();
             }
@@ -1691,7 +1692,20 @@ const PageEditor = () => {
             await queryClient.invalidateQueries({ queryKey: ['pages'] });
             addNotification('Changes published', 'success');
         } catch (error) {
-            addNotification(`Publishing failed: ${error.message}`, 'error');
+            let refreshedWorkflow;
+            try {
+                const result = await refetchWorkflow();
+                refreshedWorkflow = result.data;
+                await queryClient.invalidateQueries({ queryKey: ['pageVersion', pageId] });
+                await queryClient.invalidateQueries({ queryKey: ['pages'] });
+            } catch {
+                // Preserve the original publication error when refresh also fails.
+            }
+            if (targetVersion?.id && String(refreshedWorkflow?.liveVersion?.id) === String(targetVersion.id)) {
+                addNotification('Changes published', 'success');
+            } else {
+                addNotification(`Publishing failed: ${error.message}`, 'error');
+            }
         }
     }, [workflow, isDirty, handleSave, showConfirm, refetchWorkflow, queryClient, pageId, addNotification]);
 
