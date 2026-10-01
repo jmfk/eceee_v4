@@ -2,6 +2,7 @@
 Preview-related views for page editor
 """
 
+import json
 import os
 
 from django.conf import settings
@@ -9,8 +10,9 @@ from django.contrib.auth import get_user_model
 from django.core import signing
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.views.decorators.clickjacking import xframe_options_exempt
-from rest_framework import permissions, viewsets
+from rest_framework import permissions, status, viewsets
 from rest_framework.authentication import BaseAuthentication, SessionAuthentication, TokenAuthentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
@@ -23,6 +25,8 @@ from ..serializers import PreviewSizeSerializer
 
 PREVIEW_GRANT_SALT = "webpages.version-preview"
 PREVIEW_GRANT_MAX_AGE_SECONDS = 60
+PREVIEW_NAVIGATION_GRANT_SALT = "webpages.version-preview-navigation"
+PREVIEW_NAVIGATION_GRANT_MAX_AGE_SECONDS = 15 * 60
 
 
 class PreviewGrantAuthentication(BaseAuthentication):
@@ -55,6 +59,40 @@ class PreviewGrantAuthentication(BaseAuthentication):
         return user, token
 
 
+class PreviewNavigationGrantAuthentication(BaseAuthentication):
+    """Authenticate a read-only navigation grant for one rendered preview."""
+
+    def authenticate_header(self, request):
+        return "PreviewNavigationGrant"
+
+    def authenticate(self, request):
+        token = request.headers.get("X-Preview-Navigation-Grant")
+        if token is None:
+            return None
+
+        try:
+            payload = signing.loads(
+                token,
+                salt=PREVIEW_NAVIGATION_GRANT_SALT,
+                max_age=PREVIEW_NAVIGATION_GRANT_MAX_AGE_SECONDS,
+            )
+        except signing.SignatureExpired as error:
+            raise AuthenticationFailed("Preview navigation grant has expired.") from error
+        except signing.BadSignature as error:
+            raise AuthenticationFailed("Invalid preview navigation grant.") from error
+
+        route = request.resolver_match.kwargs
+        if str(payload.get("page_id")) != str(route.get("page_id")) or str(payload.get("version_id")) != str(
+            route.get("version_id")
+        ):
+            raise AuthenticationFailed("Preview navigation grant does not match this page version.")
+
+        user = get_user_model().objects.filter(pk=payload.get("user_id"), is_active=True).first()
+        if not user:
+            raise AuthenticationFailed("Preview user is unavailable.")
+        return user, payload
+
+
 class PreviewSizeViewSet(viewsets.ModelViewSet):
     """
     API viewset for managing preview size configurations.
@@ -74,28 +112,8 @@ class PreviewSizeViewSet(viewsets.ModelViewSet):
 
 PREVIEW_NAVIGATION_MENU_SCRIPT = r"""
         (function() {
-            const API_BASE = '/api/v1/webpages';
             const MENU_ID = 'eceee-preview-nav-link-menu';
             let activeLink = null;
-
-            async function fetchJson(url) {
-                const headers = { Accept: 'application/json' };
-
-                const response = await fetch(url, {
-                    credentials: 'same-origin',
-                    headers,
-                });
-
-                if (response.status === 204) {
-                    return null;
-                }
-
-                if (!response.ok) {
-                    throw new Error(`Request failed: ${response.status}`);
-                }
-
-                return response.json();
-            }
 
             function removeMenu() {
                 const existing = document.getElementById(MENU_ID);
@@ -206,33 +224,29 @@ PREVIEW_NAVIGATION_MENU_SCRIPT = r"""
             }
 
             async function resolveInternalPage(url) {
-                const path = url.pathname || '/';
-                const currentQuery = `path=${encodeURIComponent(path)}&version_filter=current_published`;
-                const anyQuery = `path=${encodeURIComponent(path)}`;
+                const navigation = window.eceeePreviewNavigation;
+                if (!navigation?.grant || !navigation?.endpoint) {
+                    throw new Error('Preview navigation is unavailable');
+                }
 
-                const publishedPage = await fetchJson(`${API_BASE}/pages/by-path/?${currentQuery}`).catch(function() {
-                    return null;
+                const endpoint = new URL(navigation.endpoint, window.location.origin).toString();
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Preview-Navigation-Grant': navigation.grant,
+                    },
+                    body: JSON.stringify({ path: url.pathname, hostname: url.hostname }),
                 });
-                const page = publishedPage || await fetchJson(
-                    `${API_BASE}/pages/by-path/?${anyQuery}`
-                ).catch(function() {
-                        return null;
-                    });
-
-                const pageId = page && (page.id || page.pageId || page.page_id);
-                const latestVersion = pageId
-                    ? await fetchJson(`${API_BASE}/pages/${pageId}/versions/latest/`).catch(function() {
-                        return null;
-                    })
-                    : null;
-                const versionId = latestVersion && (
-                    latestVersion.id || latestVersion.versionId || latestVersion.version_id
-                );
+                if (!response.ok) {
+                    throw new Error(`Request failed: ${response.status}`);
+                }
+                const page = await response.json();
 
                 return {
-                    pageId,
-                    isPublished: Boolean(publishedPage),
-                    latestVersionId: versionId,
+                    ...page,
                     publicUrl: `${url.pathname}${url.search}${url.hash}`,
                 };
             }
@@ -257,7 +271,17 @@ PREVIEW_NAVIGATION_MENU_SCRIPT = r"""
                 const position = menuPositionFromEvent(event, link);
                 renderLoadingMenu(link, position);
 
-                const page = await resolveInternalPage(url);
+                let page;
+                try {
+                    page = await resolveInternalPage(url);
+                } catch (error) {
+                    renderMenu(link, [{
+                        label: 'Open in new tab',
+                        disabled: false,
+                        onClick: function() { openNewTab(`${url.pathname}${url.search}${url.hash}`); },
+                    }], position);
+                    return;
+                }
                 if (!page.pageId) {
                     renderMenu(link, [{
                         label: 'Open in new tab',
@@ -267,12 +291,9 @@ PREVIEW_NAVIGATION_MENU_SCRIPT = r"""
                     return;
                 }
 
-                const editorUrl = `/pages/${page.pageId}/edit`;
-                const previewUrl = page.latestVersionId
-                    ? (
-                        `${API_BASE}/pages/${page.pageId}/versions/`
-                        + `${page.latestVersionId}/preview/${window.location.search || ''}`
-                    )
+                const editorUrl = new URL(`/pages/${page.pageId}/edit`, window.location.origin).toString();
+                const previewUrl = page.previewUrl
+                    ? new URL(page.previewUrl, window.location.origin).toString()
                     : '';
 
                 renderMenu(link, [
@@ -413,6 +434,72 @@ def create_version_preview_grant(request, page_id, version_id):
     return Response({"preview_token": token, "expires_in": PREVIEW_GRANT_MAX_AGE_SECONDS})
 
 
+@api_view(["POST"])
+@authentication_classes([PreviewNavigationGrantAuthentication])
+@permission_classes([permissions.IsAuthenticated])
+def resolve_preview_navigation(request, page_id, version_id):
+    """Resolve one same-site link and mint a grant scoped to its target preview."""
+    source_page = get_object_or_404(WebPage.objects.select_related("tenant"), id=page_id, is_deleted=False)
+    get_object_or_404(PageVersion, id=version_id, page=source_page)
+    if not source_page.tenant.user_has_access(request.user):
+        raise PermissionDenied("You do not have access to this page.")
+    if str(request.auth.get("tenant_id")) != str(source_page.tenant_id):
+        raise AuthenticationFailed("Preview navigation grant does not match this tenant.")
+
+    if not isinstance(request.data, dict):
+        return Response({"detail": "A JSON object is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    raw_path = request.data.get("path")
+    if not isinstance(raw_path, str) or len(raw_path) > 2048 or not raw_path.startswith("/"):
+        return Response({"detail": "A valid absolute path is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    normalized_path = f"/{raw_path.strip('/')}/" if raw_path.strip("/") else "/"
+    candidates = WebPage.objects.filter(
+        tenant=source_page.tenant,
+        cached_path=normalized_path,
+        is_deleted=False,
+    ).select_related("latest_version", "current_published_version", "parent")
+
+    hostname = request.data.get("hostname")
+    target_page = None
+    if isinstance(hostname, str) and hostname:
+        target_page = next(
+            (candidate for candidate in candidates if candidate.get_root_page().serves_hostname(hostname)), None
+        )
+    if target_page is None:
+        source_root_id = source_page.get_root_page().id
+        target_page = next(
+            (candidate for candidate in candidates if candidate.get_root_page().id == source_root_id), None
+        )
+
+    if target_page is None:
+        return Response({"pageId": None, "isPublished": False, "latestVersionId": None, "previewUrl": ""})
+
+    published_version = target_page.get_current_published_version()
+    target_version = target_page.get_latest_version() if request.user.is_staff else published_version
+    preview_url = ""
+    if target_version:
+        target_token = signing.dumps(
+            {"user_id": request.user.pk, "page_id": target_page.pk, "version_id": target_version.pk},
+            salt=PREVIEW_GRANT_SALT,
+            compress=True,
+        )
+        preview_url = reverse(
+            "api:page-version-preview",
+            kwargs={"page_id": target_page.pk, "version_id": target_version.pk},
+        )
+        preview_url = f"{preview_url}?standalone=1&preview_token={target_token}"
+
+    return Response(
+        {
+            "pageId": target_page.pk,
+            "isPublished": published_version is not None,
+            "latestVersionId": target_version.pk if target_version else None,
+            "previewUrl": preview_url,
+        }
+    )
+
+
 @api_view(["GET"])
 @authentication_classes(
     [
@@ -508,6 +595,26 @@ def render_version_preview(request, page_id, version_id):
     try:
         preview_overflow = "auto" if request.query_params.get("standalone") == "1" else "hidden"
 
+        navigation_grant = signing.dumps(
+            {
+                "user_id": request.user.pk,
+                "tenant_id": str(page.tenant_id),
+                "page_id": page.pk,
+                "version_id": version.pk,
+            },
+            salt=PREVIEW_NAVIGATION_GRANT_SALT,
+            compress=True,
+        )
+        navigation_context = json.dumps(
+            {
+                "endpoint": reverse(
+                    "api:page-version-preview-navigation",
+                    kwargs={"page_id": page.pk, "version_id": version.pk},
+                ),
+                "grant": navigation_grant,
+            }
+        ).replace("<", "\\u003c")
+
         # Use the WebPageRenderer to render the complete page
         renderer = WebPageRenderer(request=request)
         result = renderer.render(page, version=version)
@@ -548,6 +655,7 @@ def render_version_preview(request, page_id, version_id):
         }}
     </style>
     <script>
+        window.eceeePreviewNavigation = {navigation_context};
 {PREVIEW_NAVIGATION_MENU_SCRIPT}
     </script>
 </head>
