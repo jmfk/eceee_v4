@@ -7,7 +7,6 @@ from django.utils import timezone
 
 from webpages.models import PageVersion, WebPage
 
-
 PREVIEW_HOSTNAME = "migration-preview.localhost"
 
 
