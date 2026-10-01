@@ -3,21 +3,21 @@
 import logging
 
 from django.utils import timezone
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from content.models import Namespace, Tag
 from webpages.models import WebPage
 from webpages.services.page_version_workflow import PageVersionWorkflowService
+
 from ..models import ImportLog
 from ..serializers import ProcessImportSerializer
-from ..services.content_parser import ContentParser
 from ..services.content_analyzer import ContentAnalyzer
+from ..services.content_parser import ContentParser
 from ..services.widget_creator import create_widgets
 from ..utils.content_analyzer import identify_content_types
-
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +55,7 @@ class ProcessImportView(APIView):
         # 1. Validate input
         serializer = ProcessImportSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(
-                {"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
         validated_data = serializer.validated_data
         html = validated_data["html"]
@@ -67,7 +65,6 @@ class ProcessImportView(APIView):
         mode = validated_data["mode"]
         namespace_slug = validated_data["namespace"]
         source_url = validated_data.get("source_url", "")
-        import_id = validated_data.get("import_id", "")
         page_metadata = validated_data.get("page_metadata", {})
 
         # 2. Get namespace
@@ -77,9 +74,7 @@ class ProcessImportView(APIView):
             else:
                 namespace = Namespace.objects.get(slug=namespace_slug)
         except Namespace.DoesNotExist:
-            return Response(
-                {"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST)
 
         # 3. Create import log
         import_log = ImportLog.objects.create(
@@ -109,9 +104,7 @@ class ProcessImportView(APIView):
             for item in uploaded_media:
                 original_url = item.get("url", "")
                 media_id = item.get("media_manager_id", "")
-                item_type = item.get(
-                    "type", "image"
-                )  # Default to image for backwards compatibility
+                item_type = item.get("type", "image")  # Default to image for backwards compatibility
                 alt_text = item.get("alt", "")
                 layout = item.get("layout", {})
 
@@ -173,11 +166,7 @@ class ProcessImportView(APIView):
                 else False
             )
 
-            if (
-                save_to_page
-                and page_metadata
-                and (page_metadata.get("title") or page_metadata.get("tags"))
-            ):
+            if save_to_page and page_metadata and (page_metadata.get("title") or page_metadata.get("tags")):
                 try:
                     page = WebPage.objects.get(id=page_id)
                     page_version, _ = PageVersionWorkflowService(
@@ -203,9 +192,7 @@ class ProcessImportView(APIView):
 
                             # Create/update Tag objects for consistency
                             for tag_name in tag_names:
-                                tag, created = Tag.get_or_create_tag(
-                                    name=tag_name, namespace=namespace
-                                )
+                                tag, created = Tag.get_or_create_tag(name=tag_name, namespace=namespace)
                                 if not created:
                                     tag.increment_usage()
 
@@ -217,9 +204,7 @@ class ProcessImportView(APIView):
                 except WebPage.DoesNotExist:
                     logger.warning(f"⚠️  Page #{page_id} not found")
                 except Exception as e:
-                    logger.error(
-                        f"❌ Failed to update page metadata: {e}", exc_info=True
-                    )
+                    logger.error(f"❌ Failed to update page metadata: {e}", exc_info=True)
 
             # 8. Update import log
             import_log.status = "completed"
@@ -255,9 +240,7 @@ class ProcessImportView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    def _create_image_html(
-        self, image_url: str, alt: str, layout_config: dict = None, media_id: str = None
-    ) -> str:
+    def _create_image_html(self, image_url: str, alt: str, layout_config: dict = None, media_id: str = None) -> str:
         """
         Create WYSIWYG-compatible inline image HTML.
 
@@ -303,8 +286,8 @@ class ProcessImportView(APIView):
 
         media_id_attr = f'data-media-id="{media_id}"' if media_id else ""
 
-        html = f"""<div 
-    class="media-insert media-width-{width} media-align-{align}" 
+        html = f"""<div
+    class="media-insert media-width-{width} media-align-{align}"
     data-media-insert="true"
     data-media-type="image"
     {media_id_attr}
@@ -391,6 +374,4 @@ class AnalyzeHierarchyView(APIView):
 
         except Exception as e:
             logger.error(f"Failed to analyze hierarchy: {e}", exc_info=True)
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

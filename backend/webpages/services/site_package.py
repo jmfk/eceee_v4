@@ -741,7 +741,7 @@ class SitePackageImporter:
 
         tenant = self._destination_tenant()
         page_map: Dict[int, WebPage] = {}
-        imported_versions: List[PageVersion] = []
+        imported_versions: List[tuple[PageVersion, Optional[datetime], Optional[datetime]]] = []
         version_map: Dict[int, PageVersion] = {}
         imported_root = None
 
@@ -779,6 +779,10 @@ class SitePackageImporter:
                 preserve_publication = (self.job.options or {}).get("preserve_publication_status", True)
                 page_data_payload = _replace_in_json(version_data.get("page_data", {}), replacements)
                 widgets_payload = _replace_in_json(version_data.get("widgets", {}), replacements)
+                effective_date = (
+                    self._parse_datetime(version_data.get("effective_date")) if preserve_publication else None
+                )
+                expiry_date = self._parse_datetime(version_data.get("expiry_date")) if preserve_publication else None
                 imported_version = PageVersion.objects.create(
                     page=page,
                     version_number=version_data["version_number"],
@@ -793,21 +797,19 @@ class SitePackageImporter:
                     page_css_variables=version_data.get("page_css_variables", {}),
                     page_custom_css=version_data.get("page_custom_css", ""),
                     enable_css_injection=version_data.get("enable_css_injection", True),
-                    effective_date=(
-                        self._parse_datetime(version_data.get("effective_date")) if preserve_publication else None
-                    ),
-                    expiry_date=(
-                        self._parse_datetime(version_data.get("expiry_date")) if preserve_publication else None
-                    ),
+                    # Complete all ID remapping before restoring publication dates.
+                    # A published PageVersion is immutable by design.
+                    effective_date=None,
+                    expiry_date=None,
                     tags=version_data.get("tags", []),
                     created_by=self.job.created_by,
                 )
-                imported_versions.append(imported_version)
+                imported_versions.append((imported_version, effective_date, expiry_date))
                 version_map[version_data["source_id"]] = imported_version
 
         if version_map:
             version_reference_map = {str(source_id): version.id for source_id, version in version_map.items()}
-            for imported_version in imported_versions:
+            for imported_version, effective_date, expiry_date in imported_versions:
                 page_data_payload = _remap_structured_references(
                     imported_version.page_data,
                     page_map=page_reference_map,
@@ -826,6 +828,10 @@ class SitePackageImporter:
                     imported_version.page_data = page_data_payload
                     imported_version.widgets = widgets_payload
                     imported_version.save(update_fields=["page_data", "widgets", "updated_at"])
+                if effective_date or expiry_date:
+                    imported_version.effective_date = effective_date
+                    imported_version.expiry_date = expiry_date
+                    imported_version.save(update_fields=["effective_date", "expiry_date", "updated_at"])
 
         if not imported_root:
             raise ValueError("Package did not contain a root page")

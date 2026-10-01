@@ -152,7 +152,8 @@ export const endpoints = {
         update: (id) => `${BASE_PATH}/webpages/preview-sizes/${id}/`,
         delete: (id) => `${BASE_PATH}/webpages/preview-sizes/${id}/`,
         // Preview rendering endpoint
-        preview: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/preview/`
+        preview: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/preview/`,
+        previewGrant: (pageId, versionId) => `${BASE_PATH}/webpages/pages/${pageId}/versions/${versionId}/preview-grant/`
     },
 
     // Namespaces endpoints

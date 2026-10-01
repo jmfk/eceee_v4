@@ -68,6 +68,44 @@ class PageVersionWorkflowTest(TestCase):
         self.page.refresh_from_db()
         self.assertEqual(self.page.current_published_version_id, live.id)
 
+    def test_aggressive_pack_keeps_versions_that_were_published(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        now = timezone.now()
+        historical = PageVersion.objects.create(
+            page=self.page,
+            version_number=1,
+            version_title="Historical publication",
+            effective_date=now - timedelta(days=2),
+            expiry_date=now - timedelta(days=1),
+            created_by=self.user,
+        )
+        old_draft = PageVersion.objects.create(
+            page=self.page,
+            version_number=2,
+            version_title="Abandoned draft",
+            created_by=self.user,
+        )
+        current = PageVersion.objects.create(
+            page=self.page,
+            version_number=3,
+            version_title="Current publication",
+            effective_date=now,
+            created_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("api:pageversion-pack-aggressive"),
+            {"page_id": self.page.pk},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["deleted_count"], 1)
+        self.assertTrue(PageVersion.objects.filter(pk=historical.pk).exists())
+        self.assertFalse(PageVersion.objects.filter(pk=old_draft.pk).exists())
+        self.assertTrue(PageVersion.objects.filter(pk=current.pk).exists())
+
     def test_page_scoped_save_atomically_creates_and_updates_first_working_copy(self):
         live = self.publish_initial()
 

@@ -8,6 +8,7 @@ vi.mock('../../api/versions', () => ({
         getPageVersionsList: vi.fn(),
         compare: vi.fn(),
         restore: vi.fn(),
+        createPreviewGrant: vi.fn(),
     },
 }))
 
@@ -35,21 +36,24 @@ describe('PageVersionHistoryPanel', () => {
         versionsApi.getPageVersionsList.mockResolvedValue(versions)
         versionsApi.compare.mockResolvedValue({ changes: { fieldsChanged: ['metaTitle'] } })
         versionsApi.restore.mockResolvedValue({ version: versions[0] })
+        versionsApi.createPreviewGrant.mockResolvedValue({ previewToken: 'scoped preview grant' })
     })
 
     it('opens an authenticated preview for a historical version', async () => {
-        localStorage.setItem('access_token', 'preview token')
-        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+        const previewWindow = { opener: window, location: { replace: vi.fn() }, close: vi.fn() }
+        const openSpy = vi.spyOn(window, 'open').mockReturnValue(previewWindow)
         render(<PageVersionHistoryPanel pageId={4} workflow={{ editableVersion: { id: 11 } }} />)
 
         const previewButtons = await screen.findAllByRole('button', { name: /preview/i })
         fireEvent.click(previewButtons[1])
 
-        expect(openSpy).toHaveBeenCalledWith(
-            'http://localhost:3000/api/v1/webpages/pages/4/versions/10/preview/?standalone=1&token=preview+token',
-            '_blank',
-            'noopener,noreferrer'
+        expect(openSpy).toHaveBeenCalledWith('about:blank', '_blank')
+        await waitFor(() => expect(versionsApi.createPreviewGrant).toHaveBeenCalledWith(4, 10))
+        expect(previewWindow.opener).toBeNull()
+        expect(previewWindow.location.replace).toHaveBeenCalledWith(
+            'http://localhost:3000/api/v1/webpages/pages/4/versions/10/preview/?standalone=1&preview_token=scoped+preview+grant'
         )
+        expect(previewWindow.location.replace.mock.calls[0][0]).not.toContain('access_token')
     })
 
     it('keeps technical version details in history and reports legacy conflicts', async () => {

@@ -69,7 +69,7 @@ from .views.designer_theme_views import (
 from .views.page_debug_views import PageDebugExportView
 from .views.page_import_views import ImportSinglePageView, ImportStatusView, ImportTreeView
 from .views.path_pattern_views import PathPatternViewSet
-from .views.preview_views import PreviewSizeViewSet, render_version_preview
+from .views.preview_views import PreviewSizeViewSet, create_version_preview_grant, render_version_preview
 from .views.simplified_layout_views import (
     simplified_layout_json,
     simplified_layout_schema,
@@ -327,6 +327,11 @@ urlpatterns = [
         "pages/<int:page_id>/versions/<int:version_id>/preview/",
         render_version_preview,
         name="page-version-preview",
+    ),
+    path(
+        "pages/<int:page_id>/versions/<int:version_id>/preview-grant/",
+        create_version_preview_grant,
+        name="page-version-preview-grant",
     ),
     # Page structure query endpoints
     path("pages/<int:page_id>/metadata/", page_metadata_view, name="page-metadata"),
