@@ -83,6 +83,22 @@ jobs:
   publisher-checks:
     name: Publisher checks
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: eceee_publisher_sqltest
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d eceee_publisher_sqltest"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PUBLISHER_SQL_TEST_DATABASE_URL: postgresql://postgres:test-only@127.0.0.1:5432/eceee_publisher_sqltest
     steps:
       - uses: actions/checkout@v4
 
@@ -109,7 +125,7 @@ jobs:
           docker build -f publisher/Dockerfile -t eceee-publisher-ci .
           docker run --rm -d --name eceee-publisher-ci eceee-publisher-ci
           trap 'docker rm -f eceee-publisher-ci >/dev/null 2>&1 || true' EXIT
-          for attempt in {1..30}; do
+          for _ in {1..30}; do
             response=$(docker exec eceee-publisher-ci node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.stdout.write(r.status + ':' + (r.headers.get('x-eceee-publisher') || ''))).catch(()=>process.stdout.write('000:'))" 2>/dev/null || true)
             if [ "$response" = "503:nextjs" ]; then
               exit 0
