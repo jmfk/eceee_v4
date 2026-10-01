@@ -19,7 +19,7 @@ export async function checkFormSubmissionStore(): Promise<void> {
   const client = await connection().connect();
   try {
     const result = await client.query<{ ready: boolean }>(`
-      WITH current_role AS (
+      WITH publisher_role AS (
         SELECT oid, rolcanlogin, rolsuper, rolinherit, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls
         FROM pg_roles
         WHERE rolname = current_user
@@ -36,7 +36,7 @@ export async function checkFormSubmissionStore(): Promise<void> {
         current_user = 'eceee_publisher_forms'
         AND EXISTS (
           SELECT 1
-          FROM current_role
+          FROM publisher_role
           WHERE rolcanlogin
             AND NOT rolsuper
             AND NOT rolinherit
@@ -47,23 +47,23 @@ export async function checkFormSubmissionStore(): Promise<void> {
         )
         AND NOT EXISTS (
           SELECT 1
-          FROM pg_auth_members AS membership, current_role
-          WHERE membership.member = current_role.oid OR membership.roleid = current_role.oid
+          FROM pg_auth_members AS membership, publisher_role
+          WHERE membership.member = publisher_role.oid OR membership.roleid = publisher_role.oid
         )
         AND NOT EXISTS (
-          SELECT 1 FROM pg_database AS database, current_role
-          WHERE database.datname = current_database() AND database.datdba = current_role.oid
+          SELECT 1 FROM pg_database AS database, publisher_role
+          WHERE database.datname = current_database() AND database.datdba = publisher_role.oid
           UNION ALL
-          SELECT 1 FROM application_schemas AS namespace, current_role
-          WHERE namespace.nspowner = current_role.oid
-          UNION ALL
-          SELECT 1
-          FROM pg_class AS relation, application_schemas AS namespace, current_role
-          WHERE relation.relnamespace = namespace.oid AND relation.relowner = current_role.oid
+          SELECT 1 FROM application_schemas AS namespace, publisher_role
+          WHERE namespace.nspowner = publisher_role.oid
           UNION ALL
           SELECT 1
-          FROM pg_proc AS routine, application_schemas AS namespace, current_role
-          WHERE routine.pronamespace = namespace.oid AND routine.proowner = current_role.oid
+          FROM pg_class AS relation, application_schemas AS namespace, publisher_role
+          WHERE relation.relnamespace = namespace.oid AND relation.relowner = publisher_role.oid
+          UNION ALL
+          SELECT 1
+          FROM pg_proc AS routine, application_schemas AS namespace, publisher_role
+          WHERE routine.pronamespace = namespace.oid AND routine.proowner = publisher_role.oid
         )
         AND has_database_privilege(current_user, current_database(), 'CONNECT')
         -- TEMP remains a PostgreSQL PUBLIC default; database CREATE must never be effective.
