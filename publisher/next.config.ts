@@ -7,12 +7,13 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: repositoryRoot,
     // Shared renderer sources live outside publisher/, so their runtime imports
-    // must resolve to the publisher's installed React packages. The matching
-    // tsconfig paths are declaration-only and must not reach the client bundle.
+    // need explicit aliases instead of the declaration-only tsconfig paths.
+    // App Router uses Next's bundled React canary, so every renderer import must
+    // use that same runtime rather than the standalone stable React packages.
     resolveAlias: {
-      react: './node_modules/react',
-      'react/jsx-runtime': './node_modules/react/jsx-runtime.js',
-      'react-dom/server': './node_modules/react-dom/server.js',
+      react: './node_modules/next/dist/compiled/react',
+      'react/jsx-runtime': './node_modules/next/dist/compiled/react/jsx-runtime.js',
+      'react-dom/server': './node_modules/next/dist/compiled/react-dom/server.js',
     },
   },
 };
