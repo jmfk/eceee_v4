@@ -2,21 +2,22 @@
 Tests for dynamic ALLOWED_HOSTS functionality.
 """
 
-from django.test import TestCase, override_settings
+from unittest.mock import Mock, patch
+
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.http import HttpRequest, HttpResponseBadRequest
-from django.contrib.auth.models import User
-from unittest.mock import patch, Mock
+from django.test import TestCase, override_settings
 
-from webpages.models import WebPage
 from core.models import Tenant
 from webpages.middleware import (
     DynamicHostValidationMiddleware,
     get_dynamic_allowed_hosts,
 )
+from webpages.models import WebPage
 
 
-@override_settings(CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}})
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class DynamicHostValidationTest(TestCase):
     """Test dynamic hostname validation middleware."""
 
@@ -27,14 +28,10 @@ class DynamicHostValidationTest(TestCase):
         self.middleware = DynamicHostValidationMiddleware(self.get_response)
 
         # Create a test user for WebPage creation
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
 
         # Create a test tenant
-        self.tenant = Tenant.objects.create(
-            name="Test Tenant", identifier="test", created_by=self.user
-        )
+        self.tenant = Tenant.objects.create(name="Test Tenant", identifier="test", created_by=self.user)
 
         # Clear cache before each test
         cache.clear()
@@ -56,10 +53,11 @@ class DynamicHostValidationTest(TestCase):
     def test_database_hostname_validation(self):
         """Test validation against database hostnames."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         # Create a root page with hostnames
-        page = WebPage.objects.create(
+        WebPage.objects.create(
             title="Test Page",
             slug="test",
             hostnames=["test.example.com", "app.example.com"],
@@ -85,10 +83,11 @@ class DynamicHostValidationTest(TestCase):
     def test_wildcard_hostname(self):
         """Test wildcard hostname functionality."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         # Create page with wildcard
-        page = WebPage.objects.create(
+        WebPage.objects.create(
             title="Wildcard Page",
             slug="wildcard",
             hostnames=["*"],
@@ -104,15 +103,24 @@ class DynamicHostValidationTest(TestCase):
     @override_settings(STATIC_ALLOWED_HOSTS=[])
     def test_scoped_wildcard_matches_subdomains_but_not_apex_or_other_domains(self):
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         wildcard_root = WebPage.objects.create(
-            title="Scoped wildcard", slug="scoped", hostnames=["*.colliberty.com"],
-            created_by=self.user, last_modified_by=self.user, tenant=self.tenant,
+            title="Scoped wildcard",
+            slug="scoped",
+            hostnames=["*.colliberty.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
         )
         exact_root = WebPage.objects.create(
-            title="Exact host", slug="exact", hostnames=["summerstudy-test.colliberty.com"],
-            created_by=self.user, last_modified_by=self.user, tenant=self.tenant,
+            title="Exact host",
+            slug="exact",
+            hostnames=["summerstudy-test.colliberty.com"],
+            created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
         )
 
         self.assertTrue(self.middleware.is_host_allowed("news.colliberty.com"))
@@ -125,9 +133,10 @@ class DynamicHostValidationTest(TestCase):
     def test_hostname_normalization(self):
         """Test hostname normalization."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
-        page = WebPage.objects.create(
+        WebPage.objects.create(
             title="Norm Test",
             slug="norm",
             hostnames=["example.com"],
@@ -143,10 +152,11 @@ class DynamicHostValidationTest(TestCase):
     def test_cache_behavior(self):
         """Test caching of database hostnames."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         # Create page
-        page = WebPage.objects.create(
+        WebPage.objects.create(
             title="Cache Test",
             slug="cache",
             hostnames=["cache.example.com"],
@@ -167,7 +177,8 @@ class DynamicHostValidationTest(TestCase):
     def test_cache_invalidation_on_save(self):
         """Test that cache is cleared when hostnames are updated."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         # Create page
         page = WebPage.objects.create(
@@ -194,11 +205,12 @@ class DynamicHostValidationTest(TestCase):
     def test_get_dynamic_allowed_hosts(self):
         """Test the get_dynamic_allowed_hosts utility function."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         with override_settings(STATIC_ALLOWED_HOSTS=["static1.com", "static2.com"]):
             # Create page with database hostnames
-            page = WebPage.objects.create(
+            WebPage.objects.create(
                 title="Combined Test",
                 slug="combined",
                 hostnames=["db1.com", "db2.com"],
@@ -357,7 +369,8 @@ class DynamicHostValidationTest(TestCase):
     def test_non_root_page_hostnames_validation(self):
         """Test that non-root pages cannot have hostnames."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         # Create root page
         root = WebPage.objects.create(
@@ -409,10 +422,11 @@ class DynamicHostValidationTest(TestCase):
     def test_hostname_with_ports(self):
         """Test hostname validation with ports."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         # Create page with hostname including port
-        page = WebPage.objects.create(
+        WebPage.objects.create(
             title="Port Test",
             slug="port-test",
             hostnames=["example.com", "localhost"],
@@ -433,17 +447,14 @@ class HostnameUtilsTest(TestCase):
     def setUp(self):
         """Set up test data."""
         # Create a test user for WebPage creation
-        self.user = User.objects.create_user(
-            username="testuser2", email="test2@example.com", password="testpass123"
-        )
-        self.tenant = Tenant.objects.create(
-            name="Test Tenant 2", identifier="test2", created_by=self.user
-        )
+        self.user = User.objects.create_user(username="testuser2", email="test2@example.com", password="testpass123")
+        self.tenant = Tenant.objects.create(name="Test Tenant 2", identifier="test2", created_by=self.user)
 
     def test_hostname_normalization(self):
         """Test WebPage.normalize_hostname method."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         test_cases = [
             ("http://example.com", "example.com"),
@@ -463,7 +474,8 @@ class HostnameUtilsTest(TestCase):
     def test_hostname_validation_patterns(self):
         """Test hostname validation regex patterns."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         # Create a test page to trigger validation
         valid_hostnames = [
@@ -494,7 +506,8 @@ class HostnameUtilsTest(TestCase):
     def test_get_all_hostnames(self):
         """Test WebPage.get_all_hostnames class method."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         # Create multiple pages with hostnames
         page1 = WebPage.objects.create(
@@ -506,7 +519,7 @@ class HostnameUtilsTest(TestCase):
             tenant=self.tenant,
         )
 
-        page2 = WebPage.objects.create(
+        WebPage.objects.create(
             title="Page 2",
             slug="page2",
             hostnames=["site2.com"],
@@ -516,7 +529,7 @@ class HostnameUtilsTest(TestCase):
         )
 
         # Create child page (should not contribute hostnames)
-        child = WebPage.objects.create(
+        WebPage.objects.create(
             title="Child",
             slug="child",
             parent=page1,
