@@ -384,8 +384,22 @@ class PageVersionWorkflowService:
     def publish(self, version, *, expected_updated_at=None):
         self.lock_hostname_namespace()
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
+        # Classify the target after acquiring the page lock. A previous publish
+        # request may have committed while this retry was waiting.
+        self.now = timezone.now()
         version = PageVersion.objects.select_for_update().get(pk=version.pk)
-        self.assert_canonical_editable(version)
+        editable = self.canonical_editable_version(lock=True)
+        if not editable or editable.id != version.id:
+            live = self.live_version(lock=True)
+            if live and live.id == version.id and editable is None:
+                return version
+            raise VersionNotEditableError(
+                "Only the current working version can be changed.",
+                details={
+                    "requested_version_id": version.id,
+                    "editable_version_id": editable.id if editable else None,
+                },
+            )
         if expected_updated_at and version.updated_at != expected_updated_at:
             raise VersionConflictError(
                 "The reviewed working version has changed.",

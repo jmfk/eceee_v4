@@ -1157,6 +1157,41 @@ class PageVersionWorkflowTest(TestCase):
         self.assertIsNotNone(live.expiry_date)
         self.assertTrue(working_draft.is_current_published())
 
+    def test_publish_retry_is_idempotent_when_the_reviewed_version_is_already_live(self):
+        draft = self.page.create_version(self.user, "Reviewed draft")
+        reviewed_at = draft.updated_at
+        url = reverse("api:pageversion-publish", kwargs={"pk": draft.pk})
+
+        first = self.client.post(
+            url,
+            {"clientUpdatedAt": reviewed_at.isoformat()},
+            format="json",
+        )
+        retry = self.client.post(
+            url,
+            {"clientUpdatedAt": reviewed_at.isoformat()},
+            format="json",
+        )
+
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(retry.status_code, status.HTTP_200_OK)
+        self.assertEqual(retry.data["version"]["id"], draft.id)
+        self.assertEqual(self.page.versions.count(), 1)
+
+    def test_publish_retry_does_not_hide_a_newer_working_copy(self):
+        live = self.publish_initial()
+        reviewed_at = live.updated_at
+        self.page.create_version(self.user, "Newer working copy")
+
+        retry = self.client.post(
+            reverse("api:pageversion-publish", kwargs={"pk": live.pk}),
+            {"clientUpdatedAt": reviewed_at.isoformat()},
+            format="json",
+        )
+
+        self.assertEqual(retry.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(retry.data["error"], "version_not_editable")
+
     def test_publish_rejects_a_working_copy_changed_after_review(self):
         draft = self.page.create_version(self.user, "Reviewed draft")
         reviewed_at = draft.updated_at

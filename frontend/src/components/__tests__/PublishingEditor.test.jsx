@@ -64,6 +64,38 @@ describe('PublishingEditor', () => {
         expect(versionsApi.publish).toHaveBeenCalledWith(12, '2030-01-01T10:05:00Z')
     })
 
+    it('reconciles a lost publish response when the requested version is live', async () => {
+        versionsApi.publish.mockRejectedValue(new Error('Network connection lost'))
+        versionsApi.getWorkflow
+            .mockResolvedValueOnce({
+                state: 'live_with_unpublished_changes',
+                editableVersion: { id: 11, updatedAt: '2030-01-01T10:00:00Z' },
+                liveVersion: { id: 10 },
+            })
+            .mockResolvedValue({
+                state: 'live',
+                editableVersion: null,
+                liveVersion: { id: 11 },
+            })
+
+        renderEditor()
+        fireEvent.click(await screen.findByRole('button', { name: /publish changes/i }))
+
+        await waitFor(() => expect(addNotification).toHaveBeenCalledWith('Changes published', 'success'))
+        expect(versionsApi.getWorkflow).toHaveBeenCalledTimes(2)
+        expect(addNotification).not.toHaveBeenCalledWith('Network connection lost', 'error')
+    })
+
+    it('refreshes workflow before reporting a genuine publish failure', async () => {
+        versionsApi.publish.mockRejectedValue(new Error('Publication rejected'))
+
+        renderEditor()
+        fireEvent.click(await screen.findByRole('button', { name: /publish changes/i }))
+
+        await waitFor(() => expect(addNotification).toHaveBeenCalledWith('Publication rejected', 'error'))
+        expect(versionsApi.getWorkflow).toHaveBeenCalledTimes(2)
+    })
+
     it('confirms dirty replacement and reloads the restored working version', async () => {
         const historical = {
             id: 10,
