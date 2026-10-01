@@ -69,7 +69,7 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
 
     const iframeRef = useRef(null);
     const resizeRef = useRef(null);
-    const { showNotification } = useNotificationContext();
+    const { showNotification, showConfirm } = useNotificationContext();
 
     // Reset all state when dialog opens (isOpen changes from false to true)
     useEffect(() => {
@@ -946,6 +946,16 @@ const ImportDialog = ({ isOpen, onClose, slotName, pageId, onImportComplete }) =
     };
 
     const handleImport = async () => {
+        if (importMode === 'replace') {
+            const confirmed = await showConfirm({
+                title: 'Replace slot content',
+                message: 'Replace all widgets currently in this slot with the imported content? The published version will remain unchanged.',
+                confirmText: 'Replace content',
+                confirmButtonStyle: 'danger',
+            });
+            if (!confirmed) return;
+        }
+
         setCurrentStep(STEPS.PROCESSING);
         setIsLoading(true);
         setProgress({ step: 'Creating widgets...', percent: 50, current: 0, total: 0, item: '' });

@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 
 class PageVersion(models.Model):
@@ -100,6 +101,25 @@ class PageVersion(models.Model):
         ordering = ["-version_number"]
         unique_together = ["page", "version_number"]
 
+    IMMUTABLE_AFTER_PUBLICATION_FIELDS = (
+        "page_id",
+        "version_number",
+        "version_title",
+        "change_summary",
+        "meta_title",
+        "meta_description",
+        "code_layout",
+        "page_data",
+        "widgets",
+        "theme_id",
+        "page_css_variables",
+        "page_custom_css",
+        "enable_css_injection",
+        "tags",
+        "effective_date",
+        "created_by_id",
+    )
+
     def __str__(self):
         return f"{self.version_title} v{self.version_number}"
 
@@ -155,8 +175,31 @@ class PageVersion(models.Model):
             new_content=new_content,
         )
 
+    def _assert_published_snapshot_immutable(self, update_fields=None):
+        """Allow publication expiry updates, but never rewrite a version that has gone live."""
+        if not self.pk:
+            return
+        if update_fields and set(update_fields).issubset({"expiry_date", "updated_at"}):
+            return
+
+        original = type(self).objects.filter(pk=self.pk).only(*self.IMMUTABLE_AFTER_PUBLICATION_FIELDS).first()
+        if not original or not original.effective_date or original.effective_date > timezone.now():
+            return
+
+        changed_fields = [
+            field
+            for field in self.IMMUTABLE_AFTER_PUBLICATION_FIELDS
+            if getattr(self, field) != getattr(original, field)
+        ]
+        if changed_fields:
+            raise ValidationError(
+                "A version that has been published is an immutable snapshot. "
+                f"Create or update a working copy instead. Changed fields: {', '.join(changed_fields)}"
+            )
+
     def save(self, *args, **kwargs):
-        """Override save to handle media references"""
+        """Protect published snapshots and update their media references."""
+        self._assert_published_snapshot_immutable(kwargs.get("update_fields"))
         # First do the actual save
         super().save(*args, **kwargs)
 

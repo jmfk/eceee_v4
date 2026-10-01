@@ -1,7 +1,8 @@
 """Import processing view."""
 
 import logging
-from datetime import datetime
+
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -9,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from content.models import Namespace, Tag
 from webpages.models import WebPage
+from webpages.services.page_version_workflow import PageVersionWorkflowService
 from ..models import ImportLog
 from ..serializers import ProcessImportSerializer
 from ..services.content_parser import ContentParser
@@ -163,7 +165,12 @@ class ProcessImportView(APIView):
             # 7. Update page metadata (optional)
             page_was_updated = False
             save_to_page = (
-                page_metadata.get("saveToPage", False) if page_metadata else False
+                page_metadata.get(
+                    "save_to_page",
+                    page_metadata.get("saveToPage", False),
+                )
+                if page_metadata
+                else False
             )
 
             if (
@@ -173,7 +180,10 @@ class ProcessImportView(APIView):
             ):
                 try:
                     page = WebPage.objects.get(id=page_id)
-                    page_version = page.get_latest_version()
+                    page_version, _ = PageVersionWorkflowService(
+                        page,
+                        request.user,
+                    ).get_or_create_working_copy()
 
                     if page_version:
                         # Get current page_data or initialize empty dict
@@ -183,9 +193,8 @@ class ProcessImportView(APIView):
                         title = page_metadata.get("title", "").strip()
                         if title:
                             page_version.version_title = title
-                            page.title = title
-                            # Update page_data with title
-                            page_data["title"] = title
+                            attributes = page_data.setdefault("page_attributes", {})
+                            attributes["title"] = title
 
                         # Update tags if provided
                         tag_names = page_metadata.get("tags", [])
@@ -203,7 +212,6 @@ class ProcessImportView(APIView):
                         # Save updated page_data back to page_version
                         page_version.page_data = page_data
                         page_version.save()
-                        page.save()
                         page_was_updated = True
 
                 except WebPage.DoesNotExist:
@@ -218,7 +226,7 @@ class ProcessImportView(APIView):
             import_log.widgets_created = len(widgets)
             import_log.media_files_imported = len(media_files_info)
             import_log.errors = []
-            import_log.completed_at = datetime.now()
+            import_log.completed_at = timezone.now()
             import_log.save()
 
             # 9. Return response

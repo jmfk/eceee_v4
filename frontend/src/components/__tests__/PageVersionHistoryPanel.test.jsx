@@ -31,9 +31,25 @@ const versions = [
 describe('PageVersionHistoryPanel', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        localStorage.clear()
         versionsApi.getPageVersionsList.mockResolvedValue(versions)
         versionsApi.compare.mockResolvedValue({ changes: { fieldsChanged: ['metaTitle'] } })
         versionsApi.restore.mockResolvedValue({ version: versions[0] })
+    })
+
+    it('opens an authenticated preview for a historical version', async () => {
+        localStorage.setItem('access_token', 'preview token')
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+        render(<PageVersionHistoryPanel pageId={4} workflow={{ editableVersion: { id: 11 } }} />)
+
+        const previewButtons = await screen.findAllByRole('button', { name: /preview/i })
+        fireEvent.click(previewButtons[1])
+
+        expect(openSpy).toHaveBeenCalledWith(
+            'http://localhost:3000/api/v1/webpages/pages/4/versions/10/preview/?standalone=1&token=preview+token',
+            '_blank',
+            'noopener,noreferrer'
+        )
     })
 
     it('keeps technical version details in history and reports legacy conflicts', async () => {
