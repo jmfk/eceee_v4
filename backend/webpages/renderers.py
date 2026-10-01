@@ -103,7 +103,7 @@ class WebPageRenderer:
         # Fallback for unexpected types
         return str(css_content) if css_content else ""
 
-    def render(self, page, version=None, context=None):
+    def render(self, page, version=None, context=None, historical=False):
         """
         Render a complete WebPage to HTML string.
 
@@ -111,6 +111,7 @@ class WebPageRenderer:
             page: WebPage instance to render
             version: Optional specific PageVersion to render (defaults to latest published)
             context: Optional additional template context
+            historical: Resolve inherited content as it existed for this version
 
         Returns:
             dict: Contains 'html', 'css', 'meta', and 'debug_info'
@@ -123,8 +124,8 @@ class WebPageRenderer:
             raise ValueError(f"No published version found for page: {page.title}")
 
         snapshot_page = self._page_snapshot(page, page_version)
-        effective_layout = self._effective_layout(page, page_version)
-        effective_theme = self._effective_theme(page, page_version)
+        effective_layout = self._effective_layout(page, page_version, historical=historical)
+        effective_theme = self._effective_theme(page, page_version, historical=historical)
 
         # Build base context
         render_context = self._build_base_context(
@@ -139,7 +140,12 @@ class WebPageRenderer:
             raise ValueError(f"No layout found for page: {snapshot_page.title}")
 
         # Render widgets by slot
-        widgets_by_slot = self._render_widgets_by_slot(snapshot_page, page_version, render_context)
+        widgets_by_slot = self._render_widgets_by_slot(
+            snapshot_page,
+            page_version,
+            render_context,
+            historical=historical,
+        )
         render_context["widgets_by_slot"] = widgets_by_slot
 
         # Get layout template name
@@ -212,13 +218,15 @@ class WebPageRenderer:
             return published
         return page.versions.filter(created_at__lte=as_of).order_by("-created_at", "-version_number").first()
 
-    def _effective_layout(self, page, page_version):
+    def _effective_layout(self, page, page_version, historical=False):
         from .layout_registry import layout_registry
 
         if page_version.code_layout:
             layout = layout_registry.get_layout(page_version.code_layout)
             if layout:
                 return layout
+        if not historical:
+            return page.parent.get_effective_layout() if page.parent else None
         as_of = page_version.effective_date or page_version.created_at
         parent = page.parent
         while parent:
@@ -230,11 +238,13 @@ class WebPageRenderer:
             parent = parent.parent
         return None
 
-    def _effective_theme(self, page, page_version):
+    def _effective_theme(self, page, page_version, historical=False):
         from .models import PageTheme
 
         if page_version.theme_id:
             return page_version.theme
+        if not historical:
+            return page.parent.get_effective_theme() if page.parent else PageTheme.get_default_theme(tenant=page.tenant)
         as_of = page_version.effective_date or page_version.created_at
         parent = page.parent
         while parent:
@@ -531,7 +541,7 @@ class WebPageRenderer:
 
         return context
 
-    def _render_widgets_by_slot(self, page, page_version, context):
+    def _render_widgets_by_slot(self, page, page_version, context, historical=False):
         """Render widgets organized by slot using inheritance tree for better performance."""
         import logging
 
@@ -542,7 +552,8 @@ class WebPageRenderer:
         # NEW: Build inheritance tree (replaces complex slot-by-slot inheritance logic)
         try:
             builder = InheritanceTreeBuilder()
-            tree = builder.build_tree(page, target_version=page_version)
+            as_of = (page_version.effective_date or page_version.created_at) if historical else None
+            tree = builder.build_tree(page, target_version=page_version, as_of=as_of)
             helpers = InheritanceTreeHelpers(tree)
 
             # Get effective layout for slot configuration

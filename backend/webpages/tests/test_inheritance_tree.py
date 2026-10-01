@@ -175,6 +175,41 @@ class InheritanceTreeTest(TestCase):
 
         self.assertIsNone(tree.parent.parent.parent)
 
+    def test_historical_inheritance_is_explicit(self):
+        """Live pages inherit current parent content; history previews opt into old content."""
+        child_version = self.history_page.versions.get(version_number=1)
+        current_parent_version = PageVersion.objects.create(
+            page=self.home_page,
+            version_number=2,
+            effective_date=timezone.now(),
+            created_by=self.user,
+            widgets={
+                "header": [
+                    {
+                        "id": "home-header-2",
+                        "type": "HeaderWidget",
+                        "config": {"title": "Current site header"},
+                        "inheritance_behavior": "insert_after_parent",
+                        "is_published": True,
+                        "inheritance_level": -1,
+                    }
+                ]
+            },
+        )
+        self.home_page.current_published_version = current_parent_version
+        self.home_page.latest_version = current_parent_version
+        self.home_page.save(update_fields=["current_published_version", "latest_version"])
+
+        live_tree = InheritanceTreeBuilder().build_tree(self.history_page, target_version=child_version)
+        historical_tree = InheritanceTreeBuilder().build_tree(
+            self.history_page,
+            target_version=child_version,
+            as_of=child_version.effective_date,
+        )
+
+        self.assertEqual(live_tree.parent.parent.slots["header"][0].id, "home-header-2")
+        self.assertEqual(historical_tree.parent.parent.slots["header"][0].id, "home-header-1")
+
     def test_get_all_widgets(self):
         """Test getAllWidgets helper function"""
         from django.db import connection
