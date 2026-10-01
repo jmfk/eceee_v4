@@ -496,6 +496,8 @@ def render_version_preview(request, page_id, version_id):
         base_url = f"{protocol}://{hostname}/"
 
     try:
+        preview_overflow = "auto" if request.query_params.get("standalone") == "1" else "hidden"
+
         # Use the WebPageRenderer to render the complete page
         renderer = WebPageRenderer(request=request)
         result = renderer.render(page, version=version)
@@ -516,6 +518,7 @@ def render_version_preview(request, page_id, version_id):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
     <base href="{base_url}">
     {result.get('meta', '')}
 
@@ -529,9 +532,9 @@ def render_version_preview(request, page_id, version_id):
         /* Page CSS */
         {result.get('css', '')}
 
-        /* The editor owns preview scrolling; avoid a nested iframe scrollbar. */
+        /* The editor owns iframe scrolling; standalone history previews own their scrolling. */
         html, body {{
-            overflow: hidden !important;
+            overflow: {preview_overflow} !important;
         }}
     </style>
     <script>
@@ -544,7 +547,10 @@ def render_version_preview(request, page_id, version_id):
 </html>
 """
 
-        return HttpResponse(html_content, content_type="text/html")
+        response = HttpResponse(html_content, content_type="text/html")
+        response["Cache-Control"] = "private, no-store"
+        response["Referrer-Policy"] = "no-referrer"
+        return response
 
     except Exception as e:
         # Return error page if rendering fails

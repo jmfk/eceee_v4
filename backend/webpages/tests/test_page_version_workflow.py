@@ -3,6 +3,7 @@ from io import StringIO
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import connection
 from django.test import TestCase, TransactionTestCase
@@ -130,8 +131,7 @@ class PageVersionWorkflowTest(TestCase):
     def test_page_scoped_first_save_rejects_a_stale_live_snapshot(self):
         live = self.publish_initial()
         observed_at = live.updated_at
-        live.meta_title = "Changed elsewhere"
-        live.save()
+        live.save(update_fields=["updated_at"])
 
         response = self.client.patch(
             reverse("api:page-working-copy-save", kwargs={"page_id": self.page.pk}),
@@ -1333,6 +1333,25 @@ class PageVersionWorkflowTest(TestCase):
         self.assertIsNotNone(live.expiry_date)
         self.assertEqual(self.page.versions.count(), count_before)
         self.assertIsNone(self.page.current_published_version_id)
+
+    def test_published_and_unpublished_snapshots_reject_content_rewrites(self):
+        live = self.publish_initial()
+        original_page_data = live.page_data
+
+        live.page_data = {"page_attributes": {"title": "Rewritten"}}
+        with self.assertRaisesMessage(ValidationError, "immutable snapshot"):
+            live.save(update_fields=["page_data", "updated_at"])
+
+        live.refresh_from_db()
+        self.assertEqual(live.page_data, original_page_data)
+
+        PageVersionWorkflowService(self.page, self.user).unpublish(live)
+        live.meta_title = "Rewritten after unpublish"
+        with self.assertRaisesMessage(ValidationError, "immutable snapshot"):
+            live.save(update_fields=["meta_title", "updated_at"])
+
+        live.refresh_from_db()
+        self.assertEqual(live.meta_title, "")
 
     def test_bulk_publish_stops_a_working_copy_changed_after_review(self):
         draft = self.page.create_version(self.user, "Reviewed draft")

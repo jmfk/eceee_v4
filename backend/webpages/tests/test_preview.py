@@ -77,11 +77,15 @@ class WebPagePreviewTest(TestCase):
     def test_preview_query_token_auth_succeeds(self):
         """Test that preview succeeds with token in query parameter."""
         token = str(AccessToken.for_user(self.user))
-        url = f"{self.preview_url}?token={token}"
+        url = f"{self.preview_url}?token={token}&standalone=1"
 
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"<!DOCTYPE html>", response.content)
+        self.assertIn(b'<meta name="referrer" content="no-referrer">', response.content)
+        self.assertEqual(response["Cache-Control"], "private, no-store")
+        self.assertEqual(response["Referrer-Policy"], "no-referrer")
+        self.assertIn(b"overflow: auto !important", response.content)
 
     @override_settings(DEBUG=True)
     def test_preview_dev_hostname_port_resolution(self):
