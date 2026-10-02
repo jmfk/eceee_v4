@@ -24,6 +24,7 @@ ECEEE_IMGPROXY_PORT ?= 10106
 ECEEE_PLAYWRIGHT_PORT ?= 10107
 ECEEE_FRONTEND_E2E_PORT ?= 10108
 ECEEE_FRONTEND_PREVIEW_PORT ?= 10109
+PUBLISHER_PORT ?= 10115
 LEGACY_DB_TUNNEL_PORT ?= 10110
 SHARED_POSTGRES_PORT ?= 10300
 SHARED_REDIS_PORT ?= 10301
@@ -44,6 +45,7 @@ define check_help
 endef
 
 .PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema legacy-db-tunnel legacy-news-sample-dry legacy-news-database-dry test test-build test-parallel backend-test backend-news-test backend-test-parallel prepare-frontend-e2e frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test backend-lint frontend-lint lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db configure-local-infra shared-infra-check use-external-infra prepare-test-infra test-infra-down refresh-db-collation prod-preflight prod-deploy prod-rollback prod-backup prod-backfill-typed-tags prod-theme-access-key validate-typed-tags-backup validate-prod-typed-tags-backup prod-logs prod-status prod-audit-tenant-access prod-ssh prod-shell
+.PHONY: publisher-dev publisher-manifest publisher-manifest-check
 
 # Dummy targets for help flags
 --help:
@@ -70,6 +72,9 @@ help: ## Show this help message (use: make help [target])
 		echo "  servers           Start database, Redis, MinIO, and ImgProxy services"; \
 		echo "  backend           Start Django backend server"; \
 		echo "  frontend          Start React frontend dev server"; \
+		echo "  publisher-dev     Start standalone Next publisher on summerstudy.localhost:10115"; \
+		echo "  publisher-manifest Regenerate publisher CSS/widget metadata"; \
+		echo "  publisher-manifest-check Verify checked-in publisher CSS/widget metadata"; \
 		echo "  playwright-service Start Playwright website rendering service"; \
 		echo "  theme-sync        Start theme file sync service"; \
 		echo "  shell             Open bash shell in backend container"; \
@@ -208,6 +213,17 @@ frontend:
 	@FP="$${FRONTEND_PORT:-10100}"; \
 	 echo "🚀 Starting Frontend on http://localhost:$$FP (internal: 3000)"; \
 	 VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) docker-compose -f docker-compose.dev.yml up frontend
+
+publisher-dev: ## Start the standalone publisher with HMR on the reserved local port
+	@if [ -z "$(DATABASE_URL)" ]; then echo "DATABASE_URL is required in the ignored repository .env" >&2; exit 1; fi
+	@echo "🚀 Starting Publisher on http://summerstudy.localhost:$(PUBLISHER_PORT)"
+	@cd publisher && PUBLISHER_DATABASE_URL="$(DATABASE_URL)" npm run dev -- --hostname 0.0.0.0 --port "$(PUBLISHER_PORT)"
+
+publisher-manifest: ## Regenerate publisher CSS/widget metadata
+	$(COMPOSE_DEV) run --rm --no-deps -v "$(CURDIR)/publisher:/publisher" backend python manage.py export_publisher_manifest
+
+publisher-manifest-check: ## Verify publisher CSS/widget metadata is current
+	$(COMPOSE_DEV) run --rm --no-deps -v "$(CURDIR)/publisher:/publisher" backend python manage.py export_publisher_manifest --check
 
 # Run Playwright website rendering service
 playwright-service:

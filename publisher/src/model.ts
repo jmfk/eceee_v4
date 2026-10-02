@@ -1,3 +1,5 @@
+import { compileThemeCss, fontImports, widgetVariantClasses } from './theme';
+
 export type DbId = string;
 
 export interface Page {
@@ -39,6 +41,37 @@ export interface Theme {
   carousel_styles: Record<string, Record<string, unknown>>;
   breakpoints: Record<string, unknown>;
   custom_css: string;
+  design_groups: Record<string, unknown>;
+  html_elements: Record<string, unknown>;
+  sync_version: number;
+  updated_at: string;
+}
+
+export interface PublishedPageReference {
+  id: DbId;
+  cached_path: string;
+}
+
+export interface PublishedNavigationPage {
+  id: DbId;
+  parent_id: DbId;
+  title: string;
+  slug: string;
+  cached_path: string;
+  sort_order: number;
+}
+
+export interface PublicMediaItem {
+  id: DbId;
+  url: string;
+  type: string;
+  altText: string;
+  caption: string;
+  annotation: string;
+  title: string;
+  width: number | null;
+  height: number | null;
+  thumbnailUrl: string;
 }
 
 export interface PageReader {
@@ -47,6 +80,12 @@ export interface PageReader {
   version(pageId: DbId, at: Date): Promise<Version | null>;
   theme(themeId: DbId, tenantId: DbId): Promise<Theme | null>;
   defaultTheme(tenantId: DbId): Promise<Theme | null>;
+  publishedPageReferences(pageIds: DbId[], tenantId: DbId, rootId: DbId, at: Date): Promise<PublishedPageReference[]>;
+  publishedNavigationPages(parentIds: DbId[], tenantId: DbId, rootId: DbId, at: Date): Promise<PublishedNavigationPage[]>;
+  publicMedia(mediaIds: DbId[], collectionIds: DbId[], tenantId: DbId): Promise<{
+    files: PublicMediaItem[];
+    collections: Record<DbId, PublicMediaItem[]>;
+  }>;
 }
 
 export interface ReadDb {
@@ -235,71 +274,204 @@ function mergeSlot(
   return selected.map(({ item, page, depth }, index) => normalizeWidget(item, `${slot}-${index}`, page, depth, at)).filter((item): item is Widget => item !== null);
 }
 
-function cssRecord(input: Record<string, unknown>): string {
-  return Object.entries(input)
-    .filter(([name, candidate]) => /^[a-zA-Z0-9_-]+$/.test(name) && ['string', 'number'].includes(typeof candidate))
-    .map(([name, candidate]) => `  --${name.replace(/^--/, '')}: ${String(candidate)};`)
-    .join('\n');
-}
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function fontImports(fonts: Record<string, unknown>): string {
-  const configured = fonts.google_fonts ?? fonts.googleFonts;
-  if (!Array.isArray(configured)) return '';
-  return configured.flatMap(font => {
-    const definition = object(font);
-    const family = String(definition.family ?? '').trim().replace(/\s+/g, '+');
-    if (!family) return [];
-    const variants = Array.isArray(definition.variants)
-      ? definition.variants.map(String).filter(variant => /^\d+$/.test(variant))
-      : [];
-    const display = /^(auto|block|fallback|optional|swap)$/.test(String(definition.display))
-      ? String(definition.display)
-      : 'swap';
-    return [`@import url('https://fonts.googleapis.com/css2?family=${family}${variants.length ? `:wght@${variants.join(';')}` : ''}&display=${display}');`];
-  }).join('\n');
-}
-
-function styleCss(styles: Record<string, Record<string, unknown>>, configuredBreakpoints: Record<string, unknown>): string {
-  const breakpoints: Record<string, number> = { sm: 640, md: 768, lg: 1024, xl: 1280 };
-  for (const [name, candidate] of Object.entries(configuredBreakpoints)) {
-    const pixels = Number(candidate);
-    if (name in breakpoints && Number.isFinite(pixels) && pixels > 0) breakpoints[name] = pixels;
+function collectReferences(value: unknown, pageIds: Set<DbId>, mediaIds: Set<DbId>, collectionIds: Set<DbId>): void {
+  if (typeof value === 'string') {
+    const decoded = value.replaceAll('&quot;', '"').replaceAll('&#34;', '"');
+    for (const match of decoded.matchAll(/(?:data-page-id|data-page_id)\s*=\s*["']?(\d+)|["']?(?:pageId|page_id)["']?\s*:\s*["']?(\d+)/gi)) {
+      pageIds.add(match[1] || match[2]);
+    }
+    for (const match of decoded.matchAll(/data-media-id\s*=\s*["']([0-9a-f-]{36})["']/gi)) {
+      if (UUID_PATTERN.test(match[1])) mediaIds.add(match[1]);
+    }
+    return;
   }
-  return Object.values(styles).flatMap(style => {
-    const css = style.css;
-    if (typeof css === 'string') return css;
-    const responsive = object(css);
-    return Object.entries(responsive).flatMap(([key, block]) => {
-      if (typeof block !== 'string') return [];
-      if (key === 'default') return [block];
-      return breakpoints[key] ? [`@media (min-width: ${breakpoints[key]}px) {\n${block}\n}`] : [];
-    });
-  }).join('\n');
+  if (Array.isArray(value)) {
+    value.forEach(item => collectReferences(item, pageIds, mediaIds, collectionIds));
+    return;
+  }
+  if (!value || typeof value !== 'object') return;
+  const item = value as Record<string, unknown>;
+  const pageId = item.pageId ?? item.page_id;
+  if (pageId !== undefined && pageId !== null) pageIds.add(String(pageId));
+  const id = item.id === undefined || item.id === null ? '' : String(item.id);
+  const collectionId = item.collectionId ?? item.collection_id;
+  if (collectionId) collectionIds.add(String(collectionId));
+  if (id && (item.type === 'collection' || item.fileCount !== undefined || item.file_count !== undefined || item.sampleImages !== undefined || item.sample_images !== undefined)) {
+    collectionIds.add(id);
+  } else if (UUID_PATTERN.test(id) && (item.type === 'image' || item.type === 'video' || item.fileUrl !== undefined || item.file_url !== undefined || item.originalFilename !== undefined)) {
+    mediaIds.add(id);
+  }
+  Object.values(item).forEach(child => collectReferences(child, pageIds, mediaIds, collectionIds));
 }
 
-function effectivePageCss(page: Page, version: Version): { variables: Record<string, unknown>; customCss: string } {
-  // Match WebPage.get_effective_css_data(): either level can disable page CSS,
-  // while non-empty published-version values replace their page-level fallback.
-  if (!page.enable_css_injection || !version.enable_css_injection) return { variables: {}, customCss: '' };
-  return {
-    variables: Object.keys(version.page_css_variables).length ? version.page_css_variables : page.page_css_variables,
-    customCss: version.page_custom_css || page.page_custom_css || '',
+function htmlAttribute(attributes: string, name: string): string {
+  const match = new RegExp(`\\b${name}\\s*=\\s*(["'])(.*?)\\1`, 'i').exec(attributes);
+  return match?.[2] ?? '';
+}
+
+function escapeHtmlAttribute(value: unknown): string {
+  return String(value ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+function replaceHtmlMedia(html: string, media: Map<DbId, PublicMediaItem>): string {
+  return html.replace(/<(?:div|figure)\b([^>]*\bdata-media-id\s*=\s*(["'])([0-9a-f-]{36})\2[^>]*)>([\s\S]*?)<\/(?:div|figure)>/gi, (tag, attributes: string, _quote: string, id: string, inner: string) => {
+    const item = media.get(id);
+    if (item && item.type !== 'image') return '';
+    const savedImage = /<img\b([^>]*)>/i.exec(inner)?.[1] ?? '';
+    const source = item?.url || htmlAttribute(savedImage, 'src');
+    if (!source) return tag;
+    const width = htmlAttribute(attributes, 'data-width') || 'full';
+    const align = htmlAttribute(attributes, 'data-align') || 'left';
+    const title = htmlAttribute(attributes, 'data-title') || item?.altText || item?.title || htmlAttribute(savedImage, 'alt');
+    const captionText = item?.caption || htmlAttribute(attributes, 'data-caption');
+    const caption = captionText ? `<figcaption>${escapeHtmlAttribute(captionText)}</figcaption>` : '';
+    return `<figure class="media-insert img-width-${escapeHtmlAttribute(width)} media-align-${escapeHtmlAttribute(align)}"><img src="${escapeHtmlAttribute(source)}" alt="${escapeHtmlAttribute(title)}" class="img-width-${escapeHtmlAttribute(width)}" style="width:100%;height:auto" loading="lazy">${caption}</figure>`;
+  });
+}
+
+function replaceHtmlPageLinks(html: string, paths: Map<DbId, string>): string {
+  const structured = html.replace(/\bhref=(['"])(.*?)\1/gi, (attribute, quote: string, rawValue: string) => {
+    const decoded = rawValue.replaceAll('&quot;', '"').replaceAll('&#34;', '"').replaceAll('&#39;', "'").replaceAll('&amp;', '&');
+    if (!decoded.trim().startsWith('{')) return attribute;
+    try {
+      const link = JSON.parse(decoded) as Record<string, unknown>;
+      if (link.type === 'internal') {
+        const path = paths.get(String(link.pageId ?? link.page_id ?? ''));
+        return path ? `href=${quote}${path}${quote}` : 'aria-disabled="true"';
+      }
+      if (link.type === 'external' || link.type === 'media') return link.url ? `href=${quote}${String(link.url)}${quote}` : 'aria-disabled="true"';
+      if (link.type === 'email') return link.address ? `href=${quote}mailto:${String(link.address)}${quote}` : 'aria-disabled="true"';
+      if (link.type === 'phone') return link.number ? `href=${quote}tel:${String(link.number).replace(/[^\d+]/g, '')}${quote}` : 'aria-disabled="true"';
+      if (link.type === 'anchor') return link.anchor ? `href=${quote}#${String(link.anchor).replace(/^#/, '')}${quote}` : 'aria-disabled="true"';
+    } catch { return 'aria-disabled="true"'; }
+    return 'aria-disabled="true"';
+  });
+  return structured.replace(/<a\b([^>]*)>/gi, (tag, attributes: string) => {
+    const match = /(?:data-page-id|data-page_id|page-id|pageId)\s*=\s*["']?(\d+)["']?/i.exec(attributes);
+    if (!match) return tag;
+    const path = paths.get(match[1]);
+    const withoutHref = attributes.replace(/\s+href\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i, '');
+    return path
+      ? `<a${withoutHref} href="${path}">`
+      : `<a${withoutHref} aria-disabled="true">`;
+  });
+}
+
+function enrichValue(value: unknown, pagePaths: Map<DbId, string>, media: Map<DbId, PublicMediaItem>): unknown {
+  if (typeof value === 'string') {
+    const links = value.includes('<a') ? replaceHtmlPageLinks(value, pagePaths) : value;
+    return links.includes('data-media-id') ? replaceHtmlMedia(links, media) : links;
+  }
+  if (Array.isArray(value)) return value.map(item => enrichValue(item, pagePaths, media));
+  if (!value || typeof value !== 'object') return value;
+  const input = value as Record<string, unknown>;
+  const result = Object.fromEntries(Object.entries(input).map(([key, child]) => [key, enrichValue(child, pagePaths, media)]));
+  const pageId = input.pageId ?? input.page_id;
+  if (pageId !== undefined && pageId !== null) {
+    const resolved = pagePaths.get(String(pageId));
+    if (resolved) {
+      result.resolvedUrl = resolved;
+      result.url = resolved;
+      result.isPublished = true;
+    } else {
+      delete result.resolvedUrl;
+      delete result.resolved_url;
+      delete result.url;
+      delete result.path;
+      result.isActive = false;
+      result.isPublished = false;
+    }
+  }
+  const id = input.id === undefined || input.id === null ? '' : String(input.id);
+  if (id && media.has(id) && !result.url && !result.fileUrl && !result.file_url) return { ...result, ...media.get(id) };
+  return result;
+}
+
+function prepareWidgets(
+  slots: Record<string, Widget[]>,
+  pagePaths: Map<DbId, string>,
+  files: PublicMediaItem[],
+  collections: Record<DbId, PublicMediaItem[]>,
+  theme: Theme | null,
+  pages: Page[],
+  navigationPages: PublishedNavigationPage[],
+): Record<string, Widget[]> {
+  const media = new Map(files.map(item => [String(item.id), item]));
+  const current = pages.at(-1)!;
+  const parent = pages.at(-2);
+  const childrenByParent = new Map<DbId, PublishedNavigationPage[]>();
+  for (const page of navigationPages) {
+    const parentId = String(page.parent_id);
+    const siblings = childrenByParent.get(parentId) ?? [];
+    siblings.push(page);
+    childrenByParent.set(parentId, siblings);
+  }
+  const navigationItem = (page: PublishedNavigationPage) => ({
+    id: page.id,
+    label: page.title,
+    title: page.title,
+    path: page.cached_path,
+    url: page.cached_path,
+    resolvedUrl: page.cached_path,
+    isActive: true,
+    isPublished: true,
+    type: 'internal',
+    order: page.sort_order,
+  });
+  const currentChildren = (childrenByParent.get(String(current.id)) ?? []).map(navigationItem);
+  const parentChildren = parent ? (childrenByParent.get(String(parent.id)) ?? []).map(navigationItem) : [];
+  const parentItem = parent ? {
+    id: parent.id,
+    label: parent.title,
+    title: parent.title,
+    path: parent.id === pages[0].id ? '/' : `/${pages.slice(1, -1).map(page => page.slug).filter(Boolean).join('/')}/`,
+  } : null;
+  const prepare = (widget: Widget): Widget => {
+    const enriched = enrichValue(widget.config, pagePaths, media) as Record<string, unknown>;
+    const prepareValue = (candidate: unknown): unknown => {
+      if (Array.isArray(candidate)) return candidate.map(prepareValue);
+      if (!candidate || typeof candidate !== 'object') return candidate;
+      const record = candidate as Record<string, unknown>;
+      if (typeof record.type === 'string' && record.config && typeof record.config === 'object') return prepare(record as unknown as Widget);
+      return Object.fromEntries(Object.entries(record).map(([key, child]) => [key, prepareValue(child)]));
+    };
+    const config = prepareValue(enriched) as Record<string, unknown>;
+    config.variantClasses = widgetVariantClasses(widget.type, config);
+    if (widget.type === 'easy_widgets.NavigationWidget') {
+      config.publisherNavigation = {
+        isInherited: pages.length > 1,
+        depth: pages.length - 1,
+        currentChildren,
+        parentChildren,
+        parentPage: parentItem,
+      };
+      if (config.includeSubpages === true || config.include_subpages === true) {
+        config.dynamicItems = currentChildren;
+      }
+    }
+    if (widget.type === 'easy_widgets.ImageWidget') {
+      const image = object(config.image);
+      const collectionId = image.type === 'collection' ? image.id : (image.collectionId ?? image.collection_id ?? config.collectionId ?? config.collection_id);
+      if (collectionId) {
+        let items = collections[String(collectionId)] ?? [];
+        const collectionConfig = object(config.collectionConfig ?? config.collection_config);
+        const limit = Number(collectionConfig.maxItems ?? collectionConfig.max_items ?? 0);
+        if (limit > 0) items = items.slice(0, limit);
+        config.mediaItems = items;
+      } else if (Object.keys(image).length) {
+        const item = media.get(String(image.id ?? '')) ?? image;
+        config.mediaItems = [item];
+      }
+      const styleName = String(config.imageStyle ?? config.image_style ?? '');
+      const style = theme?.image_styles[styleName] ?? theme?.gallery_styles[styleName] ?? theme?.carousel_styles[styleName];
+      if (!config.displayType && !config.display_type && style?.styleType) config.displayType = style.styleType;
+      if (config.showCaptions === undefined && config.show_captions === undefined && style?.defaultShowCaptions !== undefined) config.showCaptions = style.defaultShowCaptions;
+    }
+    return { ...widget, config };
   };
-}
-
-function compileThemeCss(theme: Theme | null, page: Page, version: Version): string {
-  const pageCss = effectivePageCss(page, version);
-  const variables = { ...(theme?.css_variables ?? {}), ...(theme?.colors ?? {}), ...pageCss.variables };
-  const variableCss = cssRecord(variables);
-  return [
-    variableCss ? `:root {\n${variableCss}\n}` : '',
-    theme?.custom_css ?? '',
-    theme ? styleCss(theme.component_styles, theme.breakpoints) : '',
-    theme ? styleCss(theme.image_styles, theme.breakpoints) : '',
-    theme ? styleCss(theme.gallery_styles, theme.breakpoints) : '',
-    theme ? styleCss(theme.carousel_styles, theme.breakpoints) : '',
-    pageCss.customCss,
-  ].filter(Boolean).join('\n\n');
+  return Object.fromEntries(Object.entries(slots).map(([slot, widgets]) => [slot, widgets.map(prepare)]));
 }
 
 export async function buildPublishedPageModel(db: ReadDb, hostname: string, path: string, at = new Date()): Promise<PublishedPageModel | null> {
@@ -329,7 +501,7 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
       : []);
     const layout = [...chain].reverse().find(item => item.version.code_layout)?.version.code_layout || 'main_layout';
     const slotNames = new Set([...(LAYOUT_SLOTS[layout] ?? []), ...chain.flatMap(item => Object.keys(object(item.version.widgets)))]);
-    const slots = Object.fromEntries([...slotNames].map(slot => [
+    let slots = Object.fromEntries([...slotNames].map(slot => [
       slot,
       mergeSlot(slot, chain, at),
     ]));
@@ -339,6 +511,16 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
     const theme = explicitThemeId
       ? await reader.theme(explicitThemeId, root.tenant_id)
       : await reader.defaultTheme(root.tenant_id);
+
+    const pageIds = new Set<DbId>();
+    const mediaIds = new Set<DbId>();
+    const collectionIds = new Set<DbId>();
+    collectReferences(slots, pageIds, mediaIds, collectionIds);
+    const references = await reader.publishedPageReferences([...pageIds], root.tenant_id, root.id, at);
+    const navigationPages = await reader.publishedNavigationPages(pages.map(page => page.id), root.tenant_id, root.id, at);
+    const publicMedia = await reader.publicMedia([...mediaIds], [...collectionIds], root.tenant_id);
+    const pagePaths = new Map(references.map(reference => [String(reference.id), reference.cached_path]));
+    slots = prepareWidgets(slots, pagePaths, publicMedia.files, publicMedia.collections, theme, pages, navigationPages);
 
     const matchedPath = '/' + segments.join('/');
     return {
@@ -359,7 +541,7 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
         },
       },
       fontCss: theme ? fontImports(theme.fonts) : '',
-      themeCss: compileThemeCss(theme, current, currentVersion),
+      themeCss: compileThemeCss(theme, current, currentVersion, slots),
       title: currentVersion.meta_title || current.title,
       description: currentVersion.meta_description || '',
       matchedPath,

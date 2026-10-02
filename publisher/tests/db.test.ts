@@ -68,6 +68,30 @@ describe('database snapshot', () => {
     expect(defaultParameters).toEqual(['7']);
   });
 
+  it('keeps page references and public collection media tenant and site scoped', async () => {
+    await database.withSnapshot(async reader => {
+      await reader.publishedPageReferences(['10'], '7', '1', new Date('2026-06-01'));
+      await reader.publishedNavigationPages(['10'], '7', '1', new Date('2026-06-01'));
+      await reader.publicMedia(['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], ['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'], '7');
+    });
+
+    const pageSql = mocks.query.mock.calls[1][0];
+    const navigationSql = mocks.query.mock.calls[2][0];
+    const fileSql = mocks.query.mock.calls[3][0];
+    const collectionSql = mocks.query.mock.calls[4][0];
+    expect(pageSql).toContain('page.tenant_id = $2');
+    expect(pageSql).toContain('page.cached_root_id = $3');
+    expect(pageSql).toContain('version.effective_date <= $4');
+    expect(navigationSql).toContain('page.parent_id = ANY($1::bigint[])');
+    expect(navigationSql).toContain('page.tenant_id = $2');
+    expect(navigationSql).toContain('page.cached_root_id = $3');
+    expect(fileSql).toContain("media.access_level = 'public'");
+    expect(fileSql).toContain('media.tenant_id = $2');
+    expect(collectionSql).toContain("collection.access_level = 'public'");
+    expect(collectionSql).toContain('namespace.tenant_id = $2');
+    expect(collectionSql).toContain('media.is_deleted = false');
+  });
+
   it('rolls back and releases the client when resolution fails', async () => {
     const failure = new Error('resolution failed');
     await expect(database.withSnapshot(async () => { throw failure; })).rejects.toBe(failure);

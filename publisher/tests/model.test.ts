@@ -39,7 +39,7 @@ const versions: Record<string, Version> = {
     id: '10', page_id: '3', meta_title: 'Published story', meta_description: 'Description',
     page_css_variables: { spacing: '2rem' }, page_custom_css: '.story { color: red; }',
     widgets: {
-      main: [{ type: 'easy_widgets.ContentWidget', config: { content: '<p>Hello</p>' } }],
+      main: [{ type: 'easy_widgets.ContentWidget', config: { content: '<p>Hello</p>', component_style: 'card' } }],
       sidebar: [{ id: 'local-side', type: 'easy_widgets.HeadlineWidget', inheritanceBehavior: 'insert_before_parent', config: { content: 'Local sidebar' } }],
     },
   }),
@@ -47,6 +47,7 @@ const versions: Record<string, Version> = {
 const theme: Theme = {
   id: '20', tenant_id: '7', name: 'Public', fonts: { google_fonts: [{ family: 'Open Sans', variants: ['400', '700'], display: 'swap' }] },
   colors: { primary: '#123456' }, css_variables: {},
+  design_groups: {}, html_elements: {}, sync_version: 1, updated_at: '2026-01-01T00:00:00Z',
   component_styles: { card: { template: '<article>{{{content}}}</article>', css: { default: '.card { padding: 1rem; }', sm: '.card { padding: 2rem; }' } } },
   image_styles: {}, gallery_styles: {}, carousel_styles: {}, breakpoints: { sm: 700 }, custom_css: 'body { margin: 0; }',
 };
@@ -56,6 +57,9 @@ const reader: PageReader = {
   version: async (id, at) => at >= new Date('2026-01-01') && at < new Date('2027-01-01') ? versions[id] ?? null : null,
   theme: async (id, tenant) => id === theme.id && tenant === theme.tenant_id ? theme : null,
   defaultTheme: async tenant => tenant === theme.tenant_id ? theme : null,
+  publishedPageReferences: async () => [],
+  publishedNavigationPages: async () => [],
+  publicMedia: async () => ({ files: [], collections: {} }),
 };
 const db: ReadDb = { withSnapshot: async read => read(reader) };
 
@@ -286,6 +290,45 @@ describe('public resolution', () => {
     await buildPublishedPageModel({ withSnapshot: async read => { snapshots++; return read(observed); } }, 'EXAMPLE.ORG:443', '/');
     expect(snapshots).toBe(1);
     expect(selectedHost).toBe('example.org');
+  });
+
+  it('resolves same-site page links and public media collections inside one snapshot', async () => {
+    const enrichedReader: PageReader = {
+      ...reader,
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        if (id !== article.id || !selected) return selected;
+        return version({ ...selected, widgets: { main: [
+          { id: 'nav', type: 'easy_widgets.NavigationWidget', config: { menuItems: [{ linkData: { type: 'internal', pageId: child.id, label: 'News' } }, { linkData: { type: 'internal', pageId: '999', label: 'Missing' } }] } },
+          { id: 'copy', type: 'easy_widgets.ContentWidget', config: { content: '<p><a data-page-id="2" href="#">News</a><a href="{&quot;type&quot;:&quot;internal&quot;,&quot;pageId&quot;:2}">Structured</a><a href="{&quot;type&quot;:&quot;external&quot;,&quot;url&quot;:&quot;https://example.net&quot;}">External</a><a data-page-id="999" href="#">Missing</a></p>' } },
+          { id: 'logos', type: 'easy_widgets.ImageWidget', config: { collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8', display_type: 'gallery' } },
+          { id: 'section', type: 'easy_widgets.SectionWidget', config: { slots: { content: [
+            { id: 'nested-logos', type: 'easy_widgets.ImageWidget', config: { collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8' } },
+            { id: 'subpages', type: 'easy_widgets.NavigationWidget', config: { navigation_style: 'sub-page-navigation', menu_items: [] } },
+          ] } } },
+        ] } });
+      },
+      publishedPageReferences: async (ids, tenant, site) => ids.includes(child.id) && tenant === root.tenant_id && site === root.id ? [{ id: child.id, cached_path: '/news/' }] : [],
+      publishedNavigationPages: async () => [{ id: '4', parent_id: article.id, title: 'Child page', slug: 'child', cached_path: '/news/story/child/', sort_order: 0 }],
+      publicMedia: async () => ({ files: [], collections: { '67d9020f-1d73-47be-bd24-1fe52d2dbef8': [{ id: 'a', url: '/logo.png', type: 'image', altText: 'Partner', caption: '', annotation: '', title: 'Partner', width: 100, height: 50, thumbnailUrl: '/logo.png' }] } }),
+    };
+
+    const model = await buildPublishedPageModel({ withSnapshot: async read => read(enrichedReader) }, 'example.org', '/news/story', new Date('2026-06-01'));
+    expect(model?.slots.main[0].config.menuItems).toEqual([
+      expect.objectContaining({ linkData: expect.objectContaining({ resolvedUrl: '/news/', url: '/news/' }) }),
+      expect.objectContaining({ linkData: expect.objectContaining({ isActive: false, isPublished: false }) }),
+    ]);
+    expect(model?.slots.main[1].config.content).toContain('href="/news/"');
+    expect(model?.slots.main[1].config.content).toContain('href="https://example.net"');
+    expect(model?.slots.main[1].config.content).not.toContain('href="#"');
+    expect(model?.slots.main[2].config.mediaItems).toEqual([expect.objectContaining({ url: '/logo.png' })]);
+    const nested = (model?.slots.main[3].config.slots as Record<string, Widget[]>).content;
+    expect(nested[0].config.mediaItems).toEqual([expect.objectContaining({ url: '/logo.png' })]);
+    expect(nested[1].config.publisherNavigation).toMatchObject({
+      isInherited: true,
+      depth: 2,
+      currentChildren: [expect.objectContaining({ path: '/news/story/child/' })],
+    });
   });
 
   it('rejects dynamic patterns', async () => {

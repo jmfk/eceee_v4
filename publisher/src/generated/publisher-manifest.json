@@ -1,0 +1,470 @@
+{
+  "baseCss": "*,:after,:before{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/*! tailwindcss v3.4.18 | MIT License | https://tailwindcss.com*/*,:after,:before{box-sizing:border-box;border:0 solid #e5e7eb}:after,:before{--tw-content:\"\"}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;-o-tab-size:4;tab-size:4;font-family:Source Sans 3,ui-sans-serif,system-ui,-apple-system,sans-serif;font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0}fieldset,legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::-moz-placeholder,textarea::-moz-placeholder{opacity:1;color:#9ca3af}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}img,video{max-width:unset;height:unset}body{font-family:Source Sans\\ 3,ui-sans-serif,system-ui,-apple-system,sans-serif}h1{font-size:41px;line-height:44px;font-weight:600}h1,h2{margin-bottom:11px}h2{font-size:36px;line-height:43px;font-weight:500}h3{font-size:22px;line-height:26px;font-weight:600;margin-top:22px}h3,p{margin-bottom:11px}p{font-size:16px;line-height:22px;font-weight:300}ul{list-style-type:disc}ol,ul{margin-top:11px;margin-bottom:11px;padding-left:1.5em}ol{list-style-type:decimal}li{font-size:16px;line-height:22px;font-weight:300}a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}.\\!container{width:100%!important}.container{width:100%}@media (min-width:640px){.\\!container{max-width:640px!important}.container{max-width:640px}}@media (min-width:768px){.\\!container{max-width:768px!important}.container{max-width:768px}}@media (min-width:1024px){.\\!container{max-width:1024px!important}.container{max-width:1024px}}@media (min-width:1280px){.\\!container{max-width:1280px!important}.container{max-width:1280px}}@media (min-width:1536px){.\\!container{max-width:1536px!important}.container{max-width:1536px}}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0}.visible{visibility:visible}.collapse{visibility:collapse}.static{position:static}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.bottom-4{bottom:1rem}.right-4{right:1rem}.top-4{top:1rem}.z-50{z-index:50}.mx-2{margin-left:.5rem;margin-right:.5rem}.mx-auto{margin-left:auto;margin-right:auto}.mb-1{margin-bottom:.25rem}.mb-2{margin-bottom:.5rem}.mb-3{margin-bottom:.75rem}.mb-4{margin-bottom:1rem}.mb-6{margin-bottom:1.5rem}.ml-2{margin-left:.5rem}.ml-4{margin-left:1rem}.mr-1{margin-right:.25rem}.mt-0\\.5{margin-top:.125rem}.mt-1{margin-top:.25rem}.mt-2{margin-top:.5rem}.mt-4{margin-top:1rem}.mt-5{margin-top:1.25rem}.mt-6{margin-top:1.5rem}.mt-8{margin-top:2rem}.block{display:block}.inline-block{display:inline-block}.inline{display:inline}.flex{display:flex}.inline-flex{display:inline-flex}.table{display:table}.table-caption{display:table-caption}.\\!grid{display:grid!important}.grid{display:grid}.hidden{display:none}.h-12{height:3rem}.h-16{height:4rem}.h-4{height:1rem}.h-5{height:1.25rem}.h-6{height:1.5rem}.h-8{height:2rem}.min-h-\\[200px\\]{min-height:200px}.min-h-screen{min-height:100vh}.w-12{width:3rem}.w-16{width:4rem}.w-4{width:1rem}.w-5{width:1.25rem}.w-6{width:1.5rem}.w-8{width:2rem}.w-full{width:100%}.max-w-3xl{max-width:48rem}.flex-shrink{flex-shrink:1}.border-collapse{border-collapse:collapse}.translate-x-full{--tw-translate-x:100%}.transform,.translate-x-full{transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}@keyframes spin{to{transform:rotate(1turn)}}.animate-spin{animation:spin 1s linear infinite}.cursor-pointer{cursor:pointer}.resize{resize:both}.grid-cols-1{grid-template-columns:repeat(1,minmax(0,1fr))}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.items-start{align-items:flex-start}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-1{gap:.25rem}.gap-2{gap:.5rem}.gap-6{gap:1.5rem}.space-x-2>:not([hidden])~:not([hidden]){--tw-space-x-reverse:0;margin-right:calc(.5rem*var(--tw-space-x-reverse));margin-left:calc(.5rem*(1 - var(--tw-space-x-reverse)))}.space-x-4>:not([hidden])~:not([hidden]){--tw-space-x-reverse:0;margin-right:calc(1rem*var(--tw-space-x-reverse));margin-left:calc(1rem*(1 - var(--tw-space-x-reverse)))}.space-y-1>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.25rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.25rem*var(--tw-space-y-reverse))}.space-y-2>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.5rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.5rem*var(--tw-space-y-reverse))}.space-y-4>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem*var(--tw-space-y-reverse))}.space-y-8>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(2rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(2rem*var(--tw-space-y-reverse))}.break-all{word-break:break-all}.rounded{border-radius:.25rem}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:.5rem}.rounded-md{border-radius:.375rem}.border{border-width:1px}.border-2{border-width:2px}.border-b{border-bottom-width:1px}.border-l-4{border-left-width:4px}.border-t{border-top-width:1px}.border-blue-400{--tw-border-opacity:1;border-color:rgb(96 165 250/var(--tw-border-opacity,1))}.border-gray-200{--tw-border-opacity:1;border-color:rgb(229 231 235/var(--tw-border-opacity,1))}.border-gray-300{--tw-border-opacity:1;border-color:rgb(209 213 219/var(--tw-border-opacity,1))}.border-green-200{--tw-border-opacity:1;border-color:rgb(187 247 208/var(--tw-border-opacity,1))}.border-green-400{--tw-border-opacity:1;border-color:rgb(74 222 128/var(--tw-border-opacity,1))}.border-purple-200{--tw-border-opacity:1;border-color:rgb(233 213 255/var(--tw-border-opacity,1))}.border-purple-300{--tw-border-opacity:1;border-color:rgb(216 180 254/var(--tw-border-opacity,1))}.border-purple-500{--tw-border-opacity:1;border-color:rgb(168 85 247/var(--tw-border-opacity,1))}.border-red-200{--tw-border-opacity:1;border-color:rgb(254 202 202/var(--tw-border-opacity,1))}.border-red-500{--tw-border-opacity:1;border-color:rgb(239 68 68/var(--tw-border-opacity,1))}.border-yellow-400{--tw-border-opacity:1;border-color:rgb(250 204 21/var(--tw-border-opacity,1))}.bg-blue-100{--tw-bg-opacity:1;background-color:rgb(219 234 254/var(--tw-bg-opacity,1))}.bg-blue-50{--tw-bg-opacity:1;background-color:rgb(239 246 255/var(--tw-bg-opacity,1))}.bg-blue-600{--tw-bg-opacity:1;background-color:rgb(37 99 235/var(--tw-bg-opacity,1))}.bg-gray-100{--tw-bg-opacity:1;background-color:rgb(243 244 246/var(--tw-bg-opacity,1))}.bg-gray-300{--tw-bg-opacity:1;background-color:rgb(209 213 219/var(--tw-bg-opacity,1))}.bg-gray-50{--tw-bg-opacity:1;background-color:rgb(249 250 251/var(--tw-bg-opacity,1))}.bg-green-100{--tw-bg-opacity:1;background-color:rgb(220 252 231/var(--tw-bg-opacity,1))}.bg-green-50{--tw-bg-opacity:1;background-color:rgb(240 253 244/var(--tw-bg-opacity,1))}.bg-green-600{--tw-bg-opacity:1;background-color:rgb(22 163 74/var(--tw-bg-opacity,1))}.bg-purple-100{--tw-bg-opacity:1;background-color:rgb(243 232 255/var(--tw-bg-opacity,1))}.bg-purple-200{--tw-bg-opacity:1;background-color:rgb(233 213 255/var(--tw-bg-opacity,1))}.bg-purple-50{--tw-bg-opacity:1;background-color:rgb(250 245 255/var(--tw-bg-opacity,1))}.bg-red-50{--tw-bg-opacity:1;background-color:rgb(254 242 242/var(--tw-bg-opacity,1))}.bg-red-600{--tw-bg-opacity:1;background-color:rgb(220 38 38/var(--tw-bg-opacity,1))}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity,1))}.bg-yellow-100{--tw-bg-opacity:1;background-color:rgb(254 249 195/var(--tw-bg-opacity,1))}.bg-yellow-50{--tw-bg-opacity:1;background-color:rgb(254 252 232/var(--tw-bg-opacity,1))}.bg-yellow-600{--tw-bg-opacity:1;background-color:rgb(202 138 4/var(--tw-bg-opacity,1))}.bg-opacity-20{--tw-bg-opacity:0.2}.bg-gradient-to-r{background-image:linear-gradient(to right,var(--tw-gradient-stops))}.from-blue-600{--tw-gradient-from:#2563eb var(--tw-gradient-from-position);--tw-gradient-to:rgba(37,99,235,0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from),var(--tw-gradient-to)}.to-blue-700{--tw-gradient-to:#1d4ed8 var(--tw-gradient-to-position)}.p-3{padding:.75rem}.p-4{padding:1rem}.p-6{padding:1.5rem}.p-8{padding:2rem}.px-1{padding-left:.25rem;padding-right:.25rem}.px-2{padding-left:.5rem;padding-right:.5rem}.px-3{padding-left:.75rem;padding-right:.75rem}.px-4{padding-left:1rem;padding-right:1rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.py-1{padding-top:.25rem;padding-bottom:.25rem}.py-2{padding-top:.5rem;padding-bottom:.5rem}.py-3{padding-top:.75rem;padding-bottom:.75rem}.py-6{padding-top:1.5rem;padding-bottom:1.5rem}.py-8{padding-top:2rem;padding-bottom:2rem}.pt-4{padding-top:1rem}.text-center{text-align:center}.font-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace}.text-2xl{font-size:1.5rem;line-height:2rem}.text-3xl{font-size:1.875rem;line-height:2.25rem}.text-4xl{font-size:2.25rem;line-height:2.5rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:.75rem;line-height:1rem}.font-bold{font-weight:700}.font-medium{font-weight:500}.font-semibold{font-weight:600}.uppercase{text-transform:uppercase}.italic{font-style:italic}.text-blue-600{--tw-text-opacity:1;color:rgb(37 99 235/var(--tw-text-opacity,1))}.text-blue-800{--tw-text-opacity:1;color:rgb(30 64 175/var(--tw-text-opacity,1))}.text-gray-300{--tw-text-opacity:1;color:rgb(209 213 219/var(--tw-text-opacity,1))}.text-gray-400{--tw-text-opacity:1;color:rgb(156 163 175/var(--tw-text-opacity,1))}.text-gray-500{--tw-text-opacity:1;color:rgb(107 114 128/var(--tw-text-opacity,1))}.text-gray-600{--tw-text-opacity:1;color:rgb(75 85 99/var(--tw-text-opacity,1))}.text-gray-700{--tw-text-opacity:1;color:rgb(55 65 81/var(--tw-text-opacity,1))}.text-gray-900{--tw-text-opacity:1;color:rgb(17 24 39/var(--tw-text-opacity,1))}.text-green-600{--tw-text-opacity:1;color:rgb(22 163 74/var(--tw-text-opacity,1))}.text-green-700{--tw-text-opacity:1;color:rgb(21 128 61/var(--tw-text-opacity,1))}.text-green-800{--tw-text-opacity:1;color:rgb(22 101 52/var(--tw-text-opacity,1))}.text-green-900{--tw-text-opacity:1;color:rgb(20 83 45/var(--tw-text-opacity,1))}.text-purple-600{--tw-text-opacity:1;color:rgb(147 51 234/var(--tw-text-opacity,1))}.text-purple-800{--tw-text-opacity:1;color:rgb(107 33 168/var(--tw-text-opacity,1))}.text-purple-900{--tw-text-opacity:1;color:rgb(88 28 135/var(--tw-text-opacity,1))}.text-red-600{--tw-text-opacity:1;color:rgb(220 38 38/var(--tw-text-opacity,1))}.text-red-800{--tw-text-opacity:1;color:rgb(153 27 27/var(--tw-text-opacity,1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1))}.text-yellow-600{--tw-text-opacity:1;color:rgb(202 138 4/var(--tw-text-opacity,1))}.text-yellow-700{--tw-text-opacity:1;color:rgb(161 98 7/var(--tw-text-opacity,1))}.text-yellow-800{--tw-text-opacity:1;color:rgb(133 77 14/var(--tw-text-opacity,1))}.opacity-0{opacity:0}.opacity-25{opacity:.25}.opacity-75{opacity:.75}.opacity-90{opacity:.9}.shadow-lg{--tw-shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1);--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color),0 4px 6px -4px var(--tw-shadow-color)}.shadow-lg,.shadow-sm{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-sm{--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color)}.outline{outline-style:solid}.blur{--tw-blur:blur(8px)}.blur,.filter{filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.backdrop-filter{-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.transition{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,-webkit-backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter,-webkit-backdrop-filter;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.transition-all{transition-property:all;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.transition-colors{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.transition-shadow{transition-property:box-shadow;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.duration-300{transition-duration:.3s}.ease-in-out{transition-timing-function:cubic-bezier(.4,0,.2,1)}.ease-out{transition-timing-function:cubic-bezier(0,0,.2,1)}.htmx-indicator{opacity:0;transition:opacity .3s ease-in-out}.htmx-request .htmx-indicator{opacity:1}.fade-in{animation:fadeIn .3s ease-in-out}@keyframes fadeIn{0%{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}.media-insert .img-width-full,.media-insert img.img-width-full{width:100%;height:auto}.media-insert .img-width-half,.media-insert img.img-width-half{width:50%;height:auto}.media-insert .img-width-third,.media-insert img.img-width-third{width:33.33%;height:auto}.media-insert img{display:block;max-width:100%;height:auto}.media-insert.media-align-left{text-align:left}.media-insert.media-align-center{text-align:center}.media-insert.media-align-right{text-align:right}.media-insert.media-align-center img,.media-insert.media-align-right img{margin-left:auto}.media-insert.media-align-center img{margin-right:auto}.cell-left{text-align:left}.cell-center{text-align:center}.cell-right{text-align:right}.cell-v-top{vertical-align:top}.cell-v-middle{vertical-align:middle}.cell-v-bottom{vertical-align:bottom}.table-cell-quote{font-style:italic;color:#6b7280;font-weight:400}.table-cell-caption{font-size:.875rem;color:#6b7280;font-weight:400}.cell-image{padding:.25rem}.cell-image img{max-width:100%;height:auto;display:block}.hover\\:bg-blue-700:hover{--tw-bg-opacity:1;background-color:rgb(29 78 216/var(--tw-bg-opacity,1))}.hover\\:bg-gray-400:hover{--tw-bg-opacity:1;background-color:rgb(156 163 175/var(--tw-bg-opacity,1))}.hover\\:text-blue-600:hover{--tw-text-opacity:1;color:rgb(37 99 235/var(--tw-text-opacity,1))}.hover\\:text-blue-700:hover{--tw-text-opacity:1;color:rgb(29 78 216/var(--tw-text-opacity,1))}.hover\\:text-blue-800:hover{--tw-text-opacity:1;color:rgb(30 64 175/var(--tw-text-opacity,1))}.hover\\:text-gray-200:hover{--tw-text-opacity:1;color:rgb(229 231 235/var(--tw-text-opacity,1))}.hover\\:text-gray-900:hover{--tw-text-opacity:1;color:rgb(17 24 39/var(--tw-text-opacity,1))}.hover\\:shadow-md:hover{--tw-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1);--tw-shadow-colored:0 4px 6px -1px var(--tw-shadow-color),0 2px 4px -2px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.focus\\:border-blue-500:focus{--tw-border-opacity:1;border-color:rgb(59 130 246/var(--tw-border-opacity,1))}.focus\\:ring-blue-500:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(59 130 246/var(--tw-ring-opacity,1))}@media (min-width:768px){.md\\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (min-width:1024px){.lg\\:grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}}@media (min-width:1280px){.xl\\:pl-\\[80px\\]{padding-left:80px}.xl\\:pr-\\[60px\\]{padding-right:60px}}",
+  "formatVersion": 1,
+  "widgets": {
+    "easy_widgets.BannerWidget": {
+      "css": "\n    .banner-widget {\n        box-sizing: border-box;\n        display: flex;\n        flex-direction: column;\n        width: 100%;\n        height: 140px;\n        outline: 1px solid rgb(0,0,0,0.3);\n        border-width: 0;\n        overflow: hidden;\n        border-radius: 0;\n        box-shadow: none;\n        margin-bottom: 30px;\n        position: relative;\n    }\n    .banner-widget.border-disabled {\n        outline: none;\n    }\n    .banner-widget:last-child {\n        margin-bottom: 0;\n    }\n    .banner-background {\n        position: absolute;\n        top: 0;\n        left: 0;\n        width: 100%;\n        height: 100%;\n        background-size: cover;\n        background-position: center;\n        background-repeat: no-repeat;\n        z-index: 0;\n    }\n    \n    .banner-body {\n        display: flex;  \n        flex: 1;\n        min-height: 0;\n        height: 140px;\n        position: relative;\n        z-index: 1;\n    }\n    \n    /* Text mode styles */\n    .banner-body.mode-text {\n        justify-content: flex-start;\n        align-items: flex-start;\n    }\n    \n    .banner-body.mode-text .banner-text {\n        flex: 1; \n        padding: 26px 30px 30px;\n        font-size: 16px;\n        font-family: 'Source Sans 3', sans-serif;\n        font-weight: 300;\n        line-height: 22px;\n        overflow: hidden;\n    }\n    .banner-body.mode-text .banner-text h3 {\n        font-size: 18px;\n        font-family: 'Source Sans 3', sans-serif;\n        font-weight: 700;\n        line-height: 22px;\n        overflow: hidden;\n        margin-top: 0;\n        margin-bottom: 3px;\n    }\n    .banner-body.mode-text .banner-text p {\n        font-size: 14px;\n        font-family: 'Source Sans 3', sans-serif;\n        font-weight: 300;\n        line-height: 17px;\n        overflow: hidden;\n        margin-top: 0;\n        margin-bottom: 0;\n    }    \n    .banner-body.mode-text .banner-images {\n        display: flex;\n        align-items: top;\n        justify-content: right;\n        padding: 0px; \n    }\n    \n    /* Header mode styles */\n    .banner-body.mode-header {\n        justify-content: center;\n        align-items: center;\n    }\n    \n    .banner-body.mode-header .banner-text {\n        width: 100%;\n        padding: 30px;\n        text-align: center;\n        font-size: 36px;\n        font-family: 'Source Sans 3', sans-serif;\n        font-weight: 500;\n        line-height: 32px;\n        overflow: hidden;\n        margin-top: 0;\n        margin-bottom: 0;\n    }\n\n    /* Individual image styling - square (default) */\n    .banner-image {\n        width: 140px;\n        height: 140px;\n        object-fit: cover;\n        border: 5px solid white;\n    }\n\n    .banner-widget.border-disabled {\n        border: none;\n    }\n    \n    /* Rectangle image styling */\n    .banner-body.image-size-rectangle .banner-image {\n        width: 280px;\n        height: 140px;\n        border: 5px solid white;\n    }\n    \n    /* Responsive behavior */\n    @media (max-width: 768px) {\n        .banner-body.mode-text {\n            flex-direction: column;\n        }\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "banner-image": {
+          "relationship": "auto",
+          "selector": ".banner-image"
+        },
+        "banner-widget": {
+          "relationship": "auto",
+          "selector": ".banner-widget"
+        }
+      },
+      "name": "Banner",
+      "variants": []
+    },
+    "easy_widgets.BioWidget": {
+      "css": "\n    .bio-widget {\n        display: block;\n        width: 100%;\n        height: auto;\n        margin-bottom: 30px;\n    }\n    \n    .bio-widget__container {\n        width: 100%;\n    }\n    \n    /* Column layout - side by side */\n    .bio-widget--column .bio-widget__container {\n        display: flex;\n        gap: 30px;\n        align-items: flex-start;\n    }\n    \n    .bio-widget--column .bio-widget__image {\n        flex: 0 0 33.33%;\n        max-width: 33.33%;\n    }\n    \n    .bio-widget--column .bio-widget__text {\n        flex: 1;\n        min-width: 0;\n    }\n    \n    /* Flow layout - text wraps around image */\n    .bio-widget--flow .bio-widget__container {\n        display: block;\n    }\n    \n    .bio-widget--flow .bio-widget__image {\n        float: left;\n        width: 33.33%;\n        max-width: 400px;\n        margin: 0 30px 30px 0;\n    }\n    \n    .bio-widget--flow .bio-widget__text {\n        display: block;\n    }\n    \n    /* Clear float after flow layout */\n    .bio-widget--flow .bio-widget__container::after {\n        content: \"\";\n        display: table;\n        clear: both;\n    }\n    \n    /* Image styling */\n    .bio-widget__image img {\n        width: 100%;\n        height: auto;\n    }   \n   \n    /* Responsive - stack on mobile */\n    @media (max-width: 768px) {\n        .bio-widget--column .bio-widget__container {\n            flex-direction: column;\n        }\n        \n        .bio-widget--column .bio-widget__image {\n            flex: 0 0 auto;\n            max-width: 100%;\n            margin-bottom: 40px;\n        }\n        \n        .bio-widget--flow .bio-widget__image {\n            float: none;\n            width: 100%;\n            max-width: 100%;\n            margin: 0 0 30px 0;\n        }\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "bio-widget": {
+          "relationship": "auto",
+          "selector": ".bio-widget"
+        }
+      },
+      "name": "Bio",
+      "variants": []
+    },
+    "easy_widgets.ContentCardWidget": {
+      "css": "\n    .content-card-widget {\n        box-sizing: border-box;\n        display: flex;\n        flex-direction: column;\n        width: 100%;\n        height: 310px;\n        outline: 1px solid rgb(0,0,0,0.3);\n        border-width: 0;\n        overflow: hidden;\n        border-radius: 0;\n        box-shadow: none;\n        margin-bottom: 30px;\n    }\n    .content-card-widget.border-disabled {\n        outline: none;\n    }\n    .content-card-widget:last-child {\n        margin-bottom: 0;\n    }\n\n    .content-card-header {\n        box-sizing: border-box;\n        height: 140px;\n        padding: 30px;\n        font-size: 36px;\n        font-family: 'Source Sans 3', sans-serif;\n        font-weight: 400;\n    }\n    .content-card-body {\n        display: flex;  \n        flex: 1;\n        min-height: 0;\n        height: 170px;\n        padding-bottom: 30px;\n        gap: 30px;\n    }\n    .content-card-text {\n        flex: 1; \n        padding: 0px 0px 0px 30px;\n        font-size: 16px;\n        font-family: 'Source Sans 3', sans-serif;\n        font-weight: 300;\n        line-height: 22px;\n        overflow: hidden;\n    }\n    .content-card-images {\n        display: flex;\n        align-items: top;\n        justify-content: right;\n        padding: 0px 30px 30px 0px;        \n    }\n    \n    /* Individual image styling - square (default) */\n    .content-card-image {\n        width: 140px;\n        height: 140px;\n        object-fit: cover;\n    }\n    \n    /* Rectangle image styling */\n    .content-card-body.image-size-rectangle .content-card-image {\n        width: 280px;\n        height: 140px;\n    }\n     \n    /* Responsive behavior */\n    @media (max-width: 768px) {\n        .content-card-body {\n            flex-direction: column;\n        }\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "content-card-header": {
+          "relationship": "direct-child",
+          "selector": ".content-card-header"
+        },
+        "content-card-image": {
+          "relationship": "auto",
+          "selector": ".content-card-image"
+        },
+        "content-card-text": {
+          "relationship": "auto",
+          "selector": ".content-card-text"
+        },
+        "content-card-widget": {
+          "relationship": "same-element",
+          "selector": ".content-card-widget"
+        }
+      },
+      "name": "Content Card",
+      "variants": []
+    },
+    "easy_widgets.ContentWidget": {
+      "css": "\n    .content-widget {\n        box-sizing: border-box;\n        width: 100%;\n        min-height: 32px;\n        font-family: inherit;\n        line-height: 1.6;\n        color: inherit;\n        margin-bottom: 30px;        \n    }\n    .content-widget.border-enabled {\n        padding-top: 50px;\n        padding-bottom: 50px;\n        outline: 1px solid rgb(0,0,0,0.3);\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "content-widget": {
+          "relationship": "descendant",
+          "selector": ".content-widget"
+        }
+      },
+      "name": "Content",
+      "variants": [
+        {
+          "config_field": "show_border",
+          "id": "border-enabled",
+          "label": "Border Enabled",
+          "type": "class"
+        }
+      ]
+    },
+    "easy_widgets.FooterWidget": {
+      "css": "\n    .widget-type-footer {\n        box-sizing: border-box;\n        width: 100%;\n        min-height: 310px;\n        flex: 1;\n        display: flex;\n        flex-direction: column;\n        background-image: var(--footer-widget-background-xs, none);\n        background-color: var(--footer-bg-color-xs, transparent);\n        color: var(--footer-text-color-xs, inherit);\n        background-size: cover;\n        background-position: center;\n        background-repeat: no-repeat;\n    }\n\n    @media (min-width: 640px) {\n        .widget-type-footer {\n            background-image: var(--footer-widget-background-sm, var(--footer-widget-background-xs, none));\n            background-color: var(--footer-bg-color-sm, var(--footer-bg-color-xs, transparent));\n            color: var(--footer-text-color-sm, var(--footer-text-color-xs, inherit));\n        }\n    }\n\n    @media (min-width: 768px) {\n        .widget-type-footer {\n            background-image: var(--footer-widget-background-md, var(--footer-widget-background-sm, none));\n            background-color: var(--footer-bg-color-md, var(--footer-bg-color-sm, transparent));\n            color: var(--footer-text-color-md, var(--footer-text-color-sm, inherit));\n        }\n    }\n\n    @media (min-width: 1024px) {\n        .widget-type-footer {\n            background-image: var(--footer-widget-background-lg, none);\n            background-color: var(--footer-bg-color-lg, transparent);\n            color: var(--footer-text-color-lg, inherit);\n        }\n    }\n\n    @media (min-width: 1280px) {\n        .widget-type-footer {\n            background-image: var(--footer-widget-background-xl, none);\n            background-color: var(--footer-bg-color-xl, transparent);\n            color: var(--footer-text-color-xl, inherit);\n        }\n    }\n    \n    .empty-slot {\n        color: #9ca3af;\n        font-style: italic;\n        text-align: center;\n        font-size: 16px;\n        font-weight: 300;\n        padding: 30px;\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "footer-widget": {
+          "relationship": "auto",
+          "selector": ".footer-widget"
+        }
+      },
+      "name": "Footer",
+      "variants": []
+    },
+    "easy_widgets.FormsWidget": {
+      "css": "\n    .forms-widget {\n        background-color: var(--form-bg-color, #ffffff);\n        padding: var(--form-padding, 2rem);\n        border-radius: var(--form-radius, 0.5rem);\n        border: var(--form-border, 1px solid #e5e7eb);\n        max-width: var(--form-max-width, 600px);\n        margin: var(--form-margin, 0 auto);\n    }\n    \n    .forms-widget .form-title {\n        font-size: var(--form-title-size, 1.5rem);\n        font-weight: var(--form-title-weight, 600);\n        color: var(--form-title-color, #1f2937);\n        margin-bottom: var(--form-title-margin, 1rem);\n        text-align: var(--form-title-align, center);\n    }\n    \n    .forms-widget .form-description {\n        color: var(--form-description-color, #6b7280);\n        margin-bottom: var(--form-description-margin, 2rem);\n        text-align: var(--form-description-align, center);\n        line-height: var(--form-description-line-height, 1.6);\n    }\n    \n    .forms-widget .form-group {\n        margin-bottom: var(--form-group-margin, 1.5rem);\n    }\n    \n    .forms-widget label {\n        display: block;\n        font-weight: var(--form-label-weight, 500);\n        color: var(--form-label-color, #374151);\n        margin-bottom: var(--form-label-margin, 0.5rem);\n        font-size: var(--form-label-size, 0.875rem);\n    }\n    \n    .forms-widget .required {\n        color: var(--form-required-color, #dc2626);\n    }\n    \n    .forms-widget input[type=\"text\"],\n    .forms-widget input[type=\"email\"],\n    .forms-widget input[type=\"tel\"],\n    .forms-widget input[type=\"number\"],\n    .forms-widget textarea,\n    .forms-widget select {\n        width: 100%;\n        padding: var(--form-input-padding, 0.75rem);\n        border: var(--form-input-border, 1px solid #d1d5db);\n        border-radius: var(--form-input-radius, 0.375rem);\n        font-size: var(--form-input-font-size, 1rem);\n        background-color: var(--form-input-bg, #ffffff);\n        color: var(--form-input-color, #1f2937);\n        transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;\n    }\n    \n    .forms-widget input:focus,\n    .forms-widget textarea:focus,\n    .forms-widget select:focus {\n        outline: none;\n        border-color: var(--form-input-focus-border, #3b82f6);\n        box-shadow: var(--form-input-focus-shadow, 0 0 0 3px rgba(59, 130, 246, 0.1));\n    }\n    \n    .forms-widget textarea {\n        min-height: var(--form-textarea-height, 120px);\n        resize: vertical;\n    }\n    \n    .forms-widget .checkbox-group,\n    .forms-widget .radio-group {\n        display: flex;\n        flex-direction: column;\n        gap: var(--form-option-gap, 0.5rem);\n    }\n    \n    .forms-widget .checkbox-item,\n    .forms-widget .radio-item {\n        display: flex;\n        align-items: center;\n        gap: var(--form-option-item-gap, 0.5rem);\n    }\n    \n    .forms-widget input[type=\"checkbox\"],\n    .forms-widget input[type=\"radio\"] {\n        width: auto;\n        margin: 0;\n    }\n    \n    .forms-widget .submit-button {\n        background-color: var(--form-submit-bg, #3b82f6);\n        color: var(--form-submit-color, #ffffff);\n        padding: var(--form-submit-padding, 0.75rem 2rem);\n        border: none;\n        border-radius: var(--form-submit-radius, 0.375rem);\n        font-size: var(--form-submit-font-size, 1rem);\n        font-weight: var(--form-submit-font-weight, 500);\n        cursor: pointer;\n        transition: background-color 0.2s ease-in-out;\n        width: var(--form-submit-width, auto);\n        margin: var(--form-submit-margin, 1rem auto 0);\n        display: block;\n    }\n    \n    .forms-widget .submit-button:hover {\n        background-color: var(--form-submit-hover-bg, #2563eb);\n    }\n    \n    .forms-widget .submit-button:disabled {\n        background-color: var(--form-submit-disabled-bg, #9ca3af);\n        cursor: not-allowed;\n    }\n    \n    .forms-widget .form-error {\n        color: var(--form-error-color, #dc2626);\n        font-size: var(--form-error-size, 0.875rem);\n        margin-top: var(--form-error-margin, 0.25rem);\n    }\n    \n    .forms-widget .form-success {\n        background-color: var(--form-success-bg, #dcfce7);\n        color: var(--form-success-color, #166534);\n        padding: var(--form-success-padding, 1rem);\n        border-radius: var(--form-success-radius, 0.375rem);\n        border: var(--form-success-border, 1px solid #bbf7d0);\n        text-align: center;\n    }\n    ",
+      "cssVariables": {
+        "form-bg-color": "#ffffff",
+        "form-border": "1px solid #e5e7eb",
+        "form-description-align": "center",
+        "form-description-color": "#6b7280",
+        "form-description-line-height": "1.6",
+        "form-description-margin": "2rem",
+        "form-error-color": "#dc2626",
+        "form-error-margin": "0.25rem",
+        "form-error-size": "0.875rem",
+        "form-group-margin": "1.5rem",
+        "form-input-bg": "#ffffff",
+        "form-input-border": "1px solid #d1d5db",
+        "form-input-color": "#1f2937",
+        "form-input-focus-border": "#3b82f6",
+        "form-input-focus-shadow": "0 0 0 3px rgba(59, 130, 246, 0.1)",
+        "form-input-font-size": "1rem",
+        "form-input-padding": "0.75rem",
+        "form-input-radius": "0.375rem",
+        "form-label-color": "#374151",
+        "form-label-margin": "0.5rem",
+        "form-label-size": "0.875rem",
+        "form-label-weight": "500",
+        "form-margin": "0 auto",
+        "form-max-width": "600px",
+        "form-option-gap": "0.5rem",
+        "form-option-item-gap": "0.5rem",
+        "form-padding": "2rem",
+        "form-radius": "0.5rem",
+        "form-required-color": "#dc2626",
+        "form-submit-bg": "#3b82f6",
+        "form-submit-color": "#ffffff",
+        "form-submit-disabled-bg": "#9ca3af",
+        "form-submit-font-size": "1rem",
+        "form-submit-font-weight": "500",
+        "form-submit-hover-bg": "#2563eb",
+        "form-submit-margin": "1rem auto 0",
+        "form-submit-padding": "0.75rem 2rem",
+        "form-submit-radius": "0.375rem",
+        "form-submit-width": "auto",
+        "form-success-bg": "#dcfce7",
+        "form-success-border": "1px solid #bbf7d0",
+        "form-success-color": "#166534",
+        "form-success-padding": "1rem",
+        "form-success-radius": "0.375rem",
+        "form-textarea-height": "120px",
+        "form-title-align": "center",
+        "form-title-color": "#1f2937",
+        "form-title-margin": "1rem",
+        "form-title-size": "1.5rem",
+        "form-title-weight": "600"
+      },
+      "layoutParts": {
+        "forms-widget": {
+          "relationship": "auto",
+          "selector": ".forms-widget"
+        }
+      },
+      "name": "Forms",
+      "variants": []
+    },
+    "easy_widgets.HeaderWidget": {
+      "css": "\n        /* Base mobile styles (< 640px) */\n        .widget-type-header {\n            width: 100%;\n            height: var(--header-height-xs, auto);\n            background-size: cover;\n            background-repeat: no-repeat;\n            background-position: top left;\n            aspect-ratio: var(--header-aspect-ratio-xs, 16 / 9);\n        }\n\n        /* Small devices and up (≥ 640px) - fixed height with cover */\n        @media (min-width: 640px) {\n            .widget-type-header {\n                height: var(--header-height-sm, 120px);\n                aspect-ratio: auto;\n                background-size: contain;\n            }\n        }\n\n        @media (min-width: 768px) {\n            .widget-type-header {\n                height: var(--header-height-md, 120px);\n            }\n        }\n\n        @media (min-width: 1024px) {\n            .widget-type-header {\n                height: var(--header-height-lg, 120px);\n            }\n        }\n\n        @media (min-width: 1280px) {\n            .widget-type-header {\n                height: var(--header-height-xl, 120px);\n            }\n        }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "header-widget": {
+          "relationship": "same-element",
+          "selector": ".header-widget"
+        }
+      },
+      "name": "Header",
+      "variants": []
+    },
+    "easy_widgets.HeadlineWidget": {
+      "css": "\n    .headline-widget {\n        box-sizing: border-box;\n        display: flex;\n        flex-direction: column;\n        width: 100%;\n        min-height: 140px;\n        outline: 1px solid rgb(0,0,0,0.3);\n        border-width: 0;\n        overflow: hidden;\n        margin-bottom: 30px;\n    }\n    .headline-widget.border-disabled {\n        outline: none;\n    }\n    .headline-widget:last-child {\n        margin-bottom: 0;\n    }\n    \n    .headline-content {\n        padding: 0;\n        margin: 0;\n    }\n    \n    /* Responsive behavior */\n    @media (max-width: 768px) {\n        .headline-content {\n            padding: 20px;\n        }\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "headline-widget": {
+          "relationship": "auto",
+          "selector": ".headline-widget"
+        }
+      },
+      "name": "Headline",
+      "variants": []
+    },
+    "easy_widgets.HeroWidget": {
+      "css": "\n    .hero-widget {\n        box-sizing: border-box;\n        position: relative;\n        padding: 0;\n        overflow: hidden;\n        height: 310px;\n        min-height: 310px;\n        max-height: 310px;\n        width: 100%;\n        background-color: var(--hero-bg-color, #000000);\n        background-size: cover;\n        background-position: center;\n        background-repeat: no-repeat;\n        color: var(--hero-text-color, #ffffff);\n        margin-bottom: 30px;\n        flex-shrink: 0;\n    }\n    .hero-widget:last-child {\n        margin-bottom: 0;\n    }   \n    \n    .hero-content {\n        position: relative;\n        max-width: 1200px;\n        margin: 0 auto;\n        text-align: center;\n        display: flex;\n        flex-direction: column;\n        justify-content: center;\n        height: 100%;\n        padding: 30px;\n    }\n\n    .hero-widget h1 {\n        font-family: \"Source Sans 3\", sans-serif;\n        font-weight: 300;\n        font-size: 50px;\n        line-height: 54px;\n        margin-top: 16px;\n        margin-bottom: 16px;\n        color: var(--hero-text-color, #ffffff);\n        background-color: rgba(0,0,0,0.4);\n        display: inline-block;\n        padding: 17px 20px 12px;\n    }\n\n    .hero-widget .before-text {\n        font-size: 24px;\n        line-height: 24px;\n        font-weight: 500;\n        margin: 0;\n        color: var(--hero-decor-color, #ffffff);\n    }\n    \n    .hero-widget .after-text {\n        font-size: 24px;\n        line-height: 24px;\n        font-weight: 500;\n        margin: 0;\n        color: var(--hero-text-color, #ffffff);\n    }\n    \n    @media (max-width: 768px) {\n        .hero-widget {\n            padding: 0;\n        }\n        \n        .hero-widget h1 {\n            font-size: 32px;\n            line-height: 36px;\n        }\n        \n        .hero-widget .before-text {\n            font-size: 18px;\n        }\n        \n        .hero-widget .after-text {\n            font-size: 18px;\n        }\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "hero-after-text": {
+          "relationship": "auto",
+          "selector": ".hero-after-text"
+        },
+        "hero-before-text": {
+          "relationship": "auto",
+          "selector": ".hero-before-text"
+        },
+        "hero-content": {
+          "relationship": "auto",
+          "selector": ".hero-content"
+        },
+        "hero-header": {
+          "relationship": "auto",
+          "selector": ".hero-header"
+        },
+        "hero-widget": {
+          "relationship": "auto",
+          "selector": ".hero-widget"
+        }
+      },
+      "name": "Hero",
+      "variants": []
+    },
+    "easy_widgets.ImageWidget": {
+      "css": "\n    .image-widget {\n        display: block;\n        text-align: var(--image-alignment, center);\n        margin-bottom: 30px;\n    }\n    .image-widget:last-child {\n        image-widget: 0;\n    }    \n    \n    .image-widget img {\n        max-width: 100%;\n        height: auto;\n        border-radius: var(--image-radius, 0);\n        box-shadow: var(--image-shadow, none);\n        border: var(--image-border, none);\n    }\n    \n    .image-widget video {\n        max-width: 100%;\n        height: auto;\n        border-radius: var(--video-radius, 0.5rem);\n        box-shadow: var(--video-shadow, 0 4px 6px rgba(0, 0, 0, 0.1));\n    }\n    \n    .image-widget .caption {\n        margin-top: var(--caption-margin-top, 0.5rem);\n        font-size: var(--caption-font-size, 0.875rem);\n        color: var(--caption-color, #6b7280);\n        font-style: var(--caption-style, italic);\n        text-align: var(--caption-alignment, center);\n    }\n    \n    .image-widget .gallery {\n        display: grid;\n        grid-template-columns: repeat(var(--gallery-columns, 3), 1fr);\n        gap: var(--gallery-gap, 1rem);\n        margin: var(--gallery-margin, 1rem 0);\n    }\n    \n    .image-widget .gallery img {\n        width: 100%;\n        height: var(--gallery-item-height, 200px);\n        object-fit: cover;\n        cursor: pointer;\n        transition: transform 0.2s ease-in-out;\n    }\n    \n    .image-widget .gallery img:hover {\n        transform: scale(1.05);\n    }\n    \n    .image-widget.size-small img,\n    .image-widget.size-small video {\n        max-width: var(--size-small, 300px);\n    }\n    \n    .image-widget.size-medium img,\n    .image-widget.size-medium video {\n        max-width: var(--size-medium, 600px);\n    }\n    \n    .image-widget.size-large img,\n    .image-widget.size-large video {\n        max-width: var(--size-large, 900px);\n    }\n    \n    .image-widget.size-full img,\n    .image-widget.size-full video {\n        max-width: 100%;\n        width: 100%;\n    }\n    ",
+      "cssVariables": {
+        "caption-alignment": "center",
+        "caption-color": "#6b7280",
+        "caption-font-size": "0.875rem",
+        "caption-margin-top": "0.5rem",
+        "caption-style": "italic",
+        "gallery-columns": "3",
+        "gallery-gap": "1rem",
+        "gallery-item-height": "200px",
+        "gallery-margin": "1rem 0",
+        "image-alignment": "center",
+        "image-border": "none",
+        "image-radius": "0",
+        "image-shadow": "none",
+        "size-large": "900px",
+        "size-medium": "600px",
+        "size-small": "300px",
+        "video-radius": "0.5rem",
+        "video-shadow": "0 4px 6px rgba(0, 0, 0, 0.1)"
+      },
+      "layoutParts": {
+        "image-widget": {
+          "relationship": "auto",
+          "selector": ".image-widget"
+        }
+      },
+      "name": "Image",
+      "variants": []
+    },
+    "easy_widgets.NavbarWidget": {
+      "css": "\n        /* Navbar Widget - Styling from design groups */\n        .widget-type-navbar {\n            background-color: var(--navbar-bg-color-xs, #3b82f6);\n            color: var(--navbar-text-color-xs, #ffffff);\n            background-size: cover;\n            background-position: center;\n            background-repeat: no-repeat;\n        }\n\n        @media (min-width: 640px) {\n            .widget-type-navbar {\n                background-color: var(--navbar-bg-color-sm, var(--navbar-bg-color-xs, #3b82f6));\n                color: var(--navbar-text-color-sm, var(--navbar-text-color-xs, #ffffff));\n            }\n        }\n\n        @media (min-width: 768px) {\n            .widget-type-navbar {\n                background-color: var(--navbar-bg-color-md, var(--navbar-bg-color-sm, #3b82f6));\n                color: var(--navbar-text-color-md, var(--navbar-text-color-sm, #ffffff));\n            }\n        }\n\n        @media (min-width: 1024px) {\n            .widget-type-navbar {\n                background-color: var(--navbar-bg-color-lg, #3b82f6);\n                color: var(--navbar-text-color-lg, #ffffff);\n            }\n        }\n\n        @media (min-width: 1280px) {\n            .widget-type-navbar {\n                background-color: var(--navbar-bg-color-xl, #3b82f6);\n                color: var(--navbar-text-color-xl, #ffffff);\n            }\n        }\n\n        /* Navbar Menu Styling */\n        .navbar-menu-list {\n            list-style: none !important;\n            font-size: 16px;\n            margin-top: 0px;\n            font-family: \"Source Sans 3\", sans-serif;\n            font-weight: 300;\n            line-height: 22px;\n            margin-bottom: 0;          \n        }\n\n        .navbar-menu-item {\n            list-style: none !important;\n            font-size: 14px;\n            margin-top: 0px;\n            font-family: \"Source Sans 3\", sans-serif;\n            font-weight: 300;\n            line-height: 22px;\n            margin-bottom: 0px;            \n        }\n\n        .navbar-menu-item  a {\n            font-size: 14px;\n            color: inherit;\n            font-family: \"Source Sans 3\", sans-serif;\n            font-weight: 500;\n        }\n        \n        .navbar-secondary-menu {\n            display: flex;\n            gap: 0;\n            list-style: none;\n            margin: 0;\n            padding: 0;\n            align-items: flex-end;\n        }\n        \n        .navbar-secondary-menu .navbar-menu-item {\n            text-align: left;\n            width: 140px;\n            padding: 2px 11px 2px;\n            margin-top: 2px;\n            box-shadow: inset -1px -1px 1px rgba(0, 0, 0, 0.2);\n        }\n        \n        .navbar-secondary-menu .navbar-menu-item a {\n            border-radius: 0 0 0 0;\n        }\n\n        .navbar-link {\n            text-decoration: none !important;\n        }\n        ",
+      "cssVariables": {},
+      "layoutParts": {
+        "navbar-widget": {
+          "relationship": "auto",
+          "selector": ".navbar-widget"
+        }
+      },
+      "name": "Navbar",
+      "variants": []
+    },
+    "easy_widgets.NavigationWidget": {
+      "css": "\n    .nav-container {\n        display: flex;\n        flex-direction: column;\n        list-style: none;\n        margin: 0 0 30px 0;\n        padding: 0;\n        gap: 10px;\n        align-items: top;\n        height: var(--nav-height, auto);\n        width: 100%;\n    }\n    .nav-container li {\n        height: 24px;\n        width: 100%;\n    }\n    .nav-container a {\n        color: inherit;\n        text-decoration: none;\n        transition: opacity 0.2s;\n    }\n\n    .nav-container a:hover {\n        opacity: 0.7;\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "nav-container": {
+          "relationship": "auto",
+          "selector": ".nav-container"
+        }
+      },
+      "name": "Navigation",
+      "variants": []
+    },
+    "easy_widgets.NewsDetailWidget": {
+      "css": "",
+      "cssVariables": {},
+      "layoutParts": {
+        "news-detail-widget": {
+          "relationship": "auto",
+          "selector": ".news-detail-widget"
+        }
+      },
+      "name": "News Detail",
+      "variants": []
+    },
+    "easy_widgets.NewsListWidget": {
+      "css": "\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "news-list-widget": {
+          "relationship": "auto",
+          "selector": ".news-list-widget"
+        }
+      },
+      "name": "News List",
+      "variants": []
+    },
+    "easy_widgets.PathDebugWidget": {
+      "css": "",
+      "cssVariables": {},
+      "layoutParts": {
+        "path-debug-widget": {
+          "relationship": "auto",
+          "selector": ".path-debug-widget"
+        }
+      },
+      "name": "Path Debug",
+      "variants": []
+    },
+    "easy_widgets.SectionWidget": {
+      "css": "\n    .section-widget {\n        margin-bottom: 30px;\n    }\n    .section-widget.border-enabled {\n        outline: 1px solid rgb(0,0,0,0.3);\n    }\n    .section-widget:last-child {\n        margin-bottom: 0;\n    }\n    .section-content-only-widget {\n        margin-bottom: 30px;\n    }\n    .section-content-only-widget.border-enabled {\n        outline: 1px solid rgb(0,0,0,0.3);\n    }\n    .section-content-only-widget:last-child {\n        margin-bottom: 0;\n    }    \n    .section-header {\n        padding: 30px;\n        user-select: none;\n    }\n    \n    .widget-wrapper {\n    }\n    \n    .section-remaining-content {\n        display: block;\n        margin-bottom: 30px;\n    }\n    \n    .section-collapsed .section-remaining-content {\n        display: none;\n    }\n    \n    .section-banner {\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        height: 30px;\n        outline: 1px solid rgb(0,0,0,0.3);\n        border-width: 0;\n        overflow: hidden;\n        border-radius: 0;\n        box-shadow: none;\n        padding: 0;\n        cursor: pointer;\n        user-select: none;\n        transition: opacity 0.2s ease;\n        font-size: 16px;\n        font-weight: 300;        \n    }\n    \n    .section-banner:hover {\n        opacity: 0.8;\n    }\n    \n    .contract-banner {\n        display: flex;\n    }\n    \n    .section-collapsed .contract-banner {\n        display: none;\n    }\n    \n    .expand-banner {\n        display: none;\n    }\n    \n    .section-collapsed .expand-banner {\n        display: flex;\n    }\n    \n    .empty-slot {\n        color: #9ca3af;\n        font-style: italic;\n        text-align: center;\n        font-size: 16px;\n        font-weight: 300;        \n        padding: 30px;\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "section-content-only-widget": {
+          "relationship": "auto",
+          "selector": ".section-content-only-widget"
+        },
+        "section-widget": {
+          "relationship": "auto",
+          "selector": ".section-widget"
+        }
+      },
+      "name": "Section",
+      "variants": [
+        {
+          "config_field": "show_border",
+          "id": "border-enabled",
+          "label": "Border Enabled",
+          "type": "class"
+        }
+      ]
+    },
+    "easy_widgets.SidebarTopNewsWidget": {
+      "css": "\n    .sidebar-top-news-widget {\n        font-family: var(--body-font, inherit);\n        background: #ffffff;\n        border: 1px solid #e5e7eb;\n        border-radius: 0.5rem;\n        padding: 1.5rem;\n    }\n\n    .sidebar-top-news-widget .widget-title {\n        font-size: 1.25rem;\n        font-weight: 700;\n        color: #1f2937;\n        margin: 0 0 1.25rem 0;\n        padding-bottom: 0.75rem;\n        border-bottom: 2px solid #3b82f6;\n    }\n\n    .sidebar-top-news-widget .news-list {\n        list-style: none;\n        margin: 0;\n        padding: 0;\n    }\n\n    .sidebar-top-news-widget .news-item {\n        display: flex;\n        gap: 1rem;\n        padding: 1rem 0;\n        border-bottom: 1px solid #e5e7eb;\n        transition: background-color 0.2s ease;\n    }\n\n    .sidebar-top-news-widget .news-item:last-child {\n        border-bottom: none;\n        padding-bottom: 0;\n    }\n\n    .sidebar-top-news-widget .news-item:first-child {\n        padding-top: 0;\n    }\n\n    .sidebar-top-news-widget .news-item:hover {\n        background-color: #f9fafb;\n        margin: 0 -0.5rem;\n        padding-left: 0.5rem;\n        padding-right: 0.5rem;\n        border-radius: 0.375rem;\n    }\n\n    .sidebar-top-news-widget .news-item.pinned .news-title::before {\n        content: \"📌 \";\n        font-size: 0.75rem;\n    }\n\n    .sidebar-top-news-widget .news-thumbnail {\n        flex-shrink: 0;\n        width: 80px;\n        height: 80px;\n        overflow: hidden;\n        border-radius: 0.375rem;\n        background: #f3f4f6;\n    }\n\n    .sidebar-top-news-widget .news-thumbnail img {\n        width: 100%;\n        height: 100%;\n        object-fit: cover;\n    }\n\n    .sidebar-top-news-widget .news-content {\n        flex: 1;\n        min-width: 0;\n    }\n\n    .sidebar-top-news-widget .news-meta {\n        display: flex;\n        gap: 0.5rem;\n        margin-bottom: 0.375rem;\n        font-size: 0.75rem;\n        flex-wrap: wrap;\n    }\n\n    .sidebar-top-news-widget .news-type-badge {\n        padding: 0.125rem 0.5rem;\n        background: #3b82f6;\n        color: white;\n        font-weight: 600;\n        text-transform: uppercase;\n        border-radius: 0.25rem;\n        font-size: 0.625rem;\n        line-height: 1.5;\n    }\n\n    .sidebar-top-news-widget .news-date {\n        color: #6b7280;\n        font-size: 0.75rem;\n    }\n\n    .sidebar-top-news-widget .news-title {\n        font-size: 0.9375rem;\n        font-weight: 600;\n        color: #1f2937;\n        margin: 0;\n        line-height: 1.4;\n    }\n\n    .sidebar-top-news-widget .news-title a {\n        color: inherit;\n        text-decoration: none;\n    }\n\n    .sidebar-top-news-widget .news-title a:hover {\n        color: #3b82f6;\n    }\n\n    .sidebar-top-news-widget .news-excerpt {\n        margin-top: 0.375rem;\n        color: #4b5563;\n        font-size: 0.8125rem;\n        line-height: 1.35;\n    }\n\n    .sidebar-top-news-widget .view-all-link {\n        display: block;\n        margin-top: 1.25rem;\n        padding-top: 1rem;\n        border-top: 1px solid #e5e7eb;\n        text-align: center;\n        color: #3b82f6;\n        font-weight: 600;\n        font-size: 0.875rem;\n        text-decoration: none;\n    }\n\n    .sidebar-top-news-widget .view-all-link:hover {\n        text-decoration: underline;\n    }\n\n    /* Mobile adjustments */\n    @media (max-width: 768px) {\n        .sidebar-top-news-widget {\n            padding: 1rem;\n        }\n\n        .sidebar-top-news-widget .news-thumbnail {\n            width: 60px;\n            height: 60px;\n        }\n\n        .sidebar-top-news-widget .news-title {\n            font-size: 0.875rem;\n        }\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "sidebar-top-news-widget": {
+          "relationship": "auto",
+          "selector": ".sidebar-top-news-widget"
+        }
+      },
+      "name": "Sidebar Top News",
+      "variants": []
+    },
+    "easy_widgets.SidebarWidget": {
+      "css": "\n    .sidebar-widget {\n        background-color: var(--sidebar-bg-color, #f9fafb);\n        background-image: var(--sidebar-bg-image, none);\n        background-size: var(--sidebar-bg-size, cover);\n        background-position: var(--sidebar-bg-position, center);\n        background-repeat: var(--sidebar-bg-repeat, no-repeat);\n        color: var(--sidebar-text-color, #1f2937);\n        padding: var(--sidebar-padding, 1.5rem);\n        border: var(--sidebar-border, 1px solid #e5e7eb);\n        border-radius: var(--sidebar-radius, 0.5rem);\n        height: fit-content;\n    }\n    \n    .sidebar-widget .sidebar-section {\n        margin-bottom: var(--sidebar-section-margin, 2rem);\n    }\n    \n    .sidebar-widget .sidebar-section:last-child {\n        margin-bottom: 0;\n    }\n    \n    .sidebar-widget h1, .sidebar-widget h2, .sidebar-widget h3,\n    .sidebar-widget h4, .sidebar-widget h5, .sidebar-widget h6 {\n        color: var(--sidebar-heading-color, #1f2937);\n        margin-bottom: var(--sidebar-heading-margin, 1rem);\n        font-weight: var(--sidebar-heading-weight, 600);\n        border-bottom: var(--sidebar-heading-border, 2px solid #e5e7eb);\n        padding-bottom: var(--sidebar-heading-padding, 0.5rem);\n    }\n    \n    .sidebar-widget p {\n        margin-bottom: var(--sidebar-paragraph-margin, 1rem);\n        line-height: var(--sidebar-line-height, 1.6);\n        font-size: var(--sidebar-font-size, 0.875rem);\n    }\n    \n    .sidebar-widget ul {\n        list-style: var(--sidebar-list-style, none);\n        padding: var(--sidebar-list-padding, 0);\n        margin: var(--sidebar-list-margin, 0);\n    }\n    \n    .sidebar-widget ul li {\n        margin-bottom: var(--sidebar-list-item-margin, 0.75rem);\n        padding-left: var(--sidebar-list-item-padding, 1rem);\n        position: relative;\n    }\n    \n    .sidebar-widget ul li:before {\n        content: var(--sidebar-list-bullet, \"•\");\n        color: var(--sidebar-list-bullet-color, #6b7280);\n        position: absolute;\n        left: 0;\n        display: var(--sidebar-list-bullet-display, block);\n    }\n    \n    .sidebar-widget a {\n        color: var(--sidebar-link-color, #3b82f6);\n        text-decoration: none;\n        transition: color 0.2s ease-in-out;\n    }\n    \n    .sidebar-widget a:hover {\n        color: var(--sidebar-link-hover-color, #2563eb);\n        text-decoration: underline;\n    }\n    \n    .sidebar-widget .sidebar-widget-list {\n        background-color: var(--sidebar-widget-list-bg, #ffffff);\n        border: var(--sidebar-widget-list-border, 1px solid #e5e7eb);\n        border-radius: var(--sidebar-widget-list-radius, 0.375rem);\n        padding: var(--sidebar-widget-list-padding, 1rem);\n    }\n    \n    .sidebar-widget .sidebar-widget-list ul li {\n        padding: var(--sidebar-widget-list-item-padding, 0.5rem 0);\n        border-bottom: var(--sidebar-widget-list-item-border, 1px solid #f3f4f6);\n    }\n    \n    .sidebar-widget .sidebar-widget-list ul li:last-child {\n        border-bottom: none;\n    }\n    ",
+      "cssVariables": {
+        "sidebar-bg-color": "#f9fafb",
+        "sidebar-bg-image": "none",
+        "sidebar-bg-position": "center",
+        "sidebar-bg-repeat": "no-repeat",
+        "sidebar-bg-size": "cover",
+        "sidebar-border": "1px solid #e5e7eb",
+        "sidebar-font-size": "0.875rem",
+        "sidebar-heading-border": "2px solid #e5e7eb",
+        "sidebar-heading-color": "#1f2937",
+        "sidebar-heading-margin": "1rem",
+        "sidebar-heading-padding": "0.5rem",
+        "sidebar-heading-weight": "600",
+        "sidebar-line-height": "1.6",
+        "sidebar-link-color": "#3b82f6",
+        "sidebar-link-hover-color": "#2563eb",
+        "sidebar-list-bullet": "•",
+        "sidebar-list-bullet-color": "#6b7280",
+        "sidebar-list-bullet-display": "block",
+        "sidebar-list-item-margin": "0.75rem",
+        "sidebar-list-item-padding": "1rem",
+        "sidebar-list-margin": "0",
+        "sidebar-list-padding": "0",
+        "sidebar-list-style": "none",
+        "sidebar-padding": "1.5rem",
+        "sidebar-paragraph-margin": "1rem",
+        "sidebar-radius": "0.5rem",
+        "sidebar-section-margin": "2rem",
+        "sidebar-text-color": "#1f2937",
+        "sidebar-widget-list-bg": "#ffffff",
+        "sidebar-widget-list-border": "1px solid #e5e7eb",
+        "sidebar-widget-list-item-border": "1px solid #f3f4f6",
+        "sidebar-widget-list-item-padding": "0.5rem 0",
+        "sidebar-widget-list-padding": "1rem",
+        "sidebar-widget-list-radius": "0.375rem"
+      },
+      "layoutParts": {
+        "sidebar-widget": {
+          "relationship": "auto",
+          "selector": ".sidebar-widget"
+        }
+      },
+      "name": "Sidebar",
+      "variants": []
+    },
+    "easy_widgets.TableWidget": {
+      "css": "\n    .table-widget {\n        overflow-x: auto;\n        margin-bottom: 30px;\n    }\n    .table-widget:last-child {\n        margin-bottom: 0;\n    }    \n    \n    .table-widget table {\n        width: 100%;\n        border-collapse: collapse;\n        font-family: var(--table-font, inherit);\n        background-color: var(--table-bg, transparent);\n    }\n    \n    .table-widget th,\n    .table-widget td {\n        padding: var(--cell-padding, 0.75rem);\n        border: var(--cell-border, 1px solid #d1d5db);\n        text-align: var(--cell-alignment, left);\n        vertical-align: var(--cell-vertical-alignment, top);\n        transition: background-color 0.2s ease, color 0.2s ease;\n    }\n    \n    .table-widget th {\n        background-color: var(--header-bg, #f3f4f6);\n        color: var(--header-color, #1f2937);\n        font-weight: var(--header-font-weight, 600);\n    }\n    \n    .table-widget td {\n        background-color: var(--cell-bg, transparent);\n        color: var(--cell-color, inherit);\n    }\n    \n    /* Font style presets */\n    .table-cell-quote {\n        font-style: italic;\n        padding-left: 1.5rem;\n        border-left: 3px solid var(--quote-border-color, #d1d5db);\n        color: var(--quote-color, #6b7280);\n    }\n    \n    .table-cell-caption {\n        font-size: 0.875rem;\n        color: var(--caption-color, #6b7280);\n        font-weight: 400;\n    }\n    \n    /* Alignment classes */\n    .table-widget .cell-center {\n        text-align: center;\n    }\n    \n    .table-widget .cell-right {\n        text-align: right;\n    }\n    \n    .table-widget .cell-left {\n        text-align: left;\n    }\n    \n    /* Image cells */\n    .table-widget .cell-image {\n        padding: 0.25rem;\n    }\n    \n    .table-widget .cell-image img {\n        max-width: 100%;\n        height: auto;\n        display: block;\n    }\n    \n    /* Striped rows */\n    .table-widget.table-striped tr:nth-child(even) td {\n        background-color: var(--row-even-bg, #f9fafb);\n    }\n    \n    /* Hover effect */\n    .table-widget.table-hover tr:hover td {\n        background-color: var(--row-hover-bg, #f3f4f6);\n    }\n    \n    /* Responsive table */\n    @media (max-width: 768px) {\n        .table-widget.table-responsive {\n            font-size: var(--mobile-font-size, 0.875rem);\n        }\n        \n        .table-widget.table-responsive th,\n        .table-widget.table-responsive td {\n            padding: var(--mobile-cell-padding, 0.5rem);\n        }\n    }\n    ",
+      "cssVariables": {
+        "caption-color": "#6b7280",
+        "cell-alignment": "left",
+        "cell-bg": "transparent",
+        "cell-border": "1px solid #d1d5db",
+        "cell-color": "inherit",
+        "cell-padding": "0.75rem",
+        "cell-vertical-alignment": "top",
+        "header-bg": "#f3f4f6",
+        "header-color": "#1f2937",
+        "header-font-weight": "600",
+        "mobile-cell-padding": "0.5rem",
+        "mobile-font-size": "0.875rem",
+        "quote-border-color": "#d1d5db",
+        "quote-color": "#6b7280",
+        "row-even-bg": "#f9fafb",
+        "row-hover-bg": "#f3f4f6",
+        "table-bg": "transparent",
+        "table-font": "inherit",
+        "table-margin": "1rem 0"
+      },
+      "layoutParts": {
+        "table-widget": {
+          "relationship": "auto",
+          "selector": ".table-widget"
+        }
+      },
+      "name": "Table",
+      "variants": []
+    },
+    "easy_widgets.ThreeColumnsWidget": {
+      "css": "\n    .three-columns-widget {\n        display: grid;\n        gap: 30px;\n        width: 100%;\n        min-height: 140px;\n        margin-bottom: 30px;\n    }\n    .three-columns-widget:last-child {\n        margin-bottom: 0;\n    }\n    \n    \n    .three-columns-widget.three-col-ratio-3-2-1 {\n        grid-template-columns: 3fr 2fr 1fr;\n    }\n    \n    .three-columns-widget.three-col-ratio-2-2-2 {\n        grid-template-columns: 1fr 1fr 1fr;\n    }\n    \n    .three-columns-widget.three-col-ratio-1-2-3 {\n        grid-template-columns: 1fr 2fr 3fr;\n    }\n    \n    .three-columns-widget.three-col-ratio-1-4-1 {\n        grid-template-columns: 1fr 4fr 1fr;\n    }\n    \n    .three-col-slot {\n        position: relative;\n        min-height: 140px;\n        height: 100%;\n    }\n    \n    .three-col-slot.left {\n        grid-area: 1 / 1;\n    }\n    \n    .three-col-slot.center {\n        grid-area: 1 / 2;\n    }\n    \n    .three-col-slot.right {\n        grid-area: 1 / 3;\n    }\n    \n    .three-col-widget-wrapper {\n        margin-bottom: 30px;\n    }\n    \n    .three-col-widget-wrapper:last-child {\n        margin-bottom: 0;\n    }\n    \n    .three-col-empty-slot {\n        color: #9ca3af;\n        font-style: italic;\n        text-align: center;\n        padding: 2rem 1rem;\n        border: 1px dashed #e5e7eb;\n        background-color: #f9fafb;\n        height: 100%;\n    }\n    \n    /* Responsive design */\n    @media (max-width: 1024px) {\n        .three-columns-widget {\n            grid-template-columns: 1fr 1fr;\n            grid-template-rows: auto auto;\n        }\n        \n        .three-col-slot.left {\n            grid-area: 1 / 1;\n        }\n        \n        .three-col-slot.center {\n            grid-area: 1 / 2;\n        }\n        \n        .three-col-slot.right {\n            grid-area: 2 / 1 / 2 / 3;\n        }\n    }\n    \n    @media (max-width: 768px) {\n        .three-columns-widget {\n            grid-template-columns: 1fr;\n            grid-template-rows: auto auto auto;\n        }\n        \n        .three-col-slot.left {\n            grid-area: 1 / 1;\n        }\n        \n        .three-col-slot.center {\n            grid-area: 2 / 1;\n        }\n        \n        .three-col-slot.right {\n            grid-area: 3 / 1;\n        }\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "three-col-widget-wrapper": {
+          "relationship": "auto",
+          "selector": ".three-col-widget-wrapper"
+        },
+        "three-columns-widget": {
+          "relationship": "auto",
+          "selector": ".three-columns-widget"
+        }
+      },
+      "name": "Three Columns",
+      "variants": []
+    },
+    "easy_widgets.TopNewsPlugWidget": {
+      "css": "\n    .top-news-plug-widget {\n        font-family: var(--body-font, inherit);\n        margin-bottom: 30px;\n    }\n    .top-news-plug-widget:last-child {\n        margin-bottom: 0;\n    }\n\n    /* Layout: 1x3 - Three columns */\n    .top-news-plug-widget.layout-1x3 .news-grid {\n        display: grid;\n        grid-template-columns: repeat(3, 1fr);\n        gap: 2rem;\n    }\n\n    /* Layout: 1x2 - Two columns */\n    .top-news-plug-widget.layout-1x2 .news-grid {\n        display: grid;\n        grid-template-columns: repeat(2, 1fr);\n        gap: 2rem;\n    }\n\n    /* Layout: 2x3_2 - First row 3 cols, second row 2 cols */\n    .top-news-plug-widget.layout-2x3_2 .news-grid {\n        display: grid;\n        grid-template-columns: repeat(6, 1fr);\n        gap: 2rem;\n    }\n\n    .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(1),\n    .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(2),\n    .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(3) {\n        grid-column: span 2;\n    }\n\n    .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(4),\n    .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(5) {\n        grid-column: span 3;\n    }\n\n    /* Layout: 2x1 - Two rows, one column */\n    .top-news-plug-widget.layout-2x1 .news-grid {\n        display: grid;\n        grid-template-columns: 1fr;\n        gap: 2rem;\n        max-width: 800px;\n        margin: 0 auto;\n    }\n\n    /* Layout: 2x2 - Four items in 2x2 grid */\n    .top-news-plug-widget.layout-2x2 .news-grid {\n        display: grid;\n        grid-template-columns: repeat(2, 1fr);\n        gap: 2rem;\n    }\n\n    /* News card styling */\n    .top-news-plug-widget .news-card {\n        position: relative;\n        border-radius: 0.75rem;\n        overflow: hidden;\n        background: #ffffff;\n        border: 1px solid #e5e7eb;\n        transition: all 0.3s ease;\n        display: flex;\n        flex-direction: column;\n    }\n\n    .top-news-plug-widget .news-card:hover {\n        transform: translateY(-4px);\n        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);\n    }\n\n    .top-news-plug-widget .news-card.pinned::before {\n        content: \"📌\";\n        position: absolute;\n        top: 1rem;\n        right: 1rem;\n        z-index: 10;\n        background: white;\n        width: 32px;\n        height: 32px;\n        border-radius: 50%;\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        font-size: 0.875rem;\n        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);\n    }\n\n    .top-news-plug-widget .news-image {\n        width: 100%;\n        height: 200px;\n        overflow: hidden;\n        background: #f3f4f6;\n    }\n\n    .top-news-plug-widget .news-image img {\n        width: 100%;\n        height: 100%;\n        object-fit: cover;\n        transition: transform 0.3s ease;\n    }\n\n    .top-news-plug-widget .news-card:hover .news-image img {\n        transform: scale(1.05);\n    }\n\n    .top-news-plug-widget .news-body {\n        padding: 1.5rem;\n        flex: 1;\n        display: flex;\n        flex-direction: column;\n    }\n\n    .top-news-plug-widget .news-meta {\n        display: flex;\n        gap: 0.75rem;\n        margin-bottom: 0.75rem;\n        font-size: 0.75rem;\n        align-items: center;\n    }\n\n    .top-news-plug-widget .news-type-badge {\n        padding: 0.25rem 0.625rem;\n        background: #3b82f6;\n        color: white;\n        font-weight: 600;\n        text-transform: uppercase;\n        border-radius: 0.25rem;\n        letter-spacing: 0.025em;\n    }\n\n    .top-news-plug-widget .news-date {\n        color: #6b7280;\n        font-size: 0.875rem;\n    }\n\n    .top-news-plug-widget .news-title {\n        font-size: 1.25rem;\n        font-weight: 700;\n        color: #1f2937;\n        margin: 0 0 0.75rem 0;\n        line-height: 1.3;\n    }\n\n    .top-news-plug-widget .news-title a {\n        color: inherit;\n        text-decoration: none;\n    }\n\n    .top-news-plug-widget .news-title a:hover {\n        color: #3b82f6;\n    }\n\n    .top-news-plug-widget .news-excerpt {\n        color: #4b5563;\n        line-height: 1.6;\n        font-size: 0.9375rem;\n        flex: 1;\n    }\n\n    .top-news-plug-widget .news-footer {\n        margin-top: 1rem;\n        padding-top: 1rem;\n        border-top: 1px solid #e5e7eb;\n    }\n\n    .top-news-plug-widget .read-more {\n        color: #3b82f6;\n        font-weight: 600;\n        font-size: 0.875rem;\n        text-decoration: none;\n        display: inline-flex;\n        align-items: center;\n        gap: 0.25rem;\n    }\n\n    .top-news-plug-widget .read-more:hover {\n        text-decoration: underline;\n    }\n\n    /* Tablet responsiveness */\n    @media (max-width: 1024px) {\n        .top-news-plug-widget.layout-1x3 .news-grid {\n            grid-template-columns: repeat(2, 1fr);\n        }\n\n        .top-news-plug-widget.layout-2x3_2 .news-grid {\n            grid-template-columns: repeat(2, 1fr);\n        }\n\n        .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(1),\n        .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(2),\n        .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(3),\n        .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(4),\n        .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(5) {\n            grid-column: span 1;\n        }\n    }\n\n    /* Mobile responsiveness - all layouts become single column */\n    @media (max-width: 768px) {\n        .top-news-plug-widget .news-grid {\n            grid-template-columns: 1fr !important;\n            gap: 1.5rem;\n        }\n\n        .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(1),\n        .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(2),\n        .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(3),\n        .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(4),\n        .top-news-plug-widget.layout-2x3_2 .news-card:nth-child(5) {\n            grid-column: span 1 !important;\n        }\n\n        .top-news-plug-widget .news-title {\n            font-size: 1.125rem;\n        }\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "top-news-plug-widget": {
+          "relationship": "auto",
+          "selector": ".top-news-plug-widget"
+        }
+      },
+      "name": "Top News Plug",
+      "variants": []
+    },
+    "easy_widgets.TwoColumnsWidget": {
+      "css": "\n    .two-columns-widget {\n        display: grid;\n        gap: 30px;\n        width: 100%;\n        margin-bottom: 30px;\n    }\n    .two-columns-widget:last-child {\n        margin-bottom: 0;\n    }\n    \n    .two-columns-widget.two-col-ratio-5-1 {\n        grid-template-columns: 5fr 1fr;\n    }\n    \n    .two-columns-widget.two-col-ratio-4-2 {\n        grid-template-columns: 2fr 1fr;\n    }\n    \n    .two-columns-widget.two-col-ratio-3-3 {\n        grid-template-columns: 1fr 1fr;\n    }\n    \n    .two-columns-widget.two-col-ratio-2-4 {\n        grid-template-columns: 1fr 2fr;\n    }\n    \n    .two-columns-widget.two-col-ratio-1-5 {\n        grid-template-columns: 1fr 5fr;\n    }\n    \n    .two-col-slot {\n        position: relative;\n        height: 100%;\n    }\n    \n    .two-col-slot.left {\n        grid-area: 1 / 1;\n    }\n    \n    .two-col-slot.right {\n        grid-area: 1 / 2;\n    }\n    \n    .two-col-widget-wrapper {\n        margin-bottom: 30px;\n    }\n    \n    .two-col-widget-wrapper:last-child {\n        margin-bottom: 0;\n    }\n    \n    .two-col-empty-slot {\n        color: #9ca3af;\n        font-style: italic;\n        text-align: center;\n        padding: 2rem 1rem;\n        border: 1px dashed #e5e7eb;\n        background-color: #f9fafb;\n        height: 100%;\n    }\n    \n    /* Responsive design */\n    @media (max-width: 768px) {\n        .two-columns-widget {\n            grid-template-columns: 1fr;\n            grid-template-rows: auto auto;\n        }\n        \n        .two-col-slot.left {\n            grid-area: 1 / 1;\n        }\n        \n        .two-col-slot.right {\n            grid-area: 2 / 1;\n        }\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {
+        "two-columns-widget": {
+          "relationship": "auto",
+          "selector": ".two-columns-widget"
+        }
+      },
+      "name": "Two Columns",
+      "variants": []
+    },
+    "object_storage.ObjectChildrenWidget": {
+      "css": "\n    .object-children-widget {\n        font-family: var(--body-font, inherit);\n    }\n    \n    .object-children-widget .children-list {\n        margin: var(--children-spacing, 1rem 0);\n    }\n    \n    .object-children-widget .child-item {\n        margin: var(--child-spacing, 0.5rem 0);\n        padding: var(--child-padding, 0.75rem);\n        border-left: var(--child-border, 3px solid #e5e7eb);\n        background: var(--child-bg, #f9fafb);\n    }\n    \n    .object-children-widget .child-item.level-1 {\n        margin-left: var(--level-1-indent, 1rem);\n        border-color: var(--level-1-color, #3b82f6);\n    }\n    \n    .object-children-widget .child-item.level-2 {\n        margin-left: var(--level-2-indent, 2rem);\n        border-color: var(--level-2-color, #10b981);\n    }\n    \n    .object-children-widget .child-item.level-3 {\n        margin-left: var(--level-3-indent, 3rem);\n        border-color: var(--level-3-color, #f59e0b);\n    }\n    \n    .object-children-widget .child-title {\n        font-weight: var(--child-title-weight, 600);\n        color: var(--child-title-color, #1f2937);\n        margin-bottom: var(--child-title-spacing, 0.25rem);\n    }\n    \n    .object-children-widget .child-meta {\n        font-size: var(--child-meta-size, 0.75rem);\n        color: var(--child-meta-color, #6b7280);\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {},
+      "name": "Object Children",
+      "variants": []
+    },
+    "object_storage.ObjectDetailWidget": {
+      "css": "\n    .object-detail-widget {\n        font-family: var(--body-font, inherit);\n    }\n    \n    .object-detail-widget .object-header {\n        margin-bottom: var(--header-spacing, 2rem);\n        padding-bottom: var(--header-padding, 1rem);\n        border-bottom: var(--header-border, 1px solid #e5e7eb);\n    }\n    \n    .object-detail-widget .object-title {\n        font-size: var(--detail-title-size, 2rem);\n        font-weight: var(--detail-title-weight, 700);\n        color: var(--detail-title-color, #1f2937);\n        margin-bottom: var(--detail-title-spacing, 0.5rem);\n    }\n    \n    .object-detail-widget .object-meta {\n        font-size: var(--detail-meta-size, 0.875rem);\n        color: var(--detail-meta-color, #6b7280);\n    }\n    \n    .object-detail-widget .object-content {\n        margin: var(--content-spacing, 2rem 0);\n    }\n    \n    .object-detail-widget .object-hierarchy {\n        background: var(--hierarchy-bg, #f9fafb);\n        padding: var(--hierarchy-padding, 1rem);\n        border-radius: var(--hierarchy-radius, 0.5rem);\n        margin: var(--hierarchy-spacing, 1rem 0);\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {},
+      "name": "Object Detail",
+      "variants": []
+    },
+    "object_storage.ObjectListWidget": {
+      "css": "\n    .object-list-widget {\n        font-family: var(--body-font, inherit);\n    }\n    \n    .object-list-widget .object-item {\n        padding: var(--object-padding, 1rem);\n        margin-bottom: var(--object-spacing, 1rem);\n        border: var(--object-border, 1px solid #e5e7eb);\n        border-radius: var(--object-radius, 0.5rem);\n        background: var(--object-bg, #ffffff);\n    }\n    \n    .object-list-widget .object-item:hover {\n        box-shadow: var(--object-hover-shadow, 0 4px 6px -1px rgba(0, 0, 0, 0.1));\n        transform: var(--object-hover-transform, translateY(-2px));\n        transition: all 0.2s ease;\n    }\n    \n    .object-list-widget .object-title {\n        font-size: var(--object-title-size, 1.25rem);\n        font-weight: var(--object-title-weight, 600);\n        color: var(--object-title-color, #1f2937);\n        margin-bottom: var(--object-title-spacing, 0.5rem);\n    }\n    \n    .object-list-widget .object-excerpt {\n        color: var(--object-text-color, #6b7280);\n        line-height: var(--object-line-height, 1.6);\n    }\n    \n    .object-list-widget .object-meta {\n        font-size: var(--object-meta-size, 0.875rem);\n        color: var(--object-meta-color, #9ca3af);\n        margin-top: var(--object-meta-spacing, 0.5rem);\n    }\n    \n    .object-list-widget.template-card .object-item {\n        background: var(--card-bg, #ffffff);\n        border: var(--card-border, 1px solid #e5e7eb);\n        border-radius: var(--card-radius, 0.75rem);\n        padding: var(--card-padding, 1.5rem);\n    }\n    \n    .object-list-widget.template-list .object-item {\n        border-left: var(--list-border, 4px solid #3b82f6);\n        padding-left: var(--list-padding, 1rem);\n        background: transparent;\n        border-radius: 0;\n    }\n    \n    .object-list-widget.template-minimal .object-item {\n        border: none;\n        padding: var(--minimal-padding, 0.5rem 0);\n        background: transparent;\n    }\n    ",
+      "cssVariables": {},
+      "layoutParts": {},
+      "name": "Object List",
+      "variants": []
+    }
+  }
+}
