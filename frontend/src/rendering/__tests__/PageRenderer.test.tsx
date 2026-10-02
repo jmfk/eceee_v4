@@ -326,6 +326,28 @@ describe('PageRenderer', () => {
         expect(container.querySelector('[data-widget-type="object-detail"]')).toHaveTextContent('Published body')
     })
 
+    it('falls back to published object data when structured widgets are disabled or absent', () => {
+        const item = {
+            id: 'object-1',
+            title: 'Published object',
+            objectType: { name: 'article', label: 'Article' },
+            data: { summary: 'Published summary', audience_name: 'Members' },
+            widgets: { main: [{ id: 'nested', type: 'easy_widgets.ContentWidget', config: { content: '<p>Hidden body</p>' } }] },
+        }
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'disabled', type: 'object_storage.ObjectDetailWidget', config: { showWidgets: false }, data: { status: 'ready', item } },
+            { id: 'absent', type: 'object_storage.ObjectDetailWidget', config: {}, data: { status: 'ready', item: { ...item, id: 'object-2', widgets: {} } } },
+        ] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        const details = container.querySelectorAll('[data-widget-type="object-detail"]')
+        expect(details[0]).toHaveTextContent('Published summary')
+        expect(details[0]).toHaveTextContent('audience name')
+        expect(details[0]).not.toHaveTextContent('Hidden body')
+        expect(details[1]).toHaveTextContent('Published summary')
+    })
+
     it('uses Django compact date formatting in top-news and sidebar views', () => {
         const item = {
             id: 1,

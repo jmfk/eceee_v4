@@ -75,6 +75,7 @@ export interface PublishedObject {
 }
 
 export interface PublishedObjectQuery {
+  objectIds?: DbId[];
   objectTypeIds?: DbId[];
   objectTypeNames?: string[];
   slug?: string;
@@ -570,8 +571,24 @@ async function resolvePublishedData(
   pathVariables: Record<string, string>,
 ): Promise<Record<string, Widget[]>> {
   const resolve = async (widget: Widget): Promise<Widget> => {
-    if (widget.data?.item || widget.data?.items) return widget;
-    const config = widget.config;
+    const resolveNested = async (candidate: unknown): Promise<unknown> => {
+      if (Array.isArray(candidate)) {
+        const values: unknown[] = [];
+        for (const value of candidate) values.push(await resolveNested(value));
+        return values;
+      }
+      if (!candidate || typeof candidate !== 'object') return candidate;
+      const record = candidate as Record<string, unknown>;
+      if (typeof record.type === 'string' && record.config && typeof record.config === 'object') {
+        return resolve(record as unknown as Widget);
+      }
+      const entries: Array<[string, unknown]> = [];
+      for (const [key, value] of Object.entries(record)) entries.push([key, await resolveNested(value)]);
+      return Object.fromEntries(entries);
+    };
+    const config = await resolveNested(widget.config) as Record<string, unknown>;
+    const prepared = config === widget.config ? widget : { ...widget, config };
+    if (prepared.data?.item || (Array.isArray(prepared.data?.items) && prepared.data.items.length)) return prepared;
     let items: PublishedObject[] | null = null;
     let item: PublishedObject | undefined;
     if (widget.type === 'easy_widgets.NewsListWidget') {
@@ -611,9 +628,16 @@ async function resolvePublishedData(
         }, tenantId, at);
       }
     } else if (widget.type === 'object_storage.ObjectDetailWidget') {
+      const objectId = String(config.objectId ?? config.object_id ?? '');
       const objectType = String(config.objectType ?? config.object_type ?? '');
       const slug = String(config.objectSlug ?? config.object_slug ?? Object.values(pathVariables)[0] ?? '');
-      if (objectType && slug) {
+      if (/^\d+$/.test(objectId)) {
+        [item] = await reader.publishedObjects({
+          objectIds: [objectId],
+          limit: 1,
+          sortOrder: '-publish_date',
+        }, tenantId, at);
+      } else if (objectType && slug) {
         [item] = await reader.publishedObjects({
           objectTypeNames: [objectType],
           slug,
@@ -623,14 +647,14 @@ async function resolvePublishedData(
       }
     }
     if (items) {
-      return { ...widget, data: { status: items.length ? 'ready' : 'empty', items: items.map(value => ({ ...value, path: objectPath(pagePath, value.slug) })) } };
+      return { ...prepared, data: { status: items.length ? 'ready' : 'empty', items: items.map(value => ({ ...value, path: objectPath(pagePath, value.slug) })) } };
     }
     if (widget.type === 'easy_widgets.NewsDetailWidget' || widget.type === 'object_storage.ObjectDetailWidget') {
-      return { ...widget, data: item
+      return { ...prepared, data: item
         ? { status: 'ready', item: { ...item, path: objectPath(pagePath, item.slug) } }
         : { status: 'empty' } };
     }
-    return widget;
+    return prepared;
   };
   const resolved: Record<string, Widget[]> = {};
   for (const [slot, widgets] of Object.entries(slots)) {
