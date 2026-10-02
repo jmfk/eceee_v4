@@ -121,7 +121,8 @@ describe('ObjectBrowser grouped type list', () => {
         mocks.updateRelationships.mockResolvedValue({ data: {} })
     })
 
-    it('saves the selected main browser group from object type settings', async () => {
+    it('loads unpaginated browser group choices and saves the selected group', async () => {
+        mocks.listObjectTypes.mockResolvedValue({ data: { results: [] } })
         const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
         render(
             <QueryClientProvider client={queryClient}>
@@ -144,6 +145,7 @@ describe('ObjectBrowser grouped type list', () => {
 
         const groupSelect = await screen.findByLabelText('Main object type')
         await screen.findByRole('option', { name: 'News Articles' })
+        expect(mocks.getMainBrowserTypes).toHaveBeenCalled()
         fireEvent.change(groupSelect, { target: { value: String(news.id) } })
         fireEvent.click(screen.getByRole('button', { name: 'Save Relationships' }))
 
