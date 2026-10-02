@@ -54,6 +54,20 @@ class PageVersionWorkflowTest(TestCase):
         self.page.save()
         return parent
 
+    def make_published_hostname_owner(self, hostname, *, slug="hostname-owner"):
+        owner = WebPage.objects.create(
+            title="Hostname owner",
+            slug=slug,
+            hostnames=[hostname],
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        version = owner.create_version(self.user, "Initial")
+        PageVersionWorkflowService(owner, self.user).publish(version)
+        owner.refresh_from_db()
+        return owner, version
+
     def test_working_copy_is_idempotent_and_does_not_change_live(self):
         live = self.publish_initial()
         service = PageVersionWorkflowService(self.page, self.user)
@@ -1042,14 +1056,7 @@ class PageVersionWorkflowTest(TestCase):
         )
         self.assertEqual(saved.status_code, status.HTTP_200_OK, saved.data)
         draft.refresh_from_db()
-        WebPage.objects.create(
-            title="Hostname owner",
-            slug="hostname-owner",
-            hostnames=["claimed-later.example"],
-            tenant=self.tenant,
-            created_by=self.user,
-            last_modified_by=self.user,
-        )
+        self.make_published_hostname_owner("claimed-later.example")
 
         response = self.client.post(
             reverse("api:pageversion-publish", kwargs={"pk": draft.pk}),
@@ -1063,6 +1070,40 @@ class PageVersionWorkflowTest(TestCase):
         self.page.refresh_from_db()
         self.assertIsNone(draft.effective_date)
         self.assertEqual(self.page.hostnames, [])
+
+    def test_publish_allows_hostname_released_by_unpublished_page(self):
+        owner, owner_version = self.make_published_hostname_owner("released.example")
+        PageVersionWorkflowService(owner, self.user).unpublish(owner_version)
+
+        draft = self.page.create_version(self.user, "Claim released hostname")
+        draft.page_data = {"page_attributes": {"hostnames": ["released.example"]}}
+        draft.save(update_fields=["page_data", "updated_at"])
+
+        PageVersionWorkflowService(self.page, self.user).publish(draft)
+
+        self.page.refresh_from_db()
+        self.assertEqual(self.page.hostnames, ["released.example"])
+        self.assertEqual(WebPage.get_root_page_for_hostname("released.example"), self.page)
+
+    def test_publish_allows_hostname_released_by_deleted_page(self):
+        owner, _ = self.make_published_hostname_owner("deleted-owner.example")
+        owner.soft_delete(self.user)
+
+        draft = self.page.create_version(self.user, "Claim deleted hostname")
+        draft.page_data = {"page_attributes": {"hostnames": ["deleted-owner.example"]}}
+        draft.save(update_fields=["page_data", "updated_at"])
+
+        PageVersionWorkflowService(self.page, self.user).publish(draft)
+
+        self.page.refresh_from_db()
+        self.assertEqual(self.page.hostnames, ["deleted-owner.example"])
+        self.assertEqual(WebPage.get_root_page_for_hostname("deleted-owner.example"), self.page)
+
+        restore_result = owner.restore(self.user)
+        owner.refresh_from_db()
+        self.assertEqual(owner.hostnames, [])
+        self.assertIn("now used by another published page", restore_result["warnings"][0])
+        self.assertEqual(WebPage.get_root_page_for_hostname("deleted-owner.example"), self.page)
 
     def test_scheduled_activation_rechecks_slug_conflicts(self):
         parent = self.make_page_child()
@@ -1112,13 +1153,9 @@ class PageVersionWorkflowTest(TestCase):
         draft.save(update_fields=["page_data", "updated_at"])
         scheduled_at = timezone.now() + timedelta(hours=1)
         PageVersionWorkflowService(self.page, self.user).schedule(draft, scheduled_at)
-        WebPage.objects.create(
-            title="Scheduled hostname owner",
+        self.make_published_hostname_owner(
+            "scheduled-conflict.example",
             slug="scheduled-hostname-owner",
-            hostnames=["scheduled-conflict.example"],
-            tenant=self.tenant,
-            created_by=self.user,
-            last_modified_by=self.user,
         )
 
         with self.assertLogs("webpages.tasks", level="ERROR"):
