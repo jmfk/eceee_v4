@@ -126,6 +126,15 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         required=False,
         help_text="List of object type names that can be children of this type",
     )
+    browser_group = serializers.SerializerMethodField()
+    browser_group_id = serializers.PrimaryKeyRelatedField(
+        queryset=ObjectTypeDefinition.objects.all(),
+        source="browser_group",
+        write_only=True,
+        required=False,
+        allow_null=True,
+        help_text="Main object type under which this type is grouped in the object browser",
+    )
     schema_fields_count = serializers.SerializerMethodField()
     slots_count = serializers.SerializerMethodField()
     child_types_count = serializers.SerializerMethodField()
@@ -145,6 +154,8 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             "slot_configuration",
             "allowed_child_types",
             "allowed_child_types_input",
+            "browser_group",
+            "browser_group_id",
             "hierarchy_level",
             "namespace",
             "namespace_id",
@@ -171,6 +182,17 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
     def get_child_types_count(self, obj):
         """Return count of allowed child types"""
         return obj.allowed_child_types.count()
+
+    def get_browser_group(self, obj):
+        """Return the main browser type used to group this supporting type."""
+        if not obj.browser_group:
+            return None
+        return {
+            "id": obj.browser_group.id,
+            "name": obj.browser_group.name,
+            "label": obj.browser_group.label,
+            "plural_label": obj.browser_group.plural_label,
+        }
 
     def get_instance_count(self, obj):
         """Return count of object instances of this type"""
@@ -553,6 +575,34 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 
         return value
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        browser_group = attrs.get("browser_group")
+        if browser_group is None:
+            return attrs
+
+        if self.instance and browser_group.pk == self.instance.pk:
+            raise serializers.ValidationError(
+                {"browser_group_id": "An object type cannot be its own browser group."}
+            )
+        if not browser_group.is_active or browser_group.hierarchy_level not in ["top_level_only", "both"]:
+            raise serializers.ValidationError(
+                {"browser_group_id": "The browser group must be an active top-level object type."}
+            )
+        if browser_group.browser_group_id:
+            raise serializers.ValidationError(
+                {"browser_group_id": "Browser groups cannot be nested."}
+            )
+        if self.instance and self.instance.supporting_browser_types.exists():
+            raise serializers.ValidationError(
+                {
+                    "browser_group_id": (
+                        "A browser group with supporting types cannot itself become a supporting type."
+                    )
+                }
+            )
+        return attrs
+
     def create(self, validated_data):
         """Create object type with allowed child types"""
         allowed_child_types_names = validated_data.pop("allowed_child_types_input", [])
@@ -601,6 +651,7 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
     instance_count = serializers.SerializerMethodField()
     allowed_child_types = serializers.SerializerMethodField()
     icon_image = serializers.SerializerMethodField()
+    browser_group = serializers.SerializerMethodField()
 
     class Meta:
         model = ObjectTypeDefinition
@@ -618,6 +669,7 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
             "created_by_name",
             "instance_count",
             "allowed_child_types",
+            "browser_group",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
@@ -673,6 +725,17 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
             }
             for ct in child_types
         ]
+
+    def get_browser_group(self, obj):
+        """Return the main browser type used to group this supporting type."""
+        if not obj.browser_group:
+            return None
+        return {
+            "id": obj.browser_group.id,
+            "name": obj.browser_group.name,
+            "label": obj.browser_group.label,
+            "plural_label": obj.browser_group.plural_label,
+        }
 
 
 class ObjectInstanceSerializer(serializers.ModelSerializer):

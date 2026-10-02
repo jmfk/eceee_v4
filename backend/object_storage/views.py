@@ -39,7 +39,9 @@ logger = logging.getLogger(__name__)
 class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
     """ViewSet for managing Object Type Definitions"""
 
-    queryset = ObjectTypeDefinition.objects.select_related("created_by").prefetch_related("allowed_child_types")
+    queryset = ObjectTypeDefinition.objects.select_related("created_by", "browser_group").prefetch_related(
+        "allowed_child_types"
+    )
     serializer_class = ObjectTypeDefinitionSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -96,7 +98,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def main_browser_types(self, request):
-        """Get object types that should appear in the main browser grid"""
+        """Get object types that should appear in the main object browser."""
         # Show types that can appear at top level: 'top_level_only' and 'both'
         queryset = self.get_queryset().filter(is_active=True, hierarchy_level__in=["top_level_only", "both"])
         serializer = self.get_serializer(queryset, many=True)
@@ -311,37 +313,17 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Update hierarchy level if provided
+            relationship_data = {
+                "allowed_child_types_input": allowed_child_types,
+            }
             if hierarchy_level is not None:
-                obj_type.hierarchy_level = hierarchy_level
+                relationship_data["hierarchy_level"] = hierarchy_level
+            if "browser_group_id" in request.data:
+                relationship_data["browser_group_id"] = request.data.get("browser_group_id")
 
-            # Update allowed child types if provided
-            if allowed_child_types is not None:
-                # Validate that all child type names exist and are active
-                if allowed_child_types:
-                    existing_types = ObjectTypeDefinition.objects.filter(
-                        name__in=allowed_child_types, is_active=True
-                    ).values_list("name", flat=True)
-
-                    invalid_names = set(allowed_child_types) - set(existing_types)
-                    if invalid_names:
-                        return Response(
-                            {"error": f"Invalid child types: {', '.join(invalid_names)}"},
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
-
-                # Get the ObjectTypeDefinition instances
-                child_types = (
-                    ObjectTypeDefinition.objects.filter(name__in=allowed_child_types, is_active=True)
-                    if allowed_child_types
-                    else []
-                )
-
-                # Update the allowed child types
-                obj_type.allowed_child_types.set(child_types)
-
-            # Save the object type
-            obj_type.save()
+            serializer = self.get_serializer(obj_type, data=relationship_data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
 
             # Return updated data
             serializer = self.get_serializer(obj_type)
@@ -350,6 +332,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
                     "message": "Relationships updated successfully",
                     "hierarchy_level": obj_type.hierarchy_level,
                     "allowed_child_types": [ct.name for ct in obj_type.allowed_child_types.all()],
+                    "browser_group": serializer.data.get("browser_group"),
                     "updated_at": serializer.data.get("updated_at"),
                 },
                 status=status.HTTP_200_OK,
