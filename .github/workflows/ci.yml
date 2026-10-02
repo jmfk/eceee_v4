@@ -242,7 +242,7 @@ jobs:
           EOF
 
       - name: Run backend tests
-        run: make backend-test TEST_RUN_FLAGS=--no-build
+        run: make backend-test
 
       - name: Clean up Docker resources
         if: always()
