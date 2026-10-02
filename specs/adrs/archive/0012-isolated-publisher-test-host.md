@@ -1,13 +1,14 @@
 ---
 id: ADR-0012
 title: Validate the publisher through an isolated hostname alias
-status: accepted
+status: superseded
 date: 2026-09-29
 related_prds:
   - PRD-0010
   - PRD-0011
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0014
 ---
 
 # ADR-0012: Validate the Publisher through an Isolated Hostname Alias

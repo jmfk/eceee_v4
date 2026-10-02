@@ -517,7 +517,11 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
     }
     if (pages.length !== segments.length + 1 || current.path_pattern) return null;
 
-    const versions = await Promise.all(pages.map(page => reader.version(page.id, at)));
+    // PageReader methods share one PostgreSQL client inside a repeatable-read
+    // transaction. Keep reads sequential: node-postgres does not support
+    // concurrent queries on a single client and is removing its legacy queueing.
+    const versions: Array<Version | null> = [];
+    for (const page of pages) versions.push(await reader.version(page.id, at));
     const currentVersion = versions.at(-1);
     if (!currentVersion || currentVersion.page_id !== current.id) return null;
     const chain = pages.flatMap((page, index) => versions[index]

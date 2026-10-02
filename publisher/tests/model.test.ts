@@ -84,6 +84,32 @@ describe('public resolution', () => {
     expect(JSON.parse(JSON.stringify(model))).toEqual(model);
   });
 
+  it('reads page versions sequentially on the shared snapshot client', async () => {
+    let versionReadInFlight = false;
+    const sequentialReader: PageReader = {
+      ...reader,
+      version: async (id, at) => {
+        if (versionReadInFlight) throw new Error('concurrent version read');
+        versionReadInFlight = true;
+        await Promise.resolve();
+        try {
+          return await reader.version(id, at);
+        } finally {
+          versionReadInFlight = false;
+        }
+      },
+    };
+
+    const model = await buildPublishedPageModel(
+      { withSnapshot: async read => read(sequentialReader) },
+      'example.org',
+      '/news/story',
+      new Date('2026-06-01'),
+    );
+
+    expect(model?.context.versionId).toBe('10');
+  });
+
   it('applies the public renderer inheritance behavior and ordering across ancestors', async () => {
     const model = await buildPublishedPageModel(db, 'example.org', '/news/story', new Date('2026-06-01'));
     expect(model?.slots.header).toEqual([expect.objectContaining({ id: 'root-header', inheritedFrom: { id: '1', title: 'Home', depth: 2 } })]);
