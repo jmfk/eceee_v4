@@ -1,4 +1,44 @@
-# Public publisher MVP
+# Standalone public publisher
+
+The publisher is a Next.js App Router server whose request path is entirely TypeScript/React. Public rendering does not call Django, a Django API, or a Django-served asset: each request reads one repeatable-read PostgreSQL snapshot, resolves public media from stored URLs, compiles the checked-in theme/widget metadata, and renders with the shared React renderer. Django remains the content-management system and migration owner, and its public renderer is the parity reference during development.
+
+## Local development
+
+From the repository root run:
+
+```sh
+make servers
+make publisher-dev
+```
+
+The reference Django renderer is available at `http://summerstudy.localhost:10101` and the Next renderer with HMR at `http://summerstudy.localhost:10115`. No `/etc/hosts` entry is needed: names below `.localhost` resolve to the loopback interface, and `summerstudy.localhost` is already assigned to the matching root page in the local database. Port `10115` is the registered `publisher-preview` port; the target does not create a database, container, or another port.
+
+`make publisher-dev` reads the repository's ignored `.env` without printing it, derives a publisher connection string for the existing shared PostgreSQL service, forces transactions to be read-only, and starts Next directly on the host. The renderer process needs PostgreSQL and the public object URLs stored in the database, but it does not need a running Django web process except when doing a visual comparison.
+
+## Publisher manifest
+
+Registered widget CSS, CSS variables, layout parts and variant metadata plus the built base CSS are stored in `src/generated/publisher-manifest.json`. Regenerate the deterministic artifact after a backend widget or base CSS change:
+
+```sh
+make publisher-manifest
+```
+
+Use `make publisher-manifest-check` in the local gate. It fails when the checked-in artifact differs from the Django widget registry/build output. This is a build-time consistency check only; Django is not imported or contacted by the running Next publisher.
+
+## Local parity loop
+
+Iterate with HMR on `:10115`, then run the focused publisher checks and the 16-route Summer Study comparison:
+
+```sh
+cd publisher
+npm test
+npm run lint
+npm run typecheck
+npm run build
+npm run test:parity
+```
+
+The Playwright suite compares desktop and mobile responses against Django on `:10101`, including published internal paths, headings, image presence, important computed styles, asset failures, browser errors, empty image sources, fallback states, and placeholder links. Invalid, deleted, unpublished, and cross-site page references are intentionally omitted even if legacy Django markup still contains a dead link. The local dataset must contain the referenced public media collections to exercise their full contents; missing local fixture data is reported separately from renderer behavior.
 
 Standalone Next.js App Router (Node) server. Django owns models and migrations, while public requests read PostgreSQL and store validated form submissions directly; no public request calls Django APIs. Start with `npm ci && npm run dev` in this directory and provide `PUBLISHER_DATABASE_URL` for a PostgreSQL role granted SELECT only on `webpages_webpage`, `webpages_pageversion`, and `webpages_pagetheme`. Point a development hostname at the app and register that hostname on a Django root page. No database credentials are needed for tests, typecheck or build. Keep the page-rendering role read-only even though the client also requests `default_transaction_read_only=on`.
 
@@ -8,6 +48,6 @@ Production includes parallel test routes for `eceee-test.colliberty.com`, `summe
 
 The path resolver selects an exact hostname in PostgreSQL, then the most specific scoped wildcard alias (`*.example.com` matches subdomains but not `example.com`), then walks parent/slug within that root's tenant. Unrestricted fallback routing is denied by default: set `PUBLISHER_ALLOW_WILDCARD_HOSTNAMES=true` to permit bare `*`, and list specific comma-separated request hosts in `PUBLISHER_DEFAULT_HOSTNAMES` to permit the `default` root for those hosts. All reads for a request use one read-only, repeatable-read snapshot. Root slug is silent for hostname roots. It selects effective, unexpired page versions by descending effective date and version number. Dynamic path patterns return 404. Database IDs are strings because Django uses 64-bit IDs.
 
-The public model now resolves layout and theme inheritance from published ancestor versions, applies the Django public renderer's widget inheritance behaviors and ordering, filters widget visibility and publication windows, and carries inheritance metadata. Rendering reuses the same `PageRenderer`, widget registry, layouts and HTML sanitizer as the editor preview, so all registered static widgets and recursive containers share one implementation. Theme fonts, breakpoints, colors, legacy variables, component/image style CSS, theme custom CSS and page/version overrides are rendered without calling Django. Rich HTML is sanitized during server rendering.
+The public model resolves layout and theme inheritance from published ancestor versions, applies widget inheritance behavior and ordering, filters widget visibility and publication windows, resolves same-site published links and navigation, and resolves tenant-scoped public media/collections. Rendering reuses the same React `PageRenderer`, widget registry, layouts and HTML sanitizer as the editor preview, so registered static widgets and recursive containers share one implementation. Theme fonts, breakpoints, colors, design groups, legacy HTML elements, widget CSS/variables, variants, layout properties, component/image/gallery/carousel styles, theme CSS and page/version overrides are compiled in TypeScript. Rich HTML is sanitized during server rendering.
 
-Still required before replacing Django traffic: compile `design_groups` and registered backend widget CSS in TypeScript; resolve ID-based media and links plus dynamic navigation directly from PostgreSQL/object storage; add path-pattern/object/news resolvers; implement preview tokens; add scheduled-publication cache/invalidation; and validate real production-shaped data and visual parity. Data-driven widgets currently render their shared empty/loading state unless their saved configuration already contains resolved data. The production deploy applies Django migration `0077_publicformsubmission` before idempotently provisioning the two publisher roles; it then starts the test Publisher without changing the live public routes.
+Still required before replacing every Django route: add path-pattern/object/news resolvers, implement preview tokens, add scheduled-publication cache/invalidation, and validate sites outside the static Summer Study scope against complete production-shaped media fixtures. Data-driven widgets render their shared empty/loading state unless their saved configuration already contains resolved data. The production deploy applies Django migration `0077_publicformsubmission` before idempotently provisioning the two publisher roles; it then starts the test Publisher without changing the live public routes.

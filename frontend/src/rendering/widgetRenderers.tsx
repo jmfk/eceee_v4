@@ -4,7 +4,7 @@ import { processNavigationItems } from '../utils/navigationItems'
 import { asArray, EmptyRender, formatDisplayDate, imageUrl, ImageView, normalizeContentMediaHtml, PreviewLink, RenderFailure, SafeHtml, sanitizeHtml, TextWithBreaks, value } from './primitives'
 
 const ContentRender: WidgetRenderComponent = ({ widget }) => <div className="widget-type-easy-widgets-contentwidget">
-    <SafeHtml className={`content-widget${value(widget.config, 'showBorder', 'show_border') ? ' border-enabled' : ''}`} html={normalizeContentMediaHtml(value(widget.config, 'content', 'html'))} />
+    <SafeHtml className={`content-widget${value(widget.config, 'variantClasses') ? ` ${value(widget.config, 'variantClasses')}` : ''}${value(widget.config, 'showBorder', 'show_border') ? ' border-enabled' : ''}`} html={normalizeContentMediaHtml(value(widget.config, 'content', 'html'))} />
 </div>
 
 const ObjectDataPreviewRender: WidgetRenderComponent = ({ context }) => {
@@ -246,6 +246,14 @@ const tableCellStyle = (cell: Record<string, any>, showBorders: boolean): React.
     return style
 }
 
+const TableCellContent = ({ cell }: { cell: Record<string, any> }) => {
+    if (value(cell, 'contentType', 'content_type') === 'image') {
+        const image = value(cell, 'imageData', 'image_data')
+        return <ImageView source={image} alt={image?.alt || image?.altText || image?.alt_text || ''} />
+    }
+    return <SafeHtml as="span" className="table-cell-content" html={value(cell, 'content')} />
+}
+
 const TableRender: WidgetRenderComponent = ({ widget }) => {
     const config = widget.config
     const rows = asArray<any>(value(config, 'rows', 'data'))
@@ -294,10 +302,14 @@ const TableRender: WidgetRenderComponent = ({ widget }) => {
     </div>
 }
 
-const navigationItems = (config: Record<string, any>, secondary = false) => processNavigationItems(value(
-    config,
-    ...(secondary ? ['secondaryMenuItems', 'secondary_menu_items'] : ['menuItems', 'menu_items', 'items', 'links']),
-))
+const navigationItems = (config: Record<string, any>, secondary = false) => {
+    const staticItems = processNavigationItems(value(
+        config,
+        ...(secondary ? ['secondaryMenuItems', 'secondary_menu_items'] : ['menuItems', 'menu_items', 'items', 'links']),
+    ))
+    if (secondary) return staticItems
+    return [...staticItems, ...processNavigationItems(value(config, 'dynamicItems', 'dynamic_items'))]
+}
 
 const filterNavigationItems = (items: any[], context: WidgetRenderProps['context']): any[] => (
     items.filter((item) => {
@@ -323,7 +335,20 @@ const NavigationList = ({ items, className }: { items: any[], className: string 
     <ul className={className}>{items.map((item, index) => <li key={item.id || index}><PreviewLink href={item.resolvedUrl || item.path || item.url || item}>{item.label || item.title || item.text || ''}</PreviewLink>{asArray<any>(item.children).length > 0 && <NavigationList items={item.children} className="navigation-children" />}</li>)}</ul>
 )
 
+const CurrentNavigationList = ({ items }: { items: any[] }) => (
+    <ul className="current-menu-list">{items.map((item, index) => <li className="current-menu-item" key={item.id || index}><PreviewLink href={item.resolvedUrl || item.path || item.url}>{item.label || item.title || ''}</PreviewLink></li>)}</ul>
+)
+
 const NavigationRender: WidgetRenderComponent = ({ widget, context }) => {
+    const style = String(value(widget.config, 'navigationStyle', 'navigation_style') || '')
+    const publisherNavigation = value(widget.config, 'publisherNavigation') as Record<string, any> | undefined
+    if (style === 'sub-page-navigation' && publisherNavigation?.isInherited) {
+        const children = processNavigationItems(publisherNavigation.currentChildren)
+        const parent = publisherNavigation.parentPage
+        if (children.length) return <nav className="current-page-menu widget-type-navigation widget-type-easy-widgets-navigationwidget"><CurrentNavigationList items={children} /></nav>
+        if (Number(publisherNavigation.depth) >= 2 && parent?.path) return <nav className="current-page-menu widget-type-navigation widget-type-easy-widgets-navigationwidget"><ul className="current-menu-list"><li className="current-menu-item"><PreviewLink href={parent.path}>← Back to {parent.title}</PreviewLink></li></ul></nav>
+        return null
+    }
     const items = sameSiteNavigationItems(widget.config, context)
     return <nav className="navigation-widget widget-type-navigation widget-type-easy-widgets-navigationwidget">{items.length ? <NavigationList items={items} className="nav-container" /> : null}</nav>
 }
@@ -333,7 +358,7 @@ const NavbarRender: WidgetRenderComponent = ({ widget, context }) => {
     const items = sameSiteNavigationItems(widget.config, context)
     const secondaryItems = sameSiteNavigationItems(widget.config, context, true)
     const breakpoint = Number(value(widget.config, 'hamburgerBreakpoint', 'hamburger_breakpoint') || 768)
-    const [mobile, setMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < breakpoint)
+    const [mobile, setMobile] = useState(false)
     useEffect(() => {
         const update = () => setMobile(window.innerWidth < breakpoint)
         update()
@@ -349,9 +374,11 @@ const NavbarRender: WidgetRenderComponent = ({ widget, context }) => {
     >{item.label}</PreviewLink>
     return <nav className="widget-type-navbar navbar-widget" style={{ position: 'relative' }}>
         {mobile && <div className="navbar-hamburger-mode" style={{ display: 'flex', alignItems: 'center', height: '100%', padding: '0 20px', justifyContent: 'space-between' }}>
-            <button type="button" aria-label="Toggle menu" aria-expanded={open} onClick={() => setOpen((current) => !current)}>☰</button>
+            <button type="button" aria-label="Toggle menu" aria-expanded={open} onClick={() => setOpen((current) => !current)} style={{ color: 'white', background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}>
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{open ? <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></> : <><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></>}</svg>
+            </button>
         </div>}
-        {mobile && open && <div className="navbar-mobile-menu">{items.map((item, index) => <div key={index}>{renderLink(item)}</div>)}{secondaryItems.map((item, index) => <div key={`secondary-${index}`}>{renderLink(item, true)}</div>)}</div>}
+        {mobile && <div className="navbar-mobile-menu" hidden={!open}>{items.map((item, index) => <div key={index}>{renderLink(item)}</div>)}{secondaryItems.map((item, index) => <div key={`secondary-${index}`}>{renderLink(item, true)}</div>)}</div>}
         {!mobile && <div className="navbar-desktop-menu">
             <ul className="navbar-menu-list">{items.map((item, index) => <li className="navbar-menu-item" key={index}>{renderLink(item)}</li>)}</ul>
             {secondaryItems.length > 0 && <ul className="navbar-menu-list navbar-secondary-menu">{secondaryItems.map((item, index) => <li className="navbar-menu-item" key={index} style={{ backgroundColor: item.backgroundColor || item.background_color || undefined, color: item.textColor || item.text_color || undefined }}>{renderLink(item, true)}</li>)}</ul>}
@@ -525,12 +552,13 @@ const SectionRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
         return () => window.removeEventListener('eceee-section-expand', collapseOther)
     }, [accordion, collapsible, widget.id])
     if (!content.length) return null
-    if (!collapsible) return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} className={`section-content-only-widget${bordered ? ' border-enabled' : ''}`}>{renderWidgets(content)}</div></div>
+    const variants = value(widget.config, 'variantClasses') ? ` ${value(widget.config, 'variantClasses')}` : ''
+    if (!collapsible) return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} className={`section-content-only-widget${variants}${bordered ? ' border-enabled' : ''}`}>{renderWidgets(content)}</div></div>
     const toggleExpanded = () => setExpanded((current) => {
         if (!current && accordion) window.dispatchEvent(new CustomEvent('eceee-section-expand', { detail: widget.id }))
         return !current
     })
-    return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} data-accordion-mode={accordion || undefined} className={`section-widget${bordered ? ' border-enabled' : ''}${expanded ? '' : ' section-collapsed'}`}>
+    return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} data-accordion-mode={accordion || undefined} className={`section-widget${variants}${bordered ? ' border-enabled' : ''}${expanded ? '' : ' section-collapsed'}`}>
         <div className="slot-section-content">
             {renderWidgets(content.slice(0, 1))}
             {expanded && <div className="section-remaining-content">{renderWidgets(content.slice(1))}</div>}

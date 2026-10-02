@@ -1,5 +1,5 @@
 import { Pool, type PoolClient } from 'pg';
-import { normalizeHostname, type Page, type PageReader, type ReadDb, type Theme, type Version } from './model';
+import { normalizeHostname, type Page, type PageReader, type PublicMediaItem, type ReadDb, type Theme, type Version } from './model';
 let pool: Pool | undefined;
 function wildcardAllowed(): boolean {
   return process.env.PUBLISHER_ALLOW_WILDCARD_HOSTNAMES?.trim().toLowerCase() === 'true';
@@ -48,12 +48,88 @@ function reader(client: PoolClient): PageReader {
       return result.rows[0] ?? null;
     },
     async theme(themeId, tenantId) {
-      const result = await client.query<Theme>('SELECT id, tenant_id, name, fonts, colors, css_variables, component_styles, image_styles, gallery_styles, carousel_styles, breakpoints, custom_css FROM webpages_pagetheme WHERE id = $1 AND tenant_id = $2 LIMIT 1', [themeId, tenantId]);
+      const result = await client.query<Theme>('SELECT id, tenant_id, name, fonts, colors, css_variables, design_groups, html_elements, component_styles, image_styles, gallery_styles, carousel_styles, breakpoints, custom_css, sync_version, updated_at FROM webpages_pagetheme WHERE id = $1 AND tenant_id = $2 LIMIT 1', [themeId, tenantId]);
       return result.rows[0] ?? null;
     },
     async defaultTheme(tenantId) {
-      const result = await client.query<Theme>('SELECT id, tenant_id, name, fonts, colors, css_variables, component_styles, image_styles, gallery_styles, carousel_styles, breakpoints, custom_css FROM webpages_pagetheme WHERE tenant_id = $1 AND is_default = true AND is_active = true ORDER BY created_at, id LIMIT 1', [tenantId]);
+      const result = await client.query<Theme>('SELECT id, tenant_id, name, fonts, colors, css_variables, design_groups, html_elements, component_styles, image_styles, gallery_styles, carousel_styles, breakpoints, custom_css, sync_version, updated_at FROM webpages_pagetheme WHERE tenant_id = $1 AND is_default = true AND is_active = true ORDER BY created_at, id LIMIT 1', [tenantId]);
       return result.rows[0] ?? null;
+    },
+    async publishedPageReferences(pageIds, tenantId, rootId, at) {
+      if (!pageIds.length) return [];
+      const result = await client.query<{ id: string; cached_path: string }>(`
+        SELECT page.id::text, CASE WHEN page.id = $3 THEN '/' ELSE page.cached_path END AS cached_path
+        FROM webpages_webpage AS page
+        JOIN LATERAL (
+          SELECT 1
+          FROM webpages_pageversion AS version
+          WHERE version.page_id = page.id
+            AND version.effective_date <= $4
+            AND (version.expiry_date IS NULL OR version.expiry_date > $4)
+          ORDER BY version.effective_date DESC, version.version_number DESC
+          LIMIT 1
+        ) AS published ON true
+        WHERE page.id = ANY($1::bigint[])
+          AND page.tenant_id = $2
+          AND (page.id = $3 OR page.cached_root_id = $3)
+          AND page.is_deleted = false
+          AND (page.id = $3 OR page.cached_path <> '')`, [pageIds, tenantId, rootId, at]);
+      return result.rows;
+    },
+    async publishedNavigationPages(parentIds, tenantId, rootId, at) {
+      if (!parentIds.length) return [];
+      const result = await client.query<{
+        id: string; parent_id: string; title: string; slug: string; cached_path: string; sort_order: number;
+      }>(`
+        SELECT page.id::text, page.parent_id::text, page.title, page.slug,
+          page.cached_path, page.sort_order
+        FROM webpages_webpage AS page
+        JOIN LATERAL (
+          SELECT 1
+          FROM webpages_pageversion AS version
+          WHERE version.page_id = page.id
+            AND version.effective_date <= $4
+            AND (version.expiry_date IS NULL OR version.expiry_date > $4)
+          ORDER BY version.effective_date DESC, version.version_number DESC
+          LIMIT 1
+        ) AS published ON true
+        WHERE page.parent_id = ANY($1::bigint[])
+          AND page.tenant_id = $2
+          AND page.cached_root_id = $3
+          AND page.is_deleted = false
+          AND page.cached_path <> ''
+        ORDER BY page.parent_id, page.sort_order, page.id`, [parentIds, tenantId, rootId, at]);
+      return result.rows;
+    },
+    async publicMedia(mediaIds, collectionIds, tenantId) {
+      const mediaFields = `media.id::text, COALESCE(media.file_url, '') AS url,
+        CASE WHEN media.file_type = 'video' THEN 'video' ELSE 'image' END AS type,
+        COALESCE(media.title, '') AS "altText", COALESCE(media.description, '') AS caption,
+        COALESCE(media.metadata->>'annotation', '') AS annotation, COALESCE(media.title, '') AS title,
+        media.width, media.height, COALESCE(media.file_url, '') AS "thumbnailUrl"`;
+      const files = mediaIds.length ? await client.query<PublicMediaItem>(`
+        SELECT ${mediaFields}
+        FROM file_manager_mediafile AS media
+        WHERE media.id = ANY($1::uuid[]) AND media.tenant_id = $2
+          AND media.access_level = 'public' AND media.is_deleted = false
+        ORDER BY media.created_at, media.id`, [mediaIds, tenantId]) : { rows: [] as PublicMediaItem[] };
+      const collectionRows = collectionIds.length ? await client.query<PublicMediaItem & { collection_id: string }>(`
+        SELECT membership.mediacollection_id::text AS collection_id, ${mediaFields}
+        FROM file_manager_mediafile_collections AS membership
+        JOIN file_manager_mediacollection AS collection ON collection.id = membership.mediacollection_id
+        JOIN content_namespace AS namespace ON namespace.id = collection.namespace_id
+        JOIN file_manager_mediafile AS media ON media.id = membership.mediafile_id
+        WHERE membership.mediacollection_id = ANY($1::uuid[])
+          AND media.tenant_id = $2 AND namespace.tenant_id = $2
+          AND collection.access_level = 'public'
+          AND media.access_level = 'public' AND media.is_deleted = false
+        ORDER BY media.created_at, media.id`, [collectionIds, tenantId]) : { rows: [] as Array<PublicMediaItem & { collection_id: string }> };
+      const collections: Record<string, PublicMediaItem[]> = {};
+      for (const row of collectionRows.rows) {
+        const { collection_id, ...item } = row;
+        (collections[collection_id] ??= []).push(item);
+      }
+      return { files: files.rows, collections };
     },
   };
 }

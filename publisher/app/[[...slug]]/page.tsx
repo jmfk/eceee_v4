@@ -7,6 +7,7 @@ import { contentHostname } from '@/src/hostname';
 import { buildPublishedPageModel } from '@/src/model';
 import { PublishedPage } from '@/src/render';
 import { RENDER_LAYOUT_CSS } from '../../../frontend/src/rendering/layoutRenderers';
+import { PUBLIC_RENDER_CSS } from '../../../frontend/src/rendering/publicRenderCss';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 type Query = Record<string, string | string[] | undefined>;
@@ -37,5 +38,5 @@ export default async function Page(props: Props) {
       publicForms: { ...model.context.publicForms, result },
     },
   } : model;
-  return <><style>{`${model.fontCss}\n${RENDER_LAYOUT_CSS}\n${model.themeCss}`}</style><PublishedPage model={renderModel} /></>;
+  return <><style>{`${model.fontCss}\n${PUBLIC_RENDER_CSS}\n${RENDER_LAYOUT_CSS}\n${model.themeCss}`}</style><PublishedPage model={renderModel} /></>;
 }

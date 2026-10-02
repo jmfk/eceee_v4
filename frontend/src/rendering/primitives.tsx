@@ -14,7 +14,37 @@ export const normalizeCssName = (candidate: string) => String(candidate || '')
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, '-')
 
-export const sanitizeHtml = (html?: string): string => String(DOMPurify.sanitize(String(html || ''), {
+const BACKEND_SAFE_STYLE_PROPERTIES = new Set([
+    'background', 'background-color', 'background-image', 'background-position', 'background-size', 'background-repeat',
+    'color', 'font-size', 'font-weight', 'font-family', 'line-height', 'text-align', 'padding', 'margin', 'border',
+    'border-radius', 'width', 'height', 'max-width', 'max-height', 'min-width', 'min-height', 'display', 'flex',
+    'flex-direction', 'align-items', 'justify-content', 'position', 'top', 'left', 'right', 'bottom', 'z-index',
+    'opacity', 'overflow', 'box-shadow', 'outline',
+])
+
+export const backendCompatibleHtml = (html: unknown): string => String(html || '').replace(
+    /\sstyle=(['"])(.*?)\1/gi,
+    (_attribute, quote: string, declarations: string) => {
+        const entityQuotedFont = /font-family\s*:\s*(?:&quot;|&#34;).*?(?:&quot;|&#34;)[^;]*;?/i.test(declarations)
+        const remaining = entityQuotedFont
+            ? declarations.replace(/font-family\s*:\s*(?:&quot;|&#34;).*?(?:&quot;|&#34;)[^;]*;?/i, '')
+            : declarations
+        const safe = remaining.split(';').flatMap(declaration => {
+            const separator = declaration.indexOf(':')
+            if (separator < 1) return []
+            const property = declaration.slice(0, separator).trim().toLowerCase()
+            const candidate = declaration.slice(separator + 1).trim()
+            return BACKEND_SAFE_STYLE_PROPERTIES.has(property) && candidate ? [`${property}: ${candidate}`] : []
+        })
+        // Match Bleach's effective handling of legacy entity-quoted font stacks:
+        // the malformed family consumes the remaining safe declarations.
+        if (entityQuotedFont) return ` style=${quote}font-family: &quot; ${safe.join('; ')};${quote}`
+        const cleaned = safe.join('; ')
+        return cleaned ? ` style=${quote}${cleaned}${quote}` : ''
+    },
+)
+
+export const sanitizeHtml = (html?: string): string => String(DOMPurify.sanitize(backendCompatibleHtml(html), {
     ADD_ATTR: ['loading'],
 }))
 
