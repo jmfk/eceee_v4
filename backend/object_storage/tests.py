@@ -85,6 +85,53 @@ class ObjectTypeDefinitionModelTest(ObjectStorageModelTestBase):
         self.assertEqual(obj_type.name, "news")
         self.assertEqual(obj_type.label, "News Article")
 
+    def test_browser_group_is_cleared_when_main_type_is_deleted(self):
+        main_type = ObjectTypeDefinition.objects.create(
+            name="news", label="News", plural_label="News", created_by=self.user
+        )
+        supporting_type = ObjectTypeDefinition.objects.create(
+            name="news_category",
+            label="News Category",
+            plural_label="News Categories",
+            browser_group=main_type,
+            created_by=self.user,
+        )
+
+        main_type.delete()
+        supporting_type.refresh_from_db()
+
+        self.assertIsNone(supporting_type.browser_group)
+
+    def test_browser_group_rejects_self_and_nested_groups(self):
+        main_type = ObjectTypeDefinition.objects.create(
+            name="news", label="News", plural_label="News", created_by=self.user
+        )
+        supporting_type = ObjectTypeDefinition.objects.create(
+            name="news_category",
+            label="News Category",
+            plural_label="News Categories",
+            browser_group=main_type,
+            created_by=self.user,
+        )
+
+        main_type.browser_group = main_type
+        with self.assertRaisesMessage(ValidationError, "cannot be its own browser group"):
+            main_type.full_clean()
+
+        nested_type = ObjectTypeDefinition(
+            name="news_category_type",
+            label="News Category Type",
+            plural_label="News Category Types",
+            browser_group=supporting_type,
+            created_by=self.user,
+        )
+        with self.assertRaisesMessage(ValidationError, "Browser groups cannot be nested"):
+            nested_type.full_clean()
+
+        main_type.browser_group = supporting_type
+        with self.assertRaisesMessage(ValidationError, "Browser groups cannot be nested"):
+            main_type.full_clean()
+
 
 class ObjectInstanceModelTest(ObjectStorageModelTestBase):
     """Test ObjectInstance model"""
@@ -142,6 +189,108 @@ class ObjectStorageAPITest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Might be empty if tenant filtering is active
+
+    def test_create_object_type_with_browser_group(self):
+        main_type = ObjectTypeDefinition.objects.create(
+            name="news", label="News", plural_label="News Articles", created_by=self.user
+        )
+
+        response = self.client.post(
+            reverse("api:object_storage:objecttypedefinition-list"),
+            {
+                "name": "news_type",
+                "label": "News Type",
+                "pluralLabel": "News Types",
+                "browserGroupId": main_type.id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["browserGroup"]["id"], main_type.id)
+        self.assertEqual(ObjectTypeDefinition.objects.get(name="news_type").browser_group, main_type)
+
+    def test_relationship_update_exposes_browser_group(self):
+        main_type = ObjectTypeDefinition.objects.create(
+            name="news", label="News", plural_label="News Articles", created_by=self.user
+        )
+        supporting_type = ObjectTypeDefinition.objects.create(
+            name="news_category",
+            label="News Category",
+            plural_label="News Categories",
+            created_by=self.user,
+        )
+
+        url = reverse(
+            "api:object_storage:objecttypedefinition-update-relationships",
+            args=[supporting_type.id],
+        )
+        response = self.client.put(
+            url,
+            {"hierarchyLevel": "both", "allowedChildTypes": [], "browserGroupId": main_type.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["browserGroup"]["id"], main_type.id)
+        supporting_type.refresh_from_db()
+        self.assertEqual(supporting_type.browser_group, main_type)
+
+    def test_relationship_update_rejects_nested_browser_group(self):
+        main_type = ObjectTypeDefinition.objects.create(
+            name="news", label="News", plural_label="News", created_by=self.user
+        )
+        supporting_type = ObjectTypeDefinition.objects.create(
+            name="news_category",
+            label="News Category",
+            plural_label="News Categories",
+            browser_group=main_type,
+            created_by=self.user,
+        )
+        third_type = ObjectTypeDefinition.objects.create(
+            name="news_type", label="News Type", plural_label="News Types", created_by=self.user
+        )
+
+        url = reverse(
+            "api:object_storage:objecttypedefinition-update-relationships",
+            args=[third_type.id],
+        )
+        response = self.client.put(
+            url,
+            {"hierarchyLevel": "both", "allowedChildTypes": [], "browserGroupId": supporting_type.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Browser groups cannot be nested", response.json()["error"])
+
+    def test_main_browser_types_include_group_information_and_visibility_filter(self):
+        main_type = ObjectTypeDefinition.objects.create(
+            name="news", label="News", plural_label="News Articles", created_by=self.user
+        )
+        supporting_type = ObjectTypeDefinition.objects.create(
+            name="news_category",
+            label="News Category",
+            plural_label="News Categories",
+            browser_group=main_type,
+            created_by=self.user,
+        )
+        ObjectTypeDefinition.objects.create(
+            name="news_detail",
+            label="News Detail",
+            plural_label="News Details",
+            hierarchy_level="sub_object_only",
+            created_by=self.user,
+        )
+
+        url = reverse("api:object_storage:objecttypedefinition-main-browser-types")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.json()
+        self.assertEqual([item["name"] for item in payload], ["news", "news_category"])
+        supporting_payload = next(item for item in payload if item["id"] == supporting_type.id)
+        self.assertEqual(supporting_payload["browserGroup"]["id"], main_type.id)
 
     def test_object_instances_reject_an_inaccessible_tenant(self):
         other_user = User.objects.create_user(username="other-object-user")

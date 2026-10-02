@@ -64,6 +64,14 @@ class ObjectTypeDefinition(models.Model):
         symmetrical=False,
         help_text="Object types that can be children of this type",
     )
+    browser_group = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="supporting_browser_types",
+        help_text="Main object type under which this type is grouped in the object browser",
+    )
 
     HIERARCHY_LEVEL_CHOICES = [
         ("top_level_only", "Top-level only"),
@@ -123,6 +131,16 @@ class ObjectTypeDefinition(models.Model):
         # Validate slot configuration format
         if self.slot_configuration:
             self._validate_slot_configuration()
+
+        if self.browser_group_id:
+            if self.pk and self.browser_group_id == self.pk:
+                raise ValidationError({"browser_group": "An object type cannot be its own browser group."})
+            if self.browser_group.browser_group_id:
+                raise ValidationError({"browser_group": "Browser groups cannot be nested."})
+            if self.pk and self.supporting_browser_types.exists():
+                raise ValidationError(
+                    {"browser_group": "A browser group with supporting types cannot itself become a supporting type."}
+                )
 
     def _validate_schema(self):
         """Validate the schema JSON structure using the general schema system."""

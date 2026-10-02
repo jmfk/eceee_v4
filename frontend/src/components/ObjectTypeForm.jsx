@@ -38,6 +38,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         },
         slotConfiguration: { slots: [] },
         allowedChildTypes: [],
+        browserGroupId: null,
         hierarchyLevel: 'both', // 'top_level_only', 'sub_object_only', 'both'
         namespaceId: null, // Use null for default namespace
         metadata: {}
@@ -105,6 +106,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                 schema: schema,
                 slotConfiguration: objectType.slotConfiguration || { slots: [] },
                 allowedChildTypes: allowedChildTypeNames,
+                browserGroupId: objectType.browserGroup?.id || null,
                 hierarchyLevel: objectType.hierarchyLevel || 'both',
                 namespaceId: objectType.namespace?.id || null,
                 metadata: objectType.metadata || {}
@@ -134,7 +136,8 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             // Track original relationships
             const relationships = {
                 hierarchyLevel: objectType.hierarchyLevel || 'both',
-                allowedChildTypes: allowedChildTypeNames
+                allowedChildTypes: allowedChildTypeNames,
+                browserGroupId: objectType.browserGroup?.id || null
             }
             setOriginalRelationships(JSON.parse(JSON.stringify(relationships)))
             setHasUnsavedRelationshipsChanges(false)
@@ -238,11 +241,12 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         }
 
         // Track relationships changes
-        if (['hierarchyLevel', 'allowedChildTypes'].includes(field)) {
+        if (['hierarchyLevel', 'allowedChildTypes', 'browserGroupId'].includes(field)) {
             // Check if relationships have changed from original
             const currentRelationships = {
                 hierarchyLevel: field === 'hierarchyLevel' ? value : formData.hierarchyLevel,
-                allowedChildTypes: field === 'allowedChildTypes' ? value : formData.allowedChildTypes
+                allowedChildTypes: field === 'allowedChildTypes' ? value : formData.allowedChildTypes,
+                browserGroupId: field === 'browserGroupId' ? value : formData.browserGroupId
             }
             const hasChanges = JSON.stringify(currentRelationships) !== JSON.stringify(originalRelationships)
             setHasUnsavedRelationshipsChanges(hasChanges)
@@ -780,7 +784,8 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             // Prepare relationships data
             const relationshipsData = {
                 hierarchyLevel: formData.hierarchyLevel,
-                allowedChildTypes: formData.allowedChildTypes
+                allowedChildTypes: formData.allowedChildTypes,
+                browserGroupId: formData.browserGroupId
             }
 
             // Use the dedicated relationships update endpoint
@@ -1241,6 +1246,41 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
             {/* Relationships Tab */}
             {activeTab === 'relationships' && (
                 <div className="space-y-8">
+                    <div>
+                        <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">
+                            Object Browser Group
+                        </div>
+                        <div className="text-gray-600 mb-4">
+                            Choose the main object type this type should support in the Objects list. This only changes navigation and does not affect child object rules.
+                        </div>
+                        <label className="block max-w-xl">
+                            <span className="block text-sm font-medium text-gray-700 mb-2">Main object type</span>
+                            <select
+                                value={formData.browserGroupId || ''}
+                                onChange={(event) => handleInputChange(
+                                    'browserGroupId',
+                                    event.target.value ? Number(event.target.value) : null
+                                )}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="">Own main group</option>
+                                {existingTypes
+                                    .filter(type =>
+                                        type.id !== objectType?.id &&
+                                        type.isActive &&
+                                        !type.browserGroup &&
+                                        (type.hierarchyLevel === 'top_level_only' || type.hierarchyLevel === 'both')
+                                    )
+                                    .sort((a, b) => (a.label || '').localeCompare(b.label || ''))
+                                    .map(type => (
+                                        <option key={type.id} value={type.id}>
+                                            {type.pluralLabel || type.label}
+                                        </option>
+                                    ))}
+                            </select>
+                        </label>
+                    </div>
+
                     {/* Hierarchy Level Configuration */}
                     <div>
                         <div className="text-lg font-medium text-gray-900 mb-4" role="heading" aria-level="3">Hierarchy Level</div>

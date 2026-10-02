@@ -1,13 +1,24 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
-import { Search, ArrowLeft, Plus, Grid, List, AlertCircle, Image, FolderOpen, Trash2 } from 'lucide-react'
+import { Search, ArrowLeft, Plus, ChevronRight, AlertCircle, Image, FolderOpen, Trash2 } from 'lucide-react'
 import { objectTypesApi, objectInstancesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import DeleteConfirmationModal from './DeleteConfirmationModal'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import ContextualHelpLink from './help/ContextualHelpLink'
 import OptimizedImage from './media/OptimizedImage'
+import { buildObjectTypeGroups } from './objectBrowserGrouping'
+
+const objectTypeTestId = (objectType) => (
+    (objectType.name || objectType.label || 'object-type')
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'object-type'
+)
+
+const itemCountLabel = (count) => `${count || 0} ${(count || 0) === 1 ? 'item' : 'items'}`
 
 const ObjectBrowser = () => {
     // Set document title
@@ -116,6 +127,7 @@ const ObjectBrowser = () => {
     })
 
     const objectTypes = objectTypesResponse?.data || []
+    const objectTypeGroups = buildObjectTypeGroups(objectTypes)
     const instances = instancesResponse?.data?.results || instancesResponse?.data || []
 
     const handleObjectTypeSelect = (objectType) => {
@@ -232,51 +244,92 @@ const ObjectBrowser = () => {
                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {objectTypes.map((objectType) => {
-                                    const objectTypeTestId = (objectType.name || objectType.label || 'object-type')
-                                        .toString()
-                                        .toLowerCase()
-                                        .replace(/[^a-z0-9]+/g, '-')
-                                        .replace(/^-+|-+$/g, '') || 'object-type'
-
-                                    return (
-                                    <div
-                                        key={objectType.id}
-                                        data-testid={`object-type-card-${objectTypeTestId}`}
-                                        onClick={() => handleObjectTypeSelect(objectType)}
-                                        className="bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
-                                    >
-                                        <div className="flex flex-col items-center text-center">
-                                            <div className="w-16 h-16 flex-shrink-0 mb-3">
-                                                {objectType.iconImage ? (
+                            <ul className="space-y-4" aria-label="Object type groups">
+                                {objectTypeGroups.map(({ primary, supporting }) => (
+                                    <li key={primary.id} className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                                        <button
+                                            type="button"
+                                            data-testid={`object-type-card-${objectTypeTestId(primary)}`}
+                                            onClick={() => handleObjectTypeSelect(primary)}
+                                            className="group flex w-full items-center gap-4 p-5 text-left transition-colors hover:bg-blue-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:gap-5 sm:p-6"
+                                        >
+                                            <div className="h-14 w-14 flex-shrink-0 sm:h-16 sm:w-16">
+                                                {primary.iconImage ? (
                                                     <OptimizedImage
-                                                        src={objectType.iconImage}
-                                                        alt={objectType.label}
+                                                        src={primary.iconImage}
+                                                        alt=""
                                                         width={64}
                                                         height={64}
-                                                        className="w-full h-full rounded-lg object-cover shadow-sm border border-gray-100"
+                                                        className="h-full w-full rounded-lg border border-gray-100 object-cover shadow-sm"
                                                     />
                                                 ) : (
-                                                    <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
-                                                        <Image className="h-8 w-8 text-gray-400" />
+                                                    <div className="flex h-full w-full items-center justify-center rounded-lg bg-gray-100">
+                                                        <Image className="h-7 w-7 text-gray-400 sm:h-8 sm:w-8" aria-hidden="true" />
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="text-lg font-medium text-gray-900 mb-1" role="heading" aria-level="3">
-                                                {objectType.label}
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-lg font-semibold text-gray-900 sm:text-xl">
+                                                    {primary.pluralLabel || primary.label}
+                                                </div>
+                                                <div className="mt-1 line-clamp-2 text-sm text-gray-500">
+                                                    {primary.description || `Manage ${primary.pluralLabel?.toLowerCase()}`}
+                                                </div>
                                             </div>
-                                            <div className="text-sm text-gray-500 mb-3 line-clamp-2">
-                                                {objectType.description || `Manage ${objectType.pluralLabel?.toLowerCase()}`}
+                                            <div className="flex flex-shrink-0 items-center gap-2 text-sm text-gray-500">
+                                                <span className="whitespace-nowrap">{itemCountLabel(primary.instanceCount)}</span>
+                                                <ChevronRight className="h-5 w-5 text-gray-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                                             </div>
-                                            <div className="text-xs text-gray-400">
-                                                {objectType.instanceCount || 0} items
+                                        </button>
+
+                                        {supporting.length > 0 && (
+                                            <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6 sm:py-4">
+                                                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                    Supporting types
+                                                </div>
+                                                <ul className="divide-y divide-gray-200" aria-label={`Supporting types for ${primary.pluralLabel || primary.label}`}>
+                                                    {supporting.map(type => (
+                                                        <li key={type.id}>
+                                                            <button
+                                                                type="button"
+                                                                data-testid={`object-type-supporting-row-${objectTypeTestId(type)}`}
+                                                                onClick={() => handleObjectTypeSelect(type)}
+                                                                className="group flex w-full items-center gap-3 rounded-md px-2 py-3 text-left transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                                            >
+                                                                <div className="h-9 w-9 flex-shrink-0">
+                                                                    {type.iconImage ? (
+                                                                        <OptimizedImage
+                                                                            src={type.iconImage}
+                                                                            alt=""
+                                                                            width={36}
+                                                                            height={36}
+                                                                            className="h-full w-full rounded-md border border-gray-100 object-cover"
+                                                                        />
+                                                                    ) : (
+                                                                        <div className="flex h-full w-full items-center justify-center rounded-md bg-gray-200">
+                                                                            <Image className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="text-sm font-medium text-gray-900">{type.pluralLabel || type.label}</div>
+                                                                    {type.description && (
+                                                                        <div className="mt-0.5 truncate text-xs text-gray-500">{type.description}</div>
+                                                                    )}
+                                                                </div>
+                                                                <span className="flex-shrink-0 whitespace-nowrap text-xs text-gray-500">
+                                                                    {itemCountLabel(type.instanceCount)}
+                                                                </span>
+                                                                <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                                                            </button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
                                             </div>
-                                        </div>
-                                    </div>
-                                    )
-                                })}
-                            </div>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
                         )}
 
                         {!typesLoading && objectTypes.length === 0 && (
