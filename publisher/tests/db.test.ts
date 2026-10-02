@@ -140,6 +140,19 @@ describe('database snapshot', () => {
     expect(mocks.query.mock.calls[2][0]).toContain('ORDER BY object.updated_at DESC, object.id DESC');
   });
 
+  it('loads tenant-scoped published hierarchy only when requested', async () => {
+    await database.withSnapshot(async reader => {
+      await reader.publishedObjects({ objectTypeNames: ['article'], limit: 1, sortOrder: '-publish_date', includeHierarchy: true }, '7', new Date('2026-06-01'));
+    });
+
+    const [sql, parameters] = mocks.query.mock.calls[1];
+    expect(sql).toContain('CASE WHEN $8::boolean');
+    expect(sql).toContain('ancestor.tenant_id = $1');
+    expect(sql).toContain('child.tenant_id = $1 AND child.parent_id = object.id');
+    expect(sql).toContain('child_version.effective_date <= $4');
+    expect(parameters[7]).toBe(true);
+  });
+
   it('rolls back and releases the client when resolution fails', async () => {
     const failure = new Error('resolution failed');
     await expect(database.withSnapshot(async () => { throw failure; })).rejects.toBe(failure);

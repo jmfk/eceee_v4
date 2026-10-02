@@ -177,10 +177,10 @@ export async function submitPublishedForm(input: {
   if (!widget || configured(widget.config, 'storeSubmissions', 'store_submissions') === false) return { status: 'not_found' };
 
   const honeypotEnabled = configured(widget.config, 'honeypotProtection', 'honeypot_protection') !== false;
-  if (honeypotEnabled && input.honeypot) return { status: 'success', redirectPath: model.matchedPath };
+  if (honeypotEnabled && input.honeypot) return { status: 'success', redirectPath: input.pagePath };
 
   const data = validateFormValues(configured(widget.config, 'fields'), input.values);
-  if (!data) return { status: 'invalid', redirectPath: model.matchedPath };
+  if (!data) return { status: 'invalid', redirectPath: input.pagePath };
   const stored = await input.store.insert({
     tenantId: model.context.tenantId,
     pageId: model.context.pageId,
@@ -189,5 +189,5 @@ export async function submitPublishedForm(input: {
     formTitle: String(configured(widget.config, 'title', 'formTitle', 'form_title') ?? '').slice(0, 255),
     data,
   });
-  return { status: stored === 'stored' ? 'success' : 'rate_limited', redirectPath: model.matchedPath };
+  return { status: stored === 'stored' ? 'success' : 'rate_limited', redirectPath: input.pagePath };
 }
