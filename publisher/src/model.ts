@@ -276,15 +276,33 @@ function mergeSlot(
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_POSTGRES_BIGINT = 9_223_372_036_854_775_807n;
+
+function pageReferenceId(input: unknown): DbId | null {
+  const candidate = String(input ?? '').trim();
+  if (!/^\d+$/.test(candidate) || candidate.length > 19) return null;
+  const numeric = BigInt(candidate);
+  return numeric > 0n && numeric <= MAX_POSTGRES_BIGINT ? numeric.toString() : null;
+}
+
+function addPageReference(ids: Set<DbId>, input: unknown): void {
+  const id = pageReferenceId(input);
+  if (id) ids.add(id);
+}
+
+function addUuidReference(ids: Set<DbId>, input: unknown): void {
+  const id = String(input ?? '').trim();
+  if (UUID_PATTERN.test(id)) ids.add(id.toLowerCase());
+}
 
 function collectReferences(value: unknown, pageIds: Set<DbId>, mediaIds: Set<DbId>, collectionIds: Set<DbId>): void {
   if (typeof value === 'string') {
     const decoded = value.replaceAll('&quot;', '"').replaceAll('&#34;', '"');
     for (const match of decoded.matchAll(/(?:data-page-id|data-page_id)\s*=\s*["']?(\d+)|["']?(?:pageId|page_id)["']?\s*:\s*["']?(\d+)/gi)) {
-      pageIds.add(match[1] || match[2]);
+      addPageReference(pageIds, match[1] || match[2]);
     }
     for (const match of decoded.matchAll(/data-media-id\s*=\s*["']([0-9a-f-]{36})["']/gi)) {
-      if (UUID_PATTERN.test(match[1])) mediaIds.add(match[1]);
+      addUuidReference(mediaIds, match[1]);
     }
     return;
   }
@@ -295,14 +313,14 @@ function collectReferences(value: unknown, pageIds: Set<DbId>, mediaIds: Set<DbI
   if (!value || typeof value !== 'object') return;
   const item = value as Record<string, unknown>;
   const pageId = item.pageId ?? item.page_id;
-  if (pageId !== undefined && pageId !== null) pageIds.add(String(pageId));
+  if (pageId !== undefined && pageId !== null) addPageReference(pageIds, pageId);
   const id = item.id === undefined || item.id === null ? '' : String(item.id);
   const collectionId = item.collectionId ?? item.collection_id;
-  if (collectionId) collectionIds.add(String(collectionId));
+  if (collectionId) addUuidReference(collectionIds, collectionId);
   if (id && (item.type === 'collection' || item.fileCount !== undefined || item.file_count !== undefined || item.sampleImages !== undefined || item.sample_images !== undefined)) {
-    collectionIds.add(id);
+    addUuidReference(collectionIds, id);
   } else if (UUID_PATTERN.test(id) && (item.type === 'image' || item.type === 'video' || item.fileUrl !== undefined || item.file_url !== undefined || item.originalFilename !== undefined)) {
-    mediaIds.add(id);
+    addUuidReference(mediaIds, id);
   }
   Object.values(item).forEach(child => collectReferences(child, pageIds, mediaIds, collectionIds));
 }
@@ -391,7 +409,7 @@ function enrichValue(value: unknown, pagePaths: Map<DbId, string>, media: Map<Db
     }
   }
   const id = input.id === undefined || input.id === null ? '' : String(input.id);
-  if (id && media.has(id) && !result.url && !result.fileUrl && !result.file_url) return { ...result, ...media.get(id) };
+  if (id && media.has(id.toLowerCase()) && !result.url && !result.fileUrl && !result.file_url) return { ...result, ...media.get(id.toLowerCase()) };
   return result;
 }
 
@@ -461,13 +479,13 @@ function prepareWidgets(
       const image = object(config.image);
       const collectionId = image.type === 'collection' ? image.id : (image.collectionId ?? image.collection_id ?? config.collectionId ?? config.collection_id);
       if (collectionId) {
-        let items = collections[String(collectionId)] ?? [];
+        let items = collections[String(collectionId).toLowerCase()] ?? [];
         const collectionConfig = object(config.collectionConfig ?? config.collection_config);
         const limit = Number(collectionConfig.maxItems ?? collectionConfig.max_items ?? 0);
         if (limit > 0) items = items.slice(0, limit);
         config.mediaItems = items;
       } else if (Object.keys(image).length) {
-        const item = media.get(String(image.id ?? '')) ?? image;
+        const item = media.get(String(image.id ?? '').toLowerCase()) ?? image;
         config.mediaItems = [item];
       }
       const styleName = String(config.imageStyle ?? config.image_style ?? '');

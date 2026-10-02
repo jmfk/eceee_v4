@@ -185,6 +185,17 @@ class WidgetAppDependencyTest(TestCase):
         """Test that widget registry properly isolates different widget sets"""
         from webpages.widget_autodiscovery import autodiscover_widgets
 
+        original_widgets = widget_type_registry._widgets.copy()
+        original_instances = widget_type_registry._instances.copy()
+
+        def restore_registry():
+            widget_type_registry._widgets.clear()
+            widget_type_registry._widgets.update(original_widgets)
+            widget_type_registry._instances.clear()
+            widget_type_registry._instances.update(original_instances)
+
+        self.addCleanup(restore_registry)
+
         # Clear and populate registry
         widget_type_registry._widgets.clear()
         widget_type_registry._instances.clear()

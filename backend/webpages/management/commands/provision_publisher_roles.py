@@ -269,7 +269,8 @@ class Command(BaseCommand):
             )
             cursor.execute(
                 sql.SQL(
-                    "GRANT SELECT (id, tenant_id, file_url, file_type, title, description, metadata, width, height, "
+                    "GRANT SELECT (id, tenant_id, file_url, file_path, file_type, title, description, "
+                    "metadata, width, height, "
                     "access_level, is_deleted, created_at) ON file_manager_mediafile TO {}"
                 ).format(sql.Identifier(READ_ROLE))
             )

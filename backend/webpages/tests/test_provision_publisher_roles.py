@@ -41,6 +41,7 @@ class ProvisionPublisherRolesTests(SimpleTestCase):
         self.assertIn("file_manager_mediacollection", statements)
         self.assertIn("file_manager_mediafile_collections", statements)
         self.assertIn("content_namespace", statements)
+        self.assertIn("file_url, file_path, file_type", statements)
         self.assertIn("access_level, is_deleted, created_at", statements)
         self.assertNotIn("ai_extracted_text", statements)
         self.assertIn("tenant_id, page_id, widget_id, submitted_at", statements)
