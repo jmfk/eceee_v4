@@ -191,7 +191,7 @@ class WebPagePreviewTest(TestCase):
         token = str(AccessToken.for_user(self.user))
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
 
-        response = self.client.get(self.preview_url, HTTP_HOST="summerstudy")
+        response = self.client.get(self.preview_url, HTTP_HOST="testserver")
         self.assertEqual(response.status_code, 200)
 
         # In production, it should use the configured hostname "summerstudy" exactly.

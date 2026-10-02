@@ -9,20 +9,18 @@ This test suite covers:
 5. Rate limiting
 """
 
-from django.test import TestCase, override_settings
-from django.core.management import call_command
-from django.core.management.base import CommandError
+from unittest.mock import Mock, patch
+
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.test import TestCase, override_settings
 from django.test.client import RequestFactory
-from unittest.mock import patch, Mock
-import io
-from contextlib import redirect_stderr
 
 from core.models import Tenant
-from webpages.models import WebPage
 from webpages.middleware import DynamicHostValidationMiddleware
-from webpages.management.commands.sync_hostnames import Command
+from webpages.models import WebPage
 
 
 class ManagementCommandSecurityTest(TestCase):
@@ -48,7 +46,8 @@ class ManagementCommandSecurityTest(TestCase):
         )
 
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.page = None
             return
 
@@ -124,8 +123,8 @@ class ManagementCommandSecurityTest(TestCase):
         mock_input.return_value = "yes"
 
         # Capture stdout
-        from io import StringIO
         import sys
+        from io import StringIO
 
         captured_output = StringIO()
         sys.stdout = captured_output
@@ -160,6 +159,7 @@ class CacheRaceConditionTest(TestCase):
     def setUp(self):
         def mock_get_response(request):
             return Mock()
+
         self.middleware = DynamicHostValidationMiddleware(mock_get_response)
         try:
             cache.clear()
@@ -189,9 +189,7 @@ class PortValidationTest(TestCase):
     """Test fixes for port validation with IPv6 addresses."""
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            username="testuser", password="testpass123", email="test@example.com"
-        )
+        self.user = User.objects.create_user(username="testuser", password="testpass123", email="test@example.com")
         self.tenant = Tenant.objects.create(
             name="Port Validation Tenant",
             identifier="port-validation",
@@ -201,7 +199,8 @@ class PortValidationTest(TestCase):
     def test_ipv6_with_port_validation(self):
         """Test that IPv6 addresses with ports are validated correctly."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         page = WebPage(
             title="IPv6 Test",
@@ -221,7 +220,8 @@ class PortValidationTest(TestCase):
     def test_invalid_port_range(self):
         """Test that invalid port ranges are rejected."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         page = WebPage(
             title="Invalid Port Test",
@@ -238,7 +238,8 @@ class PortValidationTest(TestCase):
     def test_ipv6_without_brackets_detection(self):
         """Test detection of IPv6 addresses without brackets."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         page = WebPage(
             title="IPv6 No Brackets Test",
@@ -327,9 +328,7 @@ class RateLimitingTest(TestCase):
     """Test rate limiting for hostname management operations."""
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            username="testuser", password="testpass123", email="test@example.com"
-        )
+        self.user = User.objects.create_user(username="testuser", password="testpass123", email="test@example.com")
         self.factory = RequestFactory()
 
     @override_settings(
@@ -345,13 +344,12 @@ class RateLimitingTest(TestCase):
     def test_rate_limiting_configuration(self):
         """Test that rate limiting is properly configured."""
         from rest_framework.throttling import UserRateThrottle
-        from django.conf import settings
 
         throttle = UserRateThrottle()
         # Force the rate limit for this test instance
         throttle.rate = "1/hour"
         throttle.num_requests, throttle.duration = throttle.parse_rate(throttle.rate)
-        
+
         # Create a mock request
         request = self.factory.post("/api/pages/")
         request.user = self.user
@@ -394,14 +392,16 @@ class IntegrationTest(TestCase):
     def test_full_hostname_workflow_with_security(self):
         """Test complete hostname workflow with all security fixes."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
 
         # Create page with complex hostname (IPv6 + IDN)
-        page = WebPage.objects.create(
+        WebPage.objects.create(
             title="Security Test Page",
             slug="security-test",
             hostnames=["[::1]:8080", "münchen.de"],
+            is_currently_published=True,
             created_by=self.user,
             last_modified_by=self.user,
             tenant=self.tenant,
@@ -441,9 +441,7 @@ class WildcardSecurityTest(TestCase):
     """Test wildcard hostname security controls."""
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            username="testuser", password="testpass123", email="test@example.com"
-        )
+        self.user = User.objects.create_user(username="testuser", password="testpass123", email="test@example.com")
         self.tenant = Tenant.objects.create(
             name="Wildcard Security Tenant",
             identifier="wildcard-security",
@@ -457,12 +455,14 @@ class WildcardSecurityTest(TestCase):
     def test_wildcard_allowed_when_enabled(self):
         """Test wildcard hostnames work when explicitly enabled."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
-        page = WebPage.objects.create(
+        WebPage.objects.create(
             title="Wildcard Test",
             slug="wildcard",
             hostnames=["*"],
+            is_currently_published=True,
             created_by=self.user,
             last_modified_by=self.user,
             tenant=self.tenant,
@@ -476,12 +476,14 @@ class WildcardSecurityTest(TestCase):
     def test_wildcard_blocked_when_disabled(self):
         """Test wildcard hostnames are blocked when disabled."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
-        page = WebPage.objects.create(
+        WebPage.objects.create(
             title="Wildcard Test",
             slug="wildcard",
             hostnames=["*"],
+            is_currently_published=True,
             created_by=self.user,
             last_modified_by=self.user,
             tenant=self.tenant,
@@ -494,11 +496,11 @@ class WildcardSecurityTest(TestCase):
     def test_wildcard_logging_warnings(self):
         """Test that wildcard usage generates appropriate warnings."""
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         import logging
         from io import StringIO
-        import sys
 
         # Capture log output
         log_capture_string = StringIO()
@@ -531,9 +533,7 @@ class EnhancedSecurityTest(TestCase):
     """Test enhanced security controls."""
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            username="testuser", password="testpass123", email="test@example.com"
-        )
+        self.user = User.objects.create_user(username="testuser", password="testpass123", email="test@example.com")
         # Create mock get_response function for middleware
         self.get_response = Mock(return_value=Mock())
         self.middleware = DynamicHostValidationMiddleware(self.get_response)
@@ -563,7 +563,7 @@ class EnhancedSecurityTest(TestCase):
                 # Use a separate logger for testing to ensure we capture the messages
                 test_logger = logging.getLogger("webpages.middleware")
                 test_logger.addHandler(ch)
-                test_logger.propagate = False # Prevent double logging
+                test_logger.propagate = False  # Prevent double logging
 
                 result = self.middleware._check_database_hostnames("test.com")
                 self.assertTrue(result)  # Should allow due to fallback
@@ -597,11 +597,7 @@ class EnhancedSecurityTest(TestCase):
                         self.assertEqual(result, f"[{input_hostname}]")
                     else:
                         # For bracketed, normalization may still apply
-                        self.assertTrue(
-                            result.startswith("[")
-                            and result.endswith("]")
-                            or ":8080" in result
-                        )
+                        self.assertTrue(result.startswith("[") and result.endswith("]") or ":8080" in result)
                 else:
                     # Regular hostname - should match expected
                     self.assertEqual(result, expected)
@@ -623,7 +619,8 @@ class ManagementCommandWildcardTest(TestCase):
             created_by=self.user,
         )
         from django.db import connection
-        if connection.vendor == 'sqlite':
+
+        if connection.vendor == "sqlite":
             self.page = None
             return
         self.page = WebPage.objects.create(
@@ -643,8 +640,8 @@ class ManagementCommandWildcardTest(TestCase):
         mock_getpass.return_value = "testpass123"
         mock_input.return_value = "no"  # User decides not to proceed
 
-        from io import StringIO
         import sys
+        from io import StringIO
 
         captured_output = StringIO()
         sys.stdout = captured_output
