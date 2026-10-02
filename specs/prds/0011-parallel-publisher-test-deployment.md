@@ -7,6 +7,7 @@ created: 2026-09-29
 related_adrs:
   - ADR-0011
   - ADR-0012
+  - ADR-0014
 ---
 
 # PRD-0011: Parallel Publisher Test Deployment
@@ -68,11 +69,13 @@ The standalone TypeScript publisher cannot be validated with production-shaped c
 - 2026-09-29: Implementation started on `codex/publisher-test-deploy`, stacked on the public-form branch until PR #167 is merged.
 - 2026-09-29: The test host is mapped inside the application instead of rewriting the upstream Host header, preserving same-origin form redirects.
 - 2026-09-30: Scope expanded to three site-specific test hosts; their Linode DNS A records point to the existing VPS.
+- 2026-10-02: ADR-0014 superseded deployment-owned hostname mappings with exact aliases on the intended CMS root pages; rendered-host verification remains an operational acceptance step.
 
 ## Linked ADRs
 
 - [ADR-0011: Validate published forms and write through a dedicated PostgreSQL role](../adrs/active/0011-public-form-write-boundary.md)
-- [ADR-0012: Validate the publisher through an isolated hostname alias](../adrs/active/0012-isolated-publisher-test-host.md)
+- [ADR-0012: Validate the publisher through an isolated hostname alias (superseded)](../adrs/archive/0012-isolated-publisher-test-host.md)
+- [ADR-0014: Resolve publisher test hosts through CMS root aliases](../adrs/active/0014-cms-root-hostname-aliases.md)
 
 ## Completion Evidence
 

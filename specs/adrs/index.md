@@ -14,11 +14,12 @@
 | ADR-0009 | [Store preview documents in the theme snapshot](active/0009-theme-preview-documents.md) | accepted | PRD-0008 |
 | ADR-0010 | [Numbered snapshots with mutable display names](active/0010-named-theme-version-checkpoints.md) | accepted | PRD-0009 |
 | ADR-0011 | [Validate published forms and write through a dedicated PostgreSQL role](active/0011-public-form-write-boundary.md) | accepted | PRD-0010 |
-| ADR-0012 | [Validate the publisher through an isolated hostname alias](active/0012-isolated-publisher-test-host.md) | accepted | PRD-0010, PRD-0011 |
 | ADR-0013 | [Gate the legacy News migration through canonical golden samples](active/0013-legacy-news-golden-sample-gate.md) | accepted | PRD-0012 |
+| ADR-0014 | [Resolve publisher test hosts through CMS root aliases](active/0014-cms-root-hostname-aliases.md) | accepted | PRD-0010, PRD-0011 |
 
 ## Archived Decisions
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
 | ADR-0006 | [Immutable theme snapshots with request-scoped remote credentials](archive/0006-theme-version-lineage.md) | superseded | PRD-0005 |
+| ADR-0012 | [Validate the publisher through an isolated hostname alias](archive/0012-isolated-publisher-test-host.md) | superseded | PRD-0010, PRD-0011 |

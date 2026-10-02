@@ -7,6 +7,7 @@ created: 2026-09-29
 related_adrs:
   - ADR-0011
   - ADR-0012
+  - ADR-0014
 ---
 
 # PRD-0010: Public Form Submissions
@@ -68,11 +69,13 @@ The TypeScript public publisher can render configured forms but cannot safely ac
 
 - 2026-09-29: Implementation started on `codex/publisher-public-forms`.
 - 2026-09-29: Review fixes preserve submissions across page-version compaction, restrict writer-role reads to non-payload rate-limit columns, and enforce configured patterns with a linear-time engine.
+- 2026-10-02: ADR-0014 superseded the deployment-only hostname mapping with CMS-owned root aliases while preserving same-origin form redirects.
 
 ## Linked ADRs
 
 - [ADR-0011: Validate published forms and write through a dedicated PostgreSQL role](../adrs/active/0011-public-form-write-boundary.md)
-- [ADR-0012: Validate the publisher through an isolated hostname alias](../adrs/active/0012-isolated-publisher-test-host.md)
+- [ADR-0012: Validate the publisher through an isolated hostname alias (superseded)](../adrs/archive/0012-isolated-publisher-test-host.md)
+- [ADR-0014: Resolve publisher test hosts through CMS root aliases](../adrs/active/0014-cms-root-hostname-aliases.md)
 
 ## Completion Evidence
 
