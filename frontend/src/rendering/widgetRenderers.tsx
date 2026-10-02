@@ -212,6 +212,8 @@ const tableCellClassName = (cell: Record<string, any>) => [
     `cell-${value(cell, 'alignment') || 'left'}`,
     value(cell, 'verticalAlignment', 'vertical_alignment') ? `cell-v-${value(cell, 'verticalAlignment', 'vertical_alignment')}` : '',
     value(cell, 'contentType', 'content_type') === 'image' ? 'cell-image' : '',
+    value(cell, 'hoverBgColor', 'hover_bg_color') ? 'cell-hover-bg' : '',
+    value(cell, 'hoverTextColor', 'hover_text_color') ? 'cell-hover-text' : '',
     value(cell, 'cssClass', 'css_class') || '',
 ].filter(Boolean).join(' ')
 
@@ -220,13 +222,15 @@ const tableCellStyle = (cell: Record<string, any>, showBorders: boolean): React.
     const verticalAlignment = configuredVerticalAlignment === 'middle' || configuredVerticalAlignment === 'bottom'
         ? configuredVerticalAlignment
         : 'top'
-    const style: React.CSSProperties = {
+    const style = {
         backgroundColor: value(cell, 'backgroundColor', 'background_color') || undefined,
         color: value(cell, 'textColor', 'text_color') || undefined,
         padding: '0.75rem',
         verticalAlign: verticalAlignment,
         border: showBorders ? '1px solid #d1d5db' : undefined,
-    }
+        '--cell-hover-bg': value(cell, 'hoverBgColor', 'hover_bg_color') || undefined,
+        '--cell-hover-text': value(cell, 'hoverTextColor', 'hover_text_color') || undefined,
+    } as React.CSSProperties
     const borders = value(cell, 'borders') || {}
     ;(['top', 'right', 'bottom', 'left'] as const).forEach((side) => {
         const border = borders[side]
@@ -246,17 +250,18 @@ const TableRender: WidgetRenderComponent = ({ widget }) => {
     const config = widget.config
     const rows = asArray<any>(value(config, 'rows', 'data'))
     if (!rows.length) return <EmptyRender>No table data</EmptyRender>
+    const showBorders = value(config, 'showBorders', 'show_borders') !== false
     const className = [
         'widget-type-easy-widgets-tablewidget',
         'table-widget',
         'cms-content',
+        showBorders ? '' : 'table-no-borders',
         value(config, 'stripedRows', 'striped_rows') ? 'table-striped' : '',
         value(config, 'hoverEffect', 'hover_effect') ? 'table-hover' : '',
         value(config, 'responsive') !== false ? 'table-responsive' : '',
         value(config, 'cssClass', 'css_class') || '',
     ].filter(Boolean).join(' ')
     const columnWidths = asArray<string>(value(config, 'columnWidths', 'column_widths'))
-    const showBorders = value(config, 'showBorders', 'show_borders') !== false
     return <div className={className}>
         {value(config, 'caption') && <div className="table-caption text-sm text-gray-600 mb-2">{value(config, 'caption')}</div>}
         <table className={`${value(config, 'tableWidth', 'table_width') === 'full' ? 'w-full' : ''}${showBorders ? ' border' : ''}`} style={{ borderCollapse: 'collapse', borderColor: showBorders ? '#d1d5db' : undefined }}>
@@ -621,7 +626,7 @@ const TopNewsPlugRender: WidgetRenderComponent = ({ widget }) => {
         const fields = newsFields(item)
         return <article className={`news-card${fields.pinned ? ' pinned' : ''}`} data-object-id={item.id} key={item.id || index}>
             {fields.image && <div className="news-image"><ImageView source={fields.image} alt={item.title || ''} /></div>}
-            <div className="news-body"><div className="news-meta">{showType && <span className="news-type-badge">{fields.objectType.label || fields.objectType.name}</span>}{showDate && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{formatDisplayDate(fields.publishDate)}</time>}</div>
+            <div className="news-body"><div className="news-meta">{showType && <span className="news-type-badge">{fields.objectType.label || fields.objectType.name}</span>}{showDate && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{formatDisplayDate(fields.publishDate, 'short')}</time>}</div>
                 <h3 className="news-title"><PreviewLink href={fields.path}>{item.title || `Article ${index + 1}`}</PreviewLink></h3>
                 {showExcerpt && fields.excerpt && <div className="news-excerpt">{fields.excerpt}</div>}
                 <div className="news-footer"><PreviewLink className="read-more" href={fields.path}>Read more</PreviewLink></div>
@@ -641,7 +646,7 @@ const SidebarTopNewsRender: WidgetRenderComponent = ({ widget }) => {
             const fields = newsFields(item)
             return <li className={`news-item${fields.pinned ? ' pinned' : ''}`} data-object-id={item.id} key={item.id || index}>
                 {showThumbnails && fields.thumbnail && <div className="news-thumbnail"><ImageView source={fields.thumbnail} alt={item.title || ''} /></div>}
-                <div className="news-content"><div className="news-meta">{showType && <span className="news-type-badge">{fields.objectType.label || fields.objectType.name}</span>}{showDates && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{formatDisplayDate(fields.publishDate)}</time>}</div>
+                <div className="news-content"><div className="news-meta">{showType && <span className="news-type-badge">{fields.objectType.label || fields.objectType.name}</span>}{showDates && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{formatDisplayDate(fields.publishDate, 'short')}</time>}</div>
                     <h4 className="news-title"><PreviewLink href={fields.path}>{item.title || `Article ${index + 1}`}</PreviewLink></h4>
                     {showExcerpt && fields.excerpt && <p className="news-excerpt">{fields.excerpt}</p>}
                 </div>

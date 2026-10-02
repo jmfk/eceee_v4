@@ -292,6 +292,25 @@ describe('PageRenderer', () => {
         expect(screen.getByText('Select a golden sample.')).toBeInTheDocument()
     })
 
+    it('uses Django compact date formatting in top-news and sidebar views', () => {
+        const item = {
+            id: 1,
+            title: 'Compact date article',
+            publishDate: '2026-09-30',
+            objectType: { name: 'news', label: 'News' },
+        }
+        const model = createPageRenderModel({
+            widgets: { main: [
+                { id: 'top', type: 'easy_widgets.TopNewsPlugWidget', config: {}, data: { status: 'ready', items: [item] } },
+                { id: 'side', type: 'easy_widgets.SidebarTopNewsWidget', config: { showDates: true }, data: { status: 'ready', items: [item] } },
+            ] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+        const dates = Array.from(container.querySelectorAll('time')).map((element) => element.textContent)
+        expect(dates).toEqual(['Sep 30, 2026', 'Sep 30, 2026'])
+    })
+
     it('normalizes imported media inserts to the Django figure structure', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'content', type: 'easy_widgets.ContentWidget', config: {
@@ -373,7 +392,7 @@ describe('PageRenderer', () => {
                 columnWidths: ['60%', '40%'],
                 rows: [
                     { isHeader: true, cells: [{ content: 'Person' }, { content: 'Role' }] },
-                    { cells: [{ content: '<strong>Ada</strong>', colspan: 2, alignment: 'center', verticalAlignment: 'middle' }] },
+                    { height: '40px', backgroundColor: '#f0f0f0', cells: [{ content: '<strong>Ada</strong>', colspan: 2, alignment: 'center', verticalAlignment: 'middle', hoverBgColor: '#ffeecc', hoverTextColor: '#123456' }] },
                     { cells: [{ contentType: 'image', imageData: { url: '/portrait.jpg', alt: 'Ada portrait' }, rowspan: 2, backgroundColor: '#ffeecc', borders: { top: { style: 'thick', color: '#123456' } }, cssClass: 'portrait-cell' }] },
                 ],
             } }] },
@@ -382,7 +401,10 @@ describe('PageRenderer', () => {
         expect(screen.getByRole('columnheader', { name: 'Person' })).toBeInTheDocument()
         expect(screen.getByRole('cell', { name: 'Ada' })).toHaveAttribute('colspan', '2')
         expect(screen.getByRole('cell', { name: 'Ada' })).toHaveClass('cell-v-middle')
+        expect(screen.getByRole('cell', { name: 'Ada' })).toHaveClass('cell-hover-bg', 'cell-hover-text')
         expect(screen.getByRole('cell', { name: 'Ada' })).toHaveStyle({ verticalAlign: 'middle' })
+        expect(screen.getByRole('cell', { name: 'Ada' })).toHaveStyle({ '--cell-hover-bg': '#ffeecc', '--cell-hover-text': '#123456' })
+        expect(screen.getByRole('cell', { name: 'Ada' }).closest('tr')).toHaveStyle({ height: '40px', backgroundColor: '#f0f0f0' })
         expect(container.querySelector('td strong')).toHaveTextContent('Ada')
         expect(container.querySelector('td > span')).toBeNull()
         expect(container.querySelector('table')).toHaveClass('border')
@@ -391,6 +413,20 @@ describe('PageRenderer', () => {
         expect(screen.getByRole('img', { name: 'Ada portrait' }).closest('td')).toHaveAttribute('rowspan', '2')
         expect(screen.getByRole('img', { name: 'Ada portrait' }).closest('td')).toHaveClass('cell-image', 'portrait-cell')
         expect(screen.getByRole('img', { name: 'Ada portrait' }).closest('td')).toHaveStyle({ backgroundColor: '#ffeecc', borderTop: '3px solid #123456' })
+    })
+
+    it('marks borderless tables so shared widget CSS cannot restore cell borders', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{
+                id: 'table',
+                type: 'easy_widgets.TableWidget',
+                config: { showBorders: false, rows: [{ cells: [{ content: 'Borderless' }] }] },
+            }] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+        expect(container.querySelector('.table-widget')).toHaveClass('table-no-borders')
+        expect(screen.getByRole('cell', { name: 'Borderless' })).not.toHaveStyle({ border: '1px solid #d1d5db' })
     })
 
     it('renders sidebar section descriptors and the HTML fallback', () => {

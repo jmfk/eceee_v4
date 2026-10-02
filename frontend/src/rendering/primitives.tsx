@@ -22,13 +22,13 @@ export const SafeHtml = ({ html, className = '', as: Tag = 'div' }: { html?: str
     <Tag className={className} dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />
 )
 
-export const formatDisplayDate = (candidate: unknown): string => {
+export const formatDisplayDate = (candidate: unknown, month: 'long' | 'short' = 'long'): string => {
     const raw = String(candidate || '')
     const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw)
     if (!match) return raw
     const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
     return new Intl.DateTimeFormat('en-US', {
-        month: 'long',
+        month,
         day: 'numeric',
         year: 'numeric',
         timeZone: 'UTC',

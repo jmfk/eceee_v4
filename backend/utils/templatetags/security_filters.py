@@ -12,6 +12,8 @@ register = template.Library()
 # CSS sanitizer that allows safe CSS properties
 css_sanitizer = CSSSanitizer(
     allowed_css_properties=[
+        "--cell-hover-bg",
+        "--cell-hover-text",
         "background",
         "background-color",
         "background-image",
