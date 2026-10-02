@@ -13,6 +13,7 @@ import StatusBar from '../components/StatusBar'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import Breadcrumbs from '../components/common/Breadcrumbs'
 import ContextualHelpLink from '../components/help/ContextualHelpLink'
+import GlobalWysiwygToolbar from '../components/wysiwyg/GlobalWysiwygToolbar'
 
 // Import individual tab components
 import ObjectContentView from '../components/objectEdit/ObjectContentView'
@@ -456,6 +457,7 @@ const ObjectInstanceEditPage = () => {
                     </div>
                 </div>
             </div>
+            <GlobalWysiwygToolbar />
             <div className="flex-1 min-h-0 overflow-y-auto">
                 {udcInitError && (
                     <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mx-4 mt-4">
