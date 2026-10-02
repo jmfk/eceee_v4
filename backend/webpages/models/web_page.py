@@ -484,6 +484,7 @@ class WebPage(models.Model):
             parent__isnull=True,
             hostnames__contains=[normalized_hostname],
             is_deleted=False,
+            is_currently_published=True,
         ).select_related("parent")
 
         if pages.exists():
@@ -492,7 +493,11 @@ class WebPage(models.Model):
         # 2. Fallback: Iterate through root pages and match normalized versions
         # This ensures we match 'hostname:8000' even if we're accessing 'hostname:8001'
         # and vice-versa, as the user wants to ignore ports globally.
-        for page in cls.objects.filter(parent__isnull=True, is_deleted=False).select_related("parent"):
+        for page in cls.objects.filter(
+            parent__isnull=True,
+            is_deleted=False,
+            is_currently_published=True,
+        ).select_related("parent"):
             if any(cls.normalize_hostname(h) == normalized_hostname for h in page.hostnames):
                 return page
 
@@ -500,13 +505,21 @@ class WebPage(models.Model):
         labels = normalized_hostname.split(".")
         for index in range(1, len(labels) - 1):
             pattern = "*." + ".".join(labels[index:])
-            page = cls.objects.filter(parent__isnull=True, hostnames__contains=[pattern], is_deleted=False).first()
+            page = cls.objects.filter(
+                parent__isnull=True,
+                hostnames__contains=[pattern],
+                is_deleted=False,
+                is_currently_published=True,
+            ).first()
             if page:
                 return page
 
         # 3. Last fallback: look for wildcard or default patterns
         wildcard_pages = cls.objects.filter(
-            parent__isnull=True, hostnames__overlap=["*", "default"], is_deleted=False
+            parent__isnull=True,
+            hostnames__overlap=["*", "default"],
+            is_deleted=False,
+            is_currently_published=True,
         ).select_related("parent")
 
         if wildcard_pages.exists():
@@ -518,7 +531,12 @@ class WebPage(models.Model):
     def get_all_hostnames(cls):
         """Get all hostnames used across all root pages"""
         hostnames = set()
-        for page in cls.objects.filter(parent__isnull=True, hostnames__isnull=False):
+        for page in cls.objects.filter(
+            parent__isnull=True,
+            hostnames__isnull=False,
+            is_deleted=False,
+            is_currently_published=True,
+        ):
             if page.hostnames:
                 hostnames.update(page.hostnames)
         return sorted(list(hostnames))
@@ -826,7 +844,10 @@ class WebPage(models.Model):
                 # Use normalized hostname for conflict checking
                 normalized_hostname = self.normalize_hostname(hostname)
                 conflicting_pages = WebPage.objects.filter(
-                    parent__isnull=True, hostnames__contains=[normalized_hostname]
+                    parent__isnull=True,
+                    hostnames__contains=[normalized_hostname],
+                    is_deleted=False,
+                    is_currently_published=True,
                 ).exclude(pk=self.pk)
 
                 if conflicting_pages.exists():
@@ -1849,6 +1870,30 @@ class WebPage(models.Model):
                 f"Slug renamed from '{slug_result['original_slug']}' to '{slug_result['new_slug']}' to avoid conflicts"
             )
 
+        # Deletion releases root hostnames. If another live site claimed one in
+        # the meantime, restore the page without that alias rather than
+        # recreating two active owners for the same hostname.
+        if self.parent_id is None and self.hostnames:
+            available_hostnames = []
+            claimed_hostnames = []
+            for hostname in self.hostnames:
+                claimed_elsewhere = WebPage.objects.filter(
+                    parent__isnull=True,
+                    hostnames__contains=[self.normalize_hostname(hostname)],
+                    is_deleted=False,
+                    is_currently_published=True,
+                ).exclude(pk=self.pk)
+                if claimed_elsewhere.exists():
+                    claimed_hostnames.append(hostname)
+                else:
+                    available_hostnames.append(hostname)
+            if claimed_hostnames:
+                self.hostnames = available_hostnames
+                result["warnings"].append(
+                    "Hostname(s) not restored because they are now used by another published page: "
+                    + ", ".join(claimed_hostnames)
+                )
+
         # Restore the page itself
         self.is_deleted = False
         self.deleted_at = None
@@ -1862,6 +1907,7 @@ class WebPage(models.Model):
                 "last_modified_by",
                 "parent",
                 "slug",
+                "hostnames",
             ]
         )
         result["restored_count"] += 1
@@ -2082,22 +2128,28 @@ class WebPage(models.Model):
         if self.hostnames:
             self.hostnames = [self.normalize_hostname(h) for h in self.hostnames if h]
 
-        # Check if hostnames are being changed (for cache invalidation)
-        hostname_changed = False
+        # Check if the active hostname registration is changing. Draft,
+        # unpublished, and soft-deleted roots do not own routing hostnames.
+        hostname_registration_changed = False
         if self.pk:  # Only check for existing objects
             try:
                 old_instance = WebPage.objects.get(pk=self.pk)
-                if old_instance.hostnames != self.hostnames:
-                    hostname_changed = True
+                old_is_active = bool(
+                    old_instance.hostnames and not old_instance.is_deleted and old_instance.is_currently_published
+                )
+                new_is_active = bool(self.hostnames and not self.is_deleted and self.is_currently_published)
+                hostname_registration_changed = (
+                    old_instance.hostnames != self.hostnames or old_is_active != new_is_active
+                )
             except WebPage.DoesNotExist:
                 pass
-        elif self.hostnames:  # New object with hostnames
-            hostname_changed = True
+        elif self.hostnames and not self.is_deleted and self.is_currently_published:
+            hostname_registration_changed = True
 
         super().save(*args, **kwargs)
 
-        # Clear hostname cache if hostnames changed
-        if hostname_changed:
+        # Clear hostname cache if the active registration changed.
+        if hostname_registration_changed:
             self._clear_hostname_cache()
 
     def delete(self, *args, **kwargs):
