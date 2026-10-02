@@ -30,7 +30,16 @@ The system centers on page management, publishing workflows, code-based layouts/
 - Use functional React components and hooks.
 - Use React Query for server state and Zustand for client state.
 - Use Tailwind utility classes; organize complex class lists roughly as layout, spacing, typography, then color.
-- Backend uses `snake_case`. Frontend uses `camelCase`. API serialization/conversion is expected to bridge these conventions.
+- Treat identifier casing as an important cross-language contract. Python names and
+  Python-owned payload fields use `snake_case`; TypeScript/JavaScript variables,
+  properties, and frontend-owned payload fields use `camelCase`. Follow normal
+  language exceptions such as `PascalCase` for React components, classes, and
+  types, and preserve any deliberate project-specific exception.
+- Before adding or changing a cross-language name, inspect serializers, adapters,
+  API payloads, persisted data, tests, and nearby call sites for established casing
+  and exceptions. Bridge `snake_case` and `camelCase` explicitly at the boundary;
+  never assume a mechanical rename is safe or allow both forms to become competing
+  sources of truth.
 - Use DRF serializers for validation, viewsets for API logic, permissions for access control, and filters/pagination for list endpoints.
 - Add Django indexes for frequently queried columns and use `select_related`/`prefetch_related` where query shape warrants it.
 - Prefer UUIDs for cross-service references.
@@ -67,11 +76,12 @@ Backend static assets: `cd backend && npm run build` / `npm run watch:css`
 
 ## Pull Request Review And Merge Gate
 
-- After addressing review feedback on an existing pull request, run the relevant
-  local verification, commit the completed review fixes, and push them to that
-  pull request's branch before handing the work back. Do not leave completed
-  review fixes only in the local working tree unless the user explicitly asks
-  for that.
+- After addressing review feedback on an existing pull request, always run the
+  relevant local verification, commit the completed review fixes, and push them
+  to that pull request's branch before handing the work back. Do not leave
+  completed review fixes only in the local working tree. Omit the push only when
+  the user explicitly requests that or an external blocker prevents it, and report
+  the reason.
 - Never equate passing CI with code review or approval. Report CI status,
   submitted reviews, and GitHub's `reviewDecision` as separate facts.
 - Before merging any pull request, fetch its current checks, submitted reviews,
