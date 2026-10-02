@@ -563,7 +563,7 @@ refresh-db-collation: prepare-test-infra
 
 # Run backend tests
 backend-test: prepare-test-infra refresh-db-collation
-	$(COMPOSE_DEV) run --rm --no-deps -T \
+	$(COMPOSE_DEV) run $(TEST_RUN_FLAGS) --rm --no-deps -T \
 		-e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres \
 		-e POSTGRES_DB=eceee_v4_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=test-only \
 		-e POSTGRES_HOST=test-db -e POSTGRES_PORT=5432 \
@@ -620,8 +620,9 @@ frontend-admin-e2e-test: prepare-frontend-e2e
 		-e PLAYWRIGHT_BASE_URL=http://frontend:3000 \
 		frontend-e2e npm run test:e2e:admin
 
-# Run public browser regression tests against the Django public renderer
-frontend-public-e2e-test: prepare-test-infra prepare-frontend-e2e
+# Start and seed the Django public renderer without installing browser dependencies.
+.PHONY: prepare-public-e2e-backend
+prepare-public-e2e-backend: prepare-test-infra
 	DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test \
 	POSTGRES_DB=eceee_v4_test POSTGRES_USER=postgres POSTGRES_PASSWORD=test-only \
 	POSTGRES_HOST=test-db POSTGRES_PORT=5432 \
@@ -629,7 +630,7 @@ frontend-public-e2e-test: prepare-test-infra prepare-frontend-e2e
 	AWS_ACCESS_KEY_ID=test-eceee AWS_SECRET_ACCESS_KEY=test-eceee-secret \
 	AWS_S3_ENDPOINT_URL=http://test-minio:9000 \
 	AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
-	$(COMPOSE_DEV) up -d --force-recreate backend
+	$(COMPOSE_DEV) up $(TEST_UP_FLAGS) -d --force-recreate backend
 	@BP=$${BACKEND_PORT:-10101}; \
 	echo "Waiting for backend on http://127.0.0.1:$$BP..."; \
 	i=0; \
@@ -637,8 +638,11 @@ frontend-public-e2e-test: prepare-test-infra prepare-frontend-e2e
 		i=$$((i + 1)); \
 		if [ $$i -ge 60 ]; then echo "Error: backend did not become ready."; exit 1; fi; \
 		sleep 1; \
-	done; \
-	$(COMPOSE_DEV) exec -T backend python manage.py seed_public_regression_site --hostname public-regression.test; \
+	done
+	$(COMPOSE_DEV) exec -T backend python manage.py seed_public_regression_site --hostname public-regression.test
+
+# Run public browser regression tests against the Django public renderer.
+frontend-public-e2e-test: prepare-public-e2e-backend prepare-frontend-e2e
 	$(COMPOSE_DEV) run --rm --no-deps -T \
 		-e PLAYWRIGHT_PUBLIC_BASE_URL=http://public-regression.test:8000 \
 		frontend-e2e npm run test:e2e:public
