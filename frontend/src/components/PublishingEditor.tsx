@@ -71,10 +71,10 @@ const PublishingEditor = ({
     }, [workflow?.scheduledAt])
 
     const refresh = async () => {
-        const result = await refetch({ throwOnError: true })
+        const result = await refetch()
         await onWorkflowChange?.()
         await queryClient.invalidateQueries({ queryKey: ['pages'] })
-        return result.data
+        return result.isError ? undefined : result.data
     }
 
     const workingVersion = async () => {

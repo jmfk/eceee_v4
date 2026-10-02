@@ -1694,8 +1694,8 @@ const PageEditor = () => {
         } catch (error) {
             let refreshedWorkflow;
             try {
-                const result = await refetchWorkflow({ throwOnError: true });
-                refreshedWorkflow = result.data;
+                const result = await refetchWorkflow();
+                refreshedWorkflow = result.isError ? undefined : result.data;
                 await queryClient.invalidateQueries({ queryKey: ['pageVersion', pageId] });
                 await queryClient.invalidateQueries({ queryKey: ['pages'] });
             } catch {
