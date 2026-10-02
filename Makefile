@@ -564,7 +564,7 @@ refresh-db-collation: prepare-test-infra
 
 # Run backend tests
 backend-test: prepare-test-infra refresh-db-collation
-	$(COMPOSE_DEV) run $(TEST_RUN_FLAGS) --rm --no-deps -T \
+	$(COMPOSE_DEV) run --rm --no-deps -T \
 		-e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres \
 		-e POSTGRES_DB=eceee_v4_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=test-only \
 		-e POSTGRES_HOST=test-db -e POSTGRES_PORT=5432 \
