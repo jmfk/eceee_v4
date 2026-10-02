@@ -5,14 +5,16 @@ Provides serialization and deserialization for object types and instances,
 following camelCase API conventions and existing patterns.
 """
 
-from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import ObjectTypeDefinition, ObjectInstance, ObjectVersion
-from content.models import Namespace
-from utils.schema_system import validate_schema
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from rest_framework import serializers
+
+from content.models import Namespace
 from file_manager.imgproxy import imgproxy_service
+from utils.schema_system import validate_schema
+
+from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -40,16 +42,12 @@ class RelationshipSerializer(serializers.Serializer):
         max_length=100,
         help_text="Relationship type (e.g., 'authors', 'translators', 'related_articles')",
     )
-    object_id = serializers.IntegerField(
-        help_text="Primary key of the related ObjectInstance"
-    )
+    object_id = serializers.IntegerField(help_text="Primary key of the related ObjectInstance")
 
     def validate_object_id(self, value):
         """Validate that the referenced object exists"""
         if not ObjectInstance.objects.filter(id=value).exists():
-            raise serializers.ValidationError(
-                f"ObjectInstance with id {value} does not exist"
-            )
+            raise serializers.ValidationError(f"ObjectInstance with id {value} does not exist")
         return value
 
 
@@ -92,8 +90,9 @@ class ObjectReferenceFieldSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         """Validate the object reference field value"""
-        from utils.schema_system import validate_object_reference
         from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from utils.schema_system import validate_object_reference
 
         value = attrs.get("value")
         field_config = attrs.get("field_config", {})
@@ -204,7 +203,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             return None
         if url.startswith("http"):
             return url
-        
+
         request = self.context.get("request")
         if request:
             return request.build_absolute_uri(url)
@@ -214,13 +213,13 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         """Return icon image URL with imgproxy optimization and cache busting"""
         if not obj.icon_image:
             return None
-        
+
         # Use imgproxy for optimized icon delivery
         source_url = obj.icon_image.url
-        
+
         # Ensure URL is absolute for imgproxy
         absolute_source_url = self._get_absolute_url(source_url)
-        
+
         # Generate optimized URL using imgproxy (small square icon)
         return imgproxy_service.generate_url(
             source_url=absolute_source_url,
@@ -228,7 +227,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             height=64,
             resize_type="fill",
             gravity="ce",
-            version=int(obj.updated_at.timestamp())
+            version=int(obj.updated_at.timestamp()),
         )
 
     def to_representation(self, instance):
@@ -249,9 +248,11 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
                 "id": ct.id,
                 "name": ct.name,
                 "label": ct.label,
-                "iconImage": f"{self._get_absolute_url(ct.icon_image.url)}?v={int(ct.updated_at.timestamp())}"
-                if ct.icon_image
-                else None,
+                "iconImage": (
+                    f"{self._get_absolute_url(ct.icon_image.url)}?v={int(ct.updated_at.timestamp())}"
+                    if ct.icon_image
+                    else None
+                ),
                 "description": ct.description,
             }
             for ct in child_types
@@ -282,23 +283,15 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         # Convert properties object keys
         if "properties" in converted and isinstance(converted["properties"], dict):
             old_props = converted["properties"]
-            converted["properties"] = {
-                self._camel_to_snake(key): value for key, value in old_props.items()
-            }
+            converted["properties"] = {self._camel_to_snake(key): value for key, value in old_props.items()}
 
         # Convert required array items
         if "required" in converted and isinstance(converted["required"], list):
-            converted["required"] = [
-                self._camel_to_snake(key) for key in converted["required"]
-            ]
+            converted["required"] = [self._camel_to_snake(key) for key in converted["required"]]
 
         # Convert propertyOrder array items
-        if "propertyOrder" in converted and isinstance(
-            converted["propertyOrder"], list
-        ):
-            converted["propertyOrder"] = [
-                self._camel_to_snake(key) for key in converted["propertyOrder"]
-            ]
+        if "propertyOrder" in converted and isinstance(converted["propertyOrder"], list):
+            converted["propertyOrder"] = [self._camel_to_snake(key) for key in converted["propertyOrder"]]
 
         return converted
 
@@ -312,23 +305,15 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         # Convert properties object keys
         if "properties" in converted and isinstance(converted["properties"], dict):
             old_props = converted["properties"]
-            converted["properties"] = {
-                self._snake_to_camel(key): value for key, value in old_props.items()
-            }
+            converted["properties"] = {self._snake_to_camel(key): value for key, value in old_props.items()}
 
         # Convert required array items
         if "required" in converted and isinstance(converted["required"], list):
-            converted["required"] = [
-                self._snake_to_camel(key) for key in converted["required"]
-            ]
+            converted["required"] = [self._snake_to_camel(key) for key in converted["required"]]
 
         # Convert propertyOrder array items
-        if "propertyOrder" in converted and isinstance(
-            converted["propertyOrder"], list
-        ):
-            converted["propertyOrder"] = [
-                self._snake_to_camel(key) for key in converted["propertyOrder"]
-            ]
+        if "propertyOrder" in converted and isinstance(converted["propertyOrder"], list):
+            converted["propertyOrder"] = [self._snake_to_camel(key) for key in converted["propertyOrder"]]
 
         return converted
 
@@ -362,15 +347,11 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             self._slot_warnings = []
 
         if not isinstance(value, dict):
-            raise serializers.ValidationError(
-                "Slot configuration must be a JSON object"
-            )
+            raise serializers.ValidationError("Slot configuration must be a JSON object")
 
         if "slots" in value:
             if not isinstance(value["slots"], list):
-                raise serializers.ValidationError(
-                    "Slot configuration 'slots' must be an array"
-                )
+                raise serializers.ValidationError("Slot configuration 'slots' must be an array")
 
             slot_names = set()
             for slot in value["slots"]:
@@ -378,14 +359,10 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError("Each slot must be an object")
 
                 if "name" not in slot or "label" not in slot:
-                    raise serializers.ValidationError(
-                        "Each slot must have 'name' and 'label'"
-                    )
+                    raise serializers.ValidationError("Each slot must have 'name' and 'label'")
 
                 if slot["name"] in slot_names:
-                    raise serializers.ValidationError(
-                        f"Duplicate slot name: {slot['name']}"
-                    )
+                    raise serializers.ValidationError(f"Duplicate slot name: {slot['name']}")
                 slot_names.add(slot["name"])
 
                 # Validate widget type restrictions
@@ -397,15 +374,11 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         """Validate widget type restrictions for a slot."""
         from webpages.widget_registry import widget_type_registry
 
-        available_widgets = {
-            widget.type for widget in widget_type_registry.list_widget_types()
-        }
+        available_widgets = {widget.type for widget in widget_type_registry.list_widget_types()}
         # Validate widget_controls (new field)
         if "widget_controls" in slot:
             if not isinstance(slot["widget_controls"], list):
-                raise serializers.ValidationError(
-                    f"Slot '{slot['name']}': widget_controls must be an array"
-                )
+                raise serializers.ValidationError(f"Slot '{slot['name']}': widget_controls must be an array")
 
             valid_controls = []
             for i, control in enumerate(slot["widget_controls"]):
@@ -426,7 +399,10 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
                             "slot": slot["name"],
                             "control": control.get("label", f"control {i}"),
                             "issue": "missing_widget_type",
-                            "message": f"Widget control '{control.get('label', i)}' is missing 'widget_type' field and was removed",
+                            "message": (
+                                f"Widget control '{control.get('label', i)}' is missing "
+                                "'widget_type' field and was removed"
+                            ),
                         }
                     )
                     continue
@@ -437,7 +413,10 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
                             "slot": slot["name"],
                             "control": control.get("widget_type", f"control {i}"),
                             "issue": "missing_label",
-                            "message": f"Widget control for '{control.get('widget_type', i)}' is missing 'label' field and was removed",
+                            "message": (
+                                f"Widget control for '{control.get('widget_type', i)}' is missing "
+                                "'label' field and was removed"
+                            ),
                         }
                     )
                     continue
@@ -451,7 +430,10 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
                             "control": control["label"],
                             "widget_type": widget_type,
                             "issue": "widget_type_not_found",
-                            "message": f"Widget type '{widget_type}' for control '{control['label']}' does not exist and was removed",
+                            "message": (
+                                f"Widget type '{widget_type}' for control '{control['label']}' "
+                                "does not exist and was removed"
+                            ),
                         }
                     )
                     continue
@@ -466,7 +448,10 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
                     {
                         "slot": slot["name"],
                         "issue": "widgets_filtered",
-                        "message": f"Slot '{slot['name']}': {original_count - filtered_count} widget control(s) were filtered out",
+                        "message": (
+                            f"Slot '{slot['name']}': {original_count - filtered_count} "
+                            "widget control(s) were filtered out"
+                        ),
                         "original_count": original_count,
                         "filtered_count": filtered_count,
                     }
@@ -478,9 +463,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         # Validate allowed_widgets
         if "allowed_widgets" in slot:
             if not isinstance(slot["allowed_widgets"], list):
-                raise serializers.ValidationError(
-                    f"Slot '{slot['name']}': allowed_widgets must be an array"
-                )
+                raise serializers.ValidationError(f"Slot '{slot['name']}': allowed_widgets must be an array")
 
             for widget_type in slot["allowed_widgets"]:
                 if widget_type not in available_widgets:
@@ -491,9 +474,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         # Validate disallowed_widgets
         if "disallowed_widgets" in slot:
             if not isinstance(slot["disallowed_widgets"], list):
-                raise serializers.ValidationError(
-                    f"Slot '{slot['name']}': disallowed_widgets must be an array"
-                )
+                raise serializers.ValidationError(f"Slot '{slot['name']}': disallowed_widgets must be an array")
 
             for widget_type in slot["disallowed_widgets"]:
                 if widget_type not in available_widgets:
@@ -504,9 +485,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         # Validate allowed_types
         if "allowed_types" in slot:
             if not isinstance(slot["allowed_types"], list):
-                raise serializers.ValidationError(
-                    f"Slot '{slot['name']}': allowed_types must be an array"
-                )
+                raise serializers.ValidationError(f"Slot '{slot['name']}': allowed_types must be an array")
 
             for widget_type in slot["allowed_types"]:
                 if widget_type not in available_widgets:
@@ -517,9 +496,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         # Validate disallowed_types
         if "disallowed_types" in slot:
             if not isinstance(slot["disallowed_types"], list):
-                raise serializers.ValidationError(
-                    f"Slot '{slot['name']}': disallowed_types must be an array"
-                )
+                raise serializers.ValidationError(f"Slot '{slot['name']}': disallowed_types must be an array")
 
             for widget_type in slot["disallowed_types"]:
                 if widget_type not in available_widgets:
@@ -537,9 +514,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         # Validate pre_created_widgets
         if "pre_created_widgets" in slot:
             if not isinstance(slot["pre_created_widgets"], list):
-                raise serializers.ValidationError(
-                    f"Slot '{slot['name']}': pre_created_widgets must be an array"
-                )
+                raise serializers.ValidationError(f"Slot '{slot['name']}': pre_created_widgets must be an array")
 
             for widget in slot["pre_created_widgets"]:
                 if not isinstance(widget, dict):
@@ -548,9 +523,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
                     )
 
                 if "type" not in widget:
-                    raise serializers.ValidationError(
-                        f"Slot '{slot['name']}': pre-created widget missing 'type' field"
-                    )
+                    raise serializers.ValidationError(f"Slot '{slot['name']}': pre-created widget missing 'type' field")
 
                 if widget["type"] not in available_widgets:
                     raise serializers.ValidationError(
@@ -563,9 +536,9 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             return value
 
         # Check that all provided names exist and are active
-        existing_types = ObjectTypeDefinition.objects.filter(
-            name__in=value, is_active=True
-        ).values_list("name", flat=True)
+        existing_types = ObjectTypeDefinition.objects.filter(name__in=value, is_active=True).values_list(
+            "name", flat=True
+        )
 
         invalid_names = set(value) - set(existing_types)
         if invalid_names:
@@ -582,24 +555,16 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             return attrs
 
         if self.instance and browser_group.pk == self.instance.pk:
-            raise serializers.ValidationError(
-                {"browser_group_id": "An object type cannot be its own browser group."}
-            )
+            raise serializers.ValidationError({"browser_group_id": "An object type cannot be its own browser group."})
         if not browser_group.is_active or browser_group.hierarchy_level not in ["top_level_only", "both"]:
             raise serializers.ValidationError(
                 {"browser_group_id": "The browser group must be an active top-level object type."}
             )
         if browser_group.browser_group_id:
-            raise serializers.ValidationError(
-                {"browser_group_id": "Browser groups cannot be nested."}
-            )
+            raise serializers.ValidationError({"browser_group_id": "Browser groups cannot be nested."})
         if self.instance and self.instance.supporting_browser_types.exists():
             raise serializers.ValidationError(
-                {
-                    "browser_group_id": (
-                        "A browser group with supporting types cannot itself become a supporting type."
-                    )
-                }
+                {"browser_group_id": ("A browser group with supporting types cannot itself become a supporting type.")}
             )
         return attrs
 
@@ -612,18 +577,14 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 
         # Set the allowed child types
         if allowed_child_types_names:
-            child_types = ObjectTypeDefinition.objects.filter(
-                name__in=allowed_child_types_names, is_active=True
-            )
+            child_types = ObjectTypeDefinition.objects.filter(name__in=allowed_child_types_names, is_active=True)
             instance.allowed_child_types.set(child_types)
 
         return instance
 
     def update(self, instance, validated_data):
         """Update object type with allowed child types"""
-        allowed_child_types_names = validated_data.pop(
-            "allowed_child_types_input", None
-        )
+        allowed_child_types_names = validated_data.pop("allowed_child_types_input", None)
 
         # Update the instance fields
         instance = super().update(instance, validated_data)
@@ -631,9 +592,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
         # Update the allowed child types if provided
         if allowed_child_types_names is not None:
             if allowed_child_types_names:
-                child_types = ObjectTypeDefinition.objects.filter(
-                    name__in=allowed_child_types_names, is_active=True
-                )
+                child_types = ObjectTypeDefinition.objects.filter(name__in=allowed_child_types_names, is_active=True)
                 instance.allowed_child_types.set(child_types)
             else:
                 # Clear all child types if empty list is provided
@@ -645,9 +604,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
 class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
     """Simplified serializer for object type lists"""
 
-    created_by_name = serializers.CharField(
-        source="created_by.username", read_only=True
-    )
+    created_by_name = serializers.CharField(source="created_by.username", read_only=True)
     instance_count = serializers.SerializerMethodField()
     allowed_child_types = serializers.SerializerMethodField()
     icon_image = serializers.SerializerMethodField()
@@ -683,7 +640,7 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
             return None
         if url.startswith("http"):
             return url
-        
+
         request = self.context.get("request")
         if request:
             return request.build_absolute_uri(url)
@@ -693,13 +650,13 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
         """Return icon image URL with imgproxy optimization and cache busting"""
         if not obj.icon_image:
             return None
-        
+
         # Use imgproxy for optimized icon delivery
         source_url = obj.icon_image.url
-        
+
         # Ensure URL is absolute for imgproxy
         absolute_source_url = self._get_absolute_url(source_url)
-        
+
         # Generate optimized URL using imgproxy (small square icon)
         return imgproxy_service.generate_url(
             source_url=absolute_source_url,
@@ -707,7 +664,7 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
             height=64,
             resize_type="fill",
             gravity="ce",
-            version=int(obj.updated_at.timestamp())
+            version=int(obj.updated_at.timestamp()),
         )
 
     def get_allowed_child_types(self, obj):
@@ -718,9 +675,11 @@ class ObjectTypeDefinitionListSerializer(serializers.ModelSerializer):
                 "id": ct.id,
                 "name": ct.name,
                 "label": ct.label,
-                "iconImage": f"{self._get_absolute_url(ct.icon_image.url)}?v={int(ct.updated_at.timestamp())}"
-                if ct.icon_image
-                else None,
+                "iconImage": (
+                    f"{self._get_absolute_url(ct.icon_image.url)}?v={int(ct.updated_at.timestamp())}"
+                    if ct.icon_image
+                    else None
+                ),
                 "description": ct.description,
             }
             for ct in child_types
@@ -745,12 +704,8 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
     object_type = ObjectTypeDefinitionSerializer(read_only=True)
     object_type_id = serializers.IntegerField(write_only=True)
     created_by = UserSerializer(read_only=True)
-    parent = serializers.PrimaryKeyRelatedField(
-        queryset=ObjectInstance.objects.all(), required=False, allow_null=True
-    )
-    status = (
-        serializers.SerializerMethodField()
-    )  # Computed status based on version publication
+    parent = serializers.PrimaryKeyRelatedField(queryset=ObjectInstance.objects.all(), required=False, allow_null=True)
+    status = serializers.SerializerMethodField()  # Computed status based on version publication
     is_published = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
     version_count = serializers.SerializerMethodField()
@@ -838,10 +793,11 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
 
         # Add data and widgets from current version
         data["data"] = instance.data
-        
+
         # Convert widget configurations from snake_case to camelCase and inject active variants
         if instance.widgets and isinstance(instance.widgets, dict):
             from webpages.utils.widget_serialization import serialize_widget_slots
+
             data["widgets"] = serialize_widget_slots(instance.widgets)
         else:
             data["widgets"] = instance.widgets
@@ -878,25 +834,17 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         # Validate each relationship object
         for idx, rel in enumerate(value):
             if not isinstance(rel, dict):
-                raise serializers.ValidationError(
-                    f"Relationship at index {idx} must be an object"
-                )
+                raise serializers.ValidationError(f"Relationship at index {idx} must be an object")
 
             # Check required fields
             if "type" not in rel:
-                raise serializers.ValidationError(
-                    f"Relationship at index {idx} missing 'type' field"
-                )
+                raise serializers.ValidationError(f"Relationship at index {idx} missing 'type' field")
             if "object_id" not in rel:
-                raise serializers.ValidationError(
-                    f"Relationship at index {idx} missing 'object_id' field"
-                )
+                raise serializers.ValidationError(f"Relationship at index {idx} missing 'object_id' field")
 
             # Validate object exists
             if not ObjectInstance.objects.filter(id=rel["object_id"]).exists():
-                raise serializers.ValidationError(
-                    f"ObjectInstance with id {rel['object_id']} does not exist"
-                )
+                raise serializers.ValidationError(f"ObjectInstance with id {rel['object_id']} does not exist")
 
             # Prevent self-reference (will be checked in validate() with instance context)
 
@@ -911,9 +859,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
 
             if not parent.object_type.can_have_child_type(object_type):
                 raise serializers.ValidationError(
-                    {
-                        "parent": f"Object type '{object_type.name}' cannot be a child of '{parent.object_type.name}'"
-                    }
+                    {"parent": f"Object type '{object_type.name}' cannot be a child of '{parent.object_type.name}'"}
                 )
 
         # Validate data against schema if object type is provided
@@ -930,9 +876,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         if attrs.get("relationships") and self.instance:
             for rel in attrs["relationships"]:
                 if rel.get("object_id") == self.instance.id:
-                    raise serializers.ValidationError(
-                        {"relationships": "Cannot create relationship to self"}
-                    )
+                    raise serializers.ValidationError({"relationships": "Cannot create relationship to self"})
 
         return attrs
 
@@ -945,9 +889,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
             field_required = field_def.get("required", False)
 
             if field_required and (field_name not in data or not data[field_name]):
-                raise serializers.ValidationError(
-                    {"data": f"Required field '{field_name}' is missing or empty"}
-                )
+                raise serializers.ValidationError({"data": f"Required field '{field_name}' is missing or empty"})
 
     def _validate_widgets_against_slots(self, widgets, object_type):
         """Validate and normalize widgets against object type slots.
@@ -980,9 +922,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         instance = super().create(validated_data)
 
         # Create initial version with the data and widgets
-        instance.create_version(
-            user, data=data, widgets=widgets, change_description="Initial version"
-        )
+        instance.create_version(user, data=data, widgets=widgets, change_description="Initial version")
 
         return instance
 
@@ -1005,9 +945,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         if data_changed or widgets_changed:
             # Use current data/widgets if not provided in update
             version_data = new_data if new_data is not None else instance.data
-            version_widgets = (
-                new_widgets if new_widgets is not None else instance.widgets
-            )
+            version_widgets = new_widgets if new_widgets is not None else instance.widgets
 
             instance.create_version(
                 user,
@@ -1023,12 +961,8 @@ class ObjectInstanceListSerializer(serializers.ModelSerializer):
     """Simplified serializer for object instance lists"""
 
     object_type_name = serializers.CharField(source="object_type.name", read_only=True)
-    object_type_label = serializers.CharField(
-        source="object_type.label", read_only=True
-    )
-    created_by_name = serializers.CharField(
-        source="created_by.username", read_only=True
-    )
+    object_type_label = serializers.CharField(source="object_type.label", read_only=True)
+    created_by_name = serializers.CharField(source="created_by.username", read_only=True)
     is_published = serializers.SerializerMethodField()
     parent_title = serializers.CharField(source="parent.title", read_only=True)
 
@@ -1189,9 +1123,7 @@ class ObjectVersionListSerializer(serializers.ModelSerializer):
     """Simplified serializer for object version lists"""
 
     object_title = serializers.CharField(source="object_instance.title", read_only=True)
-    created_by_name = serializers.CharField(
-        source="created_by.username", read_only=True
-    )
+    created_by_name = serializers.CharField(source="created_by.username", read_only=True)
     publication_status = serializers.SerializerMethodField()
     is_current_published = serializers.SerializerMethodField()
 

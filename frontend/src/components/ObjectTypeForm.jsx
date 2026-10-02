@@ -77,6 +77,11 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
         queryFn: async () => await objectTypesApi.list()
     })
 
+    const { data: browserGroupTypesResponse } = useQuery({
+        queryKey: ['objectTypes', 'mainBrowser'],
+        queryFn: async () => await objectTypesApi.getMainBrowserTypes()
+    })
+
     // Load available namespaces
     const { data: namespacesResponse } = useQuery({
         queryKey: ['namespaces'],
@@ -84,6 +89,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
     })
 
     const existingTypes = existingTypesResponse?.data?.results || existingTypesResponse?.data || []
+    const browserGroupTypes = browserGroupTypesResponse?.data || []
     const availableNamespaces = namespacesResponse?.results || namespacesResponse || []
 
     useEffect(() => {
@@ -1264,7 +1270,7 @@ const ObjectTypeForm = ({ objectType, onSubmit, onCancel, isSubmitting, activeTa
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             >
                                 <option value="">Own main group</option>
-                                {existingTypes
+                                {browserGroupTypes
                                     .filter(type =>
                                         type.id !== objectType?.id &&
                                         type.isActive &&
