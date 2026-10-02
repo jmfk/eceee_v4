@@ -14,9 +14,53 @@ export const normalizeCssName = (candidate: string) => String(candidate || '')
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, '-')
 
+export const sanitizeHtml = (html?: string): string => String(DOMPurify.sanitize(String(html || ''), {
+    ADD_ATTR: ['loading'],
+}))
+
 export const SafeHtml = ({ html, className = '', as: Tag = 'div' }: { html?: string, className?: string, as?: React.ElementType }) => (
-    <Tag className={className} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(String(html || '')) }} />
+    <Tag className={className} dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />
 )
+
+export const formatDisplayDate = (candidate: unknown): string => {
+    const raw = String(candidate || '')
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw)
+    if (!match) return raw
+    const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
+    return new Intl.DateTimeFormat('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'UTC',
+    }).format(date)
+}
+
+export const normalizeContentMediaHtml = (html?: string): string => {
+    const sanitized = sanitizeHtml(html)
+    if (typeof document === 'undefined') return sanitized
+
+    const template = document.createElement('template')
+    template.innerHTML = sanitized
+    template.content.querySelectorAll<HTMLElement>('div[data-media-insert="true"]').forEach((insert) => {
+        const image = insert.querySelector('img')
+        if (!image) return
+        const width = normalizeCssName(insert.dataset.width || 'full')
+        const align = normalizeCssName(insert.dataset.align || 'center')
+        const figure = document.createElement('figure')
+        figure.className = `media-insert img-width-${width} media-align-${align}`
+        image.className = `img-width-${width}`
+        image.setAttribute('loading', 'lazy')
+        figure.appendChild(image)
+        const caption = insert.dataset.caption
+        if (caption) {
+            const figcaption = document.createElement('figcaption')
+            figcaption.textContent = caption
+            figure.appendChild(figcaption)
+        }
+        insert.replaceWith(figure)
+    })
+    return template.innerHTML
+}
 
 export const linkHref = (candidate: any): string => {
     if (!candidate) return '#'

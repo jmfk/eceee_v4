@@ -36,7 +36,12 @@ class NewsDetailWidgetRenderTests(SimpleTestCase):
             patch.object(
                 widget,
                 "_render_object_widgets_from_version",
-                return_value={"main": ["<p>Canonical widget body</p>"]},
+                return_value={
+                    "main": [
+                        '<table class="w-full border"><colgroup><col style="width: 50%"></colgroup>'
+                        "<tbody><tr><td><strong>Canonical widget body</strong></td></tr></tbody></table>"
+                    ]
+                },
             ),
         ):
             context = widget.prepare_template_context(
@@ -55,6 +60,9 @@ class NewsDetailWidgetRenderTests(SimpleTestCase):
         self.assertIn("Canonical widget body", html)
         self.assertIn("Read the original source", html)
         self.assertNotIn("Duplicate legacy scalar body", html)
+        self.assertIn('class="w-full border"', html)
+        self.assertIn("<colgroup>", html)
+        self.assertIn("September 29, 2026", html)
 
     def test_scalar_body_remains_a_backward_compatible_fallback(self):
         now = datetime(2026, 9, 30, tzinfo=timezone.utc)
@@ -117,6 +125,18 @@ class NewsDetailWidgetRenderTests(SimpleTestCase):
         self.assertIn("Published:", html)
         self.assertNotIn("Updated:", html)
         self.assertIn("Canonical widget body", html)
+
+    def test_missing_slug_renders_configured_empty_message_without_technical_comment(self):
+        widget = NewsDetailWidget()
+        context = widget.prepare_template_context(
+            {"objectTypes": [1], "emptyMessage": "Select a golden sample."},
+            {"path_variables": {}},
+        )
+
+        html = render_to_string("easy_widgets/widgets/news_detail.html", {**context, "widget_type": widget})
+
+        self.assertIn("Select a golden sample.", html)
+        self.assertNotIn("Widget not rendering", html)
 
 
 class NewsExcerptNormalizationTests(SimpleTestCase):

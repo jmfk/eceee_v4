@@ -274,6 +274,38 @@ describe('PageRenderer', () => {
         expect(screen.getByRole('link', { name: 'Read the original source' })).toHaveAttribute('href', 'https://example.org/source')
     })
 
+    it('formats News dates like Django and shows a useful empty detail state', () => {
+        const article = createPageRenderModel({
+            widgets: { main: [{
+                id: 'detail', type: 'easy_widgets.NewsDetailWidget', config: {},
+                data: { status: 'ready', item: { id: 1, title: 'Dated article', data: { presentationalPublishingDate: '2026-09-30' } } },
+            }] },
+        })
+        const rendered = render(<PageRenderer model={article} />)
+        expect(rendered.container.querySelector('time')).toHaveTextContent('September 30, 2026')
+        rendered.unmount()
+
+        const empty = createPageRenderModel({
+            widgets: { main: [{ id: 'detail', type: 'easy_widgets.NewsDetailWidget', config: { emptyMessage: 'Select a golden sample.' }, data: { status: 'ready' } }] },
+        })
+        render(<PageRenderer model={empty} />)
+        expect(screen.getByText('Select a golden sample.')).toBeInTheDocument()
+    })
+
+    it('normalizes imported media inserts to the Django figure structure', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{ id: 'content', type: 'easy_widgets.ContentWidget', config: {
+                content: '<div data-media-insert="true" data-width="full" data-align="center"><img src="/diagram.svg" alt="Migration diagram"></div>',
+            } }] },
+        })
+        const { container } = render(<PageRenderer model={model} />)
+        const figure = container.querySelector('figure.media-insert.img-width-full.media-align-center')
+        const image = screen.getByRole('img', { name: 'Migration diagram' })
+        expect(figure).toContainElement(image)
+        expect(image).toHaveClass('img-width-full')
+        expect(image).toHaveAttribute('loading', 'lazy')
+    })
+
     it('uses scalar News content only when structured widgets are absent', () => {
         const model = createPageRenderModel({
             widgets: { main: [{
@@ -350,6 +382,8 @@ describe('PageRenderer', () => {
         expect(screen.getByRole('columnheader', { name: 'Person' })).toBeInTheDocument()
         expect(screen.getByRole('cell', { name: 'Ada' })).toHaveAttribute('colspan', '2')
         expect(container.querySelector('td strong')).toHaveTextContent('Ada')
+        expect(container.querySelector('td > span')).toBeNull()
+        expect(container.querySelector('table')).toHaveClass('border')
         expect(container).not.toHaveTextContent('[object Object]')
         expect(container.querySelector('col')).toHaveStyle({ width: '60%' })
         expect(screen.getByRole('img', { name: 'Ada portrait' }).closest('td')).toHaveAttribute('rowspan', '2')

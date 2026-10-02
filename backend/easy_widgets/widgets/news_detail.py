@@ -73,6 +73,11 @@ class NewsDetailConfig(BaseModel):
             "helpText": "If enabled, renders widgets from the object's own widget configuration",
         },
     )
+    empty_message: str = Field(
+        default="",
+        description="Message shown when the detail route has no article slug",
+        json_schema_extra={"component": "TextInput"},
+    )
     component_style: str = Field(
         "default",
         description="Component style from theme",
@@ -130,10 +135,10 @@ class NewsDetailWidget(BaseWidget):
         slug = path_variables.get(news_config.slug_variable_name)
 
         if not slug:
-            # No slug in path variables - don't render
             return {
                 "news_object": None,
                 "should_render": False,
+                "empty_message": news_config.empty_message,
             }
 
         # Try to find the object in configured ObjectTypes

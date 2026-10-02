@@ -43,7 +43,7 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema legacy-db-tunnel legacy-news-sample-dry legacy-news-database-dry test test-build test-parallel backend-test-parallel prepare-frontend-e2e frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test backend-lint frontend-lint lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db configure-local-infra shared-infra-check use-external-infra prepare-test-infra test-infra-down refresh-db-collation prod-preflight prod-deploy prod-rollback prod-backup prod-backfill-typed-tags prod-theme-access-key validate-typed-tags-backup validate-prod-typed-tags-backup prod-logs prod-status prod-audit-tenant-access prod-ssh prod-shell
+.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema legacy-db-tunnel legacy-news-sample-dry legacy-news-database-dry test test-build test-parallel backend-test backend-news-test backend-test-parallel prepare-frontend-e2e frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test backend-lint frontend-lint lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db configure-local-infra shared-infra-check use-external-infra prepare-test-infra test-infra-down refresh-db-collation prod-preflight prod-deploy prod-rollback prod-backup prod-backfill-typed-tags prod-theme-access-key validate-typed-tags-backup validate-prod-typed-tags-backup prod-logs prod-status prod-audit-tenant-access prod-ssh prod-shell
 
 # Dummy targets for help flags
 --help:
@@ -129,6 +129,7 @@ help: ## Show this help message (use: make help [target])
 		echo ""; \
 		echo "Testing & Quality:"; \
 		echo "  backend-test      Run backend tests"; \
+		echo "  backend-news-test Run focused News migration tests with PostgreSQL"; \
 		echo "  frontend-public-e2e-test Run public-site Playwright regression tests"; \
 		echo "  frontend-admin-e2e-test  Run admin Playwright regression tests"; \
 		echo "  frontend-e2e-test        Run public then admin Playwright regression tests"; \
@@ -572,6 +573,30 @@ backend-test: prepare-test-infra refresh-db-collation
 		-e AWS_ACCESS_KEY_ID=test-eceee -e AWS_SECRET_ACCESS_KEY=test-eceee-secret \
 		-e AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
 		backend python manage.py test --keepdb --verbosity=2 --failfast --noinput
+
+# Run the focused News migration suite against PostgreSQL. Historical migrations
+# contain PostgreSQL-native ArrayFields and therefore cannot be validated on SQLite.
+backend-news-test: prepare-test-infra refresh-db-collation
+	$(COMPOSE_DEV) run --rm --no-deps -T \
+		-e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres \
+		-e POSTGRES_DB=eceee_v4_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=test-only \
+		-e POSTGRES_HOST=test-db -e POSTGRES_PORT=5432 \
+		-e DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test \
+		-e REDIS_URL=redis://test-redis:6379/0 \
+		-e AWS_ACCESS_KEY_ID=test-eceee -e AWS_SECRET_ACCESS_KEY=test-eceee-secret \
+		-e AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
+		backend pytest \
+			content_migration/tests/test_migrate_legacy_news_command.py \
+			content_migration/tests/test_legacy_news_ai_tags.py \
+			content_migration/tests/test_legacy_news_database.py \
+			content_migration/tests/test_legacy_news_extractor.py \
+			content_migration/tests/test_legacy_news_fetcher.py \
+			content_migration/tests/test_legacy_news_preview.py \
+			content_migration/tests/test_legacy_news_repository.py \
+			content_migration/tests/test_legacy_news_transformer.py \
+			easy_widgets/tests/test_content_widget.py \
+			easy_widgets/tests/test_news_detail_widget.py \
+			easy_widgets/tests/test_table_widget.py -q
 
 # Run backend tests in parallel once the suite is stable.
 backend-test-parallel: prepare-test-infra refresh-db-collation
