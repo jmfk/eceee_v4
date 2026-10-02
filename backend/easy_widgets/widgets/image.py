@@ -2,13 +2,13 @@
 Image widget implementation.
 """
 
-from typing import Type, Optional, List, Literal, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+import logging
+from typing import Any, Dict, Literal, Optional, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +24,7 @@ class ImageMediaItem(BaseModel):
     id: Optional[str] = Field(None, description="Media file ID")
     url: str = Field(..., description="Media URL (image or video)")
     type: Literal["image", "video"] = Field("image", description="Media type")
-    altText: str = Field(
-        ..., min_length=1, description="Alternative text for accessibility"
-    )
+    altText: str = Field(..., min_length=1, description="Alternative text for accessibility")
     caption: Optional[str] = Field(None, description="Optional caption")
     annotation: Optional[str] = Field(None, description="Annotation text for the image")
     title: Optional[str] = Field(None, description="Image title")
@@ -205,8 +203,8 @@ class ImageWidget(BaseWidget):
     }
     .image-widget:last-child {
         image-widget: 0;
-    }    
-    
+    }
+
     .image-widget img {
         max-width: 100%;
         height: auto;
@@ -214,14 +212,14 @@ class ImageWidget(BaseWidget):
         box-shadow: var(--image-shadow, none);
         border: var(--image-border, none);
     }
-    
+
     .image-widget video {
         max-width: 100%;
         height: auto;
         border-radius: var(--video-radius, 0.5rem);
         box-shadow: var(--video-shadow, 0 4px 6px rgba(0, 0, 0, 0.1));
     }
-    
+
     .image-widget .caption {
         margin-top: var(--caption-margin-top, 0.5rem);
         font-size: var(--caption-font-size, 0.875rem);
@@ -229,14 +227,14 @@ class ImageWidget(BaseWidget):
         font-style: var(--caption-style, italic);
         text-align: var(--caption-alignment, center);
     }
-    
+
     .image-widget .gallery {
         display: grid;
         grid-template-columns: repeat(var(--gallery-columns, 3), 1fr);
         gap: var(--gallery-gap, 1rem);
         margin: var(--gallery-margin, 1rem 0);
     }
-    
+
     .image-widget .gallery img {
         width: 100%;
         height: var(--gallery-item-height, 200px);
@@ -244,26 +242,26 @@ class ImageWidget(BaseWidget):
         cursor: pointer;
         transition: transform 0.2s ease-in-out;
     }
-    
+
     .image-widget .gallery img:hover {
         transform: scale(1.05);
     }
-    
+
     .image-widget.size-small img,
     .image-widget.size-small video {
         max-width: var(--size-small, 300px);
     }
-    
+
     .image-widget.size-medium img,
     .image-widget.size-medium video {
         max-width: var(--size-medium, 600px);
     }
-    
+
     .image-widget.size-large img,
     .image-widget.size-large video {
         max-width: var(--size-large, 900px);
     }
-    
+
     .image-widget.size-full img,
     .image-widget.size-full video {
         max-width: 100%;
@@ -360,15 +358,15 @@ class ImageWidget(BaseWidget):
             return []
 
         try:
-            from file_manager.models import MediaCollection, MediaFile
+            from file_manager.models import MediaCollection
 
             # Get the collection
             collection = MediaCollection.objects.get(id=collection_id)
 
             # Get all files in the collection (using reverse relationship mediafile_set)
-            collection_files = collection.mediafile_set.filter(
-                is_deleted=False  # Only get non-deleted files
-            ).order_by("created_at")
+            collection_files = collection.mediafile_set.filter(is_deleted=False).order_by(  # Only get non-deleted files
+                "created_at"
+            )
 
             # Convert to the format expected by the template (snake_case)
             media_items = []
@@ -376,16 +374,12 @@ class ImageWidget(BaseWidget):
                 # Determine media type
                 media_type = "video" if media_file.file_type == "video" else "image"
 
-                # Get URL - use get_file_url() method to generate URL from file_path
-                file_url = (
-                    media_file.get_file_url()
-                    if hasattr(media_file, "get_file_url")
-                    else (media_file.file_url or "")
+                # Honor an explicit public URL before deriving one from storage.
+                file_url = media_file.file_url or (
+                    media_file.get_file_url() if hasattr(media_file, "get_file_url") else ""
                 )
 
-                if media_file.file_type == "image" and hasattr(
-                    media_file, "get_imgproxy_url"
-                ):
+                if media_file.file_type == "image" and hasattr(media_file, "get_imgproxy_url"):
                     # Use imgproxy for thumbnail (e.g., 800px wide)
                     thumbnail_url = media_file.get_imgproxy_url(width=800)
                     full_url = file_url
@@ -395,11 +389,7 @@ class ImageWidget(BaseWidget):
 
                 # Get annotation from metadata
                 annotation = ""
-                if (
-                    hasattr(media_file, "metadata")
-                    and media_file.metadata
-                    and isinstance(media_file.metadata, dict)
-                ):
+                if hasattr(media_file, "metadata") and media_file.metadata and isinstance(media_file.metadata, dict):
                     annotation = media_file.metadata.get("annotation", "")
 
                 media_items.append(
@@ -452,9 +442,7 @@ class ImageWidget(BaseWidget):
                 # Fallback to legacy
                 gallery_styles = theme.gallery_styles or {}
                 carousel_styles = theme.carousel_styles or {}
-                style = gallery_styles.get(style_name) or carousel_styles.get(
-                    style_name
-                )
+                style = gallery_styles.get(style_name) or carousel_styles.get(style_name)
 
         # Handle new image field (single image or collection)
         image = config.get("image")
@@ -462,9 +450,7 @@ class ImageWidget(BaseWidget):
 
         # Backward compatibility: check for old collectionId field
         if not is_collection and not collection_id:
-            old_collection_id = config.get("collection_id") or config.get(
-                "collectionId"
-            )
+            old_collection_id = config.get("collection_id") or config.get("collectionId")
             if old_collection_id:
                 collection_id = old_collection_id
                 is_collection = True
@@ -482,31 +468,21 @@ class ImageWidget(BaseWidget):
                 template_config["media_items"] = collection_images
 
                 # Apply collection configuration if present (backward compatibility)
-                collection_config = config.get("collection_config") or config.get(
-                    "collectionConfig", {}
-                )
+                collection_config = config.get("collection_config") or config.get("collectionConfig", {})
                 if collection_config:
                     # Apply max items limit first (before randomization)
-                    max_items = collection_config.get(
-                        "max_items"
-                    ) or collection_config.get("maxItems", 0)
+                    max_items = collection_config.get("max_items") or collection_config.get("maxItems", 0)
                     if max_items > 0:
-                        template_config["media_items"] = template_config["media_items"][
-                            :max_items
-                        ]
+                        template_config["media_items"] = template_config["media_items"][:max_items]
         elif image and not is_collection:
             # Single image: convert to media_items array format
             if isinstance(image, dict):
                 # Convert camelCase to snake_case for template
                 media_item = {
                     "id": image.get("id"),
-                    "url": image.get("url")
-                    or image.get("fileUrl")
-                    or image.get("imgproxyBaseUrl", ""),
+                    "url": image.get("url") or image.get("fileUrl") or image.get("imgproxyBaseUrl", ""),
                     "type": image.get("type", "image"),
-                    "alt_text": image.get("altText")
-                    or image.get("alt_text")
-                    or image.get("title", ""),
+                    "alt_text": image.get("altText") or image.get("alt_text") or image.get("title", ""),
                     "caption": image.get("caption") or image.get("description", ""),
                     "annotation": image.get("annotation", ""),
                     "title": image.get("title", ""),
@@ -526,8 +502,7 @@ class ImageWidget(BaseWidget):
             camel_case_items = config.get("mediaItems") or config.get("media_items", [])
             if camel_case_items:
                 logger.warning(
-                    "ImageWidget: Using deprecated 'mediaItems' field. "
-                    "Please migrate to using 'image' field"
+                    "ImageWidget: Using deprecated 'mediaItems' field. " "Please migrate to using 'image' field"
                 )
                 # Convert camelCase fields to snake_case for template compatibility
                 snake_case_items = []
@@ -558,24 +533,18 @@ class ImageWidget(BaseWidget):
         template_config["display_type"] = template_config.get(
             "displayType", template_config.get("display_type", "single")
         )
-        template_config["image_style"] = template_config.get(
-            "imageStyle", template_config.get("image_style", None)
-        )
+        template_config["image_style"] = template_config.get("imageStyle", template_config.get("image_style", None))
         template_config["gallery_columns"] = template_config.get(
             "galleryColumns", template_config.get("gallery_columns", 3)
         )
 
         # Apply style defaults with widget overrides
         # enableLightbox now comes from style only
-        template_config["enable_lightbox"] = (
-            style.get("enableLightbox", True) if style else True
-        )
+        template_config["enable_lightbox"] = style.get("enableLightbox", True) if style else True
 
         # Apply widget overrides or style defaults for other settings
         # showCaptions
-        show_captions_override = template_config.get(
-            "showCaptions"
-        ) or template_config.get("show_captions")
+        show_captions_override = template_config.get("showCaptions") or template_config.get("show_captions")
         if show_captions_override is not None:
             template_config["show_captions"] = show_captions_override
         elif style and "defaultShowCaptions" in style:
@@ -584,9 +553,7 @@ class ImageWidget(BaseWidget):
             template_config["show_captions"] = True
 
         # lightboxGroup
-        lightbox_group_override = template_config.get(
-            "lightboxGroup"
-        ) or template_config.get("lightbox_group")
+        lightbox_group_override = template_config.get("lightboxGroup") or template_config.get("lightbox_group")
         if lightbox_group_override is not None:
             template_config["lightbox_group"] = lightbox_group_override
         elif style and "defaultLightboxGroup" in style:
@@ -614,9 +581,7 @@ class ImageWidget(BaseWidget):
 
         template_config["lightbox_style"] = template_config.get("lightbox_style")
         template_config["imgproxy_override"] = template_config.get("imgproxy_override")
-        template_config["use_content_margins"] = config.get(
-            "use_content_margins", False
-        )
+        template_config["use_content_margins"] = config.get("use_content_margins", False)
 
         # Apply randomization if enabled (widget override, then style default)
         randomize_override = config.get("randomize")
@@ -626,14 +591,8 @@ class ImageWidget(BaseWidget):
             should_randomize = style["defaultRandomize"]
         else:
             # Backward compatibility: check old collection config
-            collection_config = config.get("collection_config") or config.get(
-                "collectionConfig", {}
-            )
-            should_randomize = (
-                collection_config.get("randomize", False)
-                if collection_config
-                else False
-            )
+            collection_config = config.get("collection_config") or config.get("collectionConfig", {})
+            should_randomize = collection_config.get("randomize", False) if collection_config else False
         if should_randomize and template_config.get("media_items"):
             import random
 
@@ -655,11 +614,12 @@ class ImageWidget(BaseWidget):
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import (
-            render_mustache,
-            prepare_component_context,
-        )
         from django.template.loader import render_to_string
+
+        from webpages.utils.mustache_renderer import (
+            prepare_component_context,
+            render_mustache,
+        )
 
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
@@ -708,15 +668,13 @@ class ImageWidget(BaseWidget):
             Tuple of (html, css) or None if no custom style
         """
         from webpages.utils.mustache_renderer import (
-            render_mustache,
-            prepare_gallery_context,
             prepare_carousel_context,
+            prepare_gallery_context,
+            render_mustache,
         )
 
         # Check for component_style first (takes precedence over image_style)
-        component_style_name = config.get("component_style") or config.get(
-            "componentStyle"
-        )
+        component_style_name = config.get("component_style") or config.get("componentStyle")
         if component_style_name and component_style_name != "default" and theme:
             result = self.render_with_component_style(config, theme)
             if result is not None:
@@ -740,9 +698,7 @@ class ImageWidget(BaseWidget):
             if not style:
                 gallery_styles = theme.gallery_styles or {}
                 carousel_styles = theme.carousel_styles or {}
-                style = gallery_styles.get(style_name) or carousel_styles.get(
-                    style_name
-                )
+                style = gallery_styles.get(style_name) or carousel_styles.get(style_name)
 
         # If style not found, return None to use default template
         if not style:
@@ -772,15 +728,11 @@ class ImageWidget(BaseWidget):
         # Add carousel-specific defaults if carousel type
         if style_type == "carousel":
             style_defaults["defaultAutoPlay"] = style.get("defaultAutoPlay", False)
-            style_defaults["defaultAutoPlayInterval"] = style.get(
-                "defaultAutoPlayInterval", 3
-            )
+            style_defaults["defaultAutoPlayInterval"] = style.get("defaultAutoPlayInterval", 3)
 
         # Use styleType to determine which context to prepare
         if style_type == "carousel":
-            context = prepare_carousel_context(
-                images, config, style.get("variables"), imgproxy_config, style_defaults
-            )
+            context = prepare_carousel_context(images, config, style.get("variables"), imgproxy_config, style_defaults)
         else:
             context = prepare_gallery_context(
                 images,
@@ -795,8 +747,48 @@ class ImageWidget(BaseWidget):
         html = render_mustache(style.get("template", ""), context)
         css = style.get("css", "")
 
+        if style_type == "carousel":
+            html += self._carousel_behavior_script(context)
+
         # Ensure we return valid HTML (not empty string) when using custom style
         if not html or html.strip() == "":
             return None
 
         return html, css
+
+    @staticmethod
+    def _carousel_behavior_script(context):
+        """Attach behavior to the carousel emitted immediately before this script."""
+        auto_play = "true" if context.get("autoPlay") else "false"
+        interval_ms = max(1, context.get("autoPlayInterval") or 3) * 1000
+        return f"""
+<script>
+(function() {{
+  const script = document.currentScript;
+  const root = script && script.previousElementSibling;
+  if (!root || !root.classList.contains('gallery-carousel')) return;
+  const track = root.querySelector('.carousel-track');
+  const slides = root.querySelectorAll('.carousel-slide');
+  const indicators = root.querySelectorAll('.indicator-dot');
+  if (!track || slides.length < 2) return;
+  let currentSlide = 0;
+  const update = () => {{
+    track.style.transform = `translateX(-${{currentSlide * 100}}%)`;
+    indicators.forEach((indicator, index) => indicator.classList.toggle('active', index === currentSlide));
+  }};
+  root.querySelectorAll('[data-direction]').forEach(button => {{
+    button.addEventListener('click', () => {{
+      currentSlide = (currentSlide + Number(button.dataset.direction) + slides.length) % slides.length;
+      update();
+    }});
+  }});
+  indicators.forEach((indicator, index) => indicator.addEventListener('click', () => {{
+    currentSlide = Number(indicator.dataset.slideIndex ?? index);
+    update();
+  }}));
+  if ({auto_play}) window.setInterval(() => {{
+    currentSlide = (currentSlide + 1) % slides.length;
+    update();
+  }}, {interval_ms});
+}})();
+</script>"""

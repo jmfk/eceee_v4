@@ -58,7 +58,8 @@ const reader: PageReader = {
   defaultTheme: async () => null,
   publishedPageReferences: async () => [],
   publishedNavigationPages: async () => [],
-  publicMedia: async () => ({ files: [], collections: {} }),
+      publicMedia: async () => ({ files: [], collections: {} }),
+      publishedObjects: async () => [],
 };
 const readDb: ReadDb = { withSnapshot: async read => read(reader) };
 const insert = vi.fn<FormSubmissionStore['insert']>();

@@ -3,34 +3,32 @@ Mustache template renderer for component styles, gallery styles, and carousel st
 """
 
 import chevron
-from django.template.loader import get_template
 from django.template import TemplateDoesNotExist
 
 
 def load_mustache_template(template_name):
     """
     Load a Mustache template file using Django's template finder.
-    
+
     Args:
         template_name: Template path (e.g., "easy_widgets/widgets/navbar.mustache")
-        
+
     Returns:
         str: Raw template string
-        
+
     Raises:
         TemplateDoesNotExist: If template file is not found
     """
-    from django.template.loader import select_template
     import os
-    
+
     try:
         # Use Django's template engine to find the template location
         # but don't parse it (since Mustache syntax conflicts with Django syntax)
         from django.template import engines
-        
+
         # Get Django template engine
-        django_engine = engines['django']
-        
+        django_engine = engines["django"]
+
         # Find the template file using Django's loader
         template_path = None
         for template_dir in django_engine.engine.dirs:
@@ -38,7 +36,7 @@ def load_mustache_template(template_name):
             if os.path.exists(full_path):
                 template_path = full_path
                 break
-        
+
         # Also check app directories
         if not template_path:
             for loader in django_engine.engine.template_loaders:
@@ -52,18 +50,19 @@ def load_mustache_template(template_name):
                         break
                 except (AttributeError, ImportError):
                     continue
-        
+
         if not template_path:
             raise TemplateDoesNotExist(f"Mustache template not found: {template_name}")
-        
+
         # Read the raw template source without Django parsing
-        with open(template_path, 'r', encoding='utf-8') as f:
+        with open(template_path, "r", encoding="utf-8") as f:
             return f.read()
-            
+
     except TemplateDoesNotExist:
         raise
     except Exception as e:
         import logging
+
         logger = logging.getLogger(__name__)
         logger.error(f"Error loading Mustache template '{template_name}': {e}")
         raise
@@ -91,7 +90,9 @@ def render_mustache(template, context):
         return f"<!-- Template render error: {str(e)} -->"
 
 
-def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=None, lightbox_config=None, style_defaults=None):
+def prepare_gallery_context(
+    images, config, style_vars=None, imgproxy_config=None, lightbox_config=None, style_defaults=None
+):
     """
     Prepare context for gallery template rendering.
 
@@ -123,6 +124,9 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
     for i, img in enumerate(images):
         img_copy = img.copy() if isinstance(img, dict) else {}
         img_copy["index"] = i
+        img_copy["alt"] = (
+            img_copy.get("alt") or img_copy.get("altText") or img_copy.get("alt_text") or img_copy.get("title") or ""
+        )
 
         # Store original URL for lightbox fallback
         original_url = img_copy.get("url")
@@ -133,11 +137,11 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
                 # Extract max dimensions (prefer max_width/max_height, fallback to width/height)
                 max_width = final_imgproxy_config.get("max_width") or final_imgproxy_config.get("width")
                 max_height = final_imgproxy_config.get("max_height") or final_imgproxy_config.get("height")
-                
+
                 # Get original dimensions from image
                 original_width = img_copy.get("width")
                 original_height = img_copy.get("height")
-                
+
                 # Generate responsive URLs
                 responsive_data = imgproxy_service.generate_responsive_urls(
                     source_url=img_copy["url"],
@@ -150,7 +154,7 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
                     quality=final_imgproxy_config.get("quality"),
                     format=final_imgproxy_config.get("format"),
                 )
-                
+
                 # Update image with responsive data (all camelCase)
                 if responsive_data and "1x" in responsive_data:
                     img_copy["url"] = responsive_data["1x"]["url"]  # Backward compat
@@ -163,21 +167,27 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
                 import logging
 
                 logger = logging.getLogger(__name__)
-                logger.warning(
-                    f"Failed to generate imgproxy URL for gallery image: {e}"
-                )
+                logger.warning(f"Failed to generate imgproxy URL for gallery image: {e}")
 
         # Generate lightbox URL with separate sizing config
         if final_lightbox_config and original_url:
             try:
                 # Extract lightbox max dimensions
-                lb_max_width = final_lightbox_config.get("max_width") or final_lightbox_config.get("maxWidth") or final_lightbox_config.get("width")
-                lb_max_height = final_lightbox_config.get("max_height") or final_lightbox_config.get("maxHeight") or final_lightbox_config.get("height")
-                
+                lb_max_width = (
+                    final_lightbox_config.get("max_width")
+                    or final_lightbox_config.get("maxWidth")
+                    or final_lightbox_config.get("width")
+                )
+                lb_max_height = (
+                    final_lightbox_config.get("max_height")
+                    or final_lightbox_config.get("maxHeight")
+                    or final_lightbox_config.get("height")
+                )
+
                 # Get original dimensions from image
                 original_width = img_copy.get("width")
                 original_height = img_copy.get("height")
-                
+
                 # Generate lightbox URL
                 lightbox_data = imgproxy_service.generate_responsive_urls(
                     source_url=original_url,
@@ -190,7 +200,7 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
                     quality=final_lightbox_config.get("quality"),
                     format=final_lightbox_config.get("format"),
                 )
-                
+
                 # Set lightbox URL (camelCase)
                 if lightbox_data and "1x" in lightbox_data:
                     img_copy["lightboxUrl"] = lightbox_data["1x"]["url"]
@@ -201,9 +211,7 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
                 import logging
 
                 logger = logging.getLogger(__name__)
-                logger.warning(
-                    f"Failed to generate lightbox imgproxy URL: {e}"
-                )
+                logger.warning(f"Failed to generate lightbox imgproxy URL: {e}")
                 img_copy["lightboxUrl"] = original_url
         else:
             # No lightbox config, use original URL
@@ -217,31 +225,33 @@ def prepare_gallery_context(images, config, style_vars=None, imgproxy_config=Non
     lightbox_prev_icon = ""
     lightbox_next_icon = ""
     lightbox_template = ""
-    
+
     if final_lightbox_config:
-        lightbox_button_class = final_lightbox_config.get("button_class") or final_lightbox_config.get("buttonClass", "")
+        lightbox_button_class = final_lightbox_config.get("button_class") or final_lightbox_config.get(
+            "buttonClass", ""
+        )
         lightbox_close_icon = final_lightbox_config.get("close_icon") or final_lightbox_config.get("closeIcon", "")
         lightbox_prev_icon = final_lightbox_config.get("prev_icon") or final_lightbox_config.get("prevIcon", "")
         lightbox_next_icon = final_lightbox_config.get("next_icon") or final_lightbox_config.get("nextIcon", "")
 
     # Apply style defaults with widget overrides
     style_defaults = style_defaults or {}
-    
+
     # Widget config overrides take precedence, then style defaults, then hardcoded defaults
     show_captions = config.get("show_captions")
     if show_captions is None:
         show_captions = style_defaults.get("defaultShowCaptions", True)
-    
+
     enable_lightbox = style_defaults.get("enableLightbox", True)
-    
+
     lightbox_group = config.get("lightbox_group")
     if lightbox_group is None:
         lightbox_group = style_defaults.get("defaultLightboxGroup", "")
-    
+
     randomize = config.get("randomize")
     if randomize is None:
         randomize = style_defaults.get("defaultRandomize", False)
-    
+
     # Get lightbox template from style
     if style_defaults.get("lightboxTemplate"):
         lightbox_template = style_defaults["lightboxTemplate"]
@@ -290,6 +300,9 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
     for i, img in enumerate(images):
         img_copy = img.copy() if isinstance(img, dict) else {}
         img_copy["index"] = i
+        img_copy["alt"] = (
+            img_copy.get("alt") or img_copy.get("altText") or img_copy.get("alt_text") or img_copy.get("title") or ""
+        )
 
         # Generate responsive imgproxy URLs if config provided and image has URL
         if final_imgproxy_config and img_copy.get("url"):
@@ -297,11 +310,11 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
                 # Extract max dimensions (prefer max_width/max_height, fallback to width/height)
                 max_width = final_imgproxy_config.get("max_width") or final_imgproxy_config.get("width")
                 max_height = final_imgproxy_config.get("max_height") or final_imgproxy_config.get("height")
-                
+
                 # Get original dimensions from image
                 original_width = img_copy.get("width")
                 original_height = img_copy.get("height")
-                
+
                 # Generate responsive URLs
                 responsive_data = imgproxy_service.generate_responsive_urls(
                     source_url=img_copy["url"],
@@ -314,7 +327,7 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
                     quality=final_imgproxy_config.get("quality"),
                     format=final_imgproxy_config.get("format"),
                 )
-                
+
                 # Update image with responsive data (all camelCase)
                 if responsive_data and "1x" in responsive_data:
                     img_copy["url"] = responsive_data["1x"]["url"]  # Backward compat
@@ -327,28 +340,26 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
                 import logging
 
                 logger = logging.getLogger(__name__)
-                logger.warning(
-                    f"Failed to generate imgproxy URL for carousel image: {e}"
-                )
+                logger.warning(f"Failed to generate imgproxy URL for carousel image: {e}")
 
         indexed_images.append(img_copy)
 
     # Apply style defaults with widget overrides
     style_defaults = style_defaults or {}
-    
+
     # Widget config overrides take precedence, then style defaults, then hardcoded defaults
     show_captions = config.get("show_captions")
     if show_captions is None:
         show_captions = style_defaults.get("defaultShowCaptions", True)
-    
+
     auto_play = config.get("auto_play")
     if auto_play is None:
         auto_play = style_defaults.get("defaultAutoPlay", False)
-    
+
     auto_play_interval = config.get("auto_play_interval")
     if auto_play_interval is None:
         auto_play_interval = style_defaults.get("defaultAutoPlayInterval", 3)
-    
+
     randomize = config.get("randomize")
     if randomize is None:
         randomize = style_defaults.get("defaultRandomize", False)
@@ -382,7 +393,7 @@ def prepare_component_context(content, anchor="", style_vars=None, config=None, 
     return {
         "content": content,
         "anchor": anchor,
-        "config": config or {},     # NEW: Widget configuration (snake_case)
-        "slots": slots or {},       # NEW: Slot data for container widgets
+        "config": config or {},  # NEW: Widget configuration (snake_case)
+        "slots": slots or {},  # NEW: Slot data for container widgets
         **(style_vars or {}),
     }

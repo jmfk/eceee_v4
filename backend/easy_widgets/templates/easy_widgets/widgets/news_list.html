@@ -7,14 +7,14 @@
         <div class="error-message">
             {{ error }}
         </div>
-    {% elif config.news_items %}
+    {% elif news_items %}
         <!-- Future HTMX filtering placeholder -->
         <div class="news-filters" data-htmx-filter-target style="display: none;">
             <!-- Filtering UI will be added here in future -->
         </div>
 
         <div class="news-items-container">
-            {% for item in config.news_items %}
+            {% for item in news_items %}
                 <article class="news-item{% if item.is_pinned %} pinned{% endif %}" data-object-id="{{ item.id }}">
                     {% if config.show_featured_image and item.featured_image_url %}
                         <div class="news-featured-image">
@@ -41,7 +41,7 @@
                         </div>
 
                         <h3 class="news-title">
-                            <a href="/{{ item.object_type.name }}/{{ item.slug }}/">{{ item.title }}</a>
+                            <a href="{{ current_page.cached_path }}{{ item.slug }}/">{{ item.title }}</a>
                         </h3>
 
                         {% if config.show_excerpts and item.excerpt_text %}
@@ -51,7 +51,7 @@
                         {% endif %}
 
                         <div class="news-footer">
-                            <a href="/{{ item.object_type.name }}/{{ item.slug }}/" class="read-more">
+                            <a href="{{ current_page.cached_path }}{{ item.slug }}/" class="read-more">
                                 Read more →
                             </a>
                         </div>
@@ -65,4 +65,3 @@
         </div>
     {% endif %}
 </div>
-

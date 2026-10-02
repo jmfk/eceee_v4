@@ -6,7 +6,8 @@ import { getRenderLayoutTypes, getRenderWidgetTypes } from '../registry'
 describe('render registry parity', () => {
     it('covers every editable widget with a renderer and deterministic fixture', () => {
         const editable = Object.keys(EASY_WIDGET_REGISTRY).sort()
-        expect(getRenderWidgetTypes().sort()).toEqual(editable)
+        const rendered = getRenderWidgetTypes().sort()
+        expect(rendered).toEqual(editable)
         expect(Object.keys(RENDER_WIDGET_FIXTURES).sort()).toEqual(editable)
     })
 

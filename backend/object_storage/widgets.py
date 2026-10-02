@@ -5,24 +5,20 @@ Widget types for displaying object storage instances in web pages.
 These widgets integrate with the existing widget system to show dynamic objects.
 """
 
-from typing import Type, Optional, List, Dict, Any
+from typing import Optional, Type
+
 from pydantic import BaseModel, Field, validator
-from django.template.loader import render_to_string
-from django.utils.safestring import mark_safe
 
 from webpages.widget_registry import BaseWidget, register_widget_type
-from .models import ObjectTypeDefinition, ObjectInstance
+
+from .models import ObjectInstance, ObjectTypeDefinition
 
 
 class ObjectListConfig(BaseModel):
     """Configuration for Object List widget"""
 
-    object_type: str = Field(
-        ..., description="Object type to display (e.g., 'news', 'blog')"
-    )
-    limit: int = Field(
-        default=5, ge=1, le=50, description="Maximum number of objects to display"
-    )
+    object_type: str = Field(..., description="Object type to display (e.g., 'news', 'blog')")
+    limit: int = Field(default=5, ge=1, le=50, description="Maximum number of objects to display")
     order_by: str = Field(
         default="-created_at",
         description="Field to order by (prefix with - for descending)",
@@ -31,28 +27,20 @@ class ObjectListConfig(BaseModel):
         default="published",
         description="Status filter: 'all', 'draft', 'published', 'archived'",
     )
-    show_hierarchy: bool = Field(
-        default=False, description="Show hierarchical structure with indentation"
-    )
-    display_template: str = Field(
-        default="card", description="Display template: 'card', 'list', 'minimal'"
-    )
-    show_excerpt: bool = Field(
-        default=True, description="Show excerpt from object data"
-    )
+    show_hierarchy: bool = Field(default=False, description="Show hierarchical structure with indentation")
+    display_template: str = Field(default="card", description="Display template: 'card', 'list', 'minimal'")
+    show_excerpt: bool = Field(default=True, description="Show excerpt from object data")
     excerpt_field: Optional[str] = Field(
         default=None,
         description="Field to use for excerpt (auto-detect if not specified)",
     )
-    excerpt_length: int = Field(
-        default=150, ge=50, le=500, description="Maximum length of excerpt"
-    )
+    excerpt_length: int = Field(default=150, ge=50, le=500, description="Maximum length of excerpt")
 
     @validator("object_type")
     def validate_object_type(cls, v):
         """Validate that object type exists and is active"""
         try:
-            obj_type = ObjectTypeDefinition.objects.get(name=v, is_active=True)
+            ObjectTypeDefinition.objects.get(name=v, is_active=True)
             return v
         except ObjectTypeDefinition.DoesNotExist:
             raise ValueError(f"Object type '{v}' does not exist or is not active")
@@ -82,21 +70,11 @@ class ObjectDetailConfig(BaseModel):
         default=None,
         description="Specific object ID to display (if not provided, uses context)",
     )
-    object_type: Optional[str] = Field(
-        default=None, description="Object type filter if using slug lookup"
-    )
-    object_slug: Optional[str] = Field(
-        default=None, description="Object slug for lookup (alternative to object_id)"
-    )
-    display_template: str = Field(
-        default="full", description="Display template: 'full', 'summary', 'minimal'"
-    )
-    show_metadata: bool = Field(
-        default=False, description="Show object metadata and technical details"
-    )
-    show_hierarchy: bool = Field(
-        default=True, description="Show parent/child relationships"
-    )
+    object_type: Optional[str] = Field(default=None, description="Object type filter if using slug lookup")
+    object_slug: Optional[str] = Field(default=None, description="Object slug for lookup (alternative to object_id)")
+    display_template: str = Field(default="full", description="Display template: 'full', 'summary', 'minimal'")
+    show_metadata: bool = Field(default=False, description="Show object metadata and technical details")
+    show_hierarchy: bool = Field(default=True, description="Show parent/child relationships")
     show_widgets: bool = Field(default=True, description="Render object's widget slots")
 
 
@@ -106,19 +84,11 @@ class ObjectChildrenConfig(BaseModel):
     parent_object_id: Optional[int] = Field(
         default=None, description="Parent object ID (if not provided, uses context)"
     )
-    object_type_filter: Optional[str] = Field(
-        default=None, description="Filter children by object type"
-    )
-    limit: int = Field(
-        default=10, ge=1, le=100, description="Maximum number of children to display"
-    )
+    object_type_filter: Optional[str] = Field(default=None, description="Filter children by object type")
+    limit: int = Field(default=10, ge=1, le=100, description="Maximum number of children to display")
     order_by: str = Field(default="title", description="Field to order children by")
-    display_template: str = Field(
-        default="card", description="Display template: 'card', 'list', 'grid'"
-    )
-    show_levels: int = Field(
-        default=1, ge=1, le=5, description="Number of hierarchy levels to show"
-    )
+    display_template: str = Field(default="card", description="Display template: 'card', 'list', 'grid'")
+    show_levels: int = Field(default=1, ge=1, le=5, description="Number of hierarchy levels to show")
 
 
 @register_widget_type
@@ -137,7 +107,7 @@ class ObjectListWidget(BaseWidget):
     .object-list-widget {
         font-family: var(--body-font, inherit);
     }
-    
+
     .object-list-widget .object-item {
         padding: var(--object-padding, 1rem);
         margin-bottom: var(--object-spacing, 1rem);
@@ -145,45 +115,45 @@ class ObjectListWidget(BaseWidget):
         border-radius: var(--object-radius, 0.5rem);
         background: var(--object-bg, #ffffff);
     }
-    
+
     .object-list-widget .object-item:hover {
         box-shadow: var(--object-hover-shadow, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
         transform: var(--object-hover-transform, translateY(-2px));
         transition: all 0.2s ease;
     }
-    
+
     .object-list-widget .object-title {
         font-size: var(--object-title-size, 1.25rem);
         font-weight: var(--object-title-weight, 600);
         color: var(--object-title-color, #1f2937);
         margin-bottom: var(--object-title-spacing, 0.5rem);
     }
-    
+
     .object-list-widget .object-excerpt {
         color: var(--object-text-color, #6b7280);
         line-height: var(--object-line-height, 1.6);
     }
-    
+
     .object-list-widget .object-meta {
         font-size: var(--object-meta-size, 0.875rem);
         color: var(--object-meta-color, #9ca3af);
         margin-top: var(--object-meta-spacing, 0.5rem);
     }
-    
+
     .object-list-widget.template-card .object-item {
         background: var(--card-bg, #ffffff);
         border: var(--card-border, 1px solid #e5e7eb);
         border-radius: var(--card-radius, 0.75rem);
         padding: var(--card-padding, 1.5rem);
     }
-    
+
     .object-list-widget.template-list .object-item {
         border-left: var(--list-border, 4px solid #3b82f6);
         padding-left: var(--list-padding, 1rem);
         background: transparent;
         border-radius: 0;
     }
-    
+
     .object-list-widget.template-minimal .object-item {
         border: none;
         padding: var(--minimal-padding, 0.5rem 0);
@@ -195,12 +165,16 @@ class ObjectListWidget(BaseWidget):
         """Get objects and prepare context for template rendering"""
         try:
             # Get object type
+            current_page = page_context.get("current_page") or page_context.get("page")
+            tenant = getattr(current_page, "tenant", None)
             object_type = ObjectTypeDefinition.objects.get(
-                name=config.object_type, is_active=True
+                name=config.object_type, is_active=True, **({"namespace__tenant": tenant} if tenant else {})
             )
 
             # Build queryset
             queryset = ObjectInstance.objects.filter(object_type=object_type)
+            if tenant:
+                queryset = queryset.filter(tenant=tenant)
 
             # Apply status filter
             if config.status_filter == "published":
@@ -208,22 +182,45 @@ class ObjectListWidget(BaseWidget):
                 from django.utils import timezone
 
                 now = timezone.now()
-                queryset = ObjectInstance.published.published_only(now).filter(
-                    object_type=object_type
-                )
+                queryset = ObjectInstance.published.published_only(now).filter(object_type=object_type)
+                if tenant:
+                    queryset = queryset.filter(tenant=tenant)
             elif config.status_filter != "all":
                 # For draft/archived, use the status field
                 queryset = queryset.filter(status=config.status_filter)
 
             # Apply ordering
-            queryset = queryset.order_by(config.order_by)
+            if config.order_by.lstrip("-") == "publish_date":
+                from django.db.models import OuterRef, Q, Subquery
+                from django.utils import timezone
+
+                from .models import ObjectVersion
+
+                published_version = (
+                    ObjectVersion.objects.filter(object_instance=OuterRef("pk"), effective_date__lte=timezone.now())
+                    .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=timezone.now()))
+                    .order_by("-version_number")
+                )
+                direction = "-" if config.order_by.startswith("-") else ""
+                queryset = queryset.annotate(
+                    published_effective_date=Subquery(published_version.values("effective_date")[:1])
+                ).order_by(f"{direction}published_effective_date", f"{direction}id")
+            else:
+                queryset = queryset.order_by(config.order_by, "id")
 
             # Apply limit
             objects = list(queryset[: config.limit])
 
             # Prepare objects with excerpts
             for obj in objects:
-                obj.excerpt = self._get_excerpt(obj, config)
+                published_version = obj.get_current_published_version()
+                if published_version:
+                    obj.render_publish_date = published_version.effective_date
+                obj.excerpt = self._get_excerpt(
+                    obj,
+                    config,
+                    published_version.data if published_version else {},
+                )
 
             return {
                 "objects": objects,
@@ -245,21 +242,28 @@ class ObjectListWidget(BaseWidget):
                 "config": config,
             }
 
-    def _get_excerpt(self, obj: ObjectInstance, config: ObjectListConfig) -> str:
+    def prepare_template_context(self, config, context=None):
+        parsed = ObjectListConfig(**(config or {}))
+        prepared = super().prepare_template_context(parsed.model_dump(), context)
+        prepared.update(self.get_context_data(parsed, context or {}))
+        return prepared
+
+    def _get_excerpt(self, obj: ObjectInstance, config: ObjectListConfig, data=None) -> str:
         """Extract excerpt from object data"""
         if not config.show_excerpt:
             return ""
+        data = data if data is not None else obj.data
 
         # Use specified field or auto-detect
-        if config.excerpt_field and config.excerpt_field in obj.data:
-            text = str(obj.data[config.excerpt_field])
+        if config.excerpt_field and config.excerpt_field in data:
+            text = str(data[config.excerpt_field])
         else:
             # Auto-detect content field
             content_fields = ["content", "description", "summary", "text", "body"]
             text = ""
             for field in content_fields:
-                if field in obj.data and obj.data[field]:
-                    text = str(obj.data[field])
+                if field in data and data[field]:
+                    text = str(data[field])
                     break
 
         # Truncate to excerpt length
@@ -285,29 +289,29 @@ class ObjectDetailWidget(BaseWidget):
     .object-detail-widget {
         font-family: var(--body-font, inherit);
     }
-    
+
     .object-detail-widget .object-header {
         margin-bottom: var(--header-spacing, 2rem);
         padding-bottom: var(--header-padding, 1rem);
         border-bottom: var(--header-border, 1px solid #e5e7eb);
     }
-    
+
     .object-detail-widget .object-title {
         font-size: var(--detail-title-size, 2rem);
         font-weight: var(--detail-title-weight, 700);
         color: var(--detail-title-color, #1f2937);
         margin-bottom: var(--detail-title-spacing, 0.5rem);
     }
-    
+
     .object-detail-widget .object-meta {
         font-size: var(--detail-meta-size, 0.875rem);
         color: var(--detail-meta-color, #6b7280);
     }
-    
+
     .object-detail-widget .object-content {
         margin: var(--content-spacing, 2rem 0);
     }
-    
+
     .object-detail-widget .object-hierarchy {
         background: var(--hierarchy-bg, #f9fafb);
         padding: var(--hierarchy-padding, 1rem);
@@ -320,23 +324,35 @@ class ObjectDetailWidget(BaseWidget):
         """Get object and prepare context for template rendering"""
         try:
             obj = None
+            object_slug = None
+            current_page = page_context.get("current_page") or page_context.get("page")
+            tenant = getattr(current_page, "tenant", None)
 
             # Get object by ID or slug (using version-based publishing)
             if config.object_id:
+                queryset = ObjectInstance.published.published_only()
+                if tenant:
+                    queryset = queryset.filter(tenant=tenant)
                 obj = (
-                    ObjectInstance.published.published_only()
-                    .select_related("object_type", "parent", "current_version")
+                    queryset.select_related("object_type", "parent", "current_version")
                     .filter(id=config.object_id)
                     .first()
                 )
-            elif config.object_slug and config.object_type:
+            else:
+                path_variables = page_context.get("path_variables", {})
+                object_slug = config.object_slug or next(iter(path_variables.values()), None)
+            if not obj and object_slug and config.object_type:
                 object_type = ObjectTypeDefinition.objects.get(
-                    name=config.object_type, is_active=True
+                    name=config.object_type,
+                    is_active=True,
+                    **({"namespace__tenant": tenant} if tenant else {}),
                 )
+                queryset = ObjectInstance.published.published_only()
+                if tenant:
+                    queryset = queryset.filter(tenant=tenant)
                 obj = (
-                    ObjectInstance.published.published_only()
-                    .select_related("object_type", "parent", "current_version")
-                    .filter(slug=config.object_slug, object_type=object_type)
+                    queryset.select_related("object_type", "parent", "current_version")
+                    .filter(slug=object_slug, object_type=object_type)
                     .first()
                 )
 
@@ -347,7 +363,16 @@ class ObjectDetailWidget(BaseWidget):
                     "config": config,
                 }
 
-            context = {"object": obj, "object_type": obj.object_type, "config": config}
+            published_version = obj.get_current_published_version()
+            if published_version:
+                obj.render_publish_date = published_version.effective_date
+
+            context = {
+                "object": obj,
+                "object_type": obj.object_type,
+                "published_version": published_version,
+                "config": config,
+            }
 
             # Add hierarchy information if requested
             if config.show_hierarchy:
@@ -356,6 +381,8 @@ class ObjectDetailWidget(BaseWidget):
 
                 now = timezone.now()
                 published_qs = ObjectInstance.published.published_only(now)
+                if tenant:
+                    published_qs = published_qs.filter(tenant=tenant)
                 published_ids = list(published_qs.values_list("id", flat=True))
 
                 context.update(
@@ -377,6 +404,21 @@ class ObjectDetailWidget(BaseWidget):
                 "config": config,
             }
 
+    def prepare_template_context(self, config, context=None):
+        parsed = ObjectDetailConfig(**(config or {}))
+        prepared = super().prepare_template_context(parsed.model_dump(), context)
+        prepared.update(self.get_context_data(parsed, context or {}))
+        obj = prepared.get("object")
+        published_version = prepared.get("published_version")
+        if obj and published_version and parsed.show_widgets and context and context.get("renderer"):
+            rendered_widgets = {}
+            for slot_name, widgets in published_version.widgets.items():
+                rendered_widgets[slot_name] = [
+                    context["renderer"].render_widget_json(widget_data, context) for widget_data in widgets
+                ]
+            prepared["rendered_widgets"] = rendered_widgets
+        return prepared
+
 
 @register_widget_type
 class ObjectChildrenWidget(BaseWidget):
@@ -394,59 +436,53 @@ class ObjectChildrenWidget(BaseWidget):
     .object-children-widget {
         font-family: var(--body-font, inherit);
     }
-    
+
     .object-children-widget .children-list {
         margin: var(--children-spacing, 1rem 0);
     }
-    
+
     .object-children-widget .child-item {
         margin: var(--child-spacing, 0.5rem 0);
         padding: var(--child-padding, 0.75rem);
         border-left: var(--child-border, 3px solid #e5e7eb);
         background: var(--child-bg, #f9fafb);
     }
-    
+
     .object-children-widget .child-item.level-1 {
         margin-left: var(--level-1-indent, 1rem);
         border-color: var(--level-1-color, #3b82f6);
     }
-    
+
     .object-children-widget .child-item.level-2 {
         margin-left: var(--level-2-indent, 2rem);
         border-color: var(--level-2-color, #10b981);
     }
-    
+
     .object-children-widget .child-item.level-3 {
         margin-left: var(--level-3-indent, 3rem);
         border-color: var(--level-3-color, #f59e0b);
     }
-    
+
     .object-children-widget .child-title {
         font-weight: var(--child-title-weight, 600);
         color: var(--child-title-color, #1f2937);
         margin-bottom: var(--child-title-spacing, 0.25rem);
     }
-    
+
     .object-children-widget .child-meta {
         font-size: var(--child-meta-size, 0.75rem);
         color: var(--child-meta-color, #6b7280);
     }
     """
 
-    def get_context_data(
-        self, config: ObjectChildrenConfig, page_context: dict
-    ) -> dict:
+    def get_context_data(self, config: ObjectChildrenConfig, page_context: dict) -> dict:
         """Get children objects and prepare context for template rendering"""
         try:
             parent_obj = None
 
             # Get parent object (using version-based publishing)
             if config.parent_object_id:
-                parent_obj = (
-                    ObjectInstance.published.published_only()
-                    .filter(id=config.parent_object_id)
-                    .first()
-                )
+                parent_obj = ObjectInstance.published.published_only().filter(id=config.parent_object_id).first()
             else:
                 # Try to get from page context (if object detail page)
                 parent_obj = page_context.get("object")
@@ -471,9 +507,7 @@ class ObjectChildrenWidget(BaseWidget):
 
             # Apply object type filter
             if config.object_type_filter:
-                object_type = ObjectTypeDefinition.objects.get(
-                    name=config.object_type_filter, is_active=True
-                )
+                object_type = ObjectTypeDefinition.objects.get(name=config.object_type_filter, is_active=True)
                 children = children.filter(object_type=object_type)
 
             # Apply ordering and limit

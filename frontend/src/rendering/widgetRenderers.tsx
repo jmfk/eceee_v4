@@ -589,7 +589,7 @@ const newsFields = (item: any) => {
         thumbnail: item.thumbnailUrl || item.thumbnail_url || data.thumbnailUrl || data.thumbnail_url || data.featuredImage || data.featured_image || item.image,
         excerpt: data.summary || item.summary || data.excerpt || item.excerptText || item.excerpt_text || item.excerpt || '',
         publishDate: data.presentationalPublishingDate || data.presentational_publishing_date || item.publishDate || item.publish_date || metadata.publishDate || metadata.publish_date,
-        pinned: Boolean(item.isPinned || item.is_pinned || metadata.pinned || metadata.featured),
+        pinned: Boolean(item.isPinned || item.is_pinned || item.isFeatured || item.is_featured || metadata.pinned || metadata.featured),
         metadata,
     }
 }
@@ -618,9 +618,10 @@ const NewsListRender: WidgetRenderComponent = ({ widget, context }) => {
         </article>
     })}</div></section>
 }
-const NewsDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
+const NewsDetailRender: WidgetRenderComponent = ({ widget, context, renderWidgets }) => {
     if (widget.data?.status === 'error') return <RenderFailure message={widget.data.error} />
     const item: any = widget.data?.item || value(widget.config, 'item')
+    if (!item && Object.keys(context.pathVariables || {}).length) return null
     if (!item) return <EmptyRender>{value(widget.config, 'emptyMessage', 'empty_message') || 'No news article selected.'}</EmptyRender>
     const fields = newsFields(item)
     const data = item.data || {}
@@ -642,6 +643,32 @@ const NewsDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
         {!hasStructuredWidgets && <SafeHtml className="news-content" html={data.content || data.body || data.text || item.content} />}
         {configEnabled(widget.config, true, 'renderObjectWidgets', 'render_object_widgets') && Object.keys(slots).length > 0 && <div className="news-object-widgets">{Object.entries(slots).map(([slotName, widgets]) => <div className={`news-widget-slot news-widget-slot-${slotName}`} data-slot={slotName} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)}</div>}
         {externalUrl && <div className="news-external-source"><PreviewLink href={externalUrl} rel="noopener noreferrer">Read the original source</PreviewLink></div>}
+    </article>
+}
+const ObjectListRender: WidgetRenderComponent = ({ widget }) => {
+    const state = newsState(widget)
+    if (!Array.isArray(state)) return <section className="object-list-widget" data-widget-type="object-list">{state}</section>
+    const showExcerpt = configEnabled(widget.config, true, 'showExcerpt', 'show_excerpt')
+    const template = value(widget.config, 'displayTemplate', 'display_template') || 'card'
+    return <section className={`object-list-widget template-${template}`} data-widget-type="object-list"><div className="objects-container">{state.map((item, index) => {
+        const fields = newsFields(item)
+        return <article className="object-item" key={item.id || index}>
+            <div className="object-content"><h3 className="object-title"><PreviewLink href={fields.path}>{item.title}</PreviewLink></h3>
+                {showExcerpt && fields.excerpt && <div className="object-excerpt">{fields.excerpt}</div>}
+                <div className="object-meta"><span className="object-type">{fields.objectType.label || fields.objectType.name}</span>{fields.publishDate && <time className="object-date" dateTime={fields.publishDate}> • {formatDisplayDate(fields.publishDate, 'short')}</time>}</div>
+            </div>
+        </article>
+    })}</div></section>
+}
+const ObjectDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
+    const item: any = widget.data?.item
+    if (!item) return <div className="object-detail-widget" data-widget-type="object-detail"><div className="widget-empty"><p>Object not found.</p></div></div>
+    const fields = newsFields(item)
+    const slots: Record<string, unknown> = item.widgets && typeof item.widgets === 'object' ? item.widgets : {}
+    const showWidgets = configEnabled(widget.config, true, 'showWidgets', 'show_widgets')
+    return <article className={`object-detail-widget template-${value(widget.config, 'displayTemplate', 'display_template') || 'full'}`} data-widget-type="object-detail" data-object-id={item.id}>
+        <header className="object-header"><h1 className="object-title">{item.title}</h1><div className="object-meta"><span className="object-type">{fields.objectType.label || fields.objectType.name}</span>{fields.publishDate && <time className="object-date" dateTime={fields.publishDate}> • Published {formatDisplayDate(fields.publishDate)}</time>}</div></header>
+        <div className="object-content">{showWidgets && Object.entries(slots).map(([slotName, widgets]) => <div className="widget-slot" data-slot={slotName} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)}</div>
     </article>
 }
 const TopNewsPlugRender: WidgetRenderComponent = ({ widget }) => {
@@ -706,6 +733,11 @@ export const RENDER_WIDGET_COMPONENTS: Record<string, WidgetRenderComponent> = {
     'easy_widgets.TopNewsPlugWidget': TopNewsPlugRender,
     'easy_widgets.SidebarTopNewsWidget': SidebarTopNewsRender,
     'easy_widgets.SectionWidget': SectionRender,
+}
+
+export const PUBLIC_DATA_WIDGET_COMPONENTS: Record<string, WidgetRenderComponent> = {
+    'object_storage.ObjectListWidget': ObjectListRender,
+    'object_storage.ObjectDetailWidget': ObjectDetailRender,
 }
 
 export const DESIGNER_RENDER_WIDGET_COMPONENTS: Record<string, WidgetRenderComponent> = {

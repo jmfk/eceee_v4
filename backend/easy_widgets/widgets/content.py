@@ -182,6 +182,13 @@ class ContentWidget(BaseWidget):
         padding-bottom: 50px;
         outline: 1px solid rgb(0,0,0,0.3);
     }
+    .content-widget .media-insert,
+    .content-widget .media-insert img {
+        max-width: 100%;
+    }
+    .content-widget .media-insert img {
+        height: auto;
+    }
     """
 
     not_used = """
@@ -467,7 +474,7 @@ class ContentWidget(BaseWidget):
                     items.append(
                         {
                             "id": str(file.id),
-                            "url": (file.get_file_url() if hasattr(file, "get_file_url") else file.file_url),
+                            "url": file.file_url or (file.get_file_url() if hasattr(file, "get_file_url") else ""),
                             "alt_text": title or file.title or "",
                             "caption": caption or file.description or "",
                             "title": title or file.title or "",
@@ -477,7 +484,9 @@ class ContentWidget(BaseWidget):
                     )
             else:
                 media_file = MediaFile.objects.get(id=media_id)
-                file_url = media_file.get_file_url() if hasattr(media_file, "get_file_url") else media_file.file_url
+                file_url = media_file.file_url or (
+                    media_file.get_file_url() if hasattr(media_file, "get_file_url") else ""
+                )
 
                 has_template = style and style.get("template", "").strip()
                 if imgproxy_config and not has_template:
@@ -507,18 +516,26 @@ class ContentWidget(BaseWidget):
                         format=imgproxy_config.get("format"),
                     )
                     img_url = responsive.get("1x", {}).get("url", file_url)
+                    display_width = responsive.get("1x", {}).get("width")
+                    display_height = responsive.get("1x", {}).get("height")
                     srcset = responsive.get("srcset", "")
                     alt = title or media_file.title or ""
                     cap_html = f"<figcaption>{escape(caption)}</figcaption>" if caption else ""
                     srcset_attr = f' srcset="{escape(srcset)}"' if srcset else ""
+                    size_attr = (
+                        f' width="{int(display_width)}" height="{int(display_height)}"'
+                        if display_width and display_height
+                        else ""
+                    )
 
                     # Use width and alignment classes for display
                     width_class = f"img-width-{escape(width)}"
                     align_class = f"media-align-{escape(align)}"
 
                     img_tag = (
-                        f'<img src="{escape(img_url)}"{srcset_attr}'
-                        f' alt="{escape(alt)}" class="{width_class}" loading="lazy" />'
+                        f'<img src="{escape(img_url)}"{srcset_attr}{size_attr}'
+                        f' alt="{escape(alt)}" class="{width_class}"'
+                        ' style="max-width:100%;height:auto" loading="lazy" />'
                     )
                     # Generate lightbox URL using lightbox_config
                     lb_url = file_url
@@ -555,7 +572,10 @@ class ContentWidget(BaseWidget):
                             f"{img_tag}</a>"
                         )
 
-                    return f'<figure class="media-insert {width_class} {align_class}">' f"{img_tag}{cap_html}</figure>"
+                    return (
+                        f'<figure class="media-insert {width_class} {align_class}" style="width:100%;max-width:100%">'
+                        f"{img_tag}{cap_html}</figure>"
+                    )
 
                 items.append(
                     {

@@ -1,5 +1,5 @@
 import { Pool, type PoolClient } from 'pg';
-import { normalizeHostname, type Page, type PageReader, type PublicMediaItem, type ReadDb, type Theme, type Version } from './model';
+import { normalizeHostname, type Page, type PageReader, type PublicMediaItem, type PublishedObject, type ReadDb, type Theme, type Version } from './model';
 let pool: Pool | undefined;
 type PublicMediaRow = PublicMediaItem & { file_path: string };
 
@@ -155,6 +155,44 @@ function reader(client: PoolClient): PageReader {
         (collections[collection_id] ??= []).push(publicMediaItem(item));
       }
       return { files: files.rows.map(publicMediaItem), collections };
+    },
+    async publishedObjects(query, tenantId, at) {
+      const typeIds = (query.objectTypeIds ?? []).filter(value => /^\d+$/.test(value));
+      const typeNames = (query.objectTypeNames ?? []).filter(value => /^[a-z0-9_-]+$/i.test(value));
+      if (!typeIds.length && !typeNames.length) return [];
+      const sortOrders: Record<string, string> = {
+        '-publish_date': 'published.effective_date DESC, object.id DESC',
+        publish_date: 'published.effective_date, object.id',
+        '-created_at': 'object.created_at DESC, object.id DESC',
+        created_at: 'object.created_at, object.id',
+        title: 'object.title, object.id',
+        '-title': 'object.title DESC, object.id DESC',
+      };
+      const order = sortOrders[query.sortOrder] ?? sortOrders['-publish_date'];
+      const featured = query.featuredFirst ? 'published.is_featured DESC, ' : '';
+      const result = await client.query<PublishedObject>(`
+        SELECT object.id::text, object.title, object.slug,
+          jsonb_build_object('id', type.id::text, 'name', type.name, 'label', type.label, 'pluralLabel', type.plural_label) AS "objectType",
+          published.data, published.widgets, object.metadata,
+          published.effective_date::text AS "publishDate", published.is_featured AS "isFeatured"
+        FROM object_storage_objectinstance AS object
+        JOIN object_storage_objecttypedefinition AS type ON type.id = object.object_type_id
+        JOIN LATERAL (
+          SELECT version.data, version.widgets, version.effective_date, version.is_featured
+          FROM object_storage_objectversion AS version
+          WHERE version.object_instance_id = object.id
+            AND version.effective_date <= $4
+            AND (version.expiry_date IS NULL OR version.expiry_date > $4)
+          ORDER BY version.version_number DESC
+          LIMIT 1
+        ) AS published ON true
+        WHERE object.tenant_id = $1
+          AND ($2::bigint[] <> '{}'::bigint[] AND type.id = ANY($2::bigint[])
+            OR $3::text[] <> '{}'::text[] AND type.name = ANY($3::text[]))
+          AND ($5::text IS NULL OR object.slug = $5)
+        ORDER BY ${featured}${order}
+        LIMIT $6`, [tenantId, typeIds, typeNames, at, query.slug ?? null, Math.min(Math.max(query.limit, 1), 50)]);
+      return result.rows;
     },
   };
 }

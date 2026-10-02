@@ -1,12 +1,12 @@
 {% load static %}
 
 <div class="widget-type-{{ widget_type.css_class_name }}" data-widget-type="forms">
-    {% if config.form_title %}
+    {% if config.title %}
         <header class="form-header">
-            <h2 class="form-title">{{ config.form_title }}</h2>
-            {% if config.form_description %}
+            <h2 class="form-title">{{ config.title }}</h2>
+            {% if config.description %}
                 <div class="form-description">
-                    {{ config.form_description|linebreaks }}
+                    {{ config.description|linebreaks }}
                 </div>
             {% endif %}
         </header>
@@ -414,4 +414,4 @@ document.addEventListener('DOMContentLoaded', function() {
         width: 100%;
     }
 }
-</style> 
+</style>

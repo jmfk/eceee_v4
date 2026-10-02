@@ -60,6 +60,7 @@ const reader: PageReader = {
   publishedPageReferences: async () => [],
   publishedNavigationPages: async () => [],
   publicMedia: async () => ({ files: [], collections: {} }),
+  publishedObjects: async () => [],
 };
 const db: ReadDb = { withSnapshot: async read => read(reader) };
 
@@ -319,8 +320,9 @@ describe('public resolution', () => {
   });
 
   it('resolves same-site page links and public media collections inside one snapshot', async () => {
+    const inlineMediaId = '411f8c75-c95a-429b-a485-65839b868795';
     const publishedPageReferences = vi.fn(async (ids: string[], tenant: string, site: string) => ids.includes(child.id) && tenant === root.tenant_id && site === root.id ? [{ id: child.id, cached_path: '/news/' }] : []);
-    const publicMedia = vi.fn(async () => ({ files: [], collections: { '67d9020f-1d73-47be-bd24-1fe52d2dbef8': [{ id: 'a', url: '/logo.png', type: 'image', altText: 'Partner', caption: '', annotation: '', title: 'Partner', width: 100, height: 50, thumbnailUrl: '/logo.png' }] } }));
+    const publicMedia = vi.fn(async () => ({ files: [{ id: inlineMediaId, url: '/inline.png', type: 'image' as const, altText: 'Inline', caption: '', annotation: '', title: 'Inline', width: 460, height: 275, thumbnailUrl: '/inline.png' }], collections: { '67d9020f-1d73-47be-bd24-1fe52d2dbef8': [{ id: 'a', url: '/logo.png', type: 'image' as const, altText: 'Partner', caption: '', annotation: '', title: 'Partner', width: 100, height: 50, thumbnailUrl: '/logo.png' }] } }));
     const enrichedReader: PageReader = {
       ...reader,
       version: async (id, at) => {
@@ -328,7 +330,7 @@ describe('public resolution', () => {
         if (id !== article.id || !selected) return selected;
         return version({ ...selected, widgets: { main: [
           { id: 'nav', type: 'easy_widgets.NavigationWidget', config: { menuItems: [{ linkData: { type: 'internal', pageId: child.id, anchor: 'agenda', label: 'News' } }, { linkData: { type: 'internal', pageId: '999', label: 'Missing' } }, { linkData: { type: 'internal', pageId: 'invalid', label: 'Invalid' } }] } },
-          { id: 'copy', type: 'easy_widgets.ContentWidget', config: { content: '<p><a data-page-id="2" href="#">News</a><a href="{&quot;type&quot;:&quot;internal&quot;,&quot;pageId&quot;:2,&quot;anchor&quot;:&quot;details&quot;}">Structured</a><a href="{&quot;type&quot;:&quot;external&quot;,&quot;url&quot;:&quot;https://example.net&quot;}">External</a><a data-page-id="999" href="#">Missing</a></p>' } },
+          { id: 'copy', type: 'easy_widgets.ContentWidget', config: { content: `<p><a data-page-id="2" href="#">News</a><a href="{&quot;type&quot;:&quot;internal&quot;,&quot;pageId&quot;:2,&quot;anchor&quot;:&quot;details&quot;}">Structured</a><a href="{&quot;type&quot;:&quot;external&quot;,&quot;url&quot;:&quot;https://example.net&quot;}">External</a><a data-page-id="999" href="#">Missing</a></p><div data-media-insert="true" data-media-id="${inlineMediaId}" data-width="medium"><img src="/old.png"></div>` } },
           { id: 'logos', type: 'easy_widgets.ImageWidget', config: { collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8', display_type: 'gallery' } },
           { id: 'section', type: 'easy_widgets.SectionWidget', config: { slots: { content: [
             { id: 'nested-logos', type: 'easy_widgets.ImageWidget', config: { collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8' } },
@@ -352,6 +354,9 @@ describe('public resolution', () => {
     expect(model?.slots.main[1].config.content).toContain('href="/news/#details"');
     expect(model?.slots.main[1].config.content).toContain('href="https://example.net"');
     expect(model?.slots.main[1].config.content).not.toContain('href="#"');
+    expect(model?.slots.main[1].config.content).toContain('src="/inline.png"');
+    expect(model?.slots.main[1].config.content).toContain('width="460" height="275"');
+    expect(model?.slots.main[1].config.content).not.toContain('style="width:100%');
     expect(model?.slots.main[2].config.mediaItems).toEqual([expect.objectContaining({ url: '/logo.png' })]);
     const nested = (model?.slots.main[3].config.slots as Record<string, Widget[]>).content;
     expect(nested[0].config.mediaItems).toEqual([expect.objectContaining({ url: '/logo.png' })]);
@@ -361,11 +366,41 @@ describe('public resolution', () => {
       currentChildren: [expect.objectContaining({ label: 'Child', path: '/news/story/child/' })],
     });
     expect(publishedPageReferences).toHaveBeenCalledWith([child.id, '999'], root.tenant_id, root.id, expect.any(Date));
-    expect(publicMedia).toHaveBeenCalledWith([], ['67d9020f-1d73-47be-bd24-1fe52d2dbef8'], root.tenant_id);
+    expect(publicMedia).toHaveBeenCalledWith([inlineMediaId], ['67d9020f-1d73-47be-bd24-1fe52d2dbef8'], root.tenant_id);
   });
 
-  it('rejects dynamic patterns', async () => {
-    const dynamic = { ...reader, child: async () => page({ ...child, path_pattern: 'article' }) };
-    expect(await buildPublishedPageModel({ withSnapshot: async read => read(dynamic) }, 'example.org', '/news')).toBeNull();
+  it('resolves registered dynamic paths and published object list/detail data', async () => {
+    const dynamicPage = page({ ...child, path_pattern: 'news_slug' });
+    const publishedObjects = vi.fn(async (query: { slug?: string }) => [{
+      id: '41', title: 'Dynamic story', slug: query.slug || 'dynamic-story',
+      objectType: { id: '5', name: 'news', label: 'News', pluralLabel: 'News' },
+      data: { summary: 'Resolved from a published object version.' }, widgets: {}, metadata: {},
+      publishDate: '2026-05-01T00:00:00Z', isFeatured: false,
+    }]);
+    const dynamic = {
+      ...reader,
+      child: async (parent: string, tenant: string, slug: string) => parent === root.id && tenant === root.tenant_id && slug === 'news' ? dynamicPage : null,
+      version: async (id: string, at: Date) => id === dynamicPage.id && at < new Date('2027-01-01') ? version({
+        id: '11', page_id: dynamicPage.id, widgets: { main: [
+          { id: 'list', type: 'easy_widgets.NewsListWidget', config: { objectTypes: [5], limit: 4 } },
+          { id: 'detail', type: 'easy_widgets.NewsDetailWidget', config: { objectTypes: [5], slugVariableName: 'news_slug' } },
+        ] },
+      }) : reader.version(id, at),
+      publishedObjects,
+    };
+    const model = await buildPublishedPageModel({ withSnapshot: async read => read(dynamic) }, 'example.org', '/news/dynamic-story', new Date('2026-06-01'));
+    expect(model?.matchedPath).toBe('/news');
+    expect(model?.remainingPath).toBe('dynamic-story/');
+    expect(model?.context.pathVariables).toEqual({ news_slug: 'dynamic-story' });
+    expect(model?.slots.main[0].data?.items).toEqual([expect.objectContaining({ path: '/news/dynamic-story/' })]);
+    expect(model?.slots.main[1].data?.item).toEqual(expect.objectContaining({ slug: 'dynamic-story' }));
+    expect(publishedObjects).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects unknown, malformed and unmatched dynamic paths', async () => {
+    const unknown = { ...reader, child: async () => page({ ...child, path_pattern: 'unknown' }) };
+    expect(await buildPublishedPageModel({ withSnapshot: async read => read(unknown) }, 'example.org', '/news/story')).toBeNull();
+    const dynamic = { ...reader, child: async () => page({ ...child, path_pattern: 'date_slug' }) };
+    expect(await buildPublishedPageModel({ withSnapshot: async read => read(dynamic) }, 'example.org', '/news/not-a-date')).toBeNull();
   });
 });

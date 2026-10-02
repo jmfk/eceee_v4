@@ -2,8 +2,9 @@
 Forms widget implementation.
 """
 
-from typing import Type, Optional, List, Literal, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, Dict, List, Literal, Optional, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
@@ -35,9 +36,7 @@ class FormField(BaseModel):
     required: bool = Field(False, description="Required field")
     placeholder: Optional[str] = Field(None, description="Placeholder text")
     default_value: Optional[str] = Field(None, description="Default value")
-    options: Optional[List[str]] = Field(
-        None, description="Options for select/radio fields"
-    )
+    options: Optional[List[str]] = Field(None, description="Options for select/radio fields")
     validation: Optional[Dict[str, Any]] = Field(
         None, description="Validation rules (min_length, max_length, pattern, etc.)"
     )
@@ -152,15 +151,9 @@ class FormsConfig(BaseModel):
         },
     )
     email_notifications: bool = Field(False, description="Send email notifications")
-    notification_email: Optional[str] = Field(
-        None, description="Notification email address"
-    )
-    store_submissions: bool = Field(
-        True, description="Store form submissions in database"
-    )
-    honeypot_protection: bool = Field(
-        True, description="Enable honeypot spam protection"
-    )
+    notification_email: Optional[str] = Field(None, description="Notification email address")
+    store_submissions: bool = Field(True, description="Store form submissions in database")
+    honeypot_protection: bool = Field(True, description="Enable honeypot spam protection")
     recaptcha_enabled: bool = Field(False, description="Enable reCAPTCHA protection")
     css_framework: Literal["default", "bootstrap", "tailwind", "custom"] = Field(
         "default", description="CSS framework for styling"
@@ -227,7 +220,7 @@ class FormsWidget(BaseWidget):
         max-width: var(--form-max-width, 600px);
         margin: var(--form-margin, 0 auto);
     }
-    
+
     .forms-widget .form-title {
         font-size: var(--form-title-size, 1.5rem);
         font-weight: var(--form-title-weight, 600);
@@ -235,18 +228,18 @@ class FormsWidget(BaseWidget):
         margin-bottom: var(--form-title-margin, 1rem);
         text-align: var(--form-title-align, center);
     }
-    
+
     .forms-widget .form-description {
         color: var(--form-description-color, #6b7280);
         margin-bottom: var(--form-description-margin, 2rem);
         text-align: var(--form-description-align, center);
         line-height: var(--form-description-line-height, 1.6);
     }
-    
+
     .forms-widget .form-group {
         margin-bottom: var(--form-group-margin, 1.5rem);
     }
-    
+
     .forms-widget label {
         display: block;
         font-weight: var(--form-label-weight, 500);
@@ -254,11 +247,11 @@ class FormsWidget(BaseWidget):
         margin-bottom: var(--form-label-margin, 0.5rem);
         font-size: var(--form-label-size, 0.875rem);
     }
-    
+
     .forms-widget .required {
         color: var(--form-required-color, #dc2626);
     }
-    
+
     .forms-widget input[type="text"],
     .forms-widget input[type="email"],
     .forms-widget input[type="tel"],
@@ -274,7 +267,7 @@ class FormsWidget(BaseWidget):
         color: var(--form-input-color, #1f2937);
         transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
     }
-    
+
     .forms-widget input:focus,
     .forms-widget textarea:focus,
     .forms-widget select:focus {
@@ -282,32 +275,32 @@ class FormsWidget(BaseWidget):
         border-color: var(--form-input-focus-border, #3b82f6);
         box-shadow: var(--form-input-focus-shadow, 0 0 0 3px rgba(59, 130, 246, 0.1));
     }
-    
+
     .forms-widget textarea {
         min-height: var(--form-textarea-height, 120px);
         resize: vertical;
     }
-    
+
     .forms-widget .checkbox-group,
     .forms-widget .radio-group {
         display: flex;
         flex-direction: column;
         gap: var(--form-option-gap, 0.5rem);
     }
-    
+
     .forms-widget .checkbox-item,
     .forms-widget .radio-item {
         display: flex;
         align-items: center;
         gap: var(--form-option-item-gap, 0.5rem);
     }
-    
+
     .forms-widget input[type="checkbox"],
     .forms-widget input[type="radio"] {
         width: auto;
         margin: 0;
     }
-    
+
     .forms-widget .submit-button {
         background-color: var(--form-submit-bg, #3b82f6);
         color: var(--form-submit-color, #ffffff);
@@ -322,22 +315,22 @@ class FormsWidget(BaseWidget):
         margin: var(--form-submit-margin, 1rem auto 0);
         display: block;
     }
-    
+
     .forms-widget .submit-button:hover {
         background-color: var(--form-submit-hover-bg, #2563eb);
     }
-    
+
     .forms-widget .submit-button:disabled {
         background-color: var(--form-submit-disabled-bg, #9ca3af);
         cursor: not-allowed;
     }
-    
+
     .forms-widget .form-error {
         color: var(--form-error-color, #dc2626);
         font-size: var(--form-error-size, 0.875rem);
         margin-top: var(--form-error-margin, 0.25rem);
     }
-    
+
     .forms-widget .form-success {
         background-color: var(--form-success-bg, #dcfce7);
         color: var(--form-success-color, #166534);
@@ -407,6 +400,11 @@ class FormsWidget(BaseWidget):
     def configuration_model(self) -> Type[BaseModel]:
         return FormsConfig
 
+    def prepare_template_context(self, config, context=None):
+        """Normalize the frontend-owned camelCase payload for Django templates."""
+        normalized = FormsConfig(**(config or {})).model_dump()
+        return super().prepare_template_context(normalized, context)
+
     def render_with_style(self, config, theme):
         """
         Render form with custom component style from theme.
@@ -418,11 +416,12 @@ class FormsWidget(BaseWidget):
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import (
-            render_mustache,
-            prepare_component_context,
-        )
         from django.template.loader import render_to_string
+
+        from webpages.utils.mustache_renderer import (
+            prepare_component_context,
+            render_mustache,
+        )
 
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":

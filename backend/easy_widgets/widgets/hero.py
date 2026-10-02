@@ -2,8 +2,9 @@
 Hero widget implementation.
 """
 
-from typing import Type, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
@@ -194,8 +195,8 @@ class HeroWidget(BaseWidget):
     }
     .hero-widget:last-child {
         margin-bottom: 0;
-    }   
-    
+    }
+
     .hero-content {
         position: relative;
         max-width: 1200px;
@@ -228,7 +229,7 @@ class HeroWidget(BaseWidget):
         margin: 0;
         color: var(--hero-decor-color, #ffffff);
     }
-    
+
     .hero-widget .after-text {
         font-size: 24px;
         line-height: 24px;
@@ -236,21 +237,21 @@ class HeroWidget(BaseWidget):
         margin: 0;
         color: var(--hero-text-color, #ffffff);
     }
-    
+
     @media (max-width: 768px) {
         .hero-widget {
             padding: 0;
         }
-        
+
         .hero-widget h1 {
             font-size: 32px;
             line-height: 36px;
         }
-        
+
         .hero-widget .before-text {
             font-size: 18px;
         }
-        
+
         .hero-widget .after-text {
             font-size: 18px;
         }
@@ -275,8 +276,8 @@ class HeroWidget(BaseWidget):
             Tuple of (html, css) or None for default rendering
         """
         from webpages.utils.mustache_renderer import (
-            render_mustache,
             prepare_component_context,
+            render_mustache,
         )
 
         style_name = config.get("component_style", "default")
@@ -306,9 +307,7 @@ class HeroWidget(BaseWidget):
         # Render the hero HTML using the default template first
         from django.template.loader import render_to_string
 
-        hero_html = render_to_string(
-            self.template_name, {"config": prepared_config, "widget_type": self}
-        )
+        hero_html = render_to_string(self.template_name, {"config": prepared_config, "widget_type": self})
 
         # Prepare context with rendered hero as content
         context = prepare_component_context(
@@ -327,10 +326,10 @@ class HeroWidget(BaseWidget):
         Prepare template context with snake_case field conversions and layout properties.
         """
         from file_manager.imgproxy import imgproxy_service
-        from webpages.utils.color_utils import resolve_color_value
         from webpages.services.link_resolver import resolve_links_in_html
+        from webpages.utils.color_utils import resolve_color_value
 
-        template_config = config.copy() if config else {}
+        template_config = HeroConfig(**(config or {})).model_dump()
 
         # Resolve links in rich text fields
         request = context.get("request") if context else None
@@ -348,9 +347,9 @@ class HeroWidget(BaseWidget):
         # Build CSS variables for colors
         style_parts = []
 
-        text_color = config.get("text_color", "#ffffff")
-        decor_color = config.get("decor_color", "#cccccc")
-        background_color = config.get("background_color", "#000000")
+        text_color = template_config.get("text_color", "#ffffff")
+        decor_color = template_config.get("decor_color", "#cccccc")
+        background_color = template_config.get("background_color", "#000000")
 
         # Convert color names to CSS variables if they're in theme colors
         text_color = resolve_color_value(text_color, theme_colors)
@@ -362,7 +361,7 @@ class HeroWidget(BaseWidget):
         style_parts.append(f"--hero-bg-color: {background_color};")
 
         # Process background image if provided (1x and 2x)
-        image = config.get("image")
+        image = template_config.get("image")
         if image:
             imgproxy_base_url = image.get("imgproxy_base_url")
             if imgproxy_base_url:
@@ -396,13 +395,11 @@ class HeroWidget(BaseWidget):
 
             # Find layout properties for hero parts
             for group in groups:
-                layout_props = group.get("layoutProperties") or group.get(
-                    "layout_properties", {}
-                )
+                layout_props = group.get("layoutProperties") or group.get("layout_properties", {})
 
                 # Extract properties for hero-widget (main container)
                 if "hero-widget" in layout_props:
-                    part_props = layout_props["hero-widget"]
+                    pass
                     # Note: Layout properties can be applied via CSS from design groups
                     # This is just for awareness - actual application happens in rendering
 
