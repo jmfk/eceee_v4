@@ -100,6 +100,7 @@ def ensure_news_preview_page(*, tenant, user, news_object_type_id: int) -> WebPa
                         "showFeaturedImage": True,
                         "showObjectType": True,
                         "renderObjectWidgets": True,
+                        "emptyMessage": "Select a golden sample by opening its article slug under this preview URL.",
                     },
                 }
             ]

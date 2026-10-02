@@ -2,8 +2,9 @@
 Table widget implementation.
 """
 
-from typing import Type, Optional, List, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Literal, Optional, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
@@ -59,34 +60,18 @@ class TableCell(BaseModel):
         populate_by_name=True,
     )
 
-    content_type: Literal["text", "image"] = Field(
-        "text", description="Cell content type"
-    )
+    content_type: Literal["text", "image"] = Field("text", description="Cell content type")
     content: str = Field("", description="Cell content (HTML for text cells)")
-    image_data: Optional[CellImageData] = Field(
-        None, description="Image data if cell type is image"
-    )
+    image_data: Optional[CellImageData] = Field(None, description="Image data if cell type is image")
     colspan: int = Field(1, ge=1, description="Number of columns to span")
     rowspan: int = Field(1, ge=1, description="Number of rows to span")
-    font_style: Literal["normal", "quote", "caption"] = Field(
-        "normal", description="Font style preset"
-    )
-    alignment: Literal["left", "center", "right"] = Field(
-        "left", description="Text alignment"
-    )
-    borders: Optional[BorderConfig] = Field(
-        None, description="Per-side border configuration"
-    )
-    background_color: Optional[str] = Field(
-        None, description="Background color (hex or CSS color)"
-    )
+    font_style: Literal["normal", "quote", "caption"] = Field("normal", description="Font style preset")
+    alignment: Literal["left", "center", "right"] = Field("left", description="Text alignment")
+    borders: Optional[BorderConfig] = Field(None, description="Per-side border configuration")
+    background_color: Optional[str] = Field(None, description="Background color (hex or CSS color)")
     text_color: Optional[str] = Field(None, description="Text color (hex or CSS color)")
-    hover_bg_color: Optional[str] = Field(
-        None, description="Hover background color (hex or CSS color)"
-    )
-    hover_text_color: Optional[str] = Field(
-        None, description="Hover text color (hex or CSS color)"
-    )
+    hover_bg_color: Optional[str] = Field(None, description="Hover background color (hex or CSS color)")
+    hover_text_color: Optional[str] = Field(None, description="Hover text color (hex or CSS color)")
     css_class: Optional[str] = Field(None, description="Additional CSS class")
 
 
@@ -99,9 +84,7 @@ class TableRow(BaseModel):
     )
 
     cells: List[TableCell] = Field(..., description="List of cells in this row")
-    height: Optional[str] = Field(
-        None, description="Row height (CSS value: auto, 50px, 3rem)"
-    )
+    height: Optional[str] = Field(None, description="Row height (CSS value: auto, 50px, 3rem)")
     is_header: bool = Field(False, description="Whether this is a header row")
     background_color: Optional[str] = Field(None, description="Row background color")
     css_class: Optional[str] = Field(None, description="Additional CSS class")
@@ -116,9 +99,7 @@ class TableConfig(BaseModel):
     )
 
     rows: List[TableRow] = Field(..., min_items=1, description="Table rows")
-    column_widths: List[str] = Field(
-        default_factory=list, description="Column widths (CSS values: auto, 200px, 30%)"
-    )
+    column_widths: List[str] = Field(default_factory=list, description="Column widths (CSS values: auto, 200px, 30%)")
     caption: Optional[str] = Field(None, description="Table caption")
     show_borders: bool = Field(True, description="Show table borders")
     striped_rows: bool = Field(False, description="Alternate row colors")
@@ -175,15 +156,15 @@ class TableWidget(BaseWidget):
     }
     .table-widget:last-child {
         margin-bottom: 0;
-    }    
-    
+    }
+
     .table-widget table {
         width: 100%;
         border-collapse: collapse;
         font-family: var(--table-font, inherit);
         background-color: var(--table-bg, transparent);
     }
-    
+
     .table-widget th,
     .table-widget td {
         padding: var(--cell-padding, 0.75rem);
@@ -192,18 +173,18 @@ class TableWidget(BaseWidget):
         vertical-align: var(--cell-vertical-alignment, top);
         transition: background-color 0.2s ease, color 0.2s ease;
     }
-    
+
     .table-widget th {
         background-color: var(--header-bg, #f3f4f6);
         color: var(--header-color, #1f2937);
         font-weight: var(--header-font-weight, 600);
     }
-    
+
     .table-widget td {
         background-color: var(--cell-bg, transparent);
         color: var(--cell-color, inherit);
     }
-    
+
     /* Font style presets */
     .table-cell-quote {
         font-style: italic;
@@ -211,53 +192,53 @@ class TableWidget(BaseWidget):
         border-left: 3px solid var(--quote-border-color, #d1d5db);
         color: var(--quote-color, #6b7280);
     }
-    
+
     .table-cell-caption {
         font-size: 0.875rem;
         color: var(--caption-color, #6b7280);
         font-weight: 400;
     }
-    
+
     /* Alignment classes */
     .table-widget .cell-center {
         text-align: center;
     }
-    
+
     .table-widget .cell-right {
         text-align: right;
     }
-    
+
     .table-widget .cell-left {
         text-align: left;
     }
-    
+
     /* Image cells */
     .table-widget .cell-image {
         padding: 0.25rem;
     }
-    
+
     .table-widget .cell-image img {
         max-width: 100%;
         height: auto;
         display: block;
     }
-    
+
     /* Striped rows */
     .table-widget.table-striped tr:nth-child(even) td {
         background-color: var(--row-even-bg, #f9fafb);
     }
-    
+
     /* Hover effect */
     .table-widget.table-hover tr:hover td {
         background-color: var(--row-hover-bg, #f3f4f6);
     }
-    
+
     /* Responsive table */
     @media (max-width: 768px) {
         .table-widget.table-responsive {
             font-size: var(--mobile-font-size, 0.875rem);
         }
-        
+
         .table-widget.table-responsive th,
         .table-widget.table-responsive td {
             padding: var(--mobile-cell-padding, 0.5rem);
@@ -293,6 +274,19 @@ class TableWidget(BaseWidget):
     def configuration_model(self) -> Type[BaseModel]:
         return TableConfig
 
+    def prepare_template_context(self, config, context=None):
+        """Normalize editor/API camelCase config for the Django template."""
+        template_config = super().prepare_template_context(config, context)
+        try:
+            normalized = TableConfig(**config).model_dump()
+        except Exception:
+            return template_config
+        normalized["use_content_margins"] = normalized.pop("useContentMargins", False)
+        normalized["variant_classes"] = template_config.get("variant_classes", "")
+        if "_context" in template_config:
+            normalized["_context"] = template_config["_context"]
+        return normalized
+
     def render_with_style(self, config, theme):
         """
         Render table with custom component style from theme.
@@ -304,11 +298,12 @@ class TableWidget(BaseWidget):
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import (
-            render_mustache,
-            prepare_component_context,
-        )
         from django.template.loader import render_to_string
+
+        from webpages.utils.mustache_renderer import (
+            prepare_component_context,
+            render_mustache,
+        )
 
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
@@ -341,17 +336,6 @@ class TableWidget(BaseWidget):
         # Render with style template
         html = render_mustache(template, context)
         return html, css
-
-    def prepare_template_context(self, config, context=None):
-        """Prepare template context with snake_case field conversions"""
-        template_config = super().prepare_template_context(config, context)
-
-        # Ensure snake_case fields for template
-        template_config["use_content_margins"] = config.get(
-            "use_content_margins", False
-        )
-
-        return template_config
 
     @staticmethod
     def get_default_config():

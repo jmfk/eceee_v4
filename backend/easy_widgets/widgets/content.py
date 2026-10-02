@@ -2,12 +2,13 @@
 Content widget implementation.
 """
 
-from typing import Type
-from pydantic import BaseModel, Field, ConfigDict
-from pydantic.alias_generators import to_camel
-from bs4 import BeautifulSoup
 import logging
+from typing import Type
+
+from bs4 import BeautifulSoup
 from django.core.exceptions import ValidationError
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 
@@ -173,7 +174,7 @@ class ContentWidget(BaseWidget):
         font-family: inherit;
         line-height: 1.6;
         color: inherit;
-        margin-bottom: 30px;        
+        margin-bottom: 30px;
     }
     .content-widget.border-enabled {
         padding-top: 50px;
@@ -193,24 +194,24 @@ class ContentWidget(BaseWidget):
         margin-bottom: 0.5rem;
         font-weight: 600;
     }
-    
+
     .content-widget p {
         margin: 1rem 0;
     }
-    
+
     .content-widget ul,
     .content-widget ol {
         margin: 1rem 0;
         padding-left: 1.5rem;
     }
-    
+
     .content-widget blockquote {
         border-left: 4px solid #e5e7eb;
         padding: 1rem;
         margin: 1.5rem 0;
         color: #6b7280;
     }
-    
+
     .content-widget code {
         background-color: #f3f4f6;
         padding: 0.125rem 0.25rem;
@@ -218,7 +219,7 @@ class ContentWidget(BaseWidget):
         font-family: monospace;
         font-size: 0.875rem;
     }
-    
+
     .content-widget pre {
         background-color: #1f2937;
         color: #f9fafb;
@@ -227,7 +228,7 @@ class ContentWidget(BaseWidget):
         margin: 1.5rem 0;
         overflow-x: auto;
     }
-    
+
     .content-widget pre code {
         background-color: transparent;
         padding: 0;
@@ -254,8 +255,8 @@ class ContentWidget(BaseWidget):
             Tuple of (html, css) or None for default rendering
         """
         from webpages.utils.mustache_renderer import (
-            render_mustache,
             prepare_component_context,
+            render_mustache,
         )
 
         style_name = config.get("component_style", "default")
@@ -328,7 +329,12 @@ class ContentWidget(BaseWidget):
             media_type = media_insert.get("data-media-type", "image")
             media_id = media_insert.get("data-media-id")
             caption = media_insert.get("data-caption", "")
-            title = media_insert.get("data-title", "")
+            image = media_insert.find("img")
+            title = (
+                media_insert.get("data-alt-text", "")
+                or (image.get("alt", "") if image else "")
+                or media_insert.get("data-title", "")
+            )
             width = media_insert.get("data-width", "full")
             align = media_insert.get("data-align", "center")
 
@@ -420,12 +426,12 @@ class ContentWidget(BaseWidget):
         Returns:
             HTML string with styled content, or None on error
         """
-        from webpages.utils.mustache_renderer import (
-            render_mustache,
-            prepare_gallery_context,
-        )
-        from file_manager.models import MediaFile, MediaCollection
         from file_manager.imgproxy import imgproxy_service
+        from file_manager.models import MediaCollection, MediaFile
+        from webpages.utils.mustache_renderer import (
+            prepare_gallery_context,
+            render_mustache,
+        )
 
         def _resolve_style(key):
             if not key or not theme:

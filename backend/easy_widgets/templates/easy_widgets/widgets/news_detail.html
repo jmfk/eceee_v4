@@ -57,7 +57,8 @@
             {% for slot_name, widgets in rendered_widgets.items %}
                 <div class="news-widget-slot news-widget-slot-{{ slot_name }}" data-slot="{{ slot_name }}">
                     {% for widget_html in widgets %}
-                        {{ widget_html|sanitize_html }}
+                        {# Nested widgets are already rendered and sanitize their own user HTML. #}
+                        {{ widget_html|safe }}
                     {% endfor %}
                 </div>
             {% endfor %}
@@ -70,8 +71,8 @@
         </div>
     {% endif %}
 </article>
-{% elif should_render == False %}
-    <!-- Widget not rendering: slug not in path_variables or doesn't match configured ObjectTypes -->
+{% elif should_render == False and empty_message %}
+    <div class="render-empty-state">{{ empty_message }}</div>
 {% elif error %}
 <div class="widget-type-news-detail">
     <div class="not-found-message">

@@ -23,7 +23,12 @@ class LegacyNewsPreviewTests(TestCase):
         self.assertEqual(detail.parent.slug, "migration-preview")
         self.assertEqual(detail.parent.parent.slug, "migration-preview-site")
         self.assertEqual(detail.parent.parent.hostnames, [PREVIEW_HOSTNAME])
-        self.assertIsNotNone(detail.get_current_published_version())
+        version = detail.get_current_published_version()
+        self.assertIsNotNone(version)
+        self.assertEqual(
+            version.widgets["main"][0]["config"]["emptyMessage"],
+            "Select a golden sample by opening its article slug under this preview URL.",
+        )
 
         repeated = ensure_news_preview_page(tenant=self.tenant, user=self.user, news_object_type_id=42)
 

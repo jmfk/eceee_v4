@@ -2,6 +2,8 @@
 Regression tests for ContentWidget.prepare_template_context.
 """
 
+from unittest.mock import patch
+
 from django.test import TestCase
 
 from easy_widgets.widgets.content import ContentWidget
@@ -39,7 +41,7 @@ class ContentWidgetPrepareTemplateContextTest(TestCase):
         content = (
             "<h1>eceee 2026 Summer Study</h1>"
             "<p>The eceee Summer Studies are a cornerstone in our mission.</p>"
-            '<ul><li>Item 1</li><li>Item 2</li></ul>'
+            "<ul><li>Item 1</li><li>Item 2</li></ul>"
         )
         config = {"content": content}
         try:
@@ -51,11 +53,11 @@ class ContentWidgetPrepareTemplateContextTest(TestCase):
     def test_content_with_media_insert(self):
         """Content with a data-media-insert div is processed without error."""
         content = (
-            '<p>Before</p>'
+            "<p>Before</p>"
             '<div data-media-insert="true" data-media-id="999" '
             'data-media-type="image" data-width="full" data-align="center">'
-            '</div>'
-            '<p>After</p>'
+            "</div>"
+            "<p>After</p>"
         )
         config = {"content": content}
         # Should not raise even if media_id 999 doesn't exist in DB
@@ -66,3 +68,13 @@ class ContentWidgetPrepareTemplateContextTest(TestCase):
             if isinstance(exc, (NameError, AttributeError)):
                 self.fail(f"prepare_template_context raised {type(exc).__name__}: {exc}")
         self.assertIn("allow_scripts", result)
+
+    def test_media_insert_uses_authored_image_alt_text(self):
+        content = (
+            '<div data-media-insert="true" data-media-id="999" data-media-type="image" '
+            'data-width="full" data-align="center"><img src="legacy.jpg" alt="Migration diagram"></div>'
+        )
+        with patch.object(self.widget, "_render_media_insert_with_style", return_value="<figure></figure>") as render:
+            self.widget.prepare_template_context({"content": content}, {})
+
+        self.assertEqual(render.call_args.args[5], "Migration diagram")
