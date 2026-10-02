@@ -373,7 +373,7 @@ describe('PageRenderer', () => {
                 columnWidths: ['60%', '40%'],
                 rows: [
                     { isHeader: true, cells: [{ content: 'Person' }, { content: 'Role' }] },
-                    { cells: [{ content: '<strong>Ada</strong>', colspan: 2, alignment: 'center' }] },
+                    { cells: [{ content: '<strong>Ada</strong>', colspan: 2, alignment: 'center', verticalAlignment: 'middle' }] },
                     { cells: [{ contentType: 'image', imageData: { url: '/portrait.jpg', alt: 'Ada portrait' }, rowspan: 2, backgroundColor: '#ffeecc', borders: { top: { style: 'thick', color: '#123456' } }, cssClass: 'portrait-cell' }] },
                 ],
             } }] },
@@ -381,6 +381,8 @@ describe('PageRenderer', () => {
         const { container } = render(<PageRenderer model={model} />)
         expect(screen.getByRole('columnheader', { name: 'Person' })).toBeInTheDocument()
         expect(screen.getByRole('cell', { name: 'Ada' })).toHaveAttribute('colspan', '2')
+        expect(screen.getByRole('cell', { name: 'Ada' })).toHaveClass('cell-v-middle')
+        expect(screen.getByRole('cell', { name: 'Ada' })).toHaveStyle({ verticalAlign: 'middle' })
         expect(container.querySelector('td strong')).toHaveTextContent('Ada')
         expect(container.querySelector('td > span')).toBeNull()
         expect(container.querySelector('table')).toHaveClass('border')

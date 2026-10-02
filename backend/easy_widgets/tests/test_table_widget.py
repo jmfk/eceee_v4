@@ -24,3 +24,34 @@ class TableWidgetRenderTests(SimpleTestCase):
         self.assertIn('class="w-full border"', html)
         self.assertIn("<colgroup>", html)
         self.assertIn('style="width: 60%;"', html)
+
+    def test_image_url_and_vertical_alignment_survive_camel_case_normalization(self):
+        widget = TableWidget()
+        config = widget.prepare_template_context(
+            {
+                "showBorders": True,
+                "tableWidth": "full",
+                "rows": [
+                    {
+                        "cells": [
+                            {
+                                "contentType": "image",
+                                "imageData": {"url": "/portrait.jpg", "alt": "Ada portrait"},
+                                "verticalAlignment": "middle",
+                            }
+                        ]
+                    }
+                ],
+            }
+        )
+
+        html = render_to_string(
+            "easy_widgets/widgets/table.html",
+            {"config": config, "widget_type": widget},
+        )
+
+        self.assertIn('class="w-full border"', html)
+        self.assertIn('class=" cell-left cell-v-middle cell-image"', html)
+        self.assertIn("vertical-align:middle", html)
+        self.assertIn('src="/portrait.jpg"', html)
+        self.assertIn('alt="Ada portrait"', html)

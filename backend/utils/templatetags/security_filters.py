@@ -27,7 +27,12 @@ css_sanitizer = CSSSanitizer(
         "padding",
         "margin",
         "border",
+        "border-bottom",
+        "border-collapse",
+        "border-left",
         "border-radius",
+        "border-right",
+        "border-top",
         "width",
         "height",
         "max-width",
@@ -49,6 +54,7 @@ css_sanitizer = CSSSanitizer(
         "overflow",
         "box-shadow",
         "outline",
+        "vertical-align",
     ]
 )
 
@@ -91,6 +97,8 @@ ALLOWED_TAGS = [
     "figure",
     "figcaption",
     "caption",
+    "col",
+    "colgroup",
     "dl",
     "dt",
     "dd",
