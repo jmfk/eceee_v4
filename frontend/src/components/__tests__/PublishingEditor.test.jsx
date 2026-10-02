@@ -96,6 +96,24 @@ describe('PublishingEditor', () => {
         expect(versionsApi.getWorkflow).toHaveBeenCalledTimes(2)
     })
 
+    it('does not reconcile success from cached workflow data when refresh fails', async () => {
+        const onSave = vi.fn().mockResolvedValue({ id: 10, updatedAt: '2030-01-01T10:05:00Z' })
+        versionsApi.publish.mockRejectedValue(new Error('Publication rejected'))
+        versionsApi.getWorkflow
+            .mockResolvedValueOnce({
+                state: 'live_with_unpublished_changes',
+                editableVersion: { id: 11, updatedAt: '2030-01-01T10:00:00Z' },
+                liveVersion: { id: 10 },
+            })
+            .mockRejectedValueOnce(new Error('Workflow refresh failed'))
+
+        renderEditor({ isDirty: true, onSave })
+        fireEvent.click(await screen.findByRole('button', { name: /publish changes/i }))
+
+        await waitFor(() => expect(addNotification).toHaveBeenCalledWith('Publication rejected', 'error'))
+        expect(addNotification).not.toHaveBeenCalledWith('Changes published', 'success')
+    })
+
     it('confirms dirty replacement and reloads the restored working version', async () => {
         const historical = {
             id: 10,
