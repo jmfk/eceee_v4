@@ -102,7 +102,37 @@ function mergeAdditions(baseOrder, originalIds, localOrder, serverOrder, values)
 
     const result = []
     for (let index = 0; index <= base.length; index += 1) {
-        result.push(...(buckets.get(index) || []).sort())
+        const bucket = buckets.get(index) || []
+        const bucketIds = new Set(bucket)
+        const edges = new Map(bucket.map(id => [id, new Set()]))
+        const indegree = new Map(bucket.map(id => [id, 0]))
+        for (const sourceOrder of [localOrder, serverOrder]) {
+            const sequence = sourceOrder.filter(id => bucketIds.has(id))
+            for (let position = 1; position < sequence.length; position += 1) {
+                const before = sequence[position - 1]
+                const after = sequence[position]
+                if (!edges.get(before).has(after)) {
+                    edges.get(before).add(after)
+                    indegree.set(after, indegree.get(after) + 1)
+                }
+            }
+        }
+
+        const ready = bucket.filter(id => indegree.get(id) === 0).sort()
+        const orderedBucket = []
+        while (ready.length > 0) {
+            const id = ready.shift()
+            orderedBucket.push(id)
+            for (const next of edges.get(id)) {
+                indegree.set(next, indegree.get(next) - 1)
+                if (indegree.get(next) === 0) {
+                    ready.push(next)
+                    ready.sort()
+                }
+            }
+        }
+        if (orderedBucket.length !== bucket.length) return null
+        result.push(...orderedBucket)
         if (index < base.length) result.push(base[index])
     }
     return result
@@ -160,6 +190,9 @@ function mergeKeyedArray(original, local, server, path) {
 
     const baseOrder = concurrentBaseOrder || (localReordered ? localBaseOrder : serverReordered ? serverBaseOrder : originalOrder)
     const mergedOrder = mergeAdditions(baseOrder, originalIds, orderOf(local), orderOf(server), values)
+    if (!mergedOrder) {
+        return { value: clone(server), diffs: [diff(path, original, local, server, true)] }
+    }
     return { value: mergedOrder.map(id => values.get(id)), diffs }
 }
 

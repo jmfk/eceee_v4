@@ -516,6 +516,7 @@ const PageEditor = () => {
             enabled: !isNewPage && Boolean(pageId),
             activeSection: activeTab,
             activeWidgetId: editingWidget?.id || editingWidget?._id || null,
+            knownVersionId: originalPageVersionData?.id || originalPageVersionData?.versionId || null,
             knownRevision: originalPageVersionData?.editRevision || null,
             onVersionUpdated: async (updateInfo) => {
                 try {
@@ -1799,17 +1800,16 @@ const PageEditor = () => {
         // Close modal
         setShowConflictModal(false);
         setConflictData(null);
-        if (conflictData.saveOptions) {
-            await handleActualSave({
-                ...conflictData.saveOptions,
-                resolvedData: resolved,
-                baseData: {
-                    webpage: serverWebpage,
-                    version: serverVersion,
-                },
-                conflictRetryCount: 0,
-            });
-        }
+        await handleActualSave({
+            ...(conflictData.saveOptions || {}),
+            description: conflictData.saveOptions?.description || 'Conflict resolution',
+            resolvedData: resolved,
+            baseData: {
+                webpage: serverWebpage,
+                version: serverVersion,
+            },
+            conflictRetryCount: 0,
+        });
     }, [conflictData, versionId, pageId, publishUpdate, setIsDirty, handleActualSave]);
 
     const handleConflictCancel = useCallback(() => {
