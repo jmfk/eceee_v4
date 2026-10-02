@@ -109,7 +109,7 @@ jobs:
           fi
           black --check "${files[@]}"
           isort --check-only "${files[@]}"
-          flake8 "${files[@]}"
+          flake8 --config backend/.flake8 "${files[@]}"
 
   frontend-lint:
     name: Frontend lint
