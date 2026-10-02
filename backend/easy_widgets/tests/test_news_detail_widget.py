@@ -40,7 +40,8 @@ class NewsDetailWidgetRenderTests(SimpleTestCase):
                     "main": [
                         '<table class="w-full border" style="border-collapse: collapse"><colgroup>'
                         '<col style="width: 50%"></colgroup><tbody><tr><td '
-                        'style="vertical-align: middle; border-top: 1px solid #123456" '
+                        'style="vertical-align: middle; border-top: 1px solid #123456; '
+                        '--cell-hover-bg: #abcdef" '
                         'onmouseover="window.__xss = true"><strong>Canonical widget body</strong>'
                         "<script>window.__xss = true</script></td></tr></tbody></table>"
                     ]
@@ -67,6 +68,7 @@ class NewsDetailWidgetRenderTests(SimpleTestCase):
         self.assertIn("<colgroup>", html)
         self.assertIn("vertical-align: middle", html)
         self.assertIn("border-top: 1px solid #123456", html)
+        self.assertIn("--cell-hover-bg: #abcdef", html)
         self.assertNotIn("<script", html)
         self.assertNotIn("onmouseover", html)
         self.assertIn("September 29, 2026", html)

@@ -55,3 +55,37 @@ class TableWidgetRenderTests(SimpleTestCase):
         self.assertIn("vertical-align:middle", html)
         self.assertIn('src="/portrait.jpg"', html)
         self.assertIn('alt="Ada portrait"', html)
+
+    def test_hover_rows_and_hidden_borders_render_without_inline_javascript(self):
+        widget = TableWidget()
+        config = widget.prepare_template_context(
+            {
+                "showBorders": False,
+                "rows": [
+                    {
+                        "height": "40px",
+                        "backgroundColor": "#123456",
+                        "cells": [
+                            {
+                                "content": "Safe hover",
+                                "hoverBgColor": "';window.__xss=1;//",
+                                "hoverTextColor": "#ffffff",
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+
+        html = render_to_string(
+            "easy_widgets/widgets/table.html",
+            {"config": config, "widget_type": widget},
+        )
+
+        self.assertIn("table-no-borders", html)
+        self.assertIn('style="height: 40px;background-color: #123456;"', html)
+        self.assertIn("cell-hover-bg", html)
+        self.assertIn("cell-hover-text", html)
+        self.assertIn("--cell-hover-bg:", html)
+        self.assertNotIn("onmouseover", html)
+        self.assertNotIn("onmouseout", html)

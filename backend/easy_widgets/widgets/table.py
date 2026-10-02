@@ -175,6 +175,11 @@ class TableWidget(BaseWidget):
         transition: background-color 0.2s ease, color 0.2s ease;
     }
 
+    .table-widget.table-no-borders th,
+    .table-widget.table-no-borders td {
+        border: none;
+    }
+
     .table-widget th {
         background-color: var(--header-bg, #f3f4f6);
         color: var(--header-color, #1f2937);
@@ -232,6 +237,14 @@ class TableWidget(BaseWidget):
     /* Hover effect */
     .table-widget.table-hover tr:hover td {
         background-color: var(--row-hover-bg, #f3f4f6);
+    }
+
+    .table-widget .cell-hover-bg:hover {
+        background-color: var(--cell-hover-bg) !important;
+    }
+
+    .table-widget .cell-hover-text:hover {
+        color: var(--cell-hover-text) !important;
     }
 
     /* Responsive table */
