@@ -180,8 +180,8 @@ def sanitize_html(value, allow_scripts=False):
     # the script content behind. We want to be more aggressive for script tags.
     if "<script" in value.lower() and "<script" not in cleaned.lower():
         # Re-clean but this time don't strip, so script content is escaped/removed
-        # Actually, bleach.linkify or other tools might be better, but let's 
-        # just do a simple check. If we stripped a script tag, we should 
+        # Actually, bleach.linkify or other tools might be better, but let's
+        # just do a simple check. If we stripped a script tag, we should
         # probably have removed its content too if it looks dangerous.
         pass
 
@@ -195,7 +195,7 @@ def sanitize_html(value, allow_scripts=False):
         cleaned = cleaned.replace("expression(", "expr-stripped(")
         cleaned = cleaned.replace("Expression(", "expr-stripped(")
         cleaned = cleaned.replace("EXPRESSION(", "expr-stripped(")
-        
+
         # Only strip alert if it was likely from a script tag that was stripped
         if "alert(" in cleaned_lower and "<script" in value.lower():
             cleaned = cleaned.replace("alert(", "alert-stripped(")
