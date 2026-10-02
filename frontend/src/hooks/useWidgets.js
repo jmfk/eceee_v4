@@ -5,6 +5,7 @@ import {
     getWidgetDisplayName as getDisplayNameFromRegistry,
     getWidgetDefaultConfig
 } from '../widgets'
+import { generateWidgetId as createWidgetId } from '../utils/widgetIdentity'
 
 /**
  * Custom hook for widget management
@@ -64,13 +65,7 @@ export const useWidgets = (initialWidgets = {}) => {
 
     // Generate unique widget ID
     const generateWidgetId = useCallback(() => {
-        // Use a counter to ensure uniqueness even within the same millisecond
-        if (!generateWidgetId._counter) {
-            generateWidgetId._counter = 0;
-        }
-        generateWidgetId._counter++;
-
-        return `widget-${Date.now()}-${generateWidgetId._counter}-${Math.random().toString(36).substr(2, 9)}`
+        return createWidgetId()
     }, [])
 
     // Add widget to a slot

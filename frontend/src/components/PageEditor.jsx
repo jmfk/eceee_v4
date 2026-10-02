@@ -504,16 +504,35 @@ const PageEditor = () => {
     const [conflictData, setConflictData] = useState(null)
     const [showConflictModal, setShowConflictModal] = useState(false)
 
+    // Declare widget editor state before the collaboration hook so presence
+    // can identify the widget currently being edited.
+    const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
+    const [editingWidget, setEditingWidget] = useState(null)
+    const widgetEditorRef = useRef(null)
+
     // WebSocket for real-time notifications
-    const { isStale: isVersionStale, latestUpdate, clearStaleFlag } = usePageWebSocket(
+    const { activeEditors, clearStaleFlag } = usePageWebSocket(
         pageId,
         {
             enabled: !isNewPage && Boolean(pageId),
+            activeSection: activeTab,
+            activeWidgetId: editingWidget?.id || editingWidget?._id || null,
+            knownRevision: originalPageVersionData?.editRevision || null,
             onVersionUpdated: async (updateInfo) => {
                 try {
                     // Fetch latest server version
-                    const serverWebpage = await pagesApi.get(pageId);
+                    const publicServerWebpage = await pagesApi.get(pageId);
                     const serverVersion = await versionsApi.get(updateInfo.versionId);
+                    const serverWebpage = mergeVersionedPageAttributes(publicServerWebpage, serverVersion);
+
+                    if (
+                        updateInfo.revision &&
+                        originalPageVersionData?.editRevision &&
+                        updateInfo.revision <= originalPageVersionData.editRevision
+                    ) {
+                        clearStaleFlag();
+                        return;
+                    }
 
                     // Detect conflicts using deep diff analysis
                     const conflictResult = detectPageConflicts(
@@ -555,8 +574,8 @@ const PageEditor = () => {
                         // Update local state with merged data
                         setWebpageData(conflictResult.mergedWebpage);
                         setPageVersionData(conflictResult.mergedVersion);
-                        setOriginalWebpageData(conflictResult.mergedWebpage);
-                        setOriginalPageVersionData(conflictResult.mergedVersion);
+                        setOriginalWebpageData(serverWebpage);
+                        setOriginalPageVersionData(serverVersion);
 
                         // Update local widgets state for UI
                         if (conflictResult.mergedVersion.widgets) {
@@ -607,11 +626,6 @@ const PageEditor = () => {
             }
         }
     )
-
-    // Widget editor panel state
-    const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
-    const [editingWidget, setEditingWidget] = useState(null)
-    const widgetEditorRef = useRef(null)
 
     // Ref to track current editing widget for callbacks
     const editingWidgetRef = useRef(null)
@@ -1266,6 +1280,9 @@ const PageEditor = () => {
     // SMART SAVE: Intelligent save logic that only saves what changed
     const handleActualSave = useCallback(async (saveOptions = {}) => {
         try {
+            const baseWebpageData = saveOptions.baseData?.webpage || originalWebpageData || {};
+            const baseVersionData = saveOptions.baseData?.version || originalPageVersionData || {};
+
             // Collect all data from editors (no saving yet)
             const collectedData = {};
 
@@ -1312,18 +1329,20 @@ const PageEditor = () => {
                 ...versionDataOverrides,
                 widgets: versionDataOverrides.widgets || saveOptions.resolvedData?.version?.widgets || collectedData.widgets
             };
-            const clientUpdatedAt = saveOptions.resolvedData?.version?.updatedAt || originalPageVersionData?.updatedAt;
+            const clientUpdatedAt = saveOptions.resolvedData?.version?.updatedAt || baseVersionData.updatedAt;
+            const expectedRevision = saveOptions.resolvedData?.version?.editRevision || baseVersionData.editRevision;
 
             // Use smart save with separated data (include timestamp for conflict detection)
             const saveResult = await smartSave(
-                originalWebpageData || {},      // Original webpage data
+                baseWebpageData,                // Exact server baseline
                 currentWebpageDataForSave,      // Current webpage data
-                originalPageVersionData || {},  // Original version data
+                baseVersionData,                // Exact server baseline
                 currentVersionDataForSave,      // Current version data
                 { pagesApi, versionsApi },      // API functions
                 {
                     description: saveOptions.description || 'Auto-save',
                     clientUpdatedAt,
+                    expectedRevision,
                     pageId,
                 }
             );
@@ -1334,18 +1353,23 @@ const PageEditor = () => {
 
                 // Fetch latest server version
                 const serverVersion = saveResult.conflict.serverVersion || saveResult.conflict.server_version;
+                const serverWebpage = mergeVersionedPageAttributes(
+                    originalWebpageData || webpageData || {},
+                    serverVersion,
+                );
 
                 // Detect conflicts and try auto-merge
                 const conflictAnalysis = detectPageConflicts(
-                    originalWebpageData || {},
+                    baseWebpageData,
                     currentWebpageDataForSave,
-                    serverVersion,
-                    originalPageVersionData || {},
+                    serverWebpage,
+                    baseVersionData,
                     currentVersionDataForSave,
                     serverVersion
                 );
 
-                if (conflictAnalysis.canAutoMerge) {
+                const conflictRetryCount = saveOptions.conflictRetryCount || 0;
+                if (conflictAnalysis.canAutoMerge && conflictRetryCount < 3) {
                     // Auto-merge successful - retry save with merged data
                     console.log('✅ Auto-merge successful, retrying save...');
                     addNotification(
@@ -1359,7 +1383,12 @@ const PageEditor = () => {
                         resolvedData: {
                             webpage: conflictAnalysis.mergedWebpage,
                             version: conflictAnalysis.mergedVersion
-                        }
+                        },
+                        baseData: {
+                            webpage: serverWebpage,
+                            version: serverVersion,
+                        },
+                        conflictRetryCount: conflictRetryCount + 1,
                     });
                 } else {
                     // Conflicts exist - show modal for user resolution
@@ -1368,6 +1397,8 @@ const PageEditor = () => {
                         analysis: conflictAnalysis,
                         originalWebpage: currentWebpageDataForSave,
                         originalVersion: currentVersionDataForSave,
+                        serverWebpage,
+                        serverVersion,
                         saveOptions
                     });
                     setShowConflictModal(true);
@@ -1686,7 +1717,7 @@ const PageEditor = () => {
                 confirmButtonStyle: 'primary',
             });
             if (!confirmed) return;
-            await versionsApi.publish(targetVersion.id, targetVersion.updatedAt);
+            await versionsApi.publish(targetVersion.id, targetVersion.updatedAt, targetVersion.editRevision);
             await refetchWorkflow();
             await queryClient.invalidateQueries({ queryKey: ['pageVersion', pageId] });
             await queryClient.invalidateQueries({ queryKey: ['pages'] });
@@ -1763,10 +1794,12 @@ const PageEditor = () => {
         setWebpageData(resolved.webpage);
         setPageVersionData(resolved.version);
 
-        // Update original data to the server version (what we just accepted)
-        // This way if user didn't change anything, page stays clean
-        setOriginalWebpageData(resolved.webpage);
-        setOriginalPageVersionData(resolved.version);
+        // Rebase local state on the exact server snapshot; never make a locally
+        // merged draft its own concurrency baseline.
+        const serverWebpage = conflictData.serverWebpage || resolved.webpage;
+        const serverVersion = conflictData.serverVersion || resolved.version;
+        setOriginalWebpageData(serverWebpage);
+        setOriginalPageVersionData(serverVersion);
 
         // Update local widgets for UI
         if (resolved.version.widgets) {
@@ -1800,7 +1833,18 @@ const PageEditor = () => {
         // Close modal
         setShowConflictModal(false);
         setConflictData(null);
-    }, [conflictData, versionId, pageId, publishUpdate, setIsDirty]);
+        if (conflictData.saveOptions) {
+            await handleActualSave({
+                ...conflictData.saveOptions,
+                resolvedData: resolved,
+                baseData: {
+                    webpage: serverWebpage,
+                    version: serverVersion,
+                },
+                conflictRetryCount: 0,
+            });
+        }
+    }, [conflictData, versionId, pageId, publishUpdate, setIsDirty, handleActualSave]);
 
     const handleConflictCancel = useCallback(() => {
         setShowConflictModal(false);
@@ -2081,6 +2125,31 @@ const PageEditor = () => {
                         {/* Center section - Tab navigation */}
                         {/* Desktop tabs - hidden on mobile */}
                         <div className="flex items-center space-x-3">
+                            {activeEditors.length > 0 && (
+                                <div
+                                    data-testid="page-editor-presence"
+                                    className="hidden xl:flex items-center gap-1.5"
+                                    aria-label={`${activeEditors.length} other active editor${activeEditors.length === 1 ? '' : 's'}`}
+                                >
+                                    {activeEditors.slice(0, 3).map(editor => (
+                                        <span
+                                            key={editor.user.id}
+                                            title={`${editor.user.display_name} — ${editor.section}${editor.widgetId ? ` (${editor.widgetId})` : ''}`}
+                                            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 ring-2 ring-white"
+                                        >
+                                            {(editor.user.display_name || editor.user.username || '?')
+                                                .split(/\s+/)
+                                                .map(part => part[0])
+                                                .join('')
+                                                .slice(0, 2)
+                                                .toUpperCase()}
+                                        </span>
+                                    ))}
+                                    {activeEditors.length > 3 && (
+                                        <span className="text-xs text-gray-500">+{activeEditors.length - 3}</span>
+                                    )}
+                                </div>
+                            )}
                             <div className="hidden lg:flex items-center space-x-1">
                                 {tabs.map((tabItem, index) => {
                                     const Icon = tabItem.icon

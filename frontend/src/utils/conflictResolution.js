@@ -6,13 +6,29 @@
  */
 
 import { analyzeChanges } from './smartSaveUtils';
-import { deepDiff, matchesBlockingPath, setAtPath, formatPathForDisplay } from './deepDiff';
+import { matchesBlockingPath, formatPathForDisplay } from './deepDiff';
+import { mergePageState } from './threeWayMerge';
 
 /**
  * Paths that require a full page refresh rather than showing diff dialog
  * Empty for now, but infrastructure is in place to add patterns
  */
 const BLOCKING_PATHS = [];
+
+function setAtMergePath(target, path, value) {
+    if (path.length === 0) return value;
+    const [segment, ...rest] = path;
+    if (Array.isArray(target)) {
+        const index = target.findIndex(item => String(item?.id ?? item?._id) === String(segment));
+        if (index < 0) return target;
+        const copy = [...target];
+        copy[index] = setAtMergePath(copy[index], rest, value);
+        return copy;
+    }
+    const copy = { ...(target || {}) };
+    copy[segment] = setAtMergePath(copy[segment], rest, value);
+    return copy;
+}
 
 /**
  * Detect conflicts and attempt auto-merge
@@ -131,26 +147,15 @@ export function detectPageConflicts(
     localVersion,
     serverVersion
 ) {
-    // Run deep diff on webpage data
-    const webpageDiffs = deepDiff(
+    const mergeResult = mergePageState(
         originalWebpage,
         localWebpage,
         serverWebpage,
-        [],
-        { pathPrefix: 'webpage' }
-    );
-
-    // Run deep diff on version data
-    const versionDiffs = deepDiff(
         originalVersion,
         localVersion,
-        serverVersion,
-        [],
-        { pathPrefix: 'version' }
+        serverVersion
     );
-
-    // Combine all diffs
-    const allDiffs = [...webpageDiffs, ...versionDiffs];
+    const allDiffs = mergeResult.allDiffs;
     
     // Filter to only conflicts
     const conflicts = allDiffs.filter(diff => diff.hasConflict);
@@ -166,21 +171,8 @@ export function detectPageConflicts(
 
     // Build merged data by applying non-conflicting changes
     // Deep clone to ensure new references trigger re-renders
-    let mergedWebpage = JSON.parse(JSON.stringify(serverWebpage));
-    let mergedVersion = JSON.parse(JSON.stringify(serverVersion));
-
-    // Apply local changes that don't conflict
-    for (const diff of allDiffs) {
-        if (!diff.hasConflict && diff.localChanged) {
-            // Apply local change
-            const [dataType, ...path] = diff.path;
-            if (dataType === 'webpage') {
-                mergedWebpage = setAtPath(mergedWebpage, path, diff.local);
-            } else if (dataType === 'version') {
-                mergedVersion = setAtPath(mergedVersion, path, diff.local);
-            }
-        }
-    }
+    const mergedWebpage = mergeResult.mergedWebpage;
+    const mergedVersion = mergeResult.mergedVersion;
 
     // Legacy format for backward compatibility
     const webpageConflicts = conflicts.filter(c => c.path[0] === 'webpage');
@@ -254,9 +246,9 @@ export function applyConflictResolutions(conflictResult, resolutions) {
             const [dataType, ...path] = conflict.path;
             
             if (dataType === 'webpage') {
-                resolvedWebpage = setAtPath(resolvedWebpage, path, value);
+                resolvedWebpage = setAtMergePath(resolvedWebpage, path, value);
             } else if (dataType === 'version') {
-                resolvedVersion = setAtPath(resolvedVersion, path, value);
+                resolvedVersion = setAtMergePath(resolvedVersion, path, value);
             }
         }
     });
@@ -499,5 +491,3 @@ export function getConflictSummary(conflictResult) {
     
     return `${conflictCount} conflict(s) detected in: ${fields}${more}`;
 }
-
-

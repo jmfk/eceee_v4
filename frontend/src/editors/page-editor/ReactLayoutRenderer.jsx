@@ -17,6 +17,7 @@ import ImportDialog from '../../components/ImportDialog';
 import { copyWidgetsToClipboard, cutWidgetsToClipboard } from '../../utils/clipboardService';
 import { Clipboard, Scissors, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useClipboard } from '../../contexts/ClipboardContext';
+import { regenerateWidgetIds } from '../../utils/widgetIdentity';
 
 // Helper function to filter valid widgets
 const filterValidWidgets = (widgets) => {
@@ -1246,10 +1247,7 @@ const ReactLayoutRenderer = forwardRef(({
         }
 
         // Generate new IDs for pasted widgets
-        const pastedWidgets = widgetsToPaste.map(w => ({
-            ...w,
-            id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        }));
+        const pastedWidgets = widgetsToPaste.map(regenerateWidgetIds);
 
         // Determine if this is a nested slot paste
         const isNested = widgetPath.length > 0;

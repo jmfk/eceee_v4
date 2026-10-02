@@ -15,6 +15,7 @@ import { useInheritanceTree } from '../../hooks/useInheritanceTree'
 import PageWidgetSelectionModal from './PageWidgetSelectionModal'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
+import { generateWidgetId } from '../../utils/widgetIdentity'
 
 
 const TreeBasedLayoutRenderer = forwardRef(({
@@ -83,7 +84,7 @@ const TreeBasedLayoutRenderer = forwardRef(({
 
                 // Create new widget
                 const newWidget = {
-                    id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    id: generateWidgetId(),
                     type: widgetType,
                     config: {},
                     order: widgets[slotName]?.length || 0

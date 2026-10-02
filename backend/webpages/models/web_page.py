@@ -1415,6 +1415,7 @@ class WebPage(models.Model):
                 expiry_date=expiry_date,
                 change_summary=normalize_change_summary(kwargs.get("description") or kwargs.get("change_summary", "")),
                 created_by=user,
+                last_edited_by=user,
             )
             return version
 

@@ -14,3 +14,4 @@
 | PRD-0010 | [Public form submissions](0010-public-form-submissions.md) | completed | [ADR-0011](../adrs/active/0011-public-form-write-boundary.md), [ADR-0012](../adrs/archive/0012-isolated-publisher-test-host.md), [ADR-0014](../adrs/active/0014-cms-root-hostname-aliases.md) |
 | PRD-0011 | [Parallel publisher test deployment](0011-parallel-publisher-test-deployment.md) | started | [ADR-0011](../adrs/active/0011-public-form-write-boundary.md), [ADR-0012](../adrs/archive/0012-isolated-publisher-test-host.md), [ADR-0014](../adrs/active/0014-cms-root-hostname-aliases.md) |
 | PRD-0012 | [Legacy News golden samples and migration](0012-legacy-news-migration.md) | started | [ADR-0013](../adrs/active/0013-legacy-news-golden-sample-gate.md) |
+| PRD-0013 | [Robust concurrent page editing](0013-robust-concurrent-page-editing.md) | completed | [ADR-0015](../adrs/active/0015-revision-based-page-collaboration.md) |

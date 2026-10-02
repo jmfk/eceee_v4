@@ -5,14 +5,11 @@
  */
 
 import toast from 'react-hot-toast';
+import { regenerateWidgetIds } from './widgetIdentity';
 
 /**
  * Generate a unique widget ID
  */
-const generateWidgetId = () => {
-    return `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-};
-
 /**
  * Validate widget structure
  */
@@ -43,25 +40,7 @@ export const validateWidgetStructure = (data) => {
  * Recursively generate new IDs for widgets and nested widgets in slots
  */
 export const generateNewWidgetIds = (widget) => {
-    const newWidget = { ...widget };
-    
-    // Generate new ID for the widget
-    newWidget.id = generateWidgetId();
-    
-    // If widget has slots with nested widgets, generate new IDs for them too
-    if (newWidget.config && newWidget.config.slots) {
-        newWidget.config = { ...newWidget.config };
-        newWidget.config.slots = { ...newWidget.config.slots };
-        
-        Object.keys(newWidget.config.slots).forEach(slotName => {
-            const slotWidgets = newWidget.config.slots[slotName];
-            if (Array.isArray(slotWidgets)) {
-                newWidget.config.slots[slotName] = slotWidgets.map(w => generateNewWidgetIds(w));
-            }
-        });
-    }
-    
-    return newWidget;
+    return regenerateWidgetIds(widget);
 };
 
 /**
@@ -262,4 +241,3 @@ export const readWidgetsFromClipboard = async () => {
 export const readClipboardWithMetadata = async () => {
     return await readFromClipboard();
 };
-

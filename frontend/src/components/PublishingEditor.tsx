@@ -10,6 +10,7 @@ type WorkflowVersion = {
     id: number
     effectiveDate?: string | null
     updatedAt?: string
+    editRevision?: number
 }
 
 type Workflow = {
@@ -105,7 +106,9 @@ const PublishingEditor = ({
         let version: WorkflowVersion | undefined
         try {
             version = await workingVersion()
-            await versionsApi.publish(version.id, version.updatedAt)
+            const publishArgs: [number, string?, number?] = [version.id, version.updatedAt]
+            if (version.editRevision != null) publishArgs.push(version.editRevision)
+            await versionsApi.publish(...publishArgs)
             await refresh()
             addNotification('Changes published', 'success')
         } catch (error: any) {
@@ -130,12 +133,14 @@ const PublishingEditor = ({
         setBusyAction('schedule')
         try {
             const version = await workingVersion()
-            await versionsApi.scheduleWorkingCopy(
+            const scheduleArgs: [number, string, null, string?, number?] = [
                 version.id,
                 new Date(scheduleDate).toISOString(),
                 null,
                 version.updatedAt,
-            )
+            ]
+            if (version.editRevision != null) scheduleArgs.push(version.editRevision)
+            await versionsApi.scheduleWorkingCopy(...scheduleArgs)
             addNotification('Working version scheduled', 'success')
             await refresh()
         } catch (error: any) {
@@ -149,7 +154,10 @@ const PublishingEditor = ({
         if (!workflow?.scheduledVersion) return
         setBusyAction('cancel')
         try {
-            await versionsApi.cancelWorkingCopySchedule(workflow.scheduledVersion.id)
+            const cancelArgs: [number, string?, number?] = [workflow.scheduledVersion.id]
+            if (workflow.scheduledVersion.updatedAt != null) cancelArgs.push(workflow.scheduledVersion.updatedAt)
+            if (workflow.scheduledVersion.editRevision != null) cancelArgs.push(workflow.scheduledVersion.editRevision)
+            await versionsApi.cancelWorkingCopySchedule(...cancelArgs)
             setScheduleDate('')
             addNotification('Schedule cancelled', 'success')
             await refresh()

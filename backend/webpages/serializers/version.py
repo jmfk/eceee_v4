@@ -101,6 +101,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
     """Serializer for page versions with enhanced workflow support"""
 
     created_by = UserSerializer(read_only=True)
+    last_edited_by = UserSerializer(read_only=True)
     is_published = serializers.SerializerMethodField()
     is_current_published = serializers.SerializerMethodField()
     publication_status = serializers.SerializerMethodField()
@@ -161,6 +162,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "created_by",
+            "edit_revision",
+            "last_edited_by",
         ]
         read_only_fields = [
             "id",
@@ -177,6 +180,8 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "created_by",
+            "edit_revision",
+            "last_edited_by",
         ]
 
     def __init__(self, *args, **kwargs):
@@ -267,6 +272,13 @@ class PageVersionSerializer(serializers.ModelSerializer):
             )
         return super().validate(attrs)
 
+    def validate_widgets(self, value):
+        if not isinstance(value, (dict, list)):
+            raise serializers.ValidationError("Widgets must be a slot map or legacy list.")
+        from ..utils.widget_identity import normalize_widget_ids
+
+        return normalize_widget_ids(value)
+
     def to_representation(self, instance):
         """Convert widget configuration fields from snake_case to camelCase for frontend"""
         data = super().to_representation(instance)
@@ -344,35 +356,6 @@ class PageVersionSerializer(serializers.ModelSerializer):
 
         # No conflict - proceed with normal update
         updated_instance = super().update(instance, validated_data)
-
-        # Broadcast version update to WebSocket clients
-        try:
-            from ..consumers import broadcast_version_update
-
-            updated_by = None
-            session_id = None
-
-            if request:
-                # Get username if authenticated
-                if hasattr(request, "user") and request.user.is_authenticated:
-                    updated_by = request.user.username
-
-                # Get session ID from request header
-                session_id = request.META.get("HTTP_X_SESSION_ID")
-
-            broadcast_version_update(
-                page_id=updated_instance.page.id,
-                version_id=updated_instance.id,
-                updated_at=updated_instance.updated_at.isoformat(),
-                updated_by=updated_by,
-                session_id=session_id,
-            )
-        except Exception as e:
-            # Don't fail the update if broadcast fails
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to broadcast version update: {e}")
 
         return updated_instance
 
@@ -483,6 +466,7 @@ class PageVersionListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for version lists (without page_data)"""
 
     created_by = UserSerializer(read_only=True)
+    last_edited_by = UserSerializer(read_only=True)
 
     # New date-based publishing fields (computed)
     is_published = serializers.SerializerMethodField()
@@ -505,6 +489,8 @@ class PageVersionListSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "created_by",
+            "edit_revision",
+            "last_edited_by",
         ]
 
     def get_is_published(self, obj):

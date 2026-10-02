@@ -150,6 +150,7 @@ const createEditorVersion = () => ({
   title: 'Summer Study v3',
   status: 'draft',
   publicationStatus: 'draft',
+  editRevision: 1,
   codeLayout: 'main_layout',
   metaTitle: '',
   metaDescription: '',
@@ -230,17 +231,70 @@ export const testTokens = {
   refresh: REFRESH_TOKEN,
 }
 
-export async function mockCmsApi(page, { authenticated = false, pageEditor = false, responsivePages = false } = {}) {
-  const editorState = {
+export const createCollaborativeEditorState = () => ({
     page: createEditorPage(),
     version: createEditorVersion(),
     savedPages: [],
     savedVersions: [],
     clipboard: {},
-  }
+    sockets: new Map(),
+    nextConnectionId: 1,
+})
+
+export async function mockCmsApi(page, {
+  authenticated = false,
+  pageEditor = false,
+  responsivePages = false,
+  editorState: suppliedEditorState = null,
+} = {}) {
+  const editorState = suppliedEditorState || createCollaborativeEditorState()
 
   await page.routeWebSocket('**/ws/pages/**', webSocket => {
-    webSocket.send(JSON.stringify({ type: 'connection_established' }))
+    const connectionId = `playwright-${editorState.nextConnectionId++}`
+    const connection = { socket: webSocket, presence: { section: 'content', widget_id: null } }
+    editorState.sockets.set(connectionId, connection)
+    webSocket.send(JSON.stringify({ type: 'connection_established', connection_id: connectionId }))
+
+    for (const [otherId, other] of editorState.sockets.entries()) {
+      if (otherId === connectionId) continue
+      webSocket.send(JSON.stringify({
+        type: 'presence', action: 'join', page_id: 101, connection_id: otherId,
+        user: { id: 1, username: 'admin', display_name: 'Admin Editor' },
+        section: other.presence.section, widget_id: other.presence.widget_id,
+      }))
+    }
+
+    const broadcastPresence = (action, presence = {}) => {
+      connection.presence = {
+        section: presence.section || connection.presence.section,
+        widget_id: presence.widget_id || null,
+      }
+      for (const entry of editorState.sockets.values()) {
+        entry.socket.send(JSON.stringify({
+          type: 'presence',
+          action,
+          page_id: 101,
+          connection_id: connectionId,
+          user: { id: 1, username: 'admin', display_name: 'Admin Editor' },
+          section: connection.presence.section,
+          widget_id: connection.presence.widget_id,
+        }))
+      }
+    }
+
+    broadcastPresence('join')
+    webSocket.onMessage(message => {
+      try {
+        const presence = JSON.parse(message)
+        if (presence.type?.startsWith('presence_')) broadcastPresence('update', presence)
+      } catch {
+        // Ignore malformed client messages in the mock transport.
+      }
+    })
+    webSocket.onClose(() => {
+      editorState.sockets.delete(connectionId)
+      broadcastPresence('leave')
+    })
   })
 
   await page.route('**/api/v1/webpages/themes/**/styles.css*', route => route.fulfill({
@@ -438,6 +492,7 @@ export async function mockCmsApi(page, { authenticated = false, pageEditor = fal
         editableVersion: {
           id: editorState.version.id,
           updatedAt: editorState.version.updatedAt,
+          editRevision: editorState.version.editRevision,
         },
         liveVersion: null,
         scheduledVersion: null,
@@ -484,16 +539,43 @@ export async function mockCmsApi(page, { authenticated = false, pageEditor = fal
 
     if (pageEditor && url.pathname === '/api/v1/webpages/pages/101/working-copy/save/' && method === 'PATCH') {
       const body = request.postDataJSON()
+      if (body.expectedRevision != null && body.expectedRevision !== editorState.version.editRevision) {
+        return json(route, {
+          error: 'version_conflict',
+          message: 'The reviewed working version has changed.',
+          details: {
+            serverRevision: editorState.version.editRevision,
+            serverVersion: clone(editorState.version),
+            lastEditedBy: { id: 1, username: 'admin' },
+          },
+        }, 409)
+      }
       delete body.clientUpdatedAt
       delete body.expectedVersionId
+      delete body.expectedRevision
       editorState.version = {
         ...editorState.version,
         ...body,
         widgets: body.widgets || editorState.version.widgets,
         updatedAt: new Date().toISOString(),
+        editRevision: editorState.version.editRevision + 1,
       }
       editorState.savedVersions.push(clone(body))
-      return json(route, { created: false, version: clone(editorState.version) })
+      await json(route, { created: false, version: clone(editorState.version) })
+      const sessionId = request.headers()['x-session-id']
+      for (const entry of editorState.sockets.values()) {
+        entry.socket.send(JSON.stringify({
+          type: 'version_updated',
+          page_id: 101,
+          version_id: editorState.version.id,
+          updated_at: editorState.version.updatedAt,
+          revision: editorState.version.editRevision,
+          updated_by: 'admin',
+          session_id: sessionId,
+          mutation_type: 'saved',
+        }))
+      }
+      return
     }
 
     if (pageEditor && url.pathname === '/api/v1/webpages/pages/101/widget-inheritance/' && method === 'GET') {

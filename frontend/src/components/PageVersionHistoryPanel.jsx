@@ -51,7 +51,11 @@ const PageVersionHistoryPanel = ({ pageId, workflow, onRestored, onRestoreError,
         if (confirmRestore && !(await confirmRestore())) return
         setRestoringId(id)
         try {
-            const result = await versionsApi.restore(id, workflow?.editableVersion?.updatedAt || null)
+            const restoreArgs = [id, workflow?.editableVersion?.updatedAt || null]
+            if (workflow?.editableVersion?.editRevision != null) {
+                restoreArgs.push(workflow.editableVersion.editRevision)
+            }
+            const result = await versionsApi.restore(...restoreArgs)
             await load()
             await onRestored?.(result.version)
         } catch (error) {

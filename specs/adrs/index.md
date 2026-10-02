@@ -16,6 +16,7 @@
 | ADR-0011 | [Validate published forms and write through a dedicated PostgreSQL role](active/0011-public-form-write-boundary.md) | accepted | PRD-0010 |
 | ADR-0013 | [Gate the legacy News migration through canonical golden samples](active/0013-legacy-news-golden-sample-gate.md) | accepted | PRD-0012 |
 | ADR-0014 | [Resolve publisher test hosts through CMS root aliases](active/0014-cms-root-hostname-aliases.md) | accepted | PRD-0010, PRD-0011 |
+| ADR-0015 | [Revision-based optimistic page collaboration](active/0015-revision-based-page-collaboration.md) | accepted | PRD-0013 |
 
 ## Archived Decisions
 

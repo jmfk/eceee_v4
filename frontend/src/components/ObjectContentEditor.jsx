@@ -12,6 +12,7 @@ import { useClipboard } from '../contexts/ClipboardContext'
 import { copyWidgetsToClipboard, cutWidgetsToClipboard } from '../utils/clipboardService'
 import ImportDialog from './ImportDialog'
 import WidgetEditorPanel from './WidgetEditorPanel'
+import { generateWidgetId, regenerateWidgetIds } from '../utils/widgetIdentity'
 
 const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context, namespace = null }) => {
     // 1. STATE & HOOKS (Top level)
@@ -217,7 +218,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
         const widgetControl = slot.widgetControls?.find(c => c.widgetType === widgetType)
         const widgetConfig = widgetControl?.defaultConfig || createDefaultWidgetConfig(widgetType)
         const newWidget = {
-            id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: generateWidgetId(),
             type: widgetType, config: widgetConfig,
             name: getWidgetDisplayName(widgetType, widgetTypes) || widgetType
         }
@@ -292,9 +293,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
 
     const handlePasteAtPosition = useCallback(async (slotName, position, keepClipboard = false) => {
         if (!clipboardData?.data?.length) return
-        const pastedWidgets = clipboardData.data.map(w => ({
-            ...w, id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        }))
+        const pastedWidgets = clipboardData.data.map(regenerateWidgetIds)
         const slotWidgets = [...(internalWidgetsRef.current[slotName] || [])]
         slotWidgets.splice(position, 0, ...pastedWidgets)
         setInternalWidgets(prev => ({ ...prev, [slotName]: slotWidgets }))
@@ -377,7 +376,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
     const handleSlotAction = useCallback(async (action, slotName, widget) => {
         if (action === 'duplicate' && widget) {
             const newWidget = {
-                ...widget, id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                ...regenerateWidgetIds(widget),
                 name: `${widget.name} (Copy)`
             }
             const current = internalWidgetsRef.current[slotName] || []

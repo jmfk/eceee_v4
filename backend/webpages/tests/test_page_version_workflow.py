@@ -159,6 +159,108 @@ class PageVersionWorkflowTest(TestCase):
         draft.refresh_from_db()
         self.assertEqual(draft.meta_title, "Updated atomically")
 
+    def test_page_scoped_save_uses_revision_and_advances_it_once(self):
+        draft = self.page.create_version(self.user, "Working copy")
+
+        with patch("webpages.consumers.broadcast_version_update") as broadcast:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.patch(
+                    reverse("api:page-working-copy-save", kwargs={"page_id": self.page.pk}),
+                    {
+                        "expectedVersionId": draft.id,
+                        "expectedRevision": draft.edit_revision,
+                        "metaTitle": "Revision guarded",
+                    },
+                    format="json",
+                )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        draft.refresh_from_db()
+        self.assertEqual(draft.edit_revision, 2)
+        self.assertEqual(draft.last_edited_by, self.user)
+        self.assertEqual(response.data["version"]["edit_revision"], 2)
+        broadcast.assert_called_once()
+        self.assertEqual(broadcast.call_args.kwargs["revision"], 2)
+        self.assertEqual(broadcast.call_args.kwargs["mutation_type"], "saved")
+
+    def test_revision_is_authoritative_and_failed_save_does_not_broadcast(self):
+        draft = self.page.create_version(self.user, "Working copy")
+        draft.edit_revision = 2
+        draft.save(update_fields=["edit_revision", "updated_at"])
+
+        with patch("webpages.consumers.broadcast_version_update") as broadcast:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.patch(
+                    reverse("api:page-working-copy-save", kwargs={"page_id": self.page.pk}),
+                    {
+                        "expectedVersionId": draft.id,
+                        "expectedRevision": 1,
+                        "clientUpdatedAt": draft.updated_at.isoformat(),
+                        "metaTitle": "Stale edit",
+                    },
+                    format="json",
+                )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["error"], "version_conflict")
+        self.assertEqual(response.data["details"]["server_revision"], 2)
+        self.assertEqual(response.data["details"]["server_version"]["id"], draft.id)
+        broadcast.assert_not_called()
+
+    def test_legacy_timestamp_fallback_is_marked_deprecated(self):
+        draft = self.page.create_version(self.user, "Working copy")
+
+        response = self.client.patch(
+            reverse("api:page-working-copy-save", kwargs={"page_id": self.page.pk}),
+            {
+                "expectedVersionId": draft.id,
+                "clientUpdatedAt": draft.updated_at.isoformat(),
+                "metaTitle": "Legacy timestamp",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.headers["Deprecation"], "true")
+        self.assertIn("expectedRevision", response.headers["Warning"])
+
+    def test_save_normalizes_missing_and_duplicate_nested_widget_ids(self):
+        draft = self.page.create_version(self.user, "Working copy")
+        duplicate = "widget-existing"
+
+        response = self.client.patch(
+            reverse("api:page-working-copy-save", kwargs={"page_id": self.page.pk}),
+            {
+                "expectedVersionId": draft.id,
+                "expectedRevision": draft.edit_revision,
+                "widgets": {
+                    "main": [
+                        {
+                            "id": duplicate,
+                            "type": "Container",
+                            "config": {
+                                "slots": {
+                                    "body": [
+                                        {"id": duplicate, "type": "Content", "config": {}},
+                                        {"type": "Content", "config": {}},
+                                    ]
+                                }
+                            },
+                        }
+                    ]
+                },
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        draft.refresh_from_db()
+        top = draft.widgets["main"][0]
+        nested = top["config"]["slots"]["body"]
+        self.assertEqual(top["id"], duplicate)
+        self.assertEqual(len({top["id"], nested[0]["id"], nested[1]["id"]}), 3)
+        self.assertTrue(all(widget["id"].startswith("widget-") for widget in nested))
+
     def test_page_scoped_first_save_rejects_a_concurrently_created_working_copy(self):
         live = self.publish_initial()
         draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
@@ -1194,7 +1296,7 @@ class PageVersionWorkflowTest(TestCase):
         self.assertIsNotNone(live.expiry_date)
         self.assertTrue(working_draft.is_current_published())
 
-    def test_publish_retry_is_idempotent_when_the_reviewed_version_is_already_live(self):
+    def test_publish_retry_with_a_stale_review_token_conflicts_when_already_live(self):
         draft = self.page.create_version(self.user, "Reviewed draft")
         reviewed_at = draft.updated_at
         url = reverse("api:pageversion-publish", kwargs={"pk": draft.pk})
@@ -1211,8 +1313,8 @@ class PageVersionWorkflowTest(TestCase):
         )
 
         self.assertEqual(first.status_code, status.HTTP_200_OK)
-        self.assertEqual(retry.status_code, status.HTTP_200_OK)
-        self.assertEqual(retry.data["version"]["id"], draft.id)
+        self.assertEqual(retry.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(retry.data["error"], "version_conflict")
         self.assertEqual(self.page.versions.count(), 1)
 
     def test_publish_retry_does_not_hide_a_newer_working_copy(self):
@@ -1395,6 +1497,54 @@ class PageVersionWorkflowTest(TestCase):
         draft.refresh_from_db()
         self.assertIsNone(draft.effective_date)
 
+    def test_schedule_and_cancel_each_advance_revision_once(self):
+        draft = self.page.create_version(self.user, "Scheduled by revision")
+
+        scheduled = self.client.post(
+            reverse("api:pageversion-schedule", kwargs={"pk": draft.pk}),
+            {
+                "effectiveDate": (timezone.now() + timedelta(days=1)).isoformat(),
+                "expectedRevision": 1,
+            },
+            format="json",
+        )
+        self.assertEqual(scheduled.status_code, status.HTTP_200_OK)
+        self.assertEqual(scheduled.data["edit_revision"], 2)
+
+        stale = self.client.post(
+            reverse("api:pageversion-cancel-schedule", kwargs={"pk": draft.pk}),
+            {"expectedRevision": 1},
+            format="json",
+        )
+        self.assertEqual(stale.status_code, status.HTTP_409_CONFLICT)
+
+        cancelled = self.client.post(
+            reverse("api:pageversion-cancel-schedule", kwargs={"pk": draft.pk}),
+            {"expectedRevision": 2},
+            format="json",
+        )
+        self.assertEqual(cancelled.status_code, status.HTTP_200_OK)
+        self.assertEqual(cancelled.data["edit_revision"], 3)
+
+    def test_publish_advances_revision_and_a_stale_retry_conflicts(self):
+        draft = self.page.create_version(self.user, "Publish by revision")
+
+        published = self.client.post(
+            reverse("api:pageversion-publish", kwargs={"pk": draft.pk}),
+            {"expectedRevision": 1},
+            format="json",
+        )
+        self.assertEqual(published.status_code, status.HTTP_200_OK)
+        self.assertEqual(published.data["version"]["edit_revision"], 2)
+
+        stale = self.client.post(
+            reverse("api:pageversion-publish", kwargs={"pk": draft.pk}),
+            {"expectedRevision": 1},
+            format="json",
+        )
+        self.assertEqual(stale.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(stale.data["details"]["server_revision"], 2)
+
     def test_restore_copies_history_into_working_copy_only(self):
         live = self.publish_initial()
         draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
@@ -1412,6 +1562,20 @@ class PageVersionWorkflowTest(TestCase):
         self.page.refresh_from_db()
         self.assertEqual(draft.page_data["page_attributes"]["title"], "Live title")
         self.assertEqual(self.page.current_published_version_id, live.id)
+
+    def test_restore_advances_the_working_revision_once(self):
+        live = self.publish_initial()
+        draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+        before = draft.edit_revision
+
+        response = self.client.post(
+            reverse("api:pageversion-restore", kwargs={"pk": live.pk}),
+            {"expectedRevision": before},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["version"]["edit_revision"], before + 1)
 
     def test_restore_rejects_a_working_copy_changed_after_review(self):
         live = self.publish_initial()

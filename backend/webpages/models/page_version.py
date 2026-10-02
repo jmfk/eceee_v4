@@ -96,6 +96,17 @@ class PageVersion(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    edit_revision = models.PositiveBigIntegerField(
+        default=1,
+        help_text="Monotonic concurrency token for mutations to this version",
+    )
+    last_edited_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="last_edited_page_versions",
+    )
 
     class Meta:
         ordering = ["-version_number"]
@@ -118,6 +129,8 @@ class PageVersion(models.Model):
         "tags",
         "effective_date",
         "created_by_id",
+        "edit_revision",
+        "last_edited_by_id",
     )
 
     def __str__(self):
@@ -419,6 +432,7 @@ class PageVersion(models.Model):
             page_data=self.page_data.copy(),
             widgets=self.widgets.copy() if self.widgets else {},
             created_by=user,
+            last_edited_by=user,
         )
 
         return draft
