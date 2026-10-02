@@ -329,7 +329,7 @@ class PageVersionViewSet(
     def restore(self, request, pk=None):
         """Copy a historical version into the canonical working copy."""
         version = self.get_object()
-        expected_revision, client_timestamp, error_response = self._parse_review_token(request)
+        expected_revision, client_timestamp, error_response = self._parse_review_token(request, required=False)
         if error_response:
             return error_response
 

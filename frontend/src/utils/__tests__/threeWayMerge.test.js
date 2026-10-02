@@ -55,6 +55,17 @@ describe('threeWayMerge', () => {
         expect(result.diffs.some(diff => diff.hasConflict)).toBe(true)
     })
 
+    it('combines concurrent moves that affect different widgets', () => {
+        const original = [widget('a'), widget('b'), widget('c'), widget('d')]
+        const local = [widget('b'), widget('a'), widget('c'), widget('d')]
+        const server = [widget('a'), widget('b'), widget('d'), widget('c')]
+
+        const result = mergeValue(original, local, server, ['widgets'])
+
+        expect(result.value.map(item => item.id)).toEqual(['b', 'a', 'd', 'c'])
+        expect(result.diffs.some(diff => diff.hasConflict)).toBe(false)
+    })
+
     it('flags delete versus edit', () => {
         const original = [widget('a', { text: 'Before' })]
         const local = []
