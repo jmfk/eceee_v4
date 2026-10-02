@@ -326,6 +326,24 @@ describe('PageRenderer', () => {
         expect(container.querySelector('[data-widget-type="object-detail"]')).toHaveTextContent('Published body')
     })
 
+    it('uses the configured ObjectList excerpt field and length', () => {
+        const model = createPageRenderModel({ widgets: { main: [{
+            id: 'list',
+            type: 'object_storage.ObjectListWidget',
+            config: { show_excerpt: true, excerpt_field: 'teaser', excerpt_length: 12 },
+            data: { status: 'ready', items: [{
+                id: 'object-1', title: 'Published object', slug: 'published-object',
+                objectType: { name: 'article', label: 'Article' },
+                data: { summary: 'Wrong summary', teaser: 'Alpha beta gamma delta' },
+            }] },
+        }] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(container.querySelector('.object-excerpt')).toHaveTextContent('Alpha beta...')
+        expect(container.querySelector('.object-excerpt')).not.toHaveTextContent('Wrong summary')
+    })
+
     it('falls back to published object data when structured widgets are disabled or absent', () => {
         const item = {
             id: 'object-1',

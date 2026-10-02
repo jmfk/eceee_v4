@@ -166,6 +166,8 @@ function reader(client: PoolClient): PageReader {
         publish_date: 'published.effective_date, object.id',
         '-created_at': 'object.created_at DESC, object.id DESC',
         created_at: 'object.created_at, object.id',
+        '-updated_at': 'object.updated_at DESC, object.id DESC',
+        updated_at: 'object.updated_at, object.id',
         title: 'object.title, object.id',
         '-title': 'object.title DESC, object.id DESC',
       };
