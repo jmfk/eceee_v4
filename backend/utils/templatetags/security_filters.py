@@ -2,10 +2,10 @@
 Security-focused template filters for HTML sanitization
 """
 
-from django import template
-from django.utils.safestring import mark_safe
 import bleach
 from bleach.css_sanitizer import CSSSanitizer
+from django import template
+from django.utils.safestring import mark_safe
 
 register = template.Library()
 
