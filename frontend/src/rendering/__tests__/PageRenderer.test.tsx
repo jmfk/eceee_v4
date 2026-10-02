@@ -226,7 +226,7 @@ describe('PageRenderer', () => {
                 id: 'news',
                 type: 'easy_widgets.NewsListWidget',
                 config: { showFeaturedImage: false, showExcerpts: false, showPublishDate: false },
-                data: { status: 'ready', items: [{ id: 1, title: 'Article', slug: 'article', publishDate: '2026-09-27', objectType: { name: 'news', label: 'News' }, data: { featuredImage: '/news.jpg', excerpt: 'Excerpt' } }] },
+                data: { status: 'ready', items: [{ id: 1, title: 'Article', slug: 'article', isFeatured: true, publishDate: '2026-09-27', objectType: { name: 'news', label: 'News' }, data: { featuredImage: '/news.jpg', excerpt: 'Excerpt' } }] },
             }] },
         })
 
@@ -234,6 +234,7 @@ describe('PageRenderer', () => {
 
         expect(container.querySelector('[data-widget-type="news-list"] .news-items-container')).toBeTruthy()
         expect(container.querySelector('.news-featured-image,.news-excerpt,.news-date')).toBeNull()
+        expect(screen.getByText('Pinned')).toBeInTheDocument()
     })
 
     it('renders top-news and sidebar layouts with their configured fields', () => {
@@ -290,6 +291,39 @@ describe('PageRenderer', () => {
         })
         render(<PageRenderer model={empty} />)
         expect(screen.getByText('Select a golden sample.')).toBeInTheDocument()
+    })
+
+    it('keeps an unmatched detail path silent like the Django widget', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{ id: 'detail', type: 'easy_widgets.NewsDetailWidget', config: { emptyMessage: 'Select a golden sample.' }, data: { status: 'empty' } }] },
+            context: { pathVariables: { news_slug: 'missing-article' } },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(container.querySelector('[data-widget-type="news-detail"]')).toBeNull()
+        expect(screen.queryByText('Select a golden sample.')).not.toBeInTheDocument()
+    })
+
+    it('renders publisher-only object storage widgets without adding editor fixtures', () => {
+        const item = {
+            id: 'object-1',
+            title: 'Published object',
+            path: '/objects/published-object/',
+            objectType: { name: 'article', label: 'Article' },
+            publishDate: '2026-09-30',
+            data: { summary: 'Published summary' },
+            widgets: { main: [{ id: 'nested', type: 'easy_widgets.ContentWidget', config: { content: '<p>Published body</p>' } }] },
+        }
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'list', type: 'object_storage.ObjectListWidget', config: { showExcerpt: true }, data: { status: 'ready', items: [item] } },
+            { id: 'detail', type: 'object_storage.ObjectDetailWidget', config: { showWidgets: true }, data: { status: 'ready', item } },
+        ] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(container.querySelector('[data-widget-type="object-list"]')).toHaveTextContent('Published summary')
+        expect(container.querySelector('[data-widget-type="object-detail"]')).toHaveTextContent('Published body')
     })
 
     it('uses Django compact date formatting in top-news and sidebar views', () => {

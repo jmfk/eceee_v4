@@ -62,6 +62,27 @@ export interface PublishedNavigationPage {
   sort_order: number;
 }
 
+export interface PublishedObject {
+  id: DbId;
+  title: string;
+  slug: string;
+  objectType: { id: DbId; name: string; label: string; pluralLabel: string };
+  data: Record<string, unknown>;
+  widgets: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  publishDate: string;
+  isFeatured: boolean;
+}
+
+export interface PublishedObjectQuery {
+  objectTypeIds?: DbId[];
+  objectTypeNames?: string[];
+  slug?: string;
+  limit: number;
+  sortOrder: string;
+  featuredFirst?: boolean;
+}
+
 export interface PublicMediaItem {
   id: DbId;
   url: string;
@@ -87,6 +108,7 @@ export interface PageReader {
     files: PublicMediaItem[];
     collections: Record<DbId, PublicMediaItem[]>;
   }>;
+  publishedObjects(query: PublishedObjectQuery, tenantId: DbId, at: Date): Promise<PublishedObject[]>;
 }
 
 export interface ReadDb {
@@ -112,6 +134,8 @@ export interface PublishedPageModel {
     siteHostnames: string[];
     pageId: DbId;
     versionId: DbId;
+    pathVariables: Record<string, string>;
+    simulatedPath: string;
     componentStyles: Record<string, Record<string, unknown>>;
     publicForms: {
       endpointBase: string;
@@ -346,7 +370,10 @@ function replaceHtmlMedia(html: string, media: Map<DbId, PublicMediaItem>): stri
     const title = htmlAttribute(attributes, 'data-title') || item?.altText || item?.title || htmlAttribute(savedImage, 'alt');
     const captionText = item?.caption || htmlAttribute(attributes, 'data-caption');
     const caption = captionText ? `<figcaption>${escapeHtmlAttribute(captionText)}</figcaption>` : '';
-    return `<figure class="media-insert img-width-${escapeHtmlAttribute(width)} media-align-${escapeHtmlAttribute(align)}"><img src="${escapeHtmlAttribute(source)}" alt="${escapeHtmlAttribute(title)}" class="img-width-${escapeHtmlAttribute(width)}" style="width:100%;height:auto" loading="lazy">${caption}</figure>`;
+    const dimensions = item?.width && item?.height
+      ? ` width="${escapeHtmlAttribute(item.width)}" height="${escapeHtmlAttribute(item.height)}"`
+      : '';
+    return `<figure class="media-insert img-width-${escapeHtmlAttribute(width)} media-align-${escapeHtmlAttribute(align)}"><img src="${escapeHtmlAttribute(source)}" alt="${escapeHtmlAttribute(title)}" class="img-width-${escapeHtmlAttribute(width)}"${dimensions} loading="lazy">${caption}</figure>`;
   });
 }
 
@@ -493,9 +520,124 @@ function prepareWidgets(
       if (!config.displayType && !config.display_type && style?.styleType) config.displayType = style.styleType;
       if (config.showCaptions === undefined && config.show_captions === undefined && style?.defaultShowCaptions !== undefined) config.showCaptions = style.defaultShowCaptions;
     }
-    return { ...widget, config };
+    const data = widget.data
+      ? prepareValue(enrichValue(widget.data, pagePaths, media)) as Widget['data']
+      : undefined;
+    return { ...widget, config, ...(data ? { data } : {}) };
   };
   return Object.fromEntries(Object.entries(slots).map(([slot, widgets]) => [slot, widgets.map(prepare)]));
+}
+
+const PATH_PATTERNS: Record<string, { expression: RegExp; variables: string[] }> = {
+  news_slug: { expression: /^([\p{L}\p{N}_-]+)\/$/u, variables: ['news_slug'] },
+  event_slug: { expression: /^([\p{L}\p{N}_-]+)\/$/u, variables: ['event_slug'] },
+  library_slug: { expression: /^([\p{L}\p{N}_-]+)\/$/u, variables: ['library_slug'] },
+  member_slug: { expression: /^([\p{L}\p{N}_-]+)\/$/u, variables: ['member_slug'] },
+  date_slug: { expression: /^(\d{4})\/(\d{2})\/([\p{L}\p{N}_-]+)\/$/u, variables: ['year', 'month', 'date_slug'] },
+  year_slug: { expression: /^(\d{4})\/([\p{L}\p{N}_-]+)\/$/u, variables: ['year', 'slug'] },
+  numeric_id: { expression: /^(\d+)\/$/, variables: ['id'] },
+  category_slug: { expression: /^([\p{L}\p{N}_-]+)\/([\p{L}\p{N}_-]+)\/$/u, variables: ['category', 'category_slug'] },
+};
+
+function matchPathPattern(key: string, remainingPath: string): Record<string, string> | null {
+  const pattern = PATH_PATTERNS[key];
+  const match = pattern?.expression.exec(remainingPath);
+  if (!pattern || !match) return null;
+  return Object.fromEntries(pattern.variables.map((name, index) => [name, match[index + 1]]));
+}
+
+function stringList(input: unknown): string[] {
+  return Array.isArray(input)
+    ? input.map(value => String(value)).filter(Boolean)
+    : [];
+}
+
+function positiveLimit(input: unknown, fallback: number): number {
+  const limit = Number(input);
+  return Number.isInteger(limit) && limit > 0 ? Math.min(limit, 50) : fallback;
+}
+
+function objectPath(basePath: string, slug: string): string {
+  return `${basePath === '/' ? '' : basePath}/${encodeURIComponent(slug)}/`.replace(/^$/, '/');
+}
+
+async function resolvePublishedData(
+  slots: Record<string, Widget[]>,
+  reader: PageReader,
+  tenantId: DbId,
+  at: Date,
+  pagePath: string,
+  pathVariables: Record<string, string>,
+): Promise<Record<string, Widget[]>> {
+  const resolve = async (widget: Widget): Promise<Widget> => {
+    if (widget.data?.item || widget.data?.items) return widget;
+    const config = widget.config;
+    let items: PublishedObject[] | null = null;
+    let item: PublishedObject | undefined;
+    if (widget.type === 'easy_widgets.NewsListWidget') {
+      items = await reader.publishedObjects({
+        objectTypeIds: stringList(config.objectTypes ?? config.object_types),
+        limit: positiveLimit(config.limit, 10),
+        sortOrder: String(config.sortOrder ?? config.sort_order ?? '-publish_date'),
+        featuredFirst: true,
+      }, tenantId, at);
+    } else if (widget.type === 'object_storage.ObjectListWidget') {
+      const objectType = String(config.objectType ?? config.object_type ?? '');
+      if (objectType) {
+        items = await reader.publishedObjects({
+          objectTypeNames: [objectType],
+          limit: positiveLimit(config.limit, 5),
+          sortOrder: String(config.orderBy ?? config.order_by ?? '-created_at'),
+        }, tenantId, at);
+      } else {
+        items = [];
+      }
+    } else if (widget.type === 'easy_widgets.TopNewsPlugWidget' || widget.type === 'easy_widgets.SidebarTopNewsWidget') {
+      items = await reader.publishedObjects({
+        objectTypeNames: stringList(config.objectTypes ?? config.object_types),
+        limit: positiveLimit(config.limit ?? config.maxItems ?? config.max_items, widget.type === 'easy_widgets.TopNewsPlugWidget' ? 4 : 5),
+        sortOrder: String(config.sortOrder ?? config.sort_order ?? '-publish_date'),
+        featuredFirst: true,
+      }, tenantId, at);
+    } else if (widget.type === 'easy_widgets.NewsDetailWidget') {
+      const variable = String(config.slugVariableName ?? config.slug_variable_name ?? 'news_slug');
+      const slug = pathVariables[variable];
+      if (slug) {
+        [item] = await reader.publishedObjects({
+          objectTypeIds: stringList(config.objectTypes ?? config.object_types),
+          slug,
+          limit: 1,
+          sortOrder: '-publish_date',
+        }, tenantId, at);
+      }
+    } else if (widget.type === 'object_storage.ObjectDetailWidget') {
+      const objectType = String(config.objectType ?? config.object_type ?? '');
+      const slug = String(config.objectSlug ?? config.object_slug ?? Object.values(pathVariables)[0] ?? '');
+      if (objectType && slug) {
+        [item] = await reader.publishedObjects({
+          objectTypeNames: [objectType],
+          slug,
+          limit: 1,
+          sortOrder: '-publish_date',
+        }, tenantId, at);
+      }
+    }
+    if (items) {
+      return { ...widget, data: { status: items.length ? 'ready' : 'empty', items: items.map(value => ({ ...value, path: objectPath(pagePath, value.slug) })) } };
+    }
+    if (widget.type === 'easy_widgets.NewsDetailWidget' || widget.type === 'object_storage.ObjectDetailWidget') {
+      return { ...widget, data: item
+        ? { status: 'ready', item: { ...item, path: objectPath(pagePath, item.slug) } }
+        : { status: 'empty' } };
+    }
+    return widget;
+  };
+  const resolved: Record<string, Widget[]> = {};
+  for (const [slot, widgets] of Object.entries(slots)) {
+    resolved[slot] = [];
+    for (const widget of widgets) resolved[slot].push(await resolve(widget));
+  }
+  return resolved;
 }
 
 export async function buildPublishedPageModel(db: ReadDb, hostname: string, path: string, at = new Date()): Promise<PublishedPageModel | null> {
@@ -515,7 +657,11 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
       pages.push(child);
       current = child;
     }
-    if (pages.length !== segments.length + 1 || current.path_pattern) return null;
+    const consumedSegments = pages.length - 1;
+    const remainingSegments = segments.slice(consumedSegments);
+    const remainingPath = remainingSegments.length ? `${remainingSegments.join('/')}/` : '';
+    const pathVariables = remainingPath ? matchPathPattern(current.path_pattern, remainingPath) : {};
+    if (remainingPath && !pathVariables) return null;
 
     // PageReader methods share one PostgreSQL client inside a repeatable-read
     // transaction. Keep reads sequential: node-postgres does not support
@@ -540,6 +686,9 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
       ? await reader.theme(explicitThemeId, root.tenant_id)
       : await reader.defaultTheme(root.tenant_id);
 
+    const matchedPath = '/' + segments.slice(0, consumedSegments).join('/');
+    slots = await resolvePublishedData(slots, reader, root.tenant_id, at, matchedPath || '/', pathVariables || {});
+
     const pageIds = new Set<DbId>();
     const mediaIds = new Set<DbId>();
     const collectionIds = new Set<DbId>();
@@ -550,7 +699,6 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
     const pagePaths = new Map(references.map(reference => [String(reference.id), reference.cached_path]));
     slots = prepareWidgets(slots, pagePaths, publicMedia.files, publicMedia.collections, theme, pages, navigationPages);
 
-    const matchedPath = '/' + segments.join('/');
     return {
       layout,
       slots,
@@ -562,10 +710,12 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
         siteHostnames: root.hostnames,
         pageId: current.id,
         versionId: currentVersion.id,
+        pathVariables: pathVariables || {},
+        simulatedPath: '/' + segments.join('/') + (segments.length ? '/' : ''),
         componentStyles: theme?.component_styles ?? {},
         publicForms: {
           endpointBase: `/api/forms/${encodeURIComponent(current.id)}`,
-          pagePath: matchedPath,
+          pagePath: '/' + segments.join('/'),
         },
       },
       fontCss: theme ? fontImports(theme.fonts) : '',
@@ -573,7 +723,7 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
       title: currentVersion.meta_title || current.title,
       description: currentVersion.meta_description || '',
       matchedPath,
-      remainingPath: '',
+      remainingPath,
     };
   });
 }

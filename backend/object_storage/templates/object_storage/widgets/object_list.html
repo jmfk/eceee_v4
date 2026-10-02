@@ -21,7 +21,7 @@
                     <div class="object-content">
                         <h3 class="object-title">
                             {% if object.slug %}
-                                <a href="{% url 'object_detail' object.object_type.name object.slug %}" class="text-decoration-none">
+                                <a href="{{ current_page.cached_path }}{{ object.slug }}/" class="text-decoration-none">
                                     {{ object.title }}
                                 </a>
                             {% else %}
@@ -37,8 +37,8 @@
                         
                         <div class="object-meta">
                             <span class="object-type">{{ object.object_type.label }}</span>
-                            {% if object.publish_date %}
-                                <span class="object-date"> • {{ object.publish_date|date:"M j, Y" }}</span>
+                            {% if object.render_publish_date %}
+                                <span class="object-date"> • {{ object.render_publish_date|date:"M j, Y" }}</span>
                             {% endif %}
                             {% if config.show_hierarchy and object.parent %}
                                 <span class="object-parent"> • Child of: {{ object.parent.title }}</span>
@@ -53,7 +53,7 @@
             <div class="widget-footer text-center mt-4">
                 <p class="text-sm text-gray-600">
                     Showing {{ config.limit }} {{ object_type.plural_label|lower }}
-                    <a href="{% url 'object_list' object_type.name %}" class="text-blue-600 hover:text-blue-800 ml-2">
+                    <a href="{{ current_page.cached_path }}" class="text-blue-600 hover:text-blue-800 ml-2">
                         View all →
                     </a>
                 </p>

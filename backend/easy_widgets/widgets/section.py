@@ -2,10 +2,11 @@
 Section widget implementation with collapsible functionality and anchor support.
 """
 
-from typing import Type, Optional
-from pydantic import BaseModel, Field, ConfigDict, field_validator
-from pydantic.alias_generators import to_camel
+from typing import Optional, Type
+
 from django.utils.text import slugify
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 
@@ -209,24 +210,24 @@ class SectionWidget(BaseWidget):
     }
     .section-content-only-widget:last-child {
         margin-bottom: 0;
-    }    
+    }
     .section-header {
         padding: 30px;
         user-select: none;
     }
-    
+
     .widget-wrapper {
     }
-    
+
     .section-remaining-content {
         display: block;
         margin-bottom: 30px;
     }
-    
+
     .section-collapsed .section-remaining-content {
         display: none;
     }
-    
+
     .section-banner {
         display: flex;
         align-items: center;
@@ -242,35 +243,35 @@ class SectionWidget(BaseWidget):
         user-select: none;
         transition: opacity 0.2s ease;
         font-size: 16px;
-        font-weight: 300;        
+        font-weight: 300;
     }
-    
+
     .section-banner:hover {
         opacity: 0.8;
     }
-    
+
     .contract-banner {
         display: flex;
     }
-    
+
     .section-collapsed .contract-banner {
         display: none;
     }
-    
+
     .expand-banner {
         display: none;
     }
-    
+
     .section-collapsed .expand-banner {
         display: flex;
     }
-    
+
     .empty-slot {
         color: #9ca3af;
         font-style: italic;
         text-align: center;
         font-size: 16px;
-        font-weight: 300;        
+        font-weight: 300;
         padding: 30px;
     }
     """
@@ -303,11 +304,12 @@ class SectionWidget(BaseWidget):
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import (
-            render_mustache,
-            prepare_component_context,
-        )
         from django.template.loader import render_to_string
+
+        from webpages.utils.mustache_renderer import (
+            prepare_component_context,
+            render_mustache,
+        )
 
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
@@ -338,9 +340,7 @@ class SectionWidget(BaseWidget):
             anchor=prepared_config.get("anchor", ""),
             style_vars=style.get("variables", {}),
             config=prepared_config,  # Pass processed config for granular control
-            slots=prepared_config.get(
-                "rendered_slots"
-            ),  # Pass slot data for custom rendering
+            slots=prepared_config.get("rendered_slots"),  # Pass slot data for custom rendering
         )
 
         # Render with style template
@@ -362,26 +362,21 @@ class SectionWidget(BaseWidget):
 
     def prepare_template_context(self, config, context=None):
         """Prepare context with slot rendering and anchor generation"""
-        from webpages.utils.color_utils import resolve_color_value
-
-        template_config = super().prepare_template_context(config, context)
-
-        # Get theme colors for CSS variable conversion
-        theme = context.get("theme") if context else None
-        theme_colors = theme.colors if theme and hasattr(theme, "colors") else {}
+        normalized = {**(config or {}), **SectionConfig(**(config or {})).model_dump()}
+        template_config = super().prepare_template_context(normalized, context)
 
         # Ensure snake_case fields for template
-        template_config["show_border"] = config.get("show_border", False)
+        template_config["show_border"] = normalized.get("show_border", False)
 
         # Auto-generate anchor from title if not provided
-        title = config.get("title", "")
-        anchor = config.get("anchor")
+        title = normalized.get("title", "")
+        anchor = normalized.get("anchor")
         if title and not anchor:
             anchor = slugify(title)
             template_config["anchor"] = anchor
 
         # Get slots data (single 'content' slot)
-        slots_data = config.get("slots", {"content": []})
+        slots_data = normalized.get("slots", {"content": []})
 
         # Render widgets for the content slot using existing renderer
         rendered_slots = {}
@@ -392,16 +387,12 @@ class SectionWidget(BaseWidget):
                 try:
                     # Filter out hidden widgets (check both config.isVisible and config.is_visible)
                     widget_config = widget_data.get("config", {})
-                    is_visible = widget_config.get(
-                        "isVisible", widget_config.get("is_visible", True)
-                    )
+                    is_visible = widget_config.get("isVisible", widget_config.get("is_visible", True))
                     if not is_visible:
                         continue  # Skip hidden widgets
 
                     # Filter out inactive widgets (check both config.isActive and config.is_active)
-                    is_active = widget_config.get(
-                        "isActive", widget_config.get("is_active", True)
-                    )
+                    is_active = widget_config.get("isActive", widget_config.get("is_active", True))
                     if not is_active:
                         continue  # Skip inactive widgets
 
@@ -409,27 +400,18 @@ class SectionWidget(BaseWidget):
                     if "sort_order" not in widget_data and "order" not in widget_data:
                         widget_data = {**widget_data, "sort_order": index}
 
-                    widget_html = context["renderer"].render_widget_json(
-                        widget_data, context
-                    )
-                    rendered_widgets.append(
-                        {"html": widget_html, "widget_data": widget_data}
-                    )
-                except Exception as e:
+                    widget_html = context["renderer"].render_widget_json(widget_data, context)
+                    rendered_widgets.append({"html": widget_html, "widget_data": widget_data})
+                except Exception:
                     # Log error and continue
                     continue
             rendered_slots["content"] = rendered_widgets
         else:
             # Fallback: provide raw widget data for template
             rendered_slots = {
-                "content": [
-                    {"html": None, "widget_data": widget}
-                    for widget in slots_data.get("content", [])
-                ]
+                "content": [{"html": None, "widget_data": widget} for widget in slots_data.get("content", [])]
             }
 
-        template_config.update(
-            {"slots_data": slots_data, "rendered_slots": rendered_slots}
-        )
+        template_config.update({"slots_data": slots_data, "rendered_slots": rendered_slots})
 
         return template_config

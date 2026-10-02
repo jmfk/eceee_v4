@@ -14,7 +14,7 @@ const model: PublishedPageModel = {
   },
   context: {
     mode: 'public', preview: false, tenantId: '7', siteId: '1', siteHostnames: ['example.org'],
-    pageId: '2', versionId: '3', componentStyles: {},
+    pageId: '2', versionId: '3', pathVariables: {}, simulatedPath: '/', componentStyles: {},
     publicForms: { endpointBase: '/api/forms/2', pagePath: '/' },
   },
   fontCss: '', themeCss: '', title: 'Page', description: '', matchedPath: '/', remainingPath: '',

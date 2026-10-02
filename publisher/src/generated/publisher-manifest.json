@@ -55,7 +55,7 @@
       "variants": []
     },
     "easy_widgets.ContentWidget": {
-      "css": "\n    .content-widget {\n        box-sizing: border-box;\n        width: 100%;\n        min-height: 32px;\n        font-family: inherit;\n        line-height: 1.6;\n        color: inherit;\n        margin-bottom: 30px;\n    }\n    .content-widget.border-enabled {\n        padding-top: 50px;\n        padding-bottom: 50px;\n        outline: 1px solid rgb(0,0,0,0.3);\n    }\n    ",
+      "css": "\n    .content-widget {\n        box-sizing: border-box;\n        width: 100%;\n        min-height: 32px;\n        font-family: inherit;\n        line-height: 1.6;\n        color: inherit;\n        margin-bottom: 30px;\n    }\n    .content-widget.border-enabled {\n        padding-top: 50px;\n        padding-bottom: 50px;\n        outline: 1px solid rgb(0,0,0,0.3);\n    }\n    .content-widget .media-insert,\n    .content-widget .media-insert img {\n        max-width: 100%;\n    }\n    .content-widget .media-insert img {\n        height: auto;\n    }\n    ",
       "cssVariables": {},
       "layoutParts": {
         "content-widget": {

@@ -199,6 +199,8 @@ class NewsListWidget(BaseWidget):
 
                 # Add published_version to the item for template access
                 item.published_version = published_version
+                item.publish_date = published_version.effective_date
+                item.is_pinned = published_version.is_featured
 
                 if config.show_excerpts:
                     item.excerpt_text = self._get_excerpt(published_version.data, config.excerpt_length)

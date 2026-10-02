@@ -13,8 +13,8 @@
                 
                 <div class="object-meta">
                     <span class="object-type">{{ object.object_type.label }}</span>
-                    {% if object.publish_date %}
-                        <span class="object-date"> • Published {{ object.publish_date|date:"F j, Y" }}</span>
+                    {% if object.render_publish_date %}
+                        <span class="object-date"> • Published {{ object.render_publish_date|date:"F j, Y" }}</span>
                     {% endif %}
                     {% if object.created_by %}
                         <span class="object-author"> • By {{ object.created_by.get_full_name|default:object.created_by.username }}</span>
@@ -41,17 +41,17 @@
             </header>
             
             <div class="object-content">
-                {% if config.show_widgets and object.widgets %}
-                    {% for slot_name, widgets in object.widgets.items %}
+                {% if config.show_widgets and rendered_widgets %}
+                    {% for slot_name, widgets in rendered_widgets.items %}
                         <div class="widget-slot" data-slot="{{ slot_name }}">
-                            {% for widget_config in widgets %}
-                                {% render_widget widget_config %}
+                            {% for widget_html in widgets %}
+                                {{ widget_html|safe }}
                             {% endfor %}
                         </div>
                     {% endfor %}
                 {% else %}
                     {# Fallback: display object data fields #}
-                    {% for field_name, field_value in object.data.items %}
+                    {% for field_name, field_value in published_version.data.items %}
                         {% if field_value %}
                             <div class="object-field">
                                 <h4 class="field-label text-sm font-medium text-gray-700 mb-1">

@@ -7,12 +7,12 @@ from unittest.mock import patch
 
 from bs4 import BeautifulSoup
 from django.template.loader import render_to_string
-from django.test import TestCase
+from django.test import SimpleTestCase
 
 from easy_widgets.widgets.content import ContentWidget
 
 
-class ContentWidgetPrepareTemplateContextTest(TestCase):
+class ContentWidgetPrepareTemplateContextTest(SimpleTestCase):
     def setUp(self):
         self.widget = ContentWidget()
 
@@ -89,14 +89,14 @@ class ContentWidgetPrepareTemplateContextTest(TestCase):
             '<img src="legacy.jpg" alt="Diagram &quot; onerror=&quot;bad()"></div>'
         )
         media = SimpleNamespace(
-            id=999, width=100, height=100, title="", file_url="/safe.jpg", get_file_url=lambda: "/safe.jpg"
+            id=999, width=100, height=100, title="", file_url="/safe.jpg", get_file_url=lambda: "/derived.jpg"
         )
         with (
             patch("file_manager.models.MediaFile.objects.get", return_value=media),
             patch(
                 "file_manager.imgproxy.imgproxy_service.generate_responsive_urls",
-                return_value={"1x": {"url": "/safe.jpg"}, "srcset": ""},
-            ),
+                return_value={"1x": {"url": "/safe.jpg", "width": 100, "height": 100}, "srcset": ""},
+            ) as generate,
         ):
             config = self.widget.prepare_template_context({"content": content}, {})
 
@@ -107,6 +107,9 @@ class ContentWidgetPrepareTemplateContextTest(TestCase):
         figure = BeautifulSoup(rendered, "html.parser").find("figure")
         image = figure.find("img")
         self.assertEqual(image["alt"], 'Diagram " onerror="bad()')
+        self.assertEqual(image["width"], "100")
+        self.assertEqual(image["height"], "100")
+        self.assertEqual(generate.call_args.kwargs["source_url"], "/safe.jpg")
         self.assertEqual(figure.find("figcaption").text, 'Caption " onmouseover="bad()')
         self.assertNotIn("onerror", image.attrs)
         self.assertNotIn("onmouseover", figure.attrs)
