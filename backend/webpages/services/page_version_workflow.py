@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -122,8 +122,12 @@ class PageVersionWorkflowService:
         self.now = now or timezone.now()
 
     def _versions(self, *, lock=False):
-        queryset = self.page.versions.select_related("created_by")
-        return queryset.select_for_update() if lock else queryset
+        queryset = self.page.versions.all()
+        if lock:
+            # Nullable last_edited_by would introduce an outer join that
+            # PostgreSQL cannot lock with SELECT FOR UPDATE.
+            return queryset.select_for_update()
+        return queryset.select_related("created_by", "last_edited_by")
 
     def editable_versions(self, *, lock=False):
         return self._versions(lock=lock).filter(Q(effective_date__isnull=True) | Q(effective_date__gt=self.now))
@@ -236,6 +240,39 @@ class PageVersionWorkflowService:
             )
         return editable
 
+    def assert_reviewed(self, version, *, expected_revision=None, expected_updated_at=None, required=True):
+        """Require an exact server-issued revision, with timestamp compatibility fallback."""
+        if expected_revision is not None:
+            if version.edit_revision == expected_revision:
+                return
+        elif expected_updated_at is not None:
+            if version.updated_at == expected_updated_at:
+                return
+        elif not required:
+            return
+
+        raise VersionConflictError(
+            "The reviewed working version has changed.",
+            details={
+                "server_version_id": version.id,
+                "server_revision": version.edit_revision,
+                "server_updated_at": version.updated_at.isoformat(),
+                "last_edited_by": (
+                    {
+                        "id": version.last_edited_by_id,
+                        "username": version.last_edited_by.username,
+                    }
+                    if version.last_edited_by_id
+                    else None
+                ),
+            },
+        )
+
+    def advance_revision(self, version):
+        version.edit_revision += 1
+        if self.user and getattr(self.user, "is_authenticated", False):
+            version.last_edited_by = self.user
+
     @staticmethod
     def lock_hostname_namespace():
         """Lock the global root-page namespace before locking a publication target."""
@@ -290,6 +327,7 @@ class PageVersionWorkflowService:
             version_title=title,
             change_summary={"action": "working_copy_created"},
             created_by=self.user,
+            last_edited_by=self.user,
             **values,
         )
 
@@ -303,7 +341,7 @@ class PageVersionWorkflowService:
         return self._create_version_from(source), True
 
     @transaction.atomic
-    def resolve_atomic_save_target(self, *, expected_version_id, expected_updated_at):
+    def resolve_atomic_save_target(self, *, expected_version_id, expected_revision=None, expected_updated_at=None):
         """Lock and return the reviewed save target, creating it from live content when needed."""
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
         # The page lock may have blocked across a scheduled activation boundary.
@@ -312,27 +350,39 @@ class PageVersionWorkflowService:
         self.now = timezone.now()
         editable = self.canonical_editable_version(lock=True)
         if editable:
-            if editable.id != expected_version_id or editable.updated_at != expected_updated_at:
+            if editable.id != expected_version_id:
                 raise VersionConflictError(
                     "The page's working version has changed.",
                     details={
                         "expected_version_id": expected_version_id,
                         "server_version_id": editable.id,
+                        "server_revision": editable.edit_revision,
                         "server_updated_at": editable.updated_at.isoformat(),
                     },
                 )
+            self.assert_reviewed(
+                editable,
+                expected_revision=expected_revision,
+                expected_updated_at=expected_updated_at,
+            )
             return editable, False
 
         source = self.live_version(lock=True) or self._versions(lock=True).order_by("-version_number").first()
-        if not source or source.id != expected_version_id or source.updated_at != expected_updated_at:
+        if not source or source.id != expected_version_id:
             raise VersionConflictError(
                 "The reviewed source version has changed.",
                 details={
                     "expected_version_id": expected_version_id,
                     "server_version_id": source.id if source else None,
+                    "server_revision": source.edit_revision if source else None,
                     "server_updated_at": source.updated_at.isoformat() if source else None,
                 },
             )
+        self.assert_reviewed(
+            source,
+            expected_revision=expected_revision,
+            expected_updated_at=expected_updated_at,
+        )
         return self._create_version_from(source), True
 
     @staticmethod
@@ -381,7 +431,7 @@ class PageVersionWorkflowService:
             ) from error
 
     @transaction.atomic
-    def publish(self, version, *, expected_updated_at=None):
+    def publish(self, version, *, expected_revision=None, expected_updated_at=None):
         self.lock_hostname_namespace()
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
         # Classify the target after acquiring the page lock. A previous publish
@@ -392,6 +442,11 @@ class PageVersionWorkflowService:
         if not editable or editable.id != version.id:
             live = self.live_version(lock=True)
             if live and live.id == version.id and editable is None:
+                self.assert_reviewed(
+                    live,
+                    expected_revision=expected_revision,
+                    expected_updated_at=expected_updated_at,
+                )
                 return version
             raise VersionNotEditableError(
                 "Only the current working version can be changed.",
@@ -400,11 +455,12 @@ class PageVersionWorkflowService:
                     "editable_version_id": editable.id if editable else None,
                 },
             )
-        if expected_updated_at and version.updated_at != expected_updated_at:
-            raise VersionConflictError(
-                "The reviewed working version has changed.",
-                details={"server_updated_at": version.updated_at.isoformat()},
-            )
+        self.assert_reviewed(
+            version,
+            expected_revision=expected_revision,
+            expected_updated_at=expected_updated_at,
+            required=False,
+        )
         self.assert_page_attributes_publishable(version, lock_namespace=True)
         now = timezone.now()
         previous_live = self.live_version(lock=True)
@@ -413,7 +469,8 @@ class PageVersionWorkflowService:
             previous_live.save(update_fields=["expiry_date", "updated_at"])
         version.effective_date = now
         version.expiry_date = None
-        version.save(update_fields=["effective_date", "expiry_date", "updated_at"])
+        self.advance_revision(version)
+        version.save(update_fields=["effective_date", "expiry_date", "edit_revision", "last_edited_by", "updated_at"])
         self.page.refresh_from_db()
         version.page = self.page
         version._apply_version_data()
@@ -435,16 +492,25 @@ class PageVersionWorkflowService:
         return summary
 
     @transaction.atomic
-    def schedule(self, version, effective_date, expiry_date=None, *, expected_updated_at=None):
+    def schedule(
+        self,
+        version,
+        effective_date,
+        expiry_date=None,
+        *,
+        expected_revision=None,
+        expected_updated_at=None,
+    ):
         self.lock_hostname_namespace()
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
         version = PageVersion.objects.select_for_update().get(pk=version.pk)
         self.assert_canonical_editable(version)
-        if expected_updated_at and version.updated_at != expected_updated_at:
-            raise VersionConflictError(
-                "The reviewed working version has changed.",
-                details={"server_updated_at": version.updated_at.isoformat()},
-            )
+        self.assert_reviewed(
+            version,
+            expected_revision=expected_revision,
+            expected_updated_at=expected_updated_at,
+            required=False,
+        )
         self.assert_page_attributes_publishable(version, lock_namespace=True)
         now = timezone.now()
         if effective_date <= now:
@@ -473,19 +539,45 @@ class PageVersionWorkflowService:
         version.effective_date = effective_date
         version.expiry_date = expiry_date
         version.change_summary = summary
-        version.save(update_fields=["effective_date", "expiry_date", "change_summary", "updated_at"])
+        self.advance_revision(version)
+        version.save(
+            update_fields=[
+                "effective_date",
+                "expiry_date",
+                "change_summary",
+                "edit_revision",
+                "last_edited_by",
+                "updated_at",
+            ]
+        )
         return version
 
     @transaction.atomic
-    def cancel_schedule(self, version):
+    def cancel_schedule(self, version, *, expected_revision=None, expected_updated_at=None):
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
         version = PageVersion.objects.select_for_update().get(pk=version.pk)
         if not version.effective_date or version.effective_date <= timezone.now():
             raise WorkflowError("The requested version is not scheduled.")
+        self.assert_reviewed(
+            version,
+            expected_revision=expected_revision,
+            expected_updated_at=expected_updated_at,
+            required=False,
+        )
         version.change_summary = self._restore_scheduled_predecessor(version)
         version.effective_date = None
         version.expiry_date = None
-        version.save(update_fields=["effective_date", "expiry_date", "change_summary", "updated_at"])
+        self.advance_revision(version)
+        version.save(
+            update_fields=[
+                "effective_date",
+                "expiry_date",
+                "change_summary",
+                "edit_revision",
+                "last_edited_by",
+                "updated_at",
+            ]
+        )
         return version
 
     @transaction.atomic
@@ -506,6 +598,7 @@ class PageVersionWorkflowService:
             expiry_date=None,
             change_summary=summary,
             updated_at=timezone.now(),
+            edit_revision=F("edit_revision") + 1,
         )
         version.refresh_from_db()
         return version
@@ -525,17 +618,23 @@ class PageVersionWorkflowService:
         return version
 
     @transaction.atomic
-    def restore_as_working_copy(self, source, *, expected_updated_at=None):
+    def restore_as_working_copy(self, source, *, expected_revision=None, expected_updated_at=None):
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
         source = PageVersion.objects.select_for_update().get(pk=source.pk, page=self.page)
         editable = self.canonical_editable_version(lock=True)
         if not editable:
-            return self._create_version_from(source, title=f"Restored from version {source.version_number}")
-        if expected_updated_at is None or editable.updated_at != expected_updated_at:
-            raise VersionConflictError(
-                "The working version has changed since it was reviewed.",
-                details={"server_updated_at": editable.updated_at.isoformat()},
+            self.assert_reviewed(
+                source,
+                expected_revision=expected_revision,
+                expected_updated_at=expected_updated_at,
+                required=False,
             )
+            return self._create_version_from(source, title=f"Restored from version {source.version_number}")
+        self.assert_reviewed(
+            editable,
+            expected_revision=expected_revision,
+            expected_updated_at=expected_updated_at,
+        )
         if editable.id == source.id:
             return editable
         for field, value in self._copied_fields(source).items():
@@ -549,6 +648,7 @@ class PageVersionWorkflowService:
         if predecessor:
             summary[self.SCHEDULE_PREDECESSOR_KEY] = deepcopy(predecessor)
         editable.change_summary = summary
+        self.advance_revision(editable)
         editable.save()
         return editable
 
@@ -565,6 +665,12 @@ def version_summary(version):
         "expiry_date": version.expiry_date,
         "created_at": version.created_at,
         "updated_at": version.updated_at,
+        "edit_revision": version.edit_revision,
+        "last_edited_by": (
+            {"id": version.last_edited_by_id, "username": version.last_edited_by.username}
+            if version.last_edited_by_id
+            else None
+        ),
     }
 
 

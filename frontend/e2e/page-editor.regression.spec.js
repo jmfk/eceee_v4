@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockCmsApi, seedAuthenticatedSession } from './fixtures/apiMocks'
+import { createCollaborativeEditorState, mockCmsApi, seedAuthenticatedSession } from './fixtures/apiMocks'
 
 const editorPath = '/pages/101/edit/content'
 
@@ -317,5 +317,65 @@ test.describe('page editor regressions', () => {
       content: '<p>Edited card body</p>',
     }))
     expect(untouchedSibling.config.content).toBe('<p>Second widget copy</p>')
+  })
+})
+
+test.describe('page editor collaboration', () => {
+  test('two browser contexts merge different widgets and show advisory presence', async ({ browser }) => {
+    const shared = createCollaborativeEditorState()
+    const contextA = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+    const contextB = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+    const pageA = await contextA.newPage()
+    const pageB = await contextB.newPage()
+    installErrorGuards(pageA)
+    installErrorGuards(pageB)
+    await mockCmsApi(pageA, { authenticated: true, pageEditor: true, editorState: shared })
+    await mockCmsApi(pageB, { authenticated: true, pageEditor: true, editorState: shared })
+
+    try {
+      await Promise.all([openEditor(pageA, shared), openEditor(pageB, shared)])
+      await expect(pageA.getByTestId('page-editor-presence')).toBeVisible()
+      await expect(pageB.getByTestId('page-editor-presence')).toBeVisible()
+
+      await setEditorHtml(pageA, 'content-intro', '<p>Editor A copy</p>')
+      await setEditorHtml(pageB, 'content-sidebar', '<p>Editor B copy</p>')
+      await saveCurrentVersion(pageA)
+      await expect(contentEditor(pageB, 'content-intro')).toContainText('Editor A copy')
+      await saveCurrentVersion(pageB)
+
+      expect(shared.version.widgets.main.find(widget => widget.id === 'content-intro').config.content)
+        .toBe('<p>Editor A copy</p>')
+      expect(shared.version.widgets.main.find(widget => widget.id === 'content-sidebar').config.content)
+        .toBe('<p>Editor B copy</p>')
+    } finally {
+      await contextA.close()
+      await contextB.close()
+    }
+  })
+
+  test('two browser contexts require a choice for the same rich-text field', async ({ browser }) => {
+    const shared = createCollaborativeEditorState()
+    const contextA = await browser.newContext()
+    const contextB = await browser.newContext()
+    const pageA = await contextA.newPage()
+    const pageB = await contextB.newPage()
+    installErrorGuards(pageA)
+    installErrorGuards(pageB)
+    await mockCmsApi(pageA, { authenticated: true, pageEditor: true, editorState: shared })
+    await mockCmsApi(pageB, { authenticated: true, pageEditor: true, editorState: shared })
+
+    try {
+      await Promise.all([openEditor(pageA, shared), openEditor(pageB, shared)])
+      await setEditorHtml(pageA, 'content-intro', '<p>Editor A wins?</p>')
+      await setEditorHtml(pageB, 'content-intro', '<p>Editor B wins?</p>')
+      await saveCurrentVersion(pageA)
+
+      await expect(pageB.getByRole('heading', { name: 'Resolve Conflicts' })).toBeVisible()
+      await expect(pageB.getByRole('button', { name: 'Keep All Local' })).toBeVisible()
+      await expect(pageB.getByRole('button', { name: 'Accept All Server' })).toBeVisible()
+    } finally {
+      await contextA.close()
+      await contextB.close()
+    }
   })
 })

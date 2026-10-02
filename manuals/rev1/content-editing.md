@@ -387,6 +387,16 @@ Edit multiple pages at once:
 - `Tab`: Indent list item
 - `Shift + Tab`: Outdent list item
 
+## Editing a Page with Other People
+
+The page editor uses one shared working copy. Opening or closing the editor does not acquire or release a lock, and another editor is never blocked from opening the same page. Active-editor badges show who else is present and which tab or widget they are using; this is informational only.
+
+Each save carries the revision that was loaded. If another editor has saved in the meantime, independent changes—such as edits to different fields or different widgets—are merged automatically and saved against the latest revision. A missed or disconnected live update is still detected by this revision check the next time you save.
+
+When both editors change the same field, reorder the same widgets incompatibly, or one deletes a widget that the other edits or moves, the editor shows the conflicting values. Choose the value to keep for each conflict and save again. If another change arrives during that resolution, the dialog is refreshed without discarding the unresolved draft.
+
+Older clients may still use the saved timestamp as a compatibility fallback. That fallback remains conflict-safe but is deprecated; current clients use the server revision. Rich-text fields are resolved as one complete field rather than merged character by character.
+
 ## Best Practices
 
 ### Content Quality
@@ -435,5 +445,4 @@ Edit multiple pages at once:
 ---
 
 [← Back: Widget System](widgets.md) | [Next: Publishing Workflow →](publishing-workflow.md)
-
 

@@ -12,6 +12,9 @@ import { api } from '../api/client.js';
 export function usePageWebSocket(pageId, options = {}) {
     const {
         onVersionUpdated,
+        activeSection = 'content',
+        activeWidgetId = null,
+        knownRevision = null,
         enabled = true,
         autoReconnect = true,
         reconnectDelay = 3000
@@ -20,6 +23,7 @@ export function usePageWebSocket(pageId, options = {}) {
     const [isConnected, setIsConnected] = useState(false);
     const [latestUpdate, setLatestUpdate] = useState(null);
     const [isStale, setIsStale] = useState(false);
+    const [activeEditors, setActiveEditors] = useState([]);
     
     // Generate session ID once per hook instance
     const sessionId = useMemo(() => getSessionId(), []);
@@ -33,6 +37,32 @@ export function usePageWebSocket(pageId, options = {}) {
     const onVersionUpdatedRef = useRef(onVersionUpdated);
     const sessionIdRef = useRef(sessionId);
     const authFailureDetectedRef = useRef(false);
+    const connectionIdRef = useRef(null);
+    const presenceRef = useRef(new Map());
+    const activeSectionRef = useRef(activeSection);
+    const activeWidgetIdRef = useRef(activeWidgetId);
+    const knownRevisionRef = useRef(knownRevision);
+    const latestAcceptedRevisionRef = useRef(knownRevision || 0);
+
+    const refreshPresence = useCallback(() => {
+        const now = Date.now();
+        const byUser = new Map();
+        for (const item of presenceRef.current.values()) {
+            if (now - item.lastSeen > 60000 || item.connectionId === connectionIdRef.current) continue;
+            const existing = byUser.get(item.user.id);
+            if (!existing || item.lastSeen >= existing.lastSeen) byUser.set(item.user.id, item);
+        }
+        setActiveEditors([...byUser.values()]);
+    }, []);
+
+    const sendPresence = useCallback((type = 'presence_update') => {
+        if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({
+            type,
+            section: activeSectionRef.current,
+            widget_id: activeWidgetIdRef.current,
+        }));
+    }, []);
 
     // Keep refs updated without triggering reconnections
     useEffect(() => {
@@ -42,6 +72,19 @@ export function usePageWebSocket(pageId, options = {}) {
     useEffect(() => {
         currentPageIdRef.current = pageId;
     }, [pageId]);
+
+    useEffect(() => {
+        activeSectionRef.current = activeSection;
+        activeWidgetIdRef.current = activeWidgetId;
+        sendPresence('presence_update');
+    }, [activeSection, activeWidgetId, sendPresence]);
+
+    useEffect(() => {
+        knownRevisionRef.current = knownRevision;
+        if (knownRevision && knownRevision > latestAcceptedRevisionRef.current) {
+            latestAcceptedRevisionRef.current = knownRevision;
+        }
+    }, [knownRevision]);
 
     const connect = useCallback(() => {
         // Don't connect if disabled, no pageId, or already connected to the same page
@@ -81,16 +124,26 @@ export function usePageWebSocket(pageId, options = {}) {
                     const data = JSON.parse(event.data);
                     
                     if (data.type === 'connection_established') {
-                        // Connection confirmed
+                        connectionIdRef.current = data.connection_id;
+                        sendPresence('presence_update');
                     } else if (data.type === 'auth_failure') {
                         // Explicit auth failure from backend
                         authFailureDetectedRef.current = true;
                     } else if (data.type === 'version_updated') {
+                        const revision = Number(data.revision || 0);
+                        const known = Math.max(
+                            Number(knownRevisionRef.current || 0),
+                            Number(latestAcceptedRevisionRef.current || 0),
+                        );
+                        if (revision && revision <= known) return;
+                        if (revision) latestAcceptedRevisionRef.current = revision;
                         const updateInfo = {
                             pageId: data.page_id,
                             versionId: data.version_id,
                             updatedAt: data.updated_at,
                             updatedBy: data.updated_by,
+                            revision,
+                            mutationType: data.mutation_type,
                             sessionId: data.session_id,
                             timestamp: new Date().toISOString()
                         };
@@ -106,6 +159,21 @@ export function usePageWebSocket(pageId, options = {}) {
                         if (onVersionUpdatedRef.current) {
                             onVersionUpdatedRef.current(updateInfo);
                         }
+                    } else if (data.type === 'presence') {
+                        if (data.action === 'leave') {
+                            presenceRef.current.delete(data.connection_id);
+                        } else {
+                            presenceRef.current.set(data.connection_id, {
+                                connectionId: data.connection_id,
+                                user: data.user,
+                                section: data.section,
+                                widgetId: data.widget_id,
+                                lastSeen: Date.now(),
+                            });
+                        }
+                        refreshPresence();
+                    } else if (data.type === 'presence_sync_request') {
+                        sendPresence('presence_announce');
                     }
                 } catch (error) {
                     console.error('[WebSocket] Error parsing message:', error);
@@ -121,6 +189,9 @@ export function usePageWebSocket(pageId, options = {}) {
                 
                 setIsConnected(false);
                 wsRef.current = null;
+                connectionIdRef.current = null;
+                presenceRef.current.clear();
+                setActiveEditors([]);
 
                 // Check if this is an auth failure
                 const isAuthFailure = authFailureDetectedRef.current || 
@@ -167,7 +238,7 @@ export function usePageWebSocket(pageId, options = {}) {
         } catch (error) {
             console.error('[WebSocket] Connection error:', error);
         }
-    }, [enabled, autoReconnect, reconnectDelay]); // Removed pageId and onVersionUpdated from dependencies
+    }, [enabled, autoReconnect, reconnectDelay, refreshPresence, sendPresence]);
 
     const disconnect = useCallback(() => {
         if (reconnectTimeoutRef.current) {
@@ -216,6 +287,15 @@ export function usePageWebSocket(pageId, options = {}) {
         };
     }, []); // Empty dependency array - only run once on mount/unmount
 
+    useEffect(() => {
+        const heartbeat = setInterval(() => sendPresence('presence_heartbeat'), 20000);
+        const expiry = setInterval(refreshPresence, 10000);
+        return () => {
+            clearInterval(heartbeat);
+            clearInterval(expiry);
+        };
+    }, [refreshPresence, sendPresence]);
+
     // Listen for websocket-reconnect event after successful re-authentication
     useEffect(() => {
         const handleReconnect = () => {
@@ -246,6 +326,7 @@ export function usePageWebSocket(pageId, options = {}) {
         isConnected,
         isStale,
         latestUpdate,
+        activeEditors,
         clearStaleFlag,
         reconnect: connect,
         disconnect

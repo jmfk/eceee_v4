@@ -382,12 +382,14 @@ export async function smartSave(originalWebpageData, currentWebpageData, origina
                 currentPageVersionData,
                 currentWebpageData,
             );
-            results.versionResult = await versionsApi.savePageWorkingCopy(
+            const saveArgs = [
                 options.pageId,
                 options.expectedVersionId || versionId,
                 versionDataForSave,
                 updateOptions.clientUpdatedAt,
-            );
+            ];
+            if (options.expectedRevision != null) saveArgs.push(options.expectedRevision);
+            results.versionResult = await versionsApi.savePageWorkingCopy(...saveArgs);
         }
 
         return results;

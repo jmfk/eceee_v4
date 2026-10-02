@@ -20,32 +20,38 @@ export const versionsApi = {
         return api.post(endpoints.versions.workingCopy(pageId))
     }, 'versions.getOrCreateWorkingCopy'),
 
-    savePageWorkingCopy: wrapApiCall(async (pageId, expectedVersionId, versionData, clientUpdatedAt) => {
+    savePageWorkingCopy: wrapApiCall(async (pageId, expectedVersionId, versionData, clientUpdatedAt, expectedRevision = null) => {
         const response = await api.patch(endpoints.versions.savePageWorkingCopy(pageId), {
             ...versionData,
             expectedVersionId,
             clientUpdatedAt,
+            ...(expectedRevision ? { expectedRevision } : {}),
         })
         return response.data.version
     }, 'versions.savePageWorkingCopy'),
 
-    saveWorkingCopy: wrapApiCall(async (versionId, versionData, clientUpdatedAt) => {
+    saveWorkingCopy: wrapApiCall(async (versionId, versionData, clientUpdatedAt, expectedRevision = null) => {
         return api.patch(endpoints.versions.saveWorkingCopy(versionId), {
             ...versionData,
             clientUpdatedAt,
+            ...(expectedRevision ? { expectedRevision } : {}),
         })
     }, 'versions.saveWorkingCopy'),
 
-    scheduleWorkingCopy: wrapApiCall(async (versionId, effectiveDate, expiryDate = null, clientUpdatedAt) => {
+    scheduleWorkingCopy: wrapApiCall(async (versionId, effectiveDate, expiryDate = null, clientUpdatedAt, expectedRevision = null) => {
         return api.post(endpoints.versions.schedule(versionId), {
             effectiveDate,
             expiryDate,
             clientUpdatedAt,
+            ...(expectedRevision ? { expectedRevision } : {}),
         })
     }, 'versions.scheduleWorkingCopy'),
 
-    cancelWorkingCopySchedule: wrapApiCall(async (versionId) => {
-        return api.post(endpoints.versions.cancelSchedule(versionId))
+    cancelWorkingCopySchedule: wrapApiCall(async (versionId, clientUpdatedAt, expectedRevision = null) => {
+        return api.post(endpoints.versions.cancelSchedule(versionId), {
+            clientUpdatedAt,
+            ...(expectedRevision ? { expectedRevision } : {}),
+        })
     }, 'versions.cancelWorkingCopySchedule'),
 
     unpublishExplicit: wrapApiCall(async (pageId, versionId) => {
@@ -146,10 +152,11 @@ export const versionsApi = {
      */
     smartSave: wrapApiCall(async (versionId, changes, originalVersion = null) => {
         const clientUpdatedAt = originalVersion?.updatedAt ?? originalVersion?.updated_at
-        if (!clientUpdatedAt) {
-            throw new Error('A reviewed working-copy timestamp is required.')
+        const expectedRevision = originalVersion?.editRevision ?? originalVersion?.edit_revision
+        if (!clientUpdatedAt && !expectedRevision) {
+            throw new Error('A reviewed working-copy revision or timestamp is required.')
         }
-        return versionsApi.saveWorkingCopy(versionId, changes, clientUpdatedAt)
+        return versionsApi.saveWorkingCopy(versionId, changes, clientUpdatedAt, expectedRevision)
     }, 'versions.smartSave'),
 
     /**
@@ -167,8 +174,11 @@ export const versionsApi = {
      * @param {string} clientUpdatedAt - Timestamp of the reviewed working version
      * @returns {Promise<Object>} Publish result
      */
-    publish: wrapApiCall(async (versionId, clientUpdatedAt) => {
-        return api.post(endpoints.versions.publish(versionId), { clientUpdatedAt })
+    publish: wrapApiCall(async (versionId, clientUpdatedAt, expectedRevision = null) => {
+        return api.post(endpoints.versions.publish(versionId), {
+            clientUpdatedAt,
+            ...(expectedRevision ? { expectedRevision } : {}),
+        })
     }, 'versions.publish'),
 
     /**
@@ -265,8 +275,11 @@ export const versionsApi = {
      * @param {number} versionId - Version ID
      * @returns {Promise<Object>} Restore result
      */
-    restore: wrapApiCall(async (versionId, clientUpdatedAt = null) => {
-        return api.post(endpoints.versions.restore(versionId), { clientUpdatedAt })
+    restore: wrapApiCall(async (versionId, clientUpdatedAt = null, expectedRevision = null) => {
+        return api.post(endpoints.versions.restore(versionId), {
+            clientUpdatedAt,
+            ...(expectedRevision ? { expectedRevision } : {}),
+        })
     }, 'versions.restore'),
 
     /**

@@ -12,6 +12,7 @@ import { layoutsApi } from '../api/layouts';
 import { getAllSlotNames, categorizeSlots, formatSlotName, getSlotMetadata, getSlotsFromLayout } from '../utils/slotUtils';
 import WidgetSlot from '../layouts/easy-layouts/WidgetSlot';
 import PageWidgetSelectionModal from '../editors/page-editor/PageWidgetSelectionModal';
+import { generateWidgetId } from '../utils/widgetIdentity';
 
 const AllSlotsEditor = ({
     widgets = {},
@@ -151,7 +152,7 @@ const AllSlotsEditor = ({
 
                 // Create default widget config
                 const newWidget = {
-                    id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    id: generateWidgetId(),
                     type: widgetType,
                     config: {},
                 };

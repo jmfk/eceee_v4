@@ -35,7 +35,7 @@ class PageVersionViewSet(
 ):
     """ViewSet for page versions with workflow support."""
 
-    queryset = PageVersion.objects.select_related("page", "created_by").all()
+    queryset = PageVersion.objects.select_related("page", "created_by", "last_edited_by").all()
     serializer_class = PageVersionSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -46,6 +46,16 @@ class PageVersionViewSet(
 
     @staticmethod
     def _workflow_error_response(error):
+        if isinstance(error, VersionConflictError) and "server_version" not in error.details:
+            server_version_id = error.details.get("server_version_id")
+            if server_version_id:
+                server_version = (
+                    PageVersion.objects.select_related("page", "created_by", "last_edited_by")
+                    .filter(pk=server_version_id)
+                    .first()
+                )
+                if server_version:
+                    error.details["server_version"] = PageVersionSerializer(server_version).data
         return Response(
             {
                 "error": error.code,
@@ -60,23 +70,73 @@ class PageVersionViewSet(
         )
 
     @staticmethod
-    def _parse_required_client_updated_at(request):
+    def _parse_review_token(request, *, required=True):
+        expected_revision = request.data.get("expected_revision")
+        if expected_revision is not None:
+            try:
+                expected_revision = int(expected_revision)
+                if expected_revision < 1:
+                    raise ValueError
+            except (TypeError, ValueError):
+                return (
+                    None,
+                    None,
+                    Response(
+                        {"error": "invalid_revision", "message": "expectedRevision must be a positive integer."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    ),
+                )
+            return expected_revision, None, None
+
         client_updated_at = request.data.get("client_updated_at")
         if not client_updated_at:
-            return None, Response(
-                {
-                    "error": "client_updated_at_required",
-                    "message": "clientUpdatedAt is required for reviewed publication actions.",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            if not required:
+                return None, None, None
+            return (
+                None,
+                None,
+                Response(
+                    {
+                        "error": "client_updated_at_required",
+                        "message": "expectedRevision or clientUpdatedAt is required for reviewed mutations.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                ),
             )
         client_timestamp = parse_datetime(client_updated_at)
         if client_timestamp is None:
-            return None, Response(
-                {"error": "invalid_timestamp", "message": "clientUpdatedAt is invalid."},
-                status=status.HTTP_400_BAD_REQUEST,
+            return (
+                None,
+                None,
+                Response(
+                    {"error": "invalid_timestamp", "message": "clientUpdatedAt is invalid."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                ),
             )
-        return client_timestamp, None
+        request._used_legacy_review_token = True
+        return None, client_timestamp, None
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        if getattr(request, "_used_legacy_review_token", False):
+            response["Deprecation"] = "true"
+            response["Warning"] = '299 - "clientUpdatedAt concurrency checks are deprecated; send expectedRevision"'
+        return response
+
+    @staticmethod
+    def _broadcast_on_commit(request, version, mutation_type):
+        from ..consumers import broadcast_version_update
+
+        payload = {
+            "page_id": version.page_id,
+            "version_id": version.id,
+            "updated_at": version.updated_at.isoformat(),
+            "revision": version.edit_revision,
+            "updated_by": request.user.username if request.user.is_authenticated else None,
+            "session_id": request.META.get("HTTP_X_SESSION_ID"),
+            "mutation_type": mutation_type,
+        }
+        transaction.on_commit(lambda: broadcast_version_update(**payload), robust=True)
 
     @staticmethod
     def _legacy_mutation_response():
@@ -204,14 +264,16 @@ class PageVersionViewSet(
     def publish(self, request, pk=None):
         """Publish this exact canonical working version."""
         version = self.get_object()
-        client_timestamp, error_response = self._parse_required_client_updated_at(request)
+        expected_revision, client_timestamp, error_response = self._parse_review_token(request)
         if error_response:
             return error_response
         try:
             version = PageVersionWorkflowService(version.page, request.user).publish(
                 version,
+                expected_revision=expected_revision,
                 expected_updated_at=client_timestamp,
             )
+            self._broadcast_on_commit(request, version, "published")
             serializer = self.get_serializer(version)
             return Response(
                 {
@@ -267,21 +329,17 @@ class PageVersionViewSet(
     def restore(self, request, pk=None):
         """Copy a historical version into the canonical working copy."""
         version = self.get_object()
-        client_updated_at = request.data.get("client_updated_at")
-        client_timestamp = None
-        if client_updated_at:
-            client_timestamp = parse_datetime(client_updated_at)
-            if client_timestamp is None:
-                return Response(
-                    {"error": "invalid_timestamp", "message": "clientUpdatedAt is invalid."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        expected_revision, client_timestamp, error_response = self._parse_review_token(request)
+        if error_response:
+            return error_response
 
         try:
             restored = PageVersionWorkflowService(version.page, request.user).restore_as_working_copy(
                 version,
+                expected_revision=expected_revision,
                 expected_updated_at=client_timestamp,
             )
+            self._broadcast_on_commit(request, restored, "restored")
             serializer = self.get_serializer(restored)
             return Response(
                 {
@@ -301,21 +359,9 @@ class PageVersionViewSet(
                 {"error": "immutable_field", "message": "A working version cannot be moved to another page."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        client_updated_at = request.data.get("client_updated_at")
-        if not client_updated_at:
-            return Response(
-                {
-                    "error": "client_updated_at_required",
-                    "message": "clientUpdatedAt is required when saving a working version.",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        client_timestamp = parse_datetime(client_updated_at)
-        if client_timestamp is None:
-            return Response(
-                {"error": "invalid_timestamp", "message": "clientUpdatedAt is invalid."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        expected_revision, client_timestamp, error_response = self._parse_review_token(request)
+        if error_response:
+            return error_response
 
         try:
             with transaction.atomic():
@@ -323,17 +369,14 @@ class PageVersionViewSet(
                 locked = PageVersion.objects.select_for_update().get(pk=version.pk, page=locked_page)
                 service = PageVersionWorkflowService(locked_page, request.user)
                 service.assert_canonical_editable(locked)
-                if locked.updated_at != client_timestamp:
-                    raise VersionConflictError(
-                        "This working version has been changed by another user.",
-                        details={
-                            "server_updated_at": locked.updated_at.isoformat(),
-                            "client_updated_at": client_updated_at,
-                            "server_version": PageVersionSerializer(locked).data,
-                        },
-                    )
+                service.assert_reviewed(
+                    locked,
+                    expected_revision=expected_revision,
+                    expected_updated_at=client_timestamp,
+                )
                 payload = request.data.copy()
                 payload.pop("client_updated_at", None)
+                payload.pop("expected_revision", None)
                 payload.pop("effective_date", None)
                 payload.pop("expiry_date", None)
                 serializer = PageVersionSerializer(
@@ -343,9 +386,14 @@ class PageVersionViewSet(
                     context={"request": request, "timestamp_conflict_checked": True},
                 )
                 serializer.is_valid(raise_exception=True)
-                serializer.save()
+                service.advance_revision(locked)
+                serializer.save(edit_revision=locked.edit_revision, last_edited_by=request.user)
+                self._broadcast_on_commit(request, serializer.instance, "saved")
             return Response(serializer.data)
         except WorkflowError as error:
+            error.details["server_version"] = PageVersionSerializer(
+                PageVersion.objects.get(pk=version.pk), context={"request": request}
+            ).data
             return self._workflow_error_response(error)
 
     def save_page_working_copy(self, request, page_id=None):
@@ -372,7 +420,7 @@ class PageVersionViewSet(
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        client_timestamp, error_response = self._parse_required_client_updated_at(request)
+        expected_revision, client_timestamp, error_response = self._parse_review_token(request)
         if error_response:
             return error_response
 
@@ -382,11 +430,13 @@ class PageVersionViewSet(
                 service = PageVersionWorkflowService(page, request.user)
                 version, created = service.resolve_atomic_save_target(
                     expected_version_id=expected_version_id,
+                    expected_revision=expected_revision,
                     expected_updated_at=client_timestamp,
                 )
                 payload = request.data.copy()
                 payload.pop("expected_version_id", None)
                 payload.pop("client_updated_at", None)
+                payload.pop("expected_revision", None)
                 payload.pop("effective_date", None)
                 payload.pop("expiry_date", None)
                 serializer = PageVersionSerializer(
@@ -396,7 +446,9 @@ class PageVersionViewSet(
                     context={"request": request, "timestamp_conflict_checked": True},
                 )
                 serializer.is_valid(raise_exception=True)
-                serializer.save()
+                service.advance_revision(version)
+                serializer.save(edit_revision=version.edit_revision, last_edited_by=request.user)
+                self._broadcast_on_commit(request, serializer.instance, "saved")
             return Response(
                 {"created": created, "version": serializer.data},
                 status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
@@ -415,7 +467,7 @@ class PageVersionViewSet(
     @action(detail=True, methods=["post"], url_path="schedule")
     def schedule(self, request, pk=None):
         version = self.get_object()
-        client_timestamp, error_response = self._parse_required_client_updated_at(request)
+        expected_revision, client_timestamp, error_response = self._parse_review_token(request)
         if error_response:
             return error_response
         effective_date = parse_datetime(request.data.get("effective_date", ""))
@@ -434,8 +486,10 @@ class PageVersionViewSet(
                 version,
                 effective_date,
                 expiry_date,
+                expected_revision=expected_revision,
                 expected_updated_at=client_timestamp,
             )
+            self._broadcast_on_commit(request, scheduled, "scheduled")
             return Response(PageVersionSerializer(scheduled).data)
         except WorkflowError as error:
             return self._workflow_error_response(error)
@@ -443,8 +497,16 @@ class PageVersionViewSet(
     @action(detail=True, methods=["post"], url_path="cancel-schedule")
     def cancel_schedule(self, request, pk=None):
         version = self.get_object()
+        expected_revision, client_timestamp, error_response = self._parse_review_token(request)
+        if error_response:
+            return error_response
         try:
-            draft = PageVersionWorkflowService(version.page, request.user).cancel_schedule(version)
+            draft = PageVersionWorkflowService(version.page, request.user).cancel_schedule(
+                version,
+                expected_revision=expected_revision,
+                expected_updated_at=client_timestamp,
+            )
+            self._broadcast_on_commit(request, draft, "schedule_cancelled")
             return Response(PageVersionSerializer(draft).data)
         except WorkflowError as error:
             return self._workflow_error_response(error)
@@ -506,31 +568,32 @@ class PageVersionViewSet(
         for item in items:
             page_id = item.get("page_id") if isinstance(item, dict) else None
             version_id = item.get("version_id") if isinstance(item, dict) else None
+            expected_revision = item.get("expected_revision") if isinstance(item, dict) else None
             client_updated_at = parse_datetime(item.get("client_updated_at", "")) if isinstance(item, dict) else None
             try:
-                if not page_id or not version_id or client_updated_at is None:
-                    raise WorkflowError("Each item requires pageId, versionId, and clientUpdatedAt.")
+                if expected_revision is not None:
+                    expected_revision = int(expected_revision)
+                    if expected_revision < 1:
+                        raise ValueError
+                elif client_updated_at is None:
+                    raise WorkflowError("Each item requires expectedRevision or clientUpdatedAt.")
+                else:
+                    request._used_legacy_review_token = True
+                if not page_id or not version_id:
+                    raise WorkflowError("Each item requires pageId and versionId.")
                 page = self._page_queryset().get(pk=page_id)
                 version = self.get_queryset().get(pk=version_id, page=page)
                 published = PageVersionWorkflowService(page, request.user).publish(
-                    version, expected_updated_at=client_updated_at
+                    version,
+                    expected_revision=expected_revision,
+                    expected_updated_at=client_updated_at,
                 )
+                self._broadcast_on_commit(request, published, "published")
                 results.append(
                     {
                         "page_id": page.id,
                         "version_id": published.id,
                         "status": "published",
-                    }
-                )
-            except (WebPage.DoesNotExist, PageVersion.DoesNotExist):
-                has_errors = True
-                results.append(
-                    {
-                        "page_id": page_id,
-                        "version_id": version_id,
-                        "status": "error",
-                        "error": "not_found",
-                        "message": "The reviewed page or version no longer exists.",
                     }
                 )
             except WorkflowError as error:
@@ -543,6 +606,28 @@ class PageVersionViewSet(
                         "error": error.code,
                         "message": str(error),
                         "details": error.details,
+                    }
+                )
+            except (TypeError, ValueError):
+                has_errors = True
+                results.append(
+                    {
+                        "page_id": page_id,
+                        "version_id": version_id,
+                        "status": "error",
+                        "error": "invalid_revision",
+                        "message": "expectedRevision must be a positive integer.",
+                    }
+                )
+            except (WebPage.DoesNotExist, PageVersion.DoesNotExist):
+                has_errors = True
+                results.append(
+                    {
+                        "page_id": page_id,
+                        "version_id": version_id,
+                        "status": "error",
+                        "error": "not_found",
+                        "message": "The reviewed page or version no longer exists.",
                     }
                 )
 
@@ -577,30 +662,30 @@ class PageVersionViewSet(
         for item in items:
             page_id = item.get("page_id") if isinstance(item, dict) else None
             version_id = item.get("version_id") if isinstance(item, dict) else None
+            expected_revision = item.get("expected_revision") if isinstance(item, dict) else None
             client_updated_at = parse_datetime(item.get("client_updated_at", "")) if isinstance(item, dict) else None
             try:
-                if not page_id or not version_id or client_updated_at is None:
-                    raise WorkflowError("Each item requires pageId, versionId, and clientUpdatedAt.")
+                if expected_revision is not None:
+                    expected_revision = int(expected_revision)
+                    if expected_revision < 1:
+                        raise ValueError
+                elif client_updated_at is None:
+                    raise WorkflowError("Each item requires expectedRevision or clientUpdatedAt.")
+                else:
+                    request._used_legacy_review_token = True
+                if not page_id or not version_id:
+                    raise WorkflowError("Each item requires pageId and versionId.")
                 page = self._page_queryset().get(pk=page_id)
                 version = self.get_queryset().get(pk=version_id, page=page)
                 scheduled = PageVersionWorkflowService(page, request.user).schedule(
                     version,
                     effective_date,
                     expiry_date,
+                    expected_revision=expected_revision,
                     expected_updated_at=client_updated_at,
                 )
+                self._broadcast_on_commit(request, scheduled, "scheduled")
                 results.append({"page_id": page.id, "version_id": scheduled.id, "status": "scheduled"})
-            except (WebPage.DoesNotExist, PageVersion.DoesNotExist):
-                has_errors = True
-                results.append(
-                    {
-                        "page_id": page_id,
-                        "version_id": version_id,
-                        "status": "error",
-                        "error": "not_found",
-                        "message": "The reviewed page or version no longer exists.",
-                    }
-                )
             except WorkflowError as error:
                 has_errors = True
                 results.append(
@@ -611,6 +696,28 @@ class PageVersionViewSet(
                         "error": error.code,
                         "message": str(error),
                         "details": error.details,
+                    }
+                )
+            except (TypeError, ValueError):
+                has_errors = True
+                results.append(
+                    {
+                        "page_id": page_id,
+                        "version_id": version_id,
+                        "status": "error",
+                        "error": "invalid_revision",
+                        "message": "expectedRevision must be a positive integer.",
+                    }
+                )
+            except (WebPage.DoesNotExist, PageVersion.DoesNotExist):
+                has_errors = True
+                results.append(
+                    {
+                        "page_id": page_id,
+                        "version_id": version_id,
+                        "status": "error",
+                        "error": "not_found",
+                        "message": "The reviewed page or version no longer exists.",
                     }
                 )
 

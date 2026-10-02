@@ -13,6 +13,7 @@ import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 import DjangoTemplateRenderer from '../utils/DjangoTemplateRenderer.js';
 import { formatFieldLabel } from '../utils/labelFormatting.js';
 import { cutToClipboard, readFromClipboard, clearClipboard } from '../utils/clipboardService.js';
+import { generateWidgetId } from '../utils/widgetIdentity.js';
 // Note: Widget menu items and actions are now handled by editor-specific frameworks
 // This is a placeholder for backward compatibility
 const getWidgetMenuItems = () => [];
@@ -3172,7 +3173,7 @@ class LayoutRenderer {
    * @returns {string} Unique widget identifier
    */
   generateWidgetId() {
-    return `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return generateWidgetId();
   }
 
   // New Slot Creation UI Methods
