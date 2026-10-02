@@ -51,17 +51,13 @@ describe('usePageWebSocket', () => {
 
     it('accepts a lower revision after the working version changes', async () => {
         const onVersionUpdated = vi.fn()
-        const { rerender } = renderHook(
-            ({ versionId, revision }) => usePageWebSocket(7, {
-                knownVersionId: versionId,
-                knownRevision: revision,
-                onVersionUpdated,
-            }),
-            { initialProps: { versionId: 9, revision: 8 } },
-        )
+        renderHook(() => usePageWebSocket(7, {
+            knownVersionId: 9,
+            knownRevision: 8,
+            onVersionUpdated,
+        }))
         const socket = MockWebSocket.instances[0]
 
-        rerender({ versionId: 10, revision: 1 })
         act(() => {
             socket.message({ type: 'version_updated', page_id: 7, version_id: 10, revision: 2 })
         })
@@ -71,6 +67,42 @@ describe('usePageWebSocket', () => {
             versionId: 10,
             revision: 2,
         }))
+    })
+
+    it('marks an older callback stale when a newer update finishes first', async () => {
+        let releaseFirstUpdate
+        const firstUpdatePending = new Promise(resolve => {
+            releaseFirstUpdate = resolve
+        })
+        const appliedRevisions = []
+        let isLatestVersionUpdate
+        const onVersionUpdated = vi.fn(async updateInfo => {
+            if (updateInfo.revision === 5) await firstUpdatePending
+            if (isLatestVersionUpdate(updateInfo)) {
+                appliedRevisions.push(updateInfo.revision)
+            }
+        })
+        const { result } = renderHook(() => usePageWebSocket(7, {
+            knownVersionId: 9,
+            knownRevision: 4,
+            onVersionUpdated,
+        }))
+        isLatestVersionUpdate = result.current.isLatestVersionUpdate
+        const socket = MockWebSocket.instances[0]
+
+        act(() => {
+            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, revision: 5 })
+            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, revision: 6 })
+        })
+
+        await waitFor(() => expect(appliedRevisions).toEqual([6]))
+        const firstCallback = onVersionUpdated.mock.results[0].value
+
+        await act(async () => {
+            releaseFirstUpdate()
+            await firstCallback
+        })
+        expect(appliedRevisions).toEqual([6])
     })
 
     it('keeps another tab present when one connection for the same user leaves', async () => {

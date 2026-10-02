@@ -510,7 +510,7 @@ const PageEditor = () => {
     const widgetEditorRef = useRef(null)
 
     // WebSocket for real-time notifications
-    const { activeEditors, clearStaleFlag } = usePageWebSocket(
+    const { activeEditors, clearStaleFlag, isLatestVersionUpdate } = usePageWebSocket(
         pageId,
         {
             enabled: !isNewPage && Boolean(pageId),
@@ -525,14 +525,7 @@ const PageEditor = () => {
                     const serverVersion = await versionsApi.get(updateInfo.versionId);
                     const serverWebpage = mergeVersionedPageAttributes(publicServerWebpage, serverVersion);
 
-                    if (
-                        updateInfo.revision &&
-                        originalPageVersionData?.editRevision &&
-                        updateInfo.revision <= originalPageVersionData.editRevision
-                    ) {
-                        clearStaleFlag();
-                        return;
-                    }
+                    if (!isLatestVersionUpdate(updateInfo)) return;
 
                     // Detect conflicts using deep diff analysis
                     const conflictResult = detectPageConflicts(

@@ -46,6 +46,11 @@ export function usePageWebSocket(pageId, options = {}) {
     const knownRevisionRef = useRef(knownRevision);
     const latestAcceptedVersionIdRef = useRef(knownVersionId == null ? null : String(knownVersionId));
     const latestAcceptedRevisionRef = useRef(knownRevision || 0);
+    const latestAcceptedUpdateRef = useRef(null);
+
+    const isLatestVersionUpdate = useCallback((updateInfo) => (
+        latestAcceptedUpdateRef.current === updateInfo
+    ), []);
 
     const refreshPresence = useCallback(() => {
         const now = Date.now();
@@ -84,8 +89,13 @@ export function usePageWebSocket(pageId, options = {}) {
 
     useEffect(() => {
         const nextVersionId = knownVersionId == null ? null : String(knownVersionId);
+        const versionChanged = nextVersionId !== knownVersionIdRef.current;
+        const revisionChanged = knownRevision !== knownRevisionRef.current;
         knownVersionIdRef.current = nextVersionId;
         knownRevisionRef.current = knownRevision;
+        if (versionChanged || revisionChanged) {
+            latestAcceptedUpdateRef.current = null;
+        }
         if (nextVersionId !== latestAcceptedVersionIdRef.current) {
             latestAcceptedVersionIdRef.current = nextVersionId;
             latestAcceptedRevisionRef.current = knownRevision || 0;
@@ -161,6 +171,7 @@ export function usePageWebSocket(pageId, options = {}) {
                             sessionId: data.session_id,
                             timestamp: new Date().toISOString()
                         };
+                        latestAcceptedUpdateRef.current = updateInfo;
                         
                         // Check if this is our own session's save
                         if (data.session_id === sessionIdRef.current) {
@@ -342,6 +353,7 @@ export function usePageWebSocket(pageId, options = {}) {
         latestUpdate,
         activeEditors,
         clearStaleFlag,
+        isLatestVersionUpdate,
         reconnect: connect,
         disconnect
     };
