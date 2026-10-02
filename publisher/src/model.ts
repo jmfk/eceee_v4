@@ -650,6 +650,9 @@ async function resolvePublishedData(
       return { ...prepared, data: { status: items.length ? 'ready' : 'empty', items: items.map(value => ({ ...value, path: objectPath(pagePath, value.slug) })) } };
     }
     if (widget.type === 'easy_widgets.NewsDetailWidget' || widget.type === 'object_storage.ObjectDetailWidget') {
+      if (item) {
+        item = { ...item, widgets: await resolveNested(item.widgets) as Record<string, unknown> };
+      }
       return { ...prepared, data: item
         ? { status: 'ready', item: { ...item, path: objectPath(pagePath, item.slug) } }
         : { status: 'empty' } };

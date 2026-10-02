@@ -599,6 +599,22 @@ const configEnabled = (config: Record<string, any>, defaultValue: boolean, ...na
     return configured === undefined ? defaultValue : configured !== false
 }
 
+const objectListExcerpt = (item: any, config: Record<string, any>) => {
+    const data = item.data || {}
+    const configuredField = value(config, 'excerptField', 'excerpt_field')
+    const source = configuredField && Object.prototype.hasOwnProperty.call(data, configuredField)
+        ? data[configuredField]
+        : ['content', 'description', 'summary', 'text', 'body'].map((field) => data[field]).find(Boolean)
+    if (source === undefined) return ''
+    const text = String(source)
+    const configuredLength = Number(value(config, 'excerptLength', 'excerpt_length'))
+    const length = Number.isInteger(configuredLength) && configuredLength > 0 ? configuredLength : 150
+    if (text.length <= length) return text
+    const shortened = text.slice(0, length)
+    const lastSpace = shortened.lastIndexOf(' ')
+    return `${lastSpace > 0 ? shortened.slice(0, lastSpace) : shortened}...`
+}
+
 const NewsListRender: WidgetRenderComponent = ({ widget, context }) => {
     if (configEnabled(widget.config, false, 'hideOnDetailView', 'hide_on_detail_view') && Object.keys(context.pathVariables || {}).length) return null
     const state = newsState(widget)
@@ -652,9 +668,10 @@ const ObjectListRender: WidgetRenderComponent = ({ widget }) => {
     const template = value(widget.config, 'displayTemplate', 'display_template') || 'card'
     return <section className={`object-list-widget template-${template}`} data-widget-type="object-list"><div className="objects-container">{state.map((item, index) => {
         const fields = newsFields(item)
+        const excerpt = objectListExcerpt(item, widget.config)
         return <article className="object-item" key={item.id || index}>
             <div className="object-content"><h3 className="object-title"><PreviewLink href={fields.path}>{item.title}</PreviewLink></h3>
-                {showExcerpt && fields.excerpt && <div className="object-excerpt">{fields.excerpt}</div>}
+                {showExcerpt && excerpt && <div className="object-excerpt">{excerpt}</div>}
                 <div className="object-meta"><span className="object-type">{fields.objectType.label || fields.objectType.name}</span>{fields.publishDate && <time className="object-date" dateTime={fields.publishDate}> • {formatDisplayDate(fields.publishDate, 'short')}</time>}</div>
             </div>
         </article>

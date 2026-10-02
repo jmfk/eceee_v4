@@ -130,6 +130,16 @@ describe('database snapshot', () => {
     expect(mocks.query.mock.calls[1][0]).toContain('media.file_path');
   });
 
+  it('honors both directions of the supported updated_at object ordering', async () => {
+    await database.withSnapshot(async reader => {
+      await reader.publishedObjects({ objectTypeNames: ['article'], limit: 5, sortOrder: 'updated_at' }, '7', new Date('2026-06-01'));
+      await reader.publishedObjects({ objectTypeNames: ['article'], limit: 5, sortOrder: '-updated_at' }, '7', new Date('2026-06-01'));
+    });
+
+    expect(mocks.query.mock.calls[1][0]).toContain('ORDER BY object.updated_at, object.id');
+    expect(mocks.query.mock.calls[2][0]).toContain('ORDER BY object.updated_at DESC, object.id DESC');
+  });
+
   it('rolls back and releases the client when resolution fails', async () => {
     const failure = new Error('resolution failed');
     await expect(database.withSnapshot(async () => { throw failure; })).rejects.toBe(failure);
