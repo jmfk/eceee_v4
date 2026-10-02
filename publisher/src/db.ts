@@ -157,9 +157,10 @@ function reader(client: PoolClient): PageReader {
       return { files: files.rows.map(publicMediaItem), collections };
     },
     async publishedObjects(query, tenantId, at) {
+      const objectIds = (query.objectIds ?? []).filter(value => /^\d+$/.test(value));
       const typeIds = (query.objectTypeIds ?? []).filter(value => /^\d+$/.test(value));
       const typeNames = (query.objectTypeNames ?? []).filter(value => /^[a-z0-9_-]+$/i.test(value));
-      if (!typeIds.length && !typeNames.length) return [];
+      if (!objectIds.length && !typeIds.length && !typeNames.length) return [];
       const sortOrders: Record<string, string> = {
         '-publish_date': 'published.effective_date DESC, object.id DESC',
         publish_date: 'published.effective_date, object.id',
@@ -187,11 +188,12 @@ function reader(client: PoolClient): PageReader {
           LIMIT 1
         ) AS published ON true
         WHERE object.tenant_id = $1
-          AND ($2::bigint[] <> '{}'::bigint[] AND type.id = ANY($2::bigint[])
+          AND ($7::bigint[] <> '{}'::bigint[] AND object.id = ANY($7::bigint[])
+            OR $2::bigint[] <> '{}'::bigint[] AND type.id = ANY($2::bigint[])
             OR $3::text[] <> '{}'::text[] AND type.name = ANY($3::text[]))
           AND ($5::text IS NULL OR object.slug = $5)
         ORDER BY ${featured}${order}
-        LIMIT $6`, [tenantId, typeIds, typeNames, at, query.slug ?? null, Math.min(Math.max(query.limit, 1), 50)]);
+        LIMIT $6`, [tenantId, typeIds, typeNames, at, query.slug ?? null, Math.min(Math.max(query.limit, 1), 50), objectIds]);
       return result.rows;
     },
   };

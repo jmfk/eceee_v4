@@ -397,6 +397,45 @@ describe('public resolution', () => {
     expect(publishedObjects).toHaveBeenCalledTimes(2);
   });
 
+  it('resolves nested object widgets and fixed object IDs', async () => {
+    const publishedObject = {
+      id: '41', title: 'Selected object', slug: 'selected-object',
+      objectType: { id: '5', name: 'article', label: 'Article', pluralLabel: 'Articles' },
+      data: { summary: 'Resolved published data.' }, widgets: {}, metadata: {},
+      publishDate: '2026-05-01T00:00:00Z', isFeatured: false,
+    };
+    const publishedObjects = vi.fn(async () => [publishedObject]);
+    const nestedReader: PageReader = {
+      ...reader,
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        if (id !== child.id || !selected) return selected;
+        return version({ ...selected, widgets: { main: [
+          { id: 'section', type: 'easy_widgets.SectionWidget', config: { slots: { content: [
+            { id: 'nested-list', type: 'object_storage.ObjectListWidget', config: { objectType: 'article' } },
+          ] } } },
+          { id: 'fixed-detail', type: 'object_storage.ObjectDetailWidget', config: { objectId: 41 } },
+        ] } });
+      },
+      publishedObjects,
+    };
+
+    const model = await buildPublishedPageModel(
+      { withSnapshot: async read => read(nestedReader) },
+      'example.org',
+      '/news',
+      new Date('2026-06-01'),
+    );
+    const nested = (model?.slots.main[0].config.slots as Record<string, Widget[]>).content[0];
+    expect(nested.data?.items).toEqual([expect.objectContaining({ id: '41', path: '/news/selected-object/' })]);
+    expect(model?.slots.main[1].data?.item).toEqual(expect.objectContaining({ id: '41' }));
+    expect(publishedObjects).toHaveBeenCalledWith(
+      expect.objectContaining({ objectIds: ['41'], limit: 1 }),
+      root.tenant_id,
+      expect.any(Date),
+    );
+  });
+
   it('rejects unknown, malformed and unmatched dynamic paths', async () => {
     const unknown = { ...reader, child: async () => page({ ...child, path_pattern: 'unknown' }) };
     expect(await buildPublishedPageModel({ withSnapshot: async read => read(unknown) }, 'example.org', '/news/story')).toBeNull();

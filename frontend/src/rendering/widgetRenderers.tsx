@@ -666,9 +666,13 @@ const ObjectDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) =>
     const fields = newsFields(item)
     const slots: Record<string, unknown> = item.widgets && typeof item.widgets === 'object' ? item.widgets : {}
     const showWidgets = configEnabled(widget.config, true, 'showWidgets', 'show_widgets')
+    const hasWidgets = Object.values(slots).some((widgets) => asArray<any>(widgets).length > 0)
+    const dataEntries = Object.entries(item.data || {}).filter(([, fieldValue]) => Boolean(fieldValue))
     return <article className={`object-detail-widget template-${value(widget.config, 'displayTemplate', 'display_template') || 'full'}`} data-widget-type="object-detail" data-object-id={item.id}>
         <header className="object-header"><h1 className="object-title">{item.title}</h1><div className="object-meta"><span className="object-type">{fields.objectType.label || fields.objectType.name}</span>{fields.publishDate && <time className="object-date" dateTime={fields.publishDate}> • Published {formatDisplayDate(fields.publishDate)}</time>}</div></header>
-        <div className="object-content">{showWidgets && Object.entries(slots).map(([slotName, widgets]) => <div className="widget-slot" data-slot={slotName} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)}</div>
+        <div className="object-content">{showWidgets && hasWidgets
+            ? Object.entries(slots).map(([slotName, widgets]) => <div className="widget-slot" data-slot={slotName} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)
+            : dataEntries.map(([fieldName, fieldValue]) => <div className="object-field" key={fieldName}><h4 className="field-label">{fieldName.replaceAll('_', ' ')}</h4><div className="field-value">{typeof fieldValue === 'object' ? JSON.stringify(fieldValue) : String(fieldValue)}</div></div>)}</div>
     </article>
 }
 const TopNewsPlugRender: WidgetRenderComponent = ({ widget }) => {
