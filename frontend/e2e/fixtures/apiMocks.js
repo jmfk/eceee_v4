@@ -568,6 +568,7 @@ export async function mockCmsApi(page, {
           type: 'version_updated',
           page_id: 101,
           version_id: editorState.version.id,
+          version_number: editorState.version.versionNumber,
           updated_at: editorState.version.updatedAt,
           revision: editorState.version.editRevision,
           updated_by: 'admin',

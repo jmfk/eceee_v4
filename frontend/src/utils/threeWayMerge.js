@@ -2,6 +2,7 @@ const equal = (left, right) => JSON.stringify(left) === JSON.stringify(right)
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const clone = value => value === undefined ? undefined : JSON.parse(JSON.stringify(value))
 const identity = value => isObject(value) ? (value.id ?? value._id ?? null) : null
+const valueKind = value => Array.isArray(value) ? 'array' : isObject(value) ? 'object' : 'scalar'
 
 const ignoredKeys = new Set([
     'createdAt', 'updatedAt', 'createdBy', 'lastEditedBy', 'editRevision',
@@ -202,6 +203,11 @@ export function mergeValue(original, local, server, path = []) {
     const serverChanged = !equal(server, original)
     if (!localChanged) return { value: clone(server), diffs: [diff(path, original, local, server, false)] }
     if (!serverChanged) return { value: clone(local), diffs: [diff(path, original, local, server, false)] }
+
+    const kinds = new Set([original, local, server].filter(value => value !== undefined).map(valueKind))
+    if (kinds.size > 1) {
+        return { value: clone(server), diffs: [diff(path, original, local, server, true)] }
+    }
 
     if (isObject(original) || isObject(local) || isObject(server)) {
         const source = { ...(server || {}) }

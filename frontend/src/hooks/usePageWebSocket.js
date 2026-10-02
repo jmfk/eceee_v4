@@ -15,6 +15,7 @@ export function usePageWebSocket(pageId, options = {}) {
         activeSection = 'content',
         activeWidgetId = null,
         knownVersionId = null,
+        knownVersionNumber = null,
         knownRevision = null,
         enabled = true,
         autoReconnect = true,
@@ -43,8 +44,10 @@ export function usePageWebSocket(pageId, options = {}) {
     const activeSectionRef = useRef(activeSection);
     const activeWidgetIdRef = useRef(activeWidgetId);
     const knownVersionIdRef = useRef(knownVersionId == null ? null : String(knownVersionId));
+    const knownVersionNumberRef = useRef(Number(knownVersionNumber || 0));
     const knownRevisionRef = useRef(knownRevision);
     const latestAcceptedVersionIdRef = useRef(knownVersionId == null ? null : String(knownVersionId));
+    const latestAcceptedVersionNumberRef = useRef(Number(knownVersionNumber || 0));
     const latestAcceptedRevisionRef = useRef(knownRevision || 0);
     const latestAcceptedUpdateRef = useRef(null);
 
@@ -89,20 +92,23 @@ export function usePageWebSocket(pageId, options = {}) {
 
     useEffect(() => {
         const nextVersionId = knownVersionId == null ? null : String(knownVersionId);
+        const nextVersionNumber = Number(knownVersionNumber || 0);
         const versionChanged = nextVersionId !== knownVersionIdRef.current;
         const revisionChanged = knownRevision !== knownRevisionRef.current;
         knownVersionIdRef.current = nextVersionId;
+        knownVersionNumberRef.current = nextVersionNumber;
         knownRevisionRef.current = knownRevision;
         if (versionChanged || revisionChanged) {
             latestAcceptedUpdateRef.current = null;
         }
         if (nextVersionId !== latestAcceptedVersionIdRef.current) {
             latestAcceptedVersionIdRef.current = nextVersionId;
+            latestAcceptedVersionNumberRef.current = nextVersionNumber;
             latestAcceptedRevisionRef.current = knownRevision || 0;
         } else if (knownRevision && knownRevision > latestAcceptedRevisionRef.current) {
             latestAcceptedRevisionRef.current = knownRevision;
         }
-    }, [knownVersionId, knownRevision]);
+    }, [knownVersionId, knownVersionNumber, knownRevision]);
 
     const connect = useCallback(() => {
         // Don't connect if disabled, no pageId, or already connected to the same page
@@ -149,7 +155,13 @@ export function usePageWebSocket(pageId, options = {}) {
                         authFailureDetectedRef.current = true;
                     } else if (data.type === 'version_updated') {
                         const eventVersionId = data.version_id == null ? null : String(data.version_id);
+                        const versionNumber = Number(data.version_number || 0);
                         const revision = Number(data.revision || 0);
+                        const latestVersionNumber = Math.max(
+                            Number(knownVersionNumberRef.current || 0),
+                            Number(latestAcceptedVersionNumberRef.current || 0),
+                        );
+                        if (versionNumber && latestVersionNumber && versionNumber < latestVersionNumber) return;
                         const sameAcceptedVersion = eventVersionId === latestAcceptedVersionIdRef.current;
                         const sameKnownVersion = eventVersionId === knownVersionIdRef.current;
                         const known = Math.max(
@@ -159,11 +171,13 @@ export function usePageWebSocket(pageId, options = {}) {
                         if (revision && revision <= known) return;
                         if (revision) {
                             latestAcceptedVersionIdRef.current = eventVersionId;
+                            latestAcceptedVersionNumberRef.current = versionNumber;
                             latestAcceptedRevisionRef.current = revision;
                         }
                         const updateInfo = {
                             pageId: data.page_id,
                             versionId: data.version_id,
+                            versionNumber,
                             updatedAt: data.updated_at,
                             updatedBy: data.updated_by,
                             revision,

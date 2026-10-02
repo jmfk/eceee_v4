@@ -181,6 +181,7 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(response.data["version"]["edit_revision"], 2)
         broadcast.assert_called_once()
         self.assertEqual(broadcast.call_args.kwargs["revision"], 2)
+        self.assertEqual(broadcast.call_args.kwargs["version_number"], draft.version_number)
         self.assertEqual(broadcast.call_args.kwargs["mutation_type"], "saved")
 
     def test_revision_is_authoritative_and_failed_save_does_not_broadcast(self):
