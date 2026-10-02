@@ -517,6 +517,7 @@ const PageEditor = () => {
             activeSection: activeTab,
             activeWidgetId: editingWidget?.id || editingWidget?._id || null,
             knownVersionId: originalPageVersionData?.id || originalPageVersionData?.versionId || null,
+            knownVersionNumber: originalPageVersionData?.versionNumber || null,
             knownRevision: originalPageVersionData?.editRevision || null,
             onVersionUpdated: async (updateInfo) => {
                 try {

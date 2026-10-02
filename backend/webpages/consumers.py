@@ -89,6 +89,7 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
                     "type": "version_updated",
                     "page_id": event["page_id"],
                     "version_id": event["version_id"],
+                    "version_number": event.get("version_number"),
                     "updated_at": event["updated_at"],
                     "revision": event.get("revision"),
                     "updated_by": event.get("updated_by"),
@@ -153,6 +154,7 @@ class PageEditorConsumer(AsyncWebsocketConsumer):
 def broadcast_version_update(
     page_id,
     version_id,
+    version_number,
     updated_at,
     revision=None,
     updated_by=None,
@@ -166,6 +168,7 @@ def broadcast_version_update(
             "type": "version_updated",
             "page_id": page_id,
             "version_id": version_id,
+            "version_number": version_number,
             "updated_at": updated_at,
             "revision": revision,
             "updated_by": updated_by,

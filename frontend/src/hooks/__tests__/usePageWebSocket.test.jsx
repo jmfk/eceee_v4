@@ -36,13 +36,18 @@ describe('usePageWebSocket', () => {
 
     it('ignores duplicate and out-of-order revisions', async () => {
         const onVersionUpdated = vi.fn()
-        renderHook(() => usePageWebSocket(7, { knownRevision: 4, onVersionUpdated }))
+        renderHook(() => usePageWebSocket(7, {
+            knownVersionId: 9,
+            knownVersionNumber: 3,
+            knownRevision: 4,
+            onVersionUpdated,
+        }))
         const socket = MockWebSocket.instances[0]
 
         act(() => {
-            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, revision: 6 })
-            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, revision: 5 })
-            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, revision: 6 })
+            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, version_number: 3, revision: 6 })
+            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, version_number: 3, revision: 5 })
+            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, version_number: 3, revision: 6 })
         })
 
         await waitFor(() => expect(onVersionUpdated).toHaveBeenCalledTimes(1))
@@ -53,18 +58,21 @@ describe('usePageWebSocket', () => {
         const onVersionUpdated = vi.fn()
         renderHook(() => usePageWebSocket(7, {
             knownVersionId: 9,
+            knownVersionNumber: 3,
             knownRevision: 8,
             onVersionUpdated,
         }))
         const socket = MockWebSocket.instances[0]
 
         act(() => {
-            socket.message({ type: 'version_updated', page_id: 7, version_id: 10, revision: 2 })
+            socket.message({ type: 'version_updated', page_id: 7, version_id: 10, version_number: 4, revision: 2 })
+            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, version_number: 3, revision: 9 })
         })
 
         await waitFor(() => expect(onVersionUpdated).toHaveBeenCalledTimes(1))
         expect(onVersionUpdated.mock.calls[0][0]).toEqual(expect.objectContaining({
             versionId: 10,
+            versionNumber: 4,
             revision: 2,
         }))
     })
@@ -84,6 +92,7 @@ describe('usePageWebSocket', () => {
         })
         const { result } = renderHook(() => usePageWebSocket(7, {
             knownVersionId: 9,
+            knownVersionNumber: 3,
             knownRevision: 4,
             onVersionUpdated,
         }))
@@ -91,8 +100,8 @@ describe('usePageWebSocket', () => {
         const socket = MockWebSocket.instances[0]
 
         act(() => {
-            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, revision: 5 })
-            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, revision: 6 })
+            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, version_number: 3, revision: 5 })
+            socket.message({ type: 'version_updated', page_id: 7, version_id: 9, version_number: 3, revision: 6 })
         })
 
         await waitFor(() => expect(appliedRevisions).toEqual([6]))

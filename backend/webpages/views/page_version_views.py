@@ -130,6 +130,7 @@ class PageVersionViewSet(
         payload = {
             "page_id": version.page_id,
             "version_id": version.id,
+            "version_number": version.version_number,
             "updated_at": version.updated_at.isoformat(),
             "revision": version.edit_revision,
             "updated_by": request.user.username if request.user.is_authenticated else None,

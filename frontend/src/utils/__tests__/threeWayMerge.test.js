@@ -119,6 +119,20 @@ describe('threeWayMerge', () => {
         ]))
     })
 
+    it('treats incompatible value types as an atomic conflict', () => {
+        const arrayResult = mergeValue({}, [], { x: 1 }, ['config'])
+        const scalarResult = mergeValue({}, 'local', { x: 1 }, ['config'])
+
+        expect(arrayResult.value).toEqual({ x: 1 })
+        expect(arrayResult.diffs).toEqual([
+            expect.objectContaining({ pathString: 'config', hasConflict: true }),
+        ])
+        expect(scalarResult.value).toEqual({ x: 1 })
+        expect(scalarResult.diffs).toEqual([
+            expect.objectContaining({ pathString: 'config', hasConflict: true }),
+        ])
+    })
+
     it('applies a manual resolution through an identity-keyed widget path', () => {
         const originalVersion = { widgets: { main: [widget('a', { label: 'Before' })] } }
         const localVersion = { widgets: { main: [widget('a', { label: 'Local' })] } }
