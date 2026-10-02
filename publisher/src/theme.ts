@@ -1,4 +1,5 @@
 import manifest from './generated/publisher-manifest.json';
+import { responsiveImageSources } from './imgproxy';
 import type { Page, Theme, Version, Widget } from './model';
 
 type JsonObject = Record<string, unknown>;
@@ -146,7 +147,14 @@ function propertyRules(styles: JsonObject, colors: JsonObject, element = ''): st
       const image = object(rawValue);
       const url = image.imgproxyBaseUrl ?? image.imgproxy_base_url ?? image.fileUrl ?? image.file_url ?? image.publicUrl ?? image.public_url ?? image.url;
       if (!url && typeof rawValue !== 'string') return [];
-      const result = [`  background-image: url('${String(url ?? rawValue)}');`];
+      const sourceUrl = String(url ?? rawValue);
+      const responsive = responsiveImageSources(image, sourceUrl);
+      const result = responsive
+        ? [
+            `  background-image: -webkit-image-set(url('${responsive.oneX}') 1x, url('${responsive.twoX}') 2x);`,
+            `  background-image: image-set(url('${responsive.oneX}') 1x, url('${responsive.twoX}') 2x);`,
+          ]
+        : [`  background-image: url('${sourceUrl}');`];
       for (const [key, snakeKey, cssProperty] of [['backgroundSize', 'background_size', 'background-size'], ['backgroundPosition', 'background_position', 'background-position'], ['backgroundRepeat', 'background_repeat', 'background-repeat']] as const) {
         const value = image[key] ?? image[snakeKey];
         if (value) result.push(`  ${cssProperty}: ${String(value)};`);

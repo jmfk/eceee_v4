@@ -6,6 +6,39 @@ const page = { enable_css_injection: true, page_css_variables: {}, page_custom_c
 const version = { enable_css_injection: true, page_css_variables: {}, page_custom_css: '' } as Version;
 
 describe('publisher theme compiler', () => {
+  it('emits real 1x and 2x background sources for retina theme images', () => {
+    const previousKey = process.env.PUBLISHER_IMGPROXY_KEY;
+    const previousSalt = process.env.PUBLISHER_IMGPROXY_SALT;
+    process.env.PUBLISHER_IMGPROXY_KEY = '00'.repeat(32);
+    process.env.PUBLISHER_IMGPROXY_SALT = '11'.repeat(32);
+    try {
+      const theme = {
+        colors: {}, css_variables: {}, html_elements: {}, custom_css: '', breakpoints: {}, fonts: {},
+        component_styles: {}, image_styles: {}, gallery_styles: {}, carousel_styles: {},
+        design_groups: { groups: [{
+          widgetTypes: ['easy_widgets.HeaderWidget'], slots: ['header'], elements: {},
+          layoutProperties: { 'header-widget': { xs: { backgroundImage: {
+            imgproxyBaseUrl: 'https://media.example/header.jpg', width: 2400, height: 320, dpr: 2,
+            backgroundSize: 'auto', backgroundRepeat: 'no-repeat',
+          } } } },
+        }] },
+      } as unknown as Theme;
+
+      const css = compileThemeCss(theme, page, version);
+      expect(css).toContain("background-image: -webkit-image-set(url('/imgproxy/");
+      expect(css).toContain("background-image: image-set(url('/imgproxy/");
+      expect(css).toContain('resize:fit:1200:160');
+      expect(css).toContain('resize:fit:2400:320');
+      expect(css).toMatch(/ 1x, url\('\/imgproxy\/[^']+'\) 2x/);
+      expect(css).toContain('background-size: auto');
+    } finally {
+      if (previousKey === undefined) delete process.env.PUBLISHER_IMGPROXY_KEY;
+      else process.env.PUBLISHER_IMGPROXY_KEY = previousKey;
+      if (previousSalt === undefined) delete process.env.PUBLISHER_IMGPROXY_SALT;
+      else process.env.PUBLISHER_IMGPROXY_SALT = previousSalt;
+    }
+  });
+
   it('compiles Django-compatible design group selectors and responsive layout properties', () => {
     const theme = {
       colors: { brand: '#123456' }, css_variables: {}, html_elements: {}, custom_css: '', breakpoints: { md: 800 },

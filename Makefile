@@ -217,7 +217,7 @@ frontend:
 publisher-dev: ## Start the standalone publisher with HMR on the reserved local port
 	@if [ -z "$(DATABASE_URL)" ]; then echo "DATABASE_URL is required in the ignored repository .env" >&2; exit 1; fi
 	@echo "🚀 Starting Publisher on http://summerstudy.localhost:$(PUBLISHER_PORT)"
-	@cd publisher && PUBLISHER_DATABASE_URL="$(DATABASE_URL)" npm run dev -- --hostname 0.0.0.0 --port "$(PUBLISHER_PORT)"
+	@cd publisher && PUBLISHER_DATABASE_URL="$(DATABASE_URL)" PUBLISHER_IMGPROXY_PUBLIC_URL="http://localhost:$(ECEEE_IMGPROXY_PORT)" npm run dev -- --hostname 0.0.0.0 --port "$(PUBLISHER_PORT)"
 
 publisher-manifest: ## Regenerate publisher CSS/widget metadata
 	$(COMPOSE_DEV) run --rm --no-deps -v "$(CURDIR)/publisher:/publisher" backend python manage.py export_publisher_manifest

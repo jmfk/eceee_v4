@@ -12,6 +12,11 @@
 eceee-test.colliberty.com, summerstudy-test.colliberty.com, industry-test.colliberty.com {
     encode gzip
     header X-Robots-Tag "noindex, nofollow, noarchive"
+
+    handle_path /imgproxy/* {
+        reverse_proxy imgproxy:8080
+    }
+
     reverse_proxy publisher:3000
 }
 
