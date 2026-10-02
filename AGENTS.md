@@ -87,6 +87,9 @@ Backend static assets: `cd backend && npm run build` / `npm run watch:css`
 - Before merging any pull request, fetch its current checks, submitted reviews,
   review decision, unresolved review threads when available, and mergeability.
   Do this immediately before the merge even if the PR was inspected earlier.
+- Before requesting owner sign-off to merge, apply the `full-ci` label and verify
+  that the full CI run succeeded for the pull request's current head commit.
+  A later push requires a new full run and a new status report.
 - Never merge a pull request unless the user has explicitly instructed the agent
   to merge that specific PR after the agent has reported the current head commit,
   checks, submitted reviews, review decision, unresolved review threads, and

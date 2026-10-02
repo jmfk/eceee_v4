@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -21,48 +22,96 @@ env:
   COMPOSE_INFRA_FILES: -f docker-compose.infra.yml -f docker-compose.ci.yml
 
 jobs:
-  backend-lint:
-    name: Backend lint
+  detect:
+    name: Select CI checks
     runs-on: ubuntu-latest
-    env:
-      COMPOSE_PROJECT_NAME: eceeev4ci-${{ github.run_id }}-${{ github.run_attempt }}-backendlint
-      PY_LINT_BASE: ${{ github.event_name == 'push' && github.event.before || 'origin/main' }}
+    outputs:
+      backend: ${{ steps.select.outputs.backend }}
+      frontend: ${{ steps.select.outputs.frontend }}
+      publisher: ${{ steps.select.outputs.publisher }}
+      public_e2e: ${{ steps.select.outputs.public_e2e }}
+      base: ${{ steps.select.outputs.base }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Prepare CI environment
+      - name: Select checks for changed files
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          FULL_CI: ${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}
         run: |
-          cp .env.template .env
-          cat >> .env <<'EOF'
-          AWS_S3_ENDPOINT_URL=http://test-minio:9000
-          AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000
-          DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test
-          POSTGRES_DB=eceee_v4_test
-          POSTGRES_USER=postgres
-          POSTGRES_PASSWORD=test-only
-          POSTGRES_HOST=test-db
-          POSTGRES_PORT=5432
-          REDIS_URL=redis://test-redis:6379/0
-          AWS_ACCESS_KEY_ID=test-eceee
-          AWS_SECRET_ACCESS_KEY=test-eceee-secret
-          IMGPROXY_URL=http://imgproxy:8080
-          IMGPROXY_PUBLIC_URL=http://localhost:8080
-          IMGPROXY_KEY=0000000000000000000000000000000000000000000000000000000000000000
-          IMGPROXY_SALT=1111111111111111111111111111111111111111111111111111111111111111
-          EOF
+          if [[ "$EVENT_NAME" == push || "$FULL_CI" == true ]]; then
+            backend=true
+            frontend=true
+            publisher=true
+            public_e2e=true
+          else
+            backend=false
+            frontend=false
+            publisher=false
+            public_e2e=false
+            while IFS= read -r path; do
+              case "$path" in
+                backend/*) backend=true ;;
+                frontend/*) frontend=true ;;
+                publisher/*|deploy/scripts/tests/*|deploy/scripts/*health*|deploy/scripts/*deploy*) publisher=true ;;
+                docs/*|manuals/*|*.md|ToDo/*) ;;
+                *) backend=true; frontend=true; publisher=true; public_e2e=true ;;
+              esac
+            done < <(git diff --name-only --no-renames "$BASE_SHA"...HEAD)
+          fi
+          {
+            echo "backend=$backend"
+            echo "frontend=$frontend"
+            echo "publisher=$publisher"
+            echo "public_e2e=$public_e2e"
+            echo "base=$BASE_SHA"
+          } >> "$GITHUB_OUTPUT"
+
+  backend-lint:
+    name: Backend lint
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements/dev.txt
+
+      - name: Install lint tools
+        run: python -m pip install black==25.11.0 'isort>=5.12.0' 'flake8>=6.0.0'
 
       - name: Run backend lint
-        run: make backend-lint
-
-      - name: Clean up Docker resources
-        if: always()
-        run: docker compose -f docker-compose.dev.yml down -v --remove-orphans
+        env:
+          BASE_SHA: ${{ needs.detect.outputs.base }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" == push ]]; then
+            BASE_SHA="${{ github.event.before }}"
+          fi
+          mapfile -t files < <(git diff --name-only "$BASE_SHA"...HEAD -- backend | sed -n '/\.py$/p' | sed '/\/migrations\//d')
+          if (( ${#files[@]} == 0 )); then
+            echo 'No changed backend Python files to lint.'
+            exit 0
+          fi
+          black --check "${files[@]}"
+          isort --check-only "${files[@]}"
+          flake8 "${files[@]}"
 
   frontend-lint:
     name: Frontend lint
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -83,6 +132,8 @@ jobs:
   publisher-checks:
     name: Publisher checks
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.publisher == 'true'
     services:
       postgres:
         image: postgres:15-alpine
@@ -150,10 +201,24 @@ jobs:
   backend-tests:
     name: Backend tests
     runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
     env:
       COMPOSE_PROJECT_NAME: eceeev4ci-${{ github.run_id }}-${{ github.run_attempt }}-backendtests
     steps:
       - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build cached backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          load: true
+          tags: eceee-v4-backend:latest
+          build-args: REQUIREMENTS_FILE=dev.txt
+          cache-from: type=gha,scope=backend-ci
+          cache-to: type=gha,mode=max,scope=backend-ci
 
       - name: Prepare CI environment
         run: |
@@ -177,7 +242,7 @@ jobs:
           EOF
 
       - name: Run backend tests
-        run: make backend-test
+        run: make backend-test TEST_RUN_FLAGS=--no-build
 
       - name: Clean up Docker resources
         if: always()
@@ -189,47 +254,8 @@ jobs:
   frontend-tests:
     name: Frontend unit tests
     runs-on: ubuntu-latest
-    env:
-      COMPOSE_PROJECT_NAME: eceeev4ci-${{ github.run_id }}-${{ github.run_attempt }}-frontendtests
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Prepare CI environment
-        run: |
-          cp .env.template .env
-          cat >> .env <<'EOF'
-          AWS_S3_ENDPOINT_URL=http://test-minio:9000
-          AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000
-          DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test
-          POSTGRES_DB=eceee_v4_test
-          POSTGRES_USER=postgres
-          POSTGRES_PASSWORD=test-only
-          POSTGRES_HOST=test-db
-          POSTGRES_PORT=5432
-          REDIS_URL=redis://test-redis:6379/0
-          AWS_ACCESS_KEY_ID=test-eceee
-          AWS_SECRET_ACCESS_KEY=test-eceee-secret
-          IMGPROXY_URL=http://imgproxy:8080
-          IMGPROXY_PUBLIC_URL=http://localhost:8080
-          IMGPROXY_KEY=0000000000000000000000000000000000000000000000000000000000000000
-          IMGPROXY_SALT=1111111111111111111111111111111111111111111111111111111111111111
-          EOF
-
-      - name: Run frontend unit tests
-        run: make frontend-test
-
-      - name: Clean up Docker resources
-        if: always()
-        run: |
-          docker compose -f docker-compose.dev.yml down -v --remove-orphans
-          docker compose -f docker-compose.infra.yml -f docker-compose.ci.yml down -v --remove-orphans
-          docker compose -f docker-compose.test-infra.yml down -v --remove-orphans
-
-  frontend-e2e:
-    name: Frontend Playwright
-    runs-on: ubuntu-latest
-    env:
-      COMPOSE_PROJECT_NAME: eceeev4ci-${{ github.run_id }}-${{ github.run_attempt }}-frontende2e
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -239,6 +265,73 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend unit tests
+        working-directory: frontend
+        run: npm run test:run -- --bail=1 --maxWorkers=2
+
+  frontend-admin-e2e:
+    name: Frontend admin Playwright
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.60.0-noble
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run admin Playwright tests
+        working-directory: frontend
+        run: npm run test:e2e:admin
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-admin-playwright-report
+          path: frontend/playwright-report/
+          if-no-files-found: ignore
+
+  frontend-public-e2e:
+    name: Frontend public Playwright
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.public_e2e == 'true'
+    env:
+      COMPOSE_PROJECT_NAME: eceeev4ci-${{ github.run_id }}-${{ github.run_attempt }}-publice2e
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build cached backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          load: true
+          tags: eceee-v4-backend:latest
+          build-args: REQUIREMENTS_FILE=dev.txt
+          cache-from: type=gha,scope=backend-ci
+          cache-to: type=gha,mode=max,scope=backend-ci
+
       - name: Prepare CI environment
         run: |
           cp .env.template .env
@@ -260,22 +353,29 @@ jobs:
           IMGPROXY_SALT=1111111111111111111111111111111111111111111111111111111111111111
           EOF
 
-      - name: Install frontend dependencies
+      - name: Install frontend dependencies and Chromium
         working-directory: frontend
-        run: npm ci
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
 
-      - name: Install Playwright browsers
+      - name: Prepare public regression backend
+        run: make prepare-public-e2e-backend TEST_UP_FLAGS=--no-build
+
+      - name: Resolve public regression hostname
+        run: echo '127.0.0.1 public-regression.test' | sudo tee -a /etc/hosts > /dev/null
+
+      - name: Run public Playwright tests
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
-
-      - name: Run frontend Playwright tests
-        run: make frontend-e2e-test
+        env:
+          PLAYWRIGHT_PUBLIC_BASE_URL: http://public-regression.test:10101
+        run: npm run test:e2e:public
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-playwright-report
+          name: frontend-public-playwright-report
           path: frontend/playwright-report/
           if-no-files-found: ignore
 
@@ -285,3 +385,15 @@ jobs:
           docker compose -f docker-compose.dev.yml down -v --remove-orphans
           docker compose -f docker-compose.infra.yml -f docker-compose.ci.yml down -v --remove-orphans
           docker compose -f docker-compose.test-infra.yml down -v --remove-orphans
+
+  ci-gate:
+    name: CI gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [detect, backend-lint, backend-tests, frontend-lint, frontend-tests, frontend-admin-e2e, frontend-public-e2e, publisher-checks]
+    steps:
+      - name: Verify selected checks
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          jq -e 'all(.[]; .result == "success" or .result == "skipped") and .detect.result == "success"' <<< "$NEEDS_JSON"
