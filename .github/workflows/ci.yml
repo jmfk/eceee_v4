@@ -40,15 +40,16 @@ jobs:
         id: select
         env:
           EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           FULL_CI: ${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}
         run: |
+          BASE_SHA=''
           if [[ "$EVENT_NAME" == push || "$FULL_CI" == true ]]; then
             backend=true
             frontend=true
             publisher=true
             public_e2e=true
           else
+            BASE_SHA=$(git rev-parse HEAD^1)
             backend=false
             frontend=false
             publisher=false
@@ -61,7 +62,10 @@ jobs:
                 docs/*|manuals/*|*.md|ToDo/*) ;;
                 *) backend=true; frontend=true; publisher=true; public_e2e=true ;;
               esac
-            done < <(git diff --name-only --no-renames "$BASE_SHA"...HEAD)
+            done < <(git diff --name-only --no-renames "$BASE_SHA" HEAD)
+          fi
+          if [[ "$EVENT_NAME" == pull_request && -z "$BASE_SHA" ]]; then
+            BASE_SHA=$(git rev-parse HEAD^1)
           fi
           {
             echo "backend=$backend"
@@ -98,7 +102,7 @@ jobs:
           if [[ "$EVENT_NAME" == push ]]; then
             BASE_SHA="${{ github.event.before }}"
           fi
-          mapfile -t files < <(git diff --name-only "$BASE_SHA"...HEAD -- backend | sed -n '/\.py$/p' | sed '/\/migrations\//d')
+          mapfile -t files < <(git diff --name-only "$BASE_SHA" HEAD -- backend | sed -n '/\.py$/p' | sed '/\/migrations\//d')
           if (( ${#files[@]} == 0 )); then
             echo 'No changed backend Python files to lint.'
             exit 0
