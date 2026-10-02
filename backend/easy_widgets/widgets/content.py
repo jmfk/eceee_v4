@@ -7,6 +7,7 @@ from typing import Type
 
 from bs4 import BeautifulSoup
 from django.core.exceptions import ValidationError
+from django.utils.html import escape
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -254,10 +255,7 @@ class ContentWidget(BaseWidget):
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import (
-            prepare_component_context,
-            render_mustache,
-        )
+        from webpages.utils.mustache_renderer import prepare_component_context, render_mustache
 
         style_name = config.get("component_style", "default")
 
@@ -428,10 +426,7 @@ class ContentWidget(BaseWidget):
         """
         from file_manager.imgproxy import imgproxy_service
         from file_manager.models import MediaCollection, MediaFile
-        from webpages.utils.mustache_renderer import (
-            prepare_gallery_context,
-            render_mustache,
-        )
+        from webpages.utils.mustache_renderer import prepare_gallery_context, render_mustache
 
         def _resolve_style(key):
             if not key or not theme:
@@ -514,15 +509,16 @@ class ContentWidget(BaseWidget):
                     img_url = responsive.get("1x", {}).get("url", file_url)
                     srcset = responsive.get("srcset", "")
                     alt = title or media_file.title or ""
-                    cap_html = f"<figcaption>{caption}</figcaption>" if caption else ""
-                    srcset_attr = f' srcset="{srcset}"' if srcset else ""
+                    cap_html = f"<figcaption>{escape(caption)}</figcaption>" if caption else ""
+                    srcset_attr = f' srcset="{escape(srcset)}"' if srcset else ""
 
                     # Use width and alignment classes for display
-                    width_class = f"img-width-{width}"
-                    align_class = f"media-align-{align}"
+                    width_class = f"img-width-{escape(width)}"
+                    align_class = f"media-align-{escape(align)}"
 
                     img_tag = (
-                        f'<img src="{img_url}"{srcset_attr}' f' alt="{alt}" class="{width_class}" loading="lazy" />'
+                        f'<img src="{escape(img_url)}"{srcset_attr}'
+                        f' alt="{escape(alt)}" class="{width_class}" loading="lazy" />'
                     )
                     # Generate lightbox URL using lightbox_config
                     lb_url = file_url
@@ -554,8 +550,8 @@ class ContentWidget(BaseWidget):
 
                     if lightbox_config:
                         img_tag = (
-                            f'<a data-lightbox data-lightbox-src="{lb_url}"'
-                            f' data-lightbox-caption="{caption}">'
+                            f'<a data-lightbox data-lightbox-src="{escape(lb_url)}"'
+                            f' data-lightbox-caption="{escape(caption)}">'
                             f"{img_tag}</a>"
                         )
 

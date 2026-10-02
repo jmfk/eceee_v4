@@ -2,8 +2,11 @@
 Regression tests for ContentWidget.prepare_template_context.
 """
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
+from bs4 import BeautifulSoup
+from django.template.loader import render_to_string
 from django.test import TestCase
 
 from easy_widgets.widgets.content import ContentWidget
@@ -78,3 +81,32 @@ class ContentWidgetPrepareTemplateContextTest(TestCase):
             self.widget.prepare_template_context({"content": content}, {})
 
         self.assertEqual(render.call_args.args[5], "Migration diagram")
+
+    def test_media_insert_escapes_alt_and_caption_in_public_html(self):
+        content = (
+            '<div data-media-insert="true" data-media-id="999" data-media-type="image" '
+            'data-caption="Caption &quot; onmouseover=&quot;bad()">'
+            '<img src="legacy.jpg" alt="Diagram &quot; onerror=&quot;bad()"></div>'
+        )
+        media = SimpleNamespace(
+            id=999, width=100, height=100, title="", file_url="/safe.jpg", get_file_url=lambda: "/safe.jpg"
+        )
+        with (
+            patch("file_manager.models.MediaFile.objects.get", return_value=media),
+            patch(
+                "file_manager.imgproxy.imgproxy_service.generate_responsive_urls",
+                return_value={"1x": {"url": "/safe.jpg"}, "srcset": ""},
+            ),
+        ):
+            config = self.widget.prepare_template_context({"content": content}, {})
+
+        rendered = render_to_string(
+            self.widget.template_name,
+            {"config": config, "widget_type": SimpleNamespace(css_class_name="content")},
+        )
+        figure = BeautifulSoup(rendered, "html.parser").find("figure")
+        image = figure.find("img")
+        self.assertEqual(image["alt"], 'Diagram " onerror="bad()')
+        self.assertEqual(figure.find("figcaption").text, 'Caption " onmouseover="bad()')
+        self.assertNotIn("onerror", image.attrs)
+        self.assertNotIn("onmouseover", figure.attrs)

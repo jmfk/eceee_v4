@@ -325,6 +325,21 @@ describe('PageRenderer', () => {
         expect(image).toHaveAttribute('loading', 'lazy')
     })
 
+    it('preserves media collections and lightbox links in content', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{ id: 'content', type: 'easy_widgets.ContentWidget', config: {
+                content: '<div data-media-insert="true" data-media-type="collection"><div class="media-gallery"><img src="/one.jpg" alt="One"><img src="/two.jpg" alt="Two"></div></div>'
+                    + '<div data-media-insert="true" data-media-type="image"><a data-lightbox href="/full.jpg"><img src="/thumb.jpg" alt="Thumbnail"></a></div>',
+            } }] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+        expect(container.querySelectorAll('.media-gallery img')).toHaveLength(2)
+        expect(screen.getByRole('link', { name: 'Thumbnail' })).toHaveAttribute('href', '/full.jpg')
+        expect(screen.getByRole('link', { name: 'Thumbnail' })).toHaveAttribute('data-lightbox')
+        expect(container.querySelectorAll('figure.media-insert')).toHaveLength(0)
+    })
+
     it('uses scalar News content only when structured widgets are absent', () => {
         const model = createPageRenderModel({
             widgets: { main: [{
