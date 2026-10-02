@@ -102,7 +102,7 @@ jobs:
           if [[ "$EVENT_NAME" == push ]]; then
             BASE_SHA="${{ github.event.before }}"
           fi
-          mapfile -t files < <(git diff --name-only "$BASE_SHA" HEAD -- backend | sed -n '/\.py$/p' | sed '/\/migrations\//d')
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMRT "$BASE_SHA" HEAD -- backend | sed -n '/\.py$/p' | sed '/\/migrations\//d')
           if (( ${#files[@]} == 0 )); then
             echo 'No changed backend Python files to lint.'
             exit 0
