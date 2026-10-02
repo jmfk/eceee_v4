@@ -114,6 +114,26 @@ describe('PublishingEditor', () => {
         expect(addNotification).not.toHaveBeenCalledWith('Changes published', 'success')
     })
 
+    it('keeps a successful schedule successful when workflow refresh fails', async () => {
+        versionsApi.getWorkflow
+            .mockResolvedValueOnce({
+                state: 'live_with_unpublished_changes',
+                editableVersion: { id: 11, updatedAt: '2030-01-01T10:00:00Z' },
+                liveVersion: { id: 10 },
+            })
+            .mockRejectedValueOnce(new Error('Workflow refresh failed'))
+
+        const { container } = renderEditor()
+        await screen.findByRole('button', { name: /publish changes/i })
+        fireEvent.change(container.querySelector('input[type="datetime-local"]'), {
+            target: { value: '2030-01-02T12:00' },
+        })
+        fireEvent.click(screen.getByRole('button', { name: 'Schedule' }))
+
+        await waitFor(() => expect(addNotification).toHaveBeenCalledWith('Working version scheduled', 'success'))
+        expect(addNotification).not.toHaveBeenCalledWith('Workflow refresh failed', 'error')
+    })
+
     it('confirms dirty replacement and reloads the restored working version', async () => {
         const historical = {
             id: 10,
