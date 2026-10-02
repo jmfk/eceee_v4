@@ -56,6 +56,7 @@ export interface PublishedNavigationPage {
   id: DbId;
   parent_id: DbId;
   title: string;
+  label: string;
   slug: string;
   cached_path: string;
   sort_order: number;
@@ -331,6 +332,11 @@ function replaceHtmlMedia(html: string, media: Map<DbId, PublicMediaItem>): stri
   });
 }
 
+function pageHref(path: string, anchor: unknown): string {
+  const fragment = typeof anchor === 'string' ? anchor.replace(/^#/, '') : '';
+  return fragment ? `${path}#${fragment}` : path;
+}
+
 function replaceHtmlPageLinks(html: string, paths: Map<DbId, string>): string {
   const structured = html.replace(/\bhref=(['"])(.*?)\1/gi, (attribute, quote: string, rawValue: string) => {
     const decoded = rawValue.replaceAll('&quot;', '"').replaceAll('&#34;', '"').replaceAll('&#39;', "'").replaceAll('&amp;', '&');
@@ -339,7 +345,7 @@ function replaceHtmlPageLinks(html: string, paths: Map<DbId, string>): string {
       const link = JSON.parse(decoded) as Record<string, unknown>;
       if (link.type === 'internal') {
         const path = paths.get(String(link.pageId ?? link.page_id ?? ''));
-        return path ? `href=${quote}${path}${quote}` : 'aria-disabled="true"';
+        return path ? `href=${quote}${pageHref(path, link.anchor)}${quote}` : 'aria-disabled="true"';
       }
       if (link.type === 'external' || link.type === 'media') return link.url ? `href=${quote}${String(link.url)}${quote}` : 'aria-disabled="true"';
       if (link.type === 'email') return link.address ? `href=${quote}mailto:${String(link.address)}${quote}` : 'aria-disabled="true"';
@@ -372,8 +378,8 @@ function enrichValue(value: unknown, pagePaths: Map<DbId, string>, media: Map<Db
   if (pageId !== undefined && pageId !== null) {
     const resolved = pagePaths.get(String(pageId));
     if (resolved) {
-      result.resolvedUrl = resolved;
-      result.url = resolved;
+      result.resolvedUrl = pageHref(resolved, input.anchor);
+      result.url = result.resolvedUrl;
       result.isPublished = true;
     } else {
       delete result.resolvedUrl;
@@ -410,7 +416,7 @@ function prepareWidgets(
   }
   const navigationItem = (page: PublishedNavigationPage) => ({
     id: page.id,
-    label: page.title,
+    label: page.label,
     title: page.title,
     path: page.cached_path,
     url: page.cached_path,
