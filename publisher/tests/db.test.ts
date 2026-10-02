@@ -20,6 +20,7 @@ describe('database snapshot', () => {
     process.env.PUBLISHER_DATABASE_URL = 'postgresql://publisher.invalid/eceee';
     delete process.env.PUBLISHER_ALLOW_WILDCARD_HOSTNAMES;
     delete process.env.PUBLISHER_DEFAULT_HOSTNAMES;
+    delete process.env.PUBLISHER_MEDIA_BASE_URL;
   });
 
   it('selects exact hosts while fallback routing is denied by default', async () => {
@@ -92,6 +93,41 @@ describe('database snapshot', () => {
     expect(collectionSql).toContain("collection.access_level = 'public'");
     expect(collectionSql).toContain('namespace.tenant_id = $2');
     expect(collectionSql).toContain('media.is_deleted = false');
+  });
+
+  it('derives public media URLs from file paths when the legacy URL column is empty', async () => {
+    process.env.PUBLISHER_MEDIA_BASE_URL = 'https://media.example/public-bucket/';
+    mocks.query.mockImplementation(async sql => {
+      const statement = String(sql);
+      if (statement.includes('FROM file_manager_mediafile AS media')) return { rows: [{
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', url: '', file_path: 'uploads/hero image.jpg',
+        type: 'image', altText: 'Hero', caption: '', annotation: '', title: 'Hero',
+        width: 1200, height: 800, thumbnailUrl: '',
+      }] };
+      if (statement.includes('FROM file_manager_mediafile_collections AS membership')) return { rows: [{
+        collection_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', url: '', file_path: 'uploads/logo.svg',
+        type: 'image', altText: 'Logo', caption: '', annotation: '', title: 'Logo',
+        width: 200, height: 100, thumbnailUrl: '',
+      }] };
+      return { rows: [] };
+    });
+
+    const media = await database.withSnapshot(reader => reader.publicMedia(
+      ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
+      ['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'],
+      '7',
+    ));
+
+    expect(media.files[0]).toMatchObject({
+      url: 'https://media.example/public-bucket/uploads/hero%20image.jpg',
+      thumbnailUrl: 'https://media.example/public-bucket/uploads/hero%20image.jpg',
+    });
+    expect(media.collections['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'][0]).toMatchObject({
+      url: 'https://media.example/public-bucket/uploads/logo.svg',
+      thumbnailUrl: 'https://media.example/public-bucket/uploads/logo.svg',
+    });
+    expect(mocks.query.mock.calls[1][0]).toContain('media.file_path');
   });
 
   it('rolls back and releases the client when resolution fails', async () => {

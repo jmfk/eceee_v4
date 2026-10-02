@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildPublishedPageModel, normalizeHostname, type Page, type PageReader, type ReadDb, type Theme, type Version, type Widget } from '../src/model';
 
 const page = (values: Partial<Page> & Pick<Page, 'id' | 'tenant_id' | 'parent_id' | 'slug' | 'title'>): Page => ({
@@ -293,29 +293,33 @@ describe('public resolution', () => {
   });
 
   it('resolves same-site page links and public media collections inside one snapshot', async () => {
+    const publishedPageReferences = vi.fn(async (ids: string[], tenant: string, site: string) => ids.includes(child.id) && tenant === root.tenant_id && site === root.id ? [{ id: child.id, cached_path: '/news/' }] : []);
+    const publicMedia = vi.fn(async () => ({ files: [], collections: { '67d9020f-1d73-47be-bd24-1fe52d2dbef8': [{ id: 'a', url: '/logo.png', type: 'image', altText: 'Partner', caption: '', annotation: '', title: 'Partner', width: 100, height: 50, thumbnailUrl: '/logo.png' }] } }));
     const enrichedReader: PageReader = {
       ...reader,
       version: async (id, at) => {
         const selected = await reader.version(id, at);
         if (id !== article.id || !selected) return selected;
         return version({ ...selected, widgets: { main: [
-          { id: 'nav', type: 'easy_widgets.NavigationWidget', config: { menuItems: [{ linkData: { type: 'internal', pageId: child.id, anchor: 'agenda', label: 'News' } }, { linkData: { type: 'internal', pageId: '999', label: 'Missing' } }] } },
+          { id: 'nav', type: 'easy_widgets.NavigationWidget', config: { menuItems: [{ linkData: { type: 'internal', pageId: child.id, anchor: 'agenda', label: 'News' } }, { linkData: { type: 'internal', pageId: '999', label: 'Missing' } }, { linkData: { type: 'internal', pageId: 'invalid', label: 'Invalid' } }] } },
           { id: 'copy', type: 'easy_widgets.ContentWidget', config: { content: '<p><a data-page-id="2" href="#">News</a><a href="{&quot;type&quot;:&quot;internal&quot;,&quot;pageId&quot;:2,&quot;anchor&quot;:&quot;details&quot;}">Structured</a><a href="{&quot;type&quot;:&quot;external&quot;,&quot;url&quot;:&quot;https://example.net&quot;}">External</a><a data-page-id="999" href="#">Missing</a></p>' } },
           { id: 'logos', type: 'easy_widgets.ImageWidget', config: { collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8', display_type: 'gallery' } },
           { id: 'section', type: 'easy_widgets.SectionWidget', config: { slots: { content: [
             { id: 'nested-logos', type: 'easy_widgets.ImageWidget', config: { collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8' } },
             { id: 'subpages', type: 'easy_widgets.NavigationWidget', config: { navigation_style: 'sub-page-navigation', menu_items: [] } },
+            { id: 'broken-collection', type: 'easy_widgets.ImageWidget', config: { collection_id: 'not-a-uuid' } },
           ] } } },
         ] } });
       },
-      publishedPageReferences: async (ids, tenant, site) => ids.includes(child.id) && tenant === root.tenant_id && site === root.id ? [{ id: child.id, cached_path: '/news/' }] : [],
+      publishedPageReferences,
       publishedNavigationPages: async () => [{ id: '4', parent_id: article.id, title: 'Child page', label: 'Child', slug: 'child', cached_path: '/news/story/child/', sort_order: 0 }],
-      publicMedia: async () => ({ files: [], collections: { '67d9020f-1d73-47be-bd24-1fe52d2dbef8': [{ id: 'a', url: '/logo.png', type: 'image', altText: 'Partner', caption: '', annotation: '', title: 'Partner', width: 100, height: 50, thumbnailUrl: '/logo.png' }] } }),
+      publicMedia,
     };
 
     const model = await buildPublishedPageModel({ withSnapshot: async read => read(enrichedReader) }, 'example.org', '/news/story', new Date('2026-06-01'));
     expect(model?.slots.main[0].config.menuItems).toEqual([
       expect.objectContaining({ linkData: expect.objectContaining({ resolvedUrl: '/news/#agenda', url: '/news/#agenda' }) }),
+      expect.objectContaining({ linkData: expect.objectContaining({ isActive: false, isPublished: false }) }),
       expect.objectContaining({ linkData: expect.objectContaining({ isActive: false, isPublished: false }) }),
     ]);
     expect(model?.slots.main[1].config.content).toContain('href="/news/"');
@@ -330,6 +334,8 @@ describe('public resolution', () => {
       depth: 2,
       currentChildren: [expect.objectContaining({ label: 'Child', path: '/news/story/child/' })],
     });
+    expect(publishedPageReferences).toHaveBeenCalledWith([child.id, '999'], root.tenant_id, root.id, expect.any(Date));
+    expect(publicMedia).toHaveBeenCalledWith([], ['67d9020f-1d73-47be-bd24-1fe52d2dbef8'], root.tenant_id);
   });
 
   it('rejects dynamic patterns', async () => {

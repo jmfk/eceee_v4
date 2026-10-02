@@ -1,6 +1,24 @@
 import { Pool, type PoolClient } from 'pg';
 import { normalizeHostname, type Page, type PageReader, type PublicMediaItem, type ReadDb, type Theme, type Version } from './model';
 let pool: Pool | undefined;
+type PublicMediaRow = PublicMediaItem & { file_path: string };
+
+function mediaBaseUrl(): string {
+  const configured = process.env.PUBLISHER_MEDIA_BASE_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, '');
+  const endpoint = process.env.AWS_S3_ENDPOINT_URL?.trim().replace(/\/+$/, '');
+  const bucket = process.env.AWS_STORAGE_BUCKET_NAME?.trim().replace(/^\/+|\/+$/g, '');
+  return endpoint && bucket ? `${endpoint}/${bucket}` : '';
+}
+
+function publicMediaItem(row: PublicMediaRow): PublicMediaItem {
+  const { file_path: filePath, ...item } = row;
+  const path = filePath.split('/').filter(Boolean).map(encodeURIComponent).join('/');
+  const baseUrl = mediaBaseUrl();
+  const url = item.url || (path && baseUrl ? `${baseUrl}/${path}` : '');
+  return { ...item, url, thumbnailUrl: item.thumbnailUrl || url };
+}
+
 function wildcardAllowed(): boolean {
   return process.env.PUBLISHER_ALLOW_WILDCARD_HOSTNAMES?.trim().toLowerCase() === 'true';
 }
@@ -109,18 +127,18 @@ function reader(client: PoolClient): PageReader {
       return result.rows;
     },
     async publicMedia(mediaIds, collectionIds, tenantId) {
-      const mediaFields = `media.id::text, COALESCE(media.file_url, '') AS url,
+      const mediaFields = `media.id::text, COALESCE(media.file_url, '') AS url, media.file_path,
         CASE WHEN media.file_type = 'video' THEN 'video' ELSE 'image' END AS type,
         COALESCE(media.title, '') AS "altText", COALESCE(media.description, '') AS caption,
         COALESCE(media.metadata->>'annotation', '') AS annotation, COALESCE(media.title, '') AS title,
         media.width, media.height, COALESCE(media.file_url, '') AS "thumbnailUrl"`;
-      const files = mediaIds.length ? await client.query<PublicMediaItem>(`
+      const files = mediaIds.length ? await client.query<PublicMediaRow>(`
         SELECT ${mediaFields}
         FROM file_manager_mediafile AS media
         WHERE media.id = ANY($1::uuid[]) AND media.tenant_id = $2
           AND media.access_level = 'public' AND media.is_deleted = false
-        ORDER BY media.created_at, media.id`, [mediaIds, tenantId]) : { rows: [] as PublicMediaItem[] };
-      const collectionRows = collectionIds.length ? await client.query<PublicMediaItem & { collection_id: string }>(`
+        ORDER BY media.created_at, media.id`, [mediaIds, tenantId]) : { rows: [] as PublicMediaRow[] };
+      const collectionRows = collectionIds.length ? await client.query<PublicMediaRow & { collection_id: string }>(`
         SELECT membership.mediacollection_id::text AS collection_id, ${mediaFields}
         FROM file_manager_mediafile_collections AS membership
         JOIN file_manager_mediacollection AS collection ON collection.id = membership.mediacollection_id
@@ -130,13 +148,13 @@ function reader(client: PoolClient): PageReader {
           AND media.tenant_id = $2 AND namespace.tenant_id = $2
           AND collection.access_level = 'public'
           AND media.access_level = 'public' AND media.is_deleted = false
-        ORDER BY media.created_at, media.id`, [collectionIds, tenantId]) : { rows: [] as Array<PublicMediaItem & { collection_id: string }> };
+        ORDER BY media.created_at, media.id`, [collectionIds, tenantId]) : { rows: [] as Array<PublicMediaRow & { collection_id: string }> };
       const collections: Record<string, PublicMediaItem[]> = {};
       for (const row of collectionRows.rows) {
         const { collection_id, ...item } = row;
-        (collections[collection_id] ??= []).push(item);
+        (collections[collection_id] ??= []).push(publicMediaItem(item));
       }
-      return { files: files.rows, collections };
+      return { files: files.rows.map(publicMediaItem), collections };
     },
   };
 }
