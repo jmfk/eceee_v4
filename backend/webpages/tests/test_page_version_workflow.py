@@ -1563,6 +1563,32 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(draft.page_data["page_attributes"]["title"], "Live title")
         self.assertEqual(self.page.current_published_version_id, live.id)
 
+    def test_restore_creates_working_copy_without_token_when_none_exists(self):
+        live = self.publish_initial()
+
+        response = self.client.post(
+            reverse("api:pageversion-restore", kwargs={"pk": live.pk}),
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotEqual(response.data["version"]["id"], live.id)
+        self.assertEqual(response.data["version"]["version_title"], f"Restored from version {live.version_number}")
+
+    def test_restore_without_token_still_conflicts_when_working_copy_exists(self):
+        live = self.publish_initial()
+        PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
+
+        response = self.client.post(
+            reverse("api:pageversion-restore", kwargs={"pk": live.pk}),
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["error"], "version_conflict")
+
     def test_restore_advances_the_working_revision_once(self):
         live = self.publish_initial()
         draft, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()

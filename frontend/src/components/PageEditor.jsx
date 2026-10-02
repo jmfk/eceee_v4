@@ -39,7 +39,6 @@ import {
     determineSaveStrategy,
     generateChangeSummary,
     processLoadedVersionData,
-    buildWorkingCopyPayload,
     buildVersionedPageData,
     canPublishWorkingCopy,
     mergeVersionedPageAttributes,
@@ -1438,7 +1437,7 @@ const PageEditor = () => {
                 updatedVersionData = {
                     ...updatedVersionData,
                     ...saveResult.versionResult,
-                    widgets: currentVersionDataForSave.widgets // Preserve collected widgets
+                    widgets: saveResult.versionResult.widgets ?? currentVersionDataForSave.widgets
                 };
 
                 // Update current version
@@ -1450,16 +1449,22 @@ const PageEditor = () => {
             setPageVersionData(updatedVersionData);
             setOriginalWebpageData(updatedWebpageData); // Update original for next comparison
             setOriginalPageVersionData(updatedVersionData); // Update original for next comparison
+            if (saveResult.versionResult) {
+                setLocalWidgets(updatedVersionData.widgets || {});
+                await publishUpdate(`page-editor-${pageId}-${saveResult.versionResult.id}`, OperationTypes.INIT_VERSION, {
+                    id: saveResult.versionResult.id,
+                    data: updatedVersionData,
+                });
+            }
             setIsDirty(false);
 
             // Clear To-Do items on success
             setErrorTodoItems([])
 
             // Show success notification with smart summary
-            const actionDescription = saveResult.strategy === 'page-only' ? 'Page updated' :
-                saveResult.strategy === 'version-only' ? 'Working version saved' :
-                    saveResult.strategy === 'both' ? 'Page and version updated' :
-                        'No changes';
+            const actionDescription = saveResult.versionResult
+                ? 'Working version saved'
+                : 'No changes';
 
             addNotification(
                 `${actionDescription}! ${saveResult.summary}${saveOptions.description ? ` - "${saveOptions.description}"` : ''}`,
@@ -1496,7 +1501,7 @@ const PageEditor = () => {
             }
             throw error;
         }
-    }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, pageId, queryClient, currentVersion, finalizePendingCutSources, refetchWorkflow, loadVersionsPreserveCurrent]);
+    }, [addNotification, showError, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, pageId, queryClient, currentVersion, finalizePendingCutSources, refetchWorkflow, loadVersionsPreserveCurrent, publishUpdate]);
 
 
     // Smart save - analyze changes first, then show modal only if needed
@@ -1577,21 +1582,21 @@ const PageEditor = () => {
             if (changes.hasPageChanges) {
                 await publishUpdate(componentId, OperationTypes.UPDATE_WEBPAGE_DATA, {
                     id: webpageData?.id,
-                    updates: changes.pageChanges
+                    updates: changes.pageFields
                 });
             }
 
             if (changes.hasVersionChanges) {
                 await publishUpdate(componentId, OperationTypes.UPDATE_PAGE_VERSION_DATA, {
                     id: pageVersionData?.id,
-                    updates: changes.versionChanges
+                    updates: changes.versionFields
                 });
             }
 
             // Decision logic: Show modal only if version changes detected
             if (strategy.strategy === 'page-only') {
                 // Only page changes - save directly without modal
-                await handleActualSave({ description: 'Page attributes updated' });
+                return await handleActualSave({ description: 'Page attributes updated' });
             } else if (strategy.strategy === 'none') {
                 // No changes - just show notification
                 addNotification(
@@ -1599,8 +1604,12 @@ const PageEditor = () => {
                     'info'
                 );
                 setIsDirty(false); // Reset dirty state since no changes
+                return {
+                    saved: true,
+                    saveResult: { versionResult: currentVersion || pageVersionData },
+                };
             } else {
-                await handleActualSave({ description: 'Version changes detected' });
+                return await handleActualSave({ description: 'Version changes detected' });
             }
 
         } catch (error) {
@@ -1609,64 +1618,21 @@ const PageEditor = () => {
                 `Save analysis failed: ${error.message}`,
                 'error'
             );
+            return { saved: false, error };
         }
-    }, [errorTodoItems, schemaValidationState, addNotification, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, contentEditorRef, settingsEditorRef, handleActualSave, publishUpdate, componentId, setIsDirty]);
+    }, [errorTodoItems, schemaValidationState, addNotification, webpageData, pageVersionData, originalWebpageData, originalPageVersionData, contentEditorRef, settingsEditorRef, handleActualSave, publishUpdate, componentId, setIsDirty, currentVersion]);
 
-    // Simple save handlers - no modal confirmation
+    // Keep one save path for status-bar and pre-publish saves.
     const handleSave = useCallback(async () => {
         setIsSaving(true);
         try {
-            const clientUpdatedAt = originalPageVersionData?.updatedAt || pageVersionData?.updatedAt;
-
-            const versionPayload = buildWorkingCopyPayload(
-                {
-                    ...pageVersionData,
-                    widgets: localWidgets || pageVersionData?.widgets || {},
-                },
-                webpageData || {},
-            );
-            const saved = await versionsApi.savePageWorkingCopy(
-                pageId,
-                pageVersionData.id,
-                versionPayload,
-                clientUpdatedAt,
-            );
-            const processed = processLoadedVersionData(saved);
-            setPageVersionData(processed);
-            setOriginalPageVersionData(processed);
-            setCurrentVersion(saved);
-            await publishUpdate(`page-editor-${pageId}-${saved.id}`, OperationTypes.INIT_VERSION, {
-                id: saved.id,
-                data: processed,
-            });
-
-            setOriginalWebpageData(webpageData);
-
-            await refreshAfterWorkingCopySave(
-                { versionResult: saved },
-                refetchWorkflow,
-                loadVersionsPreserveCurrent,
-            );
-            setIsDirty(false);
-            addNotification(
-                'Working version saved',
-                'success'
-            );
-            return saved;
-        } catch (error) {
-            console.error('Save failed:', error);
-            const isConflict = error?.originalError?.response?.status === 409;
-            addNotification(
-                isConflict
-                    ? 'Someone else changed this working version. Reload it before saving again.'
-                    : `Save failed: ${error?.message || 'Unknown error'}`,
-                'error'
-            );
-            throw error;
+            const result = await handleSaveFromStatusBar();
+            if (!result?.saved) return null;
+            return result.saveResult?.versionResult || currentVersion || pageVersionData;
         } finally {
             setIsSaving(false);
         }
-    }, [pageVersionData, originalPageVersionData, pageId, localWidgets, publishUpdate, webpageData, refetchWorkflow, loadVersionsPreserveCurrent, setIsDirty, addNotification]);
+    }, [handleSaveFromStatusBar, currentVersion, pageVersionData]);
 
     const handleVersionRestored = useCallback(async (restoredVersion) => {
         const processed = processLoadedVersionData(restoredVersion);

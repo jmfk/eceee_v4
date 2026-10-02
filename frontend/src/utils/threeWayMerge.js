@@ -33,6 +33,57 @@ function orderOf(array, allowed = null) {
     return array.map(item => String(identity(item))).filter(id => !allowed || allowed.has(id))
 }
 
+function changedOrderPairs(originalOrder, nextOrder) {
+    const nextPositions = new Map(nextOrder.map((id, index) => [id, index]))
+    const changed = new Map()
+    for (let leftIndex = 0; leftIndex < originalOrder.length; leftIndex += 1) {
+        for (let rightIndex = leftIndex + 1; rightIndex < originalOrder.length; rightIndex += 1) {
+            const left = originalOrder[leftIndex]
+            const right = originalOrder[rightIndex]
+            if (nextPositions.get(left) > nextPositions.get(right)) {
+                changed.set(JSON.stringify([left, right]), [right, left])
+            }
+        }
+    }
+    return changed
+}
+
+function mergeIndependentOrders(originalOrder, localOrder, serverOrder) {
+    const localChanges = changedOrderPairs(originalOrder, localOrder)
+    const serverChanges = changedOrderPairs(originalOrder, serverOrder)
+    const localAffected = new Set([...localChanges.values()].flat())
+    const serverAffected = new Set([...serverChanges.values()].flat())
+    if ([...localAffected].some(id => serverAffected.has(id))) return null
+
+    const edges = new Map(originalOrder.map(id => [id, new Set()]))
+    const indegree = new Map(originalOrder.map(id => [id, 0]))
+    for (let leftIndex = 0; leftIndex < originalOrder.length; leftIndex += 1) {
+        for (let rightIndex = leftIndex + 1; rightIndex < originalOrder.length; rightIndex += 1) {
+            const originalPair = [originalOrder[leftIndex], originalOrder[rightIndex]]
+            const key = JSON.stringify(originalPair)
+            const [before, after] = localChanges.get(key) || serverChanges.get(key) || originalPair
+            if (!edges.get(before).has(after)) {
+                edges.get(before).add(after)
+                indegree.set(after, indegree.get(after) + 1)
+            }
+        }
+    }
+
+    const originalPosition = new Map(originalOrder.map((id, index) => [id, index]))
+    const ready = originalOrder.filter(id => indegree.get(id) === 0)
+    const merged = []
+    while (ready.length > 0) {
+        ready.sort((left, right) => originalPosition.get(left) - originalPosition.get(right) || left.localeCompare(right))
+        const id = ready.shift()
+        merged.push(id)
+        for (const next of edges.get(id)) {
+            indegree.set(next, indegree.get(next) - 1)
+            if (indegree.get(next) === 0) ready.push(next)
+        }
+    }
+    return merged.length === originalOrder.length ? merged : null
+}
+
 function mergeAdditions(baseOrder, originalIds, localOrder, serverOrder, values) {
     const base = baseOrder.filter(id => values.has(id) && originalIds.has(id))
     const additions = [...values.keys()].filter(id => !originalIds.has(id))
@@ -84,8 +135,18 @@ function mergeKeyedArray(original, local, server, path) {
     const originalOrder = orderOf(original)
     const localReordered = !equal(localBaseOrder, originalOrder.filter(id => localMap.has(id)))
     const serverReordered = !equal(serverBaseOrder, originalOrder.filter(id => serverMap.has(id)))
+    let concurrentBaseOrder = null
     if (localReordered && serverReordered && !equal(localBaseOrder, serverBaseOrder)) {
-        return { value: clone(server), diffs: [diff(path, original, local, server, true)] }
+        const sharedIds = new Set(originalOrder.filter(id => localMap.has(id) && serverMap.has(id)))
+        const sharedOriginalOrder = originalOrder.filter(id => sharedIds.has(id))
+        concurrentBaseOrder = mergeIndependentOrders(
+            sharedOriginalOrder,
+            localBaseOrder.filter(id => sharedIds.has(id)),
+            serverBaseOrder.filter(id => sharedIds.has(id)),
+        )
+        if (!concurrentBaseOrder) {
+            return { value: clone(server), diffs: [diff(path, original, local, server, true)] }
+        }
     }
 
     const allIds = new Set([...localMap.keys(), ...serverMap.keys()])
@@ -97,7 +158,7 @@ function mergeKeyedArray(original, local, server, path) {
         if (result.value !== undefined) values.set(id, result.value)
     }
 
-    const baseOrder = localReordered ? localBaseOrder : serverReordered ? serverBaseOrder : originalOrder
+    const baseOrder = concurrentBaseOrder || (localReordered ? localBaseOrder : serverReordered ? serverBaseOrder : originalOrder)
     const mergedOrder = mergeAdditions(baseOrder, originalIds, orderOf(local), orderOf(server), values)
     return { value: mergedOrder.map(id => values.get(id)), diffs }
 }
