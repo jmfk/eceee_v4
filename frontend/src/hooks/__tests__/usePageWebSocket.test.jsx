@@ -49,6 +49,30 @@ describe('usePageWebSocket', () => {
         expect(onVersionUpdated.mock.calls[0][0].revision).toBe(6)
     })
 
+    it('accepts a lower revision after the working version changes', async () => {
+        const onVersionUpdated = vi.fn()
+        const { rerender } = renderHook(
+            ({ versionId, revision }) => usePageWebSocket(7, {
+                knownVersionId: versionId,
+                knownRevision: revision,
+                onVersionUpdated,
+            }),
+            { initialProps: { versionId: 9, revision: 8 } },
+        )
+        const socket = MockWebSocket.instances[0]
+
+        rerender({ versionId: 10, revision: 1 })
+        act(() => {
+            socket.message({ type: 'version_updated', page_id: 7, version_id: 10, revision: 2 })
+        })
+
+        await waitFor(() => expect(onVersionUpdated).toHaveBeenCalledTimes(1))
+        expect(onVersionUpdated.mock.calls[0][0]).toEqual(expect.objectContaining({
+            versionId: 10,
+            revision: 2,
+        }))
+    })
+
     it('keeps another tab present when one connection for the same user leaves', async () => {
         const { result } = renderHook(() => usePageWebSocket(7))
         const socket = MockWebSocket.instances[0]

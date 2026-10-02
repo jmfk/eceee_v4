@@ -14,6 +14,7 @@ export function usePageWebSocket(pageId, options = {}) {
         onVersionUpdated,
         activeSection = 'content',
         activeWidgetId = null,
+        knownVersionId = null,
         knownRevision = null,
         enabled = true,
         autoReconnect = true,
@@ -41,7 +42,9 @@ export function usePageWebSocket(pageId, options = {}) {
     const presenceRef = useRef(new Map());
     const activeSectionRef = useRef(activeSection);
     const activeWidgetIdRef = useRef(activeWidgetId);
+    const knownVersionIdRef = useRef(knownVersionId == null ? null : String(knownVersionId));
     const knownRevisionRef = useRef(knownRevision);
+    const latestAcceptedVersionIdRef = useRef(knownVersionId == null ? null : String(knownVersionId));
     const latestAcceptedRevisionRef = useRef(knownRevision || 0);
 
     const refreshPresence = useCallback(() => {
@@ -80,11 +83,16 @@ export function usePageWebSocket(pageId, options = {}) {
     }, [activeSection, activeWidgetId, sendPresence]);
 
     useEffect(() => {
+        const nextVersionId = knownVersionId == null ? null : String(knownVersionId);
+        knownVersionIdRef.current = nextVersionId;
         knownRevisionRef.current = knownRevision;
-        if (knownRevision && knownRevision > latestAcceptedRevisionRef.current) {
+        if (nextVersionId !== latestAcceptedVersionIdRef.current) {
+            latestAcceptedVersionIdRef.current = nextVersionId;
+            latestAcceptedRevisionRef.current = knownRevision || 0;
+        } else if (knownRevision && knownRevision > latestAcceptedRevisionRef.current) {
             latestAcceptedRevisionRef.current = knownRevision;
         }
-    }, [knownRevision]);
+    }, [knownVersionId, knownRevision]);
 
     const connect = useCallback(() => {
         // Don't connect if disabled, no pageId, or already connected to the same page
@@ -130,13 +138,19 @@ export function usePageWebSocket(pageId, options = {}) {
                         // Explicit auth failure from backend
                         authFailureDetectedRef.current = true;
                     } else if (data.type === 'version_updated') {
+                        const eventVersionId = data.version_id == null ? null : String(data.version_id);
                         const revision = Number(data.revision || 0);
+                        const sameAcceptedVersion = eventVersionId === latestAcceptedVersionIdRef.current;
+                        const sameKnownVersion = eventVersionId === knownVersionIdRef.current;
                         const known = Math.max(
-                            Number(knownRevisionRef.current || 0),
-                            Number(latestAcceptedRevisionRef.current || 0),
+                            sameKnownVersion ? Number(knownRevisionRef.current || 0) : 0,
+                            sameAcceptedVersion ? Number(latestAcceptedRevisionRef.current || 0) : 0,
                         );
                         if (revision && revision <= known) return;
-                        if (revision) latestAcceptedRevisionRef.current = revision;
+                        if (revision) {
+                            latestAcceptedVersionIdRef.current = eventVersionId;
+                            latestAcceptedRevisionRef.current = revision;
+                        }
                         const updateInfo = {
                             pageId: data.page_id,
                             versionId: data.version_id,

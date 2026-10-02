@@ -373,6 +373,15 @@ test.describe('page editor collaboration', () => {
       await expect(pageB.getByRole('heading', { name: 'Resolve Conflicts' })).toBeVisible()
       await expect(pageB.getByRole('button', { name: 'Keep All Local' })).toBeVisible()
       await expect(pageB.getByRole('button', { name: 'Accept All Server' })).toBeVisible()
+      const savesBeforeResolution = shared.savedVersions.length
+      await pageB.getByRole('button', { name: 'Keep All Local' }).click()
+      await pageB.getByRole('button', { name: 'Save with Resolutions' }).click()
+
+      await expect(pageB.getByRole('heading', { name: 'Resolve Conflicts' })).not.toBeVisible()
+      await expect.poll(() => shared.savedVersions.length).toBeGreaterThan(savesBeforeResolution)
+      await expect.poll(() => (
+        shared.version.widgets.main.find(widget => widget.id === 'content-intro').config.content
+      )).toBe('<p>Editor B wins?</p>')
     } finally {
       await contextA.close()
       await contextB.close()

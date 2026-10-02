@@ -45,6 +45,19 @@ describe('threeWayMerge', () => {
         expect(result.diffs.some(diff => diff.hasConflict)).toBe(false)
     })
 
+    it('preserves each editor relative order for multiple simultaneous additions', () => {
+        const original = [widget('anchor')]
+        const local = [widget('anchor'), widget('z-local'), widget('a-local')]
+        const server = [widget('anchor'), widget('m-server'), widget('b-server')]
+
+        const result = mergeValue(original, local, server, ['widgets'])
+        const order = result.value.map(item => item.id)
+
+        expect(order.indexOf('z-local')).toBeLessThan(order.indexOf('a-local'))
+        expect(order.indexOf('m-server')).toBeLessThan(order.indexOf('b-server'))
+        expect(result.diffs.some(diff => diff.hasConflict)).toBe(false)
+    })
+
     it('flags incompatible concurrent moves', () => {
         const original = [widget('a'), widget('b'), widget('c')]
         const local = [widget('b'), widget('a'), widget('c')]
