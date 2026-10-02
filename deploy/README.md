@@ -250,17 +250,20 @@ This stops backend/celery, drops and recreates the DB, restores from the dump, t
 
 ### PROD_HOST
 
-Set `PROD_HOST` in your local shell so you don't have to type it every time:
+Production commands default to the production VPS's public SSH endpoint
+`root@139.162.154.219`, so no local shell setup is normally required. The
+address is cross-checked through the production DNS records before an agent
+requests a production gate. Override `PROD_HOST` only when the production
+endpoint intentionally changes:
 
 ```bash
-# ~/.zshrc or ~/.bashrc
-export PROD_HOST=root@YOUR_VPS_IP
+export PROD_HOST=root@NEW_PRODUCTION_HOST
 ```
 
-Or pass it inline:
+The same override can be passed inline:
 
 ```bash
-make prod-deploy PROD_HOST=root@1.2.3.4
+make prod-deploy PROD_HOST=root@NEW_PRODUCTION_HOST
 ```
 
 ### Changing domains

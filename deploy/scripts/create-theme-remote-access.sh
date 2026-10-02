@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-PROD_HOST="${1:-root@eceee-vps}"
+PROD_HOST="${1:-root@139.162.154.219}"
 PROD_DIR="${2:-/srv/eceee_v4}"
 THEME_WORKSPACE="${THEME_WORKSPACE:-}"
 THEME_ADMIN="${THEME_ADMIN:-}"

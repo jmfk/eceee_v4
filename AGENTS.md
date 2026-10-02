@@ -55,6 +55,21 @@ The system centers on page management, publishing workflows, code-based layouts/
 
 ## Production Rules
 
+- `eceee-vps` is the production VPS's Linode-internal name. It is neither a
+  locally resolvable DNS/SSH name nor necessarily the Linode API instance
+  label. Do not run `ssh root@eceee-vps`, ask the owner to translate it into
+  `PROD_HOST`, or query the Linode API with an exact-label assumption. From a
+  local machine, resolve the public production host through the established
+  ECEEE production DNS records (`app.eceee.org`, `admin.eceee.org`, and
+  `imgproxy.eceee.org`) and require them to agree on one public IPv4 address
+  before requesting the production gate. The default local `linode-cli` profile
+  may belong to another Linode account and must not be treated as authoritative
+  for ECEEE production unless its account ownership has been independently
+  established. Report the resolved SSH host and exact command scope in the
+  gate, then use that address as the SSH target. If the DNS records disagree or
+  the production mapping is otherwise ambiguous, stop and report that specific
+  discrepancy. Never display Linode API tokens or configuration contents; apply
+  `inspect-secrets-safely`.
 - Codex may use SSH and run commands in production only after a fresh, explicit owner gate for the exact operation. Immediately before requesting that gate, report the production environment and host, the exact commands or tightly bounded command class, whether the work is read-only or mutating, the expected service and data impact, the evidence motivating it, and the rollback or recovery plan when applicable. The owner must authorize that reported operation in a new message; a general request to continue, prior approval, or an ambiguous keypad signal is not authorization.
 - Production authorization is limited to the reported environment, host, scope, commands, and time-bounded task. A materially different command, target, service, data set, risk, or recovery path requires a new report and explicit owner authorization. Stop if a command would expand beyond the approved scope, expose secrets, or require an unreviewed destructive action.
 - Prefer reviewed repository targets and scripts over ad hoc server commands. Durable production changes should normally go through local code/config changes, commit/push, and `deploy/scripts/`. A directly authorized emergency or diagnostic server change must be minimal, recorded in the handoff, verified after execution, and reconciled back into the repository when it represents persistent configuration or behavior.

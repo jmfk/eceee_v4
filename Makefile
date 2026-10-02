@@ -1141,9 +1141,9 @@ tailwind-watch: ## Watch and rebuild Tailwind CSS on changes
 
 # ============================================================
 # Production Deployment (runs on remote VPS via SSH)
-# Set PROD_HOST in your shell: export PROD_HOST=root@YOUR_VPS_IP
+# Override PROD_HOST only when the canonical production SSH endpoint changes.
 # ============================================================
-PROD_HOST ?= root@eceee-vps
+PROD_HOST ?= root@139.162.154.219
 PROD_DIR  ?= /srv/eceee_v4
 TAG       ?=
 RUN_ID    ?= typed-tags-v1

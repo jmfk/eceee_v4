@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # setup-env.sh - Securely install deploy/.env with an optional locked operation.
 # Usage: bash deploy/scripts/setup-env.sh [PROD_HOST] [PROD_DIR] [--deploy REF|--restart]
-#   PROD_HOST: SSH target (default: root@eceee-vps)
+#   PROD_HOST: SSH target (default: root@139.162.154.219)
 #   PROD_DIR:  Remote path (default: /srv/eceee_v4)
 
 set -euo pipefail
 
 LOCAL_ENV="deploy/.env"
-PROD_HOST="${1:-root@eceee-vps}"
+PROD_HOST="${1:-root@139.162.154.219}"
 PROD_DIR="${2:-/srv/eceee_v4}"
 MODE="${3:-install}"
 REF="${4:-}"
