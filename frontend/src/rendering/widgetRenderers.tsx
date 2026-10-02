@@ -599,20 +599,30 @@ const configEnabled = (config: Record<string, any>, defaultValue: boolean, ...na
     return configured === undefined ? defaultValue : configured !== false
 }
 
+const truncateExcerpt = (source: unknown, configuredLength: unknown, stripHtml = false) => {
+    if (source === undefined || source === null) return ''
+    const text = stripHtml ? String(source).replace(/<[^>]+>/g, '') : String(source)
+    const requestedLength = Number(configuredLength)
+    const length = Number.isInteger(requestedLength) && requestedLength > 0 ? requestedLength : 150
+    if (text.length <= length) return text
+    const shortened = text.slice(0, length)
+    const lastSpace = shortened.lastIndexOf(' ')
+    return `${lastSpace > 0 ? shortened.slice(0, lastSpace) : shortened}...`
+}
+
 const objectListExcerpt = (item: any, config: Record<string, any>) => {
     const data = item.data || {}
     const configuredField = value(config, 'excerptField', 'excerpt_field')
     const source = configuredField && Object.prototype.hasOwnProperty.call(data, configuredField)
         ? data[configuredField]
         : ['content', 'description', 'summary', 'text', 'body'].map((field) => data[field]).find(Boolean)
-    if (source === undefined) return ''
-    const text = String(source)
-    const configuredLength = Number(value(config, 'excerptLength', 'excerpt_length'))
-    const length = Number.isInteger(configuredLength) && configuredLength > 0 ? configuredLength : 150
-    if (text.length <= length) return text
-    const shortened = text.slice(0, length)
-    const lastSpace = shortened.lastIndexOf(' ')
-    return `${lastSpace > 0 ? shortened.slice(0, lastSpace) : shortened}...`
+    return truncateExcerpt(source, value(config, 'excerptLength', 'excerpt_length'))
+}
+
+const newsListExcerpt = (item: any, config: Record<string, any>) => {
+    const data = item.data || {}
+    const source = data.summary || data.excerpt || data.description || data.content || newsFields(item).excerpt
+    return truncateExcerpt(source, value(config, 'excerptLength', 'excerpt_length'), true)
 }
 
 const NewsListRender: WidgetRenderComponent = ({ widget, context }) => {
@@ -624,11 +634,12 @@ const NewsListRender: WidgetRenderComponent = ({ widget, context }) => {
     const showDate = configEnabled(widget.config, true, 'showPublishDate', 'show_publish_date')
     return <section className="news-list-widget" data-widget-type="news-list"><div className="news-items-container">{state.map((item, index) => {
         const fields = newsFields(item)
+        const excerpt = newsListExcerpt(item, widget.config)
         return <article className={`news-item${fields.pinned ? ' pinned' : ''}`} data-object-id={item.id} key={item.id || index}>
             {showImage && <div className="news-featured-image"><ImageView source={fields.image} alt={item.title || ''} /></div>}
             <div className="news-content"><div className="news-meta"><span className="news-type">{fields.objectType.label || fields.objectType.name}</span>{fields.pinned && <span className="pinned-badge">Pinned</span>}{showDate && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{formatDisplayDate(fields.publishDate)}</time>}</div>
                 <h3 className="news-title"><PreviewLink href={fields.path}>{item.title || `Article ${index + 1}`}</PreviewLink></h3>
-                {showExcerpt && fields.excerpt && <div className="news-excerpt">{fields.excerpt}</div>}
+                {showExcerpt && excerpt && <div className="news-excerpt">{excerpt}</div>}
                 <div className="news-footer"><PreviewLink className="read-more" href={fields.path}>Read more →</PreviewLink></div>
             </div>
         </article>
@@ -685,11 +696,20 @@ const ObjectDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) =>
     const showWidgets = configEnabled(widget.config, true, 'showWidgets', 'show_widgets')
     const hasWidgets = Object.values(slots).some((widgets) => asArray<any>(widgets).length > 0)
     const dataEntries = Object.entries(item.data || {}).filter(([, fieldValue]) => Boolean(fieldValue))
+    const showHierarchy = configEnabled(widget.config, true, 'showHierarchy', 'show_hierarchy')
+    const ancestors = asArray<any>(item.ancestors)
+    const children = asArray<any>(item.children)
     return <article className={`object-detail-widget template-${value(widget.config, 'displayTemplate', 'display_template') || 'full'}`} data-widget-type="object-detail" data-object-id={item.id}>
-        <header className="object-header"><h1 className="object-title">{item.title}</h1><div className="object-meta"><span className="object-type">{fields.objectType.label || fields.objectType.name}</span>{fields.publishDate && <time className="object-date" dateTime={fields.publishDate}> • Published {formatDisplayDate(fields.publishDate)}</time>}</div></header>
+        <header className="object-header"><h1 className="object-title">{item.title}</h1><div className="object-meta"><span className="object-type">{fields.objectType.label || fields.objectType.name}</span>{fields.publishDate && <time className="object-date" dateTime={fields.publishDate}> • Published {formatDisplayDate(fields.publishDate)}</time>}</div>
+            {showHierarchy && ancestors.length > 0 && <div className="object-hierarchy"><h4>Location in hierarchy:</h4><div className="breadcrumb">{ancestors.map((ancestor, index) => <React.Fragment key={ancestor.id || index}><PreviewLink href={ancestor.path}>{ancestor.title}</PreviewLink><span>→</span></React.Fragment>)}<span>{item.title}</span></div></div>}
+        </header>
         <div className="object-content">{showWidgets && hasWidgets
             ? Object.entries(slots).map(([slotName, widgets]) => <div className="widget-slot" data-slot={slotName} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)
             : dataEntries.map(([fieldName, fieldValue]) => <div className="object-field" key={fieldName}><h4 className="field-label">{fieldName.replaceAll('_', ' ')}</h4><div className="field-value">{typeof fieldValue === 'object' ? JSON.stringify(fieldValue) : String(fieldValue)}</div></div>)}</div>
+        {showHierarchy && children.length > 0 && <section className="object-children"><h3>Related Content</h3><div className="children-grid">{children.map((child, index) => {
+            const childFields = newsFields(child)
+            return <div className="child-item" key={child.id || index}><h4 className="child-title"><PreviewLink href={child.path}>{child.title}</PreviewLink></h4><p className="child-meta">{childFields.objectType.label || childFields.objectType.name}{childFields.publishDate && <> • {formatDisplayDate(childFields.publishDate, 'short')}</>}</p></div>
+        })}</div></section>}
     </article>
 }
 const TopNewsPlugRender: WidgetRenderComponent = ({ widget }) => {

@@ -344,6 +344,47 @@ describe('PageRenderer', () => {
         expect(container.querySelector('.object-excerpt')).not.toHaveTextContent('Wrong summary')
     })
 
+    it('uses the configured NewsList excerpt length and strips source HTML', () => {
+        const model = createPageRenderModel({ widgets: { main: [{
+            id: 'news',
+            type: 'easy_widgets.NewsListWidget',
+            config: { show_excerpts: true, excerpt_length: 12 },
+            data: { status: 'ready', items: [{
+                id: 'news-1', title: 'Published news', slug: 'published-news',
+                objectType: { name: 'news', label: 'News' },
+                data: { summary: '<p>Alpha beta gamma delta</p>' },
+            }] },
+        }] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(container.querySelector('.news-excerpt')).toHaveTextContent('Alpha beta...')
+        expect(container.querySelector('.news-excerpt')).not.toHaveTextContent('<p>')
+    })
+
+    it('renders ObjectDetail ancestors and published children unless hierarchy is disabled', () => {
+        const item = {
+            id: 'object-1', title: 'Current object', slug: 'current-object', level: 1,
+            objectType: { name: 'article', label: 'Article' }, data: {}, widgets: {},
+            ancestors: [{ id: 'parent', title: 'Parent object', path: '/objects/parent-object/', objectType: { name: 'article', label: 'Article' } }],
+            children: [{ id: 'child', title: 'Child object', path: '/objects/child-object/', publishDate: '2026-09-30', objectType: { name: 'article', label: 'Article' } }],
+        }
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'shown', type: 'object_storage.ObjectDetailWidget', config: {}, data: { status: 'ready', item } },
+            { id: 'hidden', type: 'object_storage.ObjectDetailWidget', config: { show_hierarchy: false }, data: { status: 'ready', item: { ...item, id: 'object-2' } } },
+        ] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+        const details = container.querySelectorAll('[data-widget-type="object-detail"]')
+
+        expect(details[0]).toHaveTextContent('Location in hierarchy:')
+        expect(details[0].querySelector('.breadcrumb a')).toHaveAttribute('href', '/objects/parent-object/')
+        expect(details[0]).toHaveTextContent('Related Content')
+        expect(details[0].querySelector('.child-title a')).toHaveAttribute('href', '/objects/child-object/')
+        expect(details[1].querySelector('.object-hierarchy')).toBeNull()
+        expect(details[1].querySelector('.object-children')).toBeNull()
+    })
+
     it('falls back to published object data when structured widgets are disabled or absent', () => {
         const item = {
             id: 'object-1',

@@ -177,7 +177,47 @@ function reader(client: PoolClient): PageReader {
         SELECT object.id::text, object.title, object.slug,
           jsonb_build_object('id', type.id::text, 'name', type.name, 'label', type.label, 'pluralLabel', type.plural_label) AS "objectType",
           published.data, published.widgets, object.metadata,
-          published.effective_date::text AS "publishDate", published.is_featured AS "isFeatured"
+          published.effective_date::text AS "publishDate", published.is_featured AS "isFeatured", object.level,
+          CASE WHEN $8::boolean THEN COALESCE((
+            SELECT jsonb_agg(jsonb_build_object(
+              'id', ancestor.id::text, 'title', ancestor.title, 'slug', ancestor.slug,
+              'objectType', jsonb_build_object('id', ancestor_type.id::text, 'name', ancestor_type.name,
+                'label', ancestor_type.label, 'pluralLabel', ancestor_type.plural_label)
+            ) ORDER BY ancestor.lft)
+            FROM object_storage_objectinstance AS ancestor
+            JOIN object_storage_objecttypedefinition AS ancestor_type ON ancestor_type.id = ancestor.object_type_id
+            JOIN LATERAL (
+              SELECT 1
+              FROM object_storage_objectversion AS ancestor_version
+              WHERE ancestor_version.object_instance_id = ancestor.id
+                AND ancestor_version.effective_date <= $4
+                AND (ancestor_version.expiry_date IS NULL OR ancestor_version.expiry_date > $4)
+              ORDER BY ancestor_version.version_number DESC
+              LIMIT 1
+            ) AS ancestor_published ON true
+            WHERE ancestor.tenant_id = $1 AND ancestor.tree_id = object.tree_id
+              AND ancestor.lft < object.lft AND ancestor.rght > object.rght
+          ), '[]'::jsonb) ELSE '[]'::jsonb END AS ancestors,
+          CASE WHEN $8::boolean THEN COALESCE((
+            SELECT jsonb_agg(jsonb_build_object(
+              'id', child.id::text, 'title', child.title, 'slug', child.slug,
+              'objectType', jsonb_build_object('id', child_type.id::text, 'name', child_type.name,
+                'label', child_type.label, 'pluralLabel', child_type.plural_label),
+              'publishDate', child_published.effective_date::text
+            ) ORDER BY child.tree_id, child.lft)
+            FROM object_storage_objectinstance AS child
+            JOIN object_storage_objecttypedefinition AS child_type ON child_type.id = child.object_type_id
+            JOIN LATERAL (
+              SELECT child_version.effective_date
+              FROM object_storage_objectversion AS child_version
+              WHERE child_version.object_instance_id = child.id
+                AND child_version.effective_date <= $4
+                AND (child_version.expiry_date IS NULL OR child_version.expiry_date > $4)
+              ORDER BY child_version.version_number DESC
+              LIMIT 1
+            ) AS child_published ON true
+            WHERE child.tenant_id = $1 AND child.parent_id = object.id
+          ), '[]'::jsonb) ELSE '[]'::jsonb END AS children
         FROM object_storage_objectinstance AS object
         JOIN object_storage_objecttypedefinition AS type ON type.id = object.object_type_id
         JOIN LATERAL (
@@ -195,7 +235,7 @@ function reader(client: PoolClient): PageReader {
             OR $3::text[] <> '{}'::text[] AND type.name = ANY($3::text[]))
           AND ($5::text IS NULL OR object.slug = $5)
         ORDER BY ${featured}${order}
-        LIMIT $6`, [tenantId, typeIds, typeNames, at, query.slug ?? null, Math.min(Math.max(query.limit, 1), 50), objectIds]);
+        LIMIT $6`, [tenantId, typeIds, typeNames, at, query.slug ?? null, Math.min(Math.max(query.limit, 1), 50), objectIds, Boolean(query.includeHierarchy)]);
       return result.rows;
     },
   };

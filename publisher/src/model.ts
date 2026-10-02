@@ -72,6 +72,18 @@ export interface PublishedObject {
   metadata: Record<string, unknown>;
   publishDate: string;
   isFeatured: boolean;
+  level?: number;
+  ancestors?: PublishedObjectLink[];
+  children?: PublishedObjectLink[];
+}
+
+export interface PublishedObjectLink {
+  id: DbId;
+  title: string;
+  slug: string;
+  objectType: { id: DbId; name: string; label: string; pluralLabel: string };
+  publishDate?: string;
+  path?: string;
 }
 
 export interface PublishedObjectQuery {
@@ -82,6 +94,7 @@ export interface PublishedObjectQuery {
   limit: number;
   sortOrder: string;
   featuredFirst?: boolean;
+  includeHierarchy?: boolean;
 }
 
 export interface PublicMediaItem {
@@ -636,6 +649,7 @@ async function resolvePublishedData(
           objectIds: [objectId],
           limit: 1,
           sortOrder: '-publish_date',
+          includeHierarchy: true,
         }, tenantId, at);
       } else if (objectType && slug) {
         [item] = await reader.publishedObjects({
@@ -643,6 +657,7 @@ async function resolvePublishedData(
           slug,
           limit: 1,
           sortOrder: '-publish_date',
+          includeHierarchy: true,
         }, tenantId, at);
       }
     }
@@ -651,7 +666,13 @@ async function resolvePublishedData(
     }
     if (widget.type === 'easy_widgets.NewsDetailWidget' || widget.type === 'object_storage.ObjectDetailWidget') {
       if (item) {
-        item = { ...item, widgets: await resolveNested(item.widgets) as Record<string, unknown> };
+        const withPath = (related: PublishedObjectLink) => ({ ...related, path: objectPath(pagePath, related.slug) });
+        item = {
+          ...item,
+          widgets: await resolveNested(item.widgets) as Record<string, unknown>,
+          ancestors: item.ancestors?.map(withPath),
+          children: item.children?.map(withPath),
+        };
       }
       return { ...prepared, data: item
         ? { status: 'ready', item: { ...item, path: objectPath(pagePath, item.slug) } }

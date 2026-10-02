@@ -407,6 +407,16 @@ describe('public resolution', () => {
       ] },
       metadata: {},
       publishDate: '2026-05-01T00:00:00Z', isFeatured: false,
+      level: 1,
+      ancestors: [{
+        id: '40', title: 'Parent object', slug: 'parent-object',
+        objectType: { id: '5', name: 'article', label: 'Article', pluralLabel: 'Articles' },
+      }],
+      children: [{
+        id: '42', title: 'Child object', slug: 'child-object',
+        objectType: { id: '5', name: 'article', label: 'Article', pluralLabel: 'Articles' },
+        publishDate: '2026-05-02T00:00:00Z',
+      }],
     };
     const publishedObjects = vi.fn(async () => [publishedObject]);
     const nestedReader: PageReader = {
@@ -434,10 +444,12 @@ describe('public resolution', () => {
     expect(nested.data?.items).toEqual([expect.objectContaining({ id: '41', path: '/news/selected-object/' })]);
     expect(model?.slots.main[1].data?.item).toEqual(expect.objectContaining({ id: '41' }));
     const resolvedObject = model?.slots.main[1].data?.item as PublishedObject;
+    expect(resolvedObject.ancestors).toEqual([expect.objectContaining({ path: '/news/parent-object/' })]);
+    expect(resolvedObject.children).toEqual([expect.objectContaining({ path: '/news/child-object/' })]);
     const objectWidgets = resolvedObject.widgets as Record<string, Widget[]>;
     expect(objectWidgets.body[0].data?.items).toEqual([expect.objectContaining({ id: '41' })]);
     expect(publishedObjects).toHaveBeenCalledWith(
-      expect.objectContaining({ objectIds: ['41'], limit: 1 }),
+      expect.objectContaining({ objectIds: ['41'], limit: 1, includeHierarchy: true }),
       root.tenant_id,
       expect.any(Date),
     );

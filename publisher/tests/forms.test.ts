@@ -191,6 +191,18 @@ describe('public form submissions', () => {
 
     await expect(submitPublishedForm(validInput())).resolves.toEqual({ status: 'rate_limited', redirectPath: '/' });
   });
+
+  it('redirects dynamic form submissions back to the full requested path', async () => {
+    const dynamicReadDb: ReadDb = {
+      withSnapshot: async read => read({ ...reader, root: async () => ({ ...root, path_pattern: 'news_slug' }) }),
+    };
+
+    await expect(submitPublishedForm({
+      ...validInput(),
+      readDb: dynamicReadDb,
+      pagePath: '/dynamic-story/',
+    })).resolves.toEqual({ status: 'success', redirectPath: '/dynamic-story/' });
+  });
 });
 
 describe('form lookup', () => {
