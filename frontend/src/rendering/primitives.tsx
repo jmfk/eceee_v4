@@ -42,8 +42,9 @@ export const normalizeContentMediaHtml = (html?: string): string => {
     const template = document.createElement('template')
     template.innerHTML = sanitized
     template.content.querySelectorAll<HTMLElement>('div[data-media-insert="true"]').forEach((insert) => {
-        const image = insert.querySelector('img')
-        if (!image) return
+        const image = insert.firstElementChild
+        if ((insert.dataset.mediaType && insert.dataset.mediaType !== 'image')
+            || insert.children.length !== 1 || image?.tagName !== 'IMG') return
         const width = normalizeCssName(insert.dataset.width || 'full')
         const align = normalizeCssName(insert.dataset.align || 'center')
         const figure = document.createElement('figure')
