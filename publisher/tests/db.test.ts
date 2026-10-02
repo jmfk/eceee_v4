@@ -85,6 +85,8 @@ describe('database snapshot', () => {
     expect(navigationSql).toContain('page.parent_id = ANY($1::bigint[])');
     expect(navigationSql).toContain('page.tenant_id = $2');
     expect(navigationSql).toContain('page.cached_root_id = $3');
+    expect(navigationSql).toContain("published.page_data->'shortTitle'");
+    expect(navigationSql).toContain("published.page_data->'short_title'");
     expect(fileSql).toContain("media.access_level = 'public'");
     expect(fileSql).toContain('media.tenant_id = $2');
     expect(collectionSql).toContain("collection.access_level = 'public'");

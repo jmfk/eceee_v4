@@ -79,13 +79,20 @@ function reader(client: PoolClient): PageReader {
     async publishedNavigationPages(parentIds, tenantId, rootId, at) {
       if (!parentIds.length) return [];
       const result = await client.query<{
-        id: string; parent_id: string; title: string; slug: string; cached_path: string; sort_order: number;
+        id: string; parent_id: string; title: string; label: string; slug: string; cached_path: string; sort_order: number;
       }>(`
         SELECT page.id::text, page.parent_id::text, page.title, page.slug,
-          page.cached_path, page.sort_order
+          page.cached_path, page.sort_order,
+          COALESCE(
+            NULLIF(CASE
+              WHEN jsonb_typeof(published.page_data->'shortTitle') = 'string' THEN published.page_data->>'shortTitle'
+              WHEN jsonb_typeof(published.page_data->'short_title') = 'string' THEN published.page_data->>'short_title'
+            END, ''),
+            page.title
+          ) AS label
         FROM webpages_webpage AS page
         JOIN LATERAL (
-          SELECT 1
+          SELECT version.page_data
           FROM webpages_pageversion AS version
           WHERE version.page_id = page.id
             AND version.effective_date <= $4
