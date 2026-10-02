@@ -216,11 +216,15 @@ const tableCellClassName = (cell: Record<string, any>) => [
 ].filter(Boolean).join(' ')
 
 const tableCellStyle = (cell: Record<string, any>, showBorders: boolean): React.CSSProperties => {
+    const configuredVerticalAlignment = value(cell, 'verticalAlignment', 'vertical_alignment')
+    const verticalAlignment = configuredVerticalAlignment === 'middle' || configuredVerticalAlignment === 'bottom'
+        ? configuredVerticalAlignment
+        : 'top'
     const style: React.CSSProperties = {
         backgroundColor: value(cell, 'backgroundColor', 'background_color') || undefined,
         color: value(cell, 'textColor', 'text_color') || undefined,
         padding: '0.75rem',
-        verticalAlign: 'top',
+        verticalAlign: verticalAlignment,
         border: showBorders ? '1px solid #d1d5db' : undefined,
     }
     const borders = value(cell, 'borders') || {}

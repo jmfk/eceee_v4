@@ -47,7 +47,7 @@ class CellImageData(BaseModel):
         populate_by_name=True,
     )
 
-    media_id: int = Field(..., description="Media library item ID")
+    media_id: Optional[int] = Field(None, description="Media library item ID")
     url: str = Field(..., description="Image URL")
     alt: Optional[str] = Field(None, description="Alt text for accessibility")
 
@@ -67,6 +67,7 @@ class TableCell(BaseModel):
     rowspan: int = Field(1, ge=1, description="Number of rows to span")
     font_style: Literal["normal", "quote", "caption"] = Field("normal", description="Font style preset")
     alignment: Literal["left", "center", "right"] = Field("left", description="Text alignment")
+    vertical_alignment: Literal["top", "middle", "bottom"] = Field("top", description="Vertical alignment")
     borders: Optional[BorderConfig] = Field(None, description="Per-side border configuration")
     background_color: Optional[str] = Field(None, description="Background color (hex or CSS color)")
     text_color: Optional[str] = Field(None, description="Text color (hex or CSS color)")

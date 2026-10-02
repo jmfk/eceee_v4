@@ -38,8 +38,11 @@ class NewsDetailWidgetRenderTests(SimpleTestCase):
                 "_render_object_widgets_from_version",
                 return_value={
                     "main": [
-                        '<table class="w-full border"><colgroup><col style="width: 50%"></colgroup>'
-                        "<tbody><tr><td><strong>Canonical widget body</strong></td></tr></tbody></table>"
+                        '<table class="w-full border" style="border-collapse: collapse"><colgroup>'
+                        '<col style="width: 50%"></colgroup><tbody><tr><td '
+                        'style="vertical-align: middle; border-top: 1px solid #123456" '
+                        'onmouseover="window.__xss = true"><strong>Canonical widget body</strong>'
+                        "<script>window.__xss = true</script></td></tr></tbody></table>"
                     ]
                 },
             ),
@@ -62,6 +65,10 @@ class NewsDetailWidgetRenderTests(SimpleTestCase):
         self.assertNotIn("Duplicate legacy scalar body", html)
         self.assertIn('class="w-full border"', html)
         self.assertIn("<colgroup>", html)
+        self.assertIn("vertical-align: middle", html)
+        self.assertIn("border-top: 1px solid #123456", html)
+        self.assertNotIn("<script", html)
+        self.assertNotIn("onmouseover", html)
         self.assertIn("September 29, 2026", html)
 
     def test_scalar_body_remains_a_backward_compatible_fallback(self):
