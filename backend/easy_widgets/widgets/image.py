@@ -572,7 +572,19 @@ class ImageWidget(BaseWidget):
                         snake_case_items.append(item)
                 template_config["media_items"] = snake_case_items
             else:
-                template_config["media_items"] = []
+                legacy_url = config.get("imageUrl") or config.get("image_url")
+                template_config["media_items"] = (
+                    [
+                        {
+                            "url": legacy_url,
+                            "type": "image",
+                            "alt_text": config.get("altText") or config.get("alt_text", ""),
+                            "caption": config.get("caption", ""),
+                        }
+                    ]
+                    if legacy_url
+                    else []
+                )
 
         # Convert other camelCase config fields to snake_case for template
         template_config["display_type"] = template_config.get(
@@ -648,8 +660,8 @@ class ImageWidget(BaseWidget):
                 len(template_config["media_items"]),
             )
 
-        # Keep the original URL for lightbox/full-size use, while rendering the
-        # inline image from explicit 1x/2x imgproxy sources.
+        # Keep the source URL only for signing. Public rendering uses processed
+        # imgproxy URLs for both the inline image and lightbox.
         from file_manager.imgproxy import imgproxy_service
 
         imgproxy_config = {
@@ -670,6 +682,7 @@ class ImageWidget(BaseWidget):
         for item in template_config.get("media_items", []):
             if not isinstance(item, dict) or item.get("type", "image") != "image" or not item.get("url"):
                 continue
+            responsive = {}
             try:
                 responsive = imgproxy_service.generate_responsive_urls(
                     source_url=item["url"],
@@ -684,14 +697,29 @@ class ImageWidget(BaseWidget):
                 )
             except Exception as exc:
                 logger.warning("Failed to generate responsive ImageWidget URLs: %s", exc)
-                continue
 
             one_x = responsive.get("1x", {})
-            if one_x.get("url"):
-                item["src_url"] = one_x["url"]
-                item["srcset"] = responsive.get("srcset", "")
-                item["display_width"] = one_x.get("width")
-                item["display_height"] = one_x.get("height")
+            processed_url = one_x.get("url")
+            if not processed_url:
+                try:
+                    processed_url = imgproxy_service.generate_url(
+                        source_url=item["url"],
+                        width=max_width,
+                        height=max_height,
+                        resize_type=imgproxy_config.get("resize_type", "fit"),
+                        gravity=imgproxy_config.get("gravity", "sm"),
+                        quality=imgproxy_config.get("quality"),
+                        format=imgproxy_config.get("format"),
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to generate ImageWidget URL: %s", exc)
+                    continue
+
+            item["src_url"] = processed_url
+            item["lightbox_url"] = processed_url
+            item["srcset"] = responsive.get("srcset", "")
+            item["display_width"] = one_x.get("width")
+            item["display_height"] = one_x.get("height")
 
         return template_config
 

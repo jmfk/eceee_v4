@@ -14,6 +14,7 @@ const dataDrivenNewsTypes = new Set([
 ])
 
 const linkTypes = new Set(['internal', 'external', 'email', 'phone', 'anchor', 'media'])
+const imgproxyBatchSize = 50
 
 const collectionFileToMediaItem = (file: any) => {
     const url = file.imgproxyBaseUrl || file.imgproxy_base_url || file.fileUrl || file.file_url || file.url || ''
@@ -237,8 +238,10 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
     })
 
     if (imageRequests.length) {
-        const urls = await getBatchImgproxyUrls(imageRequests)
-        urls.forEach((url, index) => imageAssignments[index]?.(url))
+        for (let start = 0; start < imageRequests.length; start += imgproxyBatchSize) {
+            const urls = await getBatchImgproxyUrls(imageRequests.slice(start, start + imgproxyBatchSize))
+            urls.forEach((url, index) => imageAssignments[start + index]?.(url))
+        }
     }
     return next
 }
