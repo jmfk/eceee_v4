@@ -403,17 +403,27 @@ function replaceHtmlMedia(html: string, media: Map<DbId, PublicMediaItem>): stri
     const item = media.get(id);
     if (item && item.type !== 'image') return '';
     const savedImage = /<img\b([^>]*)>/i.exec(inner)?.[1] ?? '';
-    const source = item?.url || htmlAttribute(savedImage, 'src');
-    if (!source) return tag;
     const width = htmlAttribute(attributes, 'data-width') || 'full';
+    const targetWidth = { full: 896, half: 448, third: 295 }[width] ?? 896;
+    const responsive = item?.url ? responsiveImageSources(item, item.url, {
+      maxWidth: targetWidth,
+      resizeType: 'fit',
+      quality: 85,
+      format: 'webp',
+    }) : null;
+    const source = responsive?.src || item?.url || htmlAttribute(savedImage, 'src');
+    if (!source) return tag;
     const align = htmlAttribute(attributes, 'data-align') || 'left';
     const title = htmlAttribute(attributes, 'data-title') || item?.altText || item?.title || htmlAttribute(savedImage, 'alt');
     const captionText = item?.caption || htmlAttribute(attributes, 'data-caption');
     const caption = captionText ? `<figcaption>${escapeHtmlAttribute(captionText)}</figcaption>` : '';
-    const dimensions = item?.width && item?.height
-      ? ` width="${escapeHtmlAttribute(item.width)}" height="${escapeHtmlAttribute(item.height)}"`
+    const srcSet = responsive?.srcSet ? ` srcset="${escapeHtmlAttribute(responsive.srcSet)}"` : '';
+    const displayWidth = responsive?.displayWidth ?? item?.width;
+    const displayHeight = responsive?.displayHeight ?? item?.height;
+    const dimensions = displayWidth && displayHeight
+      ? ` width="${escapeHtmlAttribute(displayWidth)}" height="${escapeHtmlAttribute(displayHeight)}"`
       : '';
-    return `<figure class="media-insert img-width-${escapeHtmlAttribute(width)} media-align-${escapeHtmlAttribute(align)}"><img src="${escapeHtmlAttribute(source)}" alt="${escapeHtmlAttribute(title)}" class="img-width-${escapeHtmlAttribute(width)}"${dimensions} loading="lazy">${caption}</figure>`;
+    return `<figure class="media-insert img-width-${escapeHtmlAttribute(width)} media-align-${escapeHtmlAttribute(align)}"><img src="${escapeHtmlAttribute(source)}"${srcSet} alt="${escapeHtmlAttribute(title)}" class="img-width-${escapeHtmlAttribute(width)}"${dimensions} loading="lazy">${caption}</figure>`;
   });
 }
 
@@ -746,7 +756,14 @@ async function resolvePublishedData(
       }
     }
     if (items) {
-      return { ...prepared, data: { status: items.length ? 'ready' : 'empty', items: items.map(value => ({ ...value, path: objectPath(pagePath, value.slug) })) } };
+      const usesObjectTypePath = widget.type === 'easy_widgets.TopNewsPlugWidget'
+        || widget.type === 'easy_widgets.SidebarTopNewsWidget';
+      return { ...prepared, data: { status: items.length ? 'ready' : 'empty', items: items.map(value => ({
+        ...value,
+        path: usesObjectTypePath
+          ? `/${encodeURIComponent(value.objectType.name)}/${encodeURIComponent(value.slug)}/`
+          : objectPath(pagePath, value.slug),
+      })) } };
     }
     if (widget.type === 'easy_widgets.NewsDetailWidget' || widget.type === 'object_storage.ObjectDetailWidget') {
       if (item) {
