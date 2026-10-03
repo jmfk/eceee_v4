@@ -129,4 +129,12 @@ describe('page editor active/legacy boundaries', () => {
         expect(sourceCleanupIndex).toBeGreaterThan(destinationSaveIndex)
         expect(pageEditorSource).toContain('onQueueCutSourceRemoval={queueCutSourceRemoval}')
     })
+
+    it('resets conflict choices when a newer server revision arrives', () => {
+        const pageEditorSource = readSource('src/components/PageEditor.jsx')
+
+        expect(pageEditorSource).toContain(
+            'key={conflictData.serverVersion?.editRevision ?? conflictData.updateInfo?.revision}'
+        )
+    })
 })
