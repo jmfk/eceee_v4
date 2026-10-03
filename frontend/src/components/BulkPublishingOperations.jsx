@@ -97,6 +97,7 @@ const BulkPublishingOperations = () => {
                 return {
                     pageId: pageIds[index],
                     versionId: workflow.editableVersion.id,
+                    expectedRevision: workflow.editableVersion.editRevision,
                     clientUpdatedAt: workflow.editableVersion.updatedAt,
                 };
             });

@@ -695,6 +695,7 @@ const PageEditor = () => {
                     workingCopy.version.id,
                     versionData,
                     workingCopy.version.updatedAt,
+                    workingCopy.version.editRevision,
                 );
             } catch (versionError) {
                 console.error('Failed to create version:', versionError);

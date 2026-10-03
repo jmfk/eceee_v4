@@ -297,6 +297,8 @@ const ReactLayoutRenderer = forwardRef(({
                 widgets: sourceUpdate.updatedSourceWidgets,
             },
             sourceUpdate.authoritativeSourceVersion?.updatedAt || sourceUpdate.authoritativeSourceVersion?.updated_at,
+            sourceUpdate.authoritativeSourceVersion?.editRevision
+                || sourceUpdate.authoritativeSourceVersion?.edit_revision,
         );
 
         if (sourceUpdate.loadedSourceVersion) {

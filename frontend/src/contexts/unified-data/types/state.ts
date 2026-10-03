@@ -106,6 +106,7 @@ export interface VersionData {
   metadata: PageMetadata;
   createdAt: string;
   updatedAt: string;
+  editRevision?: number;
   createdBy: string;
   publishedAt?: string;
   changesDescription?: string;
