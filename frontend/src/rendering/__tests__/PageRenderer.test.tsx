@@ -310,6 +310,35 @@ describe('PageRenderer', () => {
         expect(screen.getByRole('link', { name: 'Read the original source' })).toHaveAttribute('href', 'https://example.org/source')
     })
 
+    it('matches Django fallback behavior when NewsDetail structured widgets are disabled or filtered out', () => {
+        const item = {
+            id: 1,
+            title: 'Article',
+            objectType: { label: 'News' },
+            data: { content: '<p>Legacy body</p>' },
+            widgets: { body: [{ id: 'nested', type: 'easy_widgets.HeadlineWidget', config: { content: 'Nested heading' } }] },
+        }
+        const model = createPageRenderModel({ widgets: { main: [
+            {
+                id: 'disabled', type: 'easy_widgets.NewsDetailWidget', config: { renderObjectWidgets: false },
+                data: { status: 'ready', item },
+            },
+            {
+                id: 'filtered', type: 'easy_widgets.NewsDetailWidget', config: { render_object_widgets: true },
+                data: { status: 'ready', item: { ...item, id: 2, widgets: { body: [] } } },
+            },
+        ] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+        const details = container.querySelectorAll('[data-widget-type="news-detail"]')
+
+        expect(details[0]).toHaveTextContent('Legacy body')
+        expect(details[0]).not.toHaveTextContent('Nested heading')
+        expect(details[0].querySelector('.news-object-widgets')).toBeNull()
+        expect(details[1]).not.toHaveTextContent('Legacy body')
+        expect(details[1].querySelector('.news-object-widgets [data-slot="body"]')).toBeInTheDocument()
+    })
+
     it('formats News dates like Django and shows a useful empty detail state', () => {
         const article = createPageRenderModel({
             widgets: { main: [{
