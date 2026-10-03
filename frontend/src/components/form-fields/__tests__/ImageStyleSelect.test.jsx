@@ -29,7 +29,7 @@ describe('ImageStyleSelect', () => {
         const description = screen.getByText('Named image style from the current theme')
         const field = screen.getByText('Default')
 
-        expect(description).toHaveClass('italic', 'text-gray-400')
+        expect(description).toHaveClass('italic', 'text-gray-500')
         expect(label.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(description.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })

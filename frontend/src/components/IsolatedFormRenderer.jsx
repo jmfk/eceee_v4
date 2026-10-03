@@ -16,38 +16,13 @@ import {
 } from '../utils/pageEditorPropAdapter'
 
 const PRIMARY_FIELD_GROUPS = new Set(['content', 'media'])
-const PRIMARY_FIELD_NAMES = new Set([
-    'backgroundImage',
-    'afterText',
-    'beforeText',
-    'bioText',
-    'caption',
-    'content',
-    'description',
-    'fields',
-    'header',
-    'image',
-    'image1',
-    'imageStyle',
-    'includeSubpages',
-    'layout',
-    'layoutStyle',
-    'limit',
-    'menuItems',
-    'objectTypes',
-    'position',
-    'rows',
-    'slugVariableName',
-    'slots',
-    'sortOrder',
-    'title',
-    'widgetTitle',
-    'widgets',
-])
 
-const isPrimaryWidgetField = (fieldName, fieldSchema) => {
+const isPrimaryWidgetField = (fieldName, fieldSchema, requiredFields) => {
     const groupName = fieldSchema.group?.toLowerCase()
-    return PRIMARY_FIELD_NAMES.has(fieldName) || PRIMARY_FIELD_GROUPS.has(groupName)
+    return requiredFields.includes(fieldName)
+        || fieldSchema.editorPrimary === true
+        || !groupName
+        || PRIMARY_FIELD_GROUPS.has(groupName)
 }
 
 /**
@@ -458,7 +433,7 @@ const IsolatedFormRenderer = React.memo(forwardRef(({
         })
 
     let primaryFields = renderedFields.filter(([fieldName, fieldSchema]) =>
-        isPrimaryWidgetField(fieldName, fieldSchema)
+        isPrimaryWidgetField(fieldName, fieldSchema, requiredFields)
     )
 
     if (primaryFields.length === 0 && renderedFields.length > 0) {

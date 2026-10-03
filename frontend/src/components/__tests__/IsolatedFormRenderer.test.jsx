@@ -264,7 +264,7 @@ describe('IsolatedFormRenderer active prop ownership', () => {
                 initschema={{
                     properties: {
                         image: { type: 'object', group: 'Media' },
-                        imageStyle: { type: 'string', group: 'Display Options' },
+                        imageStyle: { type: 'string', group: 'Display Options', editorPrimary: true },
                         showCaptions: { type: 'boolean', group: 'Override Settings' }
                     }
                 }}
@@ -290,7 +290,7 @@ describe('IsolatedFormRenderer active prop ownership', () => {
         expect(screen.getByRole('button', { name: 'Change showCaptions' })).toBeVisible()
     })
 
-    it('collapses uncommon ungrouped and styled fields for every widget type', () => {
+    it('collapses fields assigned to secondary groups', () => {
         render(
             <IsolatedFormRenderer
                 initWidgetData={{
@@ -300,7 +300,7 @@ describe('IsolatedFormRenderer active prop ownership', () => {
                 initschema={{
                     properties: {
                         content: { type: 'string' },
-                        allowScripts: { type: 'boolean' },
+                        allowScripts: { type: 'boolean', group: 'Advanced' },
                         showBorder: { type: 'boolean', group: 'Styling' }
                     }
                 }}
@@ -316,7 +316,38 @@ describe('IsolatedFormRenderer active prop ownership', () => {
         expect(screen.getByRole('button', { name: 'Change content' })).toBeVisible()
         expect(screen.getByRole('button', { name: 'Change allowScripts' })).not.toBeVisible()
         expect(screen.getByRole('button', { name: 'Change showBorder' })).not.toBeVisible()
-        expect(screen.getByText('More settings').closest('details')).not.toHaveAttribute('open')
+        expect(screen.getByText('Advanced').closest('details')).not.toHaveAttribute('open')
         expect(screen.getByText('Styling').closest('details')).not.toHaveAttribute('open')
+    })
+
+    it('keeps required and ungrouped fields visible without a field-name registry', () => {
+        render(
+            <IsolatedFormRenderer
+                initWidgetData={{
+                    ...baseWidget,
+                    id: 'object-list-1',
+                    type: 'object_storage.ObjectListWidget',
+                    config: { object_type: 'news', display_template: 'card', show_hierarchy: false }
+                }}
+                initschema={{
+                    required: ['object_type'],
+                    properties: {
+                        object_type: { type: 'string', group: 'Data source' },
+                        display_template: { type: 'string' },
+                        show_hierarchy: { type: 'boolean', group: 'Display Options' }
+                    }
+                }}
+                contextType="page"
+                widgetId="object-list-1"
+                slotName="main"
+                context={{ contextType: 'page', pageId: '101', versionId: '201' }}
+                publishChanges={false}
+                onWidgetChange={vi.fn()}
+            />
+        )
+
+        expect(screen.getByRole('button', { name: 'Change object_type' })).toBeVisible()
+        expect(screen.getByRole('button', { name: 'Change display_template' })).toBeVisible()
+        expect(screen.getByRole('button', { name: 'Change show_hierarchy' })).not.toBeVisible()
     })
 })

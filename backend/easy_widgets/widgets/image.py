@@ -84,6 +84,7 @@ class ImageConfig(BaseModel):
             "title": "Image Style",
             "order": 1,
             "group": "Display Options",
+            "editorPrimary": True,
             "placeholder": "Default",
         },
     )

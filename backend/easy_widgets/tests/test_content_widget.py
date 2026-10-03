@@ -9,12 +9,19 @@ from bs4 import BeautifulSoup
 from django.template.loader import render_to_string
 from django.test import SimpleTestCase
 
-from easy_widgets.widgets.content import ContentWidget
+from easy_widgets.widgets.content import ContentConfig, ContentWidget
 
 
 class ContentWidgetPrepareTemplateContextTest(SimpleTestCase):
     def setUp(self):
         self.widget = ContentWidget()
+
+    def test_secondary_editor_fields_have_explicit_groups(self):
+        properties = ContentConfig.model_json_schema()["properties"]
+
+        self.assertEqual(properties["allowScripts"]["group"], "Advanced")
+        self.assertEqual(properties["sanitizeHtml"]["group"], "Advanced")
+        self.assertEqual(properties["componentStyle"]["group"], "Styling")
 
     def test_plain_html_no_media_inserts(self):
         """No NameError when content has no data-media-insert divs."""
