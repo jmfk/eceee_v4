@@ -2,8 +2,9 @@
 Sidebar widget implementation.
 """
 
-from typing import Type, Optional, List, Literal, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, Dict, List, Literal, Optional, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
@@ -18,22 +19,16 @@ class LayoutWidgetConfig(BaseModel):
     )
 
     content: str = Field(..., description="Widget content (HTML)")
-    background_color: Optional[str] = Field(
-        None, description="Background color (hex or CSS color)"
-    )
+    background_color: Optional[str] = Field(None, description="Background color (hex or CSS color)")
     background_image: Optional[str] = Field(None, description="Background image URL")
-    background_size: Literal["cover", "contain", "auto"] = Field(
-        "cover", description="Background image size"
-    )
+    background_size: Literal["cover", "contain", "auto"] = Field("cover", description="Background image size")
     background_position: Literal["center", "top", "bottom", "left", "right"] = Field(
         "center", description="Background image position"
     )
     text_color: Optional[str] = Field(None, description="Text color (hex or CSS color)")
     padding: Optional[str] = Field(None, description="Widget padding (CSS value)")
     margin: Optional[str] = Field(None, description="Widget margin (CSS value)")
-    text_align: Literal["left", "center", "right", "justify"] = Field(
-        "left", description="Text alignment"
-    )
+    text_align: Literal["left", "center", "right", "justify"] = Field("left", description="Text alignment")
     css_class: Optional[str] = Field(None, description="Additional CSS class")
     custom_css: Optional[str] = Field(None, description="Custom CSS for this widget")
 
@@ -102,15 +97,15 @@ class SidebarWidget(BaseWidget):
         border-radius: var(--sidebar-radius, 0.5rem);
         height: fit-content;
     }
-    
+
     .sidebar-widget .sidebar-section {
         margin-bottom: var(--sidebar-section-margin, 2rem);
     }
-    
+
     .sidebar-widget .sidebar-section:last-child {
         margin-bottom: 0;
     }
-    
+
     .sidebar-widget h1, .sidebar-widget h2, .sidebar-widget h3,
     .sidebar-widget h4, .sidebar-widget h5, .sidebar-widget h6 {
         color: var(--sidebar-heading-color, #1f2937);
@@ -119,25 +114,25 @@ class SidebarWidget(BaseWidget):
         border-bottom: var(--sidebar-heading-border, 2px solid #e5e7eb);
         padding-bottom: var(--sidebar-heading-padding, 0.5rem);
     }
-    
+
     .sidebar-widget p {
         margin-bottom: var(--sidebar-paragraph-margin, 1rem);
         line-height: var(--sidebar-line-height, 1.6);
         font-size: var(--sidebar-font-size, 0.875rem);
     }
-    
+
     .sidebar-widget ul {
         list-style: var(--sidebar-list-style, none);
         padding: var(--sidebar-list-padding, 0);
         margin: var(--sidebar-list-margin, 0);
     }
-    
+
     .sidebar-widget ul li {
         margin-bottom: var(--sidebar-list-item-margin, 0.75rem);
         padding-left: var(--sidebar-list-item-padding, 1rem);
         position: relative;
     }
-    
+
     .sidebar-widget ul li:before {
         content: var(--sidebar-list-bullet, "•");
         color: var(--sidebar-list-bullet-color, #6b7280);
@@ -145,30 +140,30 @@ class SidebarWidget(BaseWidget):
         left: 0;
         display: var(--sidebar-list-bullet-display, block);
     }
-    
+
     .sidebar-widget a {
         color: var(--sidebar-link-color, #3b82f6);
         text-decoration: none;
         transition: color 0.2s ease-in-out;
     }
-    
+
     .sidebar-widget a:hover {
         color: var(--sidebar-link-hover-color, #2563eb);
         text-decoration: underline;
     }
-    
+
     .sidebar-widget .sidebar-widget-list {
         background-color: var(--sidebar-widget-list-bg, #ffffff);
         border: var(--sidebar-widget-list-border, 1px solid #e5e7eb);
         border-radius: var(--sidebar-widget-list-radius, 0.375rem);
         padding: var(--sidebar-widget-list-padding, 1rem);
     }
-    
+
     .sidebar-widget .sidebar-widget-list ul li {
         padding: var(--sidebar-widget-list-item-padding, 0.5rem 0);
         border-bottom: var(--sidebar-widget-list-item-border, 1px solid #f3f4f6);
     }
-    
+
     .sidebar-widget .sidebar-widget-list ul li:last-child {
         border-bottom: none;
     }
@@ -239,11 +234,9 @@ class SidebarWidget(BaseWidget):
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import (
-            render_mustache,
-            prepare_component_context,
-        )
         from django.template.loader import render_to_string
+
+        from webpages.utils.mustache_renderer import prepare_component_context, render_mustache
 
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
