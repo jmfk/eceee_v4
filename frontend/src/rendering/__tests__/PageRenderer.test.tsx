@@ -645,6 +645,30 @@ describe('PageRenderer', () => {
         expect(screen.getByRole('button', { name: 'Go to slide 2' })).toHaveAttribute('aria-current', 'true')
     })
 
+    it('renders responsive image sources supplied by the publisher model', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{ id: 'image', type: 'easy_widgets.ImageWidget', config: {
+                mediaItems: [{
+                    id: 1,
+                    type: 'image',
+                    url: '/original.jpg',
+                    src: '/image-1x.webp',
+                    srcSet: '/image-1x.webp 1x, /image-2x.webp 2x',
+                    displayWidth: 600,
+                    displayHeight: 338,
+                    altText: 'Responsive image',
+                }],
+            } }] },
+        })
+
+        render(<PageRenderer model={model} />)
+
+        expect(screen.getByRole('img', { name: 'Responsive image' })).toHaveAttribute('src', '/image-1x.webp')
+        expect(screen.getByRole('img', { name: 'Responsive image' })).toHaveAttribute('srcset', '/image-1x.webp 1x, /image-2x.webp 2x')
+        expect(screen.getByRole('img', { name: 'Responsive image' })).toHaveAttribute('width', '600')
+        expect(screen.getByRole('img', { name: 'Responsive image' })).toHaveAttribute('height', '338')
+    })
+
     it('renders canonical bio fields and Django-compatible structure', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'bio', type: 'easy_widgets.BioWidget', config: {

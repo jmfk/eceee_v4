@@ -354,29 +354,50 @@ describe('public resolution', () => {
       publicMedia,
     };
 
-    const model = await buildPublishedPageModel({ withSnapshot: async read => read(enrichedReader) }, 'example.org', '/news/story', new Date('2026-06-01'));
-    expect(model?.slots.main[0].config.menuItems).toEqual([
-      expect.objectContaining({ linkData: expect.objectContaining({ resolvedUrl: '/news/#agenda', url: '/news/#agenda' }) }),
-      expect.objectContaining({ linkData: expect.objectContaining({ isActive: false, isPublished: false }) }),
-      expect.objectContaining({ linkData: expect.objectContaining({ isActive: false, isPublished: false }) }),
-    ]);
-    expect(model?.slots.main[1].config.content).toContain('href="/news/"');
-    expect(model?.slots.main[1].config.content).toContain('href="/news/#details"');
-    expect(model?.slots.main[1].config.content).toContain('href="https://example.net"');
-    expect(model?.slots.main[1].config.content).not.toContain('href="#"');
-    expect(model?.slots.main[1].config.content).toContain('src="/inline.png"');
-    expect(model?.slots.main[1].config.content).toContain('width="460" height="275"');
-    expect(model?.slots.main[1].config.content).not.toContain('style="width:100%');
-    expect(model?.slots.main[2].config.mediaItems).toEqual([expect.objectContaining({ url: '/logo.png' })]);
-    const nested = (model?.slots.main[3].config.slots as Record<string, Widget[]>).content;
-    expect(nested[0].config.mediaItems).toEqual([expect.objectContaining({ url: '/logo.png' })]);
-    expect(nested[1].config.publisherNavigation).toMatchObject({
-      isInherited: true,
-      depth: 2,
-      currentChildren: [expect.objectContaining({ label: 'Child', path: '/news/story/child/' })],
-    });
-    expect(publishedPageReferences).toHaveBeenCalledWith([child.id, '999'], root.tenant_id, root.id, expect.any(Date));
-    expect(publicMedia).toHaveBeenCalledWith([inlineMediaId], ['67d9020f-1d73-47be-bd24-1fe52d2dbef8'], root.tenant_id);
+    const previousKey = process.env.PUBLISHER_IMGPROXY_KEY;
+    const previousSalt = process.env.PUBLISHER_IMGPROXY_SALT;
+    process.env.PUBLISHER_IMGPROXY_KEY = '00'.repeat(32);
+    process.env.PUBLISHER_IMGPROXY_SALT = '11'.repeat(32);
+    try {
+      const model = await buildPublishedPageModel({ withSnapshot: async read => read(enrichedReader) }, 'example.org', '/news/story', new Date('2026-06-01'));
+      expect(model?.slots.main[0].config.menuItems).toEqual([
+        expect.objectContaining({ linkData: expect.objectContaining({ resolvedUrl: '/news/#agenda', url: '/news/#agenda' }) }),
+        expect.objectContaining({ linkData: expect.objectContaining({ isActive: false, isPublished: false }) }),
+        expect.objectContaining({ linkData: expect.objectContaining({ isActive: false, isPublished: false }) }),
+      ]);
+      expect(model?.slots.main[1].config.content).toContain('href="/news/"');
+      expect(model?.slots.main[1].config.content).toContain('href="/news/#details"');
+      expect(model?.slots.main[1].config.content).toContain('href="https://example.net"');
+      expect(model?.slots.main[1].config.content).not.toContain('href="#"');
+      expect(model?.slots.main[1].config.content).toContain('src="/inline.png"');
+      expect(model?.slots.main[1].config.content).toContain('width="460" height="275"');
+      expect(model?.slots.main[1].config.content).not.toContain('style="width:100%');
+      expect(model?.slots.main[2].config.mediaItems).toEqual([expect.objectContaining({
+        url: '/logo.png',
+        src: expect.stringContaining('resize:fit:100:50'),
+        srcSet: expect.stringMatching(/resize:fit:100:50.* 1x, .*resize:fit:100:50.* 2x/),
+        displayWidth: 100,
+        displayHeight: 50,
+      })]);
+      const nested = (model?.slots.main[3].config.slots as Record<string, Widget[]>).content;
+      expect(nested[0].config.mediaItems).toEqual([expect.objectContaining({
+        src: expect.stringContaining('resize:fit:100:50'),
+        displayWidth: 100,
+        displayHeight: 50,
+      })]);
+      expect(nested[1].config.publisherNavigation).toMatchObject({
+        isInherited: true,
+        depth: 2,
+        currentChildren: [expect.objectContaining({ label: 'Child', path: '/news/story/child/' })],
+      });
+      expect(publishedPageReferences).toHaveBeenCalledWith([child.id, '999'], root.tenant_id, root.id, expect.any(Date));
+      expect(publicMedia).toHaveBeenCalledWith([inlineMediaId], ['67d9020f-1d73-47be-bd24-1fe52d2dbef8'], root.tenant_id);
+    } finally {
+      if (previousKey === undefined) delete process.env.PUBLISHER_IMGPROXY_KEY;
+      else process.env.PUBLISHER_IMGPROXY_KEY = previousKey;
+      if (previousSalt === undefined) delete process.env.PUBLISHER_IMGPROXY_SALT;
+      else process.env.PUBLISHER_IMGPROXY_SALT = previousSalt;
+    }
   });
 
   it('resolves registered dynamic paths and published object list/detail data', async () => {
