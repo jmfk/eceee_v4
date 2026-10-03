@@ -89,6 +89,19 @@ describe('threeWayMerge', () => {
         expect(result.diffs.some(diff => diff.hasConflict)).toBe(true)
     })
 
+    it('treats nested object deletion versus edit as one atomic conflict', () => {
+        const original = { config: { style: { color: 'red', size: 'm' } } }
+        const local = { config: {} }
+        const server = { config: { style: { color: 'blue', size: 'm' } } }
+
+        const result = mergeValue(original, local, server)
+
+        expect(result.value).toEqual(server)
+        expect(result.diffs).toEqual([
+            expect.objectContaining({ pathString: 'config.style', hasConflict: true }),
+        ])
+    })
+
     it('flags delete versus move', () => {
         const original = [widget('a'), widget('b'), widget('c')]
         const local = [widget('a'), widget('c')]
