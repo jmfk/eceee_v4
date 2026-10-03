@@ -341,7 +341,10 @@ describe('public resolution', () => {
         return version({ ...selected, widgets: { main: [
           { id: 'nav', type: 'easy_widgets.NavigationWidget', config: { menuItems: [{ linkData: { type: 'internal', pageId: child.id, anchor: 'agenda', label: 'News' } }, { linkData: { type: 'internal', pageId: '999', label: 'Missing' } }, { linkData: { type: 'internal', pageId: 'invalid', label: 'Invalid' } }] } },
           { id: 'copy', type: 'easy_widgets.ContentWidget', config: { content: `<p><a data-page-id="2" href="#">News</a><a href="{&quot;type&quot;:&quot;internal&quot;,&quot;pageId&quot;:2,&quot;anchor&quot;:&quot;details&quot;}">Structured</a><a href="{&quot;type&quot;:&quot;external&quot;,&quot;url&quot;:&quot;https://example.net&quot;}">External</a><a data-page-id="999" href="#">Missing</a></p><div data-media-insert="true" data-media-id="${inlineMediaId}" data-width="medium"><img src="/old.png"></div>` } },
-          { id: 'logos', type: 'easy_widgets.ImageWidget', config: { collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8', display_type: 'gallery' } },
+          { id: 'logos', type: 'easy_widgets.ImageWidget', config: {
+            collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8', display_type: 'gallery', image_style: 'cropped',
+            imgproxy_override: { max_width: 60, gravity: 'no' },
+          } },
           { id: 'section', type: 'easy_widgets.SectionWidget', config: { slots: { content: [
             { id: 'nested-logos', type: 'easy_widgets.ImageWidget', config: { collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8' } },
             { id: 'subpages', type: 'easy_widgets.NavigationWidget', config: { navigation_style: 'sub-page-navigation', menu_items: [] } },
@@ -352,6 +355,10 @@ describe('public resolution', () => {
       publishedPageReferences,
       publishedNavigationPages: async () => [{ id: '4', parent_id: article.id, title: 'Child page', label: 'Child', slug: 'child', cached_path: '/news/story/child/', sort_order: 0 }],
       publicMedia,
+      theme: async (id, tenant) => id === theme.id && tenant === theme.tenant_id ? {
+        ...theme,
+        image_styles: { cropped: { imgproxy_config: { width: 80, height: 40, resize_type: 'fill', quality: 72, format: 'webp' } } },
+      } : null,
     };
 
     const previousKey = process.env.PUBLISHER_IMGPROXY_KEY;
@@ -374,10 +381,10 @@ describe('public resolution', () => {
       expect(model?.slots.main[1].config.content).not.toContain('style="width:100%');
       expect(model?.slots.main[2].config.mediaItems).toEqual([expect.objectContaining({
         url: '/logo.png',
-        src: expect.stringContaining('resize:fit:100:50'),
-        srcSet: expect.stringMatching(/resize:fit:100:50.* 1x, .*resize:fit:100:50.* 2x/),
-        displayWidth: 100,
-        displayHeight: 50,
+        src: expect.stringContaining('resize:fill:60:30/gravity:no/quality:72/format:webp'),
+        srcSet: expect.stringMatching(/resize:fill:60:30.* 1x, .*resize:fill:100:50.* 2x/),
+        displayWidth: 60,
+        displayHeight: 30,
       })]);
       const nested = (model?.slots.main[3].config.slots as Record<string, Widget[]>).content;
       expect(nested[0].config.mediaItems).toEqual([expect.objectContaining({

@@ -1,5 +1,5 @@
 import { compileThemeCss, fontImports, widgetVariantClasses } from './theme';
-import { responsiveImageSources } from './imgproxy';
+import { responsiveImageSources, type ResponsiveImageOptions } from './imgproxy';
 
 export type DbId = string;
 
@@ -475,8 +475,8 @@ function prepareWidgets(
   pages: Page[],
   navigationPages: PublishedNavigationPage[],
 ): Record<string, Widget[]> {
-  const responsiveItem = (item: PublicMediaItem): PublicMediaItem => {
-    const responsive = item.type === 'image' && item.url ? responsiveImageSources(item, item.url, 896) : null;
+  const responsiveItem = (item: PublicMediaItem, options: ResponsiveImageOptions = { maxWidth: 896, resizeType: 'fit', quality: 85, format: 'webp' }): PublicMediaItem => {
+    const responsive = item.type === 'image' && item.url ? responsiveImageSources(item, item.url, options) : null;
     return responsive ? {
       ...item,
       src: responsive.src,
@@ -543,19 +543,37 @@ function prepareWidgets(
     }
     if (widget.type === 'easy_widgets.ImageWidget') {
       const image = object(config.image);
+      const styleName = String(config.imageStyle ?? config.image_style ?? '');
+      const style = theme?.image_styles[styleName] ?? theme?.gallery_styles[styleName] ?? theme?.carousel_styles[styleName];
+      const styleImgproxy = object(style?.imgproxy_config ?? style?.imgproxyConfig);
+      const overrideImgproxy = object(config.imgproxyOverride ?? config.imgproxy_override);
+      const imgproxy: Record<string, unknown> = {
+        resizeType: 'fit', quality: 85, format: 'webp', ...styleImgproxy, ...overrideImgproxy,
+      };
+      const processing: ResponsiveImageOptions = {
+        maxWidth: imgproxy.max_width ?? imgproxy.maxWidth ?? imgproxy.width ?? 896,
+        maxHeight: imgproxy.max_height ?? imgproxy.maxHeight ?? imgproxy.height,
+        resizeType: imgproxy.resize_type ?? imgproxy.resizeType ?? 'fit',
+        gravity: imgproxy.gravity,
+        quality: imgproxy.quality,
+        format: imgproxy.format,
+      };
       const collectionId = image.type === 'collection' ? image.id : (image.collectionId ?? image.collection_id ?? config.collectionId ?? config.collection_id);
       if (collectionId) {
-        let items = (collections[String(collectionId).toLowerCase()] ?? []).map(responsiveItem);
+        let items = (collections[String(collectionId).toLowerCase()] ?? []).map(item => responsiveItem(item, processing));
         const collectionConfig = object(config.collectionConfig ?? config.collection_config);
         const limit = Number(collectionConfig.maxItems ?? collectionConfig.max_items ?? 0);
         if (limit > 0) items = items.slice(0, limit);
         config.mediaItems = items;
       } else if (Object.keys(image).length) {
         const item = media.get(String(image.id ?? '').toLowerCase()) ?? image;
-        config.mediaItems = [item];
+        config.mediaItems = [responsiveItem(item as unknown as PublicMediaItem, processing)];
+      } else {
+        const configuredItems = config.mediaItems ?? config.media_items;
+        if (Array.isArray(configuredItems)) {
+          config.mediaItems = configuredItems.map(item => responsiveItem(item as PublicMediaItem, processing));
+        }
       }
-      const styleName = String(config.imageStyle ?? config.image_style ?? '');
-      const style = theme?.image_styles[styleName] ?? theme?.gallery_styles[styleName] ?? theme?.carousel_styles[styleName];
       if (!config.displayType && !config.display_type && style?.styleType) config.displayType = style.styleType;
       if (config.showCaptions === undefined && config.show_captions === undefined && style?.defaultShowCaptions !== undefined) config.showCaptions = style.defaultShowCaptions;
     }

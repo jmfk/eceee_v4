@@ -19,6 +19,15 @@ export type ResponsiveImageSources = {
   displayHeight: number;
 };
 
+export type ResponsiveImageOptions = {
+  maxWidth?: unknown;
+  maxHeight?: unknown;
+  resizeType?: unknown;
+  gravity?: unknown;
+  quality?: unknown;
+  format?: unknown;
+};
+
 function positiveNumber(value: unknown): number | null {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : null;
@@ -33,29 +42,50 @@ function publicBaseUrl(): string {
   return (process.env.PUBLISHER_IMGPROXY_PUBLIC_URL || '/imgproxy').replace(/\/+$/, '');
 }
 
-function signedResizeUrl(sourceUrl: string, width: number, height: number): string | null {
+function pathToken(value: unknown, fallback = ''): string {
+  const token = String(value ?? '').trim().toLowerCase();
+  return /^[a-z0-9_-]+$/.test(token) ? token : fallback;
+}
+
+function signedResizeUrl(sourceUrl: string, width: number, height: number, options: ResponsiveImageOptions = {}): string | null {
   const key = hexSecret('PUBLISHER_IMGPROXY_KEY', 'IMGPROXY_KEY');
   const salt = hexSecret('PUBLISHER_IMGPROXY_SALT', 'IMGPROXY_SALT');
   if (!key || !salt) return null;
 
   const encodedSource = Buffer.from(sourceUrl).toString('base64url');
-  const path = `/resize:fit:${width}:${height}/${encodedSource}`;
+  const resizeType = pathToken(options.resizeType, 'fit');
+  const gravity = pathToken(options.gravity);
+  const format = pathToken(options.format);
+  const quality = positiveNumber(options.quality);
+  const processing = [
+    `resize:${resizeType}:${width}:${height}`,
+    gravity && gravity !== 'sm' ? `gravity:${gravity}` : '',
+    quality ? `quality:${Math.min(100, Math.floor(quality))}` : '',
+    format ? `format:${format}` : '',
+  ].filter(Boolean).join('/');
+  const path = `/${processing}/${encodedSource}`;
   const signature = createHmac('sha256', key).update(Buffer.concat([salt, Buffer.from(path)])).digest('base64url');
   return `${publicBaseUrl()}/${signature}${path}`;
 }
 
-export function responsiveImageSources(image: ImageRecord, sourceUrl: string, maxDisplayWidth?: number): ResponsiveImageSources | null {
+function constrainedDimensions(width: number, height: number, maxWidth: number | null, maxHeight: number | null): [number, number] {
+  if (!maxWidth && !maxHeight) return [width, height];
+  const scale = Math.min(maxWidth ? maxWidth / width : 1, maxHeight ? maxHeight / height : 1, 1);
+  return [Math.max(1, Math.floor(width * scale)), Math.max(1, Math.floor(height * scale))];
+}
+
+export function responsiveImageSources(image: ImageRecord, sourceUrl: string, options?: ResponsiveImageOptions): ResponsiveImageSources | null {
   const width = positiveNumber(image.width ?? image.originalWidth ?? image.original_width);
   const height = positiveNumber(image.height ?? image.originalHeight ?? image.original_height);
   const dpr = positiveNumber(image.dpr) ?? 2;
-  if (!width || !height || (!maxDisplayWidth && dpr <= 1)) return null;
+  if (!width || !height || (!options && dpr <= 1)) return null;
 
-  const displayWidth = Math.max(1, Math.floor(maxDisplayWidth ? Math.min(width, maxDisplayWidth) : width / dpr));
-  const displayHeight = Math.max(1, Math.floor(height * displayWidth / width));
-  const twoXWidth = Math.min(width, displayWidth * 2);
-  const twoXHeight = Math.max(1, Math.floor(height * twoXWidth / width));
-  const oneX = signedResizeUrl(sourceUrl, displayWidth, displayHeight);
-  const twoX = signedResizeUrl(sourceUrl, twoXWidth, twoXHeight);
+  const [displayWidth, displayHeight] = options
+    ? constrainedDimensions(width, height, positiveNumber(options.maxWidth), positiveNumber(options.maxHeight))
+    : [Math.max(1, Math.floor(width / dpr)), Math.max(1, Math.floor(height / dpr))];
+  const [twoXWidth, twoXHeight] = constrainedDimensions(width, height, displayWidth * 2, displayHeight * 2);
+  const oneX = signedResizeUrl(sourceUrl, displayWidth, displayHeight, options);
+  const twoX = signedResizeUrl(sourceUrl, twoXWidth, twoXHeight, options);
   if (!oneX || !twoX) return null;
   return { src: oneX, srcSet: `${oneX} 1x, ${twoX} 2x`, oneX, twoX, displayWidth, displayHeight };
 }
