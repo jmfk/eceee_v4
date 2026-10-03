@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import ValidationMessage from './ValidationMessage.jsx'
+import FieldHelpText from '../form-fields/FieldHelpText.jsx'
 
 /**
  * ValidatedInput Component
@@ -212,6 +213,7 @@ export default function ValidatedInput({
                             {required && <span className="text-red-500 ml-1">*</span>}
                         </label>
                     )}
+                    <FieldHelpText className="mb-1">{description}</FieldHelpText>
                     {renderInput()}
                 </div>
                 <div className="flex-shrink-0 min-w-0 max-w-xs">
@@ -231,10 +233,8 @@ export default function ValidatedInput({
                             {required && <span className="text-red-500 ml-1">*</span>}
                         </label>
                     )}
+                    <FieldHelpText className="mb-1">{description}</FieldHelpText>
                     {renderInput()}
-                    {description && (
-                        <div className="text-xs text-gray-500 mt-1">{description}</div>
-                    )}
                 </div>
                 <div className="flex-shrink-0 w-64">
                     {renderValidation()}
@@ -252,10 +252,8 @@ export default function ValidatedInput({
                     {required && <span className="text-red-500 ml-1">*</span>}
                 </label>
             )}
+            <FieldHelpText>{description}</FieldHelpText>
             {renderInput()}
-            {description && (
-                <div className="text-xs text-gray-500">{description}</div>
-            )}
             {renderValidation()}
         </div>
     )

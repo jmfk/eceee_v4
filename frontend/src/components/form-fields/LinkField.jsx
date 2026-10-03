@@ -16,6 +16,7 @@ import { Link, ExternalLink, Loader2, Mail, Phone, Hash, FileText, ToggleLeft, T
 import { api } from '../../api/client'
 import { endpoints } from '../../api/endpoints'
 import LinkPicker from '../LinkPicker'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * Parse a link value to get the link object
@@ -399,6 +400,8 @@ const LinkField = ({
                 </label>
             )}
 
+            {!hasError && <FieldHelpText>{description}</FieldHelpText>}
+
             {/* Main container */}
             <div className={`border rounded-lg overflow-hidden ${hasError ? 'border-red-500' : 'border-gray-300'} ${disabled ? 'bg-gray-50' : 'bg-white'}`}>
                 {/* Label input */}
@@ -460,11 +463,6 @@ const LinkField = ({
                     </div>
                 )}
             </div>
-
-            {/* Description */}
-            {description && !hasError && (
-                <div className="text-xs text-gray-500">{description}</div>
-            )}
 
             {/* Validation errors */}
             {hasError && validation.errors && (

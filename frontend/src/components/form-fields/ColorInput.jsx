@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Palette, Pipette, Check, RotateCcw } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * ColorInput Component
@@ -117,6 +118,8 @@ const ColorInput = ({
                     {required && <span className="text-red-500 ml-1">*</span>}
                 </label>
             )}
+
+            <FieldHelpText>{description}</FieldHelpText>
 
             <div className="flex items-center space-x-3">
                 {/* Color Preview */}
@@ -251,10 +254,6 @@ const ColorInput = ({
                         </div>
                     </div>
                 </div>
-            )}
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Validation Message */}

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Check, Search } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * CascaderInput Component
@@ -281,6 +282,8 @@ const CascaderInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className="relative">
                 {/* Display Input */}
                 <button
@@ -340,10 +343,6 @@ const CascaderInput = ({
                     </div>
                 )}
             </div>
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
 
             {/* Selection Summary */}
             {multiple && Array.isArray(value) && value.length > 0 && (

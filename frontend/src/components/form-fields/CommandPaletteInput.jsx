@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { Search, Command, ArrowRight, Hash, User, Settings, Zap, ChevronRight } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * CommandPaletteInput Component
@@ -243,6 +244,8 @@ const CommandPaletteInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className="relative">
                 {/* Command Input */}
                 <div className="relative">
@@ -356,10 +359,6 @@ const CommandPaletteInput = ({
                     </div>
                 )}
             </div>
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
 
             {/* Current Selection Display */}
             {value && (

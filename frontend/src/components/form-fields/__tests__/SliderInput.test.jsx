@@ -349,7 +349,13 @@ describe('SliderInput', () => {
                 />
             )
 
-            expect(screen.getByText('Adjust the volume level')).toBeInTheDocument()
+            const label = screen.getByText('Volume')
+            const description = screen.getByText('Adjust the volume level')
+            const slider = screen.getByRole('slider')
+
+            expect(description).toHaveClass('italic', 'text-gray-400')
+            expect(label.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+            expect(description.compareDocumentPosition(slider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         })
 
         test('shows validation errors', () => {
@@ -405,4 +411,3 @@ describe('SliderInput', () => {
         })
     })
 })
-

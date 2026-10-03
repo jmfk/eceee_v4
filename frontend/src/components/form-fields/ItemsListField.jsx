@@ -3,6 +3,7 @@ import { Plus, List, ChevronDown, ChevronRight } from 'lucide-react'
 import ItemCard from './ItemsListField/ItemCard'
 import { parseItemSchema } from './ItemsListField/itemSchemaParser'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
+import FieldHelpText from './FieldHelpText'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget } from '../../utils/widgetUtils'
 
@@ -315,6 +316,8 @@ const ItemsListField = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             {/* Container */}
             <div className={`border rounded-lg overflow-hidden ${hasError ? 'border-red-300' : 'border-gray-300'}`}>
                 {/* Header */}
@@ -388,11 +391,6 @@ const ItemsListField = ({
                 </div>
             </div>
 
-            {/* Description */}
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
-
             {/* Validation Message */}
             {hasError && validation?.errors?.length > 0 && (
                 <div className="text-sm text-red-600" role="alert">
@@ -423,4 +421,3 @@ export default React.memo(ItemsListField, (prevProps, nextProps) => {
         prevProps.itemSchema === nextProps.itemSchema
     )
 })
-

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { getWidgetSchema, validateWidgetConfiguration } from '../api/widgetSchemas.js'
 import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import SchemaFieldRenderer from './forms/SchemaFieldRenderer.jsx'
@@ -13,6 +14,41 @@ import {
     isFieldLevelPropSource,
     shouldHydrateExternalWidgetProps
 } from '../utils/pageEditorPropAdapter'
+
+const PRIMARY_FIELD_GROUPS = new Set(['content', 'media'])
+const PRIMARY_FIELD_NAMES = new Set([
+    'backgroundImage',
+    'afterText',
+    'beforeText',
+    'bioText',
+    'caption',
+    'content',
+    'description',
+    'fields',
+    'header',
+    'image',
+    'image1',
+    'imageStyle',
+    'includeSubpages',
+    'layout',
+    'layoutStyle',
+    'limit',
+    'menuItems',
+    'objectTypes',
+    'position',
+    'rows',
+    'slugVariableName',
+    'slots',
+    'sortOrder',
+    'title',
+    'widgetTitle',
+    'widgets',
+])
+
+const isPrimaryWidgetField = (fieldName, fieldSchema) => {
+    const groupName = fieldSchema.group?.toLowerCase()
+    return PRIMARY_FIELD_NAMES.has(fieldName) || PRIMARY_FIELD_GROUPS.has(groupName)
+}
 
 /**
  * IsolatedFieldWrapper - Simplified wrapper that uses LocalStateFieldWrapper
@@ -416,30 +452,62 @@ const IsolatedFormRenderer = React.memo(forwardRef(({
     const requiredFields = activeSchema?.schema?.required || activeSchema?.required || []
 
     const renderedFields = Object.entries(schemaProperties)
-        .filter(([fieldName, fieldSchema]) => {
+        .filter(([, fieldSchema]) => {
             // Filter out hidden fields
             return !fieldSchema.hidden
         })
 
+    let primaryFields = renderedFields.filter(([fieldName, fieldSchema]) =>
+        isPrimaryWidgetField(fieldName, fieldSchema)
+    )
+
+    if (primaryFields.length === 0 && renderedFields.length > 0) {
+        primaryFields = [renderedFields[0]]
+    }
+
+    const primaryFieldNames = new Set(primaryFields.map(([fieldName]) => fieldName))
+    const secondaryFieldGroups = renderedFields.reduce((groups, field) => {
+        const [fieldName, fieldSchema] = field
+        if (primaryFieldNames.has(fieldName)) return groups
+
+        const groupName = fieldSchema.group || 'More settings'
+        const existingFields = groups.get(groupName) || []
+        groups.set(groupName, [...existingFields, field])
+        return groups
+    }, new Map())
+
+    const renderField = ([fieldName, fieldSchema]) => {
+        const isRequired = requiredFields.includes(fieldName) || false
+        return (
+            <IsolatedFieldWrapper
+                key={fieldName}
+                fieldName={fieldName}
+                fieldSchema={fieldSchema}
+                widgetData={getCurrentWidgetData()}
+                widgetType={getCurrentWidgetData()?.type || ''}
+                isRequired={isRequired}
+                onFieldChange={handleFieldChange}
+                namespace={namespace}
+                context={context}
+                fullSchema={activeSchema?.schema || activeSchema}
+            />
+        )
+    }
+
     return (
         <div className="space-y-4 p-4 min-w-0">
-            {renderedFields.map(([fieldName, fieldSchema]) => {
-                const isRequired = requiredFields.includes(fieldName) || false
-                return (
-                    <IsolatedFieldWrapper
-                        key={fieldName}
-                        fieldName={fieldName}
-                        fieldSchema={fieldSchema}
-                        widgetData={getCurrentWidgetData()}
-                        widgetType={getCurrentWidgetData()?.type || ''}
-                        isRequired={isRequired}
-                        onFieldChange={handleFieldChange}
-                        namespace={namespace}
-                        context={context}
-                        fullSchema={activeSchema?.schema || activeSchema}
-                    />
-                )
-            })}
+            {primaryFields.map(renderField)}
+            {[...secondaryFieldGroups.entries()].map(([groupName, fields]) => (
+                <details key={groupName} className="group border-t border-gray-200 pt-2">
+                    <summary className="flex cursor-pointer list-none items-center gap-2 rounded px-1 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                        <ChevronRight className="h-4 w-4 flex-shrink-0 transition-transform group-open:rotate-90" aria-hidden="true" />
+                        <span>{groupName}</span>
+                    </summary>
+                    <div className="space-y-4 pt-3">
+                        {fields.map(renderField)}
+                    </div>
+                </details>
+            ))}
         </div>
     )
 }), (prevProps, nextProps) => {

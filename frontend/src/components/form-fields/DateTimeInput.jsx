@@ -1,6 +1,7 @@
 import React from 'react'
 import ValidatedInput from '../validation/ValidatedInput'
 import { Calendar, Clock } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * DateTimeInput Component
@@ -62,6 +63,8 @@ const DateTimeInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <div className="flex items-center space-x-1">
@@ -84,10 +87,6 @@ const DateTimeInput = ({
                     {...props}
                 />
             </div>
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
 
             {step && step < 60 && (
                 <div className="text-xs text-gray-500">

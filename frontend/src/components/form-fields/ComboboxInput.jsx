@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Search, ChevronDown, Plus, Loader2, Check, X } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * ComboboxInput Component
@@ -223,6 +224,8 @@ const ComboboxInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className="relative">
                 {/* Input */}
                 <div className="relative">
@@ -334,9 +337,6 @@ const ComboboxInput = ({
                 )}
             </div>
 
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
         </div>
     )
 }

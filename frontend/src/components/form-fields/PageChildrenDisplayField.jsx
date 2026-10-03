@@ -1,6 +1,7 @@
 import React from 'react'
 import { Loader2, AlertCircle, FileText, ExternalLink } from 'lucide-react'
 import { usePageChildren } from '../../hooks/usePageStructure'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * PageChildrenDisplayField Component
@@ -44,9 +45,7 @@ const PageChildrenDisplayField = ({
                         {label}
                     </label>
                 )}
-                {description && (
-                    <div className="text-sm text-gray-500">{description}</div>
-                )}
+                <FieldHelpText>{description}</FieldHelpText>
                 <div className="text-sm text-gray-500 italic bg-gray-50 border border-gray-200 rounded-md p-4">
                     Not available in preview mode. Save the page first to see child pages.
                 </div>
@@ -64,9 +63,7 @@ const PageChildrenDisplayField = ({
             )}
 
             {/* Description */}
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
+            <FieldHelpText>{description}</FieldHelpText>
 
             {/* Children List */}
             <div className="border border-gray-200 rounded-md bg-gray-50 min-w-0">
@@ -131,4 +128,3 @@ const PageChildrenDisplayField = ({
 PageChildrenDisplayField.displayName = 'PageChildrenDisplayField'
 
 export default PageChildrenDisplayField
-

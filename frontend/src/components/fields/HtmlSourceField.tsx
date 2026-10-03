@@ -7,6 +7,7 @@ import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils';
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import type EditorContext from '../../contexts/unified-data/types/editorContext'
+import FieldHelpText from '../form-fields/FieldHelpText'
 
 
 // Use shared EditorContext type
@@ -15,6 +16,7 @@ interface HtmlSourceFieldProps {
     value: string;
     onChange: (value: string) => void;
     label?: string;
+    description?: string;
     error?: string;
     required?: boolean;
     context: EditorContext;
@@ -24,6 +26,7 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
     value,
     onChange,
     label,
+    description,
     error,
     required,
     context,
@@ -107,6 +110,8 @@ const HtmlSourceField: React.FC<HtmlSourceFieldProps> = ({
                 {label}
                 {required && <span className="required-mark">*</span>}
             </label>
+
+            <FieldHelpText>{description}</FieldHelpText>
 
             <div className="field-content">
                 <Button

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Minus, Plus } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * SliderInput Component
@@ -97,6 +98,8 @@ const SliderInput = React.memo(({
                     )}
                 </div>
             )}
+
+            <FieldHelpText>{description}</FieldHelpText>
 
             <div className="space-y-3">
                 {/* Slider Container */}
@@ -240,10 +243,6 @@ const SliderInput = React.memo(({
                     )}
                 </div>
             </div>
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
 
             {/* Validation Message */}
             {hasError && validation?.errors?.length > 0 && (

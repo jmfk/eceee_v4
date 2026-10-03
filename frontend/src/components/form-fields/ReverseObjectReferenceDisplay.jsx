@@ -2,6 +2,7 @@ import React from 'react'
 import { ExternalLink, Loader2, ArrowLeft } from 'lucide-react'
 import { useReverseReferences } from '../../hooks/useObjectReferences'
 import { Link } from 'react-router-dom'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * ReverseObjectReferenceDisplay Component
@@ -74,9 +75,7 @@ const ReverseObjectReferenceDisplay = ({
                         {show_count && <span className="text-gray-500 ml-2">(0)</span>}
                     </label>
                 )}
-                {description && (
-                    <div className="text-sm text-gray-500">{description}</div>
-                )}
+                <FieldHelpText>{description}</FieldHelpText>
                 <div className="text-sm text-gray-500 italic p-4 bg-gray-50 rounded-md">
                     No {reverse_relationship_type} references
                 </div>
@@ -95,9 +94,7 @@ const ReverseObjectReferenceDisplay = ({
             )}
 
             {/* Description */}
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
+            <FieldHelpText>{description}</FieldHelpText>
 
             {/* Reverse Reference List */}
             <div className="border border-gray-200 rounded-md bg-gray-50">
@@ -168,4 +165,3 @@ const ReverseObjectReferenceDisplay = ({
 }
 
 export default ReverseObjectReferenceDisplay
-

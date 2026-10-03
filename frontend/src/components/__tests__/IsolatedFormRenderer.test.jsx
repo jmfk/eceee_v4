@@ -251,4 +251,72 @@ describe('IsolatedFormRenderer active prop ownership', () => {
         expect(firstOnWidgetChange).not.toHaveBeenCalled()
         expect(latestOnWidgetChange).toHaveBeenCalledOnce()
     })
+
+    it('keeps primary ImageWidget fields visible and collapses secondary groups by default', () => {
+        render(
+            <IsolatedFormRenderer
+                initWidgetData={{
+                    ...baseWidget,
+                    id: 'image-1',
+                    type: 'easy_widgets.ImageWidget',
+                    config: { image: null, imageStyle: null, showCaptions: true }
+                }}
+                initschema={{
+                    properties: {
+                        image: { type: 'object', group: 'Media' },
+                        imageStyle: { type: 'string', group: 'Display Options' },
+                        showCaptions: { type: 'boolean', group: 'Override Settings' }
+                    }
+                }}
+                contextType="page"
+                widgetId="image-1"
+                slotName="main"
+                context={{ contextType: 'page', pageId: '101', versionId: '201' }}
+                publishChanges={false}
+                onWidgetChange={vi.fn()}
+            />
+        )
+
+        const accordion = screen.getByText('Override Settings').closest('details')
+
+        expect(screen.getByRole('button', { name: 'Change image' })).toBeVisible()
+        expect(screen.getByRole('button', { name: 'Change imageStyle' })).toBeVisible()
+        expect(accordion).not.toHaveAttribute('open')
+        expect(screen.getByRole('button', { name: 'Change showCaptions' })).not.toBeVisible()
+
+        fireEvent.click(screen.getByText('Override Settings'))
+
+        expect(accordion).toHaveAttribute('open')
+        expect(screen.getByRole('button', { name: 'Change showCaptions' })).toBeVisible()
+    })
+
+    it('collapses uncommon ungrouped and styled fields for every widget type', () => {
+        render(
+            <IsolatedFormRenderer
+                initWidgetData={{
+                    ...baseWidget,
+                    config: { content: '<p>Initial</p>', allowScripts: false, showBorder: false }
+                }}
+                initschema={{
+                    properties: {
+                        content: { type: 'string' },
+                        allowScripts: { type: 'boolean' },
+                        showBorder: { type: 'boolean', group: 'Styling' }
+                    }
+                }}
+                contextType="page"
+                widgetId="content-1"
+                slotName="main"
+                context={{ contextType: 'page', pageId: '101', versionId: '201' }}
+                publishChanges={false}
+                onWidgetChange={vi.fn()}
+            />
+        )
+
+        expect(screen.getByRole('button', { name: 'Change content' })).toBeVisible()
+        expect(screen.getByRole('button', { name: 'Change allowScripts' })).not.toBeVisible()
+        expect(screen.getByRole('button', { name: 'Change showBorder' })).not.toBeVisible()
+        expect(screen.getByText('More settings').closest('details')).not.toHaveAttribute('open')
+        expect(screen.getByText('Styling').closest('details')).not.toHaveAttribute('open')
+    })
 })

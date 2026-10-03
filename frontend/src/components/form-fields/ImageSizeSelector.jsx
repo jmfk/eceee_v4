@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * ImageSizeSelector Component
@@ -40,6 +41,8 @@ const ImageSizeSelector = React.memo(({
                     {required && <span className="text-red-500 ml-1">*</span>}
                 </label>
             )}
+
+            <FieldHelpText>{description}</FieldHelpText>
 
             <div className="inline-flex rounded-md overflow-hidden border border-gray-300">
                 {sizes.map((size, index) => {
@@ -85,10 +88,6 @@ const ImageSizeSelector = React.memo(({
                 })}
             </div>
 
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
-
             {/* Validation Message */}
             {hasError && validation?.errors?.length > 0 && (
                 <div className="text-sm text-red-600">
@@ -107,4 +106,3 @@ const ImageSizeSelector = React.memo(({
 ImageSizeSelector.displayName = 'ImageSizeSelector'
 
 export default ImageSizeSelector
-

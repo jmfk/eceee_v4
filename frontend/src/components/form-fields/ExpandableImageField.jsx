@@ -3,6 +3,7 @@ import { Image } from 'lucide-react'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import ImageDisplaySection from './ImageDisplaySection'
 import MediaSelectModal from '../media/MediaSelectModal'
+import FieldHelpText from './FieldHelpText'
 import {
     validateImageFile,
     getImageUrl,
@@ -185,9 +186,7 @@ const ExpandableImageField = ({
                     {label}
                     {required && <span className="text-red-500 ml-1">*</span>}
                 </label>
-                {description && (
-                    <div className="text-sm text-gray-500 mt-1">{description}</div>
-                )}
+                <FieldHelpText className="mt-1">{description}</FieldHelpText>
             </div>
 
             {/* Main Container with Dropzone */}

@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo } from 'react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * TwoColumnRatioSelector Component
@@ -51,6 +52,8 @@ const TwoColumnRatioSelector = React.memo(({
                     {required && <span className="text-red-500 ml-1">*</span>}
                 </label>
             )}
+
+            <FieldHelpText>{description}</FieldHelpText>
 
             <div className="inline-flex rounded-md overflow-hidden border border-gray-300">
                 {ratios.map((ratio, index) => {
@@ -107,10 +110,6 @@ const TwoColumnRatioSelector = React.memo(({
                 })}
             </div>
 
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
-
             {/* Validation Message */}
             {hasError && validation?.errors?.length > 0 && (
                 <div className="text-sm text-red-600">
@@ -131,4 +130,3 @@ const TwoColumnRatioSelector = React.memo(({
 TwoColumnRatioSelector.displayName = 'TwoColumnRatioSelector'
 
 export default TwoColumnRatioSelector
-

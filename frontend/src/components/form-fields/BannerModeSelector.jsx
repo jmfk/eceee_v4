@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react'
 import { Type, AlignLeft } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * BannerModeSelector Component
@@ -51,6 +52,8 @@ const BannerModeSelector = React.memo(({
                     {required && <span className="text-red-500 ml-1">*</span>}
                 </label>
             )}
+
+            <FieldHelpText>{description}</FieldHelpText>
 
             <div className="inline-flex rounded-md overflow-hidden border border-gray-300">
                 {modes.map((mode, index) => {
@@ -104,10 +107,6 @@ const BannerModeSelector = React.memo(({
                 })}
             </div>
 
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
-
             {/* Validation Message */}
             {hasError && validation?.errors?.length > 0 && (
                 <div className="text-sm text-red-600">
@@ -126,4 +125,3 @@ const BannerModeSelector = React.memo(({
 BannerModeSelector.displayName = 'BannerModeSelector'
 
 export default BannerModeSelector
-

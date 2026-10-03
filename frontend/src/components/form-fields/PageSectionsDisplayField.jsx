@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import { Loader2, AlertCircle, Hash, ExternalLink } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * PageSectionsDisplayField Component
@@ -59,9 +60,7 @@ const PageSectionsDisplayField = ({
                         {label}
                     </label>
                 )}
-                {description && (
-                    <div className="text-sm text-gray-500">{description}</div>
-                )}
+                <FieldHelpText>{description}</FieldHelpText>
                 <div className="text-sm text-gray-500 italic bg-gray-50 border border-gray-200 rounded-md p-4">
                     Not available in preview mode. Save the page first to see sections.
                 </div>
@@ -79,9 +78,7 @@ const PageSectionsDisplayField = ({
             )}
 
             {/* Description */}
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
+            <FieldHelpText>{description}</FieldHelpText>
 
             {/* Sections List */}
             <div className="border border-gray-200 rounded-md bg-gray-50">
@@ -136,4 +133,3 @@ const PageSectionsDisplayField = ({
 PageSectionsDisplayField.displayName = 'PageSectionsDisplayField'
 
 export default PageSectionsDisplayField
-

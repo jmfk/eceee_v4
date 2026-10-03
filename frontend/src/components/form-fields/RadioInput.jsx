@@ -1,4 +1,5 @@
 import React from 'react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * RadioInput Component
@@ -59,9 +60,7 @@ const RadioInput = ({
                 </label>
             )}
 
-            {description && (
-                <div className="text-sm text-gray-500 mb-2">{description}</div>
-            )}
+            <FieldHelpText className="mb-2">{description}</FieldHelpText>
 
             <div className={`space-${layout === 'horizontal' ? 'x' : 'y'}-2 ${layout === 'horizontal' ? 'flex flex-wrap' : ''}`}>
                 {normalizedOptions.map((option) => {

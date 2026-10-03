@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { User, Search, X, AlertCircle } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * UserSelectorInput Component
@@ -87,9 +88,7 @@ const UserSelectorInput = ({
             )}
 
             {/* Description */}
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
+            <FieldHelpText>{description}</FieldHelpText>
 
             {/* TODO Implementation Notice */}
             <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-md flex items-center space-x-2">

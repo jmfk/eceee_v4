@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Check } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * BooleanInput Component
@@ -64,6 +65,8 @@ const BooleanInput = ({
                     </label>
                 )}
 
+                <FieldHelpText>{description}</FieldHelpText>
+
                 <div className="flex items-center space-x-3">
                     <button
                         type="button"
@@ -92,10 +95,6 @@ const BooleanInput = ({
                         <span className="text-sm text-blue-600">Validating...</span>
                     )}
                 </div>
-
-                {description && (
-                    <div className="text-sm text-gray-500">{description}</div>
-                )}
 
                 {hasError && validation?.errors?.length > 0 && (
                     <div className="text-sm text-red-600">
@@ -148,9 +147,7 @@ const BooleanInput = ({
                 )}
             </div>
 
-            {description && (
-                <div className="text-sm text-gray-500 ml-7">{description}</div>
-            )}
+            <FieldHelpText className="ml-7">{description}</FieldHelpText>
 
             {hasError && validation?.errors?.length > 0 && (
                 <div className="text-sm text-red-600 ml-7">

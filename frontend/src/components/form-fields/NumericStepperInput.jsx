@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Plus, Minus, RotateCcw, Calculator } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * NumericStepperInput Component
@@ -199,6 +200,8 @@ const NumericStepperInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className="space-y-3">
                 {/* Large Step Buttons */}
                 {showButtons && (
@@ -356,10 +359,6 @@ const NumericStepperInput = ({
                     )}
                 </div>
             </div>
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
 
             {/* Keyboard Shortcuts */}
             <div className="text-xs text-gray-500">

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { X, Plus, Tag, Hash } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * TagInput Component
@@ -150,6 +151,8 @@ const TagInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             {/* Tag Container */}
             <div
                 className={`
@@ -226,10 +229,6 @@ const TagInput = ({
                 <div className="text-xs text-gray-500">
                     Press Enter or comma to create "{inputValue.trim()}"
                 </div>
-            )}
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Tag Count */}

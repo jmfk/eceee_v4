@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react'
 import { Plus, X, ChevronDown, Filter, Code, Eye } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * RuleBuilderInput Component
@@ -430,6 +431,8 @@ const RuleBuilderInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className={`border rounded-lg ${hasError ? 'border-red-300' : 'border-gray-300'}`}>
                 {/* Header */}
                 <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
@@ -475,10 +478,6 @@ const RuleBuilderInput = ({
                     </div>
                 )}
             </div>
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
 
             {/* Validation Message */}
             {hasError && validation?.errors?.length > 0 && (

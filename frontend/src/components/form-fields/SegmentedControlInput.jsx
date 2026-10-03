@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react'
 import { Check, Grid, Play } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * SegmentedControlInput Component
@@ -174,6 +175,8 @@ const SegmentedControlInput = React.memo(({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className={getContainerClasses()}>
                 {normalizedOptions.map((option, index) => {
                     const isSelected = selectedValues.includes(option.value)
@@ -241,10 +244,6 @@ const SegmentedControlInput = React.memo(({
                         )
                     )}
                 </div>
-            )}
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Selection Info */}
