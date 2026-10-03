@@ -261,6 +261,7 @@ export function UnifiedDataProvider({
                     pageData: buildVersionedPageData((versionData as any).pageData, pageData),
                 },
                 versionData.updatedAt,
+                versionData.editRevision,
             );
 
             // Update page dirty state

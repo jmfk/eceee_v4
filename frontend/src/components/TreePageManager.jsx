@@ -1072,6 +1072,7 @@ const TreePageManager = () => {
                 publishable.map(item => ({
                     pageId: item.page.id,
                     versionId: item.workflow.editableVersion.id,
+                    expectedRevision: item.workflow.editableVersion.editRevision,
                     clientUpdatedAt: item.workflow.editableVersion.updatedAt,
                 }))
             )

@@ -19,7 +19,12 @@ vi.mock('../../../contexts/unified-data/context/UnifiedDataContext', () => ({
 vi.mock('../../../api/versions', () => ({
     versionsApi: {
         getPageVersion: getPageVersionMock,
-        saveWorkingCopy: (versionId, versionData) => updateWidgetsMock(versionId, { widgets: versionData.widgets })
+        saveWorkingCopy: (versionId, versionData, clientUpdatedAt, expectedRevision) => updateWidgetsMock(
+            versionId,
+            { widgets: versionData.widgets },
+            clientUpdatedAt,
+            expectedRevision,
+        )
     }
 }))
 
@@ -162,6 +167,8 @@ describe('ReactLayoutRenderer cut source context', () => {
                     id: 'version-a',
                     pageId: 'page-1',
                     publicationStatus: 'draft',
+                    updatedAt: '2026-10-03T08:00:00Z',
+                    editRevision: 7,
                     widgets: {
                         main: [
                             {
@@ -223,7 +230,9 @@ describe('ReactLayoutRenderer cut source context', () => {
                         expect.objectContaining({ id: 'container-widget', order: 0 })
                     ]
                 }
-            }
+            },
+            '2026-10-03T08:00:00Z',
+            7,
         )
         expect(publishUpdateMock).toHaveBeenCalledWith(
             'renderer-test',
@@ -244,6 +253,8 @@ describe('ReactLayoutRenderer cut source context', () => {
         getStateMock.mockReturnValue({ versions: {} })
         getPageVersionMock.mockResolvedValue({
             publicationStatus: 'draft',
+            updatedAt: '2026-10-03T08:30:00Z',
+            editRevision: 8,
             widgets: {
                 main: [
                     {
@@ -269,7 +280,9 @@ describe('ReactLayoutRenderer cut source context', () => {
         expect(getPageVersionMock).toHaveBeenCalledWith('page-1', 'version-a')
         expect(updateWidgetsMock).toHaveBeenCalledWith(
             'version-a',
-            { widgets: { main: [] } }
+            { widgets: { main: [] } },
+            '2026-10-03T08:30:00Z',
+            8,
         )
         expect(publishUpdateMock).not.toHaveBeenCalled()
         expect(onWidgetChange).not.toHaveBeenCalled()
@@ -333,7 +346,9 @@ describe('ReactLayoutRenderer cut source context', () => {
                         })
                     ]
                 }
-            }
+            },
+            '2026-10-03T08:00:00Z',
+            7,
         )
         expect(publishUpdateMock).toHaveBeenCalledWith(
             'renderer-test',
@@ -386,7 +401,9 @@ describe('ReactLayoutRenderer cut source context', () => {
                         expect.objectContaining({ id: 'container-widget', order: 0 })
                     ]
                 }
-            }
+            },
+            '2026-10-03T08:00:00Z',
+            7,
         )
         expect(publishUpdateMock).toHaveBeenNthCalledWith(
             2,
@@ -456,7 +473,9 @@ describe('ReactLayoutRenderer cut source context', () => {
                         })
                     ]
                 }
-            }
+            },
+            '2026-10-03T08:00:00Z',
+            7,
         )
         expect(publishUpdateMock).toHaveBeenNthCalledWith(
             2,
