@@ -6,8 +6,49 @@ echo "Running test suite before pushing..."
 TEST_LOG="${TMPDIR:-/tmp}/eceee-pre-push-test.$$.log"
 TEST_STATUS_LOG="${TMPDIR:-/tmp}/eceee-pre-push-status.$$.log"
 AGENT_LOG="${TMPDIR:-/tmp}/eceee-pre-push-agent.$$.log"
+TEST_LOCK="${TMPDIR:-/tmp}/eceee-v4-pre-push-test.lock"
 LAST_TEST_STATUS=1
-trap 'rm -f "$TEST_LOG" "$TEST_STATUS_LOG" "$AGENT_LOG"' EXIT HUP INT TERM
+LOCK_OWNED=0
+
+# Invoked indirectly by the signal trap below.
+# shellcheck disable=SC2329
+cleanup() {
+	rm -f "$TEST_LOG" "$TEST_STATUS_LOG" "$AGENT_LOG"
+	if [ "$LOCK_OWNED" -eq 1 ]; then
+		rm -f "$TEST_LOCK/pid"
+		rmdir "$TEST_LOCK" 2>/dev/null || true
+	fi
+}
+
+trap cleanup EXIT HUP INT TERM
+
+acquire_test_lock() {
+	if mkdir "$TEST_LOCK" 2>/dev/null; then
+		printf '%s\n' "$$" >"$TEST_LOCK/pid"
+		LOCK_OWNED=1
+		return 0
+	fi
+
+	lock_pid="$(cat "$TEST_LOCK/pid" 2>/dev/null || true)"
+	case "$lock_pid" in
+		'' | *[!0-9]*) lock_pid='' ;;
+	esac
+	if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
+		echo "Another ECEEE pre-push test suite is already running (PID $lock_pid)."
+		echo "Wait for it to finish before pushing again."
+		return 1
+	fi
+
+	# Recover a lock left behind by an interrupted hook, then retry atomically.
+	rm -f "$TEST_LOCK/pid"
+	rmdir "$TEST_LOCK" 2>/dev/null || true
+	if ! mkdir "$TEST_LOCK" 2>/dev/null; then
+		echo "Another ECEEE pre-push test suite started while acquiring the test lock."
+		return 1
+	fi
+	printf '%s\n' "$$" >"$TEST_LOCK/pid"
+	LOCK_OWNED=1
+}
 
 find_codex() {
 	if command -v codex >/dev/null 2>&1; then
@@ -40,6 +81,10 @@ run_tests() {
 
 	[ "$LAST_TEST_STATUS" -eq 0 ]
 }
+
+if ! acquire_test_lock; then
+	exit 1
+fi
 
 if run_tests; then
 	echo "Test suite passed."
