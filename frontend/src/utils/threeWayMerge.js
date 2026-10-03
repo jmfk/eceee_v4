@@ -204,6 +204,10 @@ export function mergeValue(original, local, server, path = []) {
     if (!localChanged) return { value: clone(server), diffs: [diff(path, original, local, server, false)] }
     if (!serverChanged) return { value: clone(local), diffs: [diff(path, original, local, server, false)] }
 
+    if (isObject(original) && ((local === undefined) !== (server === undefined))) {
+        return { value: clone(server), diffs: [diff(path, original, local, server, true)] }
+    }
+
     const kinds = new Set([original, local, server].filter(value => value !== undefined).map(valueKind))
     if (kinds.size > 1) {
         return { value: clone(server), diffs: [diff(path, original, local, server, true)] }
