@@ -144,8 +144,11 @@ export const themeStylesheetUrl = (themeId: string | number, theme?: any): strin
 }
 
 export const ImageView = ({ source, alt = '', className = '' }: { source?: any, alt?: string, className?: string }) => {
-    const url = imageUrl(source)
-    return url ? <img src={url} alt={alt} className={className} /> : null
+    const url = source && typeof source === 'object' && source.src ? source.src : imageUrl(source)
+    const srcSet = source && typeof source === 'object' ? source.srcSet || source.srcset : undefined
+    const width = source && typeof source === 'object' ? source.displayWidth || source.display_width : undefined
+    const height = source && typeof source === 'object' ? source.displayHeight || source.display_height : undefined
+    return url ? <img src={url} srcSet={srcSet} width={width} height={height} alt={alt} className={className} /> : null
 }
 
 export const TextWithBreaks = ({ children }: { children?: any }) => <>{String(children || '').split(/\r?\n/).map((line, index) => <React.Fragment key={index}>{index > 0 && <br />}{line}</React.Fragment>)}</>

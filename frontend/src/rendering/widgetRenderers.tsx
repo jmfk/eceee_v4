@@ -179,8 +179,11 @@ const ImageRender: WidgetRenderComponent = ({ widget }) => {
     }
     const source = mediaItems[0] || value(config, 'imageUrl', 'image_url', 'image', 'src', 'url')
     if (!imageUrl(source)) return null
+    const alt = source && typeof source === 'object'
+        ? source.altText || source.alt_text || source.alt || source.title || ''
+        : value(config, 'altText', 'alt_text', 'alt') || ''
     return <div className={`image-widget widget-type-easy-widgets-imagewidget image-size-${value(config, 'size') || 'medium'} image-align-${value(config, 'alignment') || 'center'} cms-content`}>
-        <div className="image-container"><ImageView source={source} alt={value(config, 'altText', 'alt_text', 'alt') || ''} className="widget-image" /></div>
+        <div className="image-container"><ImageView source={source} alt={alt} className="widget-image" /></div>
         {value(config, 'caption') && <div className="image-caption">{value(config, 'caption')}</div>}
     </div>
 }

@@ -1,4 +1,5 @@
 import { compileThemeCss, fontImports, widgetVariantClasses } from './theme';
+import { responsiveImageSources } from './imgproxy';
 
 export type DbId = string;
 
@@ -115,6 +116,10 @@ export interface PublicMediaItem {
   width: number | null;
   height: number | null;
   thumbnailUrl: string;
+  src?: string;
+  srcSet?: string;
+  displayWidth?: number;
+  displayHeight?: number;
 }
 
 export interface PageReader {
@@ -470,7 +475,20 @@ function prepareWidgets(
   pages: Page[],
   navigationPages: PublishedNavigationPage[],
 ): Record<string, Widget[]> {
-  const media = new Map(files.map(item => [String(item.id), item]));
+  const responsiveItem = (item: PublicMediaItem): PublicMediaItem => {
+    const responsive = item.type === 'image' && item.url ? responsiveImageSources(item, item.url, 896) : null;
+    return responsive ? {
+      ...item,
+      src: responsive.src,
+      srcSet: responsive.srcSet,
+      displayWidth: responsive.displayWidth,
+      displayHeight: responsive.displayHeight,
+    } : item;
+  };
+  const media = new Map(files.map(item => {
+    const prepared = responsiveItem(item);
+    return [String(prepared.id), prepared];
+  }));
   const current = pages.at(-1)!;
   const parent = pages.at(-2);
   const childrenByParent = new Map<DbId, PublishedNavigationPage[]>();
@@ -527,7 +545,7 @@ function prepareWidgets(
       const image = object(config.image);
       const collectionId = image.type === 'collection' ? image.id : (image.collectionId ?? image.collection_id ?? config.collectionId ?? config.collection_id);
       if (collectionId) {
-        let items = collections[String(collectionId).toLowerCase()] ?? [];
+        let items = (collections[String(collectionId).toLowerCase()] ?? []).map(responsiveItem);
         const collectionConfig = object(config.collectionConfig ?? config.collection_config);
         const limit = Number(collectionConfig.maxItems ?? collectionConfig.max_items ?? 0);
         if (limit > 0) items = items.slice(0, limit);
