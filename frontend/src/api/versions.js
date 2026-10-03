@@ -162,10 +162,17 @@ export const versionsApi = {
     /**
      * Delete a version (only drafts can be deleted)
      * @param {number} versionId - Version ID
+     * @param {string} clientUpdatedAt - Timestamp fallback for legacy clients
+     * @param {number|null} expectedRevision - Reviewed server revision
      * @returns {Promise<void>}
      */
-    delete: wrapApiCall(async (versionId) => {
-        return api.delete(endpoints.versions.detail(versionId))
+    delete: wrapApiCall(async (versionId, clientUpdatedAt, expectedRevision = null) => {
+        return api.delete(endpoints.versions.detail(versionId), {
+            data: {
+                clientUpdatedAt,
+                ...(expectedRevision ? { expectedRevision } : {}),
+            },
+        })
     }, 'versions.delete'),
 
     /**

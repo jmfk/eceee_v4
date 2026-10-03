@@ -341,6 +341,34 @@ class PageVersionWorkflowService:
         return self._create_version_from(source), True
 
     @transaction.atomic
+    def update_working_copy_import_metadata(self, *, title="", tags=None):
+        """Apply imported metadata as one revisioned working-copy mutation."""
+        self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)
+        editable = self.canonical_editable_version(lock=True)
+        if not editable:
+            source = self.live_version(lock=True) or self._versions(lock=True).order_by("-version_number").first()
+            editable = self._create_version_from(source)
+
+        update_fields = []
+        normalized_title = title.strip()
+        if normalized_title:
+            page_data = deepcopy(editable.page_data) if isinstance(editable.page_data, dict) else {}
+            page_data.setdefault("page_attributes", {})["title"] = normalized_title
+            editable.version_title = normalized_title
+            editable.page_data = page_data
+            update_fields.extend(["version_title", "page_data"])
+
+        if tags:
+            editable.tags = list(tags)
+            update_fields.append("tags")
+
+        self.advance_revision(editable)
+        editable.save(
+            update_fields=[*update_fields, "edit_revision", "last_edited_by", "updated_at"],
+        )
+        return editable
+
+    @transaction.atomic
     def resolve_atomic_save_target(self, *, expected_version_id, expected_revision=None, expected_updated_at=None):
         """Lock and return the reviewed save target, creating it from live content when needed."""
         self.page = WebPage.objects.select_for_update().get(pk=self.page.pk)

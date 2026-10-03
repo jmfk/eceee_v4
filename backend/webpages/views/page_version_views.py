@@ -237,12 +237,17 @@ class PageVersionViewSet(
         serializer.save()
 
     @transaction.atomic
-    def perform_destroy(self, instance):
+    def perform_destroy(self, instance, *, expected_revision=None, expected_updated_at=None):
         """Override destroy to cleanup media references"""
         locked_page = WebPage.objects.select_for_update().get(pk=instance.page_id)
         locked = PageVersion.objects.select_for_update().get(pk=instance.pk, page=locked_page)
         service = PageVersionWorkflowService(locked_page, self.request.user)
         service.assert_canonical_editable(locked)
+        service.assert_reviewed(
+            locked,
+            expected_revision=expected_revision,
+            expected_updated_at=expected_updated_at,
+        )
         if locked.effective_date and locked.effective_date > timezone.now():
             raise ScheduleConflictError("Cancel the schedule before deleting this working version.")
         from file_manager.utils import cleanup_content_references
@@ -255,8 +260,15 @@ class PageVersionViewSet(
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        expected_revision, client_timestamp, error_response = self._parse_review_token(request)
+        if error_response:
+            return error_response
         try:
-            self.perform_destroy(instance)
+            self.perform_destroy(
+                instance,
+                expected_revision=expected_revision,
+                expected_updated_at=client_timestamp,
+            )
         except WorkflowError as error:
             return self._workflow_error_response(error)
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -45,6 +45,7 @@ class ProcessImportVersionSafetyTest(TestCase):
 
         self.client = APIClient()
         self.client.force_authenticate(self.user)
+        self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
 
     @patch("content_import.views.process.create_widgets", return_value=[])
     @patch("content_import.views.process.ContentParser.parse", return_value=[])
@@ -55,23 +56,25 @@ class ProcessImportVersionSafetyTest(TestCase):
         _parse,
         _create_widgets,
     ):
-        response = self.client.post(
-            reverse("api:content_import:process"),
-            {
-                "html": "<p>Imported content</p>",
-                "uploaded_media_urls": [],
-                "slot_name": "main_content",
-                "page_id": self.page.pk,
-                "mode": "replace",
-                "namespace": self.namespace.slug,
-                "page_metadata": {
-                    "title": "Imported working title",
-                    "tags": [],
-                    "saveToPage": True,
-                },
-            },
-            format="json",
-        )
+        with patch("webpages.consumers.broadcast_version_update") as broadcast:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    reverse("api:content_import:process"),
+                    {
+                        "html": "<p>Imported content</p>",
+                        "uploaded_media_urls": [],
+                        "slot_name": "main_content",
+                        "page_id": self.page.pk,
+                        "mode": "replace",
+                        "namespace": self.namespace.slug,
+                        "page_metadata": {
+                            "title": "Imported working title",
+                            "tags": [],
+                            "saveToPage": True,
+                        },
+                    },
+                    format="json",
+                )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["page_was_updated"])
@@ -91,3 +94,23 @@ class ProcessImportVersionSafetyTest(TestCase):
             working.page_data["page_attributes"]["title"],
             "Imported working title",
         )
+        self.assertEqual(working.edit_revision, 2)
+        self.assertEqual(working.last_edited_by, self.user)
+        broadcast.assert_called_once()
+        self.assertEqual(broadcast.call_args.kwargs["revision"], 2)
+        self.assertEqual(broadcast.call_args.kwargs["mutation_type"], "content_import")
+
+        stale_response = self.client.patch(
+            reverse("api:page-working-copy-save", kwargs={"page_id": self.page.pk}),
+            {
+                "expectedVersionId": working.id,
+                "expectedRevision": 1,
+                "versionTitle": "Stale editor title",
+            },
+            format="json",
+        )
+
+        self.assertEqual(stale_response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(stale_response.data["error"], "version_conflict")
+        working.refresh_from_db()
+        self.assertEqual(working.version_title, "Imported working title")
