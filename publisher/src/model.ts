@@ -202,6 +202,20 @@ function value(input: RawWidget, ...names: string[]): unknown {
   return names.map(name => input[name]).find(candidate => candidate !== undefined && candidate !== null);
 }
 
+function normalizeImgproxyOptions(input: Record<string, unknown>): ResponsiveImageOptions {
+  const aliases: Array<[keyof ResponsiveImageOptions, string[]]> = [
+    ['maxWidth', ['max_width', 'maxWidth', 'width']],
+    ['maxHeight', ['max_height', 'maxHeight', 'height']],
+    ['resizeType', ['resize_type', 'resizeType']],
+    ['gravity', ['gravity']],
+    ['quality', ['quality']],
+    ['format', ['format']],
+  ];
+  return Object.fromEntries(
+    aliases.map(([name, names]) => [name, value(input, ...names)]).filter(([, candidate]) => candidate !== undefined),
+  );
+}
+
 function dateVisible(input: RawWidget, at: Date): boolean {
   if (value(input, 'is_visible', 'isVisible') === false || value(input, 'is_published', 'isPublished') === false) return false;
   const effective = value(input, 'publish_effective_date', 'publishEffectiveDate');
@@ -547,16 +561,13 @@ function prepareWidgets(
       const style = theme?.image_styles[styleName] ?? theme?.gallery_styles[styleName] ?? theme?.carousel_styles[styleName];
       const styleImgproxy = object(style?.imgproxy_config ?? style?.imgproxyConfig);
       const overrideImgproxy = object(config.imgproxyOverride ?? config.imgproxy_override);
-      const imgproxy: Record<string, unknown> = {
-        resizeType: 'fit', quality: 85, format: 'webp', ...styleImgproxy, ...overrideImgproxy,
-      };
       const processing: ResponsiveImageOptions = {
-        maxWidth: imgproxy.max_width ?? imgproxy.maxWidth ?? imgproxy.width ?? 896,
-        maxHeight: imgproxy.max_height ?? imgproxy.maxHeight ?? imgproxy.height,
-        resizeType: imgproxy.resize_type ?? imgproxy.resizeType ?? 'fit',
-        gravity: imgproxy.gravity,
-        quality: imgproxy.quality,
-        format: imgproxy.format,
+        maxWidth: 896,
+        resizeType: 'fit',
+        quality: 85,
+        format: 'webp',
+        ...normalizeImgproxyOptions(styleImgproxy),
+        ...normalizeImgproxyOptions(overrideImgproxy),
       };
       const collectionId = image.type === 'collection' ? image.id : (image.collectionId ?? image.collection_id ?? config.collectionId ?? config.collection_id);
       if (collectionId) {

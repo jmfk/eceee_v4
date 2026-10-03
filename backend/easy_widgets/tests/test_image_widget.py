@@ -76,6 +76,44 @@ class ImageWidgetTests(SimpleTestCase):
             format="webp",
         )
 
+    @patch("file_manager.imgproxy.imgproxy_service.generate_responsive_urls")
+    def test_widget_imgproxy_aliases_override_style_aliases(self, generate_responsive_urls):
+        generate_responsive_urls.return_value = {}
+        theme = SimpleNamespace(
+            image_styles={
+                "cropped": {
+                    "imgproxy_config": {
+                        "max_width": 800,
+                        "max_height": 600,
+                        "resize_type": "fit",
+                    }
+                }
+            },
+            gallery_styles={},
+            carousel_styles={},
+        )
+
+        ImageWidget().prepare_template_context(
+            {
+                "image_style": "cropped",
+                "image": {"id": "media-1", "url": "/original.jpg", "type": "image"},
+                "imgproxyOverride": {"width": 400, "resizeType": "fill"},
+            },
+            {"theme": theme},
+        )
+
+        generate_responsive_urls.assert_called_once_with(
+            source_url="/original.jpg",
+            max_width=400,
+            max_height=600,
+            original_width=None,
+            original_height=None,
+            resize_type="fill",
+            gravity="sm",
+            quality=85,
+            format="webp",
+        )
+
     def test_styled_carousel_script_scopes_controls_and_supports_autoplay(self):
         script = ImageWidget._carousel_behavior_script({"autoPlay": True, "autoPlayInterval": 4})
 
