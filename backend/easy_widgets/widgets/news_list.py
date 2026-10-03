@@ -162,8 +162,10 @@ class NewsListWidget(BaseWidget):
                 "news_items": [],
             }
 
-        # Query news items
-        news_items = self._get_news_items(news_config)
+        # Query news items within the current tenant.
+        current_page = context.get("current_page") or context.get("page")
+        tenant = getattr(current_page, "tenant", None)
+        news_items = self._get_news_items(news_config, tenant=tenant)
 
         template_config.update(
             {
@@ -174,9 +176,12 @@ class NewsListWidget(BaseWidget):
 
         return template_config
 
-    def _get_news_items(self, config: NewsListConfig):
+    def _get_news_items(self, config: NewsListConfig, tenant=None):
         """Query and return news items based on configuration"""
         from object_storage.models import ObjectInstance
+
+        if tenant is None:
+            return []
 
         try:
             # Use the model method to get published news items
@@ -186,6 +191,7 @@ class NewsListWidget(BaseWidget):
                     limit=config.limit,
                     sort_order=config.sort_order,
                     prioritize_featured=True,
+                    tenant=tenant,
                 )
             )
 

@@ -28,7 +28,7 @@
                             <h4 class="text-sm font-medium text-gray-700 mb-2">Location in hierarchy:</h4>
                             <div class="breadcrumb">
                                 {% for ancestor in ancestors %}
-                                    <a href="{% url 'object_detail' ancestor.object_type.name ancestor.slug %}" class="text-blue-600 hover:text-blue-800">
+                                    <a href="{{ current_page.cached_path }}{{ ancestor.slug }}/" class="text-blue-600 hover:text-blue-800">
                                         {{ ancestor.title }}
                                     </a>
                                     <span class="mx-2 text-gray-400">→</span>
@@ -77,7 +77,7 @@
                         {% for child in children %}
                             <div class="child-item">
                                 <h4 class="child-title">
-                                    <a href="{% url 'object_detail' child.object_type.name child.slug %}" class="text-blue-600 hover:text-blue-800">
+                                    <a href="{{ current_page.cached_path }}{{ child.slug }}/" class="text-blue-600 hover:text-blue-800">
                                         {{ child.title }}
                                     </a>
                                 </h4>

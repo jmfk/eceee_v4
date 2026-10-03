@@ -163,6 +163,32 @@ describe('database snapshot', () => {
     ]);
   });
 
+  it('drops numeric object type IDs outside the PostgreSQL bigint range', async () => {
+    const objects = await database.withSnapshot(reader => reader.publishedObjects({
+      objectTypeIds: ['99999999999999999999'], limit: 1, sortOrder: '-publish_date',
+    }, '7', new Date('2026-06-01')));
+
+    expect(objects).toEqual([]);
+    expect(mocks.query.mock.calls.map(call => call[0])).toEqual([
+      'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
+      'COMMIT',
+    ]);
+  });
+
+  it('supports NewsList across all active tenant-compatible object types', async () => {
+    await database.withSnapshot(reader => reader.publishedObjects({
+      objectTypeIds: [],
+      allActiveTypes: true,
+      limit: 10,
+      sortOrder: '-publish_date',
+    }, '7', new Date('2026-06-01')));
+
+    const [sql, parameters] = mocks.query.mock.calls[1];
+    expect(sql).toContain('OR $11::boolean');
+    expect(sql).toContain('NOT ($10::boolean OR $11::boolean)');
+    expect(parameters[10]).toBe(true);
+  });
+
   it('loads tenant-scoped published hierarchy only when requested', async () => {
     await database.withSnapshot(async reader => {
       await reader.publishedObjects({ objectTypeNames: ['article'], limit: 1, sortOrder: '-publish_date', includeHierarchy: true }, '7', new Date('2026-06-01'));
@@ -178,6 +204,46 @@ describe('database snapshot', () => {
     expect(sql).toContain('object.created_at::text AS "createdAt"');
     expect(sql).toContain('object.updated_at::text AS "updatedAt"');
     expect(parameters[7]).toBe(true);
+  });
+
+  it('applies allowlisted ObjectList status and active-type filters', async () => {
+    await database.withSnapshot(reader => reader.publishedObjects({
+      objectTypeNames: ['article'],
+      limit: 5,
+      sortOrder: '-publish_date',
+      status: 'archived',
+      activeTypeOnly: true,
+    }, '7', new Date('2026-06-01')));
+
+    const [sql, parameters] = mocks.query.mock.calls[1];
+    expect(sql).toContain('($9::text IS NULL OR object.status = $9)');
+    expect(sql).toContain('LEFT JOIN content_namespace AS type_namespace');
+    expect(sql).toContain('type.is_active = true');
+    expect(sql).toContain('(type.namespace_id IS NULL OR type_namespace.tenant_id = $1)');
+    expect(sql).toContain('object.current_version_id IS NOT NULL');
+    expect(parameters[8]).toBe('archived');
+    expect(parameters[9]).toBe(true);
+  });
+
+  it('requires current-version pointers for objects and hierarchy members', async () => {
+    await database.withSnapshot(reader => reader.publishedObjects({
+      objectTypeNames: ['article'],
+      limit: 1,
+      sortOrder: '-publish_date',
+      includeHierarchy: true,
+    }, '7', new Date('2026-06-01')));
+
+    const sql = mocks.query.mock.calls[1][0];
+    expect(sql).toContain('object.current_version_id IS NOT NULL');
+    expect(sql).toContain('parent.current_version_id IS NOT NULL');
+    expect(sql).toContain('ancestor.current_version_id IS NOT NULL');
+    expect(sql).toContain('child.current_version_id IS NOT NULL');
+    expect(sql).toContain('parent_type.is_active = true');
+    expect(sql).toContain('(parent_type.namespace_id IS NULL OR parent_namespace.tenant_id = $1)');
+    expect(sql).toContain('ancestor_type.is_active = true');
+    expect(sql).toContain('(ancestor_type.namespace_id IS NULL OR ancestor_namespace.tenant_id = $1)');
+    expect(sql).toContain('child_type.is_active = true');
+    expect(sql).toContain('(child_type.namespace_id IS NULL OR child_namespace.tenant_id = $1)');
   });
 
   it('rolls back and releases the client when resolution fails', async () => {

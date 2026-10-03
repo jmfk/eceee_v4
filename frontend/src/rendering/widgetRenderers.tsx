@@ -699,7 +699,7 @@ const ObjectDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) =>
     const slots: Record<string, unknown> = item.widgets && typeof item.widgets === 'object' ? item.widgets : {}
     const showWidgets = configEnabled(widget.config, true, 'showWidgets', 'show_widgets')
     const showMetadata = configEnabled(widget.config, false, 'showMetadata', 'show_metadata')
-    const hasWidgets = Object.values(slots).some((widgets) => asArray<any>(widgets).length > 0)
+    const hasWidgetSlots = Object.keys(slots).length > 0
     const dataEntries = Object.entries(item.data || {}).filter(([, fieldValue]) => Boolean(fieldValue))
     const showHierarchy = configEnabled(widget.config, true, 'showHierarchy', 'show_hierarchy')
     const ancestors = asArray<any>(item.ancestors)
@@ -708,7 +708,7 @@ const ObjectDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) =>
         <header className="object-header"><h1 className="object-title">{item.title}</h1><div className="object-meta"><span className="object-type">{fields.objectType.label || fields.objectType.name}</span>{fields.publishDate && <time className="object-date" dateTime={fields.publishDate}> • Published {formatDisplayDate(fields.publishDate)}</time>}</div>
             {showHierarchy && ancestors.length > 0 && <div className="object-hierarchy"><h4>Location in hierarchy:</h4><div className="breadcrumb">{ancestors.map((ancestor, index) => <React.Fragment key={ancestor.id || index}><PreviewLink href={ancestor.path}>{ancestor.title}</PreviewLink><span>→</span></React.Fragment>)}<span>{item.title}</span></div></div>}
         </header>
-        <div className="object-content">{showWidgets && hasWidgets
+        <div className="object-content">{showWidgets && hasWidgetSlots
             ? Object.entries(slots).map(([slotName, widgets]) => <div className="widget-slot" data-slot={slotName} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)
             : dataEntries.map(([fieldName, fieldValue]) => <div className="object-field" key={fieldName}><h4 className="field-label">{fieldName.replaceAll('_', ' ')}</h4><div className="field-value">{typeof fieldValue === 'object' ? JSON.stringify(fieldValue) : String(fieldValue)}</div></div>)}</div>
         {showHierarchy && children.length > 0 && <section className="object-children"><h3>Related Content</h3><div className="children-grid">{children.map((child, index) => {

@@ -506,6 +506,24 @@ describe('PageRenderer', () => {
         expect(details[1]).toHaveTextContent('Published summary')
     })
 
+    it('does not expose raw object data when structured widget slots are present but empty', () => {
+        const model = createPageRenderModel({ widgets: { main: [{
+            id: 'detail', type: 'object_storage.ObjectDetailWidget', config: { showWidgets: true },
+            data: { status: 'ready', item: {
+                id: 'object-1', title: 'Published object',
+                objectType: { name: 'article', label: 'Article' },
+                data: { internal_note: 'Must stay hidden' },
+                widgets: { main: [] },
+            } },
+        }] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+        const detail = container.querySelector('[data-widget-type="object-detail"]')
+
+        expect(detail).not.toHaveTextContent('Must stay hidden')
+        expect(detail?.querySelector('[data-slot="main"]')).toBeInTheDocument()
+    })
+
     it('uses Django compact date formatting in top-news and sidebar views', () => {
         const item = {
             id: 1,
