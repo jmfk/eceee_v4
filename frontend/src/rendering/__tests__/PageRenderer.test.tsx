@@ -682,6 +682,26 @@ describe('PageRenderer', () => {
         expect(screen.getByRole('img', { name: 'Legacy image description' })).toHaveAttribute('src', '/legacy.jpg')
     })
 
+    it('renders a canonical single image as a single image even with the legacy gallery default', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{ id: 'image', type: 'easy_widgets.ImageWidget', config: {
+                image: {
+                    id: 'media-1',
+                    imgproxy_base_url: '/full-size.jpg',
+                    thumbnail_url: '/thumbnail.jpg',
+                    title: 'The power of light',
+                },
+                displayType: 'gallery',
+            } }] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(screen.getByRole('img', { name: 'The power of light' })).toHaveAttribute('src', '/full-size.jpg')
+        expect(container.querySelector('.image-size-medium')).toBeInTheDocument()
+        expect(container.querySelector('.gallery-grid')).toBeNull()
+    })
+
     it('renders canonical bio fields and Django-compatible structure', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'bio', type: 'easy_widgets.BioWidget', config: {

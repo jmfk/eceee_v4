@@ -124,4 +124,25 @@ describe('ImageWidget', () => {
         })
         expect(track).toHaveStyle({ transform: 'translateX(-100%)' })
     })
+
+    it('renders the canonical single image selected by ImageInput', () => {
+        render(
+            <ImageWidget
+                mode="editor"
+                widgetId="image-1"
+                slotName="main"
+                config={{
+                    image: {
+                        id: 'media-1',
+                        imgproxy_base_url: '/full-size.jpg',
+                        thumbnail_url: '/thumbnail.jpg',
+                        title: 'The power of light',
+                    },
+                    displayType: 'gallery',
+                }}
+            />
+        )
+
+        expect(screen.getByRole('img', { name: 'The power of light' })).toHaveAttribute('src', '/full-size.jpg')
+    })
 })

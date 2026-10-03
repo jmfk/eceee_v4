@@ -1,5 +1,6 @@
 import DOMPurify from 'isomorphic-dompurify'
 import React from 'react'
+import { imageMediaUrl } from '../utils/imageWidgetMedia'
 
 export const value = (config: Record<string, any>, ...names: string[]) => {
     for (const name of names) {
@@ -121,11 +122,7 @@ export const PreviewLink = ({ href = '#', children, className = '', ...props }: 
     <a {...props} href={linkHref(href)} className={className}>{children}</a>
 )
 
-export const imageUrl = (source: any): string => typeof source === 'string'
-    ? source
-    : source?.imgproxyBaseUrl || source?.imgproxy_base_url || source?.fileUrl || source?.file_url
-        || source?.publicUrl || source?.public_url || source?.absoluteUrl || source?.absolute_url
-        || source?.downloadUrl || source?.download_url || source?.thumbnailUrl || source?.thumbnail_url || source?.url || ''
+export const imageUrl = (source: any): string => imageMediaUrl(source)
 
 export const googleFontsStylesheetUrl = (fonts: any): string => {
     const families = Array.isArray(fonts?.googleFonts) ? fonts.googleFonts : Array.isArray(fonts?.google_fonts) ? fonts.google_fonts : []

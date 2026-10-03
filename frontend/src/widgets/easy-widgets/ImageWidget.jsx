@@ -10,6 +10,7 @@ import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 import { generateCSSFromBreakpoints } from '../../utils/cssBreakpointUtils'
 import { getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout'
 import { mediaCollectionsApi } from '../../api/media'
+import { imageMediaUrl, imageWidgetMediaItems, isImageCollectionReference } from '../../utils/imageWidgetMedia'
 
 const shuffleWithSeed = (items, initialSeed) => {
     const shuffled = [...items]
@@ -119,18 +120,7 @@ const ImageWidget = ({
 
     // Check if image field is a collection and resolve it
     const isCollection = useMemo(() => {
-        const image = localConfig.image
-        if (!image || typeof image !== 'object') return false
-        // Check for explicit type marker
-        if (image.type === 'collection') {
-            return true
-        }
-        // Check for collection-specific properties (fileCount, sampleImages, slug)
-        // A MediaFile would have url/fileUrl, but not fileCount or slug
-        const hasCollectionProps = image.fileCount !== undefined || image.sampleImages !== undefined || image.slug !== undefined
-        const hasFileProps = image.url || image.fileUrl || image.imgproxyBaseUrl
-        // If it has collection properties but no file URL properties, and has an ID, it's a collection
-        return hasCollectionProps && !hasFileProps && !!image.id
+        return isImageCollectionReference(localConfig.image)
     }, [localConfig.image])
 
     // Resolve collection files when image is a collection
@@ -212,13 +202,7 @@ const ImageWidget = ({
         return shuffleWithSeed(effectiveMediaItems, randomizationSeed)
     }, [effectiveMediaItems, localConfig.randomize, randomizationSeed])
 
-    // Handle backward compatibility
-    const items = randomizedMediaItems.length > 0 ? randomizedMediaItems : (localConfig.imageUrl ? [{
-        url: localConfig.imageUrl,
-        type: 'image',
-        altText: localConfig.altText || 'Image',
-        caption: localConfig.caption || ''
-    }] : [])
+    const items = imageWidgetMediaItems(localConfig, randomizedMediaItems)
 
     // Auto-play functionality for carousel
     useEffect(() => {
@@ -276,7 +260,8 @@ const ImageWidget = ({
     }
 
     const renderMediaItem = (item, index = 0) => {
-        if (!item || !item.url) {
+        const displayUrl = imageMediaUrl(item)
+        if (!item || !displayUrl) {
             return null
         }
 
@@ -289,14 +274,11 @@ const ImageWidget = ({
                     className="max-w-full h-auto rounded shadow-sm"
                     poster={item.thumbnail}
                 >
-                    <source src={item.url} type="video/mp4" />
+                    <source src={displayUrl} type="video/mp4" />
                     Your browser does not support the video tag.
                 </video>
             )
         }
-
-        // Always use full image URL for page editor preview
-        const displayUrl = item.url
 
         return (
             <img
