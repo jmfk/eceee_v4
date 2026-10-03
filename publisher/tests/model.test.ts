@@ -455,6 +455,114 @@ describe('public resolution', () => {
     );
   });
 
+  it('stops self-referential and mutual published object widget cycles', async () => {
+    const object = (id: string, nestedId: string): PublishedObject => ({
+      id,
+      title: `Object ${id}`,
+      slug: `object-${id}`,
+      objectType: { id: '5', name: 'article', label: 'Article', pluralLabel: 'Articles' },
+      data: {},
+      widgets: { body: [{ id: `detail-${nestedId}`, type: 'object_storage.ObjectDetailWidget', config: { objectId: nestedId } }] },
+      metadata: {},
+      publishDate: '2026-05-01T00:00:00Z',
+      isFeatured: false,
+    });
+    const runCycle = async (objects: Record<string, PublishedObject>) => {
+      const publishedObjects = vi.fn(async (query: { objectIds?: string[] }) => {
+        const selected = objects[String(query.objectIds?.[0])];
+        return selected ? [selected] : [];
+      });
+      const cycleReader: PageReader = {
+        ...reader,
+        version: async (id, at) => {
+          const selected = await reader.version(id, at);
+          if (id !== child.id || !selected) return selected;
+          return version({ ...selected, widgets: { main: [
+            { id: 'cycle-root', type: 'object_storage.ObjectDetailWidget', config: { objectId: 41 } },
+          ] } });
+        },
+        publishedObjects,
+      };
+      const model = await buildPublishedPageModel(
+        { withSnapshot: async read => read(cycleReader) },
+        'example.org',
+        '/news',
+        new Date('2026-06-01'),
+      );
+      return { model, publishedObjects };
+    };
+
+    const selfCycle = await runCycle({ '41': object('41', '41') });
+    const selfNested = ((selfCycle.model?.slots.main[0].data?.item as PublishedObject).widgets as Record<string, Widget[]>).body[0];
+    expect((selfNested.data?.item as PublishedObject).widgets).toEqual({});
+    expect(selfCycle.publishedObjects).toHaveBeenCalledTimes(2);
+
+    const mutualCycle = await runCycle({ '41': object('41', '42'), '42': object('42', '41') });
+    const firstNested = ((mutualCycle.model?.slots.main[0].data?.item as PublishedObject).widgets as Record<string, Widget[]>).body[0];
+    const secondNested = (((firstNested.data?.item as PublishedObject).widgets as Record<string, Widget[]>).body[0]);
+    expect((secondNested.data?.item as PublishedObject).widgets).toEqual({});
+    expect(mutualCycle.publishedObjects).toHaveBeenCalledTimes(3);
+  });
+
+  it('uses the Django item count for every TopNews layout', async () => {
+    const queries: Array<{ limit: number }> = [];
+    const publishedObjects = vi.fn(async (query: { limit: number }) => {
+      queries.push(query);
+      return [];
+    });
+    const topNewsReader: PageReader = {
+      ...reader,
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        if (id !== child.id || !selected) return selected;
+        return version({ ...selected, widgets: { main: ['1x2', '1x3', '2x3_2', '2x1', '2x2'].map(layout => ({
+          id: `top-${layout}`,
+          type: 'easy_widgets.TopNewsPlugWidget',
+          config: { objectTypes: ['news'], layout },
+        })) } });
+      },
+      publishedObjects,
+    };
+
+    await buildPublishedPageModel(
+      { withSnapshot: async read => read(topNewsReader) },
+      'example.org',
+      '/news',
+      new Date('2026-06-01'),
+    );
+
+    expect(queries.map(query => query.limit)).toEqual([2, 3, 5, 2, 4]);
+  });
+
+  it('loads ObjectList hierarchy only when it is configured for display', async () => {
+    const queries: Array<{ includeHierarchy?: boolean }> = [];
+    const publishedObjects = vi.fn(async (query: { includeHierarchy?: boolean }) => {
+      queries.push(query);
+      return [];
+    });
+    const listReader: PageReader = {
+      ...reader,
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        if (id !== child.id || !selected) return selected;
+        return version({ ...selected, widgets: { main: [
+          { id: 'hierarchy', type: 'object_storage.ObjectListWidget', config: { objectType: 'article', show_hierarchy: true } },
+          { id: 'flat', type: 'object_storage.ObjectListWidget', config: { objectType: 'article', showHierarchy: false } },
+        ] } });
+      },
+      publishedObjects,
+    };
+
+    await buildPublishedPageModel(
+      { withSnapshot: async read => read(listReader) },
+      'example.org',
+      '/news',
+      new Date('2026-06-01'),
+    );
+
+    expect(queries.map(query => query.includeHierarchy)).toEqual([true, false]);
+  });
+
   it('rejects unknown, malformed and unmatched dynamic paths', async () => {
     const unknown = { ...reader, child: async () => page({ ...child, path_pattern: 'unknown' }) };
     expect(await buildPublishedPageModel({ withSnapshot: async read => read(unknown) }, 'example.org', '/news/story')).toBeNull();

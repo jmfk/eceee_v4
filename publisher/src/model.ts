@@ -72,7 +72,10 @@ export interface PublishedObject {
   metadata: Record<string, unknown>;
   publishDate: string;
   isFeatured: boolean;
+  createdAt?: string;
+  updatedAt?: string;
   level?: number;
+  parent?: PublishedObjectLink;
   ancestors?: PublishedObjectLink[];
   children?: PublishedObjectLink[];
 }
@@ -571,6 +574,17 @@ function positiveLimit(input: unknown, fallback: number): number {
   return Number.isInteger(limit) && limit > 0 ? Math.min(limit, 50) : fallback;
 }
 
+function topNewsLimit(layout: unknown): number {
+  const limits: Record<string, number> = {
+    '1x3': 3,
+    '1x2': 2,
+    '2x3_2': 5,
+    '2x1': 2,
+    '2x2': 4,
+  };
+  return limits[String(layout ?? '1x3')] ?? 3;
+}
+
 function objectPath(basePath: string, slug: string): string {
   return `${basePath === '/' ? '' : basePath}/${encodeURIComponent(slug)}/`.replace(/^$/, '/');
 }
@@ -583,20 +597,20 @@ async function resolvePublishedData(
   pagePath: string,
   pathVariables: Record<string, string>,
 ): Promise<Record<string, Widget[]>> {
-  const resolve = async (widget: Widget): Promise<Widget> => {
-    const resolveNested = async (candidate: unknown): Promise<unknown> => {
+  const resolve = async (widget: Widget, objectStack = new Set<string>()): Promise<Widget> => {
+    const resolveNested = async (candidate: unknown, activeObjectStack = objectStack): Promise<unknown> => {
       if (Array.isArray(candidate)) {
         const values: unknown[] = [];
-        for (const value of candidate) values.push(await resolveNested(value));
+        for (const value of candidate) values.push(await resolveNested(value, activeObjectStack));
         return values;
       }
       if (!candidate || typeof candidate !== 'object') return candidate;
       const record = candidate as Record<string, unknown>;
       if (typeof record.type === 'string' && record.config && typeof record.config === 'object') {
-        return resolve(record as unknown as Widget);
+        return resolve(record as unknown as Widget, activeObjectStack);
       }
       const entries: Array<[string, unknown]> = [];
-      for (const [key, value] of Object.entries(record)) entries.push([key, await resolveNested(value)]);
+      for (const [key, value] of Object.entries(record)) entries.push([key, await resolveNested(value, activeObjectStack)]);
       return Object.fromEntries(entries);
     };
     const config = await resolveNested(widget.config) as Record<string, unknown>;
@@ -614,10 +628,12 @@ async function resolvePublishedData(
     } else if (widget.type === 'object_storage.ObjectListWidget') {
       const objectType = String(config.objectType ?? config.object_type ?? '');
       if (objectType) {
+        const showHierarchy = (config.showHierarchy ?? config.show_hierarchy) === true;
         items = await reader.publishedObjects({
           objectTypeNames: [objectType],
           limit: positiveLimit(config.limit, 5),
           sortOrder: String(config.orderBy ?? config.order_by ?? '-created_at'),
+          includeHierarchy: showHierarchy,
         }, tenantId, at);
       } else {
         items = [];
@@ -625,7 +641,9 @@ async function resolvePublishedData(
     } else if (widget.type === 'easy_widgets.TopNewsPlugWidget' || widget.type === 'easy_widgets.SidebarTopNewsWidget') {
       items = await reader.publishedObjects({
         objectTypeNames: stringList(config.objectTypes ?? config.object_types),
-        limit: positiveLimit(config.limit ?? config.maxItems ?? config.max_items, widget.type === 'easy_widgets.TopNewsPlugWidget' ? 4 : 5),
+        limit: widget.type === 'easy_widgets.TopNewsPlugWidget'
+          ? topNewsLimit(config.layout)
+          : positiveLimit(config.limit ?? config.maxItems ?? config.max_items, 5),
         sortOrder: String(config.sortOrder ?? config.sort_order ?? '-publish_date'),
         featuredFirst: true,
       }, tenantId, at);
@@ -667,9 +685,13 @@ async function resolvePublishedData(
     if (widget.type === 'easy_widgets.NewsDetailWidget' || widget.type === 'object_storage.ObjectDetailWidget') {
       if (item) {
         const withPath = (related: PublishedObjectLink) => ({ ...related, path: objectPath(pagePath, related.slug) });
+        const objectId = String(item.id);
+        const isCycle = objectStack.has(objectId);
+        const nestedObjectStack = new Set(objectStack);
+        nestedObjectStack.add(objectId);
         item = {
           ...item,
-          widgets: await resolveNested(item.widgets) as Record<string, unknown>,
+          widgets: isCycle ? {} : await resolveNested(item.widgets, nestedObjectStack) as Record<string, unknown>,
           ancestors: item.ancestors?.map(withPath),
           children: item.children?.map(withPath),
         };

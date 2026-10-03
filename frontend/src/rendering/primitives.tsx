@@ -65,6 +65,19 @@ export const formatDisplayDate = (candidate: unknown, month: 'long' | 'short' = 
     }).format(date)
 }
 
+export const formatDisplayDateTime = (candidate: unknown): string => {
+    const raw = String(candidate || '')
+    const date = new Date(raw)
+    if (Number.isNaN(date.getTime())) return raw
+    const time = new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'UTC',
+    }).format(date)
+    return `${formatDisplayDate(date.toISOString())} ${time}`
+}
+
 export const normalizeContentMediaHtml = (html?: string): string => {
     const sanitized = sanitizeHtml(html)
     if (typeof document === 'undefined') return sanitized

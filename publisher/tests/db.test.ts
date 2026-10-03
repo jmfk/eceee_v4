@@ -148,8 +148,12 @@ describe('database snapshot', () => {
     const [sql, parameters] = mocks.query.mock.calls[1];
     expect(sql).toContain('CASE WHEN $8::boolean');
     expect(sql).toContain('ancestor.tenant_id = $1');
+    expect(sql).toContain('parent.id = object.parent_id AND parent.tenant_id = $1');
+    expect(sql).toContain('parent_version.effective_date <= $4');
     expect(sql).toContain('child.tenant_id = $1 AND child.parent_id = object.id');
     expect(sql).toContain('child_version.effective_date <= $4');
+    expect(sql).toContain('object.created_at::text AS "createdAt"');
+    expect(sql).toContain('object.updated_at::text AS "updatedAt"');
     expect(parameters[7]).toBe(true);
   });
 

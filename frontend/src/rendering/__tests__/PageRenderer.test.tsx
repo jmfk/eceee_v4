@@ -344,6 +344,30 @@ describe('PageRenderer', () => {
         expect(container.querySelector('.object-excerpt')).not.toHaveTextContent('Wrong summary')
     })
 
+    it('renders ObjectList hierarchy only when enabled', () => {
+        const item = {
+            id: 'object-1', title: 'Child object', slug: 'child-object', level: 2,
+            objectType: { name: 'article', label: 'Article' }, data: {},
+            parent: { id: 'parent', title: 'Parent object', objectType: { name: 'article', label: 'Article' } },
+            ancestors: [{ id: 'grandparent', title: 'Grandparent object', objectType: { name: 'article', label: 'Article' } }],
+        }
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'shown', type: 'object_storage.ObjectListWidget', config: { show_hierarchy: true }, data: { status: 'ready', items: [item] } },
+            { id: 'hidden', type: 'object_storage.ObjectListWidget', config: { showHierarchy: false }, data: { status: 'ready', items: [{ ...item, id: 'object-2' }] } },
+        ] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+        const lists = container.querySelectorAll('[data-widget-type="object-list"]')
+
+        expect(lists[0].querySelector('.object-item')).toHaveClass('level-2')
+        expect(lists[0].querySelector('.hierarchy-indicator')).toHaveStyle({ marginLeft: '40px' })
+        expect(lists[0]).toHaveTextContent('Child of: Parent object')
+        expect(lists[0]).not.toHaveTextContent('Child of: Grandparent object')
+        expect(lists[1].querySelector('.object-item')).not.toHaveClass('level-2')
+        expect(lists[1].querySelector('.hierarchy-indicator')).toBeNull()
+        expect(lists[1]).not.toHaveTextContent('Child of:')
+    })
+
     it('uses the configured NewsList excerpt length and strips source HTML', () => {
         const model = createPageRenderModel({ widgets: { main: [{
             id: 'news',
@@ -383,6 +407,46 @@ describe('PageRenderer', () => {
         expect(details[0].querySelector('.child-title a')).toHaveAttribute('href', '/objects/child-object/')
         expect(details[1].querySelector('.object-hierarchy')).toBeNull()
         expect(details[1].querySelector('.object-children')).toBeNull()
+    })
+
+    it('renders ObjectDetail technical metadata only when enabled', () => {
+        const item = {
+            id: 'object-1', title: 'Published object', slug: 'published-object', level: 2,
+            objectType: { name: 'article', label: 'Article' }, data: {}, widgets: {},
+            createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-30T12:00:00Z',
+            metadata: { source: 'archive' },
+        }
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'shown', type: 'object_storage.ObjectDetailWidget', config: { show_metadata: true }, data: { status: 'ready', item } },
+            { id: 'hidden', type: 'object_storage.ObjectDetailWidget', config: { showMetadata: false }, data: { status: 'ready', item: { ...item, id: 'object-2' } } },
+        ] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+        const details = container.querySelectorAll('[data-widget-type="object-detail"]')
+
+        expect(details[0]).toHaveTextContent('Technical Details')
+        expect(details[0]).toHaveTextContent('Object ID: object-1')
+        expect(details[0]).toHaveTextContent('Slug: published-object')
+        expect(details[0]).toHaveTextContent('Tree Level: 2')
+        expect(details[0]).toHaveTextContent('Created: September 1, 2026 10:00 AM')
+        expect(details[0]).toHaveTextContent('Last Updated: September 30, 2026 12:00 PM')
+        expect(details[0]).toHaveTextContent('{"source":"archive"}')
+        expect(details[1].querySelector('.object-metadata')).toBeNull()
+    })
+
+    it('formats ObjectDetail metadata timestamps as one UTC instant', () => {
+        const model = createPageRenderModel({ widgets: { main: [{
+            id: 'detail', type: 'object_storage.ObjectDetailWidget', config: { showMetadata: true },
+            data: { status: 'ready', item: {
+                id: 'object-1', title: 'Published object', slug: 'published-object', level: 0,
+                objectType: { name: 'article', label: 'Article' }, data: {}, widgets: {},
+                createdAt: '2026-09-01T23:30:00-04:00',
+            } },
+        }] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(container.querySelector('.object-metadata')).toHaveTextContent('Created: September 2, 2026 3:30 AM')
     })
 
     it('falls back to published object data when structured widgets are disabled or absent', () => {

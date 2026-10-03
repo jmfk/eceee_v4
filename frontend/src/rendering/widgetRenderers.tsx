@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import type { RenderWidgetModel, WidgetRenderComponent, WidgetRenderProps } from './types'
 import { processNavigationItems } from '../utils/navigationItems'
-import { asArray, EmptyRender, formatDisplayDate, imageUrl, ImageView, normalizeContentMediaHtml, PreviewLink, RenderFailure, SafeHtml, sanitizeHtml, TextWithBreaks, value } from './primitives'
+import { asArray, EmptyRender, formatDisplayDate, formatDisplayDateTime, imageUrl, ImageView, normalizeContentMediaHtml, PreviewLink, RenderFailure, SafeHtml, sanitizeHtml, TextWithBreaks, value } from './primitives'
 
 const ContentRender: WidgetRenderComponent = ({ widget }) => <div className="widget-type-easy-widgets-contentwidget">
     <SafeHtml className={`content-widget${value(widget.config, 'variantClasses') ? ` ${value(widget.config, 'variantClasses')}` : ''}${value(widget.config, 'showBorder', 'show_border') ? ' border-enabled' : ''}`} html={normalizeContentMediaHtml(value(widget.config, 'content', 'html'))} />
@@ -676,14 +676,18 @@ const ObjectListRender: WidgetRenderComponent = ({ widget }) => {
     const state = newsState(widget)
     if (!Array.isArray(state)) return <section className="object-list-widget" data-widget-type="object-list">{state}</section>
     const showExcerpt = configEnabled(widget.config, true, 'showExcerpt', 'show_excerpt')
+    const showHierarchy = configEnabled(widget.config, false, 'showHierarchy', 'show_hierarchy')
     const template = value(widget.config, 'displayTemplate', 'display_template') || 'card'
     return <section className={`object-list-widget template-${template}`} data-widget-type="object-list"><div className="objects-container">{state.map((item, index) => {
         const fields = newsFields(item)
         const excerpt = objectListExcerpt(item, widget.config)
-        return <article className="object-item" key={item.id || index}>
+        const parent = item.parent
+        const level = Number(item.level) || 0
+        return <article className={`object-item${showHierarchy ? ` level-${level}` : ''}`} key={item.id || index}>
+            {showHierarchy && level > 0 && <div className="hierarchy-indicator" style={{ marginLeft: `${level * 20}px` }}><span className="hierarchy-line">└─</span></div>}
             <div className="object-content"><h3 className="object-title"><PreviewLink href={fields.path}>{item.title}</PreviewLink></h3>
                 {showExcerpt && excerpt && <div className="object-excerpt">{excerpt}</div>}
-                <div className="object-meta"><span className="object-type">{fields.objectType.label || fields.objectType.name}</span>{fields.publishDate && <time className="object-date" dateTime={fields.publishDate}> • {formatDisplayDate(fields.publishDate, 'short')}</time>}</div>
+                <div className="object-meta"><span className="object-type">{fields.objectType.label || fields.objectType.name}</span>{fields.publishDate && <time className="object-date" dateTime={fields.publishDate}> • {formatDisplayDate(fields.publishDate, 'short')}</time>}{showHierarchy && parent && <span className="object-parent"> • Child of: {parent.title}</span>}</div>
             </div>
         </article>
     })}</div></section>
@@ -694,6 +698,7 @@ const ObjectDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) =>
     const fields = newsFields(item)
     const slots: Record<string, unknown> = item.widgets && typeof item.widgets === 'object' ? item.widgets : {}
     const showWidgets = configEnabled(widget.config, true, 'showWidgets', 'show_widgets')
+    const showMetadata = configEnabled(widget.config, false, 'showMetadata', 'show_metadata')
     const hasWidgets = Object.values(slots).some((widgets) => asArray<any>(widgets).length > 0)
     const dataEntries = Object.entries(item.data || {}).filter(([, fieldValue]) => Boolean(fieldValue))
     const showHierarchy = configEnabled(widget.config, true, 'showHierarchy', 'show_hierarchy')
@@ -710,6 +715,14 @@ const ObjectDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) =>
             const childFields = newsFields(child)
             return <div className="child-item" key={child.id || index}><h4 className="child-title"><PreviewLink href={child.path}>{child.title}</PreviewLink></h4><p className="child-meta">{childFields.objectType.label || childFields.objectType.name}{childFields.publishDate && <> • {formatDisplayDate(childFields.publishDate, 'short')}</>}</p></div>
         })}</div></section>}
+        {showMetadata && <footer className="object-metadata"><details><summary>Technical Details</summary><div>
+            <p><strong>Object ID:</strong> {item.id}</p>
+            <p><strong>Slug:</strong> {item.slug}</p>
+            <p><strong>Tree Level:</strong> {item.level}</p>
+            {item.createdAt && <p><strong>Created:</strong> <time dateTime={item.createdAt}>{formatDisplayDateTime(item.createdAt)}</time></p>}
+            {item.updatedAt && <p><strong>Last Updated:</strong> <time dateTime={item.updatedAt}>{formatDisplayDateTime(item.updatedAt)}</time></p>}
+            {item.metadata && Object.keys(item.metadata).length > 0 && <p><strong>Metadata:</strong> {JSON.stringify(item.metadata)}</p>}
+        </div></details></footer>}
     </article>
 }
 const TopNewsPlugRender: WidgetRenderComponent = ({ widget }) => {

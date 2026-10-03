@@ -177,7 +177,27 @@ function reader(client: PoolClient): PageReader {
         SELECT object.id::text, object.title, object.slug,
           jsonb_build_object('id', type.id::text, 'name', type.name, 'label', type.label, 'pluralLabel', type.plural_label) AS "objectType",
           published.data, published.widgets, object.metadata,
-          published.effective_date::text AS "publishDate", published.is_featured AS "isFeatured", object.level,
+          published.effective_date::text AS "publishDate", published.is_featured AS "isFeatured",
+          object.created_at::text AS "createdAt", object.updated_at::text AS "updatedAt", object.level,
+          CASE WHEN $8::boolean THEN (
+            SELECT jsonb_build_object(
+              'id', parent.id::text, 'title', parent.title, 'slug', parent.slug,
+              'objectType', jsonb_build_object('id', parent_type.id::text, 'name', parent_type.name,
+                'label', parent_type.label, 'pluralLabel', parent_type.plural_label)
+            )
+            FROM object_storage_objectinstance AS parent
+            JOIN object_storage_objecttypedefinition AS parent_type ON parent_type.id = parent.object_type_id
+            JOIN LATERAL (
+              SELECT 1
+              FROM object_storage_objectversion AS parent_version
+              WHERE parent_version.object_instance_id = parent.id
+                AND parent_version.effective_date <= $4
+                AND (parent_version.expiry_date IS NULL OR parent_version.expiry_date > $4)
+              ORDER BY parent_version.version_number DESC
+              LIMIT 1
+            ) AS parent_published ON true
+            WHERE parent.id = object.parent_id AND parent.tenant_id = $1
+          ) ELSE NULL END AS parent,
           CASE WHEN $8::boolean THEN COALESCE((
             SELECT jsonb_agg(jsonb_build_object(
               'id', ancestor.id::text, 'title', ancestor.title, 'slug', ancestor.slug,
