@@ -78,12 +78,26 @@ export function responsiveImageSources(image: ImageRecord, sourceUrl: string, op
   const width = positiveNumber(image.width ?? image.originalWidth ?? image.original_width);
   const height = positiveNumber(image.height ?? image.originalHeight ?? image.original_height);
   const dpr = positiveNumber(image.dpr) ?? 2;
-  if (!width || !height || (!options && dpr <= 1)) return null;
+  const maxWidth = positiveNumber(options?.maxWidth);
+  const maxHeight = positiveNumber(options?.maxHeight);
+  if ((!width || !height) && (!options || !maxWidth || !maxHeight)) return null;
+  if (!options && dpr <= 1) return null;
 
-  const [displayWidth, displayHeight] = options
-    ? constrainedDimensions(width, height, positiveNumber(options.maxWidth), positiveNumber(options.maxHeight))
-    : [Math.max(1, Math.floor(width / dpr)), Math.max(1, Math.floor(height / dpr))];
-  const [twoXWidth, twoXHeight] = constrainedDimensions(width, height, displayWidth * 2, displayHeight * 2);
+  let displayWidth: number;
+  let displayHeight: number;
+  let twoXWidth: number;
+  let twoXHeight: number;
+  if (width && height) {
+    [displayWidth, displayHeight] = options
+      ? constrainedDimensions(width, height, maxWidth, maxHeight)
+      : [Math.max(1, Math.floor(width / dpr)), Math.max(1, Math.floor(height / dpr))];
+    [twoXWidth, twoXHeight] = constrainedDimensions(width, height, displayWidth * 2, displayHeight * 2);
+  } else {
+    displayWidth = Math.max(1, Math.floor(maxWidth!));
+    displayHeight = Math.max(1, Math.floor(maxHeight!));
+    twoXWidth = displayWidth * 2;
+    twoXHeight = displayHeight * 2;
+  }
   const oneX = signedResizeUrl(sourceUrl, displayWidth, displayHeight, options);
   const twoX = signedResizeUrl(sourceUrl, twoXWidth, twoXHeight, options);
   if (!oneX || !twoX) return null;

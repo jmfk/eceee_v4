@@ -343,13 +343,17 @@ describe('public resolution', () => {
           { id: 'copy', type: 'easy_widgets.ContentWidget', config: { content: `<p><a data-page-id="2" href="#">News</a><a href="{&quot;type&quot;:&quot;internal&quot;,&quot;pageId&quot;:2,&quot;anchor&quot;:&quot;details&quot;}">Structured</a><a href="{&quot;type&quot;:&quot;external&quot;,&quot;url&quot;:&quot;https://example.net&quot;}">External</a><a data-page-id="999" href="#">Missing</a></p><div data-media-insert="true" data-media-id="${inlineMediaId}" data-width="medium"><img src="/old.png"></div>` } },
           { id: 'logos', type: 'easy_widgets.ImageWidget', config: {
             collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8', display_type: 'gallery', image_style: 'cropped',
-            imgproxy_override: { max_width: 60, gravity: 'no' },
+            imgproxy_override: { width: 60, gravity: 'no' },
           } },
           { id: 'section', type: 'easy_widgets.SectionWidget', config: { slots: { content: [
             { id: 'nested-logos', type: 'easy_widgets.ImageWidget', config: { collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8' } },
             { id: 'subpages', type: 'easy_widgets.NavigationWidget', config: { navigation_style: 'sub-page-navigation', menu_items: [] } },
             { id: 'broken-collection', type: 'easy_widgets.ImageWidget', config: { collection_id: 'not-a-uuid' } },
           ] } } },
+          { id: 'legacy-image', type: 'easy_widgets.ImageWidget', config: {
+            image: { url: '/legacy.png', type: 'image', altText: 'Legacy image' }, image_style: 'cropped',
+            imgproxyOverride: { width: 60 },
+          } },
         ] } });
       },
       publishedPageReferences,
@@ -357,7 +361,7 @@ describe('public resolution', () => {
       publicMedia,
       theme: async (id, tenant) => id === theme.id && tenant === theme.tenant_id ? {
         ...theme,
-        image_styles: { cropped: { imgproxy_config: { width: 80, height: 40, resize_type: 'fill', quality: 72, format: 'webp' } } },
+        image_styles: { cropped: { imgproxy_config: { max_width: 80, max_height: 40, resize_type: 'fill', quality: 72, format: 'webp' } } },
       } : null,
     };
 
@@ -397,6 +401,13 @@ describe('public resolution', () => {
         depth: 2,
         currentChildren: [expect.objectContaining({ label: 'Child', path: '/news/story/child/' })],
       });
+      expect(model?.slots.main[4].config.mediaItems).toEqual([expect.objectContaining({
+        url: '/legacy.png',
+        src: expect.stringContaining('resize:fill:60:40/quality:72/format:webp'),
+        srcSet: expect.stringMatching(/resize:fill:60:40.* 1x, .*resize:fill:120:80.* 2x/),
+        displayWidth: 60,
+        displayHeight: 40,
+      })]);
       expect(publishedPageReferences).toHaveBeenCalledWith([child.id, '999'], root.tenant_id, root.id, expect.any(Date));
       expect(publicMedia).toHaveBeenCalledWith([inlineMediaId], ['67d9020f-1d73-47be-bd24-1fe52d2dbef8'], root.tenant_id);
     } finally {

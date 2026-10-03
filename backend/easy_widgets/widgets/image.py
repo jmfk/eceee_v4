@@ -13,6 +13,26 @@ from webpages.widget_registry import BaseWidget, register_widget_type
 logger = logging.getLogger(__name__)
 
 
+def _normalize_imgproxy_config(config):
+    if not isinstance(config, dict):
+        return {}
+
+    aliases = {
+        "max_width": ("max_width", "maxWidth", "width"),
+        "max_height": ("max_height", "maxHeight", "height"),
+        "resize_type": ("resize_type", "resizeType"),
+        "gravity": ("gravity",),
+        "quality": ("quality",),
+        "format": ("format",),
+    }
+    normalized = {}
+    for name, candidates in aliases.items():
+        selected = next((config.get(candidate) for candidate in candidates if config.get(candidate) is not None), None)
+        if selected is not None:
+            normalized[name] = selected
+    return normalized
+
+
 class ImageMediaItem(BaseModel):
     """Individual media item for Image widget"""
 
@@ -611,10 +631,14 @@ class ImageWidget(BaseWidget):
             "format": "webp",
         }
         if style:
-            imgproxy_config.update(style.get("imgproxy_config") or style.get("imgproxyConfig") or {})
-        imgproxy_config.update(config.get("imgproxy_override") or config.get("imgproxyOverride") or {})
-        max_width = imgproxy_config.get("max_width") or imgproxy_config.get("width") or 896
-        max_height = imgproxy_config.get("max_height") or imgproxy_config.get("height")
+            imgproxy_config.update(
+                _normalize_imgproxy_config(style.get("imgproxy_config") or style.get("imgproxyConfig"))
+            )
+        imgproxy_config.update(
+            _normalize_imgproxy_config(config.get("imgproxy_override") or config.get("imgproxyOverride"))
+        )
+        max_width = imgproxy_config.get("max_width", 896)
+        max_height = imgproxy_config.get("max_height")
 
         for item in template_config.get("media_items", []):
             if not isinstance(item, dict) or item.get("type", "image") != "image" or not item.get("url"):
