@@ -33,6 +33,33 @@ def _normalize_imgproxy_config(config):
     return normalized
 
 
+def _media_url(media):
+    if not isinstance(media, dict):
+        return ""
+    return next(
+        (
+            media.get(key)
+            for key in (
+                "imgproxyBaseUrl",
+                "imgproxy_base_url",
+                "fileUrl",
+                "file_url",
+                "publicUrl",
+                "public_url",
+                "absoluteUrl",
+                "absolute_url",
+                "downloadUrl",
+                "download_url",
+                "uuidUrl",
+                "uuid_url",
+                "url",
+            )
+            if media.get(key)
+        ),
+        "",
+    )
+
+
 class ImageMediaItem(BaseModel):
     """Individual media item for Image widget"""
 
@@ -454,7 +481,7 @@ class ImageWidget(BaseWidget):
         # Get theme and style for applying defaults (context may contain theme)
         theme = context.get("theme")
         style = None
-        style_name = config.get("image_style")
+        style_name = config.get("imageStyle") or config.get("image_style")
 
         if theme and style_name:
             image_styles = theme.image_styles or {}
@@ -501,7 +528,7 @@ class ImageWidget(BaseWidget):
                 # Convert camelCase to snake_case for template
                 media_item = {
                     "id": image.get("id"),
-                    "url": image.get("url") or image.get("fileUrl") or image.get("imgproxyBaseUrl", ""),
+                    "url": _media_url(image),
                     "type": image.get("type", "image"),
                     "alt_text": image.get("altText") or image.get("alt_text") or image.get("title", ""),
                     "caption": image.get("caption") or image.get("description", ""),
@@ -511,10 +538,7 @@ class ImageWidget(BaseWidget):
                     "source": image.get("source", ""),
                     "width": image.get("width"),
                     "height": image.get("height"),
-                    "thumbnail_url": image.get("thumbnailUrl")
-                    or image.get("thumbnail_url")
-                    or image.get("url")
-                    or image.get("fileUrl", ""),
+                    "thumbnail_url": image.get("thumbnailUrl") or image.get("thumbnail_url") or _media_url(image),
                 }
                 template_config["media_items"] = [media_item]
 
@@ -554,6 +578,8 @@ class ImageWidget(BaseWidget):
         template_config["display_type"] = template_config.get(
             "displayType", template_config.get("display_type", "single")
         )
+        if image and not is_collection and not style_name:
+            template_config["display_type"] = "single"
         template_config["image_style"] = template_config.get("imageStyle", template_config.get("image_style", None))
         template_config["gallery_columns"] = template_config.get(
             "galleryColumns", template_config.get("gallery_columns", 3)

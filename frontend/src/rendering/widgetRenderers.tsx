@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import type { RenderWidgetModel, WidgetRenderComponent, WidgetRenderProps } from './types'
 import { processNavigationItems } from '../utils/navigationItems'
 import { asArray, EmptyRender, formatDisplayDate, formatDisplayDateTime, imageUrl, ImageView, normalizeContentMediaHtml, PreviewLink, RenderFailure, SafeHtml, sanitizeHtml, TextWithBreaks, value } from './primitives'
+import { imageWidgetMediaItems, isImageCollectionReference } from '../utils/imageWidgetMedia'
 
 const ContentRender: WidgetRenderComponent = ({ widget }) => <div className="widget-type-easy-widgets-contentwidget">
     <SafeHtml className={`content-widget${value(widget.config, 'variantClasses') ? ` ${value(widget.config, 'variantClasses')}` : ''}${value(widget.config, 'showBorder', 'show_border') ? ' border-enabled' : ''}`} html={normalizeContentMediaHtml(value(widget.config, 'content', 'html'))} />
@@ -137,9 +138,13 @@ const MediaView = ({ item, className }: { item: any, className: string }) => {
 
 const ImageRender: WidgetRenderComponent = ({ widget }) => {
     const config = widget.config
-    const displayType = value(config, 'displayType', 'display_type') || 'single'
-    const mediaItems = asArray<any>(value(config, 'mediaItems', 'media_items'))
-    const items = mediaItems
+    const configuredMediaItems = asArray<any>(value(config, 'mediaItems', 'media_items'))
+    const items = imageWidgetMediaItems(config, configuredMediaItems)
+    const canonicalImage = value(config, 'image')
+    const isCanonicalSingle = Boolean(canonicalImage)
+        && !isImageCollectionReference(canonicalImage)
+        && configuredMediaItems.length === 0
+    const displayType = isCanonicalSingle ? 'single' : value(config, 'displayType', 'display_type') || 'single'
     const [currentIndex, setCurrentIndex] = useState(0)
     const autoPlay = value(config, 'autoPlay', 'auto_play') === true
     const autoPlayInterval = Number(value(config, 'autoPlayInterval', 'auto_play_interval')) || 3
@@ -177,7 +182,7 @@ const ImageRender: WidgetRenderComponent = ({ widget }) => {
             </div>
         </div>
     }
-    const source = mediaItems[0] || value(config, 'imageUrl', 'image_url', 'image', 'src', 'url')
+    const source = items[0] || value(config, 'imageUrl', 'image_url', 'image', 'src', 'url')
     if (!imageUrl(source)) return null
     const alt = source && typeof source === 'object'
         ? source.altText || source.alt_text || source.alt || source.title || value(config, 'altText', 'alt_text', 'alt') || ''

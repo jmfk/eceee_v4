@@ -82,6 +82,38 @@ class ImageWidgetTests(SimpleTestCase):
         )
 
     @patch("file_manager.imgproxy.imgproxy_service.generate_responsive_urls")
+    def test_canonical_single_image_accepts_media_api_snake_case_urls(self, generate_responsive_urls):
+        generate_responsive_urls.return_value = {}
+
+        config = ImageWidget().prepare_template_context(
+            {
+                "image": {
+                    "id": "media-1",
+                    "imgproxy_base_url": "/full-size.jpg",
+                    "thumbnail_url": "/thumbnail.jpg",
+                    "type": "image",
+                    "title": "The power of light",
+                },
+                "display_type": "gallery",
+            }
+        )
+
+        self.assertEqual(config["media_items"][0]["url"], "/full-size.jpg")
+        self.assertEqual(config["media_items"][0]["thumbnail_url"], "/thumbnail.jpg")
+        self.assertEqual(config["display_type"], "single")
+        generate_responsive_urls.assert_called_once_with(
+            source_url="/full-size.jpg",
+            max_width=896,
+            max_height=None,
+            original_width=None,
+            original_height=None,
+            resize_type="fit",
+            gravity="sm",
+            quality=85,
+            format="webp",
+        )
+
+    @patch("file_manager.imgproxy.imgproxy_service.generate_responsive_urls")
     def test_widget_imgproxy_aliases_override_style_aliases(self, generate_responsive_urls):
         generate_responsive_urls.return_value = {}
         theme = SimpleNamespace(
