@@ -41,11 +41,21 @@ class LayoutWidgetConfig(BaseModel):
 class SidebarConfig(LayoutWidgetConfig):
     """Configuration for Sidebar widget"""
 
-    position: Literal["left", "right"] = Field("right", description="Sidebar position")
-    width: Optional[str] = Field(None, description="Sidebar width (CSS value)")
+    position: Literal["left", "right"] = Field(
+        "right",
+        description="Sidebar position",
+        json_schema_extra={"group": "Layout"},
+    )
+    width: Optional[str] = Field(
+        None,
+        description="Sidebar width (CSS value)",
+        json_schema_extra={"group": "Layout"},
+    )
     collapsible: bool = Field(False, description="Make sidebar collapsible")
     widgets: List[Dict[str, Any]] = Field(
-        default_factory=list, description="Nested widgets in sidebar sections"
+        default_factory=list,
+        description="Nested widgets in sidebar sections",
+        json_schema_extra={"group": "Content"},
     )
     component_style: str = Field(
         "default",

@@ -25,6 +25,7 @@ class NewsDetailConfig(BaseModel):
         json_schema_extra={
             "component": "TextInput",
             "placeholder": "news_slug",
+            "group": "Content",
         },
     )
 
@@ -34,6 +35,7 @@ class NewsDetailConfig(BaseModel):
         json_schema_extra={
             "component": "ObjectTypeSelectorInput",
             "multiple": True,
+            "group": "Content",
         },
     )
 

@@ -35,6 +35,7 @@ class HeroConfig(BaseModel):
         json_schema_extra={
             "component": "TextareaInput",
             "order": 2,
+            "group": "Content",
             "placeholder": "Optional text before header",
             "rows": 3,
         },
@@ -46,6 +47,7 @@ class HeroConfig(BaseModel):
         json_schema_extra={
             "component": "TextareaInput",
             "order": 3,
+            "group": "Content",
             "placeholder": "Optional text after header",
             "rows": 3,
         },
@@ -57,6 +59,7 @@ class HeroConfig(BaseModel):
         json_schema_extra={
             "component": "ImageInput",
             "order": 4,
+            "group": "Media",
             "mediaTypes": ["image"],
             "allowCollections": False,
             "multiple": False,

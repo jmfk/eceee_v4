@@ -24,6 +24,7 @@ class NewsListConfig(BaseModel):
         json_schema_extra={
             "component": "ObjectTypeSelectorInput",
             "multiple": True,
+            "group": "Content",
         },
     )
 
@@ -34,6 +35,7 @@ class NewsListConfig(BaseModel):
         description="Maximum number of items to display",
         json_schema_extra={
             "component": "NumberInput",
+            "group": "Content",
         },
     )
 
@@ -42,6 +44,7 @@ class NewsListConfig(BaseModel):
         description="Sort order for news items",
         json_schema_extra={
             "component": "SelectInput",
+            "group": "Content",
             "choices": [
                 {"value": "-publish_date", "label": "Newest First (Publish Date)"},
                 {"value": "publish_date", "label": "Oldest First (Publish Date)"},

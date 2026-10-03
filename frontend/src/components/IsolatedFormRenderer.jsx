@@ -15,13 +15,12 @@ import {
     shouldHydrateExternalWidgetProps
 } from '../utils/pageEditorPropAdapter'
 
-const PRIMARY_FIELD_GROUPS = new Set(['content', 'media'])
+const PRIMARY_FIELD_GROUPS = new Set(['content', 'media', 'layout'])
 
 const isPrimaryWidgetField = (fieldName, fieldSchema, requiredFields) => {
     const groupName = fieldSchema.group?.toLowerCase()
     return requiredFields.includes(fieldName)
         || fieldSchema.editorPrimary === true
-        || !groupName
         || PRIMARY_FIELD_GROUPS.has(groupName)
 }
 

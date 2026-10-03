@@ -66,6 +66,7 @@ class FormsConfig(BaseModel):
         description="Form description",
         json_schema_extra={
             "component": "TextareaInput",
+            "group": "Content",
             "rows": 3,
             "placeholder": "Optional form description...",
         },
