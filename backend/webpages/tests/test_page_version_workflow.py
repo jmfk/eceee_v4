@@ -947,7 +947,9 @@ class PageVersionWorkflowTest(TestCase):
                 {"clientUpdatedAt": version.updated_at.isoformat(), "metaTitle": "Changed"},
                 format="json",
             )
-            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+            self.assertEqual(response.data["error"], "version_conflict")
+            self.assertEqual(response.data["details"]["server_version"]["id"], current_draft.id)
 
         url = reverse("api:pageversion-save-working-copy", kwargs={"pk": current_draft.pk})
         response = self.client.patch(
@@ -1290,7 +1292,8 @@ class PageVersionWorkflowTest(TestCase):
             format="json",
         )
 
-        self.assertEqual(rejected.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(rejected.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(rejected.data["details"]["server_version"]["id"], working_draft.id)
         self.assertEqual(published.status_code, status.HTTP_200_OK)
         live.refresh_from_db()
         working_draft.refresh_from_db()
@@ -1321,7 +1324,7 @@ class PageVersionWorkflowTest(TestCase):
     def test_publish_retry_does_not_hide_a_newer_working_copy(self):
         live = self.publish_initial()
         reviewed_at = live.updated_at
-        self.page.create_version(self.user, "Newer working copy")
+        newer = self.page.create_version(self.user, "Newer working copy")
 
         retry = self.client.post(
             reverse("api:pageversion-publish", kwargs={"pk": live.pk}),
@@ -1329,8 +1332,9 @@ class PageVersionWorkflowTest(TestCase):
             format="json",
         )
 
-        self.assertEqual(retry.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(retry.data["error"], "version_not_editable")
+        self.assertEqual(retry.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(retry.data["error"], "version_conflict")
+        self.assertEqual(retry.data["details"]["server_version"]["id"], newer.id)
 
     def test_publish_rejects_a_working_copy_changed_after_review(self):
         draft = self.page.create_version(self.user, "Reviewed draft")
@@ -1497,6 +1501,23 @@ class PageVersionWorkflowTest(TestCase):
         self.assertEqual(response.data["error"], "version_conflict")
         draft.refresh_from_db()
         self.assertIsNone(draft.effective_date)
+
+    def test_schedule_returns_the_newer_working_copy_for_a_stale_target(self):
+        stale = self.page.create_version(self.user, "Stale working copy")
+        current = self.page.create_version(self.user, "Current working copy")
+
+        response = self.client.post(
+            reverse("api:pageversion-schedule", kwargs={"pk": stale.pk}),
+            {
+                "effectiveDate": (timezone.now() + timedelta(days=1)).isoformat(),
+                "expectedRevision": stale.edit_revision,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["error"], "version_conflict")
+        self.assertEqual(response.data["details"]["server_version"]["id"], current.id)
 
     def test_schedule_and_cancel_each_advance_revision_once(self):
         draft = self.page.create_version(self.user, "Scheduled by revision")

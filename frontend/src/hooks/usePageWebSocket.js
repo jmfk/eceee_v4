@@ -81,10 +81,6 @@ export function usePageWebSocket(pageId, options = {}) {
     }, [onVersionUpdated]);
 
     useEffect(() => {
-        currentPageIdRef.current = pageId;
-    }, [pageId]);
-
-    useEffect(() => {
         activeSectionRef.current = activeSection;
         activeWidgetIdRef.current = activeWidgetId;
         sendPresence('presence_update');
@@ -285,11 +281,16 @@ export function usePageWebSocket(pageId, options = {}) {
             reconnectTimeoutRef.current = null;
         }
 
-        if (wsRef.current) {
-            wsRef.current.close();
+        const socket = wsRef.current;
+        if (socket) {
             wsRef.current = null;
+            socket.onclose = null;
+            socket.close();
         }
 
+        connectionIdRef.current = null;
+        presenceRef.current.clear();
+        setActiveEditors([]);
         setIsConnected(false);
     }, []);
 
@@ -299,8 +300,9 @@ export function usePageWebSocket(pageId, options = {}) {
 
     // Handle pageId changes - reconnect only when pageId actually changes
     useEffect(() => {
-        if (pageId !== currentPageIdRef.current && wsRef.current) {
+        if (pageId !== currentPageIdRef.current) {
             disconnect();
+            currentPageIdRef.current = pageId;
             if (enabled) {
                 connect();
             }
