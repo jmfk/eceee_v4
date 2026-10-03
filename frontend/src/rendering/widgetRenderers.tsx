@@ -653,7 +653,8 @@ const NewsDetailRender: WidgetRenderComponent = ({ widget, context, renderWidget
     const fields = newsFields(item)
     const data = item.data || {}
     const slots: Record<string, unknown> = item.widgets && typeof item.widgets === 'object' ? item.widgets : {}
-    const hasStructuredWidgets = Object.values(slots).some((widgets) => asArray<any>(widgets).length > 0)
+    const renderObjectWidgets = configEnabled(widget.config, true, 'renderObjectWidgets', 'render_object_widgets')
+    const hasStructuredWidgets = renderObjectWidgets && Object.keys(slots).length > 0
     const summary = data.summary || item.summary || ''
     const externalUrl = data.externalUrl || data.external_url || ''
     return <article className="news-detail-widget" data-widget-type="news-detail" data-object-id={item.id}>
@@ -668,7 +669,7 @@ const NewsDetailRender: WidgetRenderComponent = ({ widget, context, renderWidget
         {configEnabled(widget.config, true, 'showFeaturedImage', 'show_featured_image') && <div className="news-featured-image"><ImageView source={fields.image} alt={item.title || ''} /></div>}
         {summary && <p className="news-summary">{summary}</p>}
         {!hasStructuredWidgets && <SafeHtml className="news-content" html={data.content || data.body || data.text || item.content} />}
-        {configEnabled(widget.config, true, 'renderObjectWidgets', 'render_object_widgets') && Object.keys(slots).length > 0 && <div className="news-object-widgets">{Object.entries(slots).map(([slotName, widgets]) => <div className={`news-widget-slot news-widget-slot-${slotName}`} data-slot={slotName} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)}</div>}
+        {hasStructuredWidgets && <div className="news-object-widgets">{Object.entries(slots).map(([slotName, widgets]) => <div className={`news-widget-slot news-widget-slot-${slotName}`} data-slot={slotName} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)}</div>}
         {externalUrl && <div className="news-external-source"><PreviewLink href={externalUrl} rel="noopener noreferrer">Read the original source</PreviewLink></div>}
     </article>
 }
