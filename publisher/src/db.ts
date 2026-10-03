@@ -157,7 +157,9 @@ function reader(client: PoolClient): PageReader {
       return { files: files.rows.map(publicMediaItem), collections };
     },
     async publishedObjects(query, tenantId, at) {
-      const objectIds = (query.objectIds ?? []).filter(value => /^\d+$/.test(value));
+      const objectIds = (query.objectIds ?? []).filter(value => (
+        /^\d{1,19}$/.test(value) && BigInt(value) <= 9_223_372_036_854_775_807n
+      ));
       const typeIds = (query.objectTypeIds ?? []).filter(value => /^\d+$/.test(value));
       const typeNames = (query.objectTypeNames ?? []).filter(value => /^[a-z0-9_-]+$/i.test(value));
       if (!objectIds.length && !typeIds.length && !typeNames.length) return [];
@@ -172,7 +174,9 @@ function reader(client: PoolClient): PageReader {
         '-title': 'object.title DESC, object.id DESC',
       };
       const order = sortOrders[query.sortOrder] ?? sortOrders['-publish_date'];
-      const featured = query.featuredFirst ? 'published.is_featured DESC, ' : '';
+      const priority = query.pinnedFirst
+        ? `(object.metadata @> '{"pinned": true}'::jsonb OR object.metadata @> '{"featured": true}'::jsonb) DESC, `
+        : query.featuredFirst ? 'published.is_featured DESC, ' : '';
       const result = await client.query<PublishedObject>(`
         SELECT object.id::text, object.title, object.slug,
           jsonb_build_object('id', type.id::text, 'name', type.name, 'label', type.label, 'pluralLabel', type.plural_label) AS "objectType",
@@ -254,7 +258,7 @@ function reader(client: PoolClient): PageReader {
             OR $2::bigint[] <> '{}'::bigint[] AND type.id = ANY($2::bigint[])
             OR $3::text[] <> '{}'::text[] AND type.name = ANY($3::text[]))
           AND ($5::text IS NULL OR object.slug = $5)
-        ORDER BY ${featured}${order}
+        ORDER BY ${priority}${order}
         LIMIT $6`, [tenantId, typeIds, typeNames, at, query.slug ?? null, Math.min(Math.max(query.limit, 1), 50), objectIds, Boolean(query.includeHierarchy)]);
       return result.rows;
     },

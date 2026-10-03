@@ -733,11 +733,15 @@ const TopNewsPlugRender: WidgetRenderComponent = ({ widget }) => {
     const showType = configEnabled(widget.config, true, 'showObjectType', 'show_object_type')
     return <section className={`top-news-plug-widget layout-${value(widget.config, 'layout') || '1x3'}`} data-widget-type="top-news-plug"><div className="news-grid">{state.map((item, index) => {
         const fields = newsFields(item)
-        return <article className={`news-card${fields.pinned ? ' pinned' : ''}`} data-object-id={item.id} key={item.id || index}>
+        const data = item.data || {}
+        const excerptSource = data.summary || data.excerpt || data.description || data.content || fields.excerpt
+        const excerpt = truncateExcerpt(excerptSource, value(widget.config, 'excerptLength', 'excerpt_length') ?? 100, true)
+        const pinned = Boolean(fields.metadata.pinned || fields.metadata.featured)
+        return <article className={`news-card${pinned ? ' pinned' : ''}`} data-object-id={item.id} key={item.id || index}>
             {fields.image && <div className="news-image"><ImageView source={fields.image} alt={item.title || ''} /></div>}
             <div className="news-body"><div className="news-meta">{showType && <span className="news-type-badge">{fields.objectType.label || fields.objectType.name}</span>}{showDate && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{formatDisplayDate(fields.publishDate, 'short')}</time>}</div>
                 <h3 className="news-title"><PreviewLink href={fields.path}>{item.title || `Article ${index + 1}`}</PreviewLink></h3>
-                {showExcerpt && fields.excerpt && <div className="news-excerpt">{fields.excerpt}</div>}
+                {showExcerpt && excerpt && <div className="news-excerpt">{excerpt}</div>}
                 <div className="news-footer"><PreviewLink className="read-more" href={fields.path}>Read more</PreviewLink></div>
             </div>
         </article>
@@ -753,11 +757,15 @@ const SidebarTopNewsRender: WidgetRenderComponent = ({ widget }) => {
         {value(widget.config, 'widgetTitle', 'widget_title') && <h3 className="widget-title">{value(widget.config, 'widgetTitle', 'widget_title')}</h3>}
         {Array.isArray(state) ? <ul className="news-list">{state.map((item, index) => {
             const fields = newsFields(item)
-            return <li className={`news-item${fields.pinned ? ' pinned' : ''}`} data-object-id={item.id} key={item.id || index}>
+            const data = item.data || {}
+            const excerptSource = data.summary || data.excerpt || data.description || fields.excerpt
+            const excerpt = truncateExcerpt(excerptSource, value(widget.config, 'excerptLength', 'excerpt_length') ?? 120, true)
+            const pinned = Boolean(fields.metadata.pinned || fields.metadata.featured)
+            return <li className={`news-item${pinned ? ' pinned' : ''}`} data-object-id={item.id} key={item.id || index}>
                 {showThumbnails && fields.thumbnail && <div className="news-thumbnail"><ImageView source={fields.thumbnail} alt={item.title || ''} /></div>}
                 <div className="news-content"><div className="news-meta">{showType && <span className="news-type-badge">{fields.objectType.label || fields.objectType.name}</span>}{showDates && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{formatDisplayDate(fields.publishDate, 'short')}</time>}</div>
                     <h4 className="news-title"><PreviewLink href={fields.path}>{item.title || `Article ${index + 1}`}</PreviewLink></h4>
-                    {showExcerpt && fields.excerpt && <p className="news-excerpt">{fields.excerpt}</p>}
+                    {showExcerpt && excerpt && <p className="news-excerpt">{excerpt}</p>}
                 </div>
             </li>
         })}</ul> : state}

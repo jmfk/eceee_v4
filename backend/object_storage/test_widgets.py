@@ -90,6 +90,46 @@ class PublicObjectWidgetTest(TestCase):
 
         self.assertIsNone(context["object"])
 
+    def test_detail_uses_semantic_slug_from_multi_part_path(self):
+        obj, _ = self.create_object("Annual report", self.tenant, timezone.now())
+
+        context = ObjectDetailWidget().get_context_data(
+            ObjectDetailConfig(object_type=self.object_type.name),
+            {
+                "current_page": SimpleNamespace(tenant=self.tenant),
+                "path_variables": {"year": "2026", "month": "10", "date_slug": obj.slug},
+            },
+        )
+
+        self.assertEqual(context["object"], obj)
+
+    def test_detail_uses_numeric_path_id(self):
+        obj, _ = self.create_object("Numeric object", self.tenant, timezone.now())
+
+        context = ObjectDetailWidget().get_context_data(
+            ObjectDetailConfig(),
+            {
+                "current_page": SimpleNamespace(tenant=self.tenant),
+                "path_variables": {"id": str(obj.id)},
+            },
+        )
+
+        self.assertEqual(context["object"], obj)
+
+    def test_explicit_detail_slug_wins_over_numeric_path_id(self):
+        configured, _ = self.create_object("Configured object", self.tenant, timezone.now())
+        routed, _ = self.create_object("Routed object", self.tenant, timezone.now())
+
+        context = ObjectDetailWidget().get_context_data(
+            ObjectDetailConfig(object_type=self.object_type.name, object_slug=configured.slug),
+            {
+                "current_page": SimpleNamespace(tenant=self.tenant),
+                "path_variables": {"id": str(routed.id)},
+            },
+        )
+
+        self.assertEqual(context["object"], configured)
+
     def test_detail_renders_widgets_from_current_published_version(self):
         now = timezone.now()
         obj, published = self.create_object(

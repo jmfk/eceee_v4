@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import SimpleTestCase
 
 from easy_widgets.widgets.forms import FormsWidget
@@ -7,18 +9,24 @@ from easy_widgets.widgets.section import SectionWidget
 
 class CamelCaseTemplateContextTests(SimpleTestCase):
     def test_hero_normalizes_frontend_owned_configuration(self):
-        context = HeroWidget().prepare_template_context(
-            {
-                "header": "Parity",
-                "beforeText": "Before",
-                "afterText": "After",
-                "backgroundColor": "#123456",
-            }
-        )
+        with patch("file_manager.imgproxy.imgproxy_service.generate_url") as generate_url:
+            generate_url.side_effect = ["/hero-1x.jpg", "/hero-2x.jpg"]
+            context = HeroWidget().prepare_template_context(
+                {
+                    "header": "Parity",
+                    "beforeText": "Before",
+                    "afterText": "After",
+                    "backgroundColor": "#123456",
+                    "image": {"imgproxyBaseUrl": "https://media.example/hero.jpg"},
+                }
+            )
 
         self.assertEqual(context["before_text"], "Before")
         self.assertEqual(context["after_text"], "After")
         self.assertIn("--hero-bg-color: #123456", context["hero_style"])
+        self.assertEqual(context["background_image_url"], "/hero-1x.jpg")
+        self.assertEqual(context["background_image_url_2x"], "/hero-2x.jpg")
+        self.assertEqual(generate_url.call_count, 2)
 
     def test_forms_normalizes_frontend_owned_configuration(self):
         context = FormsWidget().prepare_template_context(

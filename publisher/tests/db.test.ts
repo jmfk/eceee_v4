@@ -140,6 +140,29 @@ describe('database snapshot', () => {
     expect(mocks.query.mock.calls[2][0]).toContain('ORDER BY object.updated_at DESC, object.id DESC');
   });
 
+  it('prioritizes the same instance metadata flags as Django top-news widgets', async () => {
+    await database.withSnapshot(reader => reader.publishedObjects({
+      objectTypeNames: ['article'], limit: 5, sortOrder: '-publish_date', pinnedFirst: true,
+    }, '7', new Date('2026-06-01')));
+
+    const sql = mocks.query.mock.calls[1][0];
+    expect(sql).toContain(`object.metadata @> '{"pinned": true}'::jsonb`);
+    expect(sql).toContain(`object.metadata @> '{"featured": true}'::jsonb`);
+    expect(sql).not.toContain('ORDER BY published.is_featured DESC');
+  });
+
+  it('drops numeric object IDs outside the PostgreSQL bigint range', async () => {
+    const objects = await database.withSnapshot(reader => reader.publishedObjects({
+      objectIds: ['99999999999999999999'], limit: 1, sortOrder: '-publish_date',
+    }, '7', new Date('2026-06-01')));
+
+    expect(objects).toEqual([]);
+    expect(mocks.query.mock.calls.map(call => call[0])).toEqual([
+      'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
+      'COMMIT',
+    ]);
+  });
+
   it('loads tenant-scoped published hierarchy only when requested', async () => {
     await database.withSnapshot(async reader => {
       await reader.publishedObjects({ objectTypeNames: ['article'], limit: 1, sortOrder: '-publish_date', includeHierarchy: true }, '7', new Date('2026-06-01'));
