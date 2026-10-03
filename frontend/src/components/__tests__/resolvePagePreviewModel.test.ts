@@ -12,7 +12,12 @@ vi.mock('../../api/media', () => ({ mediaCollectionsApi: { getFiles: mediaApi.ge
 vi.mock('../../utils/imgproxySecure', () => ({ getBatchImgproxyUrls: imgproxyApi.getBatch }))
 
 describe('page preview model resolution', () => {
-    beforeEach(() => vi.clearAllMocks())
+    beforeEach(() => {
+        vi.clearAllMocks()
+        imgproxyApi.getBatch.mockImplementation(requests => Promise.resolve(
+            requests.map(request => `/imgproxy/resize:fit:${request.width}:0/${request.sourceUrl}`)
+        ))
+    })
 
     it('resolves detail widgets from editor path variables', async () => {
         objectApi.search.mockResolvedValue({ data: { results: [{ id: 17, slug: 'selected-story' }] } })
@@ -111,6 +116,64 @@ describe('page preview model resolution', () => {
         const resolved = await resolvePagePreviewModel(model)
 
         expect(mediaApi.getFiles).toHaveBeenCalledWith(3, { page_size: 100, namespace: 'press' }, { headers: { 'X-Tenant-ID': 'tenant-b' } })
-        expect(resolved.slots.main[0].config.mediaItems).toEqual([expect.objectContaining({ id: '7', url: '/collection.jpg', altText: 'Collection image' })])
+        expect(resolved.slots.main[0].config.mediaItems).toEqual([expect.objectContaining({
+            id: '7',
+            url: '/collection.jpg',
+            src: '/imgproxy/resize:fit:896:0//collection.jpg',
+            altText: 'Collection image',
+        })])
+    })
+
+    it('resolves canonical ImageWidget media through imgproxy', async () => {
+        const model = createPageRenderModel({ widgets: { main: [{
+            id: 'image',
+            type: 'easy_widgets.ImageWidget',
+            config: {
+                image: {
+                    id: 'media-1',
+                    imgproxyBaseUrl: '/original.jpg',
+                    thumbnailUrl: '/thumbnail.jpg',
+                    width: 720,
+                },
+            },
+        }] } })
+
+        const resolved = await resolvePagePreviewModel(model)
+
+        expect(imgproxyApi.getBatch).toHaveBeenCalledWith([{
+            sourceUrl: '/original.jpg',
+            width: 720,
+            resize_type: 'fit',
+            quality: 85,
+            format: 'webp',
+        }])
+        expect(resolved.slots.main[0].config.mediaItems[0]).toMatchObject({
+            url: '/original.jpg',
+            src: '/imgproxy/resize:fit:720:0//original.jpg',
+        })
+    })
+
+    it('resolves ImageWidget media nested in a container slot', async () => {
+        const model = createPageRenderModel({ widgets: { main: [{
+            id: 'columns',
+            type: 'easy_widgets.ThreeColumnsWidget',
+            config: {
+                slots: {
+                    left: [{
+                        id: 'nested-image',
+                        type: 'easy_widgets.ImageWidget',
+                        config: { image: { url: '/nested.jpg', width: 1200 } },
+                    }],
+                },
+            },
+        }] } })
+
+        const resolved = await resolvePagePreviewModel(model)
+        const nestedImage = resolved.slots.main[0].config.slots.left[0]
+
+        expect(nestedImage.config.mediaItems[0]).toMatchObject({
+            url: '/nested.jpg',
+            src: '/imgproxy/resize:fit:896:0//nested.jpg',
+        })
     })
 })

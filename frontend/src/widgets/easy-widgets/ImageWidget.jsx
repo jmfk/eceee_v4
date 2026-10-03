@@ -10,7 +10,8 @@ import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 import { generateCSSFromBreakpoints } from '../../utils/cssBreakpointUtils'
 import { getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout'
 import { mediaCollectionsApi } from '../../api/media'
-import { imageMediaUrl, imageWidgetMediaItems, isImageCollectionReference } from '../../utils/imageWidgetMedia'
+import { getImgproxyUrl } from '../../utils/imgproxySecure'
+import { IMAGE_WIDGET_DEFAULT_WIDTH, imageSourceUrl, imageWidgetMediaItems, isImageCollectionReference } from '../../utils/imageWidgetMedia'
 
 const shuffleWithSeed = (items, initialSeed) => {
     const shuffled = [...items]
@@ -202,7 +203,42 @@ const ImageWidget = ({
         return shuffleWithSeed(effectiveMediaItems, randomizationSeed)
     }, [effectiveMediaItems, localConfig.randomize, randomizationSeed])
 
-    const items = imageWidgetMediaItems(localConfig, randomizedMediaItems)
+    const sourceItems = useMemo(
+        () => imageWidgetMediaItems(localConfig, randomizedMediaItems),
+        [localConfig, randomizedMediaItems]
+    )
+    const [processedImageUrls, setProcessedImageUrls] = useState({})
+
+    useEffect(() => {
+        let cancelled = false
+        const imageItems = sourceItems.filter(item => item.type !== 'video')
+
+        Promise.all(imageItems.map(async item => {
+            const sourceUrl = imageSourceUrl(item)
+            if (!sourceUrl) return [sourceUrl, '']
+            const width = Math.min(Number(item.width) || IMAGE_WIDGET_DEFAULT_WIDTH, IMAGE_WIDGET_DEFAULT_WIDTH)
+            const url = await getImgproxyUrl(sourceUrl, {
+                width,
+                resize_type: 'fit',
+                quality: 85,
+                format: 'webp',
+            })
+            return [sourceUrl, url && url !== sourceUrl ? url : '']
+        })).then(entries => {
+            if (!cancelled) setProcessedImageUrls(Object.fromEntries(entries))
+        })
+
+        return () => {
+            cancelled = true
+        }
+    }, [sourceItems])
+
+    const items = useMemo(() => sourceItems.map(item => {
+        if (item.type === 'video') return item
+        const sourceUrl = imageSourceUrl(item)
+        const url = processedImageUrls[sourceUrl]
+        return url ? { ...item, sourceUrl, url, src: url } : null
+    }).filter(Boolean), [sourceItems, processedImageUrls])
 
     // Auto-play functionality for carousel
     useEffect(() => {
@@ -260,7 +296,7 @@ const ImageWidget = ({
     }
 
     const renderMediaItem = (item, index = 0) => {
-        const displayUrl = imageMediaUrl(item)
+        const displayUrl = item?.type === 'video' ? imageSourceUrl(item) : item?.src
         if (!item || !displayUrl) {
             return null
         }

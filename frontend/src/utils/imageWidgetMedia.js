@@ -1,15 +1,13 @@
-export const imageMediaUrl = source => {
+export const IMAGE_WIDGET_DEFAULT_WIDTH = 896
+
+export const imageSourceUrl = source => {
     if (typeof source === 'string') return source
     if (!source || typeof source !== 'object') return ''
 
-    return source.imgproxyBaseUrl || source.imgproxy_base_url
+    return source.sourceUrl || source.source_url
+        || source.imgproxyBaseUrl || source.imgproxy_base_url
         || source.fileUrl || source.file_url
-        || source.publicUrl || source.public_url
-        || source.absoluteUrl || source.absolute_url
-        || source.downloadUrl || source.download_url
-        || source.uuidUrl || source.uuid_url
         || source.url
-        || source.thumbnailUrl || source.thumbnail_url
         || ''
 }
 
@@ -22,7 +20,7 @@ export const isImageCollectionReference = image => Boolean(
         || ((image.fileCount !== undefined || image.file_count !== undefined
             || image.sampleImages !== undefined || image.sample_images !== undefined
             || image.slug !== undefined)
-            && !imageMediaUrl(image))
+            && !imageSourceUrl(image))
     )
 )
 
@@ -30,12 +28,14 @@ export const normalizeImageMediaItem = item => {
     if (!item) return null
     if (typeof item === 'string') return { url: item, type: 'image', altText: '' }
 
-    const url = imageMediaUrl(item)
+    const url = imageSourceUrl(item)
     if (!url) return null
 
     return {
         ...item,
         url,
+        src: item.src || item.srcUrl || item.src_url || '',
+        srcSet: item.srcSet || item.srcset || '',
         type: item.type || ((item.fileType || item.file_type) === 'video' ? 'video' : 'image'),
         altText: item.altText || item.alt_text || item.title || '',
         caption: item.caption || item.description || '',
