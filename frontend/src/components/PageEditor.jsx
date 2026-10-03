@@ -2440,6 +2440,7 @@ const PageEditor = () => {
             {/* Conflict Resolution Modal */}
             {showConflictModal && conflictData && (
                 <ConflictResolutionModal
+                    key={conflictData.serverVersion?.editRevision ?? conflictData.updateInfo?.revision}
                     conflictResult={conflictData.analysis}
                     onResolve={handleConflictResolve}
                     onCancel={handleConflictCancel}
