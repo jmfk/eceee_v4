@@ -669,6 +669,19 @@ describe('PageRenderer', () => {
         expect(screen.getByRole('img', { name: 'Responsive image' })).toHaveAttribute('height', '338')
     })
 
+    it('falls back to the widget alt text for legacy media items', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{ id: 'image', type: 'easy_widgets.ImageWidget', config: {
+                mediaItems: [{ id: 1, type: 'image', url: '/legacy.jpg' }],
+                altText: 'Legacy image description',
+            } }] },
+        })
+
+        render(<PageRenderer model={model} />)
+
+        expect(screen.getByRole('img', { name: 'Legacy image description' })).toHaveAttribute('src', '/legacy.jpg')
+    })
+
     it('renders canonical bio fields and Django-compatible structure', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'bio', type: 'easy_widgets.BioWidget', config: {
