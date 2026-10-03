@@ -128,11 +128,16 @@ def prepare_gallery_context(
             img_copy.get("alt") or img_copy.get("altText") or img_copy.get("alt_text") or img_copy.get("title") or ""
         )
 
-        # Store original URL for lightbox fallback
+        # Keep the original URL only as the imgproxy signing source. ImageWidget
+        # supplies processed URLs that must remain the public-render fallback.
         original_url = img_copy.get("url")
+        processed_url = img_copy.get("src_url") or img_copy.get("srcUrl")
+        processed_lightbox_url = img_copy.get("lightbox_url") or img_copy.get("lightboxUrl") or processed_url
+        img_copy["url"] = processed_url or ""
+        img_copy["lightboxUrl"] = processed_lightbox_url
 
         # Generate responsive imgproxy URLs if config provided and image has URL
-        if final_imgproxy_config and img_copy.get("url"):
+        if final_imgproxy_config and original_url:
             try:
                 # Extract max dimensions (prefer max_width/max_height, fallback to width/height)
                 max_width = final_imgproxy_config.get("max_width") or final_imgproxy_config.get("width")
@@ -144,7 +149,7 @@ def prepare_gallery_context(
 
                 # Generate responsive URLs
                 responsive_data = imgproxy_service.generate_responsive_urls(
-                    source_url=img_copy["url"],
+                    source_url=original_url,
                     max_width=max_width,
                     max_height=max_height,
                     original_width=original_width,
@@ -163,7 +168,7 @@ def prepare_gallery_context(
                     img_copy["srcset"] = responsive_data.get("srcset", "")
                     img_copy["responsiveSizes"] = responsive_data.get("sizes", [])
             except Exception as e:
-                # Log error but continue with original URL
+                # Log error but retain the already processed URL.
                 import logging
 
                 logger = logging.getLogger(__name__)
@@ -204,18 +209,12 @@ def prepare_gallery_context(
                 # Set lightbox URL (camelCase)
                 if lightbox_data and "1x" in lightbox_data:
                     img_copy["lightboxUrl"] = lightbox_data["1x"]["url"]
-                else:
-                    img_copy["lightboxUrl"] = original_url
             except Exception as e:
-                # Log error and use original URL for lightbox
+                # Log error but retain the already processed lightbox URL.
                 import logging
 
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Failed to generate lightbox imgproxy URL: {e}")
-                img_copy["lightboxUrl"] = original_url
-        else:
-            # No lightbox config, use original URL
-            img_copy["lightboxUrl"] = original_url
 
         indexed_images.append(img_copy)
 
@@ -304,8 +303,14 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
             img_copy.get("alt") or img_copy.get("altText") or img_copy.get("alt_text") or img_copy.get("title") or ""
         )
 
+        # ImageWidget has already generated the public URL. Keep the original
+        # only as the source for an optional style-specific transformation.
+        original_url = img_copy.get("url")
+        processed_url = img_copy.get("src_url") or img_copy.get("srcUrl")
+        img_copy["url"] = processed_url or ""
+
         # Generate responsive imgproxy URLs if config provided and image has URL
-        if final_imgproxy_config and img_copy.get("url"):
+        if final_imgproxy_config and original_url:
             try:
                 # Extract max dimensions (prefer max_width/max_height, fallback to width/height)
                 max_width = final_imgproxy_config.get("max_width") or final_imgproxy_config.get("width")
@@ -317,7 +322,7 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
 
                 # Generate responsive URLs
                 responsive_data = imgproxy_service.generate_responsive_urls(
-                    source_url=img_copy["url"],
+                    source_url=original_url,
                     max_width=max_width,
                     max_height=max_height,
                     original_width=original_width,
@@ -336,7 +341,7 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
                     img_copy["srcset"] = responsive_data.get("srcset", "")
                     img_copy["responsiveSizes"] = responsive_data.get("sizes", [])
             except Exception as e:
-                # Log error but continue with original URL
+                # Log error but retain the already processed URL.
                 import logging
 
                 logger = logging.getLogger(__name__)

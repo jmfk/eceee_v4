@@ -34,11 +34,12 @@
                                     loading="lazy">
                                 </video>
                             {% else %}
+                                {% if item.src_url %}
                                 <a 
-                                    {% if config.enable_lightbox %}
+                                    {% if config.enable_lightbox and item.lightbox_url %}
                                         data-lightbox
                                         data-lightbox-group="{{ config.lightbox_group|default:'widget-'|add:widget.id }}"
-                                        data-lightbox-src="{{ item.url }}"
+                                        data-lightbox-src="{{ item.lightbox_url }}"
                                         data-lightbox-caption="{{ item.caption|default:'' }}"
                                         data-lightbox-alt="{{ item.alt_text|default:'' }}"
                                         data-lightbox-style="{{ config.lightbox_style|default:config.image_style|default:'default' }}"
@@ -48,43 +49,44 @@
                                         {% widthratio item.width item.height 100 as aspect_ratio_x100 %}
                                         {% if aspect_ratio_x100 > 130 or aspect_ratio_x100 < 70 %}
                                             <img 
-                                                src="{{ item.src_url|default:item.thumbnail_url|default:item.url }}"
+                                                src="{{ item.src_url }}"
                                                 {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
                                                 {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
                                                 {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
                                                 alt="{{ item.alt_text }}"
                                                 class="gallery-image"
                                                 loading="lazy"
-                                                style="{% if config.enable_lightbox %}cursor: pointer; {% endif %}object-fit: contain;"
+                                                style="{% if config.enable_lightbox and item.lightbox_url %}cursor: pointer; {% endif %}object-fit: contain;"
                                             >
                                         {% else %}
                                             <img 
-                                                src="{{ item.src_url|default:item.thumbnail_url|default:item.url }}"
+                                                src="{{ item.src_url }}"
                                                 {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
                                                 {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
                                                 {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
                                                 alt="{{ item.alt_text }}"
                                                 class="gallery-image"
                                                 loading="lazy"
-                                                style="{% if config.enable_lightbox %}cursor: pointer; {% endif %}object-fit: cover;"
+                                                style="{% if config.enable_lightbox and item.lightbox_url %}cursor: pointer; {% endif %}object-fit: cover;"
                                             >
                                         {% endif %}
                                     {% else %}
                                         <img 
-                                            src="{{ item.src_url|default:item.thumbnail_url|default:item.url }}"
+                                            src="{{ item.src_url }}"
                                             {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
                                             {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
                                             {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
                                             alt="{{ item.alt_text }}"
                                             class="gallery-image"
                                             loading="lazy"
-                                            style="{% if config.enable_lightbox %}cursor: pointer; {% endif %}object-fit: cover;"
+                                            style="{% if config.enable_lightbox and item.lightbox_url %}cursor: pointer; {% endif %}object-fit: cover;"
                                         >
                                     {% endif %}
                                 </a>
+                                {% endif %}
                             {% endif %}
                             
-                            {% if config.enable_lightbox %}
+                            {% if config.enable_lightbox and item.lightbox_url %}
                                 <div class="image-overlay">
                                     <span class="expand-icon"></span>
                                 </div>
@@ -118,24 +120,26 @@
                                 {% if config.auto_play %}autoplay loop muted{% endif %}>
                             </video>
                         {% else %}
+                            {% if item.src_url %}
                             <a 
-                                {% if config.enable_lightbox %}
+                                {% if config.enable_lightbox and item.lightbox_url %}
                                     data-lightbox
                                     data-lightbox-group="{{ config.lightbox_group|default:'widget-'|add:widget.id }}"
-                                    data-lightbox-src="{{ item.url }}"
+                                    data-lightbox-src="{{ item.lightbox_url }}"
                                     data-lightbox-caption="{{ item.caption|default:'' }}"
                                     data-lightbox-alt="{{ item.alt_text|default:'' }}"
                                     data-lightbox-style="{{ config.lightbox_style|default:config.image_style|default:'default' }}"
                                 {% endif %}
                             >
                                 <img 
-                                    src="{{ item.src_url|default:item.thumbnail_url|default:item.url }}"
+                                    src="{{ item.src_url }}"
                                     {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
                                     {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
                                     {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
                                     alt="{{ item.alt_text }}"
                                     class="carousel-image">
                             </a>
+                            {% endif %}
                         {% endif %}
                         {% if config.show_captions and item.caption %}
                             <div class="carousel-caption">{{ item.caption }}</div>
@@ -213,18 +217,19 @@
                             loading="lazy">
                         </video>
                     {% else %}
+                        {% if item.src_url %}
                         <a 
-                            {% if config.enable_lightbox %}
+                            {% if config.enable_lightbox and item.lightbox_url %}
                                 data-lightbox
                                 data-lightbox-group="{{ config.lightbox_group|default:'widget-'|add:widget.id }}"
-                                data-lightbox-src="{{ item.url }}"
+                                data-lightbox-src="{{ item.lightbox_url }}"
                                 data-lightbox-caption="{{ item.caption|default:'' }}"
                                 data-lightbox-alt="{{ item.alt_text|default:'' }}"
                                 data-lightbox-style="{{ config.lightbox_style|default:config.image_style|default:'default' }}"
                             {% endif %}
                         >
                             <img 
-                                src="{{ item.src_url|default:item.url }}"
+                                src="{{ item.src_url }}"
                                 {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
                                 {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
                                 {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
@@ -233,6 +238,7 @@
                                 loading="lazy"
                             />
                         </a>
+                        {% endif %}
                     {% endif %}
                 </div>
                 
@@ -242,21 +248,6 @@
                     </div>
                 {% endif %}
             {% endwith %}
-        {% elif config.image_url %}
-            <div class="image-container">
-                <img 
-                    src="{{ config.image_url }}" 
-                    alt="{{ config.alt_text }}"
-                    class="widget-image"
-                    loading="lazy"
-                />
-            </div>
-            
-            {% if config.caption %}
-                <div class="image-caption">
-                    {{ config.caption }}
-                </div>
-            {% endif %}
 {% endif %}
 </div>
 {% endif %}

@@ -4,6 +4,7 @@ import { mediaCollectionsApi } from '../api/media'
 import { objectInstancesApi } from '../api/objectStorage'
 import type { RenderPageModel, RenderWidgetModel } from '../rendering/types'
 import { getBatchImgproxyUrls } from '../utils/imgproxySecure'
+import { IMAGE_WIDGET_DEFAULT_WIDTH, imageSourceUrl, imageWidgetMediaItems, isImageCollectionReference } from '../utils/imageWidgetMedia'
 
 const dataDrivenNewsTypes = new Set([
     'easy_widgets.NewsListWidget',
@@ -13,12 +14,7 @@ const dataDrivenNewsTypes = new Set([
 ])
 
 const linkTypes = new Set(['internal', 'external', 'email', 'phone', 'anchor', 'media'])
-
-const isMediaCollection = (image: any) => image && typeof image === 'object' && Boolean(image.id) && (
-    image.type === 'collection'
-    || ((image.fileCount !== undefined || image.sampleImages !== undefined || image.slug !== undefined)
-        && !(image.url || image.fileUrl || image.imgproxyBaseUrl))
-)
+const imgproxyBatchSize = 50
 
 const collectionFileToMediaItem = (file: any) => {
     const url = file.imgproxyBaseUrl || file.imgproxy_base_url || file.fileUrl || file.file_url || file.url || ''
@@ -117,7 +113,7 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         ] as RenderWidgetModel[]
         return [widget, ...collectWidgets(nested)]
     })
-    const allWidgets = collectWidgets(Object.values(next.slots).flat())
+    let allWidgets = collectWidgets(Object.values(next.slots).flat())
     const internalPageIds = new Set<string>()
     allWidgets.forEach((widget) => collectInternalPageIds(widget.config, internalPageIds))
     const pageLookup = new Map<string, any>()
@@ -133,6 +129,7 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
         }
     }))
     allWidgets.forEach((widget) => { widget.config = resolveConfigLinks(widget.config, pageLookup) })
+    allWidgets = collectWidgets(Object.values(next.slots).flat())
 
     const imageRequests: Array<Record<string, any>> = []
     const imageAssignments: Array<(url: string) => void> = []
@@ -158,13 +155,8 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
             queueImage(image, { width: rectangle ? 560 : 280, height: 280, resize_type: 'fill' }, (url) => { widget.config.image1Url2x = url })
         }
     })
-    if (imageRequests.length) {
-        const urls = await getBatchImgproxyUrls(imageRequests)
-        urls.forEach((url, index) => imageAssignments[index]?.(url))
-    }
-
     await Promise.all(allWidgets.map(async (widget) => {
-        if (widget.type === 'easy_widgets.ImageWidget' && isMediaCollection(widget.config.image)) {
+        if (widget.type === 'easy_widgets.ImageWidget' && isImageCollectionReference(widget.config.image)) {
             const collection = widget.config.image
             const params: Record<string, any> = { page_size: 100 }
             if (collection.namespace) params.namespace = collection.namespace
@@ -227,5 +219,29 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
             widget.data = { status: 'error', error: error?.message || 'Failed to load preview data.', items: [] }
         }
     }))
+
+    allWidgets.forEach((widget) => {
+        if (widget.type !== 'easy_widgets.ImageWidget') return
+
+        const items = imageWidgetMediaItems(widget.config)
+        widget.config.mediaItems = items
+        items.forEach(item => {
+            if (item.type === 'video' || item.src) return
+            const sourceUrl = imageSourceUrl(item)
+            if (!sourceUrl) return
+            const width = Math.min(Number(item.width) || IMAGE_WIDGET_DEFAULT_WIDTH, IMAGE_WIDGET_DEFAULT_WIDTH)
+            imageRequests.push({ sourceUrl, width, resize_type: 'fit', quality: 85, format: 'webp' })
+            imageAssignments.push(url => {
+                if (url && url !== sourceUrl) item.src = url
+            })
+        })
+    })
+
+    if (imageRequests.length) {
+        for (let start = 0; start < imageRequests.length; start += imgproxyBatchSize) {
+            const urls = await getBatchImgproxyUrls(imageRequests.slice(start, start + imgproxyBatchSize))
+            urls.forEach((url, index) => imageAssignments[start + index]?.(url))
+        }
+    }
     return next
 }

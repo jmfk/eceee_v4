@@ -5,7 +5,7 @@ from django.template.loader import render_to_string
 from django.test import SimpleTestCase
 
 from easy_widgets.widgets.image import ImageConfig, ImageWidget
-from webpages.utils.mustache_renderer import prepare_carousel_context
+from webpages.utils.mustache_renderer import prepare_carousel_context, prepare_gallery_context
 
 
 class ImageWidgetTests(SimpleTestCase):
@@ -68,13 +68,109 @@ class ImageWidgetTests(SimpleTestCase):
         self.assertIn('srcset="/image-1x.webp 600w, /image-2x.webp 1200w"', html)
         self.assertIn('width="600"', html)
         self.assertIn('height="338"', html)
-        self.assertIn('data-lightbox-src="/original.jpg"', html)
+        self.assertIn('data-lightbox-src="/image-1x.webp"', html)
+        self.assertNotIn('src="/original.jpg"', html)
         generate_responsive_urls.assert_called_once_with(
             source_url="/original.jpg",
             max_width=896,
             max_height=None,
             original_width=1600,
             original_height=900,
+            resize_type="fit",
+            gravity="sm",
+            quality=85,
+            format="webp",
+        )
+
+    @patch("file_manager.imgproxy.imgproxy_service.generate_url")
+    @patch("file_manager.imgproxy.imgproxy_service.generate_responsive_urls")
+    def test_legacy_image_url_is_signed_when_dimensions_are_unavailable(self, generate_responsive_urls, generate_url):
+        generate_responsive_urls.return_value = {"srcset": "", "sizes": []}
+        generate_url.return_value = "/legacy-896.webp"
+
+        config = ImageWidget().prepare_template_context(
+            {
+                "image_url": "/legacy-original.jpg",
+                "alt_text": "Legacy image",
+            }
+        )
+        html = render_to_string(
+            "easy_widgets/widgets/image.html",
+            {
+                "config": config,
+                "widget": SimpleNamespace(id="image-1"),
+                "widget_type": SimpleNamespace(css_class_name="imagewidget"),
+            },
+        )
+
+        self.assertIn('src="/legacy-896.webp"', html)
+        self.assertIn('data-lightbox-src="/legacy-896.webp"', html)
+        self.assertNotIn('src="/legacy-original.jpg"', html)
+        generate_url.assert_called_once_with(
+            source_url="/legacy-original.jpg",
+            width=896,
+            height=None,
+            resize_type="fit",
+            gravity="sm",
+            quality=85,
+            format="webp",
+        )
+
+    @patch("file_manager.imgproxy.imgproxy_service.generate_url", side_effect=ValueError("signing failed"))
+    @patch("file_manager.imgproxy.imgproxy_service.generate_responsive_urls", side_effect=ValueError("signing failed"))
+    def test_signing_failure_does_not_render_the_source_url(self, _generate_responsive_urls, _generate_url):
+        config = ImageWidget().prepare_template_context(
+            {
+                "image": {
+                    "id": "media-1",
+                    "url": "/original.jpg",
+                    "type": "image",
+                    "title": "Unavailable image",
+                }
+            }
+        )
+        html = render_to_string(
+            "easy_widgets/widgets/image.html",
+            {
+                "config": config,
+                "widget": SimpleNamespace(id="image-1"),
+                "widget_type": SimpleNamespace(css_class_name="imagewidget"),
+            },
+        )
+
+        self.assertNotIn("/original.jpg", html)
+        self.assertNotIn("<img", html)
+
+    @patch("file_manager.imgproxy.imgproxy_service.generate_responsive_urls")
+    def test_canonical_single_image_accepts_media_api_snake_case_urls(self, generate_responsive_urls):
+        generate_responsive_urls.return_value = {
+            "1x": {"url": "/image-896.webp", "width": 896, "height": 896},
+            "srcset": "/image-896.webp 896w",
+        }
+
+        config = ImageWidget().prepare_template_context(
+            {
+                "image": {
+                    "id": "media-1",
+                    "imgproxy_base_url": "/full-size.jpg",
+                    "thumbnail_url": "/thumbnail.jpg",
+                    "type": "image",
+                    "title": "The power of light",
+                },
+                "display_type": "gallery",
+            }
+        )
+
+        self.assertEqual(config["media_items"][0]["url"], "/full-size.jpg")
+        self.assertEqual(config["media_items"][0]["src_url"], "/image-896.webp")
+        self.assertEqual(config["media_items"][0]["thumbnail_url"], "/thumbnail.jpg")
+        self.assertEqual(config["display_type"], "single")
+        generate_responsive_urls.assert_called_once_with(
+            source_url="/full-size.jpg",
+            max_width=896,
+            max_height=None,
+            original_width=None,
+            original_height=None,
             resize_type="fit",
             gravity="sm",
             quality=85,
@@ -135,3 +231,33 @@ class ImageWidgetTests(SimpleTestCase):
         )
 
         self.assertEqual(context["images"][0]["alt"], "Slide one")
+
+    def test_gallery_context_keeps_processed_image_urls(self):
+        context = prepare_gallery_context(
+            [
+                {
+                    "url": "/original.jpg",
+                    "src_url": "/processed.webp",
+                    "lightbox_url": "/processed-lightbox.webp",
+                }
+            ],
+            {},
+        )
+
+        self.assertEqual(context["images"][0]["url"], "/processed.webp")
+        self.assertEqual(context["images"][0]["lightboxUrl"], "/processed-lightbox.webp")
+
+        unavailable = prepare_gallery_context([{"url": "/original.jpg"}], {})
+        self.assertEqual(unavailable["images"][0]["url"], "")
+        self.assertIsNone(unavailable["images"][0]["lightboxUrl"])
+
+    def test_carousel_context_keeps_processed_image_url(self):
+        context = prepare_carousel_context(
+            [{"url": "/original.jpg", "src_url": "/processed.webp"}],
+            {},
+        )
+
+        self.assertEqual(context["images"][0]["url"], "/processed.webp")
+
+        unavailable = prepare_carousel_context([{"url": "/original.jpg"}], {})
+        self.assertEqual(unavailable["images"][0]["url"], "")

@@ -177,7 +177,15 @@ export const createDesignerRenderModel = ({
         slots[slot].push(normalizeWidget({
             id: `${view.id || 'preview'}-image-${index}`,
             type: 'easy_widgets.ImageWidget',
-            config: { imageUrl: image?.url || image?.fileUrl, altText: image?.filename || '' },
+            config: {
+                imageUrl: image?.url || image?.fileUrl,
+                altText: image?.filename || '',
+                mediaItems: [{
+                    url: image?.url || image?.fileUrl,
+                    src: image?.url || image?.fileUrl,
+                    altText: image?.filename || '',
+                }],
+            },
             previewImageReferences: image && typeof image === 'object'
                 ? imageReferenceCollection.referencesByObject.get(image) || []
                 : [],

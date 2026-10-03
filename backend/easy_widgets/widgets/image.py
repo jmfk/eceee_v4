@@ -33,6 +33,33 @@ def _normalize_imgproxy_config(config):
     return normalized
 
 
+def _media_url(media):
+    if not isinstance(media, dict):
+        return ""
+    return next(
+        (
+            media.get(key)
+            for key in (
+                "imgproxyBaseUrl",
+                "imgproxy_base_url",
+                "fileUrl",
+                "file_url",
+                "publicUrl",
+                "public_url",
+                "absoluteUrl",
+                "absolute_url",
+                "downloadUrl",
+                "download_url",
+                "uuidUrl",
+                "uuid_url",
+                "url",
+            )
+            if media.get(key)
+        ),
+        "",
+    )
+
+
 class ImageMediaItem(BaseModel):
     """Individual media item for Image widget"""
 
@@ -454,7 +481,7 @@ class ImageWidget(BaseWidget):
         # Get theme and style for applying defaults (context may contain theme)
         theme = context.get("theme")
         style = None
-        style_name = config.get("image_style")
+        style_name = config.get("imageStyle") or config.get("image_style")
 
         if theme and style_name:
             image_styles = theme.image_styles or {}
@@ -501,7 +528,7 @@ class ImageWidget(BaseWidget):
                 # Convert camelCase to snake_case for template
                 media_item = {
                     "id": image.get("id"),
-                    "url": image.get("url") or image.get("fileUrl") or image.get("imgproxyBaseUrl", ""),
+                    "url": _media_url(image),
                     "type": image.get("type", "image"),
                     "alt_text": image.get("altText") or image.get("alt_text") or image.get("title", ""),
                     "caption": image.get("caption") or image.get("description", ""),
@@ -511,10 +538,7 @@ class ImageWidget(BaseWidget):
                     "source": image.get("source", ""),
                     "width": image.get("width"),
                     "height": image.get("height"),
-                    "thumbnail_url": image.get("thumbnailUrl")
-                    or image.get("thumbnail_url")
-                    or image.get("url")
-                    or image.get("fileUrl", ""),
+                    "thumbnail_url": image.get("thumbnailUrl") or image.get("thumbnail_url") or _media_url(image),
                 }
                 template_config["media_items"] = [media_item]
 
@@ -548,12 +572,26 @@ class ImageWidget(BaseWidget):
                         snake_case_items.append(item)
                 template_config["media_items"] = snake_case_items
             else:
-                template_config["media_items"] = []
+                legacy_url = config.get("imageUrl") or config.get("image_url")
+                template_config["media_items"] = (
+                    [
+                        {
+                            "url": legacy_url,
+                            "type": "image",
+                            "alt_text": config.get("altText") or config.get("alt_text", ""),
+                            "caption": config.get("caption", ""),
+                        }
+                    ]
+                    if legacy_url
+                    else []
+                )
 
         # Convert other camelCase config fields to snake_case for template
         template_config["display_type"] = template_config.get(
             "displayType", template_config.get("display_type", "single")
         )
+        if image and not is_collection and not style_name:
+            template_config["display_type"] = "single"
         template_config["image_style"] = template_config.get("imageStyle", template_config.get("image_style", None))
         template_config["gallery_columns"] = template_config.get(
             "galleryColumns", template_config.get("gallery_columns", 3)
@@ -622,8 +660,8 @@ class ImageWidget(BaseWidget):
                 len(template_config["media_items"]),
             )
 
-        # Keep the original URL for lightbox/full-size use, while rendering the
-        # inline image from explicit 1x/2x imgproxy sources.
+        # Keep the source URL only for signing. Public rendering uses processed
+        # imgproxy URLs for both the inline image and lightbox.
         from file_manager.imgproxy import imgproxy_service
 
         imgproxy_config = {
@@ -644,6 +682,7 @@ class ImageWidget(BaseWidget):
         for item in template_config.get("media_items", []):
             if not isinstance(item, dict) or item.get("type", "image") != "image" or not item.get("url"):
                 continue
+            responsive = {}
             try:
                 responsive = imgproxy_service.generate_responsive_urls(
                     source_url=item["url"],
@@ -658,14 +697,29 @@ class ImageWidget(BaseWidget):
                 )
             except Exception as exc:
                 logger.warning("Failed to generate responsive ImageWidget URLs: %s", exc)
-                continue
 
             one_x = responsive.get("1x", {})
-            if one_x.get("url"):
-                item["src_url"] = one_x["url"]
-                item["srcset"] = responsive.get("srcset", "")
-                item["display_width"] = one_x.get("width")
-                item["display_height"] = one_x.get("height")
+            processed_url = one_x.get("url")
+            if not processed_url:
+                try:
+                    processed_url = imgproxy_service.generate_url(
+                        source_url=item["url"],
+                        width=max_width,
+                        height=max_height,
+                        resize_type=imgproxy_config.get("resize_type", "fit"),
+                        gravity=imgproxy_config.get("gravity", "sm"),
+                        quality=imgproxy_config.get("quality"),
+                        format=imgproxy_config.get("format"),
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to generate ImageWidget URL: %s", exc)
+                    continue
+
+            item["src_url"] = processed_url
+            item["lightbox_url"] = processed_url
+            item["srcset"] = responsive.get("srcset", "")
+            item["display_width"] = one_x.get("width")
+            item["display_height"] = one_x.get("height")
 
         return template_config
 
