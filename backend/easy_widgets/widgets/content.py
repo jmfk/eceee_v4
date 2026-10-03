@@ -46,6 +46,7 @@ class ContentConfig(BaseModel):
             "component": "BooleanInput",
             "variant": "toggle",
             "warning": True,
+            "group": "Advanced",
         },
     )
     sanitize_html: bool = Field(
@@ -54,6 +55,7 @@ class ContentConfig(BaseModel):
         json_schema_extra={
             "component": "BooleanInput",
             "variant": "toggle",
+            "group": "Advanced",
         },
     )
     component_style: str = Field(
@@ -61,6 +63,7 @@ class ContentConfig(BaseModel):
         description="Component style from theme",
         json_schema_extra={
             "component": "ComponentStyleSelector",
+            "group": "Styling",
         },
     )
     show_border: bool = Field(

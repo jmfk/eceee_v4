@@ -4,11 +4,16 @@ from unittest.mock import patch
 from django.template.loader import render_to_string
 from django.test import SimpleTestCase
 
-from easy_widgets.widgets.image import ImageWidget
+from easy_widgets.widgets.image import ImageConfig, ImageWidget
 from webpages.utils.mustache_renderer import prepare_carousel_context
 
 
 class ImageWidgetTests(SimpleTestCase):
+    def test_image_style_is_a_primary_editor_field(self):
+        schema = ImageConfig.model_json_schema()
+
+        self.assertTrue(schema["properties"]["imageStyle"]["editorPrimary"])
+
     @patch("file_manager.models.MediaCollection.objects.get")
     def test_collection_prefers_explicit_public_file_url(self, get_collection):
         media = SimpleNamespace(

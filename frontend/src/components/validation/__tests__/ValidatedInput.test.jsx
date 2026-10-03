@@ -342,7 +342,7 @@ describe('ValidatedInput', () => {
             const description = screen.getByText('Enter your information here')
             const input = screen.getByRole('textbox')
 
-            expect(description).toHaveClass('italic', 'text-gray-400')
+            expect(description).toHaveClass('italic', 'text-gray-500')
             expect(label.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
             expect(description.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         })
