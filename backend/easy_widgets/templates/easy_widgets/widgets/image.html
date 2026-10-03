@@ -48,7 +48,7 @@
                                         {% widthratio item.width item.height 100 as aspect_ratio_x100 %}
                                         {% if aspect_ratio_x100 > 130 or aspect_ratio_x100 < 70 %}
                                             <img 
-                                                src="{{ item.thumbnail_url|default:item.url }}" 
+                                                src="{{ item.src_url|default:item.thumbnail_url|default:item.url }}"
                                                 {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
                                                 {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
                                                 {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
@@ -59,7 +59,7 @@
                                             >
                                         {% else %}
                                             <img 
-                                                src="{{ item.thumbnail_url|default:item.url }}" 
+                                                src="{{ item.src_url|default:item.thumbnail_url|default:item.url }}"
                                                 {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
                                                 {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
                                                 {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
@@ -71,7 +71,7 @@
                                         {% endif %}
                                     {% else %}
                                         <img 
-                                            src="{{ item.thumbnail_url|default:item.url }}" 
+                                            src="{{ item.src_url|default:item.thumbnail_url|default:item.url }}"
                                             {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
                                             {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
                                             {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
@@ -129,7 +129,7 @@
                                 {% endif %}
                             >
                                 <img 
-                                    src="{{ item.thumbnail_url|default:item.url }}" 
+                                    src="{{ item.src_url|default:item.thumbnail_url|default:item.url }}"
                                     {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
                                     {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
                                     {% if item.display_height %}height="{{ item.display_height }}"{% endif %}
@@ -224,7 +224,7 @@
                             {% endif %}
                         >
                             <img 
-                                src="{{ item.url }}" 
+                                src="{{ item.src_url|default:item.url }}"
                                 {% if item.srcset %}srcset="{{ item.srcset }}"{% endif %}
                                 {% if item.display_width %}width="{{ item.display_width }}"{% endif %}
                                 {% if item.display_height %}height="{{ item.display_height }}"{% endif %}

@@ -601,6 +601,47 @@ class ImageWidget(BaseWidget):
                 len(template_config["media_items"]),
             )
 
+        # Keep the original URL for lightbox/full-size use, while rendering the
+        # inline image from explicit 1x/2x imgproxy sources.
+        from file_manager.imgproxy import imgproxy_service
+
+        imgproxy_config = {
+            "resize_type": "fit",
+            "quality": 85,
+            "format": "webp",
+        }
+        if style:
+            imgproxy_config.update(style.get("imgproxy_config") or style.get("imgproxyConfig") or {})
+        imgproxy_config.update(config.get("imgproxy_override") or config.get("imgproxyOverride") or {})
+        max_width = imgproxy_config.get("max_width") or imgproxy_config.get("width") or 896
+        max_height = imgproxy_config.get("max_height") or imgproxy_config.get("height")
+
+        for item in template_config.get("media_items", []):
+            if not isinstance(item, dict) or item.get("type", "image") != "image" or not item.get("url"):
+                continue
+            try:
+                responsive = imgproxy_service.generate_responsive_urls(
+                    source_url=item["url"],
+                    max_width=max_width,
+                    max_height=max_height,
+                    original_width=item.get("width"),
+                    original_height=item.get("height"),
+                    resize_type=imgproxy_config.get("resize_type", "fit"),
+                    gravity=imgproxy_config.get("gravity", "sm"),
+                    quality=imgproxy_config.get("quality"),
+                    format=imgproxy_config.get("format"),
+                )
+            except Exception as exc:
+                logger.warning("Failed to generate responsive ImageWidget URLs: %s", exc)
+                continue
+
+            one_x = responsive.get("1x", {})
+            if one_x.get("url"):
+                item["src_url"] = one_x["url"]
+                item["srcset"] = responsive.get("srcset", "")
+                item["display_width"] = one_x.get("width")
+                item["display_height"] = one_x.get("height")
+
         return template_config
 
     def render_with_component_style(self, config, theme):
@@ -616,10 +657,7 @@ class ImageWidget(BaseWidget):
         """
         from django.template.loader import render_to_string
 
-        from webpages.utils.mustache_renderer import (
-            prepare_component_context,
-            render_mustache,
-        )
+        from webpages.utils.mustache_renderer import prepare_component_context, render_mustache
 
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
@@ -667,11 +705,7 @@ class ImageWidget(BaseWidget):
         Returns:
             Tuple of (html, css) or None if no custom style
         """
-        from webpages.utils.mustache_renderer import (
-            prepare_carousel_context,
-            prepare_gallery_context,
-            render_mustache,
-        )
+        from webpages.utils.mustache_renderer import prepare_carousel_context, prepare_gallery_context, render_mustache
 
         # Check for component_style first (takes precedence over image_style)
         component_style_name = config.get("component_style") or config.get("componentStyle")
