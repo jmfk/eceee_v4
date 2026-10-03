@@ -8,6 +8,18 @@ from easy_widgets.widgets.news_list import NewsListWidget
 
 
 class NewsListTemplateTests(SimpleTestCase):
+    @patch.object(NewsListWidget, "_get_news_items", return_value=[])
+    def test_prepare_scopes_news_query_to_current_page_tenant(self, get_news_items):
+        tenant = object()
+
+        NewsListWidget().prepare_template_context(
+            {"objectTypes": [1]},
+            {"current_page": SimpleNamespace(tenant=tenant)},
+        )
+
+        get_news_items.assert_called_once()
+        self.assertIs(get_news_items.call_args.kwargs["tenant"], tenant)
+
     def test_renders_prepared_items_and_links_to_the_dynamic_page(self):
         item = SimpleNamespace(
             id=41,
@@ -39,6 +51,7 @@ class NewsListTemplateTests(SimpleTestCase):
 
     @patch("object_storage.models.ObjectInstance.get_published_objects")
     def test_prepared_items_use_published_version_metadata(self, published_objects):
+        tenant = object()
         effective_date = object()
         version = SimpleNamespace(
             data={"summary": "Summary"},
@@ -57,8 +70,15 @@ class NewsListTemplateTests(SimpleTestCase):
             show_featured_image=False,
         )
 
-        result = NewsListWidget()._get_news_items(config)
+        result = NewsListWidget()._get_news_items(config, tenant=tenant)
 
         self.assertEqual(result, [item])
         self.assertIs(item.publish_date, effective_date)
         self.assertTrue(item.is_pinned)
+        published_objects.assert_called_once_with(
+            object_type_ids=[1],
+            limit=10,
+            sort_order="-publish_date",
+            prioritize_featured=True,
+            tenant=tenant,
+        )

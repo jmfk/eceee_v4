@@ -5,8 +5,11 @@ Widget types for displaying object storage instances in web pages.
 These widgets integrate with the existing widget system to show dynamic objects.
 """
 
+from datetime import datetime
 from typing import Optional, Type
 
+from django.db.models import Q
+from django.utils import timezone
 from pydantic import BaseModel, Field, validator
 
 from webpages.widget_registry import BaseWidget, register_widget_type
@@ -167,31 +170,26 @@ class ObjectListWidget(BaseWidget):
             # Get object type
             current_page = page_context.get("current_page") or page_context.get("page")
             tenant = getattr(current_page, "tenant", None)
-            object_type = ObjectTypeDefinition.objects.get(
-                name=config.object_type, is_active=True, **({"namespace__tenant": tenant} if tenant else {})
-            )
+            if tenant is None:
+                return {"objects": [], "error": "Tenant context is required", "config": config}
+            object_types = ObjectTypeDefinition.objects.filter(name=config.object_type, is_active=True)
+            if tenant:
+                object_types = object_types.filter(Q(namespace__tenant=tenant) | Q(namespace__isnull=True))
+            object_type = object_types.get()
 
-            # Build queryset
-            queryset = ObjectInstance.objects.filter(object_type=object_type)
+            # Public rendering must always start from effective, unexpired versions.
+            queryset = ObjectInstance.published.published_only().filter(object_type=object_type)
             if tenant:
                 queryset = queryset.filter(tenant=tenant)
 
-            # Apply status filter
-            if config.status_filter == "published":
-                # Use version-based publishing logic for published objects
-                from django.utils import timezone
-
-                now = timezone.now()
-                queryset = ObjectInstance.published.published_only(now).filter(object_type=object_type)
-                if tenant:
-                    queryset = queryset.filter(tenant=tenant)
-            elif config.status_filter != "all":
-                # For draft/archived, use the status field
+            # Preserve the legacy status filter without allowing it to bypass
+            # date-based publication checks.
+            if config.status_filter not in {"all", "published"}:
                 queryset = queryset.filter(status=config.status_filter)
 
             # Apply ordering
             if config.order_by.lstrip("-") == "publish_date":
-                from django.db.models import OuterRef, Q, Subquery
+                from django.db.models import OuterRef, Subquery
                 from django.utils import timezone
 
                 from .models import ObjectVersion
@@ -327,14 +325,18 @@ class ObjectDetailWidget(BaseWidget):
             object_slug = None
             current_page = page_context.get("current_page") or page_context.get("page")
             tenant = getattr(current_page, "tenant", None)
+            if tenant is None:
+                return {"object": None, "error": "Tenant context is required", "config": config}
 
             # Get object by ID or slug (using version-based publishing)
             path_variables = page_context.get("path_variables", {})
             object_id = config.object_id or (path_variables.get("id") if not config.object_slug else None)
             if object_id:
-                queryset = ObjectInstance.published.published_only()
+                queryset = ObjectInstance.published.published_only().filter(object_type__is_active=True)
                 if tenant:
-                    queryset = queryset.filter(tenant=tenant)
+                    queryset = queryset.filter(tenant=tenant).filter(
+                        Q(object_type__namespace__tenant=tenant) | Q(object_type__namespace__isnull=True)
+                    )
                 obj = queryset.select_related("object_type", "parent", "current_version").filter(id=object_id).first()
             else:
                 object_slug = config.object_slug or next(
@@ -354,11 +356,10 @@ class ObjectDetailWidget(BaseWidget):
                     None,
                 )
             if not obj and object_slug and config.object_type:
-                object_type = ObjectTypeDefinition.objects.get(
-                    name=config.object_type,
-                    is_active=True,
-                    **({"namespace__tenant": tenant} if tenant else {}),
-                )
+                object_types = ObjectTypeDefinition.objects.filter(name=config.object_type, is_active=True)
+                if tenant:
+                    object_types = object_types.filter(Q(namespace__tenant=tenant) | Q(namespace__isnull=True))
+                object_type = object_types.get()
                 queryset = ObjectInstance.published.published_only()
                 if tenant:
                     queryset = queryset.filter(tenant=tenant)
@@ -394,12 +395,14 @@ class ObjectDetailWidget(BaseWidget):
                 now = timezone.now()
                 published_qs = ObjectInstance.published.published_only(now)
                 if tenant:
-                    published_qs = published_qs.filter(tenant=tenant)
+                    published_qs = published_qs.filter(tenant=tenant, object_type__is_active=True).filter(
+                        Q(object_type__namespace__tenant=tenant) | Q(object_type__namespace__isnull=True)
+                    )
                 published_ids = list(published_qs.values_list("id", flat=True))
 
                 context.update(
                     {
-                        "ancestors": obj.get_ancestors(),
+                        "ancestors": obj.get_ancestors().filter(id__in=published_ids),
                         "children": obj.get_children().filter(id__in=published_ids),
                         "siblings": obj.get_siblings().filter(id__in=published_ids),
                     }
@@ -425,9 +428,38 @@ class ObjectDetailWidget(BaseWidget):
         if obj and published_version and parsed.show_widgets and context and context.get("renderer"):
             rendered_widgets = {}
             for slot_name, widgets in published_version.widgets.items():
-                rendered_widgets[slot_name] = [
-                    context["renderer"].render_widget_json(widget_data, context) for widget_data in widgets
-                ]
+                rendered_widgets[slot_name] = []
+                for widget_data in widgets:
+                    is_published = widget_data.get("isPublished", widget_data.get("is_published", True))
+                    is_visible = widget_data.get("isVisible", widget_data.get("is_visible", True))
+                    if not is_published or not is_visible:
+                        continue
+                    now = timezone.now()
+                    effective_date = widget_data.get("publishEffectiveDate") or widget_data.get(
+                        "publish_effective_date"
+                    )
+                    expiry_date = widget_data.get("publishExpireDate") or widget_data.get("publish_expire_date")
+                    if isinstance(effective_date, str):
+                        try:
+                            effective_date = datetime.fromisoformat(effective_date.replace("Z", "+00:00"))
+                        except ValueError:
+                            effective_date = None
+                    if isinstance(expiry_date, str):
+                        try:
+                            expiry_date = datetime.fromisoformat(expiry_date.replace("Z", "+00:00"))
+                        except ValueError:
+                            expiry_date = None
+                    if (effective_date and effective_date > now) or (expiry_date and expiry_date < now):
+                        continue
+                    widget_config = widget_data.get("config", {})
+                    config_visible = widget_config.get("isVisible", widget_config.get("is_visible", True))
+                    is_active = widget_config.get("isActive", widget_config.get("is_active", True))
+                    if not config_visible or not is_active:
+                        continue
+                    try:
+                        rendered_widgets[slot_name].append(context["renderer"].render_widget_json(widget_data, context))
+                    except Exception:
+                        continue
             prepared["rendered_widgets"] = rendered_widgets
         return prepared
 

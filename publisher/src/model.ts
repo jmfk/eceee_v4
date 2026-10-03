@@ -93,12 +93,15 @@ export interface PublishedObjectQuery {
   objectIds?: DbId[];
   objectTypeIds?: DbId[];
   objectTypeNames?: string[];
+  allActiveTypes?: boolean;
   slug?: string;
   limit: number;
   sortOrder: string;
   featuredFirst?: boolean;
   pinnedFirst?: boolean;
   includeHierarchy?: boolean;
+  status?: 'draft' | 'archived';
+  activeTypeOnly?: boolean;
 }
 
 export interface PublicMediaItem {
@@ -616,37 +619,45 @@ async function resolvePublishedData(
     };
     const config = await resolveNested(widget.config) as Record<string, unknown>;
     const prepared = config === widget.config ? widget : { ...widget, config };
-    if (prepared.data?.item || (Array.isArray(prepared.data?.items) && prepared.data.items.length)) return prepared;
     let items: PublishedObject[] | null = null;
     let item: PublishedObject | undefined;
     if (widget.type === 'easy_widgets.NewsListWidget') {
+      const configuredTypes = config.objectTypes !== undefined ? config.objectTypes : config.object_types;
+      const objectTypeIds = stringList(configuredTypes);
       items = await reader.publishedObjects({
-        objectTypeIds: stringList(config.objectTypes ?? config.object_types),
+        objectTypeIds,
+        allActiveTypes: configuredTypes === undefined || (Array.isArray(configuredTypes) && configuredTypes.length === 0),
         limit: positiveLimit(config.limit, 10),
         sortOrder: String(config.sortOrder ?? config.sort_order ?? '-publish_date'),
         featuredFirst: true,
+        activeTypeOnly: true,
       }, tenantId, at);
     } else if (widget.type === 'object_storage.ObjectListWidget') {
       const objectType = String(config.objectType ?? config.object_type ?? '');
       if (objectType) {
         const showHierarchy = (config.showHierarchy ?? config.show_hierarchy) === true;
+        const statusFilter = String(config.statusFilter ?? config.status_filter ?? 'published');
         items = await reader.publishedObjects({
           objectTypeNames: [objectType],
           limit: positiveLimit(config.limit, 5),
           sortOrder: String(config.orderBy ?? config.order_by ?? '-created_at'),
           includeHierarchy: showHierarchy,
+          status: statusFilter === 'draft' || statusFilter === 'archived' ? statusFilter : undefined,
+          activeTypeOnly: true,
         }, tenantId, at);
       } else {
         items = [];
       }
     } else if (widget.type === 'easy_widgets.TopNewsPlugWidget' || widget.type === 'easy_widgets.SidebarTopNewsWidget') {
+      const configuredTypes = config.objectTypes !== undefined ? config.objectTypes : config.object_types;
       items = await reader.publishedObjects({
-        objectTypeNames: stringList(config.objectTypes ?? config.object_types),
+        objectTypeNames: stringList(configuredTypes === undefined ? ['news'] : configuredTypes),
         limit: widget.type === 'easy_widgets.TopNewsPlugWidget'
           ? topNewsLimit(config.layout)
           : positiveLimit(config.limit ?? config.maxItems ?? config.max_items, 5),
         sortOrder: String(config.sortOrder ?? config.sort_order ?? '-publish_date'),
         pinnedFirst: true,
+        activeTypeOnly: true,
       }, tenantId, at);
     } else if (widget.type === 'easy_widgets.NewsDetailWidget') {
       const variable = String(config.slugVariableName ?? config.slug_variable_name ?? 'news_slug');
@@ -657,6 +668,7 @@ async function resolvePublishedData(
           slug,
           limit: 1,
           sortOrder: '-publish_date',
+          activeTypeOnly: true,
         }, tenantId, at);
       }
     } else if (widget.type === 'object_storage.ObjectDetailWidget') {
@@ -673,6 +685,7 @@ async function resolvePublishedData(
           limit: 1,
           sortOrder: '-publish_date',
           includeHierarchy: true,
+          activeTypeOnly: true,
         }, tenantId, at);
       } else if (objectType && slug) {
         [item] = await reader.publishedObjects({
@@ -681,6 +694,7 @@ async function resolvePublishedData(
           limit: 1,
           sortOrder: '-publish_date',
           includeHierarchy: true,
+          activeTypeOnly: true,
         }, tenantId, at);
       }
     }
@@ -694,9 +708,10 @@ async function resolvePublishedData(
         const isCycle = objectStack.has(objectId);
         const nestedObjectStack = new Set(objectStack);
         nestedObjectStack.add(objectId);
+        const normalizedItem = normalizeNestedItem(item, at, `published-object-${objectId}`);
         item = {
           ...item,
-          widgets: isCycle ? {} : await resolveNested(item.widgets, nestedObjectStack) as Record<string, unknown>,
+          widgets: isCycle ? {} : await resolveNested(normalizedItem.widgets, nestedObjectStack) as Record<string, unknown>,
           ancestors: item.ancestors?.map(withPath),
           children: item.children?.map(withPath),
         };

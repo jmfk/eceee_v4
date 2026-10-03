@@ -156,14 +156,24 @@ describe('public resolution', () => {
           ] } },
         }, {
           id: 'detail',
-          type: 'easy_widgets.NewsDetailWidget',
-          config: {},
-          data: { status: 'ready', item: { widgets: { body: [
-            { id: 'object-draft', type: 'easy_widgets.ContentWidget', isPublished: false, config: { content: 'Object draft' } },
-            { id: 'object-visible', type: 'easy_widgets.ContentWidget', config: { content: 'Object visible' } },
-          ] } } },
+          type: 'object_storage.ObjectDetailWidget',
+          config: { objectId: 41 },
         }] } });
       },
+      publishedObjects: async () => [{
+        id: '41',
+        title: 'Nested object',
+        slug: 'nested-object',
+        objectType: { id: '5', name: 'article', label: 'Article', pluralLabel: 'Articles' },
+        data: {},
+        widgets: { body: [
+          { id: 'object-draft', type: 'easy_widgets.ContentWidget', isPublished: false, config: { content: 'Object draft' } },
+          { id: 'object-visible', type: 'easy_widgets.ContentWidget', config: { content: 'Object visible' } },
+        ] },
+        metadata: {},
+        publishDate: '2026-05-01T00:00:00Z',
+        isFeatured: false,
+      }],
     };
 
     const model = await buildPublishedPageModel(
@@ -371,7 +381,7 @@ describe('public resolution', () => {
 
   it('resolves registered dynamic paths and published object list/detail data', async () => {
     const dynamicPage = page({ ...child, path_pattern: 'news_slug' });
-    const publishedObjects = vi.fn(async (query: { slug?: string }) => [{
+    const publishedObjects = vi.fn(async (query: { slug?: string; activeTypeOnly?: boolean }) => [{
       id: '41', title: 'Dynamic story', slug: query.slug || 'dynamic-story',
       objectType: { id: '5', name: 'news', label: 'News', pluralLabel: 'News' },
       data: { summary: 'Resolved from a published object version.' }, widgets: {}, metadata: {},
@@ -394,6 +404,44 @@ describe('public resolution', () => {
     expect(model?.context.pathVariables).toEqual({ news_slug: 'dynamic-story' });
     expect(model?.slots.main[0].data?.items).toEqual([expect.objectContaining({ path: '/news/dynamic-story/' })]);
     expect(model?.slots.main[1].data?.item).toEqual(expect.objectContaining({ slug: 'dynamic-story' }));
+    expect(publishedObjects).toHaveBeenCalledTimes(2);
+    expect(publishedObjects.mock.calls.every(([query]) => query.activeTypeOnly)).toBe(true);
+  });
+
+  it('re-resolves persisted object widget data against current publication state', async () => {
+    const publishedObjects = vi.fn(async () => []);
+    const staleReader: PageReader = {
+      ...reader,
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        if (id !== child.id || !selected) return selected;
+        return version({ ...selected, widgets: { main: [
+          {
+            id: 'stale-list',
+            type: 'object_storage.ObjectListWidget',
+            config: { objectType: 'article' },
+            data: { status: 'ready', items: [{ id: '41', title: 'Expired list item', slug: 'expired-list-item' }] },
+          },
+          {
+            id: 'stale-detail',
+            type: 'object_storage.ObjectDetailWidget',
+            config: { objectType: 'article', objectSlug: 'expired-detail-item' },
+            data: { status: 'ready', item: { id: '42', title: 'Expired detail item', slug: 'expired-detail-item' } },
+          },
+        ] } });
+      },
+      publishedObjects,
+    };
+
+    const model = await buildPublishedPageModel(
+      { withSnapshot: async read => read(staleReader) },
+      'example.org',
+      '/news',
+      new Date('2026-06-01'),
+    );
+
+    expect(model?.slots.main[0].data).toEqual({ status: 'empty', items: [] });
+    expect(model?.slots.main[1].data).toEqual({ status: 'empty' });
     expect(publishedObjects).toHaveBeenCalledTimes(2);
   });
 
@@ -433,8 +481,12 @@ describe('public resolution', () => {
       new Date('2026-06-01'),
     );
 
-    expect(queries[0]).toMatchObject({ objectTypeNames: ['article'], slug: 'annual-report' });
-    expect(queries[1]).toMatchObject({ objectIds: ['41'] });
+    expect(queries[0]).toMatchObject({
+      objectTypeNames: ['article'],
+      slug: 'annual-report',
+      activeTypeOnly: true,
+    });
+    expect(queries[1]).toMatchObject({ objectIds: ['41'], activeTypeOnly: true });
   });
 
   it('keeps an explicitly configured object slug ahead of a numeric route ID', async () => {
@@ -575,8 +627,8 @@ describe('public resolution', () => {
   });
 
   it('uses the Django item count for every TopNews layout', async () => {
-    const queries: Array<{ limit: number; pinnedFirst?: boolean }> = [];
-    const publishedObjects = vi.fn(async (query: { limit: number; pinnedFirst?: boolean }) => {
+    const queries: Array<{ limit: number; pinnedFirst?: boolean; activeTypeOnly?: boolean }> = [];
+    const publishedObjects = vi.fn(async (query: { limit: number; pinnedFirst?: boolean; activeTypeOnly?: boolean }) => {
       queries.push(query);
       return [];
     });
@@ -603,6 +655,59 @@ describe('public resolution', () => {
 
     expect(queries.map(query => query.limit)).toEqual([2, 3, 5, 2, 4]);
     expect(queries.every(query => query.pinnedFirst)).toBe(true);
+    expect(queries.every(query => query.activeTypeOnly)).toBe(true);
+  });
+
+  it('preserves Django object-type defaults for NewsList and top-news widgets', async () => {
+    const queries: Array<{
+      objectTypeIds?: string[];
+      objectTypeNames?: string[];
+      allActiveTypes?: boolean;
+    }> = [];
+    const publishedObjects = vi.fn(async (query: {
+      objectTypeIds?: string[];
+      objectTypeNames?: string[];
+      allActiveTypes?: boolean;
+    }) => {
+      queries.push(query);
+      return [];
+    });
+    const defaultReader: PageReader = {
+      ...reader,
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        if (id !== child.id || !selected) return selected;
+        return version({ ...selected, widgets: { main: [
+          { id: 'news-list', type: 'easy_widgets.NewsListWidget', config: {} },
+          { id: 'news-list-invalid', type: 'easy_widgets.NewsListWidget', config: { objectTypes: [''] } },
+          { id: 'news-list-null', type: 'easy_widgets.NewsListWidget', config: { objectTypes: null } },
+          { id: 'top-default', type: 'easy_widgets.TopNewsPlugWidget', config: {} },
+          { id: 'sidebar-default', type: 'easy_widgets.SidebarTopNewsWidget', config: {} },
+          { id: 'top-empty', type: 'easy_widgets.TopNewsPlugWidget', config: { objectTypes: [] } },
+          { id: 'sidebar-empty', type: 'easy_widgets.SidebarTopNewsWidget', config: { object_types: [] } },
+          { id: 'top-null', type: 'easy_widgets.TopNewsPlugWidget', config: { objectTypes: null } },
+          { id: 'sidebar-invalid', type: 'easy_widgets.SidebarTopNewsWidget', config: { object_types: 'news' } },
+        ] } });
+      },
+      publishedObjects,
+    };
+
+    await buildPublishedPageModel(
+      { withSnapshot: async read => read(defaultReader) },
+      'example.org',
+      '/news',
+      new Date('2026-06-01'),
+    );
+
+    expect(queries[0]).toMatchObject({ objectTypeIds: [], allActiveTypes: true });
+    expect(queries[1]).toMatchObject({ objectTypeIds: [], allActiveTypes: false });
+    expect(queries[2]).toMatchObject({ objectTypeIds: [], allActiveTypes: false });
+    expect(queries[3].objectTypeNames).toEqual(['news']);
+    expect(queries[4].objectTypeNames).toEqual(['news']);
+    expect(queries[5].objectTypeNames).toEqual([]);
+    expect(queries[6].objectTypeNames).toEqual([]);
+    expect(queries[7].objectTypeNames).toEqual([]);
+    expect(queries[8].objectTypeNames).toEqual([]);
   });
 
   it('loads ObjectList hierarchy only when it is configured for display', async () => {
@@ -632,6 +737,45 @@ describe('public resolution', () => {
     );
 
     expect(queries.map(query => query.includeHierarchy)).toEqual([true, false]);
+  });
+
+  it('forwards snake- and camel-case ObjectList status filters and requires an active type', async () => {
+    const queries: Array<{ status?: string; activeTypeOnly?: boolean }> = [];
+    const statusReader: PageReader = {
+      ...reader,
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        if (id !== child.id || !selected) return selected;
+        return version({ ...selected, widgets: { main: [
+          {
+            id: 'camel-status',
+            type: 'object_storage.ObjectListWidget',
+            config: { objectType: 'article', statusFilter: 'archived' },
+          },
+          {
+            id: 'snake-status',
+            type: 'object_storage.ObjectListWidget',
+            config: { object_type: 'article', status_filter: 'draft' },
+          },
+        ] } });
+      },
+      publishedObjects: async query => {
+        queries.push(query);
+        return [];
+      },
+    };
+
+    await buildPublishedPageModel(
+      { withSnapshot: async read => read(statusReader) },
+      'example.org',
+      '/news',
+      new Date('2026-06-01'),
+    );
+
+    expect(queries).toEqual([
+      expect.objectContaining({ status: 'archived', activeTypeOnly: true }),
+      expect.objectContaining({ status: 'draft', activeTypeOnly: true }),
+    ]);
   });
 
   it('rejects unknown, malformed and unmatched dynamic paths', async () => {

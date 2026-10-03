@@ -160,9 +160,12 @@ function reader(client: PoolClient): PageReader {
       const objectIds = (query.objectIds ?? []).filter(value => (
         /^\d{1,19}$/.test(value) && BigInt(value) <= 9_223_372_036_854_775_807n
       ));
-      const typeIds = (query.objectTypeIds ?? []).filter(value => /^\d+$/.test(value));
+      const typeIds = (query.objectTypeIds ?? []).filter(value => (
+        /^\d{1,19}$/.test(value) && BigInt(value) <= 9_223_372_036_854_775_807n
+      ));
       const typeNames = (query.objectTypeNames ?? []).filter(value => /^[a-z0-9_-]+$/i.test(value));
-      if (!objectIds.length && !typeIds.length && !typeNames.length) return [];
+      const status = query.status === 'draft' || query.status === 'archived' ? query.status : null;
+      if (!objectIds.length && !typeIds.length && !typeNames.length && !query.allActiveTypes) return [];
       const sortOrders: Record<string, string> = {
         '-publish_date': 'published.effective_date DESC, object.id DESC',
         publish_date: 'published.effective_date, object.id',
@@ -191,6 +194,7 @@ function reader(client: PoolClient): PageReader {
             )
             FROM object_storage_objectinstance AS parent
             JOIN object_storage_objecttypedefinition AS parent_type ON parent_type.id = parent.object_type_id
+            LEFT JOIN content_namespace AS parent_namespace ON parent_namespace.id = parent_type.namespace_id
             JOIN LATERAL (
               SELECT 1
               FROM object_storage_objectversion AS parent_version
@@ -201,6 +205,9 @@ function reader(client: PoolClient): PageReader {
               LIMIT 1
             ) AS parent_published ON true
             WHERE parent.id = object.parent_id AND parent.tenant_id = $1
+              AND parent.current_version_id IS NOT NULL
+              AND parent_type.is_active = true
+              AND (parent_type.namespace_id IS NULL OR parent_namespace.tenant_id = $1)
           ) ELSE NULL END AS parent,
           CASE WHEN $8::boolean THEN COALESCE((
             SELECT jsonb_agg(jsonb_build_object(
@@ -210,6 +217,7 @@ function reader(client: PoolClient): PageReader {
             ) ORDER BY ancestor.lft)
             FROM object_storage_objectinstance AS ancestor
             JOIN object_storage_objecttypedefinition AS ancestor_type ON ancestor_type.id = ancestor.object_type_id
+            LEFT JOIN content_namespace AS ancestor_namespace ON ancestor_namespace.id = ancestor_type.namespace_id
             JOIN LATERAL (
               SELECT 1
               FROM object_storage_objectversion AS ancestor_version
@@ -220,6 +228,9 @@ function reader(client: PoolClient): PageReader {
               LIMIT 1
             ) AS ancestor_published ON true
             WHERE ancestor.tenant_id = $1 AND ancestor.tree_id = object.tree_id
+              AND ancestor.current_version_id IS NOT NULL
+              AND ancestor_type.is_active = true
+              AND (ancestor_type.namespace_id IS NULL OR ancestor_namespace.tenant_id = $1)
               AND ancestor.lft < object.lft AND ancestor.rght > object.rght
           ), '[]'::jsonb) ELSE '[]'::jsonb END AS ancestors,
           CASE WHEN $8::boolean THEN COALESCE((
@@ -231,6 +242,7 @@ function reader(client: PoolClient): PageReader {
             ) ORDER BY child.tree_id, child.lft)
             FROM object_storage_objectinstance AS child
             JOIN object_storage_objecttypedefinition AS child_type ON child_type.id = child.object_type_id
+            LEFT JOIN content_namespace AS child_namespace ON child_namespace.id = child_type.namespace_id
             JOIN LATERAL (
               SELECT child_version.effective_date
               FROM object_storage_objectversion AS child_version
@@ -241,9 +253,13 @@ function reader(client: PoolClient): PageReader {
               LIMIT 1
             ) AS child_published ON true
             WHERE child.tenant_id = $1 AND child.parent_id = object.id
+              AND child.current_version_id IS NOT NULL
+              AND child_type.is_active = true
+              AND (child_type.namespace_id IS NULL OR child_namespace.tenant_id = $1)
           ), '[]'::jsonb) ELSE '[]'::jsonb END AS children
         FROM object_storage_objectinstance AS object
         JOIN object_storage_objecttypedefinition AS type ON type.id = object.object_type_id
+        LEFT JOIN content_namespace AS type_namespace ON type_namespace.id = type.namespace_id
         JOIN LATERAL (
           SELECT version.data, version.widgets, version.effective_date, version.is_featured
           FROM object_storage_objectversion AS version
@@ -254,12 +270,31 @@ function reader(client: PoolClient): PageReader {
           LIMIT 1
         ) AS published ON true
         WHERE object.tenant_id = $1
+          AND object.current_version_id IS NOT NULL
           AND ($7::bigint[] <> '{}'::bigint[] AND object.id = ANY($7::bigint[])
             OR $2::bigint[] <> '{}'::bigint[] AND type.id = ANY($2::bigint[])
-            OR $3::text[] <> '{}'::text[] AND type.name = ANY($3::text[]))
+            OR $3::text[] <> '{}'::text[] AND type.name = ANY($3::text[])
+            OR $11::boolean)
           AND ($5::text IS NULL OR object.slug = $5)
+          AND ($9::text IS NULL OR object.status = $9)
+          AND (NOT ($10::boolean OR $11::boolean) OR (
+            type.is_active = true
+            AND (type.namespace_id IS NULL OR type_namespace.tenant_id = $1)
+          ))
         ORDER BY ${priority}${order}
-        LIMIT $6`, [tenantId, typeIds, typeNames, at, query.slug ?? null, Math.min(Math.max(query.limit, 1), 50), objectIds, Boolean(query.includeHierarchy)]);
+        LIMIT $6`, [
+          tenantId,
+          typeIds,
+          typeNames,
+          at,
+          query.slug ?? null,
+          Math.min(Math.max(query.limit, 1), 50),
+          objectIds,
+          Boolean(query.includeHierarchy),
+          status,
+          Boolean(query.activeTypeOnly),
+          Boolean(query.allActiveTypes),
+        ]);
       return result.rows;
     },
   };

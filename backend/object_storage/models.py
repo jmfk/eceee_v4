@@ -995,7 +995,9 @@ class ObjectInstance(MPTTModel):
         queryset = cls.published.published_only(now).select_related("object_type", "current_version")
 
         if tenant is not None:
-            queryset = queryset.filter(tenant=tenant)
+            queryset = queryset.filter(tenant=tenant, object_type__is_active=True).filter(
+                models.Q(object_type__namespace__tenant=tenant) | models.Q(object_type__namespace__isnull=True)
+            )
 
         # Filter by object types if specified
         if object_type_ids:
