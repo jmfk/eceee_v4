@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { ChevronDown, X, Check, Database, Loader2, AlertCircle } from 'lucide-react'
 import { endpoints } from '../../api/endpoints'
+import FieldHelpText from './FieldHelpText'
 
 import OptimizedImage from '../media/OptimizedImage'
 
@@ -191,9 +192,7 @@ const ObjectTypeSelectorInput = ({
             )}
 
             {/* Description */}
-            {description && (
-                <div className="text-sm text-gray-500 mb-2">{description}</div>
-            )}
+            <FieldHelpText className="mb-2">{description}</FieldHelpText>
 
             {/* Main dropdown trigger */}
             <div ref={dropdownRef} className="relative">
@@ -377,4 +376,3 @@ const ObjectTypeSelectorInput = ({
 ObjectTypeSelectorInput.displayName = 'ObjectTypeSelectorInput'
 
 export default ObjectTypeSelectorInput
-

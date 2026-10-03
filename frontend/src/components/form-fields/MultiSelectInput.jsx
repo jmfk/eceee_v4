@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { ChevronDown, X, Check, Plus } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * MultiSelectInput Component
@@ -141,6 +142,8 @@ const MultiSelectInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className="relative" ref={dropdownRef}>
                 {/* Main Input */}
                 <div
@@ -251,10 +254,6 @@ const MultiSelectInput = ({
                     </div>
                 )}
             </div>
-
-            {description && (
-                <div className="text-xs text-gray-500 mt-1">{description}</div>
-            )}
 
             {/* Validation Message */}
             {hasError && validation?.errors?.length > 0 && (

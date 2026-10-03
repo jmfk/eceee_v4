@@ -1,6 +1,7 @@
 import React from 'react'
 import ValidatedInput from '../validation/ValidatedInput'
 import { Link, ExternalLink } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * URLInput Component
@@ -45,6 +46,8 @@ const URLInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Link className="h-4 w-4 text-gray-400" />
@@ -75,10 +78,6 @@ const URLInput = ({
                     </div>
                 )}
             </div>
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
 
             {showPreview && value && isValidUrl(value) && (
                 <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded text-sm">

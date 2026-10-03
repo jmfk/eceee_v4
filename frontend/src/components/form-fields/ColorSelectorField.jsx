@@ -7,6 +7,7 @@
 
 import React, { useMemo } from 'react';
 import ColorSelector from '../theme/form-fields/ColorSelector';
+import FieldHelpText from './FieldHelpText';
 
 const ColorSelectorField = ({
     value,
@@ -31,17 +32,20 @@ const ColorSelectorField = ({
 
     return (
         <div className="space-y-1">
+            {label && (
+                <label className="block text-sm font-medium text-gray-700">
+                    {label}
+                    {required && <span className="text-red-500 ml-1">*</span>}
+                </label>
+            )}
+            <FieldHelpText>{description}</FieldHelpText>
             <ColorSelector
                 value={value || ''}
                 onChange={onChange}
                 colors={themePalette}
-                label={label}
+                label={null}
                 className=""
             />
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
 
             {/* Validation Message */}
             {hasError && validation?.errors?.length > 0 && (
@@ -63,4 +67,3 @@ const ColorSelectorField = ({
 ColorSelectorField.displayName = 'ColorSelectorField';
 
 export default ColorSelectorField;
-

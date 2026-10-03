@@ -1,5 +1,6 @@
 import React from 'react'
 import { AlertCircle } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * RichTextInput Component
@@ -54,9 +55,7 @@ const RichTextInput = ({
             )}
 
             {/* Description */}
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
+            <FieldHelpText>{description}</FieldHelpText>
 
             {/* Rich Text Editor Placeholder */}
             <div className="relative">

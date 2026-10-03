@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import ValidatedInput from '../validation/ValidatedInput'
 import { Eye, EyeOff, Lock, Check, X } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * PasswordInput Component
@@ -88,6 +89,8 @@ const PasswordInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Lock className="h-4 w-4 text-gray-400" />
@@ -120,10 +123,6 @@ const PasswordInput = ({
                     </button>
                 </div>
             </div>
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
 
             {/* Strength Indicator */}
             {showStrengthIndicator && value && (

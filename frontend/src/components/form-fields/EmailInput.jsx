@@ -1,6 +1,7 @@
 import React from 'react'
 import ValidatedInput from '../validation/ValidatedInput'
 import { Mail } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * EmailInput Component
@@ -29,6 +30,8 @@ const EmailInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Mail className="h-4 w-4 text-gray-400" />
@@ -47,9 +50,6 @@ const EmailInput = ({
                 />
             </div>
 
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
         </div>
     )
 }

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, Search, Check } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * TransferInput Component
@@ -228,6 +229,8 @@ const TransferInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div
                 className={`
                     border rounded-lg overflow-hidden
@@ -306,10 +309,6 @@ const TransferInput = ({
                     </div>
                 </div>
             </div>
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
 
             {/* Summary */}
             <div className="flex justify-between text-xs text-gray-500">

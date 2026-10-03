@@ -4,6 +4,7 @@ import { ChevronDown, Check } from 'lucide-react';
 import { renderMustache, prepareGalleryContext, prepareCarouselContext } from '../../utils/mustacheRenderer';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { lookupWidget } from '../../utils/widgetUtils';
+import FieldHelpText from './FieldHelpText';
 
 /**
  * Smart visual selector for image styles with preview thumbnails
@@ -213,12 +214,10 @@ const ImageStyleSelect = ({
                         {required && <span className="text-red-500 ml-1">*</span>}
                     </label>
                 )}
+                <FieldHelpText>{description}</FieldHelpText>
                 <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm text-gray-600">
                     Default
                 </div>
-                {description && (
-                    <div className="text-sm text-gray-500">{description}</div>
-                )}
             </div>
         );
     }
@@ -231,6 +230,7 @@ const ImageStyleSelect = ({
                     {required && <span className="text-red-500 ml-1">*</span>}
                 </label>
             )}
+            <FieldHelpText>{description}</FieldHelpText>
             <div className="relative" ref={dropdownRef}>
                 {/* Selected style display button */}
                 <button
@@ -261,9 +261,6 @@ const ImageStyleSelect = ({
                     </div>
                 )}
             </div>
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
         </div>
     );
 };

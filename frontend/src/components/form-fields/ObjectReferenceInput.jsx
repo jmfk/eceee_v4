@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Search, X, Plus, GripVertical, Loader2, AlertCircle, ChevronDown, Check } from 'lucide-react'
 import { useObjectReferenceField } from '../../hooks/useObjectReferences'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * ObjectReferenceInput Component
@@ -144,9 +145,7 @@ const ObjectReferenceInput = ({
             )}
 
             {/* Description */}
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
+            <FieldHelpText>{description}</FieldHelpText>
 
             {/* Selected Items (Chips) */}
             {multiple && selectedIds.length > 0 && (

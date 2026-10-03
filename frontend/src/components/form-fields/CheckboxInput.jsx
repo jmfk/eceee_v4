@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Check } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * CheckboxInput Component
@@ -124,9 +125,7 @@ const CheckboxInput = ({
                     )}
                 </div>
 
-                {description && (
-                    <div className="text-sm text-gray-500 ml-7">{description}</div>
-                )}
+                <FieldHelpText className="ml-7">{description}</FieldHelpText>
 
                 {hasError && validation?.errors?.length > 0 && (
                     <div className="text-sm text-red-600 ml-7">
@@ -146,9 +145,7 @@ const CheckboxInput = ({
                 </label>
             )}
 
-            {description && (
-                <div className="text-sm text-gray-500 mb-2">{description}</div>
-            )}
+            <FieldHelpText className="mb-2">{description}</FieldHelpText>
 
             <div className={`space-${layout === 'horizontal' ? 'x' : 'y'}-2 ${layout === 'horizontal' ? 'flex flex-wrap' : ''}`}>
                 {normalizedOptions.map((option) => {

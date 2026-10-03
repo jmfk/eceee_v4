@@ -3,6 +3,7 @@ import { Loader2, AlertCircle } from 'lucide-react'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget } from '../../utils/widgetUtils'
+import FieldHelpText from './FieldHelpText'
 import { getFieldComponent } from './index'
 import SegmentedControlInput from './SegmentedControlInput'
 import SelectInput from './SelectInput'
@@ -366,9 +367,7 @@ const ConditionalGroupField = ({
             )}
 
             {/* Description */}
-            {description && (
-                <div className="text-sm text-gray-500 -mt-1">{description}</div>
-            )}
+            <FieldHelpText className="-mt-1">{description}</FieldHelpText>
 
             {/* Group Selector */}
             {variant === 'buttons' ? (
@@ -516,4 +515,3 @@ export default React.memo(ConditionalGroupField, (prevProps, nextProps) => {
         JSON.stringify(prevProps.context) === JSON.stringify(nextProps.context)
     )
 })
-

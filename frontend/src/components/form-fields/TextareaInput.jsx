@@ -1,5 +1,6 @@
 import React from 'react'
 import ValidatedInput from '../validation/ValidatedInput'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * TextareaInput Component
@@ -90,11 +91,9 @@ const TextareaInput = ({
                 </div>
             )}
 
-            <ValidatedInput {...inputProps} />
+            <FieldHelpText>{description}</FieldHelpText>
 
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
+            <ValidatedInput {...inputProps} />
 
             {!showCharacterCount && maxLength && (
                 <div className="text-xs text-gray-500">

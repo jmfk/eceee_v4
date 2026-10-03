@@ -203,7 +203,13 @@ describe('BooleanInput', () => {
                 />
             )
 
-            expect(screen.getByText('This is a helpful description')).toBeInTheDocument()
+            const label = screen.getByText('Test Toggle')
+            const description = screen.getByText('This is a helpful description')
+            const toggle = screen.getByRole('switch')
+
+            expect(description).toHaveClass('italic', 'text-gray-400')
+            expect(label.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+            expect(description.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         })
 
         test('disables interaction when disabled', () => {
@@ -293,4 +299,3 @@ describe('BooleanInput', () => {
         })
     })
 })
-

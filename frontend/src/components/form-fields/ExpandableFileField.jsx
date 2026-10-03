@@ -3,6 +3,7 @@ import { FolderOpen, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'l
 import { mediaApi } from '../../api'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 import MediaSearchWidget from '../media/MediaSearchWidget'
+import FieldHelpText from './FieldHelpText'
 import FileUploadSection from './FileUploadSection'
 import FileDisplaySection from './FileDisplaySection'
 import {
@@ -583,9 +584,7 @@ const ExpandableFileField = ({
                     {label}
                     {required && <span className="text-red-500 ml-1">*</span>}
                 </label>
-                {description && (
-                    <div className="text-sm text-gray-500 mt-1">{description}</div>
-                )}
+                <FieldHelpText className="mt-1">{description}</FieldHelpText>
             </div>
 
             {/* Main Container with Dropzone */}

@@ -7,6 +7,7 @@ import LocalStateFieldWrapper from './LocalStateFieldWrapper'
 import { formatFieldLabel } from '../../utils/labelFormatting'
 import { api } from '../../api/client'
 import { endpoints } from '../../api/endpoints'
+import FieldHelpText from '../form-fields/FieldHelpText'
 
 /**
  * Simple slugify function to normalize anchor values for comparison
@@ -120,10 +121,8 @@ const FieldPlaceholder = ({ componentName, label, value, ...props }) => {
                     {label}
                 </label>
             )}
+            <FieldHelpText>{props.description}</FieldHelpText>
             {renderPlaceholder()}
-            {props.description && (
-                <div className="text-sm text-gray-500">{props.description}</div>
-            )}
         </div>
     )
 }
@@ -307,6 +306,7 @@ const SchemaFieldRenderer = ({
 
     // Check if schema specifies a direct component (from Pydantic json_schema_extra)
     const componentName = fieldSchema.component
+    const fieldDescription = fieldSchema.helpText || fieldSchema.description
 
     // Filter out JSON Schema metadata and only pass component-relevant props
     const {
@@ -353,7 +353,7 @@ const SchemaFieldRenderer = ({
     const fieldProps = useMemo(() => {
         const baseProps = {
             label: fieldSchema.title || formatFieldLabel(fieldName),
-            description: fieldSchema.description,
+            description: fieldDescription,
             required,
             disabled,
             placeholder: fieldSchema.placeholder,
@@ -384,7 +384,7 @@ const SchemaFieldRenderer = ({
         return baseProps
     }, [
         fieldSchema.title,
-        fieldSchema.description,
+        fieldDescription,
         fieldSchema.placeholder,
         fieldSchema.items,
         fieldName,
@@ -405,6 +405,7 @@ const SchemaFieldRenderer = ({
                     componentName={componentName}
                     label={fieldProps.label}
                     value={value}
+                    description={fieldDescription}
                     {...componentProps}
                 />
             }>
@@ -435,6 +436,7 @@ const SchemaFieldRenderer = ({
                     {fieldSchema.title || formatFieldLabel(fieldName)}
                     {required && <span className="text-red-500 ml-1">*</span>}
                 </label>
+                <FieldHelpText>{fieldDescription}</FieldHelpText>
                 <input
                     type="text"
                     value={value ?? ''}
@@ -443,9 +445,6 @@ const SchemaFieldRenderer = ({
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder={fieldSchema.placeholder}
                 />
-                {fieldSchema.description && (
-                    <div className="text-sm text-gray-500">{fieldSchema.description}</div>
-                )}
             </div>
         )
     }
@@ -463,7 +462,7 @@ const SchemaFieldRenderer = ({
     // Prepare props for the field component
     const registryFieldProps = {
         label: fieldSchema.title || formatFieldLabel(fieldName),
-        description: fieldSchema.description,
+        description: fieldDescription,
         required,
         disabled,
         placeholder: fieldSchema.placeholder,

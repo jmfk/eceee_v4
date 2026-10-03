@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Star, Heart, ThumbsUp, Circle, Square, Triangle, X } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * RatingInput Component
@@ -146,6 +147,8 @@ const RatingInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className="space-y-3">
                 {/* Rating Icons */}
                 <div className="flex items-center space-x-1">
@@ -223,10 +226,6 @@ const RatingInput = ({
                     </div>
                 )}
             </div>
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
 
             {/* Validation Message */}
             {hasError && validation?.errors?.length > 0 && (

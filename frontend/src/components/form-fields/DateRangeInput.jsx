@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Calendar, ArrowRight, RotateCcw } from 'lucide-react'
 import DateInput from './DateInput'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * DateRangeInput Component
@@ -145,6 +146,8 @@ const DateRangeInput = ({
                 </div>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className="space-y-3" ref={containerRef}>
                 {/* Date Range Summary */}
                 {hasSelection && (
@@ -220,10 +223,6 @@ const DateRangeInput = ({
                     </div>
                 )}
             </div>
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
-            )}
 
             {/* Validation Message */}
             {hasError && validation?.errors?.length > 0 && (

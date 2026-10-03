@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { AtSign, Hash, User, Tag } from 'lucide-react'
+import FieldHelpText from './FieldHelpText'
 
 /**
  * MentionsInput Component
@@ -273,6 +274,8 @@ const MentionsInput = ({
                 </label>
             )}
 
+            <FieldHelpText>{description}</FieldHelpText>
+
             <div className="relative">
                 {/* Textarea */}
                 <textarea
@@ -357,10 +360,6 @@ const MentionsInput = ({
                         {renderHighlightedText()}
                     </div>
                 </div>
-            )}
-
-            {description && (
-                <div className="text-sm text-gray-500">{description}</div>
             )}
 
             {/* Validation Message */}
