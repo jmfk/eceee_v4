@@ -83,7 +83,7 @@ const VersionManager = ({ pageId, onClose }) => {
     })
 
     const deleteMutation = useMutation({
-        mutationFn: deleteVersion,
+        mutationFn: (version) => deleteVersion(version.id, version.updatedAt, version.editRevision),
         onSuccess: () => {
             addNotification('Version deleted successfully!', 'success', 'version-delete')
             queryClient.invalidateQueries(['page-versions', pageId])
@@ -143,7 +143,7 @@ const VersionManager = ({ pageId, onClose }) => {
         })
 
         if (confirmed) {
-            deleteMutation.mutate(version.id)
+            deleteMutation.mutate(version)
         }
     }
 

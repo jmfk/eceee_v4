@@ -17,6 +17,7 @@ import {
     buildWorkingCopyPayload,
     buildVersionedPageData,
     canPublishWorkingCopy,
+    getCanonicalWebpageDataForSave,
     mergeVersionedPageAttributes,
     refreshAfterWorkingCopySave,
     smartSave,
@@ -118,6 +119,15 @@ describe('analyzeChanges — widget dirty detection', () => {
 })
 
 describe('working-copy page attributes', () => {
+    it('keeps rebased server settings when the editor has an older field buffer', () => {
+        const staleSettingsBuffer = { title: 'Old title', description: 'Local description' }
+        const rebasedWebpageData = { title: 'Remote title', description: 'Local description' }
+
+        const result = getCanonicalWebpageDataForSave(staleSettingsBuffer, rebasedWebpageData)
+
+        expect(result).toEqual(rebasedWebpageData)
+    })
+
     it('stores public page settings inside version page data', () => {
         const pageData = buildVersionedPageData(
             { body: 'content' },

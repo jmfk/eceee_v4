@@ -2,6 +2,7 @@
 
 import logging
 
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -169,37 +170,31 @@ class ProcessImportView(APIView):
             if save_to_page and page_metadata and (page_metadata.get("title") or page_metadata.get("tags")):
                 try:
                     page = WebPage.objects.get(id=page_id)
-                    page_version, _ = PageVersionWorkflowService(
+                    title = page_metadata.get("title", "").strip()
+                    tag_names = page_metadata.get("tags", [])
+                    for tag_name in tag_names:
+                        tag, created = Tag.get_or_create_tag(name=tag_name, namespace=namespace)
+                        if not created:
+                            tag.increment_usage()
+
+                    page_version = PageVersionWorkflowService(
                         page,
                         request.user,
-                    ).get_or_create_working_copy()
+                    ).update_working_copy_import_metadata(title=title, tags=tag_names)
+                    from webpages.consumers import broadcast_version_update
 
-                    if page_version:
-                        # Get current page_data or initialize empty dict
-                        page_data = page_version.page_data or {}
-
-                        # Update title if provided
-                        title = page_metadata.get("title", "").strip()
-                        if title:
-                            page_version.version_title = title
-                            attributes = page_data.setdefault("page_attributes", {})
-                            attributes["title"] = title
-
-                        # Update tags if provided
-                        tag_names = page_metadata.get("tags", [])
-                        if tag_names:
-                            page_version.tags = tag_names
-
-                            # Create/update Tag objects for consistency
-                            for tag_name in tag_names:
-                                tag, created = Tag.get_or_create_tag(name=tag_name, namespace=namespace)
-                                if not created:
-                                    tag.increment_usage()
-
-                        # Save updated page_data back to page_version
-                        page_version.page_data = page_data
-                        page_version.save()
-                        page_was_updated = True
+                    payload = {
+                        "page_id": page_version.page_id,
+                        "version_id": page_version.id,
+                        "version_number": page_version.version_number,
+                        "updated_at": page_version.updated_at.isoformat(),
+                        "revision": page_version.edit_revision,
+                        "updated_by": request.user.username,
+                        "session_id": request.META.get("HTTP_X_SESSION_ID"),
+                        "mutation_type": "content_import",
+                    }
+                    transaction.on_commit(lambda: broadcast_version_update(**payload), robust=True)
+                    page_was_updated = True
 
                 except WebPage.DoesNotExist:
                     logger.warning(f"⚠️  Page #{page_id} not found")

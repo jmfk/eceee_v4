@@ -43,6 +43,7 @@ import {
     canPublishWorkingCopy,
     mergeVersionedPageAttributes,
     refreshAfterWorkingCopySave,
+    getCanonicalWebpageDataForSave,
 } from '../utils/smartSaveUtils'
 import { applyWidgetUpdateToWidgetMap } from '../utils/pageEditorWidgetState'
 import { saveWidgetEditorChanges } from '../utils/pageEditorWidgetSave'
@@ -1298,25 +1299,11 @@ const PageEditor = () => {
                 }
             }
 
-            // Collect settings data from SettingsEditor
-            if (settingsEditorRef.current && settingsEditorRef.current.saveSettings) {
-                try {
-                    const settingsResult = await settingsEditorRef.current.saveSettings();
-                    collectedData.settings = settingsResult.data || settingsResult;
-                } catch (error) {
-                    console.error('❌ SMART SAVE: Settings data collection failed', error);
-                    throw new Error(`Settings data collection failed: ${error.message}`);
-                }
-            }
-
-
-
             // Prepare data for smart save
-            const currentWebpageDataForSave = {
-                ...(saveOptions.resolvedData?.webpage || webpageData),
-                ...collectedData.settings,
-                ...collectedData.metadata
-            };
+            const currentWebpageDataForSave = getCanonicalWebpageDataForSave(
+                webpageData,
+                saveOptions.resolvedData?.webpage,
+            );
 
             const currentVersionDataForSave = {
                 ...(saveOptions.resolvedData?.version || pageVersionData),
@@ -1541,22 +1528,8 @@ const PageEditor = () => {
                     console.error('❌ Widget saveWidgets notification failed during analysis', error);
                 }
             }
-            // Collect settings data
-            if (settingsEditorRef.current && settingsEditorRef.current.saveSettings) {
-                try {
-                    const settingsResult = await settingsEditorRef.current.saveSettings();
-                    collectedData.settings = settingsResult.data || settingsResult;
-                } catch (error) {
-                    console.error('❌ Settings data collection failed during analysis', error);
-                    throw new Error(`Settings collection failed: ${error.message}`);
-                }
-            }
-
             // Prepare data for save analysis
-            const currentWebpageDataForSave = {
-                ...webpageData,
-                ...collectedData.settings
-            };
+            const currentWebpageDataForSave = getCanonicalWebpageDataForSave(webpageData);
 
             const currentVersionDataForSave = {
                 ...pageVersionData,

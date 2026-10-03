@@ -53,6 +53,11 @@ const METADATA_FIELDS = new Set([
     'childrenCount'
 ]);
 
+/** Use the rebased PageEditor state as the only source for page settings. */
+export function getCanonicalWebpageDataForSave(webpageData, resolvedWebpageData = null) {
+    return resolvedWebpageData || webpageData;
+}
+
 /**
  * Process loaded version data by converting backend snake_case to frontend camelCase
  * @param {Object} versionData - Raw version data from API

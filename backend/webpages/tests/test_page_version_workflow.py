@@ -2071,13 +2071,41 @@ class PageVersionMutationTransactionTest(TransactionTestCase):
 
     def test_working_copy_delete_locks_page_before_version(self):
         with CaptureQueriesContext(connection) as queries:
-            response = self.client.delete(reverse("api:pageversion-detail", kwargs={"pk": self.version.pk}))
+            response = self.client.delete(
+                reverse("api:pageversion-detail", kwargs={"pk": self.version.pk}),
+                {"expectedRevision": self.version.edit_revision},
+                format="json",
+            )
 
         lock_queries = [query["sql"] for query in queries.captured_queries if "FOR UPDATE" in query["sql"].upper()]
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertGreaterEqual(len(lock_queries), 2)
         self.assertIn("webpages_webpage", lock_queries[0])
         self.assertIn("webpages_pageversion", lock_queries[1])
+
+    def test_stale_working_copy_delete_returns_the_latest_server_version(self):
+        reviewed_revision = self.version.edit_revision
+        save_response = self.client.patch(
+            reverse("api:pageversion-save-working-copy", kwargs={"pk": self.version.pk}),
+            {
+                "expectedRevision": reviewed_revision,
+                "metaTitle": "Saved by another editor",
+            },
+            format="json",
+        )
+        self.assertEqual(save_response.status_code, status.HTTP_200_OK)
+
+        response = self.client.delete(
+            reverse("api:pageversion-detail", kwargs={"pk": self.version.pk}),
+            {"expectedRevision": reviewed_revision},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["error"], "version_conflict")
+        self.assertEqual(response.data["details"]["server_revision"], reviewed_revision + 1)
+        self.assertEqual(response.data["details"]["server_version"]["meta_title"], "Saved by another editor")
+        self.assertTrue(PageVersion.objects.filter(pk=self.version.pk).exists())
 
     def test_publish_locks_the_root_namespace_before_the_target_version(self):
         with CaptureQueriesContext(connection) as queries:
@@ -2098,7 +2126,7 @@ class PageVersionMutationTransactionTest(TransactionTestCase):
         self.version.effective_date = now
         self.version.save(update_fields=["effective_date", "updated_at"])
         scheduled, _ = PageVersionWorkflowService(self.page, self.user).get_or_create_working_copy()
-        PageVersionWorkflowService(self.page, self.user).schedule(
+        scheduled = PageVersionWorkflowService(self.page, self.user).schedule(
             scheduled,
             now + timedelta(days=1),
             expected_updated_at=scheduled.updated_at,
@@ -2106,7 +2134,11 @@ class PageVersionMutationTransactionTest(TransactionTestCase):
         self.version.refresh_from_db()
         scheduled_expiry = self.version.expiry_date
 
-        response = self.client.delete(reverse("api:pageversion-detail", kwargs={"pk": scheduled.pk}))
+        response = self.client.delete(
+            reverse("api:pageversion-detail", kwargs={"pk": scheduled.pk}),
+            {"expectedRevision": scheduled.edit_revision},
+            format="json",
+        )
 
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(response.data["error"], "schedule_conflict")
