@@ -329,18 +329,30 @@ class ObjectDetailWidget(BaseWidget):
             tenant = getattr(current_page, "tenant", None)
 
             # Get object by ID or slug (using version-based publishing)
-            if config.object_id:
+            path_variables = page_context.get("path_variables", {})
+            object_id = config.object_id or (path_variables.get("id") if not config.object_slug else None)
+            if object_id:
                 queryset = ObjectInstance.published.published_only()
                 if tenant:
                     queryset = queryset.filter(tenant=tenant)
-                obj = (
-                    queryset.select_related("object_type", "parent", "current_version")
-                    .filter(id=config.object_id)
-                    .first()
-                )
+                obj = queryset.select_related("object_type", "parent", "current_version").filter(id=object_id).first()
             else:
-                path_variables = page_context.get("path_variables", {})
-                object_slug = config.object_slug or next(iter(path_variables.values()), None)
+                object_slug = config.object_slug or next(
+                    (
+                        path_variables.get(key)
+                        for key in (
+                            "news_slug",
+                            "event_slug",
+                            "library_slug",
+                            "member_slug",
+                            "date_slug",
+                            "slug",
+                            "category_slug",
+                        )
+                        if path_variables.get(key)
+                    ),
+                    None,
+                )
             if not obj and object_slug and config.object_type:
                 object_type = ObjectTypeDefinition.objects.get(
                     name=config.object_type,

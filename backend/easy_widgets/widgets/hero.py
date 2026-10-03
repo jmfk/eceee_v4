@@ -363,7 +363,7 @@ class HeroWidget(BaseWidget):
         # Process background image if provided (1x and 2x)
         image = template_config.get("image")
         if image:
-            imgproxy_base_url = image.get("imgproxy_base_url")
+            imgproxy_base_url = image.get("imgproxy_base_url") or image.get("imgproxyBaseUrl")
             if imgproxy_base_url:
                 # Generate responsive image URL (large hero size: 1920x1080 @ 1x, 3840x2160 @ 2x)
                 image_url_1x = imgproxy_service.generate_url(

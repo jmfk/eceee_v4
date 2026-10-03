@@ -256,6 +256,41 @@ describe('PageRenderer', () => {
         expect(container.querySelector('.sidebar-top-news-widget .news-thumbnail,.sidebar-top-news-widget .news-date')).toBeNull()
     })
 
+    it('cleans and truncates top-news excerpts with widget-specific settings', () => {
+        const topItem = { id: 1, title: 'Article', slug: 'article', objectType: { name: 'news', label: 'News' }, data: { content: '<p>Alpha beta gamma delta</p>' } }
+        const sidebarItem = { ...topItem, id: 2, data: { description: '<p>Alpha beta gamma delta</p>' } }
+        const model = createPageRenderModel({
+            widgets: { main: [
+                { id: 'top', type: 'easy_widgets.TopNewsPlugWidget', config: { excerptLength: 12 }, data: { status: 'ready', items: [topItem] } },
+                { id: 'side', type: 'easy_widgets.SidebarTopNewsWidget', config: { showExcerpts: true, excerpt_length: 17 }, data: { status: 'ready', items: [sidebarItem] } },
+            ] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(container.querySelector('.top-news-plug-widget .news-excerpt')).toHaveTextContent('Alpha beta...')
+        expect(container.querySelector('.sidebar-top-news-widget .news-excerpt')).toHaveTextContent('Alpha beta gamma...')
+        expect(container).not.toHaveTextContent('<p>')
+    })
+
+    it('uses instance metadata rather than version featured state for top-news pinning', () => {
+        const versionFeatured = { id: 1, title: 'Version featured', isFeatured: true, metadata: {}, data: {} }
+        const metadataPinned = { id: 2, title: 'Metadata pinned', isFeatured: false, metadata: { pinned: true }, data: {} }
+        const model = createPageRenderModel({ widgets: { main: [
+            { id: 'top', type: 'easy_widgets.TopNewsPlugWidget', config: {}, data: { status: 'ready', items: [versionFeatured, metadataPinned] } },
+            { id: 'side', type: 'easy_widgets.SidebarTopNewsWidget', config: {}, data: { status: 'ready', items: [versionFeatured, metadataPinned] } },
+        ] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+        const topCards = container.querySelectorAll('.top-news-plug-widget .news-card')
+        const sidebarItems = container.querySelectorAll('.sidebar-top-news-widget .news-item')
+
+        expect(topCards[0]).not.toHaveClass('pinned')
+        expect(topCards[1]).toHaveClass('pinned')
+        expect(sidebarItems[0]).not.toHaveClass('pinned')
+        expect(sidebarItems[1]).toHaveClass('pinned')
+    })
+
     it('honors news-detail fields and renders object widgets', () => {
         const model = createPageRenderModel({
             widgets: { main: [{

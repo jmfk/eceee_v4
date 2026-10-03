@@ -397,6 +397,76 @@ describe('public resolution', () => {
     expect(publishedObjects).toHaveBeenCalledTimes(2);
   });
 
+  it('uses semantic slug and numeric ID variables for generic object details', async () => {
+    const queries: Array<{ slug?: string; objectIds?: string[] }> = [];
+    const publishedObjects = vi.fn(async (query: { slug?: string; objectIds?: string[] }) => {
+      queries.push(query);
+      return [{
+        id: query.objectIds?.[0] || '41', title: 'Dynamic object', slug: query.slug || 'numeric-object',
+        objectType: { id: '5', name: 'article', label: 'Article', pluralLabel: 'Articles' },
+        data: {}, widgets: {}, metadata: {}, publishDate: '2026-05-01T00:00:00Z', isFeatured: false,
+      }];
+    });
+    const dynamicReader = (pathPattern: string): PageReader => ({
+      ...reader,
+      child: async (parent, tenant, slug) => parent === root.id && tenant === root.tenant_id && slug === 'news'
+        ? page({ ...child, path_pattern: pathPattern })
+        : null,
+      version: async (id, at) => id === child.id && at < new Date('2027-01-01') ? version({
+        id: '11', page_id: child.id, widgets: { main: [{
+          id: 'detail', type: 'object_storage.ObjectDetailWidget', config: { objectType: 'article' },
+        }] },
+      }) : reader.version(id, at),
+      publishedObjects,
+    });
+
+    await buildPublishedPageModel(
+      { withSnapshot: async read => read(dynamicReader('date_slug')) },
+      'example.org',
+      '/news/2026/10/annual-report',
+      new Date('2026-06-01'),
+    );
+    await buildPublishedPageModel(
+      { withSnapshot: async read => read(dynamicReader('numeric_id')) },
+      'example.org',
+      '/news/41',
+      new Date('2026-06-01'),
+    );
+
+    expect(queries[0]).toMatchObject({ objectTypeNames: ['article'], slug: 'annual-report' });
+    expect(queries[1]).toMatchObject({ objectIds: ['41'] });
+  });
+
+  it('keeps an explicitly configured object slug ahead of a numeric route ID', async () => {
+    const publishedObjects = vi.fn(async () => []);
+    const numericReader: PageReader = {
+      ...reader,
+      child: async (parent, tenant, slug) => parent === root.id && tenant === root.tenant_id && slug === 'news'
+        ? page({ ...child, path_pattern: 'numeric_id' })
+        : null,
+      version: async (id, at) => id === child.id && at < new Date('2027-01-01') ? version({
+        id: '11', page_id: child.id, widgets: { main: [{
+          id: 'detail', type: 'object_storage.ObjectDetailWidget',
+          config: { objectType: 'article', objectSlug: 'configured-object' },
+        }] },
+      }) : reader.version(id, at),
+      publishedObjects,
+    };
+
+    await buildPublishedPageModel(
+      { withSnapshot: async read => read(numericReader) },
+      'example.org',
+      '/news/41',
+      new Date('2026-06-01'),
+    );
+
+    expect(publishedObjects).toHaveBeenCalledWith(
+      expect.objectContaining({ objectTypeNames: ['article'], slug: 'configured-object' }),
+      root.tenant_id,
+      expect.any(Date),
+    );
+  });
+
   it('resolves nested object widgets and fixed object IDs', async () => {
     const publishedObject = {
       id: '41', title: 'Selected object', slug: 'selected-object',
@@ -505,8 +575,8 @@ describe('public resolution', () => {
   });
 
   it('uses the Django item count for every TopNews layout', async () => {
-    const queries: Array<{ limit: number }> = [];
-    const publishedObjects = vi.fn(async (query: { limit: number }) => {
+    const queries: Array<{ limit: number; pinnedFirst?: boolean }> = [];
+    const publishedObjects = vi.fn(async (query: { limit: number; pinnedFirst?: boolean }) => {
       queries.push(query);
       return [];
     });
@@ -532,6 +602,7 @@ describe('public resolution', () => {
     );
 
     expect(queries.map(query => query.limit)).toEqual([2, 3, 5, 2, 4]);
+    expect(queries.every(query => query.pinnedFirst)).toBe(true);
   });
 
   it('loads ObjectList hierarchy only when it is configured for display', async () => {

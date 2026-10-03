@@ -175,12 +175,13 @@ export async function submitPublishedForm(input: {
   if (!model || model.context.pageId !== input.pageId) return { status: 'not_found' };
   const widget = findPublishedForm(model.slots, input.widgetId);
   if (!widget || configured(widget.config, 'storeSubmissions', 'store_submissions') === false) return { status: 'not_found' };
+  const redirectPath = model.context.publicForms.pagePath;
 
   const honeypotEnabled = configured(widget.config, 'honeypotProtection', 'honeypot_protection') !== false;
-  if (honeypotEnabled && input.honeypot) return { status: 'success', redirectPath: input.pagePath };
+  if (honeypotEnabled && input.honeypot) return { status: 'success', redirectPath };
 
   const data = validateFormValues(configured(widget.config, 'fields'), input.values);
-  if (!data) return { status: 'invalid', redirectPath: input.pagePath };
+  if (!data) return { status: 'invalid', redirectPath };
   const stored = await input.store.insert({
     tenantId: model.context.tenantId,
     pageId: model.context.pageId,
@@ -189,5 +190,5 @@ export async function submitPublishedForm(input: {
     formTitle: String(configured(widget.config, 'title', 'formTitle', 'form_title') ?? '').slice(0, 255),
     data,
   });
-  return { status: stored === 'stored' ? 'success' : 'rate_limited', redirectPath: input.pagePath };
+  return { status: stored === 'stored' ? 'success' : 'rate_limited', redirectPath };
 }

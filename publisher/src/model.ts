@@ -97,6 +97,7 @@ export interface PublishedObjectQuery {
   limit: number;
   sortOrder: string;
   featuredFirst?: boolean;
+  pinnedFirst?: boolean;
   includeHierarchy?: boolean;
 }
 
@@ -645,7 +646,7 @@ async function resolvePublishedData(
           ? topNewsLimit(config.layout)
           : positiveLimit(config.limit ?? config.maxItems ?? config.max_items, 5),
         sortOrder: String(config.sortOrder ?? config.sort_order ?? '-publish_date'),
-        featuredFirst: true,
+        pinnedFirst: true,
       }, tenantId, at);
     } else if (widget.type === 'easy_widgets.NewsDetailWidget') {
       const variable = String(config.slugVariableName ?? config.slug_variable_name ?? 'news_slug');
@@ -659,9 +660,13 @@ async function resolvePublishedData(
         }, tenantId, at);
       }
     } else if (widget.type === 'object_storage.ObjectDetailWidget') {
-      const objectId = String(config.objectId ?? config.object_id ?? '');
+      const configuredSlug = config.objectSlug ?? config.object_slug;
+      const objectId = String(config.objectId ?? config.object_id ?? (configuredSlug ? '' : pathVariables.id) ?? '');
       const objectType = String(config.objectType ?? config.object_type ?? '');
-      const slug = String(config.objectSlug ?? config.object_slug ?? Object.values(pathVariables)[0] ?? '');
+      const slug = String(configuredSlug
+        ?? pathVariables.news_slug ?? pathVariables.event_slug ?? pathVariables.library_slug
+        ?? pathVariables.member_slug ?? pathVariables.date_slug ?? pathVariables.slug
+        ?? pathVariables.category_slug ?? '');
       if (/^\d+$/.test(objectId)) {
         [item] = await reader.publishedObjects({
           objectIds: [objectId],
