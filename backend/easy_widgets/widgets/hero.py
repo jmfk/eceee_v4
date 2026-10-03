@@ -278,10 +278,7 @@ class HeroWidget(BaseWidget):
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import (
-            prepare_component_context,
-            render_mustache,
-        )
+        from webpages.utils.mustache_renderer import prepare_component_context, render_mustache
 
         style_name = config.get("component_style", "default")
 

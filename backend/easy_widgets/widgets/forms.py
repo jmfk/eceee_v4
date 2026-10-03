@@ -419,10 +419,7 @@ class FormsWidget(BaseWidget):
         """
         from django.template.loader import render_to_string
 
-        from webpages.utils.mustache_renderer import (
-            prepare_component_context,
-            render_mustache,
-        )
+        from webpages.utils.mustache_renderer import prepare_component_context, render_mustache
 
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
