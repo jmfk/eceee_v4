@@ -5,7 +5,7 @@ from django.template.loader import render_to_string
 from django.test import SimpleTestCase
 
 from easy_widgets.widgets.image import ImageConfig, ImageWidget
-from webpages.utils.mustache_renderer import prepare_carousel_context
+from webpages.utils.mustache_renderer import prepare_carousel_context, prepare_gallery_context
 
 
 class ImageWidgetTests(SimpleTestCase):
@@ -231,3 +231,33 @@ class ImageWidgetTests(SimpleTestCase):
         )
 
         self.assertEqual(context["images"][0]["alt"], "Slide one")
+
+    def test_gallery_context_keeps_processed_image_urls(self):
+        context = prepare_gallery_context(
+            [
+                {
+                    "url": "/original.jpg",
+                    "src_url": "/processed.webp",
+                    "lightbox_url": "/processed-lightbox.webp",
+                }
+            ],
+            {},
+        )
+
+        self.assertEqual(context["images"][0]["url"], "/processed.webp")
+        self.assertEqual(context["images"][0]["lightboxUrl"], "/processed-lightbox.webp")
+
+        unavailable = prepare_gallery_context([{"url": "/original.jpg"}], {})
+        self.assertEqual(unavailable["images"][0]["url"], "")
+        self.assertIsNone(unavailable["images"][0]["lightboxUrl"])
+
+    def test_carousel_context_keeps_processed_image_url(self):
+        context = prepare_carousel_context(
+            [{"url": "/original.jpg", "src_url": "/processed.webp"}],
+            {},
+        )
+
+        self.assertEqual(context["images"][0]["url"], "/processed.webp")
+
+        unavailable = prepare_carousel_context([{"url": "/original.jpg"}], {})
+        self.assertEqual(unavailable["images"][0]["url"], "")
