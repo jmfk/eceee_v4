@@ -25,6 +25,7 @@ class SidebarTopNewsConfig(BaseModel):
         json_schema_extra={
             "component": "MultiSelectInput",
             "placeholder": "Select object types...",
+            "group": "Content",
         },
     )
 
@@ -35,6 +36,7 @@ class SidebarTopNewsConfig(BaseModel):
         description="Maximum number of items to display",
         json_schema_extra={
             "component": "NumberInput",
+            "group": "Content",
         },
     )
 
@@ -85,6 +87,7 @@ class SidebarTopNewsConfig(BaseModel):
         json_schema_extra={
             "component": "TextInput",
             "placeholder": "e.g., Top News, Latest Updates",
+            "group": "Content",
         },
     )
     component_style: str = Field(

@@ -21,14 +21,22 @@ class ObjectListConfig(BaseModel):
     """Configuration for Object List widget"""
 
     object_type: str = Field(..., description="Object type to display (e.g., 'news', 'blog')")
-    limit: int = Field(default=5, ge=1, le=50, description="Maximum number of objects to display")
+    limit: int = Field(
+        default=5,
+        ge=1,
+        le=50,
+        description="Maximum number of objects to display",
+        json_schema_extra={"group": "Content"},
+    )
     order_by: str = Field(
         default="-created_at",
         description="Field to order by (prefix with - for descending)",
+        json_schema_extra={"group": "Content"},
     )
     status_filter: str = Field(
         default="published",
         description="Status filter: 'all', 'draft', 'published', 'archived'",
+        json_schema_extra={"group": "Content"},
     )
     show_hierarchy: bool = Field(default=False, description="Show hierarchical structure with indentation")
     display_template: str = Field(default="card", description="Display template: 'card', 'list', 'minimal'")
@@ -72,9 +80,18 @@ class ObjectDetailConfig(BaseModel):
     object_id: Optional[int] = Field(
         default=None,
         description="Specific object ID to display (if not provided, uses context)",
+        json_schema_extra={"group": "Content"},
     )
-    object_type: Optional[str] = Field(default=None, description="Object type filter if using slug lookup")
-    object_slug: Optional[str] = Field(default=None, description="Object slug for lookup (alternative to object_id)")
+    object_type: Optional[str] = Field(
+        default=None,
+        description="Object type filter if using slug lookup",
+        json_schema_extra={"group": "Content"},
+    )
+    object_slug: Optional[str] = Field(
+        default=None,
+        description="Object slug for lookup (alternative to object_id)",
+        json_schema_extra={"group": "Content"},
+    )
     display_template: str = Field(default="full", description="Display template: 'full', 'summary', 'minimal'")
     show_metadata: bool = Field(default=False, description="Show object metadata and technical details")
     show_hierarchy: bool = Field(default=True, description="Show parent/child relationships")
@@ -85,11 +102,27 @@ class ObjectChildrenConfig(BaseModel):
     """Configuration for Object Children widget"""
 
     parent_object_id: Optional[int] = Field(
-        default=None, description="Parent object ID (if not provided, uses context)"
+        default=None,
+        description="Parent object ID (if not provided, uses context)",
+        json_schema_extra={"group": "Content"},
     )
-    object_type_filter: Optional[str] = Field(default=None, description="Filter children by object type")
-    limit: int = Field(default=10, ge=1, le=100, description="Maximum number of children to display")
-    order_by: str = Field(default="title", description="Field to order children by")
+    object_type_filter: Optional[str] = Field(
+        default=None,
+        description="Filter children by object type",
+        json_schema_extra={"group": "Content"},
+    )
+    limit: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="Maximum number of children to display",
+        json_schema_extra={"group": "Content"},
+    )
+    order_by: str = Field(
+        default="title",
+        description="Field to order children by",
+        json_schema_extra={"group": "Content"},
+    )
     display_template: str = Field(default="card", description="Display template: 'card', 'list', 'grid'")
     show_levels: int = Field(default=1, ge=1, le=5, description="Number of hierarchy levels to show")
 

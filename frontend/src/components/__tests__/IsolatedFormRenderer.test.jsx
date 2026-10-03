@@ -320,19 +320,20 @@ describe('IsolatedFormRenderer active prop ownership', () => {
         expect(screen.getByText('Styling').closest('details')).not.toHaveAttribute('open')
     })
 
-    it('keeps required and ungrouped fields visible without a field-name registry', () => {
+    it('keeps required and explicitly primary fields visible without a field-name registry', () => {
         render(
             <IsolatedFormRenderer
                 initWidgetData={{
                     ...baseWidget,
                     id: 'object-list-1',
                     type: 'object_storage.ObjectListWidget',
-                    config: { object_type: 'news', display_template: 'card', show_hierarchy: false }
+                    config: { object_type: 'news', limit: 5, display_template: 'card', show_hierarchy: false }
                 }}
                 initschema={{
                     required: ['object_type'],
                     properties: {
                         object_type: { type: 'string', group: 'Data source' },
+                        limit: { type: 'number', group: 'Content' },
                         display_template: { type: 'string' },
                         show_hierarchy: { type: 'boolean', group: 'Display Options' }
                     }
@@ -347,7 +348,9 @@ describe('IsolatedFormRenderer active prop ownership', () => {
         )
 
         expect(screen.getByRole('button', { name: 'Change object_type' })).toBeVisible()
-        expect(screen.getByRole('button', { name: 'Change display_template' })).toBeVisible()
+        expect(screen.getByRole('button', { name: 'Change limit' })).toBeVisible()
+        expect(screen.getByRole('button', { name: 'Change display_template' })).not.toBeVisible()
         expect(screen.getByRole('button', { name: 'Change show_hierarchy' })).not.toBeVisible()
+        expect(screen.getByText('More settings').closest('details')).not.toHaveAttribute('open')
     })
 })

@@ -25,6 +25,7 @@ class TopNewsPlugConfig(BaseModel):
         json_schema_extra={
             "component": "MultiSelectInput",
             "placeholder": "Select object types...",
+            "group": "Content",
         },
     )
 
@@ -33,6 +34,7 @@ class TopNewsPlugConfig(BaseModel):
         description="Select layout configuration",
         json_schema_extra={
             "component": "RadioInput",
+            "group": "Layout",
             "options": [
                 {
                     "value": "1x3",
