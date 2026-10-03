@@ -52,6 +52,47 @@ describe('ImageWidget', () => {
         vi.clearAllMocks()
     })
 
+    it('keeps randomized images in the same order across unrelated re-renders', () => {
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.42)
+        const randomizedConfig = {
+            displayType: 'gallery',
+            randomize: true,
+            showCaptions: true,
+            mediaItems: [
+                { id: 'first', type: 'image', url: '/first.jpg', altText: 'First' },
+                { id: 'second', type: 'image', url: '/second.jpg', altText: 'Second' },
+                { id: 'third', type: 'image', url: '/third.jpg', altText: 'Third' }
+            ]
+        }
+
+        const { rerender } = render(
+            <ImageWidget
+                mode="editor"
+                widgetId="image-1"
+                slotName="main"
+                config={randomizedConfig}
+            />
+        )
+        const initialOrder = screen.getAllByRole('img').map(image => image.alt)
+
+        rerender(
+            <ImageWidget
+                mode="editor"
+                widgetId="image-1"
+                slotName="main"
+                config={{
+                    ...randomizedConfig,
+                    showCaptions: false,
+                    mediaItems: randomizedConfig.mediaItems.map(item => ({ ...item }))
+                }}
+            />
+        )
+
+        expect(screen.getAllByRole('img').map(image => image.alt)).toEqual(initialOrder)
+        expect(randomSpy).toHaveBeenCalledTimes(1)
+        randomSpy.mockRestore()
+    })
+
     it('stops carousel auto-play when the editor setting is turned off', () => {
         const { container } = render(
             <ImageWidget

@@ -11,6 +11,21 @@ import { generateCSSFromBreakpoints } from '../../utils/cssBreakpointUtils'
 import { getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout'
 import { mediaCollectionsApi } from '../../api/media'
 
+const shuffleWithSeed = (items, initialSeed) => {
+    const shuffled = [...items]
+    let seed = initialSeed
+
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+        seed = (seed * 16807) % 2147483647
+        const targetIndex = Math.floor(((seed - 1) / 2147483646) * (index + 1))
+        const currentItem = shuffled[index]
+        shuffled[index] = shuffled[targetIndex]
+        shuffled[targetIndex] = currentItem
+    }
+
+    return shuffled
+}
+
 /**
  * EASY Image Widget Component
  * Renders images, galleries, and videos with multiple display modes
@@ -43,6 +58,7 @@ const ImageWidget = ({
     // Carousel state - always initialized to avoid hook order issues
     const [currentIndex, setCurrentIndex] = useState(0)
     const [isPlaying, setIsPlaying] = useState(localConfig.autoPlay || false)
+    const [randomizationSeed] = useState(() => Math.floor(Math.random() * 2147483646) + 1)
 
     // Keep playback state aligned with configuration changes made in the editor.
     // Without this, turning auto-play off only updated localConfig while the
@@ -175,20 +191,29 @@ const ImageWidget = ({
 
     // Backend now provides media_items in config (resolved from image field)
     // Use media_items directly from config, or resolved collection files
-    let effectiveMediaItems = localConfig.mediaItems || localConfig.media_items || []
+    const configuredMediaItems = useMemo(
+        () => localConfig.mediaItems || localConfig.media_items || [],
+        [localConfig.mediaItems, localConfig.media_items]
+    )
 
     // If we have resolved collection files, use those instead
-    if (isCollection && collectionMediaItems.length > 0) {
-        effectiveMediaItems = collectionMediaItems
-    }
+    const effectiveMediaItems = isCollection && collectionMediaItems.length > 0
+        ? collectionMediaItems
+        : configuredMediaItems
 
-    // Apply randomization if enabled (backend handles collection randomization, but we can still randomize here for backward compat)
-    if (localConfig.randomize && effectiveMediaItems.length > 0) {
-        effectiveMediaItems = [...effectiveMediaItems].sort(() => Math.random() - 0.5)
-    }
+    // Keep one randomized order for this mounted widget. Editor state, theme,
+    // and collection updates can all cause legitimate React re-renders, which
+    // must not visibly reshuffle an unchanged image selection.
+    const randomizedMediaItems = useMemo(() => {
+        if (!localConfig.randomize || effectiveMediaItems.length === 0) {
+            return effectiveMediaItems
+        }
+
+        return shuffleWithSeed(effectiveMediaItems, randomizationSeed)
+    }, [effectiveMediaItems, localConfig.randomize, randomizationSeed])
 
     // Handle backward compatibility
-    const items = effectiveMediaItems.length > 0 ? effectiveMediaItems : (localConfig.imageUrl ? [{
+    const items = randomizedMediaItems.length > 0 ? randomizedMediaItems : (localConfig.imageUrl ? [{
         url: localConfig.imageUrl,
         type: 'image',
         altText: localConfig.altText || 'Image',
