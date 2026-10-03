@@ -44,6 +44,13 @@ const ImageWidget = ({
     const [currentIndex, setCurrentIndex] = useState(0)
     const [isPlaying, setIsPlaying] = useState(localConfig.autoPlay || false)
 
+    // Keep playback state aligned with configuration changes made in the editor.
+    // Without this, turning auto-play off only updated localConfig while the
+    // carousel interval continued to use the stale initial isPlaying value.
+    useEffect(() => {
+        setIsPlaying(localConfig.autoPlay === true)
+    }, [localConfig.autoPlay])
+
     // ODC Config Synchronization - Initialize from ODC state if available
     // useEffect(() => {
     //     if (!widgetId || !slotName) return
