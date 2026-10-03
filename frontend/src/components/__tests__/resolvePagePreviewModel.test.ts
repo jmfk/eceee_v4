@@ -176,4 +176,26 @@ describe('page preview model resolution', () => {
             src: '/imgproxy/resize:fit:896:0//nested.jpg',
         })
     })
+
+    it('signs more than 50 image requests in supported batches', async () => {
+        const mediaItems = Array.from({ length: 51 }, (_, index) => ({
+            id: `image-${index}`,
+            type: 'image',
+            url: `/image-${index}.jpg`,
+        }))
+        const model = createPageRenderModel({ widgets: { main: [{
+            id: 'gallery',
+            type: 'easy_widgets.ImageWidget',
+            config: { mediaItems, displayType: 'gallery' },
+        }] } })
+
+        const resolved = await resolvePagePreviewModel(model)
+
+        expect(imgproxyApi.getBatch).toHaveBeenCalledTimes(2)
+        expect(imgproxyApi.getBatch.mock.calls[0][0]).toHaveLength(50)
+        expect(imgproxyApi.getBatch.mock.calls[1][0]).toHaveLength(1)
+        expect(resolved.slots.main[0].config.mediaItems[50].src).toBe(
+            '/imgproxy/resize:fit:896:0//image-50.jpg'
+        )
+    })
 })
