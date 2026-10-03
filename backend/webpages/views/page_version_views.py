@@ -404,9 +404,6 @@ class PageVersionViewSet(
                 self._broadcast_on_commit(request, serializer.instance, "saved")
             return Response(serializer.data)
         except WorkflowError as error:
-            error.details["server_version"] = PageVersionSerializer(
-                PageVersion.objects.get(pk=version.pk), context={"request": request}
-            ).data
             return self._workflow_error_response(error)
 
     def save_page_working_copy(self, request, page_id=None):

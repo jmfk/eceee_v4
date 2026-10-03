@@ -162,4 +162,26 @@ describe('usePageWebSocket', () => {
 
         expect(result.current.activeEditors).toHaveLength(0)
     })
+
+    it('moves the connection and presence state when the page changes', async () => {
+        const { result, rerender } = renderHook(
+            ({ pageId }) => usePageWebSocket(pageId),
+            { initialProps: { pageId: 7 } },
+        )
+        const firstSocket = MockWebSocket.instances[0]
+
+        act(() => firstSocket.message({
+            type: 'presence', action: 'join', connection_id: 'page-seven-editor',
+            user: { id: 2, username: 'editor', display_name: 'Editor' },
+            section: 'content', widget_id: null,
+        }))
+        expect(result.current.activeEditors).toHaveLength(1)
+
+        rerender({ pageId: 8 })
+
+        await waitFor(() => expect(MockWebSocket.instances).toHaveLength(2))
+        expect(firstSocket.readyState).toBe(3)
+        expect(MockWebSocket.instances[1].url).toContain('/ws/pages/8/editor/')
+        expect(result.current.activeEditors).toHaveLength(0)
+    })
 })

@@ -230,15 +230,36 @@ class PageVersionWorkflowService:
 
     def assert_canonical_editable(self, version):
         editable = self.canonical_editable_version(lock=True)
-        if not editable or editable.id != version.id:
+        if editable and editable.id != version.id:
+            raise VersionConflictError(
+                "The page's working version has changed.",
+                details=self._version_conflict_details(editable),
+            )
+        if not editable:
             raise VersionNotEditableError(
                 "Only the current working version can be changed.",
                 details={
                     "requested_version_id": version.id,
-                    "editable_version_id": editable.id if editable else None,
+                    "editable_version_id": None,
                 },
             )
         return editable
+
+    @staticmethod
+    def _version_conflict_details(version):
+        return {
+            "server_version_id": version.id,
+            "server_revision": version.edit_revision,
+            "server_updated_at": version.updated_at.isoformat(),
+            "last_edited_by": (
+                {
+                    "id": version.last_edited_by_id,
+                    "username": version.last_edited_by.username,
+                }
+                if version.last_edited_by_id
+                else None
+            ),
+        }
 
     def assert_reviewed(self, version, *, expected_revision=None, expected_updated_at=None, required=True):
         """Require an exact server-issued revision, with timestamp compatibility fallback."""
@@ -253,19 +274,7 @@ class PageVersionWorkflowService:
 
         raise VersionConflictError(
             "The reviewed working version has changed.",
-            details={
-                "server_version_id": version.id,
-                "server_revision": version.edit_revision,
-                "server_updated_at": version.updated_at.isoformat(),
-                "last_edited_by": (
-                    {
-                        "id": version.last_edited_by_id,
-                        "username": version.last_edited_by.username,
-                    }
-                    if version.last_edited_by_id
-                    else None
-                ),
-            },
+            details=self._version_conflict_details(version),
         )
 
     def advance_revision(self, version):
@@ -467,9 +476,14 @@ class PageVersionWorkflowService:
         self.now = timezone.now()
         version = PageVersion.objects.select_for_update().get(pk=version.pk)
         editable = self.canonical_editable_version(lock=True)
-        if not editable or editable.id != version.id:
+        if editable and editable.id != version.id:
+            raise VersionConflictError(
+                "The page's working version has changed.",
+                details=self._version_conflict_details(editable),
+            )
+        if not editable:
             live = self.live_version(lock=True)
-            if live and live.id == version.id and editable is None:
+            if live and live.id == version.id:
                 self.assert_reviewed(
                     live,
                     expected_revision=expected_revision,
