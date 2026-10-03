@@ -672,14 +672,14 @@ describe('PageRenderer', () => {
     it('falls back to the widget alt text for legacy media items', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'image', type: 'easy_widgets.ImageWidget', config: {
-                mediaItems: [{ id: 1, type: 'image', url: '/legacy.jpg' }],
+                mediaItems: [{ id: 1, type: 'image', url: '/legacy.jpg', src: '/legacy-resized.jpg' }],
                 altText: 'Legacy image description',
             } }] },
         })
 
         render(<PageRenderer model={model} />)
 
-        expect(screen.getByRole('img', { name: 'Legacy image description' })).toHaveAttribute('src', '/legacy.jpg')
+        expect(screen.getByRole('img', { name: 'Legacy image description' })).toHaveAttribute('src', '/legacy-resized.jpg')
     })
 
     it('renders a canonical single image as a single image even with the legacy gallery default', () => {
@@ -689,6 +689,7 @@ describe('PageRenderer', () => {
                     id: 'media-1',
                     imgproxy_base_url: '/full-size.jpg',
                     thumbnail_url: '/thumbnail.jpg',
+                    src: '/image-896.webp',
                     title: 'The power of light',
                 },
                 displayType: 'gallery',
@@ -697,7 +698,7 @@ describe('PageRenderer', () => {
 
         const { container } = render(<PageRenderer model={model} />)
 
-        expect(screen.getByRole('img', { name: 'The power of light' })).toHaveAttribute('src', '/full-size.jpg')
+        expect(screen.getByRole('img', { name: 'The power of light' })).toHaveAttribute('src', '/image-896.webp')
         expect(container.querySelector('.image-size-medium')).toBeInTheDocument()
         expect(container.querySelector('.gallery-grid')).toBeNull()
     })

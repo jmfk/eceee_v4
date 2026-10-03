@@ -83,7 +83,10 @@ class ImageWidgetTests(SimpleTestCase):
 
     @patch("file_manager.imgproxy.imgproxy_service.generate_responsive_urls")
     def test_canonical_single_image_accepts_media_api_snake_case_urls(self, generate_responsive_urls):
-        generate_responsive_urls.return_value = {}
+        generate_responsive_urls.return_value = {
+            "1x": {"url": "/image-896.webp", "width": 896, "height": 896},
+            "srcset": "/image-896.webp 896w",
+        }
 
         config = ImageWidget().prepare_template_context(
             {
@@ -99,6 +102,7 @@ class ImageWidgetTests(SimpleTestCase):
         )
 
         self.assertEqual(config["media_items"][0]["url"], "/full-size.jpg")
+        self.assertEqual(config["media_items"][0]["src_url"], "/image-896.webp")
         self.assertEqual(config["media_items"][0]["thumbnail_url"], "/thumbnail.jpg")
         self.assertEqual(config["display_type"], "single")
         generate_responsive_urls.assert_called_once_with(

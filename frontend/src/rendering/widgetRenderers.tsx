@@ -126,14 +126,16 @@ const BioRender: WidgetRenderComponent = ({ widget }) => {
 
 const MediaView = ({ item, className }: { item: any, className: string }) => {
     const isVideo = item?.type === 'video' || String(item?.mimeType || item?.mime_type || '').startsWith('video/')
-    const source = isVideo ? item?.url || item?.fileUrl || item?.file_url : imageUrl(item)
-    if (!source) return null
     if (isVideo) {
+        const source = item?.url || item?.fileUrl || item?.file_url
+        if (!source) return null
         return <video className={className} controls poster={item.thumbnail || item.thumbnailUrl || item.thumbnail_url}>
             <source src={source} type={item.mimeType || item.mime_type || 'video/mp4'} />
         </video>
     }
-    return <ImageView source={item} alt={item?.altText || item?.alt_text || item?.title || ''} className={className} />
+    return item?.src
+        ? <ImageView source={item} alt={item?.altText || item?.alt_text || item?.title || ''} className={className} />
+        : null
 }
 
 const ImageRender: WidgetRenderComponent = ({ widget }) => {
@@ -143,7 +145,6 @@ const ImageRender: WidgetRenderComponent = ({ widget }) => {
     const canonicalImage = value(config, 'image')
     const isCanonicalSingle = Boolean(canonicalImage)
         && !isImageCollectionReference(canonicalImage)
-        && configuredMediaItems.length === 0
     const displayType = isCanonicalSingle ? 'single' : value(config, 'displayType', 'display_type') || 'single'
     const [currentIndex, setCurrentIndex] = useState(0)
     const autoPlay = value(config, 'autoPlay', 'auto_play') === true
@@ -183,7 +184,7 @@ const ImageRender: WidgetRenderComponent = ({ widget }) => {
         </div>
     }
     const source = items[0] || value(config, 'imageUrl', 'image_url', 'image', 'src', 'url')
-    if (!imageUrl(source)) return null
+    if (!source?.src) return null
     const alt = source && typeof source === 'object'
         ? source.altText || source.alt_text || source.alt || source.title || value(config, 'altText', 'alt_text', 'alt') || ''
         : value(config, 'altText', 'alt_text', 'alt') || ''

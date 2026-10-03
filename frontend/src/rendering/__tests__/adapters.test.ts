@@ -115,7 +115,15 @@ describe('render adapters', () => {
         expect(model.slots.hero).toHaveLength(1)
         expect(model.slots.hero[0]).toMatchObject({
             type: 'easy_widgets.ImageWidget',
-            config: { imageUrl: 'https://storage.test/hero.jpg', altText: 'Hero' },
+            config: {
+                imageUrl: 'https://storage.test/hero.jpg',
+                altText: 'Hero',
+                mediaItems: [{
+                    url: 'https://storage.test/hero.jpg',
+                    src: 'https://storage.test/hero.jpg',
+                    altText: 'Hero',
+                }],
+            },
         })
     })
 

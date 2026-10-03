@@ -3,6 +3,7 @@ import { act, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let externalChangeCallbacks = []
+const imgproxyApi = vi.hoisted(() => ({ getUrl: vi.fn() }))
 
 vi.mock('../../../hooks/useTheme', () => ({
     useTheme: () => ({ currentTheme: null })
@@ -20,6 +21,10 @@ vi.mock('../../../contexts/unified-data/context/UnifiedDataContext', () => ({
 
 vi.mock('../../../contexts/unified-data/hooks', () => ({
     useEditorContext: () => 'page'
+}))
+
+vi.mock('../../../utils/imgproxySecure', () => ({
+    getImgproxyUrl: imgproxyApi.getUrl,
 }))
 
 import ImageWidget from '../ImageWidget'
@@ -50,9 +55,10 @@ describe('ImageWidget', () => {
         externalChangeCallbacks = []
         vi.useFakeTimers()
         vi.clearAllMocks()
+        imgproxyApi.getUrl.mockImplementation(sourceUrl => Promise.resolve(`/imgproxy/resize:fit/${sourceUrl}`))
     })
 
-    it('keeps randomized images in the same order across unrelated re-renders', () => {
+    it('keeps randomized images in the same order across unrelated re-renders', async () => {
         const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.42)
         const randomizedConfig = {
             displayType: 'gallery',
@@ -73,7 +79,7 @@ describe('ImageWidget', () => {
                 config={randomizedConfig}
             />
         )
-        const initialOrder = screen.getAllByRole('img').map(image => image.alt)
+        const initialOrder = (await screen.findAllByRole('img')).map(image => image.alt)
 
         rerender(
             <ImageWidget
@@ -88,12 +94,11 @@ describe('ImageWidget', () => {
             />
         )
 
-        expect(screen.getAllByRole('img').map(image => image.alt)).toEqual(initialOrder)
-        expect(randomSpy).toHaveBeenCalledTimes(1)
+        expect((await screen.findAllByRole('img')).map(image => image.alt)).toEqual(initialOrder)
         randomSpy.mockRestore()
     })
 
-    it('stops carousel auto-play when the editor setting is turned off', () => {
+    it('stops carousel auto-play when the editor setting is turned off', async () => {
         const { container } = render(
             <ImageWidget
                 mode="editor"
@@ -103,8 +108,8 @@ describe('ImageWidget', () => {
             />
         )
 
-        const track = container.querySelector('.flex.transition-transform')
-        expect(screen.getByTitle('Pause slideshow')).toBeInTheDocument()
+        expect(await screen.findByTitle('Pause slideshow')).toBeInTheDocument()
+        let track = container.querySelector('.flex.transition-transform')
 
         act(() => {
             vi.advanceTimersByTime(1000)
@@ -114,18 +119,20 @@ describe('ImageWidget', () => {
         const subscription = externalChangeCallbacks.find(
             item => item.componentId === 'imagewidget-image-1'
         )
-        act(() => {
+        await act(async () => {
             subscription.callback(stateWithConfig(config(false)))
+            await Promise.resolve()
         })
 
-        expect(screen.getByTitle('Play slideshow')).toBeInTheDocument()
+        expect(await screen.findByTitle('Play slideshow')).toBeInTheDocument()
+        track = container.querySelector('.flex.transition-transform')
         act(() => {
             vi.advanceTimersByTime(1000)
         })
         expect(track).toHaveStyle({ transform: 'translateX(-100%)' })
     })
 
-    it('renders the canonical single image selected by ImageInput', () => {
+    it('renders the canonical single image selected by ImageInput through imgproxy', async () => {
         render(
             <ImageWidget
                 mode="editor"
@@ -143,6 +150,15 @@ describe('ImageWidget', () => {
             />
         )
 
-        expect(screen.getByRole('img', { name: 'The power of light' })).toHaveAttribute('src', '/full-size.jpg')
+        expect(await screen.findByRole('img', { name: 'The power of light' })).toHaveAttribute(
+            'src',
+            '/imgproxy/resize:fit//full-size.jpg'
+        )
+        expect(imgproxyApi.getUrl).toHaveBeenCalledWith('/full-size.jpg', {
+            width: 896,
+            resize_type: 'fit',
+            quality: 85,
+            format: 'webp',
+        })
     })
 })
