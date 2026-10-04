@@ -555,7 +555,7 @@ shell:
 # Start and validate the local services required by make test.
 prepare-test-infra:
 	@command -v docker >/dev/null 2>&1 || (echo "Error: Docker is required to run tests."; exit 1)
-	@if [ -z "$(CI)" ]; then \
+	@if [ -z "$(CI)" ] && [ -z "$(SKIP_PORT_REGISTRY_CHECK)" ]; then \
 		python3 scripts/configure_orbstack.py --backend-port "$(BACKEND_PORT)" --frontend-port "$(FRONTEND_PORT)" --check-only >/dev/null; \
 	fi
 	@set -e; \
