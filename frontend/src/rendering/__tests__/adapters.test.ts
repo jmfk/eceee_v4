@@ -120,7 +120,6 @@ describe('render adapters', () => {
                 altText: 'Hero',
                 mediaItems: [{
                     url: 'https://storage.test/hero.jpg',
-                    src: 'https://storage.test/hero.jpg',
                     altText: 'Hero',
                 }],
             },

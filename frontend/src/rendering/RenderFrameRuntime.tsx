@@ -421,6 +421,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement) => {
             const widgetReferences = widgetId ? referencesByWidgetId.get(widgetId) || [] : []
             const preferredReferences = widgetReferences.length ? widgetReferences : remainingReferences
             const preferredReference = preferredReferences.find((reference) => resolvedUrl(reference.sourceUrl) === resolvedUrl(sourceUrl))
+                || (widgetReferences.length === 1 ? widgetReferences[0] : undefined)
             const referenceIndex = preferredReference
                 ? remainingReferences.findIndex((reference) => reference.sourceUrl === preferredReference.sourceUrl && reference.sourceOccurrence === preferredReference.sourceOccurrence)
                 : remainingReferences.findIndex((reference) => resolvedUrl(reference.sourceUrl) === resolvedUrl(sourceUrl))
