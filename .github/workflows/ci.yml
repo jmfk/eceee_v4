@@ -201,6 +201,7 @@ jobs:
           bash deploy/scripts/tests/test-healthcheck.sh
           bash deploy/scripts/tests/test-production-operation.sh
           bash deploy/scripts/tests/test-validate-deploy-control-ref.sh
+          bash deploy/scripts/tests/test-deploy-build-order.sh
 
   backend-tests:
     name: Backend tests

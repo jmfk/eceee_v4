@@ -27,6 +27,15 @@ success() { echo -e "${GREEN}[deploy]${NC} $*"; }
 warn()    { echo -e "${YELLOW}[deploy]${NC} $*"; }
 error()   { echo -e "${RED}[deploy]${NC} $*" >&2; }
 
+build_images_serially() {
+    local service
+
+    for service in "$@"; do
+        info "Building $service image..."
+        IMAGE_TAG="$IMAGE_TAG" docker_compose build "$service"
+    done
+}
+
 commit_installed_environment() {
     if [ -n "${ECEEE_ENV_COMMIT_MARKER:-}" ]; then
         : > "$ECEEE_ENV_COMMIT_MARKER"
@@ -83,7 +92,7 @@ if grep -Fxq publisher <<< "$COMPOSE_SERVICES"; then
     PUBLISHER_DEPLOY_ENABLED=1
 fi
 unset COMPOSE_SERVICES
-IMAGE_TAG="$IMAGE_TAG" docker_compose build "${BUILD_SERVICES[@]}"
+build_images_serially "${BUILD_SERVICES[@]}"
 
 # ── 6. Migration check ────────────────────────────────────────────────────────
 info "Checking for unapplied migrations..."
