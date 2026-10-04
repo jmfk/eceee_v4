@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPageRenderModel } from '../../rendering/adapters'
+import { createDesignerRenderModel, createPageRenderModel } from '../../rendering/adapters'
 import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
 
 const objectApi = vi.hoisted(() => ({ search: vi.fn(), get: vi.fn(), getNewsList: vi.fn() }))
@@ -17,6 +17,34 @@ describe('page preview model resolution', () => {
         imgproxyApi.getBatch.mockImplementation(requests => Promise.resolve(
             requests.map(request => `/imgproxy/resize:fit:${request.width}:0/${request.sourceUrl}`)
         ))
+    })
+
+    it('resolves Designer ImageWidget sources without rendering the original URL', async () => {
+        const model = createDesignerRenderModel({
+            workspace: {
+                previewContent: { views: [{
+                    id: 'site-page',
+                    layout: 'main_layout',
+                    texts: {},
+                    images: { hero: { url: '/theme_images/site-hero.jpg', filename: 'Site hero' } },
+                }] },
+                catalog: {
+                    layouts: [{ key: 'main_layout', slots: [{ name: 'main' }] }],
+                    componentStyles: [],
+                    designGroups: [],
+                },
+            },
+            viewId: 'site-page',
+        })
+
+        expect(model.slots.main[0].config.mediaItems[0].src).toBeUndefined()
+
+        const resolved = await resolvePagePreviewModel(model)
+
+        expect(resolved.slots.main[0].config.mediaItems[0]).toMatchObject({
+            url: '/theme_images/site-hero.jpg',
+            src: '/imgproxy/resize:fit:896:0//theme_images/site-hero.jpg',
+        })
     })
 
     it('resolves detail widgets from editor path variables', async () => {

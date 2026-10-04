@@ -511,10 +511,13 @@ describe('RenderFrameRuntime designer overlay', () => {
         const postMessage = vi.spyOn(window, 'postMessage')
         render(<RenderFrameRuntime />)
 
-        sendModel(createDesignerRenderModel({ workspace: imageWorkspace, viewId: 'site-page', contentEditable: true }))
+        const model = createDesignerRenderModel({ workspace: imageWorkspace, viewId: 'site-page', contentEditable: true })
+        model.slots.hero[0].config.mediaItems[0].src = '/imgproxy/site-hero.jpg'
+        model.slots.main[0].config.mediaItems[0].src = '/imgproxy/site-hero.jpg'
+        sendModel(model)
 
         const image = await screen.findByRole('img', { name: 'Site hero' })
-        expect(image).toHaveAttribute('src', '/theme_images/site-hero.jpg')
+        expect(image).toHaveAttribute('src', '/imgproxy/site-hero.jpg')
         fireEvent.contextMenu(image, { clientX: 30, clientY: 40 })
         fireEvent.click(screen.getByRole('menuitem', { name: 'Replace image' }))
         const input = document.querySelector<HTMLInputElement>('input[type="file"][accept*="image/png"]')!

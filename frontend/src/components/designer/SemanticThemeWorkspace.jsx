@@ -3,6 +3,7 @@ import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileTex
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel, designerPreviewImageReferences } from '../../rendering/adapters'
+import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
 const typographyLabels = {
     fontFamily: 'Font family', fontSize: 'Size', fontWeight: 'Weight', fontStyle: 'Style',
     lineHeight: 'Line height', letterSpacing: 'Letter spacing',
@@ -657,6 +658,18 @@ const SemanticThemeWorkspace = ({
             guidesEnabled,
         })
     }, [contentMode, guidesEnabled, pendingPreviewTextsRef, previewContent, preview, sourceContentModel, viewId, workspace])
+    const [renderPreviewModel, setRenderPreviewModel] = useState(previewModel)
+
+    useEffect(() => {
+        setRenderPreviewModel(previewModel)
+        if (contentMode !== 'demo' || selectedViewImages.length === 0) return undefined
+
+        let current = true
+        resolvePagePreviewModel(previewModel)
+            .then((resolved) => { if (current) setRenderPreviewModel(resolved) })
+            .catch(() => undefined)
+        return () => { current = false }
+    }, [contentMode, previewModel, selectedViewImages])
 
     const previewCanvasWidth = viewport === 'mobile' ? 390 : viewport === 'tablet' ? 768 : 1280
     const previewScale = Math.min(1, previewFrameWidth / previewCanvasWidth)
@@ -1063,7 +1076,7 @@ const SemanticThemeWorkspace = ({
                 <div ref={previewFrameRef} className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm">
                     {contentMode === 'none' || (contentMode === 'demo' && !selectedView) ? <div className="flex h-full items-center justify-center p-6 text-sm text-gray-500">There is no page or object to preview.</div> : contentMode === 'content' && !sourceContentModel ? <div className="flex h-full items-center justify-center gap-2 p-6 text-sm text-gray-500">{loadingContent && <Loader2 className="h-4 w-4 animate-spin" />}{loadingContent ? 'Loading the selected content…' : 'The selected content could not be loaded.'}</div> : <RenderFrame
                         frameRef={iframeRef}
-                        model={previewModel}
+                        model={renderPreviewModel}
                         title="Live theme preview"
                         className="absolute top-0 border-0 bg-white"
                         style={{

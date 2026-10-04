@@ -182,7 +182,6 @@ export const createDesignerRenderModel = ({
                 altText: image?.filename || '',
                 mediaItems: [{
                     url: image?.url || image?.fileUrl,
-                    src: image?.url || image?.fileUrl,
                     altText: image?.filename || '',
                 }],
             },
