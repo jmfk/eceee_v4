@@ -89,7 +89,7 @@ class Command(BaseCommand):
             user=user,
             title="Public Regression Home",
             description="Public regression home meta description",
-            content='<h1>Public Regression Home</h1><p>eceee-public-regression-home</p>',
+            content="<h1>Public Regression Home</h1><p>eceee-public-regression-home</p>",
             widget_id="public-regression-home-content",
             effective_date=now,
         )
@@ -98,16 +98,12 @@ class Command(BaseCommand):
             user=user,
             title="Public Regression About",
             description="Public regression about meta description",
-            content='<h1>Public Regression About</h1><p>eceee-public-regression-about</p>',
+            content="<h1>Public Regression About</h1><p>eceee-public-regression-about</p>",
             widget_id="public-regression-about-content",
             effective_date=now,
         )
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Seeded public regression site at http://{hostname}:8000/"
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(f"Seeded public regression site at http://{hostname}:8000/"))
 
     def _upsert_published_version(
         self,
@@ -120,27 +116,36 @@ class Command(BaseCommand):
         widget_id,
         effective_date,
     ):
-        version, _ = PageVersion.objects.update_or_create(
+        defaults = {
+            "version_title": "Playwright public regression fixture",
+            "meta_title": title,
+            "meta_description": description,
+            "code_layout": "main_layout",
+            "page_data": {
+                "metaTitle": title,
+                "metaDescription": description,
+            },
+            "widgets": {
+                "main": [
+                    content_widget(widget_id, content),
+                ],
+            },
+            "change_summary": {"action": "seed_public_regression_site"},
+            "created_by": user,
+            "effective_date": effective_date,
+            "expiry_date": None,
+        }
+        version = PageVersion.objects.filter(page=page, version_number=1).first()
+        if version:
+            unchanged = all(
+                getattr(version, field) == value for field, value in defaults.items() if field != "effective_date"
+            )
+            if unchanged and version.effective_date and version.effective_date <= effective_date:
+                return version
+            version.delete()
+
+        return PageVersion.objects.create(
             page=page,
             version_number=1,
-            defaults={
-                "version_title": "Playwright public regression fixture",
-                "meta_title": title,
-                "meta_description": description,
-                "code_layout": "main_layout",
-                "page_data": {
-                    "metaTitle": title,
-                    "metaDescription": description,
-                },
-                "widgets": {
-                    "main": [
-                        content_widget(widget_id, content),
-                    ],
-                },
-                "change_summary": {"action": "seed_public_regression_site"},
-                "created_by": user,
-                "effective_date": effective_date,
-                "expiry_date": None,
-            },
+            **defaults,
         )
-        return version
