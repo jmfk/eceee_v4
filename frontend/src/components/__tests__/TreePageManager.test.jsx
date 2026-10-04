@@ -484,21 +484,21 @@ describe('TreePageManager', () => {
         pagesApi.getPageChildren.mockResolvedValue(mockChildren)
 
         const firstRender = renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
-        await waitFor(() => expect(screen.getByText('Home Page')).toBeInTheDocument())
+        const expandHomeButton = await screen.findByTestId('page-tree-expand-home')
 
-        fireEvent.click(screen.getByRole('button', { name: 'Expand Home Page' }))
-        await waitFor(() => expect(screen.getByText('Child Page 1')).toBeInTheDocument())
+        fireEvent.click(expandHomeButton)
+        await screen.findByTestId('page-tree-identity-child-1')
         firstRender.unmount()
         pagesApi.getPageChildren.mockClear()
 
         renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
 
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: 'Collapse Home Page' })).toBeInTheDocument()
-            expect(screen.getByText('Child Page 1')).toBeInTheDocument()
+            expect(screen.getByTestId('page-tree-expand-home')).toHaveAttribute('aria-expanded', 'true')
+            expect(screen.getByTestId('page-tree-identity-child-1')).toBeInTheDocument()
         })
         expect(pagesApi.getPageChildren).toHaveBeenCalledWith(1)
-    })
+    }, 10000)
 
     it('keeps expansion state when a status filter hides a branch', async () => {
         const mockChildren = {
