@@ -141,6 +141,36 @@ class ImageWidgetTests(SimpleTestCase):
         self.assertNotIn("/original.jpg", html)
         self.assertNotIn("<img", html)
 
+    @patch("file_manager.imgproxy.imgproxy_service.generate_url", return_value="/original.jpg")
+    @patch("file_manager.imgproxy.imgproxy_service.generate_responsive_urls")
+    def test_source_url_returned_by_imgproxy_does_not_render(self, generate_responsive_urls, _generate_url):
+        generate_responsive_urls.return_value = {
+            "1x": {"url": "/original.jpg", "width": 896, "height": 504},
+            "2x": {"url": "/original.jpg", "width": 1792, "height": 1008},
+            "srcset": "/original.jpg 896w, /original.jpg 1792w",
+        }
+        config = ImageWidget().prepare_template_context(
+            {
+                "image": {
+                    "id": "media-1",
+                    "url": "/original.jpg",
+                    "type": "image",
+                    "title": "Unavailable image",
+                }
+            }
+        )
+        html = render_to_string(
+            "easy_widgets/widgets/image.html",
+            {
+                "config": config,
+                "widget": SimpleNamespace(id="image-1"),
+                "widget_type": SimpleNamespace(css_class_name="imagewidget"),
+            },
+        )
+
+        self.assertNotIn("/original.jpg", html)
+        self.assertNotIn("<img", html)
+
     @patch("file_manager.imgproxy.imgproxy_service.generate_responsive_urls")
     def test_canonical_single_image_accepts_media_api_snake_case_urls(self, generate_responsive_urls):
         generate_responsive_urls.return_value = {
@@ -261,3 +291,30 @@ class ImageWidgetTests(SimpleTestCase):
 
         unavailable = prepare_carousel_context([{"url": "/original.jpg"}], {})
         self.assertEqual(unavailable["images"][0]["url"], "")
+
+    @patch("file_manager.imgproxy.imgproxy_service.generate_responsive_urls")
+    def test_styled_contexts_ignore_source_url_returned_by_imgproxy(self, generate_responsive_urls):
+        generate_responsive_urls.return_value = {
+            "1x": {"url": "/original.jpg", "width": 800, "height": 600},
+            "2x": {"url": "/original.jpg", "width": 1600, "height": 1200},
+            "srcset": "/original.jpg 800w, /original.jpg 1600w",
+        }
+        image = {
+            "url": "/original.jpg",
+            "src_url": "/processed.webp",
+            "lightbox_url": "/processed-lightbox.webp",
+        }
+
+        gallery = prepare_gallery_context(
+            [image],
+            {},
+            imgproxy_config={"width": 800},
+            lightbox_config={"width": 1200},
+        )
+        carousel = prepare_carousel_context([image], {}, imgproxy_config={"width": 800})
+
+        self.assertEqual(gallery["images"][0]["url"], "/processed.webp")
+        self.assertEqual(gallery["images"][0]["lightboxUrl"], "/processed-lightbox.webp")
+        self.assertNotIn("/original.jpg", gallery["images"][0].get("srcset", ""))
+        self.assertEqual(carousel["images"][0]["url"], "/processed.webp")
+        self.assertNotIn("/original.jpg", carousel["images"][0].get("srcset", ""))

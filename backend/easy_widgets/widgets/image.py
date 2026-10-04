@@ -698,12 +698,20 @@ class ImageWidget(BaseWidget):
             except Exception as exc:
                 logger.warning("Failed to generate responsive ImageWidget URLs: %s", exc)
 
+            source_url = item["url"]
             one_x = responsive.get("1x", {})
             processed_url = one_x.get("url")
+            responsive_urls = [
+                value.get("url") for key, value in responsive.items() if key.endswith("x") and isinstance(value, dict)
+            ]
+            if not processed_url or any(not url or url == source_url for url in responsive_urls):
+                responsive = {}
+                one_x = {}
+                processed_url = None
             if not processed_url:
                 try:
                     processed_url = imgproxy_service.generate_url(
-                        source_url=item["url"],
+                        source_url=source_url,
                         width=max_width,
                         height=max_height,
                         resize_type=imgproxy_config.get("resize_type", "fit"),
@@ -714,6 +722,8 @@ class ImageWidget(BaseWidget):
                 except Exception as exc:
                     logger.warning("Failed to generate ImageWidget URL: %s", exc)
                     continue
+            if not processed_url or processed_url == source_url:
+                continue
 
             item["src_url"] = processed_url
             item["lightbox_url"] = processed_url
