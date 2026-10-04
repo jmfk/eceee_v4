@@ -43,6 +43,10 @@ export const normalizeImageMediaItem = item => {
     }
 }
 
+/**
+ * @param {Record<string, any>} config
+ * @param {any[] | null} resolvedItems
+ */
 export const imageWidgetMediaItems = (config = {}, resolvedItems = null) => {
     const configuredItems = Array.isArray(resolvedItems)
         ? resolvedItems
