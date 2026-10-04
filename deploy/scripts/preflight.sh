@@ -87,6 +87,7 @@ fi
 
 for target in $PREFLIGHT_TARGETS; do
     info "Running make $target..."
+    SKIP_PORT_REGISTRY_CHECK=1 \
     SHARED_LOCAL_INFRA_ROOT="${SHARED_LOCAL_INFRA_ROOT:-$REPO/../shared-local-infrastructure}" \
         make -C "$WORKTREE" "$target"
 done
