@@ -161,8 +161,14 @@ def prepare_gallery_context(
                 )
 
                 # Update image with responsive data (all camelCase)
-                if responsive_data and "1x" in responsive_data:
-                    img_copy["url"] = responsive_data["1x"]["url"]  # Backward compat
+                responsive_urls = [
+                    value.get("url")
+                    for key, value in responsive_data.items()
+                    if key.endswith("x") and isinstance(value, dict)
+                ]
+                processed_style_url = responsive_data.get("1x", {}).get("url")
+                if processed_style_url and all(url and url != original_url for url in responsive_urls):
+                    img_copy["url"] = processed_style_url  # Backward compat
                     img_copy["displayWidth"] = responsive_data["1x"]["width"]
                     img_copy["displayHeight"] = responsive_data["1x"]["height"]
                     img_copy["srcset"] = responsive_data.get("srcset", "")
@@ -207,8 +213,9 @@ def prepare_gallery_context(
                 )
 
                 # Set lightbox URL (camelCase)
-                if lightbox_data and "1x" in lightbox_data:
-                    img_copy["lightboxUrl"] = lightbox_data["1x"]["url"]
+                processed_lightbox_url = lightbox_data.get("1x", {}).get("url")
+                if processed_lightbox_url and processed_lightbox_url != original_url:
+                    img_copy["lightboxUrl"] = processed_lightbox_url
             except Exception as e:
                 # Log error but retain the already processed lightbox URL.
                 import logging
@@ -334,8 +341,14 @@ def prepare_carousel_context(images, config, style_vars=None, imgproxy_config=No
                 )
 
                 # Update image with responsive data (all camelCase)
-                if responsive_data and "1x" in responsive_data:
-                    img_copy["url"] = responsive_data["1x"]["url"]  # Backward compat
+                responsive_urls = [
+                    value.get("url")
+                    for key, value in responsive_data.items()
+                    if key.endswith("x") and isinstance(value, dict)
+                ]
+                processed_style_url = responsive_data.get("1x", {}).get("url")
+                if processed_style_url and all(url and url != original_url for url in responsive_urls):
+                    img_copy["url"] = processed_style_url  # Backward compat
                     img_copy["displayWidth"] = responsive_data["1x"]["width"]
                     img_copy["displayHeight"] = responsive_data["1x"]["height"]
                     img_copy["srcset"] = responsive_data.get("srcset", "")
