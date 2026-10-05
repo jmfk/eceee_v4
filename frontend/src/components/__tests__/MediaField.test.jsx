@@ -356,6 +356,22 @@ describe('MediaField', () => {
         expect(describedBy).toContain(screen.getByRole('alert').id)
     })
 
+    it('shows description in an info popover beside the label', async () => {
+        const user = userEvent.setup()
+        renderField({ description: 'Helpful text' })
+
+        const helpButton = screen.getByRole('button', { name: 'About Media Field' })
+        let description = screen.getByText('Helpful text')
+
+        expect(description).toHaveClass('sr-only')
+
+        await user.click(helpButton)
+
+        description = screen.getByRole('note')
+        expect(helpButton).toHaveAttribute('aria-expanded', 'true')
+        expect(description).not.toHaveClass('sr-only')
+    })
+
     it('preserves selected display across rerenders', () => {
         const { rerender } = renderField({ value: mockSingleMediaValue })
 

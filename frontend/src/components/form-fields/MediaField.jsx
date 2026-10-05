@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Image, FolderOpen, X, Eye, RefreshCw } from 'lucide-react'
 import MediaSelectModal from '../media/MediaSelectModal'
 import OptimizedImage from '../media/OptimizedImage'
-import FieldHelpText from './FieldHelpText'
+import FieldHelpPopover from './FieldHelpPopover'
 
 /**
  * MediaField - Form field component for media selection
@@ -83,13 +83,15 @@ const MediaField = ({
 
     return (
         <div className="space-y-3">
-            {/* Label and Description */}
+            {/* Label and help */}
             <div>
-                <label className="block text-sm font-medium text-gray-700">
-                    {label}
-                    {required && <span className="text-red-500 ml-1">*</span>}
-                </label>
-                <FieldHelpText id={descriptionId} className="mt-1">{description}</FieldHelpText>
+                <div className="flex items-center gap-1.5">
+                    <label className="block text-sm font-medium text-gray-700">
+                        {label}
+                        {required && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    <FieldHelpPopover id={descriptionId} label={label}>{description}</FieldHelpPopover>
+                </div>
             </div>
 
             {/* Media Selection Button */}

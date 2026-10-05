@@ -10,14 +10,14 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { X, Image as ImageIcon, Settings, FolderOpen, Loader2, Trash2, RefreshCw, AlertCircle } from 'lucide-react';
+import { X, Image as ImageIcon, Settings, FolderOpen, Loader2, Trash2, RefreshCw, AlertCircle, ChevronDown } from 'lucide-react';
 import MediaBrowser from './MediaBrowser';
 import { useTheme } from '../../hooks/useTheme';
 import OverrideSettingsModal from './OverrideSettingsModal';
 import CollectionThumbnailGrid from './CollectionThumbnailGrid';
 import SimplifiedApprovalForm from './SimplifiedApprovalForm';
 import OptimizedImage from './OptimizedImage';
+import FieldHelpPopover from '../form-fields/FieldHelpPopover';
 import { mediaCollectionsApi, mediaApi } from '../../api';
 import { DEFAULT_IMGPROXY_CONFIG } from '../../utils/mediaInsertRenderer';
 
@@ -607,9 +607,14 @@ const MediaInsertModal = ({
                                 {/* Image Style (Gallery/Carousel) */}
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
-                                        <label className="block text-sm font-medium text-gray-900">
-                                            Image Style
-                                        </label>
+                                        <div className="flex items-center gap-1.5">
+                                            <label htmlFor="media-image-style" className="block text-sm font-medium text-gray-900">
+                                                Image Style
+                                            </label>
+                                            <FieldHelpPopover id="media-image-style-help" label="Image Style">
+                                                Controls how the image is processed by imgproxy (resize, quality, format)
+                                            </FieldHelpPopover>
+                                        </div>
                                         {config.galleryStyle && selectedStyle && (
                                             <button
                                                 onClick={() => setShowOverrideSettings(true)}
@@ -622,6 +627,8 @@ const MediaInsertModal = ({
                                         )}
                                     </div>
                                     <select
+                                        id="media-image-style"
+                                        aria-describedby="media-image-style-help"
                                         value={config.galleryStyle || ''}
                                         onChange={(e) => handleConfigChange('galleryStyle', e.target.value || null)}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -635,81 +642,109 @@ const MediaInsertModal = ({
                                             </option>
                                         ))}
                                     </select>
-                                    <div className="mt-1 text-xs text-gray-500">
-                                        Controls how the image is processed by imgproxy (resize, quality, format)
-                                    </div>
                                 </div>
 
                                 {/* Alt Text */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                                        Alt Text
-                                    </label>
+                                    <div className="mb-2 flex items-center gap-1.5">
+                                        <label htmlFor="media-alt-text" className="block text-sm font-medium text-gray-900">
+                                            Alt Text
+                                        </label>
+                                        <FieldHelpPopover id="media-alt-text-help" label="Alt Text">
+                                            Describe the image for visually impaired users (required for accessibility)
+                                        </FieldHelpPopover>
+                                    </div>
                                     <input
+                                        id="media-alt-text"
+                                        aria-describedby="media-alt-text-help"
                                         type="text"
                                         value={config.altText}
                                         onChange={(e) => handleConfigChange('altText', e.target.value)}
                                         placeholder="Describe image for screen readers"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
-                                    <div className="mt-1 text-xs text-gray-500">
-                                        Describe the image for visually impaired users (required for accessibility)
-                                    </div>
                                 </div>
 
                                 {/* Caption */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-900 mb-2">
-                                        Caption
-                                    </label>
+                                    <div className="mb-2 flex items-center gap-1.5">
+                                        <label htmlFor="media-caption" className="block text-sm font-medium text-gray-900">
+                                            Caption
+                                        </label>
+                                        <FieldHelpPopover id="media-caption-help" label="Caption">
+                                            Optional caption displayed below the image
+                                        </FieldHelpPopover>
+                                    </div>
                                     <input
+                                        id="media-caption"
+                                        aria-describedby="media-caption-help"
                                         type="text"
                                         value={config.caption}
                                         onChange={(e) => handleConfigChange('caption', e.target.value)}
                                         placeholder="Enter image caption (optional)"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
-                                    <div className="mt-1 text-xs text-gray-500">
-                                        Optional caption displayed below the image
-                                    </div>
                                 </div>
 
                                 {/* Lightbox */}
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                                            <input
-                                                type="checkbox"
-                                                checked={config.enableLightbox}
-                                                onChange={(e) => handleConfigChange('enableLightbox', e.target.checked)}
-                                                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                                            />
-                                            Open in lightbox
-                                        </label>
-                                        <div className="mt-1 text-xs text-gray-500">Wraps image with a lightbox trigger.</div>
-                                    </div>
-                                    {config.enableLightbox && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-900 mb-2">Lightbox Image Style</label>
-                                            <select
-                                                value={config.lightboxImageStyle || ''}
-                                                onChange={(e) => handleConfigChange('lightboxImageStyle', e.target.value || null)}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                            >
-                                                <option value="">Original (no processing)</option>
-                                                {availableImageStyles.map(style => (
-                                                    <option key={style.value} value={style.value}>
-                                                        {style.label}
-                                                        {style.description ? ` - ${style.description}` : ''}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <div className="mt-1 text-xs text-gray-500">
-                                                Image style applied to the full-size lightbox image (resize, quality, format)
-                                            </div>
+                                <details className="group rounded-md border border-gray-200 bg-gray-50/50">
+                                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 [&::-webkit-details-marker]:hidden">
+                                        <span>Lightbox</span>
+                                        <span className="flex items-center gap-2">
+                                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${config.enableLightbox
+                                                ? 'bg-green-100 text-green-700'
+                                                : 'bg-gray-200 text-gray-600'
+                                                }`}>
+                                                {config.enableLightbox ? 'On' : 'Off'}
+                                            </span>
+                                            <ChevronDown className="h-4 w-4 text-gray-500 transition-transform group-open:rotate-180" aria-hidden="true" />
+                                        </span>
+                                    </summary>
+                                    <div className="space-y-4 border-t border-gray-200 px-4 py-4">
+                                        <div className="flex items-center gap-1.5">
+                                            <label className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={config.enableLightbox}
+                                                    onChange={(e) => handleConfigChange('enableLightbox', e.target.checked)}
+                                                    aria-describedby="media-lightbox-help"
+                                                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                                                />
+                                                Open in lightbox
+                                            </label>
+                                            <FieldHelpPopover id="media-lightbox-help" label="Open in lightbox">
+                                                Wraps the image with a lightbox trigger.
+                                            </FieldHelpPopover>
                                         </div>
-                                    )}
-                                </div>
+                                        {config.enableLightbox && (
+                                            <div>
+                                                <div className="mb-2 flex items-center gap-1.5">
+                                                    <label htmlFor="media-lightbox-image-style" className="block text-sm font-medium text-gray-900">
+                                                        Lightbox Image Style
+                                                    </label>
+                                                    <FieldHelpPopover id="media-lightbox-image-style-help" label="Lightbox Image Style">
+                                                        Image style applied to the full-size lightbox image (resize, quality, format)
+                                                    </FieldHelpPopover>
+                                                </div>
+                                                <select
+                                                    id="media-lightbox-image-style"
+                                                    aria-describedby="media-lightbox-image-style-help"
+                                                    value={config.lightboxImageStyle || ''}
+                                                    onChange={(e) => handleConfigChange('lightboxImageStyle', e.target.value || null)}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                >
+                                                    <option value="">Original (no processing)</option>
+                                                    {availableImageStyles.map(style => (
+                                                        <option key={style.value} value={style.value}>
+                                                            {style.label}
+                                                            {style.description ? ` - ${style.description}` : ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                    </div>
+                                </details>
                             </div>
                         </div>
                     )}
