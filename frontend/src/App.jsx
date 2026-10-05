@@ -175,7 +175,7 @@ const GitHashBadge = () => {
   )
 }
 
-const AppRoutes = () => {
+export const AppRoutes = () => {
   useAutoPageTitle()
   const { user } = useAuth()
   const tenantId = getCurrentTenantId()
@@ -434,6 +434,13 @@ const AppRoutes = () => {
             </SettingsLayout>
           </PrivateRoute>
         } />
+        <Route path="/settings/experiments" element={
+          <PrivateRoute>
+            <SettingsLayout>
+              <ExperimentManager tenantId={tenantId} />
+            </SettingsLayout>
+          </PrivateRoute>
+        } />
         <Route path="/statistics" element={
           <PrivateRoute>
             <div className="fixed inset-0 bg-gray-50 flex flex-col">
@@ -447,19 +454,7 @@ const AppRoutes = () => {
             </div>
           </PrivateRoute>
         } />
-        <Route path="/experiments" element={
-          <PrivateRoute>
-            <div className="fixed inset-0 bg-gray-50 flex flex-col">
-              <Navbar />
-              <main className="flex-1 overflow-hidden">
-                <div className="h-full overflow-y-auto">
-                  <ExperimentManager tenantId={tenantId} />
-                </div>
-              </main>
-              <StatusBar customStatusContent={<span>Statistics - A/B Testing</span>} />
-            </div>
-          </PrivateRoute>
-        } />
+        <Route path="/experiments" element={<Navigate to="/settings/experiments" replace />} />
         <Route path="/objects" element={
           <PrivateRoute>
             <div className="fixed inset-0 bg-gray-50 flex flex-col">

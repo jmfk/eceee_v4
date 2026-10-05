@@ -12,6 +12,7 @@ const SettingsLayout = ({ children, statusContent }) => {
         if (statusContent) return statusContent
         const path = location.pathname
         if (path === '/settings') return 'Settings - Dashboard'
+        if (path.includes('/experiments')) return 'Settings - A/B Testing'
         if (path.includes('/users')) return 'Settings - Users'
         if (path.includes('/layouts')) return 'Settings - Layouts'
         if (path.includes('/themes')) return 'Settings - Themes'
@@ -44,4 +45,3 @@ const SettingsLayout = ({ children, statusContent }) => {
 }
 
 export default SettingsLayout
-

@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Beaker, Palette } from 'lucide-react'
+import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Palette } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 
 const Navbar = () => {
@@ -16,7 +16,6 @@ const Navbar = () => {
     { name: 'Objects', href: '/objects', icon: Database },
     { name: 'Media', href: '/media', icon: FolderOpen },
     { name: 'Statistics', href: '/statistics', icon: BarChart2 },
-    { name: 'A/B Tests', href: '/experiments', icon: Beaker },
     { name: 'Tags', href: '/tags', icon: Hash },
     { name: 'Designer', href: '/designer/themes', icon: Palette },
     { name: 'Settings', href: '/settings', icon: Settings },
