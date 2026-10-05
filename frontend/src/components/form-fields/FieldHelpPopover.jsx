@@ -72,6 +72,7 @@ const FieldHelpPopover = ({ children, id, label = 'field' }) => {
                 aria-expanded={isOpen}
                 aria-controls={popoverId}
                 onClick={() => setIsOpen((open) => !open)}
+                onBlur={() => setIsOpen(false)}
                 className="inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
             >
                 <Info className="h-4 w-4" aria-hidden="true" />
