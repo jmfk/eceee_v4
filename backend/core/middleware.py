@@ -81,9 +81,6 @@ class TenantContextMiddleware:
     @staticmethod
     def authenticate_api_user(request):
         """Resolve bearer credentials before selecting their tenant."""
-        if request.user.is_authenticated:
-            return
-
         for authenticator in (MachineAPIKeyAuthentication(), JWTAuthentication(), TokenAuthentication()):
             try:
                 authenticated = authenticator.authenticate(request)
@@ -94,6 +91,9 @@ class TenantContextMiddleware:
             if authenticated:
                 request.user, request.auth = authenticated
                 return
+
+        if request.user.is_authenticated:
+            return
 
     def get_tenant(self, request):
         """
@@ -144,7 +144,9 @@ class TenantContextMiddleware:
         if request.user.is_authenticated:
             if isinstance(getattr(request, "auth", None), MachineAPIKey):
                 key_tenants = request.auth.tenants.filter(is_active=True)
-                return key_tenants.first() if key_tenants.count() == 1 else None
+                if key_tenants.count() != 1:
+                    raise self.InvalidTenantSelection
+                return key_tenants.first()
             accessible = (
                 Tenant.objects.filter(is_active=True)
                 .filter(

@@ -1,5 +1,7 @@
 from django.contrib.auth.models import User
+from django.db import connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
@@ -192,6 +194,24 @@ class MachineAPIKeyAuthenticationTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_multi_tenant_key_requires_an_explicit_tenant(self):
+        raw_key, api_key = self.create_key([SERVER_FULL_ACCESS])
+        api_key.tenants.add(self.other_tenant)
+        self.client.credentials(HTTP_AUTHORIZATION=f"ApiKey {raw_key}")
+
+        response = self.client.get("/api/v1/content-migration/plans/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_machine_key_tenant_binding_overrides_an_ambient_session(self):
+        raw_key, _ = self.create_key([SERVER_FULL_ACCESS])
+        self.client.force_login(self.admin)
+        self.authorize(raw_key, self.other_tenant)
+
+        response = self.client.get("/api/v1/content-migration/plans/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_theme_read_key_is_denied_on_non_theme_endpoint(self):
         raw_key, _ = self.create_key([THEME_READ])
         self.authorize(raw_key)
@@ -244,6 +264,38 @@ class MachineAPIKeyAuthenticationTest(TestCase):
         response = self.client.get("/api/v1/core/machine-api-keys/")
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_full_access_key_cannot_generate_password_reset_links(self):
+        raw_key, _ = self.create_key([SERVER_FULL_ACCESS])
+        self.authorize(raw_key)
+
+        response = self.client.post(f"/api/v1/utils/users/{self.admin.pk}/reset-password/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_machine_denied_routes_are_explicit(self):
+        request = type("Request", (), {"method": "POST"})()
+        for path in (
+            "/api/v1/auth/token/",
+            "/api/v1/core/machine-api-keys/",
+            "/api/v1/utils/change-password/",
+            "/api/v1/utils/current-workspace/",
+            "/api/v1/utils/users/2/reset-password/",
+            "/api/v1/webpages/designer/remote-connections/",
+        ):
+            with self.subTest(path=path):
+                request.path = path
+                self.assertIsNone(_required_scope(request))
+
+    def test_rotate_locks_the_key_before_replacing_its_secret(self):
+        _, api_key = self.create_key([SERVER_FULL_ACCESS])
+        self.client.force_authenticate(self.admin)
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.post(f"/api/v1/core/machine-api-keys/{api_key.pk}/rotate/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(any("FOR UPDATE" in query["sql"].upper() for query in queries.captured_queries))
 
     def test_theme_subroutes_have_stable_specific_scopes(self):
         request = type("Request", (), {"method": "GET"})()

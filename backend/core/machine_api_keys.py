@@ -16,6 +16,14 @@ THEME_VERSION = "theme.version"
 THEME_TRANSFER = "theme.transfer"
 ALLOWED_SCOPES = {SERVER_FULL_ACCESS, THEME_READ, THEME_WRITE, THEME_VERSION, THEME_TRANSFER}
 AUTH_SCHEME = b"ApiKey"
+MACHINE_DENIED_PREFIXES = (
+    "/api/v1/auth/",
+    "/api/v1/core/machine-api-keys",
+    "/api/v1/utils/change-password/",
+    "/api/v1/utils/current-workspace/",
+    "/api/v1/utils/users/",
+    "/api/v1/webpages/designer/remote-connections/",
+)
 
 
 def deployment_environment():
@@ -28,7 +36,7 @@ def generate_machine_api_key():
 
 
 def _required_scope(request):
-    if request.path.startswith("/api/v1/core/machine-api-keys"):
+    if request.path.startswith(MACHINE_DENIED_PREFIXES):
         return None
     if request.path.startswith("/api/v1/webpages/themes/sync/") or request.path.startswith(
         "/api/v1/webpages/designer/themes/remote/"
