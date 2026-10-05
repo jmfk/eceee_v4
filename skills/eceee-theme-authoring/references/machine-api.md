@@ -30,21 +30,21 @@ The provisioned ECEEE production profile uses:
 - principal `codex-theme-prod`;
 - managed key name `Codex theme production`;
 - scopes `theme.read`, `theme.write`, `theme.version`, and `theme.transfer`;
-- 1Password vault `ECEEE - Production - Codex`;
-- 1Password item `eceee-prod-theme-api`.
+- local ignored file `.env.local`, variable `ECEEE_PROD_THEME_API_KEY`, mode `0600`;
+- recovery copy in 1Password vault `ECEEE - Production - Codex`, item `eceee-prod-theme-api`.
 
-The initial credential was created on 2026-10-05 with a 90-day lifetime. Treat its actual stored expiry as authoritative and rotate it before expiry through a separately approved production operation. Resolve it only through a purpose-built redacting adapter; never run a command that returns the credential field to tool output.
+The initial credential was created on 2026-10-05 with a 90-day lifetime. Treat its actual stored expiry as authoritative and rotate it before expiry through a separately approved production operation. For routine requests, run `scripts/theme_api.py` from the repository root so it reads `.env.local` internally. Never print, source, or otherwise return the credential variable to tool output. Use the 1Password item only for recovery, rotation, or provisioning another approved machine.
 
 ## Request workflow
 
-1. Resolve the credential internally from its allowlisted protected-store reference.
+1. Verify `.env.local` with the secret-inspection helper, then let `scripts/theme_api.py` resolve the credential internally.
 2. Fetch the latest theme representation and version identity.
 3. Create a named version or export before mutation.
 4. Re-fetch immediately before writing and stop if the theme changed.
 5. Send the narrowest API request using the machine header and explicit tenant header.
 6. Re-read the saved representation and then verify visually in Chrome.
 
-Use a redacting application adapter for requests. Do not use ad hoc `curl` commands that place secrets in arguments, and do not copy a browser session or human JWT into the machine workflow.
+Use the bundled redacting adapter for requests. Pass JSON through `--data-file`; never put credentials or request bodies in command arguments. Do not use ad hoc `curl` commands that place secrets in arguments, and do not copy a browser session or human JWT into the machine workflow.
 
 ## Rotation and revocation
 
