@@ -6,7 +6,7 @@ Use this reference when work spans `eceeeSummerStudy`, `Industry`, and `eceee`.
 
 Use Chrome for authenticated inspection, comparison, preview, export, and management in `app.eceee.org`. Do not use the Codex in-app browser for this workflow. Browser inspection remains read-only unless the production write gate has been satisfied for the exact mutation.
 
-## Production baseline observed 2026-10-05
+## Production baseline before synchronization, observed 2026-10-05
 
 The Theme Designer comparison between `Industry` and `eceeeSummerStudy` reported 60 differences. `eceeeSummerStudy` was newer and was at live theme version 57; `Industry` was at live theme version 2.
 
@@ -30,6 +30,16 @@ The production identity fields were:
 | Industry | `Industry` | `Industry` | no selected image shown in Designer |
 
 Treat these observations as a dated baseline. Re-inspect in Chrome before mutation because the themes remain independently editable.
+
+## Industry synchronization, 2026-10-05
+
+`Industry` theme ID 3 was synchronized from `eceeeSummerStudy` theme ID 2 through the scoped theme-sync API. Industry retained its own ID, stable key, name, description, tenant, active/default state, site icon, and version history. Its live sync version became 5.
+
+The complete Summer Study theme contract and seven referenced assets were copied. A named recovery checkpoint was recorded as theme version ID 7 with the name `Before copying eceeeSummerStudy 2026-10-05 asset-safe retry`.
+
+Semantic package comparison confirmed that the copied design fields and asset contents match Summer Study. The raw Designer comparison still reports `design_groups` and `image` because Industry deliberately owns separate asset paths; path inequality alone is not a design mismatch.
+
+The public Industry page was checked in Chrome at 375, 768, and 1440 px with no horizontal overflow. Its existing page content includes a black banner region and one empty-source image element; those are content-level properties, not missing copied theme assets.
 
 ## Repository baseline
 
