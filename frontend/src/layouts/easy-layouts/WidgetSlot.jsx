@@ -533,7 +533,8 @@ const WidgetSlot = ({
                                                 className={`empty-slot text-center py-12 text-gray-500 border-2 border-dashed ${pasteModeActive ? 'border-purple-500 bg-purple-50 cursor-pointer hover:bg-purple-100' : 'border-gray-300'} relative`}
                                                 onClick={(e) => {
                                                     if (pasteModeActive && onPasteAtPosition) {
-                                                        onPasteAtPosition(name, 0, slotPath, e.shiftKey);
+                                                        const pastePath = widgetPath.length === 0 ? [] : slotPath;
+                                                        onPasteAtPosition(name, 0, pastePath, e.shiftKey);
                                                     }
                                                 }}
                                             >

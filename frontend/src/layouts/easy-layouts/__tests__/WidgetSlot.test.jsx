@@ -69,3 +69,46 @@ describe('WidgetSlot hidden empty restore bar', () => {
         expect(screen.queryByRole('button', { name: 'Show Page Header slot' })).not.toBeInTheDocument()
     })
 })
+
+describe('WidgetSlot empty-slot paste paths', () => {
+    const renderPasteSlot = (props = {}) => render(
+        <WidgetSlot
+            name="header"
+            label="Page Header"
+            description="Site navigation"
+            widgets={{}}
+            slotMode="edit"
+            editable={true}
+            pasteModeActive={true}
+            {...props}
+        />
+    )
+
+    it('uses an empty path when pasting into an empty top-level slot', () => {
+        const onPasteAtPosition = vi.fn()
+
+        const { container } = renderPasteSlot({ onPasteAtPosition })
+        fireEvent.click(container.querySelector('.empty-slot'))
+
+        expect(onPasteAtPosition).toHaveBeenCalledWith('header', 0, [], false)
+    })
+
+    it('keeps the full path when pasting into an empty nested slot', () => {
+        const onPasteAtPosition = vi.fn()
+
+        const { container } = renderPasteSlot({
+            name: 'content',
+            label: 'Footer Content',
+            widgetPath: ['footer', 'footer-widget-1'],
+            onPasteAtPosition,
+        })
+        fireEvent.click(container.querySelector('.empty-slot'))
+
+        expect(onPasteAtPosition).toHaveBeenCalledWith(
+            'content',
+            0,
+            ['footer', 'footer-widget-1', 'content'],
+            false,
+        )
+    })
+})
