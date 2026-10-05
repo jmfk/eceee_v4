@@ -6,7 +6,15 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from config.celery import app
-from core.models import Tenant
+from core.machine_api_keys import (
+    SERVER_FULL_ACCESS,
+    THEME_READ,
+    THEME_TRANSFER,
+    THEME_VERSION,
+    _required_scope,
+    generate_machine_api_key,
+)
+from core.models import MachineAPIKey, Tenant
 
 
 @override_settings(APP_VERSION="build-123")
@@ -134,3 +142,114 @@ class TenantAccessPermissionTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["current_workspace"]["identifier"], selected.identifier)
+
+
+@override_settings(DEPLOYMENT_ENVIRONMENT="test")
+class MachineAPIKeyAuthenticationTest(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser("machine-admin", password="test")
+        self.tenant = Tenant.objects.create(name="Machine tenant", identifier="machine-tenant", created_by=self.admin)
+        self.other_tenant = Tenant.objects.create(
+            name="Other tenant", identifier="other-machine-tenant", created_by=self.admin
+        )
+        self.client = APIClient()
+
+    def create_key(self, scopes):
+        raw_key, key_hash, key_prefix = generate_machine_api_key()
+        api_key = MachineAPIKey.objects.create(
+            name=f"key-{len(scopes)}-{MachineAPIKey.objects.count()}",
+            principal=self.admin,
+            environment="test",
+            scopes=scopes,
+            key_hash=key_hash,
+            key_prefix=key_prefix,
+            created_by=self.admin,
+        )
+        api_key.tenants.add(self.tenant)
+        return raw_key, api_key
+
+    def authorize(self, raw_key, tenant=None):
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"ApiKey {raw_key}",
+            HTTP_X_TENANT_ID=(tenant or self.tenant).identifier,
+        )
+
+    def test_full_access_key_uses_existing_permissions_and_tenant(self):
+        raw_key, api_key = self.create_key([SERVER_FULL_ACCESS])
+        self.authorize(raw_key)
+
+        response = self.client.get("/api/v1/content-migration/plans/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        api_key.refresh_from_db()
+        self.assertIsNotNone(api_key.last_used_at)
+
+    def test_key_cannot_select_tenant_outside_its_binding_even_for_superuser_principal(self):
+        raw_key, _ = self.create_key([SERVER_FULL_ACCESS])
+        self.authorize(raw_key, self.other_tenant)
+
+        response = self.client.get("/api/v1/content-migration/plans/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_theme_read_key_is_denied_on_non_theme_endpoint(self):
+        raw_key, _ = self.create_key([THEME_READ])
+        self.authorize(raw_key)
+
+        response = self.client.get("/api/v1/content-migration/plans/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_theme_read_key_can_reach_designer_theme_list(self):
+        raw_key, _ = self.create_key([THEME_READ])
+        self.authorize(raw_key)
+
+        response = self.client.get("/api/v1/webpages/designer/themes/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_wrong_environment_key_is_rejected(self):
+        raw_key, api_key = self.create_key([SERVER_FULL_ACCESS])
+        api_key.environment = "production"
+        api_key.save(update_fields=["environment"])
+        self.authorize(raw_key)
+
+        response = self.client.get("/api/v1/content-migration/plans/")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_human_admin_can_create_and_list_key_with_secret_shown_once(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(
+            "/api/v1/core/machine-api-keys/",
+            {
+                "name": "Codex",
+                "principalId": self.admin.id,
+                "tenantIds": [str(self.tenant.id)],
+                "scopes": [SERVER_FULL_ACCESS],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["secret"].startswith("mapi_"))
+
+        listed = self.client.get("/api/v1/core/machine-api-keys/")
+        self.assertEqual(listed.status_code, status.HTTP_200_OK)
+        self.assertNotIn("secret", listed.data[0])
+
+    def test_machine_key_cannot_manage_machine_keys(self):
+        raw_key, _ = self.create_key([SERVER_FULL_ACCESS])
+        self.authorize(raw_key)
+
+        response = self.client.get("/api/v1/core/machine-api-keys/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_theme_subroutes_have_stable_specific_scopes(self):
+        request = type("Request", (), {"method": "GET"})()
+        request.path = "/api/v1/webpages/designer/themes/2/versions/"
+        self.assertEqual(_required_scope(request), THEME_VERSION)
+        request.path = "/api/v1/webpages/themes/sync/pull/"
+        self.assertEqual(_required_scope(request), THEME_TRANSFER)
+        request.path = "/api/v1/webpages/designer/theme-exports/job/download/"
+        self.assertEqual(_required_scope(request), THEME_READ)

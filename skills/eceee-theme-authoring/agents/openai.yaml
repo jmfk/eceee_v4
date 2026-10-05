@@ -1,0 +1,4 @@
+interface:
+  display_name: "ECEEE Theme Authoring"
+  short_description: "Create and safely update complete ECEEE themes"
+  default_prompt: "Use $eceee-theme-authoring to create or update an ECEEE theme and validate editor and render parity."

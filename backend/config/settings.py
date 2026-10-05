@@ -36,6 +36,7 @@ SECRET_KEY = config(
 )
 DEBUG = config("DEBUG", default=True, cast=bool)
 APP_VERSION = config("APP_VERSION", default="")
+DEPLOYMENT_ENVIRONMENT = config("DEPLOYMENT_ENVIRONMENT", default="development" if DEBUG else "production")
 
 # Layout caching configuration
 if DEBUG:
@@ -381,6 +382,7 @@ CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF tokens
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "core.machine_api_keys.MachineAPIKeyAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",

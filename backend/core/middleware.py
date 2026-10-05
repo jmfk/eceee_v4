@@ -12,7 +12,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import APIException
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from core.models import Tenant
+from core.machine_api_keys import MachineAPIKeyAuthentication
+from core.models import MachineAPIKey, Tenant
 from core.permissions import user_can_switch_tenant
 from core.rls import clear_tenant_context, set_tenant_context
 
@@ -83,7 +84,7 @@ class TenantContextMiddleware:
         if request.user.is_authenticated:
             return
 
-        for authenticator in (JWTAuthentication(), TokenAuthentication()):
+        for authenticator in (MachineAPIKeyAuthentication(), JWTAuthentication(), TokenAuthentication()):
             try:
                 authenticated = authenticator.authenticate(request)
             except APIException:
@@ -118,7 +119,10 @@ class TenantContextMiddleware:
                     tenant = Tenant.objects.get(identifier=tenant_id_header, is_active=True)
                 except Tenant.DoesNotExist:
                     raise self.InvalidTenantSelection from None
-            if request.user.is_authenticated and not user_can_switch_tenant(request.user):
+            if isinstance(getattr(request, "auth", None), MachineAPIKey):
+                if not request.auth.tenants.filter(pk=tenant.pk).exists():
+                    raise self.InvalidTenantSelection
+            elif request.user.is_authenticated and not user_can_switch_tenant(request.user):
                 has_access = (
                     tenant.user_has_access(request.user)
                     or tenant.theme_designer_assignments.filter(user=request.user).exists()
@@ -138,6 +142,9 @@ class TenantContextMiddleware:
 
         # 2. An omitted header is only unambiguous when the user can access one tenant.
         if request.user.is_authenticated:
+            if isinstance(getattr(request, "auth", None), MachineAPIKey):
+                key_tenants = request.auth.tenants.filter(is_active=True)
+                return key_tenants.first() if key_tenants.count() == 1 else None
             accessible = (
                 Tenant.objects.filter(is_active=True)
                 .filter(

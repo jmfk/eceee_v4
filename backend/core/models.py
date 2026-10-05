@@ -11,6 +11,28 @@ from django.contrib.auth.models import User
 from django.db import models
 
 
+class MachineAPIKey(models.Model):
+    """Hashed, revocable credential for a dedicated machine principal."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=120)
+    principal = models.ForeignKey(User, on_delete=models.PROTECT, related_name="machine_api_keys")
+    tenants = models.ManyToManyField("Tenant", related_name="machine_api_keys")
+    environment = models.CharField(max_length=32)
+    scopes = models.JSONField(default=list)
+    key_hash = models.CharField(max_length=64, unique=True, editable=False)
+    key_prefix = models.CharField(max_length=16, editable=False)
+    is_active = models.BooleanField(default=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_machine_api_keys")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name", "created_at"]
+        constraints = [models.UniqueConstraint(fields=["environment", "name"], name="unique_machine_key_name")]
+
+
 class Tenant(models.Model):
     """
     Tenant model for account separation.

@@ -10,6 +10,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
 from content.views import CategoryViewSet, NamespaceViewSet, TagViewSet
+from core.api_views import MachineAPIKeyViewSet
 
 app_name = "api"
 
@@ -20,6 +21,7 @@ router = DefaultRouter()
 router.register(r"categories", CategoryViewSet)
 router.register(r"tags", TagViewSet)
 router.register(r"namespaces", NamespaceViewSet)
+router.register(r"core/machine-api-keys", MachineAPIKeyViewSet, basename="machine-api-key")
 
 urlpatterns = [
     # JWT Authentication endpoints
