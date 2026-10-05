@@ -4,7 +4,9 @@ from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from rest_framework import status
 from rest_framework.authtoken.models import Token
+from rest_framework.settings import api_settings
 from rest_framework.test import APIClient
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from config.celery import app
@@ -17,6 +19,7 @@ from core.machine_api_keys import (
     generate_machine_api_key,
 )
 from core.models import MachineAPIKey, Tenant
+from webpages.models import PageTheme
 
 
 @override_settings(APP_VERSION="build-123")
@@ -228,6 +231,30 @@ class MachineAPIKeyAuthenticationTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_theme_read_key_can_compare_themes_via_read_only_post(self):
+        left = PageTheme.objects.create(name="Left theme", tenant=self.tenant, created_by=self.admin)
+        right = PageTheme.objects.create(name="Right theme", tenant=self.tenant, created_by=self.admin)
+        raw_key, _ = self.create_key([THEME_READ])
+        self.authorize(raw_key)
+
+        response = self.client.post(
+            "/api/v1/webpages/designer/themes/compare/",
+            {"leftThemeId": left.pk, "rightThemeId": right.pk},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @override_settings(THEME_SYNC_ENABLED=True)
+    def test_theme_transfer_key_can_post_sync_pull_without_csrf(self):
+        self.client = APIClient(enforce_csrf_checks=True)
+        raw_key, _ = self.create_key([THEME_TRANSFER])
+        self.authorize(raw_key)
+
+        response = self.client.post("/api/v1/webpages/themes/sync/pull/", {}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     def test_wrong_environment_key_is_rejected(self):
         raw_key, api_key = self.create_key([SERVER_FULL_ACCESS])
         api_key.environment = "production"
@@ -287,6 +314,9 @@ class MachineAPIKeyAuthenticationTest(TestCase):
                 request.path = path
                 self.assertIsNone(_required_scope(request))
 
+    def test_effective_rest_framework_settings_include_default_throttles(self):
+        self.assertEqual(api_settings.DEFAULT_THROTTLE_CLASSES, [AnonRateThrottle, UserRateThrottle])
+
     def test_rotate_locks_the_key_before_replacing_its_secret(self):
         _, api_key = self.create_key([SERVER_FULL_ACCESS])
         self.client.force_authenticate(self.admin)
@@ -304,4 +334,9 @@ class MachineAPIKeyAuthenticationTest(TestCase):
         request.path = "/api/v1/webpages/themes/sync/pull/"
         self.assertEqual(_required_scope(request), THEME_TRANSFER)
         request.path = "/api/v1/webpages/designer/theme-exports/job/download/"
+        self.assertEqual(_required_scope(request), THEME_READ)
+        request.method = "POST"
+        request.path = "/api/v1/webpages/designer/themes/compare/"
+        self.assertEqual(_required_scope(request), THEME_READ)
+        request.path = "/api/v1/webpages/designer/themes/2/export/"
         self.assertEqual(_required_scope(request), THEME_READ)
