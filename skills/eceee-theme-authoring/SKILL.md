@@ -12,6 +12,7 @@ Build coherent, recoverable ECEEE themes without inventing a parallel theme syst
 - Read [references/theme-contract.md](references/theme-contract.md) before creating or changing theme data.
 - Read [references/image-styles.md](references/image-styles.md) when image presentation, galleries, carousels, lightboxes, sizing, or alignment is in scope.
 - Read [references/theme-family.md](references/theme-family.md) when work involves the `eceeeSummerStudy`, `Industry`, or `eceee` theme family.
+- Read [references/machine-api.md](references/machine-api.md) before authenticated API work or machine-key lifecycle operations.
 - Read [references/verification.md](references/verification.md) before applying or handing off theme changes.
 
 ## Core workflow
@@ -20,7 +21,7 @@ Build coherent, recoverable ECEEE themes without inventing a parallel theme syst
 2. Inspect the current theme and relevant preview content before proposing changes. Preserve settings outside the requested design outcome. For authenticated interaction with `app.eceee.org`, always use Chrome; do not use the Codex in-app browser.
 3. For an existing theme, create a named theme version or export a recoverable theme package before mutation. For a new theme, start from the closest intentional theme or the application defaults rather than an unrelated production theme.
 4. Translate the design brief into one coordinated system: typography, colors, breakpoints, design groups, component styles, image styles, table templates, assets, HTML element rules, and custom CSS only where needed.
-5. Prefer the Theme Designer and existing theme APIs. Do not write theme rows directly in the database or create a second configuration source.
+5. Prefer the scoped machine API for structured reads and writes once a production key has been provisioned. Use Chrome for visual inspection and verification. Do not write theme rows directly in the database or create a second configuration source.
 6. Preview a complete representative page, then verify the affected edit and render surfaces described in the verification reference.
 7. Report the target theme, settings changed, recovery point, verification performed, and any intentional mismatch or unsupported request.
 
