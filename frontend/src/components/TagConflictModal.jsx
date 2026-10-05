@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { X, AlertTriangle, Hash } from 'lucide-react'
+import FieldHelpPopover from './form-fields/FieldHelpPopover'
 
 const TagConflictModal = ({ 
     isOpen, 
@@ -98,10 +99,17 @@ const TagConflictModal = ({
 
                     <form onSubmit={handleSubmit}>
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                New Tag Name
-                            </label>
+                            <div className="mb-2 flex items-center gap-1.5">
+                                <label htmlFor="new-tag-name" className="block text-sm font-medium text-gray-700">
+                                    New Tag Name
+                                </label>
+                                <FieldHelpPopover id="new-tag-name-help" label="New Tag Name">
+                                    Tag names should be unique and contain only letters, numbers, spaces, and hyphens.
+                                </FieldHelpPopover>
+                            </div>
                             <input
+                                id="new-tag-name"
+                                aria-describedby="new-tag-name-help"
                                 type="text"
                                 value={newTagName}
                                 onChange={(e) => setNewTagName(e.target.value)}
@@ -111,9 +119,6 @@ const TagConflictModal = ({
                                 disabled={isValidating}
                                 autoFocus
                             />
-                            <div className="text-xs text-gray-500 mt-1">
-                                Tag names should be unique and contain only letters, numbers, spaces, and hyphens.
-                            </div>
                         </div>
 
                         {/* Actions */}

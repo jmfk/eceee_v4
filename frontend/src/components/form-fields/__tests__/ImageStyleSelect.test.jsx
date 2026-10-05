@@ -1,5 +1,6 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import ImageStyleSelect from '../ImageStyleSelect'
 
@@ -15,7 +16,8 @@ vi.mock('../../../contexts/unified-data/context/UnifiedDataContext', () => ({
 }))
 
 describe('ImageStyleSelect', () => {
-    it('places subdued help text between the label and field', () => {
+    it('shows help in an info popover beside the label', async () => {
+        const user = userEvent.setup()
         render(
             <ImageStyleSelect
                 value={null}
@@ -26,11 +28,19 @@ describe('ImageStyleSelect', () => {
         )
 
         const label = screen.getByText('Image Style')
-        const description = screen.getByText('Named image style from the current theme')
+        let description = screen.getByText('Named image style from the current theme')
         const field = screen.getByText('Default')
+        const helpButton = screen.getByRole('button', { name: 'About Image Style' })
 
-        expect(description).toHaveClass('italic', 'text-gray-500')
-        expect(label.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        expect(description).toHaveClass('sr-only')
+        expect(helpButton).toHaveAttribute('aria-expanded', 'false')
+        expect(label.compareDocumentPosition(helpButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(description.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+        await user.click(helpButton)
+
+        description = screen.getByRole('note')
+        expect(helpButton).toHaveAttribute('aria-expanded', 'true')
+        expect(description).not.toHaveClass('sr-only')
     })
 })

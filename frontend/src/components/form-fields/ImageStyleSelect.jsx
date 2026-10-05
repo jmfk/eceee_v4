@@ -4,7 +4,7 @@ import { ChevronDown, Check } from 'lucide-react';
 import { renderMustache, prepareGalleryContext, prepareCarouselContext } from '../../utils/mustacheRenderer';
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { lookupWidget } from '../../utils/widgetUtils';
-import FieldHelpText from './FieldHelpText';
+import FieldHelpPopover from './FieldHelpPopover';
 
 /**
  * Smart visual selector for image styles with preview thumbnails
@@ -91,6 +91,15 @@ const ImageStyleSelect = ({
 
     const hasStyles = filteredStyles.length > 0;
     const selectedStyle = filteredStyles.find(s => s.value === value);
+    const fieldLabel = label && (
+        <div className="flex items-center gap-1.5">
+            <label className="block text-sm font-medium text-gray-700">
+                {label}
+                {required && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            <FieldHelpPopover label={label}>{description}</FieldHelpPopover>
+        </div>
+    );
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -208,13 +217,7 @@ const ImageStyleSelect = ({
     if (!hasStyles) {
         return (
             <div className="space-y-1">
-                {label && (
-                    <label className="block text-sm font-medium text-gray-700">
-                        {label}
-                        {required && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                )}
-                <FieldHelpText>{description}</FieldHelpText>
+                {fieldLabel}
                 <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm text-gray-600">
                     Default
                 </div>
@@ -224,13 +227,7 @@ const ImageStyleSelect = ({
 
     return (
         <div className="space-y-1">
-            {label && (
-                <label className="block text-sm font-medium text-gray-700">
-                    {label}
-                    {required && <span className="text-red-500 ml-1">*</span>}
-                </label>
-            )}
-            <FieldHelpText>{description}</FieldHelpText>
+            {fieldLabel}
             <div className="relative" ref={dropdownRef}>
                 {/* Selected style display button */}
                 <button

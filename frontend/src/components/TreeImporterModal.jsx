@@ -3,6 +3,7 @@ import { X, Download, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { pageImportApi } from '../api'
 import { namespacesApi } from '../api'
+import FieldHelpPopover from './form-fields/FieldHelpPopover'
 
 const TreeImporterModal = ({ isOpen, onClose, parentPage = null, onSuccess }) => {
     const [url, setUrl] = useState('')
@@ -143,10 +144,17 @@ const TreeImporterModal = ({ isOpen, onClose, parentPage = null, onSuccess }) =>
                 <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
                     {/* URL Input */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            URL to Import
-                        </label>
+                        <div className="mb-1 flex items-center gap-1.5">
+                            <label htmlFor="tree-import-url" className="block text-sm font-medium text-gray-700">
+                                URL to Import
+                            </label>
+                            <FieldHelpPopover id="tree-import-url-help" label="URL to Import">
+                                The crawler will import this page and all subpages under this URL path
+                            </FieldHelpPopover>
+                        </div>
                         <input
+                            id="tree-import-url"
+                            aria-describedby="tree-import-url-help"
                             type="url"
                             value={url}
                             onChange={(e) => setUrl(e.target.value)}
@@ -155,9 +163,6 @@ const TreeImporterModal = ({ isOpen, onClose, parentPage = null, onSuccess }) =>
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
                             required
                         />
-                        <div className="mt-1 text-xs text-gray-500">
-                            The crawler will import this page and all subpages under this URL path
-                        </div>
                     </div>
 
                     {/* Import Mode Info */}
