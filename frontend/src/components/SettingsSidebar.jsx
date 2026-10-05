@@ -14,6 +14,7 @@ import {
     Users,
     Package,
     Database,
+    Beaker,
     ChevronRight
 } from 'lucide-react'
 import { themesApi } from '../api'
@@ -114,6 +115,12 @@ export default function SettingsSidebar() {
             href: '/settings'
         },
         {
+            id: 'experiments',
+            label: 'A/B Testing',
+            icon: Beaker,
+            href: '/settings/experiments'
+        },
+        {
             id: 'system',
             label: 'System',
             icon: Cog,
@@ -175,4 +182,3 @@ export default function SettingsSidebar() {
         </aside>
     )
 }
-
