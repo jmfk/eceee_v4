@@ -41,11 +41,19 @@ Semantic package comparison confirmed that the copied design fields and asset co
 
 The public Industry page was checked in Chrome at 375, 768, and 1440 px with no horizontal overflow. Its existing page content includes a black banner region and one empty-source image element; those are content-level properties, not missing copied theme assets.
 
+## eceee theme creation, 2026-10-05
+
+The standalone production theme `eceee` was created as theme ID 7 from `eceeeSummerStudy` sync version 57 through the scoped theme-sync API. It received its own server-generated stable key, asset paths, and version history; its initial sync version is 1. It remains inactive, is not the default, and was not assigned to a page or site.
+
+Semantic package comparison confirmed that all design fields and referenced asset contents match Summer Study. The source transfer package contains seven asset references representing six unique file contents, so the content-addressed import stores six files under the new theme's own asset path.
+
+The authenticated Theme Designer preview was checked in Chrome with a 1440 px browser viewport and its mobile, tablet, and desktop canvases. The rendered canvas widths were 390, 768, and 1280 px respectively, with no horizontal overflow, no broken images among the 12 rendered images, and no browser console errors. A separate 375 px Chrome viewport check confirmed that the responsive Designer layout and mobile theme preview render correctly.
+
 ## Repository baseline
 
 - `themes/default/base/eceee_summer_study/theme.py` inherits `EceeeTheme` and adds its own colors, fonts, breakpoints, and preview image.
 - `themes/default/base/industry/theme.py` is standalone and supplies its own colors, fonts, breakpoints, and preview image.
-- `themes/default/base/eceee/theme.py` is currently only a minimal base with name, preview image, and breakpoints. It is not yet a complete copy of Summer Study.
+- `themes/default/base/eceee/theme.py` is currently only a minimal base with name, preview image, and breakpoints. The live production `eceee` record is a complete Summer Study copy, so this generated Python file must not be used to overwrite it until a fresh server export has reconciled the file.
 
 Do not assume generated Python files are authoritative when they conflict with the live Designer. Export or fetch the latest server representation and validate it before deriving another theme.
 
