@@ -9,6 +9,13 @@ from core.machine_api_keys import ALLOWED_SCOPES, deployment_environment, genera
 from core.models import MachineAPIKey, Tenant
 
 
+class IsSuperUser(permissions.BasePermission):
+    """Reserve machine credential management for server administrators."""
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.is_superuser)
+
+
 class MachineAPIKeySerializer(serializers.ModelSerializer):
     principal_id = serializers.PrimaryKeyRelatedField(
         source="principal", queryset=get_user_model().objects.filter(is_active=True)
@@ -66,7 +73,7 @@ class MachineAPIKeySerializer(serializers.ModelSerializer):
 class MachineAPIKeyViewSet(viewsets.GenericViewSet):
     queryset = MachineAPIKey.objects.select_related("principal", "created_by").prefetch_related("tenants")
     serializer_class = MachineAPIKeySerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsSuperUser]
 
     def list(self, request):
         return Response(self.get_serializer(self.get_queryset(), many=True).data)
