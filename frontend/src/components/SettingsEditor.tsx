@@ -4,6 +4,7 @@ import PageTagWidget from './PageTagWidget'
 import PathPatternSelector from './PathPatternSelector'
 import PathPreviewInput from './PathPreviewInput'
 import HostnameListEditor from './HostnameListEditor'
+import ThemeSelector from './ThemeSelector'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
 
@@ -19,20 +20,28 @@ type SettingsEditorProps = {
     simulatedPath?: string
     onSimulatedPathChange?: (path: string) => void
     pathVariables?: Record<string, any>
+    themeSettings?: {
+        selectedThemeId?: number | null
+        effectiveThemeId?: number | null
+        themeInheritanceInfo?: Record<string, any> | null
+        hasParent?: boolean
+        onThemeChange: (themeId: number | null) => void
+    }
 }
 
 export type SettingsEditorHandle = {
     saveSettings: () => Promise<{ module: string; status: string; data: any; timestamp: string }>
 }
 
-// Settings & SEO Editor Tab - UDC-integrated with self-controlled fields
+// Settings editor tab - UDC-integrated with self-controlled fields
 const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
     componentId,
     context,
     isNewPage,
     simulatedPath = '',
     onSimulatedPathChange,
-    pathVariables = {}
+    pathVariables = {},
+    themeSettings
 }, ref) => {
     // UDC Integration
     const { getState, publishUpdate, useExternalChanges } = useUnifiedData()
@@ -285,6 +294,13 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                         </div>
                     </div>
                 </div>
+
+                {themeSettings && (
+                    <ThemeSelector
+                        {...themeSettings}
+                        embedded
+                    />
+                )}
 
                 {/* SEO & Metadata Section */}
                 <div className="bg-white rounded-lg shadow p-6">

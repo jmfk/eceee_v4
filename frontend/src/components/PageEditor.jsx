@@ -20,7 +20,6 @@ import {
     Share2,
     ChevronDown,
     ArrowLeft,
-    Palette,
     ChevronLeft,
     ChevronRight,
     Trash2,
@@ -60,7 +59,6 @@ import ErrorTodoSidebar from './ErrorTodoSidebar'
 import SchemaDrivenForm from './SchemaDrivenForm'
 import StatusBar from './StatusBar'
 import WidgetEditorPanel from './WidgetEditorPanel'
-import ThemeSelector from './ThemeSelector'
 import PagePreview from './PagePreview'
 import SettingsEditor from './SettingsEditor'
 import PublishingEditor from './PublishingEditor'
@@ -215,7 +213,7 @@ const PageEditor = () => {
     // Determine previous view from location state or default to /pages
     const previousView = location.state?.previousView || '/pages'
     const isNewPage = pageId === 'new' || !pageId
-    const activeTab = tab || 'content'
+    const activeTab = tab === 'theme' ? 'settings' : (tab || 'content')
 
     // Helper function to construct URL with current version parameter
     const buildUrlWithVersion = (path, version = versionFromUrl) => {
@@ -227,10 +225,11 @@ const PageEditor = () => {
         return path
     }
 
-    // Redirect to content tab if no tab is specified
+    // Redirect missing and legacy theme routes to their canonical tabs.
     useEffect(() => {
-        if (!tab) {
-            const basePath = isNewPage ? `/pages/new/content` : `/pages/${pageId}/edit/content`
+        if (!tab || tab === 'theme') {
+            const targetTab = tab === 'theme' ? 'settings' : 'content'
+            const basePath = isNewPage ? `/pages/new/${targetTab}` : `/pages/${pageId}/edit/${targetTab}`
             const defaultPath = buildUrlWithVersion(basePath)
             navigate(defaultPath, { replace: true, state: { previousView } })
         }
@@ -1915,8 +1914,7 @@ const PageEditor = () => {
     const tabs = [
         { id: 'content', label: 'Content', icon: Layout },
         { id: 'slots', label: 'All Slots', icon: Layers },
-        { id: 'settings', label: 'Settings & SEO', icon: Settings },
-        { id: 'theme', label: 'Theme', icon: Palette },
+        { id: 'settings', label: 'Settings', icon: Settings },
         { id: 'publishing', label: 'Publish', icon: Calendar },
         { id: 'preview', label: 'Preview', icon: Eye },
     ]
@@ -2301,6 +2299,13 @@ const PageEditor = () => {
                                 simulatedPath={simulatedPath}
                                 onSimulatedPathChange={setSimulatedPath}
                                 pathVariables={pathVariables}
+                                themeSettings={{
+                                    selectedThemeId: pageVersionData?.theme,
+                                    effectiveThemeId: pageVersionData?.effectiveTheme?.id,
+                                    themeInheritanceInfo: pageVersionData?.themeInheritanceInfo || pageInheritance.theme.inheritanceInfo,
+                                    hasParent: (webpageData?.breadcrumbs?.length || 0) > 1,
+                                    onThemeChange: (themeId) => updatePageData({ theme: themeId })
+                                }}
                             />
                         )}
                         {activeTab === 'publishing' && !isNewPage && (
@@ -2311,15 +2316,6 @@ const PageEditor = () => {
                                 onSave={handleSave}
                                 onWorkflowChange={refetchWorkflow}
                                 onVersionRestored={handleVersionRestored}
-                            />
-                        )}
-                        {activeTab === 'theme' && (
-                            <ThemeSelector
-                                key={`theme-${pageVersionData?.versionId || 'new'}`}
-                                selectedThemeId={pageVersionData?.theme}
-                                effectiveThemeId={pageVersionData?.effectiveTheme?.id}
-                                themeInheritanceInfo={pageInheritance.theme.inheritanceInfo || pageVersionData?.themeInheritanceInfo}
-                                onThemeChange={(themeId) => updatePageData({ theme: themeId })}
                             />
                         )}
                         {activeTab === 'preview' && (
