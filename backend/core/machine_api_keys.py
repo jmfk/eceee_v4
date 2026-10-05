@@ -19,6 +19,7 @@ AUTH_SCHEME = b"ApiKey"
 MACHINE_DENIED_PREFIXES = (
     "/api/v1/auth/",
     "/api/v1/core/machine-api-keys",
+    "/api/v1/data-connections/",
     "/api/v1/utils/change-password/",
     "/api/v1/utils/current-workspace/",
     "/api/v1/utils/users/",

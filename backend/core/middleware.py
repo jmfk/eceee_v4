@@ -81,7 +81,11 @@ class TenantContextMiddleware:
     @staticmethod
     def authenticate_api_user(request):
         """Resolve bearer credentials before selecting their tenant."""
-        for authenticator in (MachineAPIKeyAuthentication(), JWTAuthentication(), TokenAuthentication()):
+        authenticators = [JWTAuthentication(), TokenAuthentication()]
+        if request.path.startswith("/api/v1/"):
+            authenticators.insert(0, MachineAPIKeyAuthentication())
+
+        for authenticator in authenticators:
             try:
                 authenticated = authenticator.authenticate(request)
             except APIException:

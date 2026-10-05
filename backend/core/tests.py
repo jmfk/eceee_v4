@@ -292,6 +292,42 @@ class MachineAPIKeyAuthenticationTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_staff_user_cannot_manage_machine_keys(self):
+        staff = User.objects.create_user("machine-staff", password="test", is_staff=True)
+        staff_tenant = Tenant.objects.create(name="Staff tenant", identifier="staff-tenant", created_by=staff)
+        self.client.force_login(staff)
+        self.client.credentials(HTTP_X_TENANT_ID=staff_tenant.identifier)
+
+        response = self.client.post(
+            "/api/v1/core/machine-api-keys/",
+            {
+                "name": "Escalated key",
+                "principalId": self.admin.id,
+                "tenantIds": [str(self.tenant.id)],
+                "scopes": [SERVER_FULL_ACCESS],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_machine_key_is_not_accepted_outside_the_application_api(self):
+        raw_key, _ = self.create_key([SERVER_FULL_ACCESS])
+        self.authorize(raw_key)
+
+        response = self.client.get("/admin/")
+
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.assertIn("/admin/login/", response["Location"])
+
+    def test_full_access_key_cannot_read_data_connection_credentials(self):
+        raw_key, _ = self.create_key([SERVER_FULL_ACCESS])
+        self.authorize(raw_key)
+
+        response = self.client.get("/api/v1/data-connections/connections/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_full_access_key_cannot_generate_password_reset_links(self):
         raw_key, _ = self.create_key([SERVER_FULL_ACCESS])
         self.authorize(raw_key)
@@ -305,6 +341,7 @@ class MachineAPIKeyAuthenticationTest(TestCase):
         for path in (
             "/api/v1/auth/token/",
             "/api/v1/core/machine-api-keys/",
+            "/api/v1/data-connections/connections/",
             "/api/v1/utils/change-password/",
             "/api/v1/utils/current-workspace/",
             "/api/v1/utils/users/2/reset-password/",
