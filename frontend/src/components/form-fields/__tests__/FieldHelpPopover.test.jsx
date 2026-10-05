@@ -33,7 +33,7 @@ describe('FieldHelpPopover', () => {
         expect(button).toHaveFocus()
     })
 
-    it('closes when focus moves to another control', async () => {
+    it('closes when keyboard focus moves to another control', async () => {
         const user = userEvent.setup()
         render(
             <div>
@@ -43,9 +43,11 @@ describe('FieldHelpPopover', () => {
         )
 
         const helpButton = screen.getByRole('button', { name: 'About Example' })
+        const nextButton = screen.getByRole('button', { name: 'Next' })
         await user.click(helpButton)
-        await user.click(screen.getByRole('button', { name: 'Next' }))
+        await user.tab()
 
+        expect(nextButton).toHaveFocus()
         expect(helpButton).toHaveAttribute('aria-expanded', 'false')
     })
 })
