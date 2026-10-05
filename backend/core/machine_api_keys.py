@@ -44,6 +44,10 @@ def _required_scope(request):
         return THEME_TRANSFER
     if request.path.startswith("/api/v1/webpages/designer/theme-exports/"):
         return THEME_READ
+    if request.path == "/api/v1/webpages/designer/themes/compare/" or (
+        request.path.startswith("/api/v1/webpages/designer/themes/") and request.path.endswith("/export/")
+    ):
+        return THEME_READ
     if request.path.startswith("/api/v1/webpages/designer/themes/") and "/versions/" in request.path:
         return THEME_VERSION
     theme_prefixes = ("/api/v1/webpages/themes/", "/api/v1/webpages/designer/themes/")

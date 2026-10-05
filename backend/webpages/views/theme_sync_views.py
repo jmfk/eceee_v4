@@ -13,6 +13,7 @@ from rest_framework import authentication, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from core.machine_api_keys import MachineAPIKeyAuthentication
 from core.permissions import HasTenantAccess
 
 from ..models import PageTheme
@@ -35,6 +36,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
 
     permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
     authentication_classes = [
+        MachineAPIKeyAuthentication,
         ThemeRemoteAccessKeyAuthentication,
         authentication.TokenAuthentication,
         authentication.SessionAuthentication,
