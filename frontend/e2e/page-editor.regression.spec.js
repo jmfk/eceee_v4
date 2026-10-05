@@ -75,7 +75,7 @@ test.describe('page editor regressions', () => {
     const editorState = await mockCmsApi(page, { authenticated: true, pageEditor: true })
     await openEditor(page, editorState)
 
-    await page.getByRole('button', { name: 'Settings & SEO' }).click()
+    await page.getByRole('button', { name: 'Settings' }).click()
     await page.getByPlaceholder('Page Title').fill('Unpublished draft title')
     await page.getByPlaceholder('page-url-slug').fill('unpublished-draft-slug')
     await saveCurrentVersion(page)
@@ -85,6 +85,18 @@ test.describe('page editor regressions', () => {
       title: 'Unpublished draft title',
       slug: 'unpublished-draft-slug',
     })
+  })
+
+  test('theme selection lives in Settings and legacy theme links redirect', async ({ page }) => {
+    await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    await seedAuthenticatedSession(page)
+
+    await page.goto('/pages/101/edit/theme', { waitUntil: 'domcontentloaded' })
+
+    await expect(page).toHaveURL(/\/pages\/101\/edit\/settings$/)
+    await expect(page.getByTestId('page-editor-tab-settings')).toContainText('Settings')
+    await expect(page.getByRole('heading', { name: 'Page Theme' })).toBeVisible()
+    await expect(page.getByTestId('page-editor-tab-theme')).toHaveCount(0)
   })
 
   test('external widget config update reaches the rendered content', async ({ page }) => {

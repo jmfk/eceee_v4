@@ -325,6 +325,15 @@ export async function mockCmsApi(page, {
       return json(route, { access: ACCESS_TOKEN })
     }
 
+    if (url.pathname === '/api/v1/webpages/themes/' && method === 'GET') {
+      return json(route, {
+        count: 1,
+        next: null,
+        previous: null,
+        results: [{ id: 1, name: 'System Default', image: null, isDefault: true }],
+      })
+    }
+
     if (url.pathname === '/api/v1/utils/current-user/') {
       if (!isAuthenticated) {
         return json(route, { detail: 'Authentication credentials were not provided.' }, 401)

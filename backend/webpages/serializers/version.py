@@ -228,20 +228,24 @@ class PageVersionSerializer(serializers.ModelSerializer):
 
     def get_effective_theme(self, obj):
         """Get effective theme (explicit or inherited from parent)"""
-        # First check if version has explicit theme
-        if obj.theme:
-            return PageThemeSerializer(obj.theme).data
-
-        # Fall back to page's inheritance resolution
-        theme = obj.page.get_effective_theme()
+        theme = self._get_effective_theme(obj)
         return PageThemeSerializer(theme).data if theme else None
+
+    @staticmethod
+    def _get_effective_theme(obj):
+        """Resolve inheritance for this version, independent of the live version."""
+        if obj.theme:
+            return obj.theme
+        if obj.page.parent_id:
+            return obj.page.parent.get_effective_theme()
+        return PageTheme.get_default_theme(tenant=obj.page.tenant)
 
     def get_theme_inheritance_info(self, obj):
         """Get metadata about where theme comes from"""
         if obj.theme:
             return {"source": "explicit", "inherited_from": None}
 
-        theme = obj.page.get_effective_theme()
+        theme = self._get_effective_theme(obj)
         if not theme:
             return {"source": "none", "inherited_from": None}
 
