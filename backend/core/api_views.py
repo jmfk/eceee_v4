@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -76,16 +77,24 @@ class MachineAPIKeyViewSet(viewsets.GenericViewSet):
         api_key = serializer.save()
         return Response(self.get_serializer(api_key).data, status=status.HTTP_201_CREATED)
 
+    def _get_object_for_update(self):
+        queryset = self.filter_queryset(self.get_queryset()).select_for_update()
+        api_key = get_object_or_404(queryset, pk=self.kwargs["pk"])
+        self.check_object_permissions(self.request, api_key)
+        return api_key
+
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def revoke(self, request, pk=None):
-        api_key = self.get_object()
+        api_key = self._get_object_for_update()
         api_key.is_active = False
         api_key.save(update_fields=["is_active"])
         return Response(self.get_serializer(api_key).data)
 
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def rotate(self, request, pk=None):
-        api_key = self.get_object()
+        api_key = self._get_object_for_update()
         raw_key, key_hash, key_prefix = generate_machine_api_key()
         api_key.key_hash = key_hash
         api_key.key_prefix = key_prefix
