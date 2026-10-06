@@ -149,6 +149,8 @@ class RemoteSiteImportCreateSerializer(RemoteSiteListSerializer):
                 connection=attrs["connection"],
                 remote_root_key=attrs["remote_site_key"],
                 local_root_id=local_root_id,
+                local_root__is_deleted=False,
+                local_root__parent__isnull=True,
             ).exists():
                 raise serializers.ValidationError({"localRootId": "This site is not linked to the remote site."})
         return attrs
