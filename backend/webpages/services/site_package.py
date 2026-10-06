@@ -697,7 +697,9 @@ class SitePackageExporter:
             pages_payload.append(page_payload)
 
         themes = list(PageTheme.objects.filter(id__in=theme_ids).order_by("id")) if include_themes else []
-        media_ids = self._collect_media_ids(selected_versions, root_page.tenant, themes) if include_media else set()
+        media_ids = (
+            self._collect_media_ids(selected_versions, pages, root_page.tenant, themes) if include_media else set()
+        )
         media_files = list(
             MediaFile.objects.filter(id__in=media_ids, tenant=root_page.tenant)
             .prefetch_related(
@@ -708,7 +710,7 @@ class SitePackageExporter:
             )
             .order_by("id")
         )
-        external_media_urls = self._collect_external_media_urls(selected_versions, media_files, themes)
+        external_media_urls = self._collect_external_media_urls(selected_versions, pages, media_files, themes)
 
         _write_json(package, "pages.json", {"pages": pages_payload})
         theme_warnings = self._write_themes(package, themes)
@@ -782,20 +784,34 @@ class SitePackageExporter:
         return [latest] if latest else []
 
     def _collect_media_ids(
-        self, versions: Iterable[PageVersion], tenant: Tenant, themes: Iterable[PageTheme] = ()
+        self,
+        versions: Iterable[PageVersion],
+        pages: Iterable[WebPage],
+        tenant: Tenant,
+        themes: Iterable[PageTheme] = (),
     ) -> Set[str]:
         candidates = set()
         texts = []
+        for page in pages:
+            texts.extend(
+                _walk_json({"page_css_variables": page.page_css_variables, "page_custom_css": page.page_custom_css})
+            )
         for version in versions:
-            for text in _walk_json({"page_data": version.page_data, "widgets": version.widgets}):
-                texts.append(text)
-                for match in UUID_RE.findall(text):
-                    candidates.add(str(match).lower())
+            texts.extend(
+                _walk_json(
+                    {
+                        "page_data": version.page_data,
+                        "widgets": version.widgets,
+                        "page_css_variables": version.page_css_variables,
+                        "page_custom_css": version.page_custom_css,
+                    }
+                )
+            )
         for theme in themes:
-            for text in _walk_json(_serialize_theme(theme)):
-                texts.append(text)
-                for match in UUID_RE.findall(text):
-                    candidates.add(str(match).lower())
+            texts.extend(_walk_json(_serialize_theme(theme)))
+        for text in texts:
+            for match in UUID_RE.findall(text):
+                candidates.add(str(match).lower())
         matched = set(
             str(value)
             for value in MediaFile.objects.filter(tenant=tenant, id__in=candidates).values_list("id", flat=True)
@@ -811,13 +827,27 @@ class SitePackageExporter:
     def _collect_external_media_urls(
         self,
         versions: Iterable[PageVersion],
+        pages: Iterable[WebPage],
         media_files: Iterable[MediaFile],
         themes: Iterable[PageTheme] = (),
     ) -> List[str]:
         owned_values = {value for media in media_files for value in (media.file_path, media.file_url) if value}
         candidates = set()
+        for page in pages:
+            for text in _walk_json(
+                {"page_css_variables": page.page_css_variables, "page_custom_css": page.page_custom_css}
+            ):
+                candidates.update(HTML_IMAGE_SRC_RE.findall(text))
+                candidates.update(url for url in URL_RE.findall(text) if IMAGE_URL_RE.search(url))
         for version in versions:
-            for text in _walk_json({"page_data": version.page_data, "widgets": version.widgets}):
+            for text in _walk_json(
+                {
+                    "page_data": version.page_data,
+                    "widgets": version.widgets,
+                    "page_css_variables": version.page_css_variables,
+                    "page_custom_css": version.page_custom_css,
+                }
+            ):
                 candidates.update(HTML_IMAGE_SRC_RE.findall(text))
                 candidates.update(url for url in URL_RE.findall(text) if IMAGE_URL_RE.search(url))
         for theme in themes:
@@ -962,8 +992,8 @@ class SitePackageImporter:
                 hostnames=[] if not parent else page_data.get("hostnames", []),
                 path_pattern_key=page_data.get("path_pattern_key", ""),
                 enable_css_injection=page_data.get("enable_css_injection", True),
-                page_css_variables=page_data.get("page_css_variables", {}),
-                page_custom_css=page_data.get("page_custom_css", ""),
+                page_css_variables=_replace_in_json(page_data.get("page_css_variables", {}), replacements),
+                page_custom_css=_replace_in_json(page_data.get("page_custom_css", ""), replacements),
                 tenant=tenant,
                 created_by=self.job.created_by,
                 last_modified_by=self.job.created_by,
@@ -998,8 +1028,8 @@ class SitePackageImporter:
                     page_data=page_data_payload,
                     widgets=widgets_payload,
                     theme=theme,
-                    page_css_variables=version_data.get("page_css_variables", {}),
-                    page_custom_css=version_data.get("page_custom_css", ""),
+                    page_css_variables=_replace_in_json(version_data.get("page_css_variables", {}), replacements),
+                    page_custom_css=_replace_in_json(version_data.get("page_custom_css", ""), replacements),
                     enable_css_injection=version_data.get("enable_css_injection", True),
                     # Complete all ID remapping before restoring publication dates.
                     # A published PageVersion is immutable by design.
@@ -1049,7 +1079,7 @@ class SitePackageImporter:
                 "media": {str(source_id): str(media.id) for source_id, media in media_map.items()},
             },
         }
-        self._create_remote_binding(manifest, pages_payload, page_map)
+        self._create_remote_binding(manifest, pages_payload, page_map, version_map)
         self.job.progress = {
             **(self.job.progress or {}),
             "warnings": manifest.get("warnings", []),
@@ -1084,7 +1114,7 @@ class SitePackageImporter:
         )
         return tag
 
-    def _create_remote_binding(self, manifest, pages_payload, page_map):
+    def _create_remote_binding(self, manifest, pages_payload, page_map, version_map):
         options = self.job.options or {}
         connection_id = options.get("connection_id")
         remote_root_key = options.get("remote_site_key") or manifest.get("source", {}).get("root_stable_key")
@@ -1108,6 +1138,7 @@ class SitePackageImporter:
             local_root=page_map[root_data["source_id"]],
             page_map=page_stable_map,
             theme_map=self.theme_stable_map,
+            version_map={str(source_id): version.id for source_id, version in version_map.items()},
             version_fingerprints=fingerprints,
             last_remote_exported_at=parse_datetime(manifest.get("exported_at")),
             last_synced_at=timezone.now(),
@@ -1173,8 +1204,8 @@ class SitePackageImporter:
                     hostnames=[],
                     path_pattern_key=page_data.get("path_pattern_key", ""),
                     enable_css_injection=page_data.get("enable_css_injection", True),
-                    page_css_variables=page_data.get("page_css_variables", {}),
-                    page_custom_css=page_data.get("page_custom_css", ""),
+                    page_css_variables=_replace_in_json(page_data.get("page_css_variables", {}), replacements),
+                    page_custom_css=_replace_in_json(page_data.get("page_custom_css", ""), replacements),
                     tenant=tenant,
                     created_by=self.job.created_by,
                     last_modified_by=self.job.created_by,
@@ -1201,8 +1232,12 @@ class SitePackageImporter:
                 page.description = page_data.get("description", page.description)
                 page.path_pattern_key = page_data.get("path_pattern_key", page.path_pattern_key)
                 page.enable_css_injection = page_data.get("enable_css_injection", page.enable_css_injection)
-                page.page_css_variables = page_data.get("page_css_variables", page.page_css_variables)
-                page.page_custom_css = page_data.get("page_custom_css", page.page_custom_css)
+                page.page_css_variables = _replace_in_json(
+                    page_data.get("page_css_variables", page.page_css_variables), replacements
+                )
+                page.page_custom_css = _replace_in_json(
+                    page_data.get("page_custom_css", page.page_custom_css), replacements
+                )
                 page.last_modified_by = self.job.created_by
                 page.save()
             page_map[page_data["source_id"]] = page
@@ -1212,8 +1247,8 @@ class SitePackageImporter:
         theme_reference_map = {str(source_id): theme.id for source_id, theme in theme_map.items()}
         media_reference_map = {str(source_id): str(media.id) for source_id, media in media_map.items()}
         next_fingerprints = dict(binding.version_fingerprints or {})
+        next_version_binding = dict(binding.version_map or {})
         new_versions = []
-        version_map = {}
 
         for page_data in pages_payload:
             page = page_map[page_data["source_id"]]
@@ -1239,8 +1274,8 @@ class SitePackageImporter:
                     page_data=_replace_in_json(version_data.get("page_data", {}), replacements),
                     widgets=_replace_in_json(version_data.get("widgets", {}), replacements),
                     theme=theme_map.get(version_data.get("theme_source_id")),
-                    page_css_variables=version_data.get("page_css_variables", {}),
-                    page_custom_css=version_data.get("page_custom_css", ""),
+                    page_css_variables=_replace_in_json(version_data.get("page_css_variables", {}), replacements),
+                    page_custom_css=_replace_in_json(version_data.get("page_custom_css", ""), replacements),
                     enable_css_injection=version_data.get("enable_css_injection", True),
                     effective_date=None,
                     expiry_date=None,
@@ -1249,29 +1284,29 @@ class SitePackageImporter:
                 )
                 self._restore_page_tags(version, version_data)
                 new_versions.append(version)
-                version_map[version_data["source_id"]] = version
+                next_version_binding[str(version_data["source_id"])] = version.id
                 known.add(fingerprint)
             next_fingerprints[stable_key] = sorted(known)
 
-        version_reference_map = {str(source_id): version.id for source_id, version in version_map.items()}
         for version in new_versions:
             version.page_data = _remap_structured_references(
                 version.page_data,
                 page_map=page_reference_map,
-                version_map=version_reference_map,
+                version_map=next_version_binding,
                 theme_map=theme_reference_map,
                 media_map=media_reference_map,
             )
             version.widgets = _remap_structured_references(
                 version.widgets,
                 page_map=page_reference_map,
-                version_map=version_reference_map,
+                version_map=next_version_binding,
                 theme_map=theme_reference_map,
                 media_map=media_reference_map,
             )
             version.save(update_fields=["page_data", "widgets", "updated_at"])
 
         binding.page_map = next_page_binding
+        binding.version_map = next_version_binding
         binding.version_fingerprints = next_fingerprints
         binding.last_remote_exported_at = parse_datetime(manifest.get("exported_at"))
         binding.last_synced_at = timezone.now()
