@@ -66,7 +66,9 @@ export const endpoints = {
         exportDetail: (jobId) => `${BASE_PATH}/webpages/site-packages/exports/${jobId}/`,
         exportDownload: (jobId) => `${BASE_PATH}/webpages/site-packages/exports/${jobId}/download/`,
         imports: `${BASE_PATH}/webpages/site-packages/imports/`,
-        importDetail: (jobId) => `${BASE_PATH}/webpages/site-packages/imports/${jobId}/`
+        importDetail: (jobId) => `${BASE_PATH}/webpages/site-packages/imports/${jobId}/`,
+        remoteSites: `${BASE_PATH}/webpages/site-packages/remote/sites/`,
+        remoteImports: `${BASE_PATH}/webpages/site-packages/remote/imports/`
     },
 
     // Versions endpoints (CONSISTENT PATH-BASED API)

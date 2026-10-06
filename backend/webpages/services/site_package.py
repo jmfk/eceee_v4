@@ -11,32 +11,38 @@ import os
 import re
 import secrets
 import tempfile
+import uuid
 import zipfile
 from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional, Set
 
 from django.core.files.base import ContentFile
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
 
 from content.models import Namespace
 from core.models import Tenant
-from file_manager.models import MediaFile
+from file_manager.models import MediaCollection, MediaFile, MediaTag
 from file_manager.storage import S3MediaStorage
-from webpages.models import PageTheme, PageVersion, SitePackageJob, WebPage
+from taxonomy.models import Tag as TaxonomyTag
+from webpages.models import PageTheme, PageVersion, PageVersionTag, RemoteSiteBinding, SitePackageJob, WebPage
 from webpages.services.theme_preview_content import (
     EMBEDDED_IMAGE_PATTERN,
     normalize_theme_preview_namespaces,
     rewrite_theme_library_image_urls,
 )
 
-PACKAGE_VERSION = "1.0"
+PACKAGE_VERSION = "2.0"
+SUPPORTED_PACKAGE_VERSIONS = {"1.0", PACKAGE_VERSION}
 THEME_TRANSFER_MAX_FILES = 250
 THEME_TRANSFER_MAX_FILE_SIZE = 25 * 1024 * 1024
 THEME_TRANSFER_MAX_TOTAL_SIZE = 100 * 1024 * 1024
 UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+URL_RE = re.compile(r"https?://[^\s\"'<>\\)]+", re.IGNORECASE)
+HTML_IMAGE_SRC_RE = re.compile(r"<img[^>]+src=[\"']([^\"']+)[\"']", re.IGNORECASE)
+IMAGE_URL_RE = re.compile(r"\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^\s]*)?$", re.IGNORECASE)
 PAGE_REFERENCE_KEYS = {
     "pageId",
     "page_id",
@@ -148,6 +154,28 @@ def _json_default(value):
 
 def _write_json(zip_file: zipfile.ZipFile, path: str, payload: Dict[str, Any]):
     zip_file.writestr(path, json.dumps(payload, indent=2, default=_json_default))
+
+
+def _payload_fingerprint(payload: Dict[str, Any]) -> str:
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=_json_default).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _version_fingerprint(payload: Dict[str, Any]) -> str:
+    provided = payload.get("content_fingerprint")
+    if provided:
+        return provided
+    lineage_fields = {
+        "content_fingerprint",
+        "source_id",
+        "source_page_id",
+        "version_number",
+        "effective_date",
+        "expiry_date",
+        "created_at",
+    }
+    fingerprint_payload = {key: value for key, value in payload.items() if key not in lineage_fields}
+    return _payload_fingerprint(fingerprint_payload)
 
 
 def _safe_export_filename_part(value: str) -> str:
@@ -336,6 +364,7 @@ def _remap_structured_references(
 def _serialize_page(page: WebPage) -> Dict[str, Any]:
     return {
         "source_id": page.id,
+        "stable_key": str(page.stable_key),
         "parent_source_id": page.parent_id,
         "title": page.title,
         "description": page.description,
@@ -353,7 +382,7 @@ def _serialize_page(page: WebPage) -> Dict[str, Any]:
 
 
 def _serialize_version(version: PageVersion) -> Dict[str, Any]:
-    return {
+    payload = {
         "source_id": version.id,
         "source_page_id": version.page_id,
         "version_number": version.version_number,
@@ -371,13 +400,27 @@ def _serialize_version(version: PageVersion) -> Dict[str, Any]:
         "effective_date": version.effective_date,
         "expiry_date": version.expiry_date,
         "tags": version.tags,
+        "canonical_tags": [
+            {
+                "name": link.tag.name,
+                "slug": link.tag.slug,
+                "tag_type": link.tag.tag_type,
+                "color": link.tag.color,
+                "description": link.tag.description,
+                "position": link.position,
+            }
+            for link in version.canonical_tag_links.select_related("tag").order_by("position")
+        ],
         "created_at": version.created_at,
     }
+    payload["content_fingerprint"] = _version_fingerprint(payload)
+    return payload
 
 
 def _serialize_theme(theme: PageTheme) -> Dict[str, Any]:
-    return {
+    payload = {
         "source_id": theme.id,
+        "stable_key": str(theme.stable_key),
         "name": theme.name,
         "description": theme.description,
         "fonts": theme.fonts,
@@ -398,9 +441,11 @@ def _serialize_theme(theme: PageTheme) -> Dict[str, Any]:
         "is_active": theme.is_active,
         "is_default": theme.is_default,
     }
+    payload["content_fingerprint"] = _payload_fingerprint(payload)
+    return payload
 
 
-def _serialize_media(media: MediaFile) -> Dict[str, Any]:
+def _serialize_media(media: MediaFile, storage=None) -> Dict[str, Any]:
     return {
         "source_id": str(media.id),
         "title": media.title,
@@ -408,6 +453,7 @@ def _serialize_media(media: MediaFile) -> Dict[str, Any]:
         "description": media.description,
         "original_filename": media.original_filename,
         "file_path": media.file_path,
+        "file_url": media.file_url or (storage.url(media.file_path) if storage else None),
         "file_size": media.file_size,
         "content_type": media.content_type,
         "file_hash": media.file_hash,
@@ -415,8 +461,46 @@ def _serialize_media(media: MediaFile) -> Dict[str, Any]:
         "width": media.width,
         "height": media.height,
         "metadata": media.metadata,
+        "ai_generated_tags": media.ai_generated_tags,
+        "ai_suggested_title": media.ai_suggested_title,
+        "ai_extracted_text": media.ai_extracted_text,
+        "ai_confidence_score": media.ai_confidence_score,
         "access_level": media.access_level,
+        "tags": [_serialize_media_tag(tag) for tag in media.tags.all()],
+        "canonical_tags": [_serialize_taxonomy_tag(tag) for tag in media.canonical_tags.all()],
+        "collections": [_serialize_collection(collection) for collection in media.collections.all()],
         "created_at": media.created_at,
+    }
+
+
+def _serialize_media_tag(tag: MediaTag) -> Dict[str, Any]:
+    return {
+        "name": tag.name,
+        "slug": tag.slug,
+        "color": tag.color,
+        "description": tag.description,
+    }
+
+
+def _serialize_taxonomy_tag(tag: TaxonomyTag) -> Dict[str, Any]:
+    return {
+        "name": tag.name,
+        "slug": tag.slug,
+        "tag_type": tag.tag_type,
+        "color": tag.color,
+        "description": tag.description,
+    }
+
+
+def _serialize_collection(collection: MediaCollection) -> Dict[str, Any]:
+    return {
+        "source_id": str(collection.id),
+        "title": collection.title,
+        "slug": collection.slug,
+        "description": collection.description,
+        "access_level": collection.access_level,
+        "tags": [_serialize_media_tag(tag) for tag in collection.tags.all()],
+        "canonical_tags": [_serialize_taxonomy_tag(tag) for tag in collection.canonical_tags.all()],
     }
 
 
@@ -612,13 +696,23 @@ class SitePackageExporter:
                 page_payload["versions"].append(_serialize_version(version))
             pages_payload.append(page_payload)
 
-        media_ids = self._collect_media_ids(selected_versions) if include_media else set()
-        media_files = list(MediaFile.objects.filter(id__in=media_ids).order_by("id"))
         themes = list(PageTheme.objects.filter(id__in=theme_ids).order_by("id")) if include_themes else []
+        media_ids = self._collect_media_ids(selected_versions, root_page.tenant, themes) if include_media else set()
+        media_files = list(
+            MediaFile.objects.filter(id__in=media_ids, tenant=root_page.tenant)
+            .prefetch_related(
+                "tags",
+                "canonical_tags",
+                "collections__tags",
+                "collections__canonical_tags",
+            )
+            .order_by("id")
+        )
+        external_media_urls = self._collect_external_media_urls(selected_versions, media_files, themes)
 
         _write_json(package, "pages.json", {"pages": pages_payload})
-        self._write_themes(package, themes)
-        self._write_media(package, media_files)
+        theme_warnings = self._write_themes(package, themes)
+        media_warnings = self._write_media(package, media_files)
 
         manifest = {
             "package_version": PACKAGE_VERSION,
@@ -626,6 +720,7 @@ class SitePackageExporter:
             "exported_at": timezone.now().isoformat(),
             "source": {
                 "root_page_id": root_page.id,
+                "root_stable_key": str(root_page.stable_key),
                 "root_title": root_page.title,
                 "root_slug": root_page.slug,
             },
@@ -645,6 +740,11 @@ class SitePackageExporter:
                 "themes": [theme.id for theme in themes],
                 "media": [str(media.id) for media in media_files],
             },
+            "warnings": [
+                *[{"code": "external_media_reference", "url": url} for url in external_media_urls],
+                *theme_warnings,
+                *media_warnings,
+            ],
         }
         _write_json(package, "manifest.json", manifest)
         self.job.progress = {"status": "packaged", "manifest": manifest}
@@ -681,34 +781,94 @@ class SitePackageExporter:
         latest = page.versions.order_by("-version_number").select_related("theme").first()
         return [latest] if latest else []
 
-    def _collect_media_ids(self, versions: Iterable[PageVersion]) -> Set[str]:
+    def _collect_media_ids(
+        self, versions: Iterable[PageVersion], tenant: Tenant, themes: Iterable[PageTheme] = ()
+    ) -> Set[str]:
+        candidates = set()
+        texts = []
+        for version in versions:
+            for text in _walk_json({"page_data": version.page_data, "widgets": version.widgets}):
+                texts.append(text)
+                for match in UUID_RE.findall(text):
+                    candidates.add(str(match).lower())
+        for theme in themes:
+            for text in _walk_json(_serialize_theme(theme)):
+                texts.append(text)
+                for match in UUID_RE.findall(text):
+                    candidates.add(str(match).lower())
+        matched = set(
+            str(value)
+            for value in MediaFile.objects.filter(tenant=tenant, id__in=candidates).values_list("id", flat=True)
+        )
+        # Older content sometimes stores only a managed URL/path and no media UUID.
+        joined = "\n".join(texts)
+        if joined:
+            for media in MediaFile.objects.filter(tenant=tenant).only("id", "file_path", "file_url"):
+                if (media.file_path and media.file_path in joined) or (media.file_url and media.file_url in joined):
+                    matched.add(str(media.id))
+        return matched
+
+    def _collect_external_media_urls(
+        self,
+        versions: Iterable[PageVersion],
+        media_files: Iterable[MediaFile],
+        themes: Iterable[PageTheme] = (),
+    ) -> List[str]:
+        owned_values = {value for media in media_files for value in (media.file_path, media.file_url) if value}
         candidates = set()
         for version in versions:
             for text in _walk_json({"page_data": version.page_data, "widgets": version.widgets}):
-                for match in UUID_RE.findall(text):
-                    candidates.add(str(match).lower())
-        if not candidates:
-            return set()
-        return set(str(value) for value in MediaFile.objects.filter(id__in=candidates).values_list("id", flat=True))
+                candidates.update(HTML_IMAGE_SRC_RE.findall(text))
+                candidates.update(url for url in URL_RE.findall(text) if IMAGE_URL_RE.search(url))
+        for theme in themes:
+            owned_values.update(_theme_asset_paths(theme))
+            for text in _walk_json(_serialize_theme(theme)):
+                candidates.update(HTML_IMAGE_SRC_RE.findall(text))
+                candidates.update(url for url in URL_RE.findall(text) if IMAGE_URL_RE.search(url))
+        return sorted(
+            url
+            for url in candidates
+            if url.startswith(("http://", "https://"))
+            and not any(owned in url or url in owned for owned in owned_values)
+        )
 
     def _write_themes(self, package: zipfile.ZipFile, themes: List[PageTheme]):
         storage = self.storage
+        warnings = []
         for theme in themes:
-            _write_json(package, f"themes/{theme.id}.json", _serialize_theme(theme))
+            theme_data = _serialize_theme(theme)
+            assets = []
             for path in _theme_asset_paths(theme):
                 file_obj = None
                 try:
                     file_obj = storage._open(path, "rb")
-                    package.writestr(f"themes/assets/{theme.id}/{path}", file_obj.read())
+                    content = file_obj.read()
+                    assets.append({"path": path, "sha256": hashlib.sha256(content).hexdigest()})
+                    package.writestr(f"themes/assets/{theme.id}/{path}", content)
                 except Exception:
-                    continue
+                    warnings.append(
+                        {
+                            "code": "theme_asset_unavailable",
+                            "themeKey": str(theme.stable_key),
+                            "path": path,
+                        }
+                    )
                 finally:
                     if file_obj:
                         file_obj.close()
+            theme_data["content_fingerprint"] = _payload_fingerprint(
+                {
+                    "metadata": {key: value for key, value in theme_data.items() if key != "content_fingerprint"},
+                    "assets": assets,
+                }
+            )
+            _write_json(package, f"themes/{theme.id}.json", theme_data)
+        return warnings
 
     def _write_media(self, package: zipfile.ZipFile, media_files: List[MediaFile]):
         storage = self.storage
-        manifest = {"files": [_serialize_media(media) for media in media_files]}
+        warnings = []
+        manifest = {"files": [_serialize_media(media, storage=storage) for media in media_files]}
         _write_json(package, "media/manifest.json", manifest)
         for media in media_files:
             file_obj = None
@@ -717,10 +877,11 @@ class SitePackageExporter:
                 filename = os.path.basename(media.file_path) or media.original_filename
                 package.writestr(f"media/files/{media.id}/{filename}", file_obj.read())
             except Exception:
-                continue
+                warnings.append({"code": "media_file_unavailable", "mediaKey": str(media.id)})
             finally:
                 if file_obj:
                     file_obj.close()
+        return warnings
 
 
 class SitePackageImporter:
@@ -729,6 +890,8 @@ class SitePackageImporter:
     def __init__(self, job: SitePackageJob, storage=None):
         self.job = job
         self.storage = storage or S3MediaStorage()
+        self.theme_stable_map = {}
+        self.media_source_metadata = {}
 
     def run(self):
         self.job.mark_running()
@@ -764,8 +927,16 @@ class SitePackageImporter:
     @transaction.atomic
     def import_package(self, package: zipfile.ZipFile) -> WebPage:
         manifest = json.loads(package.read("manifest.json").decode("utf-8"))
-        if manifest.get("package_version") != PACKAGE_VERSION:
+        if manifest.get("package_version") not in SUPPORTED_PACKAGE_VERSIONS:
             raise ValueError("Unsupported site package version")
+        options = self.job.options or {}
+        if options.get("source") == "remote":
+            package_root_key = manifest.get("source", {}).get("root_stable_key")
+            if not package_root_key or str(package_root_key) != str(options.get("remote_site_key")):
+                raise ValueError("The remote package does not match the selected site.")
+
+        if options.get("mode") == "update":
+            return self._update_package(package, manifest)
 
         pages_payload = json.loads(package.read("pages.json").decode("utf-8"))["pages"]
         theme_map = self._import_themes(package)
@@ -837,6 +1008,7 @@ class SitePackageImporter:
                     tags=version_data.get("tags", []),
                     created_by=self.job.created_by,
                 )
+                self._restore_page_tags(imported_version, version_data)
                 imported_versions.append((imported_version, effective_date, expiry_date))
                 version_map[version_data["source_id"]] = imported_version
 
@@ -877,8 +1049,241 @@ class SitePackageImporter:
                 "media": {str(source_id): str(media.id) for source_id, media in media_map.items()},
             },
         }
+        self._create_remote_binding(manifest, pages_payload, page_map)
+        self.job.progress = {
+            **(self.job.progress or {}),
+            "warnings": manifest.get("warnings", []),
+        }
         self.job.save(update_fields=["progress", "updated_at"])
         return imported_root
+
+    def _restore_page_tags(self, version: PageVersion, data: Dict[str, Any]):
+        namespace = self._destination_namespace()
+        for position, tag_data in enumerate(data.get("canonical_tags", [])):
+            tag = self._get_or_create_taxonomy_tag(tag_data, namespace)
+            PageVersionTag.objects.create(
+                page_version=version,
+                tag=tag,
+                position=tag_data.get("position", position),
+            )
+
+    def _get_or_create_taxonomy_tag(self, data: Dict[str, Any], namespace: Namespace):
+        slug = slugify(data.get("slug") or data.get("name")) or "tag"
+        tag_type = slugify(data.get("tag_type") or "general") or "general"
+        tag, _ = TaxonomyTag.objects.get_or_create(
+            tenant=namespace.tenant,
+            namespace=namespace,
+            tag_type=tag_type,
+            slug=slug,
+            defaults={
+                "name": data.get("name") or slug,
+                "color": data.get("color") or "#3B82F6",
+                "description": data.get("description", ""),
+                "created_by": self.job.created_by,
+            },
+        )
+        return tag
+
+    def _create_remote_binding(self, manifest, pages_payload, page_map):
+        options = self.job.options or {}
+        connection_id = options.get("connection_id")
+        remote_root_key = options.get("remote_site_key") or manifest.get("source", {}).get("root_stable_key")
+        if not connection_id or not remote_root_key:
+            return
+        page_stable_map = {
+            str(data.get("stable_key")): page_map[data["source_id"]].id
+            for data in pages_payload
+            if data.get("stable_key") and data["source_id"] in page_map
+        }
+        fingerprints = {}
+        for page_data in pages_payload:
+            key = str(page_data.get("stable_key") or "")
+            if key:
+                fingerprints[key] = [_version_fingerprint(item) for item in page_data.get("versions", [])]
+        root_data = next((item for item in pages_payload if item.get("parent_source_id") is None), pages_payload[0])
+        binding = RemoteSiteBinding.objects.create(
+            tenant=self._destination_tenant(),
+            connection_id=connection_id,
+            remote_root_key=remote_root_key,
+            local_root=page_map[root_data["source_id"]],
+            page_map=page_stable_map,
+            theme_map=self.theme_stable_map,
+            version_fingerprints=fingerprints,
+            last_remote_exported_at=parse_datetime(manifest.get("exported_at")),
+            last_synced_at=timezone.now(),
+        )
+        self.job.progress = {**(self.job.progress or {}), "binding_id": str(binding.id)}
+
+    def _update_package(self, package: zipfile.ZipFile, manifest: Dict[str, Any]) -> WebPage:
+        options = self.job.options or {}
+        tenant = self._destination_tenant()
+        binding = (
+            RemoteSiteBinding.objects.select_for_update()
+            .filter(
+                tenant=tenant,
+                connection_id=options.get("connection_id"),
+                remote_root_key=options.get("remote_site_key"),
+                local_root_id=options.get("local_root_id"),
+            )
+            .first()
+        )
+        if binding is None:
+            raise ValueError("The selected local site is not linked to this remote site.")
+
+        pages_payload = json.loads(package.read("pages.json").decode("utf-8"))["pages"]
+        theme_map = self._import_themes_for_update(package, binding)
+        media_map = self._import_media(package)
+        replacements = self._build_replacements(media_map)
+        warnings = list(manifest.get("warnings", []))
+
+        page_map = {}
+        next_page_binding = dict(binding.page_map or {})
+        remote_keys = {str(item.get("stable_key")) for item in pages_payload if item.get("stable_key")}
+        for stale_key in sorted(set(next_page_binding) - remote_keys):
+            warnings.append({"code": "remote_page_missing", "remotePageKey": stale_key})
+        bound_page_ids = {int(page_id) for page_id in next_page_binding.values()}
+        local_queue = [binding.local_root]
+        while local_queue:
+            local_page = local_queue.pop(0)
+            local_queue.extend(local_page.children.filter(is_deleted=False).only("id"))
+            if local_page.id != binding.local_root_id and local_page.id not in bound_page_ids:
+                warnings.append(
+                    {
+                        "code": "local_page_preserved",
+                        "localPageId": local_page.id,
+                        "title": local_page.title,
+                    }
+                )
+
+        for index, page_data in enumerate(pages_payload):
+            stable_key = str(page_data.get("stable_key") or page_data["source_id"])
+            local_id = next_page_binding.get(stable_key)
+            page = WebPage.objects.filter(id=local_id, tenant=tenant, is_deleted=False).first() if local_id else None
+            parent = page_map.get(page_data.get("parent_source_id"))
+            if index == 0:
+                page = binding.local_root
+                parent = None
+            elif page is None:
+                page = WebPage.objects.create(
+                    parent=parent,
+                    sort_order=page_data.get("sort_order", 0),
+                    title=page_data.get("title", ""),
+                    description=page_data.get("description", ""),
+                    slug=_unique_page_slug(parent, tenant, page_data.get("slug")),
+                    hostnames=[],
+                    path_pattern_key=page_data.get("path_pattern_key", ""),
+                    enable_css_injection=page_data.get("enable_css_injection", True),
+                    page_css_variables=page_data.get("page_css_variables", {}),
+                    page_custom_css=page_data.get("page_custom_css", ""),
+                    tenant=tenant,
+                    created_by=self.job.created_by,
+                    last_modified_by=self.job.created_by,
+                )
+            else:
+                desired_slug = slugify(page_data.get("slug") or "imported-page") or "imported-page"
+                conflict = (
+                    WebPage.objects.filter(
+                        tenant=tenant,
+                        parent=parent,
+                        slug=desired_slug,
+                        is_deleted=False,
+                    )
+                    .exclude(pk=page.pk)
+                    .exists()
+                )
+                if conflict:
+                    warnings.append({"code": "slug_conflict", "remotePageKey": stable_key, "keptSlug": page.slug})
+                else:
+                    page.slug = desired_slug
+                page.parent = parent
+                page.sort_order = page_data.get("sort_order", page.sort_order)
+                page.title = page_data.get("title", page.title)
+                page.description = page_data.get("description", page.description)
+                page.path_pattern_key = page_data.get("path_pattern_key", page.path_pattern_key)
+                page.enable_css_injection = page_data.get("enable_css_injection", page.enable_css_injection)
+                page.page_css_variables = page_data.get("page_css_variables", page.page_css_variables)
+                page.page_custom_css = page_data.get("page_custom_css", page.page_custom_css)
+                page.last_modified_by = self.job.created_by
+                page.save()
+            page_map[page_data["source_id"]] = page
+            next_page_binding[stable_key] = page.id
+
+        page_reference_map = {str(source_id): page.id for source_id, page in page_map.items()}
+        theme_reference_map = {str(source_id): theme.id for source_id, theme in theme_map.items()}
+        media_reference_map = {str(source_id): str(media.id) for source_id, media in media_map.items()}
+        next_fingerprints = dict(binding.version_fingerprints or {})
+        new_versions = []
+        version_map = {}
+
+        for page_data in pages_payload:
+            page = page_map[page_data["source_id"]]
+            stable_key = str(page_data.get("stable_key") or page_data["source_id"])
+            known = set(next_fingerprints.get(stable_key, []))
+            for version_data in page_data.get("versions", []):
+                fingerprint = _version_fingerprint(version_data)
+                if fingerprint in known:
+                    continue
+                latest_number = page.versions.aggregate(maximum=models.Max("version_number"))["maximum"] or 0
+                version = PageVersion.objects.create(
+                    page=page,
+                    version_number=latest_number + 1,
+                    version_title=version_data.get("version_title") or "Remote update",
+                    change_summary={
+                        **(version_data.get("change_summary") or {}),
+                        "remoteImport": True,
+                        "sourceVersionId": version_data.get("source_id"),
+                    },
+                    meta_title=version_data.get("meta_title", ""),
+                    meta_description=version_data.get("meta_description", ""),
+                    code_layout=version_data.get("code_layout", ""),
+                    page_data=_replace_in_json(version_data.get("page_data", {}), replacements),
+                    widgets=_replace_in_json(version_data.get("widgets", {}), replacements),
+                    theme=theme_map.get(version_data.get("theme_source_id")),
+                    page_css_variables=version_data.get("page_css_variables", {}),
+                    page_custom_css=version_data.get("page_custom_css", ""),
+                    enable_css_injection=version_data.get("enable_css_injection", True),
+                    effective_date=None,
+                    expiry_date=None,
+                    tags=version_data.get("tags", []),
+                    created_by=self.job.created_by,
+                )
+                self._restore_page_tags(version, version_data)
+                new_versions.append(version)
+                version_map[version_data["source_id"]] = version
+                known.add(fingerprint)
+            next_fingerprints[stable_key] = sorted(known)
+
+        version_reference_map = {str(source_id): version.id for source_id, version in version_map.items()}
+        for version in new_versions:
+            version.page_data = _remap_structured_references(
+                version.page_data,
+                page_map=page_reference_map,
+                version_map=version_reference_map,
+                theme_map=theme_reference_map,
+                media_map=media_reference_map,
+            )
+            version.widgets = _remap_structured_references(
+                version.widgets,
+                page_map=page_reference_map,
+                version_map=version_reference_map,
+                theme_map=theme_reference_map,
+                media_map=media_reference_map,
+            )
+            version.save(update_fields=["page_data", "widgets", "updated_at"])
+
+        binding.page_map = next_page_binding
+        binding.version_fingerprints = next_fingerprints
+        binding.last_remote_exported_at = parse_datetime(manifest.get("exported_at"))
+        binding.last_synced_at = timezone.now()
+        binding.save()
+        self.job.progress = {
+            **(self.job.progress or {}),
+            "binding_id": str(binding.id),
+            "warnings": warnings,
+            "updated_pages": len(page_map),
+            "created_versions": len(new_versions),
+        }
+        return binding.local_root
 
     def _parse_datetime(self, value):
         if not value:
@@ -907,35 +1312,63 @@ class SitePackageImporter:
 
     def _import_themes(self, package: zipfile.ZipFile) -> Dict[int, PageTheme]:
         theme_map = {}
-        destination_tenant = self._destination_tenant()
         theme_files = [name for name in package.namelist() if name.startswith("themes/") and name.endswith(".json")]
         for theme_file in theme_files:
             data = json.loads(package.read(theme_file).decode("utf-8"))
-            theme = PageTheme.objects.create(
-                tenant=destination_tenant,
-                name=_unique_theme_name(data.get("name", "Imported Theme")),
-                description=data.get("description", ""),
-                fonts=data.get("fonts", {}),
-                colors=data.get("colors", {}),
-                design_groups=data.get("design_groups", {}),
-                component_styles=data.get("component_styles", {}),
-                designer_preview=normalize_theme_preview_namespaces(
-                    data.get("designer_preview", {}), destination_tenant
-                ),
-                image_styles=data.get("image_styles", {}),
-                gallery_styles=data.get("gallery_styles", {}),
-                carousel_styles=data.get("carousel_styles", {}),
-                table_templates=data.get("table_templates", {}),
-                breakpoints=data.get("breakpoints", {}),
-                css_variables=data.get("css_variables", {}),
-                html_elements=data.get("html_elements", {}),
-                custom_css=data.get("custom_css", ""),
-                is_active=data.get("is_active", True),
-                is_default=False,
-                created_by=self.job.created_by,
-            )
-            self._restore_theme_assets(package, theme, data)
+            theme = self._create_theme(package, data)
             theme_map[data["source_id"]] = theme
+            if data.get("stable_key"):
+                self.theme_stable_map[str(data["stable_key"])] = {
+                    "id": theme.id,
+                    "fingerprint": data.get("content_fingerprint") or _payload_fingerprint(data),
+                }
+        return theme_map
+
+    def _create_theme(self, package, data):
+        destination_tenant = self._destination_tenant()
+        theme = PageTheme.objects.create(
+            tenant=destination_tenant,
+            name=_unique_theme_name(data.get("name", "Imported Theme")),
+            description=data.get("description", ""),
+            fonts=data.get("fonts", {}),
+            colors=data.get("colors", {}),
+            design_groups=data.get("design_groups", {}),
+            component_styles=data.get("component_styles", {}),
+            designer_preview=normalize_theme_preview_namespaces(data.get("designer_preview", {}), destination_tenant),
+            image_styles=data.get("image_styles", {}),
+            gallery_styles=data.get("gallery_styles", {}),
+            carousel_styles=data.get("carousel_styles", {}),
+            table_templates=data.get("table_templates", {}),
+            breakpoints=data.get("breakpoints", {}),
+            css_variables=data.get("css_variables", {}),
+            html_elements=data.get("html_elements", {}),
+            custom_css=data.get("custom_css", ""),
+            is_active=data.get("is_active", True),
+            is_default=False,
+            created_by=self.job.created_by,
+        )
+        self._restore_theme_assets(package, theme, data)
+        return theme
+
+    def _import_themes_for_update(self, package, binding):
+        theme_map = {}
+        next_binding_map = dict(binding.theme_map or {})
+        theme_files = [name for name in package.namelist() if name.startswith("themes/") and name.endswith(".json")]
+        for theme_file in theme_files:
+            data = json.loads(package.read(theme_file).decode("utf-8"))
+            stable_key = str(data.get("stable_key") or data["source_id"])
+            fingerprint = data.get("content_fingerprint") or _payload_fingerprint(data)
+            stored = next_binding_map.get(stable_key) or {}
+            if isinstance(stored, int):
+                stored = {"id": stored}
+            theme = None
+            if stored.get("fingerprint") == fingerprint:
+                theme = PageTheme.objects.filter(id=stored.get("id"), tenant=self._destination_tenant()).first()
+            if theme is None:
+                theme = self._create_theme(package, data)
+            next_binding_map[stable_key] = {"id": theme.id, "fingerprint": fingerprint}
+            theme_map[data["source_id"]] = theme
+        binding.theme_map = next_binding_map
         return theme_map
 
     def _restore_theme_assets(self, package, theme: PageTheme, data: Dict[str, Any]):
@@ -1001,9 +1434,23 @@ class SitePackageImporter:
         namespace = self._destination_namespace()
         media_map = {}
         for data in manifest.get("files", []):
-            existing = MediaFile.objects.filter(file_hash=data["file_hash"]).first()
+            self.media_source_metadata[str(data["source_id"])] = data
+            existing = MediaFile.objects.filter(file_hash=data["file_hash"], tenant=namespace.tenant).first()
+            destination_hash = data["file_hash"]
+            if (
+                existing is None
+                and MediaFile.objects.filter(file_hash=destination_hash).exclude(tenant=namespace.tenant).exists()
+            ):
+                destination_hash = hashlib.sha256(
+                    f"{data['file_hash']}:{namespace.tenant_id}".encode("utf-8")
+                ).hexdigest()
+                existing = MediaFile.objects.filter(
+                    file_hash=destination_hash,
+                    tenant=namespace.tenant,
+                ).first()
             if existing:
                 media_map[data["source_id"]] = existing
+                self._restore_media_relations(existing, data, namespace)
                 continue
 
             file_member = self._find_media_file_member(package, data["source_id"])
@@ -1011,23 +1458,30 @@ class SitePackageImporter:
                 continue
             content = package.read(file_member)
             extension = os.path.splitext(data.get("original_filename", ""))[1]
-            new_path = f"{namespace.slug}/site-packages/{data['source_id']}{extension}"
+            destination_id = uuid.uuid4()
+            new_path = f"{namespace.slug}/site-packages/{destination_id}{extension}"
             self.storage._save(new_path, ContentFile(content))
             media = MediaFile.objects.create(
+                id=destination_id,
                 title=data.get("title") or data.get("original_filename", "Imported media"),
                 slug=self._unique_media_slug(namespace, data.get("slug") or data.get("title")),
                 description=data.get("description", ""),
                 original_filename=data.get("original_filename", os.path.basename(new_path)),
                 file_path=new_path,
+                file_url=self.storage.url(new_path),
                 file_size=data.get("file_size") or len(content),
                 content_type=data.get("content_type")
                 or mimetypes.guess_type(new_path)[0]
                 or "application/octet-stream",
-                file_hash=data["file_hash"],
+                file_hash=destination_hash,
                 file_type=data.get("file_type", "other"),
                 width=data.get("width"),
                 height=data.get("height"),
                 metadata=data.get("metadata", {}),
+                ai_generated_tags=data.get("ai_generated_tags", []),
+                ai_suggested_title=data.get("ai_suggested_title", ""),
+                ai_extracted_text=data.get("ai_extracted_text", ""),
+                ai_confidence_score=data.get("ai_confidence_score"),
                 namespace=namespace,
                 tenant=namespace.tenant,
                 access_level=data.get("access_level", "public"),
@@ -1036,7 +1490,59 @@ class SitePackageImporter:
                 uploaded_by=self.job.created_by,
             )
             media_map[data["source_id"]] = media
+            self._restore_media_relations(media, data, namespace)
         return media_map
+
+    def _restore_media_relations(self, media: MediaFile, data: Dict[str, Any], namespace: Namespace):
+        legacy_tags = [self._get_or_create_media_tag(item, namespace) for item in data.get("tags", [])]
+        if legacy_tags:
+            media.tags.add(*legacy_tags)
+
+        canonical_tags = [self._get_or_create_taxonomy_tag(item, namespace) for item in data.get("canonical_tags", [])]
+        if canonical_tags:
+            media.canonical_tags.add(*canonical_tags)
+
+        for collection_data in data.get("collections", []):
+            base_slug = slugify(collection_data.get("slug") or collection_data.get("title")) or "collection"
+            collection, _ = MediaCollection.objects.get_or_create(
+                namespace=namespace,
+                slug=base_slug,
+                defaults={
+                    "title": collection_data.get("title") or base_slug,
+                    "description": collection_data.get("description", ""),
+                    "access_level": collection_data.get("access_level", "public"),
+                    "created_by": self.job.created_by,
+                    "last_modified_by": self.job.created_by,
+                },
+            )
+            media.collections.add(collection)
+            collection_legacy_tags = []
+            for item in collection_data.get("tags", []):
+                collection_legacy_tags.append(self._get_or_create_media_tag(item, namespace))
+            if collection_legacy_tags:
+                collection.tags.add(*collection_legacy_tags)
+            collection_canonical = [
+                self._get_or_create_taxonomy_tag(item, namespace) for item in collection_data.get("canonical_tags", [])
+            ]
+            if collection_canonical:
+                collection.canonical_tags.add(*collection_canonical)
+
+    def _get_or_create_media_tag(self, data: Dict[str, Any], namespace: Namespace):
+        slug = slugify(data.get("slug") or data.get("name")) or "tag"
+        name = data.get("name") or slug
+        tag = MediaTag.objects.filter(namespace=namespace, slug=slug).first()
+        if tag is None:
+            tag = MediaTag.objects.filter(namespace=namespace, name=name).first()
+        if tag is None:
+            tag = MediaTag.objects.create(
+                namespace=namespace,
+                name=name,
+                slug=slug,
+                color=data.get("color") or "#3B82F6",
+                description=data.get("description", ""),
+                created_by=self.job.created_by,
+            )
+        return tag
 
     def _find_media_file_member(self, package, source_id):
         prefix = f"media/files/{source_id}/"
@@ -1057,6 +1563,12 @@ class SitePackageImporter:
     def _build_replacements(self, media_map: Dict[str, MediaFile]) -> Dict[str, str]:
         replacements = {}
         for old_id, media in media_map.items():
+            source = self.media_source_metadata.get(str(old_id), {})
+            destination_url = media.file_url or self.storage.url(media.file_path)
+            if source.get("file_url"):
+                replacements[source["file_url"]] = destination_url
+            if source.get("file_path"):
+                replacements[source["file_path"]] = media.file_path
             replacements[old_id] = str(media.id)
             replacements[f"/media/{old_id}/"] = f"/media/{media.id}/"
         return replacements

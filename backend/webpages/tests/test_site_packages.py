@@ -6,7 +6,7 @@ import os
 import zipfile
 from datetime import datetime, timedelta
 from datetime import timezone as datetime_timezone
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
@@ -16,8 +16,18 @@ from rest_framework.test import APITestCase
 
 from content.models import Namespace
 from core.models import Tenant
-from file_manager.models import MediaFile
-from webpages.models import PageTheme, PageVersion, SitePackageJob, WebPage
+from file_manager.models import MediaCollection, MediaFile, MediaTag
+from taxonomy.models import Tag as TaxonomyTag
+from webpages.models import (
+    PageTheme,
+    PageVersion,
+    PageVersionTag,
+    RemoteSiteBinding,
+    SitePackageJob,
+    ThemeRemoteAccessKey,
+    ThemeRemoteConnection,
+    WebPage,
+)
 from webpages.services.site_package import (
     MultipartUploadWriter,
     SitePackageExporter,
@@ -27,6 +37,7 @@ from webpages.services.site_package import (
     build_theme_transfer_package,
     restore_theme_transfer_package,
 )
+from webpages.tasks import import_remote_site_package
 
 
 class MemoryStorage:
@@ -163,6 +174,322 @@ class SitePackageServiceTests(TestCase):
         self.assertEqual(manifest["counts"]["pages"], 2)
         self.assertEqual(manifest["counts"]["media"], 1)
         self.assertEqual(media_manifest["files"][0]["source_id"], str(self.media.id))
+
+    def test_v2_package_round_trip_preserves_page_and_media_taxonomy(self):
+        legacy_tag = MediaTag.objects.create(
+            name="Portrait",
+            slug="portrait",
+            namespace=self.namespace,
+            created_by=self.user,
+        )
+        canonical_tag = TaxonomyTag.objects.create(
+            tenant=self.tenant,
+            namespace=self.namespace,
+            name="People",
+            slug="people",
+            tag_type="subject",
+            created_by=self.user,
+        )
+        collection = MediaCollection.objects.create(
+            title="Team",
+            slug="team",
+            namespace=self.namespace,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        self.media.tags.add(legacy_tag)
+        self.media.canonical_tags.add(canonical_tag)
+        self.media.collections.add(collection)
+        version = PageVersion.objects.create(
+            page=self.root,
+            version_number=1,
+            page_data={
+                "hero": {"fileUrl": f"https://storage.test/{self.media.file_path}"},
+                "externalLogo": "https://cdn.example.net/logo.png",
+            },
+            widgets={},
+            tags=["Editorial"],
+            created_by=self.user,
+        )
+        PageVersionTag.objects.create(page_version=version, tag=canonical_tag, position=0)
+        export_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_EXPORT,
+            root_page=self.root,
+            created_by=self.user,
+            options={"include_media": True, "include_themes": True},
+        )
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"hero-data"
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            manifest = SitePackageExporter(export_job, storage=storage).write_package(package, self.root)
+        self.assertEqual(manifest["package_version"], "2.0")
+        self.assertEqual(manifest["warnings"][0]["code"], "external_media_reference")
+
+        destination_tenant = Tenant.objects.create(
+            name="Destination Tenant",
+            identifier="site-package-destination",
+            created_by=self.user,
+        )
+        Namespace.objects.create(
+            name="Destination Namespace",
+            slug="site-package-destination",
+            tenant=destination_tenant,
+            is_default=True,
+            created_by=self.user,
+        )
+        import_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(destination_tenant.id)},
+        )
+        buffer.seek(0)
+        with zipfile.ZipFile(buffer, "r") as package:
+            imported_root = SitePackageImporter(import_job, storage=storage).import_package(package)
+
+        imported_version = imported_root.versions.get()
+        self.assertEqual(imported_version.tags, ["Editorial"])
+        self.assertEqual(imported_version.canonical_tags.get().slug, "people")
+        imported_media = MediaFile.objects.get(tenant=destination_tenant)
+        self.assertEqual(imported_version.page_data["hero"]["fileUrl"], storage.url(imported_media.file_path))
+        self.assertEqual(imported_media.tags.get().slug, "portrait")
+        self.assertEqual(imported_media.canonical_tags.get().slug, "people")
+        self.assertEqual(imported_media.collections.get().slug, "team")
+
+        second_import_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(destination_tenant.id)},
+        )
+        buffer.seek(0)
+        with zipfile.ZipFile(buffer, "r") as package:
+            SitePackageImporter(second_import_job, storage=storage).import_package(package)
+        self.assertEqual(MediaFile.objects.filter(tenant=destination_tenant).count(), 1)
+
+    def test_v1_package_remains_importable(self):
+        package_buffer = io.BytesIO()
+        with zipfile.ZipFile(package_buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr(
+                "manifest.json",
+                json.dumps({"package_version": "1.0", "kind": "site-root-tree"}),
+            )
+            package.writestr(
+                "pages.json",
+                json.dumps(
+                    {
+                        "pages": [
+                            {
+                                "source_id": 101,
+                                "parent_source_id": None,
+                                "title": "Legacy root",
+                                "description": "",
+                                "slug": "legacy-root",
+                                "hostnames": ["legacy.example"],
+                                "versions": [],
+                            }
+                        ]
+                    }
+                ),
+            )
+        package_buffer.seek(0)
+        import_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id)},
+        )
+
+        with zipfile.ZipFile(package_buffer, "r") as package:
+            imported_root = SitePackageImporter(import_job, storage=MemoryStorage()).import_package(package)
+
+        self.assertEqual(imported_root.title, "Legacy root")
+        self.assertEqual(imported_root.hostnames, [])
+
+    def test_remote_update_creates_drafts_and_is_idempotent_without_deleting_local_pages(self):
+        PageVersion.objects.create(
+            page=self.root,
+            version_number=1,
+            effective_date=timezone.now() - timedelta(days=1),
+            page_data={"heading": "Published"},
+            widgets={},
+            theme=self.theme,
+            created_by=self.user,
+        )
+        destination_tenant = Tenant.objects.create(
+            name="Remote Copy Tenant",
+            identifier="remote-copy-tenant",
+            created_by=self.user,
+        )
+        Namespace.objects.create(
+            name="Remote Copy Namespace",
+            slug="remote-copy-tenant",
+            tenant=destination_tenant,
+            is_default=True,
+            created_by=self.user,
+        )
+        connection = ThemeRemoteConnection.objects.create(
+            tenant=destination_tenant,
+            name="Source",
+            base_url="https://source.test",
+            remote_workspace=self.tenant.identifier,
+            encrypted_access_key="unused-in-service-test",
+            created_by=self.user,
+            updated_by=self.user,
+        )
+        storage = MemoryStorage()
+
+        def export_buffer():
+            export_job = SitePackageJob.objects.create(
+                kind=SitePackageJob.KIND_EXPORT,
+                root_page=self.root,
+                created_by=self.user,
+                options={"include_media": True, "include_themes": True},
+            )
+            output = io.BytesIO()
+            with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as package:
+                SitePackageExporter(export_job, storage=storage).write_package(package, self.root)
+            output.seek(0)
+            return output
+
+        copy_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(destination_tenant.id),
+                "source": "remote",
+                "connection_id": str(connection.id),
+                "remote_site_key": str(self.root.stable_key),
+                "mode": "copy",
+                "preserve_publication_status": True,
+            },
+        )
+        with zipfile.ZipFile(export_buffer(), "r") as package:
+            local_root = SitePackageImporter(copy_job, storage=storage).import_package(package)
+        binding = RemoteSiteBinding.objects.get(local_root=local_root)
+        local_only = WebPage.objects.create(
+            parent=local_root,
+            title="Local only",
+            slug="local-only",
+            tenant=destination_tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        initial_count = local_root.versions.count()
+        original_local_theme_id = local_root.versions.get(version_number=1).theme_id
+
+        self.theme.colors = {"brand": "#123456"}
+        self.theme.save(update_fields=["colors", "updated_at"])
+        PageVersion.objects.create(
+            page=self.root,
+            version_number=2,
+            page_data={"heading": "Remote draft"},
+            widgets={},
+            theme=self.theme,
+            created_by=self.user,
+        )
+        update_package = export_buffer().getvalue()
+
+        def import_update():
+            job = SitePackageJob.objects.create(
+                kind=SitePackageJob.KIND_IMPORT,
+                root_page=local_root,
+                created_by=self.user,
+                options={
+                    "tenant_id": str(destination_tenant.id),
+                    "source": "remote",
+                    "connection_id": str(connection.id),
+                    "remote_site_key": str(self.root.stable_key),
+                    "local_root_id": local_root.id,
+                    "mode": "update",
+                },
+            )
+            with zipfile.ZipFile(io.BytesIO(update_package), "r") as package:
+                SitePackageImporter(job, storage=storage).import_package(package)
+            return job
+
+        update_job = import_update()
+        self.assertEqual(local_root.versions.count(), initial_count + 1)
+        imported_draft = local_root.versions.order_by("-version_number").first()
+        self.assertIsNone(imported_draft.effective_date)
+        self.assertEqual(imported_draft.page_data["heading"], "Remote draft")
+        self.assertNotEqual(imported_draft.theme_id, original_local_theme_id)
+        self.assertEqual(local_root.versions.get(version_number=1).theme_id, original_local_theme_id)
+        self.assertTrue(WebPage.objects.filter(pk=local_only.pk).exists())
+        self.assertIn("local_page_preserved", {item["code"] for item in update_job.progress["warnings"]})
+
+        import_update()
+        self.assertEqual(local_root.versions.count(), initial_count + 1)
+        binding.refresh_from_db()
+        self.assertEqual(binding.local_root_id, local_root.id)
+
+    @patch("webpages.services.theme_remote.remote_site_request")
+    def test_remote_import_rejects_invalid_zip_and_marks_job_failed(self, remote_request):
+        connection = ThemeRemoteConnection.objects.create(
+            tenant=self.tenant,
+            name="Invalid package source",
+            base_url="https://source.test",
+            remote_workspace=self.tenant.identifier,
+            encrypted_access_key="unused-in-task-test",
+            created_by=self.user,
+            updated_by=self.user,
+        )
+        response = Mock()
+        response.iter_content.return_value = [b"not-a-zip"]
+        remote_request.side_effect = [
+            {"id": "remote-job", "status": "completed"},
+            response,
+        ]
+        job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            status=SitePackageJob.STATUS_RUNNING,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "connection_id": str(connection.id),
+                "remote_site_key": str(self.root.stable_key),
+                "source": "remote",
+                "mode": "copy",
+            },
+            progress={"remote_job_id": "remote-job"},
+        )
+
+        with self.assertRaises(zipfile.BadZipFile):
+            import_remote_site_package.run(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, SitePackageJob.STATUS_FAILED)
+        response.close.assert_called_once()
+
+    @patch("webpages.services.theme_remote.remote_site_request")
+    def test_remote_import_reports_cancelled_export(self, remote_request):
+        connection = ThemeRemoteConnection.objects.create(
+            tenant=self.tenant,
+            name="Cancelled export source",
+            base_url="https://source.test",
+            remote_workspace=self.tenant.identifier,
+            encrypted_access_key="unused-in-task-test",
+            created_by=self.user,
+            updated_by=self.user,
+        )
+        remote_request.return_value = {"status": "failed", "errors": ["Export cancelled."]}
+        job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            status=SitePackageJob.STATUS_RUNNING,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "connection_id": str(connection.id),
+                "remote_site_key": str(self.root.stable_key),
+                "source": "remote",
+                "mode": "copy",
+            },
+            progress={"remote_job_id": "remote-job"},
+        )
+
+        with self.assertRaisesMessage(ValueError, "Export cancelled"):
+            import_remote_site_package.run(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, SitePackageJob.STATUS_FAILED)
 
     def test_theme_transfer_package_copies_and_rewrites_all_theme_assets(self):
         storage = MemoryStorage()
@@ -703,6 +1030,39 @@ class SitePackageAPITests(APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["kind"], SitePackageJob.KIND_IMPORT)
 
+    @patch("webpages.views.site_package_views.import_remote_site_package.delay")
+    def test_start_remote_copy_job_uses_camel_case_contract(self, delay):
+        connection = ThemeRemoteConnection.objects.create(
+            tenant=self.tenant,
+            name="Remote source",
+            base_url="https://remote.example",
+            remote_workspace="remote-workspace",
+            encrypted_access_key="not-used-by-this-test",
+            created_by=self.user,
+            updated_by=self.user,
+        )
+
+        response = self.client.post(
+            "/api/v1/webpages/site-packages/remote/imports/",
+            {
+                "connectionId": str(connection.id),
+                "remoteSiteKey": str(self.root.stable_key),
+                "mode": "copy",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.data["source"], "remote")
+        self.assertEqual(response.data["mode"], "copy")
+        self.assertEqual(response.data["remote_site_key"], str(self.root.stable_key))
+        self.assertEqual(response.data["phase"], "queued")
+        job = SitePackageJob.objects.get(id=response.data["id"])
+        self.assertEqual(job.options["source"], "remote")
+        self.assertEqual(job.options["connection_id"], str(connection.id))
+        self.assertEqual(job.options["remote_site_key"], str(self.root.stable_key))
+        delay.assert_called_once_with(str(job.id))
+
     def test_import_jobs_are_scoped_to_the_selected_tenant(self):
         other_tenant = Tenant.objects.create(
             name="Other import tenant",
@@ -721,3 +1081,76 @@ class SitePackageAPITests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(str(other_job.id), [str(job["id"]) for job in response.data])
+
+    def test_remote_source_requires_explicit_site_transfer_capability(self):
+        raw_key = "eceee_theme_site-package-test"
+        access_key = ThemeRemoteAccessKey.objects.create(
+            tenant=self.tenant,
+            name="Scoped remote",
+            key_hash=hashlib.sha256(raw_key.encode()).hexdigest(),
+            key_prefix=raw_key[:12],
+            created_by=self.user,
+        )
+        self.client.force_authenticate(user=None)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"ThemeKey {raw_key}",
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+
+        denied = self.client.get("/api/v1/webpages/site-packages/remote-source/sites/")
+        self.assertEqual(denied.status_code, 403)
+
+        access_key.capabilities = ["site.transfer"]
+        access_key.save(update_fields=["capabilities"])
+        allowed = self.client.get("/api/v1/webpages/site-packages/remote-source/sites/")
+        self.assertEqual(allowed.status_code, 200)
+        self.assertEqual(allowed.data["results"][0]["stableKey"], str(self.root.stable_key))
+
+    @patch("webpages.views.site_package_views.export_site_package.delay")
+    def test_remote_export_job_is_owned_by_the_exact_access_key(self, delay):
+        first_raw_key = "eceee_theme_first-site-key"
+        first_key = ThemeRemoteAccessKey.objects.create(
+            tenant=self.tenant,
+            name="First site key",
+            key_hash=hashlib.sha256(first_raw_key.encode()).hexdigest(),
+            key_prefix=first_raw_key[:12],
+            capabilities=["site.transfer"],
+            created_by=self.user,
+        )
+        second_raw_key = "eceee_theme_second-site-key"
+        ThemeRemoteAccessKey.objects.create(
+            tenant=self.tenant,
+            name="Second site key",
+            key_hash=hashlib.sha256(second_raw_key.encode()).hexdigest(),
+            key_prefix=second_raw_key[:12],
+            capabilities=["site.transfer"],
+            created_by=self.user,
+        )
+        self.client.force_authenticate(user=None)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"ThemeKey {first_raw_key}",
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+        created = self.client.post(
+            "/api/v1/webpages/site-packages/remote-source/exports/",
+            {"stableKey": str(self.root.stable_key)},
+            format="json",
+        )
+        self.assertEqual(created.status_code, 202)
+        job = SitePackageJob.objects.get(id=created.data["id"])
+        self.assertEqual(job.options["remote_access_key_id"], str(first_key.id))
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"ThemeKey {second_raw_key}",
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+        denied = self.client.get(f"/api/v1/webpages/site-packages/remote-source/exports/{job.id}/")
+        self.assertEqual(denied.status_code, 404)
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"ThemeKey {first_raw_key}",
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+        allowed = self.client.get(f"/api/v1/webpages/site-packages/remote-source/exports/{job.id}/")
+        self.assertEqual(allowed.status_code, 200)
+        delay.assert_called_once_with(str(job.id))

@@ -5,8 +5,12 @@ This module contains background tasks for page management and maintenance.
 """
 
 import logging
+import tempfile
+import zipfile
 
 from celery import shared_task
+from celery.exceptions import Retry
+from django.core.files import File
 from django.core.management import call_command
 from django.db import transaction
 from django.db.models import F, IntegerField, OuterRef, Q, Subquery
@@ -131,6 +135,85 @@ def import_site_package(self, job_id):
         return SitePackageImporter(job).run()
     except Exception as e:
         logger.error(f"Site package import {job_id} failed: {e}")
+        raise
+
+
+@shared_task(bind=True, max_retries=120)
+def import_remote_site_package(self, job_id):
+    """Export a remote site, stream its package locally, then run the normal importer."""
+    from file_manager.storage import S3MediaStorage
+    from webpages.models import SitePackageJob, ThemeRemoteConnection
+    from webpages.services.site_package import SitePackageImporter
+    from webpages.services.theme_remote import remote_site_request
+
+    job = SitePackageJob.objects.get(id=job_id)
+    options = job.options or {}
+    connection = ThemeRemoteConnection.objects.get(id=options["connection_id"], tenant_id=options["tenant_id"])
+    try:
+        if job.status == SitePackageJob.STATUS_PENDING:
+            job.mark_running()
+        remote_job_id = (job.progress or {}).get("remote_job_id")
+        if not remote_job_id:
+            remote_job = remote_site_request(
+                connection,
+                "POST",
+                "exports/",
+                {"stableKey": options["remote_site_key"]},
+            )
+            remote_job_id = str(remote_job["id"])
+            job.progress = {**(job.progress or {}), "phase": "remote_export", "remote_job_id": remote_job_id}
+            job.save(update_fields=["progress", "updated_at"])
+            raise self.retry(countdown=2)
+
+        remote_job = remote_site_request(connection, "GET", f"exports/{remote_job_id}/")
+        if remote_job.get("status") in {"pending", "running"}:
+            job.progress = {**(job.progress or {}), "phase": "remote_export"}
+            job.save(update_fields=["progress", "updated_at"])
+            raise self.retry(countdown=min(15, 2 + self.request.retries // 10))
+        if remote_job.get("status") != "completed":
+            errors = remote_job.get("errors") or ["The remote site export failed."]
+            raise ValueError(errors[-1])
+
+        job.progress = {**(job.progress or {}), "phase": "downloading"}
+        job.save(update_fields=["progress", "updated_at"])
+        response = remote_site_request(connection, "GET", f"exports/{remote_job_id}/download/", stream=True)
+        package_file = tempfile.SpooledTemporaryFile(max_size=25 * 1024 * 1024)
+        total_size = 0
+        try:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                if not chunk:
+                    continue
+                total_size += len(chunk)
+                if total_size > 2 * 1024 * 1024 * 1024:
+                    raise ValueError("The remote site package exceeds the 2 GB transfer limit.")
+                package_file.write(chunk)
+        finally:
+            response.close()
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            members = [item for item in package.infolist() if not item.is_dir()]
+            if len(members) > 20000 or sum(item.file_size for item in members) > 2 * 1024 * 1024 * 1024:
+                raise ValueError("The remote site package exceeds safety limits.")
+            if package.testzip() is not None:
+                raise ValueError("The remote site package is corrupt.")
+        package_file.seek(0)
+
+        object_key = f"site-packages/imports/{job.id}.zip"
+        storage = S3MediaStorage()
+        try:
+            storage._save(object_key, File(package_file, name=f"{job.id}.zip"))
+        finally:
+            package_file.close()
+        job.object_key = object_key
+        job.progress = {**(job.progress or {}), "phase": "importing", "downloaded_bytes": total_size}
+        job.save(update_fields=["object_key", "progress", "updated_at"])
+        return SitePackageImporter(job, storage=storage).run()
+    except Retry:
+        raise
+    except Exception as error:
+        if job.status != SitePackageJob.STATUS_FAILED:
+            job.mark_failed(error)
+        logger.error("Remote site import %s failed: %s", job_id, error)
         raise
 
 

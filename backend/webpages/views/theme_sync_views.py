@@ -17,6 +17,7 @@ from core.machine_api_keys import MachineAPIKeyAuthentication
 from core.permissions import HasTenantAccess
 
 from ..models import PageTheme
+from ..models.theme_remote import THEME_TRANSFER_CAPABILITY, ThemeRemoteAccessKey
 from ..serializers.theme_sync import (
     ThemeSyncPushSerializer,
     ThemeSyncSerializer,
@@ -41,6 +42,15 @@ class ThemeSyncViewSet(viewsets.ViewSet):
         authentication.TokenAuthentication,
         authentication.SessionAuthentication,
     ]
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if isinstance(request.auth, ThemeRemoteAccessKey) and THEME_TRANSFER_CAPABILITY not in set(
+            request.auth.capabilities or []
+        ):
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("This access key is not permitted to transfer themes.")
 
     def check_sync_enabled(self):
         """Check if theme sync is enabled"""

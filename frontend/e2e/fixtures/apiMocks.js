@@ -239,6 +239,8 @@ export const createCollaborativeEditorState = () => ({
     clipboard: {},
     sockets: new Map(),
     nextConnectionId: 1,
+    remoteSiteCopied: false,
+    remoteImportMode: null,
 })
 
 export async function mockCmsApi(page, {
@@ -609,6 +611,53 @@ export async function mockCmsApi(page, {
       }
 
       return json(route, { count: 0, next: null, previous: null, results: [] })
+    }
+
+    if (url.pathname === '/api/v1/webpages/designer/remote-connections/' && method === 'GET') {
+      return json(route, {
+        results: [{ id: 'remote-connection-1', name: 'Remote production', isDefault: true }],
+      })
+    }
+
+    if (url.pathname === '/api/v1/webpages/site-packages/remote/sites/' && method === 'POST') {
+      return json(route, {
+        results: [{
+          stableKey: '9ad84b80-4f5f-4a7d-9a2f-a737f35d6ebc',
+          title: 'Remote Summer Study',
+          hostnames: ['remote.example'],
+          pageCount: 6,
+          localCopies: editorState.remoteSiteCopied
+            ? [{ bindingId: 'binding-1', localRootId: 301, title: 'Remote Summer Study' }]
+            : [],
+        }],
+      })
+    }
+
+    if (url.pathname === '/api/v1/webpages/site-packages/remote/imports/' && method === 'POST') {
+      const body = request.postDataJSON()
+      editorState.remoteImportMode = body.mode
+      editorState.remoteSiteCopied = true
+      return json(route, {
+        id: `remote-${body.mode}-job`,
+        kind: 'import',
+        status: 'pending',
+        progress: { phase: 'queued' },
+      }, 202)
+    }
+
+    if (/^\/api\/v1\/webpages\/site-packages\/imports\/remote-(copy|update)-job\/$/.test(url.pathname)) {
+      return json(route, {
+        id: `remote-${editorState.remoteImportMode}-job`,
+        kind: 'import',
+        status: 'completed',
+        importedRootPageId: 301,
+        progress: {
+          phase: 'completed',
+          warnings: editorState.remoteImportMode === 'update'
+            ? [{ code: 'local_page_preserved', localPageId: 302 }]
+            : [],
+        },
+      })
     }
 
     // The application flushes page-view telemetry while a document reloads.
