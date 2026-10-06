@@ -6,8 +6,9 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Monitor, Tablet, Smartphone, Tv, RotateCcw, AlertCircle } from 'lucide-react';
+import { RotateCcw, AlertCircle } from 'lucide-react';
 import { getBreakpoints } from '../../utils/themeUtils';
+import { THEME_BREAKPOINTS } from './breakpointConfig';
 
 const BreakpointsTab = ({ breakpoints, onChange }) => {
     const currentBreakpoints = breakpoints || {};
@@ -16,37 +17,6 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
     const [errors, setErrors] = useState({});
     const [inputValues, setInputValues] = useState({});
     const debounceTimerRef = useRef(null);
-
-    const breakpointConfig = [
-        {
-            key: 'sm',
-            label: 'Small (Mobile)',
-            description: 'Small devices and mobile phones',
-            icon: Smartphone,
-            default: 640,
-        },
-        {
-            key: 'md',
-            label: 'Medium (Tablet)',
-            description: 'Tablets and small laptops',
-            icon: Tablet,
-            default: 768,
-        },
-        {
-            key: 'lg',
-            label: 'Large (Desktop)',
-            description: 'Desktops and large screens',
-            icon: Monitor,
-            default: 1024,
-        },
-        {
-            key: 'xl',
-            label: 'Extra Large',
-            description: 'Large desktops and displays',
-            icon: Tv,
-            default: 1280,
-        },
-    ];
 
     const validateBreakpoints = useCallback((newBreakpoints) => {
         const validationErrors = {};
@@ -133,7 +103,7 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
         }, 500);
     }, [inputValues, performValidation]);
 
-    const handleBlur = useCallback((key) => {
+    const handleBlur = useCallback(() => {
         // Clear any pending debounce timer
         if (debounceTimerRef.current) {
             clearTimeout(debounceTimerRef.current);
@@ -178,8 +148,7 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
 
             {/* Breakpoint Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {breakpointConfig.map(({ key, label, description, icon: Icon, default: defaultValue }) => {
-                    const value = effectiveBreakpoints[key];
+                {THEME_BREAKPOINTS.map(({ key, label, description, icon, defaultValue }) => {
                     const isCustom = currentBreakpoints[key] !== undefined;
                     const hasError = errors[key];
 
@@ -198,9 +167,9 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
                                 <div className={`p-2 rounded-md ${
                                     hasError ? 'bg-red-100' : isCustom ? 'bg-blue-100' : 'bg-gray-100'
                                 }`}>
-                                    <Icon className={`w-5 h-5 ${
+                                    {React.createElement(icon, { className: `w-5 h-5 ${
                                         hasError ? 'text-red-600' : isCustom ? 'text-blue-600' : 'text-gray-600'
-                                    }`} />
+                                    }` })}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between mb-1">
@@ -295,7 +264,7 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
                             <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Breakpoints define min-width values for mobile-first responsive design</span></div>
                             <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Base xs (&lt;640px) always applies; larger screens add/override with media queries</span></div>
                             <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Values must be in ascending order (sm &lt; md &lt; lg &lt; xl)</span></div>
-                            <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Leave fields empty to use theme defaults ({breakpointConfig.map(b => `${b.key}: ${b.default}px`).join(', ')})</span></div>
+                            <div className="flex items-start gap-2"><span className="text-blue-600">•</span><span>Leave fields empty to use theme defaults ({THEME_BREAKPOINTS.map((breakpoint) => `${breakpoint.key}: ${breakpoint.defaultValue}px`).join(', ')})</span></div>
                         </div>
                     </div>
                 </div>
@@ -305,4 +274,3 @@ const BreakpointsTab = ({ breakpoints, onChange }) => {
 };
 
 export default BreakpointsTab;
-

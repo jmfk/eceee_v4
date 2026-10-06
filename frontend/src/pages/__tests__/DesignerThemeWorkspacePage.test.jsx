@@ -612,7 +612,47 @@ describe('DesignerThemeWorkspacePage', () => {
         await waitFor(() => expect(mocks.save).toHaveBeenCalled())
         expect(mocks.save.mock.calls[0][1].spacing[0].values.padding).toBeUndefined()
         expect(mocks.save.mock.calls[0][1].spacing[1].values.padding).toBe('8px')
-        expect(mocks.save.mock.calls[0][1].spacing[2].values.padding).toBe('32px')
+        expect(mocks.save.mock.calls[0][1].spacing[2].values.padding).toBe('24px')
+        expect(mocks.save.mock.calls[0][1].spacing[3]).toEqual(expect.objectContaining({ breakpoint: 'xl', values: expect.objectContaining({ padding: '32px' }) }))
+    })
+
+    it('uses the theme breakpoints as the global preview and inspector selector', async () => {
+        const responsiveWorkspace = structuredClone(workspace)
+        responsiveWorkspace.breakpoints = { xs: 0, sm: 600, md: 820, lg: 1100, xl: 1440 }
+        responsiveWorkspace.spacing = [
+            responsiveWorkspace.spacing[0],
+            { ...responsiveWorkspace.spacing[1], breakpoint: 'sm', values: { padding: '12px' } },
+            { ...responsiveWorkspace.spacing[1], breakpoint: 'md', values: { padding: '24px' } },
+            { ...responsiveWorkspace.spacing[1], breakpoint: 'lg', values: { padding: '36px' } },
+            { ...responsiveWorkspace.spacing[1], breakpoint: 'xl', values: { marginBottom: '0px', padding: '48px' } },
+        ]
+        mocks.workspace.mockResolvedValue(responsiveWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+
+        expect(screen.getByRole('button', { name: 'Small (Mobile) preview at 600px' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Medium (Tablet) preview at 820px' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Large (Desktop) preview at 1100px' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Extra Large preview at 1440px' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByTitle('Live theme preview')).toHaveStyle({ width: '1440px' })
+
+        const iframe = screen.getByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:part:content-widget', kind: 'part', label: 'Content' },
+            source: iframe.contentWindow,
+        }))
+        expect(screen.getByRole('heading', { name: 'Spacing · Content · Extra Large' })).toBeInTheDocument()
+        expect(screen.getByText(/Defined at Extra Large/)).toBeInTheDocument()
+        expect(screen.getByDisplayValue('48px')).toBeInTheDocument()
+        expect(screen.queryByDisplayValue('0px')).not.toBeInTheDocument()
+        expect(screen.queryByDisplayValue('12px')).not.toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Small (Mobile) preview at 600px' }))
+
+        expect(screen.getByTitle('Live theme preview')).toHaveStyle({ width: '600px' })
+        expect(screen.getByRole('heading', { name: 'Spacing · Content · Small (Mobile)' })).toBeInTheDocument()
+        expect(screen.getByDisplayValue('12px')).toBeInTheDocument()
+        expect(screen.queryByDisplayValue('48px')).not.toBeInTheDocument()
     })
 
     it('shows only relevant values after clicking a visible element', async () => {
@@ -751,11 +791,21 @@ describe('DesignerThemeWorkspacePage', () => {
 
         expect(screen.queryByRole('heading', { name: 'Theme images' })).not.toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Typography · Heading 1' })).toBeInTheDocument()
-        expect(screen.getByRole('heading', { name: 'Spacing · Content · md' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Spacing · Content · Extra Large' })).toBeInTheDocument()
+        expect(screen.getByText(/Inherited at Extra Large/)).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Create Extra Large override' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Edit source at Medium (Tablet)' })).toBeInTheDocument()
+        expect(screen.getByDisplayValue('24px')).toBeDisabled()
+        fireEvent.click(screen.getByRole('button', { name: 'Edit source at Medium (Tablet)' }))
+        expect(screen.getByDisplayValue('24px')).toBeEnabled()
+        fireEvent.click(screen.getByRole('button', { name: 'Create Extra Large override' }))
+        expect(screen.getByText(/Defined at Extra Large/)).toBeInTheDocument()
+        expect(screen.getByDisplayValue('24px')).toBeEnabled()
         expect(screen.getByLabelText('brand value')).toBeInTheDocument()
     })
 
     it('keeps the preview visible while editing images in the right inspector', async () => {
+        mocks.replaceAsset.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 3, hasDraftChanges: true })
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
 
@@ -764,12 +814,17 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByTitle('Live theme preview')).toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: /Select image aspect Article/ }))
 
-        expect(screen.getByRole('button', { name: 'Upload Article hero' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Replace Article hero mobile' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Upload Article hero source at Medium (Tablet)' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Create Extra Large override for Article hero' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Replace Article hero mobile source at Small (Mobile)' })).not.toBeInTheDocument()
         expect(screen.getByText('Used for theme sizes: MD, LG and XL.')).toBeInTheDocument()
         expect(screen.getByText('Shown from 768 px wide and up.')).toBeInTheDocument()
-        expect(screen.getByText('Used for theme size: SM.')).toBeInTheDocument()
-        expect(screen.getByText('Shown from 640 px to 767 px wide.')).toBeInTheDocument()
+        expect(screen.queryByText('Used for theme size: SM.')).not.toBeInTheDocument()
+        expect(screen.queryByText('Shown from 640 px to 767 px wide.')).not.toBeInTheDocument()
+
+        const override = new File(['xl'], 'hero-xl.png', { type: 'image/png' })
+        fireEvent.change(screen.getByLabelText('New Extra Large image override for Article hero'), { target: { files: [override] } })
+        await waitFor(() => expect(mocks.replaceAsset).toHaveBeenCalledWith('7', 'design:0:hero:md:background', override, 2, 'xl'))
 
         fireEvent.click(screen.getByRole('button', { name: /Select image aspect Callout/ }))
         expect(screen.getByText('All sizes')).toBeInTheDocument()
@@ -809,10 +864,10 @@ describe('DesignerThemeWorkspacePage', () => {
         await waitFor(() => expect(mocks.replaceAsset).toHaveBeenCalledWith('7', 'site-icon', favicon, 3))
     })
 
-    it('keeps the preview visible and shows the responsive image family in the right inspector', async () => {
+    it('keeps the preview visible and shows only the active responsive image in the right inspector', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        fireEvent.click(screen.getByRole('button', { name: 'mobile preview' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Small (Mobile) preview at 640px' }))
 
         await waitFor(() => {
             const iframe = screen.getByTitle('Live theme preview')
@@ -836,10 +891,10 @@ describe('DesignerThemeWorkspacePage', () => {
 
         expect(screen.getByTitle('Live theme preview')).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Theme images' })).toHaveClass('text-gray-700')
-        expect(screen.getByRole('button', { name: 'Upload Article hero' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Replace Article hero mobile' })).toBeInTheDocument()
-        expect(screen.getByText('No file uploaded')).toBeInTheDocument()
-        expect(screen.getByText('1600 × 900 px · 2x')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Upload Article hero source at Medium (Tablet)' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Replace Article hero mobile source at Small (Mobile)' })).toBeInTheDocument()
+        expect(screen.queryByText('No file uploaded')).not.toBeInTheDocument()
+        expect(screen.queryByText('1600 × 900 px · 2x')).not.toBeInTheDocument()
         expect(screen.getByText('800 × 600 px · 2x')).toBeInTheDocument()
     })
 
@@ -1018,6 +1073,7 @@ describe('DesignerThemeWorkspacePage', () => {
             'design:0:hero:md:background',
             replacement,
             2,
+            'xl',
         ))
     })
 
@@ -1079,7 +1135,7 @@ describe('DesignerThemeWorkspacePage', () => {
             data: { source: 'eceee-designer-preview', targetId: 'asset:design:0:hero:md:background', kind: 'asset', label: 'Article hero' },
             source: iframe.contentWindow,
         }))
-        await screen.findByRole('button', { name: 'Upload Article hero' })
+        await screen.findByRole('button', { name: 'Upload Article hero source at Medium (Tablet)' })
         const upload = new File(['image'], 'hero.png', { type: 'image/png' })
         fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [upload] } })
         await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))

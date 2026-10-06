@@ -43,11 +43,12 @@ export const designerThemesApi = {
     publish: async (themeId, draftVersion) => unwrap(await api.post(`${base}/themes/${themeId}/publish/`, { draftVersion })),
     undo: async (themeId, draftVersion, liveSyncVersion) => unwrap(await api.post(`${base}/themes/${themeId}/undo/`, { draftVersion, liveSyncVersion })),
     discard: async (themeId, draftVersion) => unwrap(await api.post(`${base}/themes/${themeId}/discard/`, { draftVersion })),
-    replaceAsset: async (themeId, assetKey, image, draftVersion) => {
+    replaceAsset: async (themeId, assetKey, image, draftVersion, targetBreakpoint = null) => {
         const form = new FormData()
         form.append('asset_key', assetKey)
         form.append('image', image)
         form.append('draft_version', draftVersion)
+        if (targetBreakpoint) form.append('target_breakpoint', targetBreakpoint)
         return unwrap(await api.post(`${base}/themes/${themeId}/replace-asset/`, form, {
             headers: { 'Content-Type': 'multipart/form-data' },
         }))

@@ -801,6 +801,7 @@ class DesignerThemeAssetView(APIView):
                 asset_key,
                 upload,
                 request.data.get("draft_version"),
+                target_breakpoint=request.data.get("target_breakpoint"),
             )
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
