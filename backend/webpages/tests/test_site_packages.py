@@ -2,6 +2,7 @@ import base64
 import hashlib
 import io
 import json
+import os
 import zipfile
 from datetime import datetime, timedelta
 from datetime import timezone as datetime_timezone
@@ -169,7 +170,18 @@ class SitePackageServiceTests(TestCase):
         self.theme.site_icon.name = "theme_images/source/favicon.png"
         self.theme.design_groups = {
             "groups": [
-                {"layoutProperties": {"hero": {"md": {"background": {"url": "/media/theme_images/source/hero.png"}}}}}
+                {
+                    "layoutProperties": {
+                        "hero": {
+                            "md": {
+                                "background": {
+                                    "url": "https://production.test/bucket/theme_images/source/hero.png",
+                                    "filename": "hero.png",
+                                }
+                            }
+                        }
+                    }
+                }
             ]
         }
         self.theme.designer_preview = {
@@ -199,8 +211,10 @@ class SitePackageServiceTests(TestCase):
         demo_path = f"{destination}/{hashlib.sha256(b'demo').hexdigest()}.png"
         self.assertEqual(restored["image"], preview_path)
         self.assertEqual(restored["site_icon"], favicon_path)
-        self.assertIn(hero_path, str(restored["design_groups"]))
-        self.assertIn(demo_path, str(restored["designer_preview"]))
+        background = restored["design_groups"]["groups"][0]["layoutProperties"]["hero"]["md"]["background"]
+        self.assertEqual(background["url"], storage.url(hero_path))
+        self.assertEqual(background["filename"], os.path.basename(hero_path))
+        self.assertIn(storage.url(demo_path), str(restored["designer_preview"]))
         self.assertEqual(storage.files[preview_path], b"preview")
 
     def test_theme_transfer_package_keeps_assets_with_the_same_basename_distinct(self):

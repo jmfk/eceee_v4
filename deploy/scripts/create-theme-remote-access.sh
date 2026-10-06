@@ -60,7 +60,7 @@ fi
 compose=(docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env)
 
 if ! "${compose[@]}" exec -T backend python manage.py shell -c \
-    'from django.conf import settings; raise SystemExit(0 if settings.THEME_SYNC_ENABLED else 1)'
+    'from django.conf import settings; raise SystemExit(0 if settings.THEME_SYNC_ENABLED else 1)' </dev/null
 then
     echo "[theme-access] Theme sync is disabled in production." >&2
     echo "[theme-access] Set THEME_SYNC_ENABLED=True in deploy/.env and run make prod-restart first." >&2
@@ -70,5 +70,5 @@ fi
 "${compose[@]}" exec -T backend python manage.py setup_theme_remote_access \
     --workspace "$THEME_WORKSPACE" \
     --created-by "$THEME_ADMIN" \
-    --name "Local development"
+    --name "Local development" </dev/null
 REMOTE_SCRIPT

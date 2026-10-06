@@ -27,6 +27,7 @@ from file_manager.models import MediaFile
 from file_manager.storage import S3MediaStorage
 from webpages.models import PageTheme, PageVersion, SitePackageJob, WebPage
 from webpages.services.theme_preview_content import (
+    EMBEDDED_IMAGE_PATTERN,
     normalize_theme_preview_namespaces,
     rewrite_theme_library_image_urls,
 )
@@ -225,6 +226,38 @@ def _replace_in_json(value: Any, replacements: Dict[str, str]) -> Any:
         return {key: _replace_in_json(item, replacements) for key, item in value.items()}
     if isinstance(value, list):
         return [_replace_in_json(item, replacements) for item in value]
+    return value
+
+
+def _rewrite_transferred_theme_assets(value: Any, replacements: Dict[str, str], storage) -> Any:
+    """Point embedded theme asset references at the destination storage."""
+
+    if isinstance(value, str):
+
+        def replace_reference(match):
+            reference = match.group(0)
+            for old_path, new_path in replacements.items():
+                if old_path in reference:
+                    return storage.url(new_path)
+            return reference
+
+        rewritten = EMBEDDED_IMAGE_PATTERN.sub(replace_reference, value)
+        return _replace_in_json(rewritten, replacements)
+    if isinstance(value, dict):
+        rewritten = {key: _rewrite_transferred_theme_assets(item, replacements, storage) for key, item in value.items()}
+        referenced_path = None
+        for key in ("url", "fileUrl", "file_url"):
+            reference = value.get(key)
+            if not isinstance(reference, str):
+                continue
+            referenced_path = next((new for old, new in replacements.items() if old in reference), None)
+            if referenced_path:
+                break
+        if referenced_path and isinstance(rewritten.get("filename"), str):
+            rewritten["filename"] = os.path.basename(referenced_path)
+        return rewritten
+    if isinstance(value, list):
+        return [_rewrite_transferred_theme_assets(item, replacements, storage) for item in value]
     return value
 
 
@@ -495,7 +528,7 @@ def restore_theme_transfer_package(encoded_package: str, theme: PageTheme, stora
             "html_elements",
             "custom_css",
         ):
-            data[field_name] = _replace_in_json(data.get(field_name), replacements)
+            data[field_name] = _rewrite_transferred_theme_assets(data.get(field_name), replacements, storage)
         data["image"] = replacements.get(data.get("image"), data.get("image"))
         data["site_icon"] = replacements.get(data.get("site_icon"), data.get("site_icon"))
     return data
