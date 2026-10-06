@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Download, Loader2, Monitor, RotateCcw, Save, Send, Smartphone, Tablet, Undo2 } from 'lucide-react'
+import { Download, Loader2, RotateCcw, Save, Send, Undo2 } from 'lucide-react'
 
 import { designerThemesApi } from '../api/designerThemes'
 import DesignerNavbar from '../components/DesignerNavbar'
 import SemanticThemeWorkspace from '../components/designer/SemanticThemeWorkspace'
+import { THEME_BREAKPOINTS } from '../components/theme/breakpointConfig'
 import StatusBar from '../components/StatusBar'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { buildResolvedRenderModel } from '../rendering/directRender'
@@ -13,7 +14,7 @@ const DesignerThemeWorkspacePage = () => {
     const { themeId } = useParams()
     const { addNotification } = useGlobalNotifications()
     const [workspace, setWorkspace] = useState(null)
-    const [viewport, setViewport] = useState('desktop')
+    const [viewport, setViewport] = useState('xl')
     const [mobilePane, setMobilePane] = useState('edit')
     const [preview, setPreview] = useState({ css: '', fontUrl: '' })
     const [loading, setLoading] = useState(true)
@@ -178,13 +179,15 @@ const DesignerThemeWorkspacePage = () => {
         }
     }
 
-    const replaceAsset = async (asset, file) => {
+    const replaceAsset = async (asset, file, targetBreakpoint = null) => {
         if (!file) return
         setSaving(true)
         try {
             const current = dirty || hasPendingPreviewTexts ? await saveDraft({ silent: true, manageSaving: false }) : workspace
             if (!current) return
-            const result = await designerThemesApi.replaceAsset(themeId, asset.assetKey, file, current.draftVersion)
+            const result = targetBreakpoint
+                ? await designerThemesApi.replaceAsset(themeId, asset.assetKey, file, current.draftVersion, targetBreakpoint)
+                : await designerThemesApi.replaceAsset(themeId, asset.assetKey, file, current.draftVersion)
             setWorkspace(result)
             setDirty(false)
             addNotification({ type: 'success', message: `${asset.displayName} replaced` })
@@ -359,9 +362,12 @@ const DesignerThemeWorkspacePage = () => {
             <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
                 <div><h1 className="font-semibold text-gray-900">{workspace.name}</h1><p className="text-xs text-gray-500">Designer draft · live theme version {workspace.liveSyncVersion}</p></div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <div className="hidden rounded-md border border-gray-300 p-1 sm:flex" aria-label="Preview size">{[
-                        ['desktop', <Monitor className="h-4 w-4" />], ['tablet', <Tablet className="h-4 w-4" />], ['mobile', <Smartphone className="h-4 w-4" />],
-                    ].map(([name, icon]) => <button type="button" key={name} onClick={() => setViewport(name)} aria-label={`${name} preview`} className={`rounded p-1.5 ${viewport === name ? 'bg-gray-200 text-gray-900' : 'text-gray-500'}`}>{icon}</button>)}</div>
+                    <div className="hidden rounded-md border border-gray-300 p-1 sm:flex" aria-label="Preview breakpoint">
+                        {THEME_BREAKPOINTS.map(({ key, label, icon, defaultValue }) => {
+                            const width = Number(workspace.breakpoints?.[key] ?? defaultValue)
+                            return <button type="button" key={key} onClick={() => setViewport(key)} aria-label={`${label} preview at ${width}px`} aria-pressed={viewport === key} title={`${label} · ${width}px`} className={`rounded p-1.5 ${viewport === key ? 'bg-gray-200 text-gray-900' : 'text-gray-500'}`}>{createElement(icon, { className: 'h-4 w-4' })}</button>
+                        })}
+                    </div>
                     <button type="button" onClick={exportPackage} disabled={exporting} title={exportProgress?.message} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-50">{exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{exporting ? `Export ${exportProgress?.percent || 0}%` : 'Export'}</button>
                     <button type="button" onClick={undoPublish} disabled={!workspace.canUndo || hasDraftChanges || workspace.draftIsStale || controlsDisabled} title={hasDraftChanges ? 'Publish or discard draft changes before restoring' : 'Restore the version before the latest Designer publish'} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-40">{restoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}Undo publish</button>
                     <button type="button" onClick={discardDraft} disabled={(!hasDraftChanges && !workspace.draftIsStale) || controlsDisabled} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-40"><RotateCcw className="h-4 w-4" />Discard draft</button>

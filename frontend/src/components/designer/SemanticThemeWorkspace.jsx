@@ -3,7 +3,9 @@ import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileTex
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel, designerPreviewImageReferences } from '../../rendering/adapters'
+import { getBreakpoints } from '../../utils/themeUtils'
 import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
+import { themeBreakpointDefinition } from '../theme/breakpointConfig'
 const typographyLabels = {
     fontFamily: 'Font family', fontSize: 'Size', fontWeight: 'Weight', fontStyle: 'Style',
     lineHeight: 'Line height', letterSpacing: 'Letter spacing',
@@ -14,7 +16,6 @@ const spacingLabels = {
     padding: 'Inner spacing', paddingTop: 'Inner top', paddingRight: 'Inner right', paddingBottom: 'Inner bottom', paddingLeft: 'Inner left',
 }
 
-const defaultBreakpoints = { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 }
 const defaultSidebarWidth = 360
 const minSidebarWidth = 280
 const maxSidebarWidth = 640
@@ -96,7 +97,7 @@ const spacingRowIndexForChange = (rows, targetIds, breakpoints, viewportWidth) =
 
     const width = Number(viewportWidth)
     if (!Number.isFinite(width)) return candidates[0].index
-    const configuredBreakpoints = { ...defaultBreakpoints, ...(breakpoints || {}) }
+    const configuredBreakpoints = getBreakpoints({ breakpoints })
     const active = candidates
         .map((candidate) => ({ ...candidate, width: Number(configuredBreakpoints[candidate.row.breakpoint]) }))
         .filter((candidate) => Number.isFinite(candidate.width) && candidate.width <= width)
@@ -182,7 +183,7 @@ const listNames = (names) => names.length < 2
 
 const imageBreakpointUsage = (asset, family, breakpoints) => {
     if (!asset.breakpoint) return null
-    const sizes = Object.entries({ ...defaultBreakpoints, ...(breakpoints || {}) })
+    const sizes = Object.entries(getBreakpoints({ breakpoints }))
         .map(([name, width]) => ({ name: name.toUpperCase(), key: name, width: Number(width) }))
         .filter((size) => Number.isFinite(size.width))
         .sort((left, right) => left.width - right.width)
@@ -238,15 +239,37 @@ const imageAspectsFor = (workspace) => {
     return [...aspects.values()]
 }
 
-const ValueFields = ({ idPrefix, values, defaults, fields, labels, onChange, onRemove }) => (
+const effectiveBreakpointEntries = (entries, activeBreakpoint, breakpoints, keyForEntry) => {
+    const configuredBreakpoints = getBreakpoints({ breakpoints })
+    const activeWidth = Number(configuredBreakpoints[activeBreakpoint])
+    if (!Number.isFinite(activeWidth)) return entries
+
+    const globalEntries = entries.filter((entry) => !entry.breakpoint)
+    const responsiveEntries = entries.filter((entry) => entry.breakpoint)
+    const entriesByTarget = new Map()
+    responsiveEntries.forEach((entry) => {
+        const key = keyForEntry(entry)
+        const current = entriesByTarget.get(key)
+        const entryWidth = Number(configuredBreakpoints[entry.breakpoint])
+        const currentWidth = Number(configuredBreakpoints[current?.breakpoint])
+        if (Number.isFinite(entryWidth) && entryWidth <= activeWidth && (!current || entryWidth > currentWidth)) {
+            entriesByTarget.set(key, entry)
+        }
+    })
+    return [...globalEntries, ...entriesByTarget.values()]
+}
+
+const isZeroCssValue = (value) => /^0(?:\.0+)?(?:px|rem|em|%|vh|vw)?$/i.test(String(value || '').trim())
+
+const ValueFields = ({ idPrefix, values, defaults, fields, labels, onChange, onRemove, disabled = false }) => (
     <div className="grid grid-cols-2 gap-2">
         {fields.map((field) => (
             <div key={field} className="min-w-0">
                 <div className="flex items-center justify-between gap-2">
                     <label htmlFor={`${idPrefix}-${field}`} className="text-xs font-medium text-gray-700">{labels[field] || field}</label>
-                    <button type="button" aria-label={`Remove ${labels[field] || field}`} onClick={() => onRemove(field)} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                    <button type="button" aria-label={`Remove ${labels[field] || field}`} onClick={() => onRemove(field)} disabled={disabled} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
-                <input id={`${idPrefix}-${field}`} value={values[field] || defaults?.[field] || ''} onChange={(event) => onChange(field, event.target.value)} className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1.5 text-xs" placeholder="Theme default" />
+                <input id={`${idPrefix}-${field}`} value={values[field] || defaults?.[field] || ''} onChange={(event) => onChange(field, event.target.value)} disabled={disabled} className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500" placeholder="Theme default" />
                 {!values[field] && defaults?.[field] && <p className="mt-0.5 text-[10px] text-gray-500">Theme default</p>}
             </div>
         ))}
@@ -274,6 +297,7 @@ const SemanticThemeWorkspace = ({
     )
     const [selectedTarget, setSelectedTarget] = useState(null)
     const [addedThemeValues, setAddedThemeValues] = useState(() => new Set())
+    const [editableInheritedSpacing, setEditableInheritedSpacing] = useState(() => new Set())
     const [themeDefaults, setThemeDefaults] = useState({})
     const [selectionExpanded, setSelectionExpanded] = useState(true)
     const [workspaceView, setWorkspaceView] = useState('preview')
@@ -501,12 +525,21 @@ const SemanticThemeWorkspace = ({
                     workspace.spacing,
                     targetIds,
                     workspace.breakpoints,
-                    event.data.viewportWidth,
+                    workspace.breakpoints?.[viewport],
                 )
                 const property = event.data.property
                 if (index >= 0 && workspace.constraints.editableSpacingProperties.includes(property)) {
                     updateWorkspace((next) => {
-                        next.spacing[index].values[property] = event.data.value
+                        const source = next.spacing[index]
+                        if (source.breakpoint && source.breakpoint !== viewport) {
+                            next.spacing.push({
+                                ...source,
+                                breakpoint: viewport,
+                                values: { ...source.values, [property]: event.data.value },
+                            })
+                        } else {
+                            source.values[property] = event.data.value
+                        }
                         return next
                     })
                 }
@@ -564,7 +597,11 @@ const SemanticThemeWorkspace = ({
                 if (event.data.command === 'replaceImage' && event.data.file instanceof File) {
                     if (target.kind === 'asset') {
                         const asset = workspace.assets.find((candidate) => `asset:${candidate.assetKey}` === target.id)
-                        if (asset) void replaceAsset(asset, event.data.file)
+                        if (asset) void replaceAsset(
+                            asset,
+                            event.data.file,
+                            asset.breakpoint && asset.breakpoint !== viewport ? viewport : null,
+                        )
                     } else if (target.kind === 'previewImage' && viewId && target.sourceUrl) {
                         void replacePreviewImage?.(viewId, target.sourceUrl, target.sourcePath, target.sourceMatchIndex, event.data.file)
                     }
@@ -599,7 +636,7 @@ const SemanticThemeWorkspace = ({
         }
         window.addEventListener('message', receive)
         return () => window.removeEventListener('message', receive)
-    }, [contentMode, onPendingPreviewTextsChange, pendingPreviewTextsRef, replaceAsset, replacePreviewImage, updateWorkspace, viewId, workspace.assets, workspace.breakpoints, workspace.constraints.editableSpacingProperties, workspace.spacing])
+    }, [contentMode, onPendingPreviewTextsChange, pendingPreviewTextsRef, replaceAsset, replacePreviewImage, updateWorkspace, viewId, viewport, workspace.assets, workspace.breakpoints, workspace.constraints.editableSpacingProperties, workspace.spacing])
 
     const selectedView = previewContent.views.find((view) => view.id === viewId) || previewContent.views[0] || null
     const selectedViewImages = useMemo(() => designerPreviewImageReferences(selectedView), [selectedView])
@@ -671,7 +708,8 @@ const SemanticThemeWorkspace = ({
         return () => { current = false }
     }, [contentMode, previewModel, selectedViewImages])
 
-    const previewCanvasWidth = viewport === 'mobile' ? 390 : viewport === 'tablet' ? 768 : 1280
+    const configuredBreakpoints = getBreakpoints(workspace)
+    const previewCanvasWidth = Number(configuredBreakpoints[viewport]) || 1280
     const previewScale = Math.min(1, previewFrameWidth / previewCanvasWidth)
     const previewOffset = Math.max(0, (previewFrameWidth - previewCanvasWidth * previewScale) / 2)
 
@@ -689,18 +727,31 @@ const SemanticThemeWorkspace = ({
             ? row.groupIndex === selectedGroup.groupIndex
             : selectedTargetIds.includes(row.targetId)
     ))
-    const targetSpacing = workspace.spacing.map((row, index) => ({ row, index })).filter(({ row }) => (
+    const matchingTargetSpacing = workspace.spacing.map((row, index) => ({ row, index })).filter(({ row }) => (
         selectedTarget?.kind === 'group' && selectedGroup
             ? row.groupIndex === selectedGroup.groupIndex
             : selectedTargetIds.includes(row.targetId)
     ))
+    const targetSpacing = effectiveBreakpointEntries(
+        matchingTargetSpacing.map((entry) => ({ ...entry, breakpoint: entry.row.breakpoint })),
+        viewport,
+        workspace.breakpoints,
+        (entry) => entry.row.targetId,
+    )
     const propertyKey = (kind, index, field) => `${kind}:${index}:${field}`
     const activeFields = (kind, index, row, fields) => selectedTarget
-        ? fields
+        ? fields.filter((field) => !isZeroCssValue(row.values[field] || themeDefaults[row.targetId]?.[field]))
         : fields.filter((field) => row.values[field] || addedThemeValues.has(propertyKey(kind, index, field)))
-    const sectionLabel = (kind, row) => kind === 'typography'
+    const sectionLabel = (kind, row, breakpoint = row.breakpoint) => kind === 'typography'
         ? `Typography${row.element ? ` · ${selectedGroup?.elements?.find((element) => element.element === row.element)?.label || row.element}` : ''}`
-        : `Spacing${row.part ? ` · ${selectedGroup?.parts?.find((part) => part.part === row.part)?.label || row.part}` : ''}${row.breakpoint ? ` · ${row.breakpoint}` : ''}`
+        : `Spacing${row.part ? ` · ${selectedGroup?.parts?.find((part) => part.part === row.part)?.label || row.part}` : ''}${breakpoint ? ` · ${themeBreakpointDefinition(breakpoint)?.label || breakpoint.toUpperCase()}` : ''}`
+    const createSpacingOverride = (row) => updateWorkspace((next) => {
+        const alreadyExists = next.spacing.some((candidate) => (
+            candidate.targetId === row.targetId && candidate.breakpoint === viewport
+        ))
+        if (!alreadyExists) next.spacing.push({ ...row, breakpoint: viewport, values: { ...row.values } })
+        return next
+    })
     const addableThemeValues = selectedTarget ? [] : [
         ...targetTypography.flatMap(({ row, index }) => workspace.constraints.editableTypographyProperties
             .filter((field) => !row.values[field] && !addedThemeValues.has(propertyKey('typography', index, field)))
@@ -831,22 +882,72 @@ const SemanticThemeWorkspace = ({
         }, '*')
     }
 
+    const activeImageAssets = selectedImageAspect ? effectiveBreakpointEntries(
+        selectedImageAspect.assets,
+        viewport,
+        workspace.breakpoints,
+        (asset) => imageAspectKey(asset),
+    ) : []
+    const isAssetActiveAtBreakpoint = (asset) => {
+        if (!asset.breakpoint) return true
+        const aspect = imageAspects.find((candidate) => candidate.key === imageAspectKey(asset))
+        return effectiveBreakpointEntries(
+            aspect?.assets || [asset],
+            viewport,
+            workspace.breakpoints,
+            (candidate) => imageAspectKey(candidate),
+        ).some((candidate) => candidate.assetKey === asset.assetKey)
+    }
+    useEffect(() => {
+        if (selectedTarget?.kind !== 'asset') return
+        const selectedAsset = assetsByTargetId.get(selectedTarget.id)
+        if (!selectedAsset) return
+        const aspect = imageAspects.find((candidate) => candidate.key === imageAspectKey(selectedAsset))
+        const activeAsset = effectiveBreakpointEntries(
+            aspect?.assets || [],
+            viewport,
+            workspace.breakpoints,
+            (candidate) => imageAspectKey(candidate),
+        )[0]
+        if (!activeAsset || activeAsset.assetKey === selectedAsset.assetKey) return
+        setSelectedTarget((current) => ({
+            ...current,
+            id: `asset:${activeAsset.assetKey}`,
+            label: activeAsset.displayName,
+            alternatives: [{ ...current, id: `asset:${activeAsset.assetKey}`, label: activeAsset.displayName }],
+        }))
+    }, [assetsByTargetId, imageAspects, selectedTarget, viewport, workspace.breakpoints])
+    const imageBreakpointState = (asset) => {
+        const activeLabel = themeBreakpointDefinition(viewport)?.label || viewport.toUpperCase()
+        if (!asset.breakpoint) return { activeLabel, sourceLabel: 'All breakpoints', isInherited: false, isGlobal: true }
+        const sourceLabel = themeBreakpointDefinition(asset.breakpoint)?.label || asset.breakpoint.toUpperCase()
+        return { activeLabel, sourceLabel, isInherited: asset.breakpoint !== viewport, isGlobal: false }
+    }
+
     const themeImageEditor = selectedImageAspect && (
         <section className="space-y-4">
             <div><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Theme image</p><h2 className="mt-1 text-lg font-semibold text-gray-900">{selectedImageAspect.label}</h2>{selectedImageAspect.details && <p className="mt-1 text-sm text-gray-500">{selectedImageAspect.details}</p>}<p className="mt-2 text-sm text-gray-600">View every stored image and replace editable theme images here.</p></div>
             <div className="grid gap-4">
-                {selectedImageAspect.assets.map((asset) => {
+                {activeImageAssets.map((asset) => {
                     const usage = imageBreakpointUsage(asset, selectedImageAspect.assets, workspace.breakpoints)
+                    const breakpointState = imageBreakpointState(asset)
                     return (
                     <article key={asset.assetKey} className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
                         <div className="flex items-start justify-between gap-2"><div className="min-w-0"><h4 className="truncate text-sm font-medium text-gray-900">{asset.displayName}</h4><p className="truncate text-xs text-gray-500">{asset.filename || 'No file yet'}</p></div>{usage && <span className="shrink-0 rounded bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{usage.badge}</span>}</div>
                         {asset.url ? <img src={asset.url} alt="" className="h-32 w-full rounded-md border border-gray-200 bg-gray-50 object-contain" /> : <div className="flex h-32 items-center justify-center rounded-md border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-500">Placeholder image</div>}
+                        {breakpointState.isInherited
+                            ? <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950" role="status"><p><strong>Inherited at {breakpointState.activeLabel}.</strong> This image is defined at {breakpointState.sourceLabel}.</p><p className="mt-1">Replace the source to change every size that inherits it, or create an override only from {breakpointState.activeLabel}.</p></div>
+                            : <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>{breakpointState.isGlobal ? 'Global image.' : `Defined at ${breakpointState.activeLabel}.`}</strong> {breakpointState.isGlobal ? 'It is used at every breakpoint without a responsive image.' : 'Larger breakpoints inherit it unless they define their own image.'}</p>}
                         {usage && <div className="rounded-md bg-gray-50 px-3 py-2"><p className="text-sm font-medium text-gray-800">{usage.summary}</p><p className="mt-0.5 text-xs text-gray-600">{usage.range}</p></div>}
                         <p className="text-xs text-gray-600">{asset.width || asset.requiredWidth || asset.recommendedWidth || '?'} × {asset.height || asset.requiredHeight || '?'} px{asset.kind === 'library' ? asset.size ? ` · ${Math.ceil(asset.size / 1024)} KB` : '' : ` · ${asset.dpr || 2}x`}</p>
                         {asset.kind === 'design-group' && !asset.url && <div className="grid gap-2"><input aria-label={`${asset.displayName} placeholder name`} value={placeholderDrafts[asset.assetKey]?.displayName ?? asset.displayName} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], displayName: event.target.value } }))} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /><div className="grid grid-cols-2 gap-2"><input aria-label={`${asset.displayName} placeholder width`} type="number" min="16" max="8000" value={placeholderDrafts[asset.assetKey]?.width ?? asset.requiredWidth ?? ''} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], width: event.target.value } }))} placeholder="Width px" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /><input aria-label={`${asset.displayName} placeholder height`} type="number" min="16" max="8000" value={placeholderDrafts[asset.assetKey]?.height ?? asset.requiredHeight ?? ''} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], height: event.target.value } }))} placeholder="Height px" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></div><button type="button" onClick={() => createPlaceholder(asset)} className="rounded-md border border-gray-300 px-3 py-2 text-sm">Create placeholder</button></div>}
                         {asset.replaceable === false
                             ? <p className="text-xs text-gray-500">Stored in the theme image library. Select an element that uses it to replace that occurrence.</p>
-                            : <><input ref={(node) => { uploadRefs.current[asset.assetKey] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" /><button type="button" aria-label={`${asset.url ? 'Replace' : 'Upload'} ${asset.displayName}`} onClick={() => uploadRefs.current[asset.assetKey]?.click()} className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white">{asset.url ? 'Replace theme image' : 'Upload theme image'}</button></>}
+                            : <div className="grid gap-2">
+                                <input ref={(node) => { uploadRefs.current[asset.assetKey] = node }} aria-label={`New source image for ${asset.displayName} at ${breakpointState.sourceLabel}`} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" />
+                                <button type="button" aria-label={`${asset.url ? 'Replace' : 'Upload'} ${asset.displayName} source at ${breakpointState.sourceLabel}`} onClick={() => uploadRefs.current[asset.assetKey]?.click()} className={`w-full rounded-md px-3 py-2 text-sm font-medium ${breakpointState.isInherited ? 'border border-amber-400 bg-white text-amber-950 hover:bg-amber-50' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{asset.url ? 'Replace' : 'Upload'} source at {breakpointState.sourceLabel}</button>
+                                {breakpointState.isInherited && <><input ref={(node) => { uploadRefs.current[`override:${asset.assetKey}:${viewport}`] = node }} aria-label={`New ${breakpointState.activeLabel} image override for ${asset.displayName}`} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0], viewport)} className="sr-only" /><button type="button" aria-label={`Create ${breakpointState.activeLabel} override for ${asset.displayName}`} onClick={() => uploadRefs.current[`override:${asset.assetKey}:${viewport}`]?.click()} className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Create {breakpointState.activeLabel} override</button></>}
+                            </div>}
                     </article>
                     )
                 })}
@@ -880,13 +981,15 @@ const SemanticThemeWorkspace = ({
 
     const renderTargetAlternative = (alternative) => {
         const asset = assetsByTargetId.get(alternative.id)
+        if (asset && !isAssetActiveAtBreakpoint(asset)) return null
         if (!asset) return <button key={alternative.id} type="button" aria-pressed={alternative.id === selectedTarget.id} onClick={() => chooseTargetAlternative(alternative)} className={`rounded-md border px-3 py-2 text-left text-sm ${alternative.id === selectedTarget.id ? 'border-blue-500 bg-blue-50 font-medium text-blue-800' : 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50'}`}>{alternative.label}</button>
 
         const width = asset.width || asset.requiredWidth || asset.recommendedWidth
         const height = asset.height || asset.requiredHeight
+        const breakpointState = imageBreakpointState(asset)
         return (
-            <article key={alternative.id} className={`rounded-md border p-2 ${alternative.id === selectedTarget.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}>
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+            <article key={alternative.id} className={`space-y-2 rounded-md border p-2 ${alternative.id === selectedTarget.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}>
+                <div className="grid grid-cols-[minmax(0,1fr)] items-center gap-2">
                     <button type="button" aria-label={`Select ${asset.displayName}`} aria-pressed={alternative.id === selectedTarget.id} onClick={() => chooseTargetAlternative(alternative)} className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus:outline-none focus:ring-2 focus:ring-blue-500">
                         {asset.url
                             ? <img src={asset.url} alt="" className="h-10 w-14 shrink-0 rounded border border-gray-200 bg-gray-50 object-contain" />
@@ -897,8 +1000,12 @@ const SemanticThemeWorkspace = ({
                             <span className="block text-[11px] text-gray-500">{width || '?'} × {height || '?'} px · {asset.dpr || 2}x</span>
                         </span>
                     </button>
-                    <input ref={(node) => { uploadRefs.current[`inline:${asset.assetKey}`] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" />
-                    <button type="button" aria-label={`${asset.url ? 'Replace' : 'Upload'} ${asset.displayName}`} onClick={() => uploadRefs.current[`inline:${asset.assetKey}`]?.click()} className="shrink-0 rounded-md border border-blue-600 bg-white px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50">{asset.url ? 'Replace' : 'Upload'}</button>
+                </div>
+                {breakpointState.isInherited && <p className="rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-950"><strong>Inherited from {breakpointState.sourceLabel}.</strong> Choose where the change belongs.</p>}
+                <div className="grid gap-1.5">
+                    <input ref={(node) => { uploadRefs.current[`inline:${asset.assetKey}`] = node }} aria-label={`New source image for ${asset.displayName} at ${breakpointState.sourceLabel}`} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" />
+                    <button type="button" aria-label={`${asset.url ? 'Replace' : 'Upload'} ${asset.displayName} source at ${breakpointState.sourceLabel}`} onClick={() => uploadRefs.current[`inline:${asset.assetKey}`]?.click()} className="rounded-md border border-blue-600 bg-white px-2 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50">{asset.url ? 'Replace' : 'Upload'} source at {breakpointState.sourceLabel}</button>
+                    {breakpointState.isInherited && <><input ref={(node) => { uploadRefs.current[`inline-override:${asset.assetKey}:${viewport}`] = node }} aria-label={`New ${breakpointState.activeLabel} image override for ${asset.displayName}`} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0], viewport)} className="sr-only" /><button type="button" aria-label={`Create ${breakpointState.activeLabel} override for ${asset.displayName}`} onClick={() => uploadRefs.current[`inline-override:${asset.assetKey}:${viewport}`]?.click()} className="rounded-md bg-blue-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-blue-700">Create {breakpointState.activeLabel} override</button></>}
                 </div>
             </article>
         )
@@ -980,14 +1087,36 @@ const SemanticThemeWorkspace = ({
                     {(selectedTarget.alternatives?.length > 1 || selectedTarget.kind === 'asset') && <section className="space-y-1.5"><h3 className="text-sm font-medium text-gray-900">Choose what to edit</h3><p className="text-xs text-gray-500">These elements share the same area.</p>{(selectedTarget.alternatives || [selectedTarget]).some((alternative) => assetsByTargetId.has(alternative.id)) && <p className="text-xs text-gray-500">Images can be uploaded or replaced directly.</p>}<div className="grid gap-1">{(selectedTarget.alternatives?.length ? selectedTarget.alternatives : [selectedTarget]).map(renderTargetAlternative)}</div></section>}
                     {targetTypography.map(({ row, index }) => {
                         const fields = activeFields('typography', index, row, workspace.constraints.editableTypographyProperties)
-                        return fields.length > 0 && <section key={`type-${index}`} className="space-y-2 border-t border-gray-200 pt-3"><h3 className="text-sm font-medium text-gray-900">{sectionLabel('typography', row)}</h3><ValueFields idPrefix={`typography-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={typographyLabels} onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)} /></section>
+                        return fields.length > 0 && <section key={`type-${index}`} className="space-y-2 border-t border-gray-200 pt-3"><h3 className="text-sm font-medium text-gray-900">{sectionLabel('typography', row)}</h3><p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global value.</strong> Typography is the same at every breakpoint.</p><ValueFields idPrefix={`typography-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={typographyLabels} onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)} /></section>
                     })}
                     {targetSpacing.map(({ row, index }) => {
                         const fields = activeFields('spacing', index, row, workspace.constraints.editableSpacingProperties)
-                        return fields.length > 0 && <section key={`space-${index}`} className="space-y-2 border-t border-gray-200 pt-3"><h3 className="text-sm font-medium text-gray-900">{sectionLabel('spacing', row)}</h3><p className="text-xs text-gray-500">Margin and padding can also be changed by clicking their labels in the preview.</p><ValueFields idPrefix={`spacing-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={spacingLabels} onChange={(field, value) => updateWorkspace((next) => { next.spacing[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('spacing', index, row, field, spacingLabels[field] || field)} /></section>
+                        const isInherited = Boolean(row.breakpoint && row.breakpoint !== viewport)
+                        const sourceLabel = themeBreakpointDefinition(row.breakpoint)?.label || row.breakpoint?.toUpperCase()
+                        const activeLabel = themeBreakpointDefinition(viewport)?.label || viewport.toUpperCase()
+                        const editKey = `${index}:${viewport}`
+                        const canEditSource = !isInherited || editableInheritedSpacing.has(editKey)
+                        return fields.length > 0 && (
+                            <section key={`space-${index}`} className="space-y-2 border-t border-gray-200 pt-3">
+                                <h3 className="text-sm font-medium text-gray-900">{sectionLabel('spacing', row, row.breakpoint ? viewport : null)}</h3>
+                                {row.breakpoint ? (isInherited
+                                    ? <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950" role="status">
+                                        <p><strong>Inherited at {activeLabel}.</strong> This value is defined at {sourceLabel}.</p>
+                                        <p>Editing the source also changes every larger breakpoint that inherits it. Create an override to change only {activeLabel} and larger sizes without their own value.</p>
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                            <button type="button" onClick={() => createSpacingOverride(row)} className="rounded-md bg-blue-600 px-2.5 py-2 font-medium text-white hover:bg-blue-700">Create {activeLabel} override</button>
+                                            <button type="button" onClick={() => setEditableInheritedSpacing((current) => new Set(current).add(editKey))} className="rounded-md border border-amber-400 bg-white px-2.5 py-2 font-medium text-amber-950 hover:bg-amber-100">Edit source at {sourceLabel}</button>
+                                        </div>
+                                    </div>
+                                    : <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Defined at {activeLabel}.</strong> Changes start here and are inherited by larger breakpoints without their own value.</p>)
+                                    : <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global value.</strong> This spacing is the same at every breakpoint.</p>}
+                                <p className="text-xs text-gray-500">Margin and padding can also be changed by clicking their labels in the preview. On an inherited level, that creates an override here.</p>
+                                <ValueFields idPrefix={`spacing-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={spacingLabels} disabled={!canEditSource} onChange={(field, value) => updateWorkspace((next) => { next.spacing[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('spacing', index, row, field, spacingLabels[field] || field)} />
+                            </section>
+                        )
                     })}
                     {addableThemeValues.length > 0 && <section className="border-t border-gray-200 pt-4"><label htmlFor="add-theme-value" className="text-xs font-semibold uppercase tracking-wide text-gray-500">Add theme value</label><select id="add-theme-value" value="" onChange={(event) => addThemeValue(event.target.value)} className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"><option value="">Choose a value…</option>{addableThemeValues.map((value) => <option key={propertyKey(value.kind, value.index, value.field)} value={propertyKey(value.kind, value.index, value.field)}>{value.label}</option>)}</select></section>}
-                    {relevantColors.length > 0 && <section className="space-y-3 border-t border-gray-200 pt-4"><h3 className="font-medium text-gray-900">Colors used here</h3>{relevantColors.map(({ name, index }) => <label key={name} className="flex items-center gap-3"><input type="color" value={/^#[0-9a-f]{6}$/i.test(workspace.colors[index].value) ? workspace.colors[index].value : '#000000'} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="h-10 w-12 rounded border border-gray-300" /><span className="min-w-0 flex-1 text-sm font-medium">{name}</span><input aria-label={`${name} value`} value={workspace.colors[index].value} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="w-28 rounded-md border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>)}</section>}
+                    {relevantColors.length > 0 && <section className="space-y-3 border-t border-gray-200 pt-4"><h3 className="font-medium text-gray-900">Colors used here</h3><p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global values.</strong> Colors are the same at every breakpoint.</p>{relevantColors.map(({ name, index }) => <label key={name} className="flex items-center gap-3"><input type="color" value={/^#[0-9a-f]{6}$/i.test(workspace.colors[index].value) ? workspace.colors[index].value : '#000000'} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="h-10 w-12 rounded border border-gray-300" /><span className="min-w-0 flex-1 text-sm font-medium">{name}</span><input aria-label={`${name} value`} value={workspace.colors[index].value} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="w-28 rounded-md border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>)}</section>}
                     {childTargets.length > 0 && <section className="border-t border-gray-200 pt-3"><h3 className="mb-2 text-sm font-medium text-gray-900">Elements inside</h3><div className="divide-y divide-gray-200 border-y border-gray-200">{childTargets.map((child) => <details key={child.id} className="group py-1"><summary className="flex cursor-pointer list-none items-center gap-2 py-1 text-sm text-gray-800"><ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" /><span className="min-w-0 flex-1 truncate">{child.label}</span></summary><div className="pb-2 pl-5"><button type="button" onClick={() => chooseTargetAlternative(child)} className="text-xs font-medium text-blue-700 hover:underline">Edit this element</button></div></details>)}</div></section>}
                     {!targetTypography.length && !targetSpacing.length && !relevantColors.length && selectedTarget.kind !== 'element' && selectedTarget.kind !== 'asset' && <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500">Choose a more specific text or image inside this area to edit its details.</p>}
                 </div>
@@ -1070,7 +1199,7 @@ const SemanticThemeWorkspace = ({
                     </div>
                     <div className="flex items-center gap-2">
                     {contentMode !== 'none' && <button type="button" aria-pressed={guidesEnabled} onClick={() => setGuidesEnabled((current) => !current)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{guidesEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{guidesEnabled ? 'Hide guides' : 'Show guides'}</button>}
-                    <span className="text-xs capitalize text-gray-500">{viewport}</span>
+                    <span className="text-xs text-gray-500">{themeBreakpointDefinition(viewport)?.label || viewport} · {previewCanvasWidth}px</span>
                     </div>
                 </div>
                 <div ref={previewFrameRef} className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm">

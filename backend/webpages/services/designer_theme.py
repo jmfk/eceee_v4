@@ -886,6 +886,14 @@ def _iter_layout_properties(group):
                     yield part, breakpoint, values
 
 
+def _layout_breakpoints_for_part(group, part):
+    for key in ("layoutProperties", "layout_properties"):
+        layout = group.get(key)
+        if isinstance(layout, dict) and isinstance(layout.get(part), dict):
+            return layout[part]
+    return None
+
+
 def _image_url(value):
     if not isinstance(value, dict):
         return None
@@ -1335,6 +1343,11 @@ def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=Tr
                 if part == item.get("part") and breakpoint == item.get("breakpoint"):
                     target = values
                     break
+            if target is None and item.get("breakpoint") in theme.get_breakpoints():
+                part_breakpoints = _layout_breakpoints_for_part(groups[group_index], item.get("part"))
+                if part_breakpoints is not None:
+                    target = {}
+                    part_breakpoints[item["breakpoint"]] = target
         else:
             raise ValidationError("Unsupported spacing scope.")
         if target is None:
@@ -1812,7 +1825,16 @@ def _replace_shared_image_references(value, old_url, old_filename, replacement):
             _replace_shared_image_references(child, old_url, old_filename, replacement)
 
 
-def replace_designer_asset(theme_id, tenant, user, asset_key, upload, draft_version, placeholder_metadata=None):
+def replace_designer_asset(
+    theme_id,
+    tenant,
+    user,
+    asset_key,
+    upload,
+    draft_version,
+    placeholder_metadata=None,
+    target_breakpoint=None,
+):
     content, (width, height) = validate_image_upload(upload)
     saved_path = None
     try:
@@ -1861,15 +1883,50 @@ def replace_designer_asset(theme_id, tenant, user, asset_key, upload, draft_vers
                 if asset_key.startswith("design:"):
                     _, group_index, part, breakpoint, property_name = asset_key.split(":", 4)
                     groups = copy.deepcopy((draft_theme.design_groups or {}).get("groups", []))
-                    target = None
-                    for candidate_part, candidate_breakpoint, values in _iter_layout_properties(
-                        groups[int(group_index)]
-                    ):
-                        if candidate_part == part and candidate_breakpoint == breakpoint:
-                            target = values.get(property_name)
-                            if target is None and isinstance(values.get("images"), dict):
-                                target = values["images"].get(property_name)
-                            break
+                    group = groups[int(group_index)]
+                    part_breakpoints = _layout_breakpoints_for_part(group, part)
+                    if part_breakpoints is None:
+                        raise ValidationError("Asset slot was not found.")
+                    source_values = part_breakpoints.get(breakpoint)
+                    if not isinstance(source_values, dict):
+                        raise ValidationError("Asset slot was not found.")
+                    source_images = source_values.get("images")
+                    source_is_nested = isinstance(source_images, dict) and property_name in source_images
+                    source_target = (
+                        source_images.get(property_name) if source_is_nested else source_values.get(property_name)
+                    )
+                    if not isinstance(source_target, dict):
+                        raise ValidationError("Asset slot was not found.")
+
+                    override_breakpoint = str(target_breakpoint or "").strip()
+                    creating_override = bool(override_breakpoint and override_breakpoint != breakpoint)
+                    if creating_override:
+                        if override_breakpoint not in draft_theme.get_breakpoints():
+                            raise ValidationError("Target breakpoint was not found.")
+                        target_values = part_breakpoints.setdefault(override_breakpoint, {})
+                        if not isinstance(target_values, dict):
+                            raise ValidationError("Target breakpoint cannot contain an image override.")
+                        target_images = target_values.setdefault("images", {}) if source_is_nested else target_values
+                        if not isinstance(target_images, dict):
+                            raise ValidationError("Target breakpoint cannot contain an image override.")
+                        if property_name in target_images:
+                            raise ValidationError("An image override already exists at the target breakpoint.")
+                        target = copy.deepcopy(source_target)
+                        for key in (
+                            "url",
+                            "fileUrl",
+                            "file_url",
+                            "publicUrl",
+                            "public_url",
+                            "filename",
+                            "size",
+                            "width",
+                            "height",
+                        ):
+                            target.pop(key, None)
+                        target_images[property_name] = target
+                    else:
+                        target = source_target
                     if not isinstance(target, dict):
                         raise ValidationError("Asset slot was not found.")
                     replacement = {
@@ -1882,12 +1939,13 @@ def replace_designer_asset(theme_id, tenant, user, asset_key, upload, draft_vers
                     }
                     if placeholder_metadata:
                         replacement.update(placeholder_metadata)
-                    _replace_shared_image_references(
-                        groups,
-                        _image_url(target),
-                        target.get("filename"),
-                        replacement,
-                    )
+                    if not creating_override:
+                        _replace_shared_image_references(
+                            groups,
+                            _image_url(target),
+                            target.get("filename"),
+                            replacement,
+                        )
                     target.update(replacement)
                     draft_theme.design_groups = {**(draft_theme.design_groups or {}), "groups": groups}
 

@@ -758,6 +758,32 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 1)
         self.assertFalse(published.data["hasDraftChanges"])
 
+    def test_workspace_patch_can_create_a_breakpoint_spacing_override(self):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+
+        response = self.client.patch(
+            self.workspace_url,
+            {
+                "draftVersion": workspace["draftVersion"],
+                "spacing": [
+                    {
+                        "scope": "layout",
+                        "groupIndex": 0,
+                        "part": "hero",
+                        "breakpoint": "xl",
+                        "values": {"padding": "48px"},
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        layout = self.theme.designer_draft.snapshot["design_groups"]["groups"][0]["layoutProperties"]["hero"]
+        self.assertEqual(layout["md"]["padding"], "24px")
+        self.assertEqual(layout["xl"]["padding"], "48px")
+
     def test_publish_reports_a_conflict_for_a_concurrent_name_collision(self):
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data
@@ -1016,6 +1042,41 @@ class DesignerThemeApiTests(TestCase):
         self.theme.designer_draft.refresh_from_db()
         self.assertTrue(self.theme.designer_draft.snapshot["image"].endswith("preview.png"))
         self.assertTrue(self.theme.designer_draft.snapshot["site_icon"].endswith("favicon.png"))
+
+    @patch(
+        "webpages.services.designer_theme.system_storage.url",
+        return_value="https://storage.test/theme_images/hero-xl.png",
+    )
+    @patch(
+        "webpages.services.designer_theme.system_storage.save",
+        return_value="theme_images/1/designer_drafts/1/hero-xl.png",
+    )
+    def test_inherited_image_can_be_overridden_at_the_active_breakpoint(self, _save, _url):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+        upload = SimpleUploadedFile(
+            "hero-xl.png",
+            generate_placeholder_png("XL hero", "hero", 1600, 900),
+            content_type="image/png",
+        )
+
+        response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/replace-asset/",
+            {
+                "asset_key": "design:0:hero:md:background",
+                "target_breakpoint": "xl",
+                "image": upload,
+                "draft_version": workspace["draftVersion"],
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        asset = next(item for item in response.data["assets"] if item["assetKey"] == "design:0:hero:xl:background")
+        self.assertEqual(asset["url"], "https://storage.test/theme_images/hero-xl.png")
+        layout = self.theme.designer_draft.snapshot["design_groups"]["groups"][0]["layoutProperties"]["hero"]
+        self.assertNotIn("url", layout["md"]["images"]["background"])
+        self.assertEqual(layout["xl"]["images"]["background"]["url"], asset["url"])
 
     def test_only_tenant_admin_can_manage_assignments(self):
         url = f"/api/v1/webpages/themes/{self.other_theme.id}/designer-assignments/"
