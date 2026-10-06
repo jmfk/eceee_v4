@@ -3,7 +3,7 @@ import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileTex
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel, designerPreviewImageReferences } from '../../rendering/adapters'
-import { getBreakpoints } from '../../utils/themeUtils'
+import { getBreakpoints, mapBreakpointName } from '../../utils/themeUtils'
 import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
 import { themeBreakpointDefinition } from '../theme/breakpointConfig'
 const typographyLabels = {
@@ -25,6 +25,21 @@ const maxInspectorWidth = 720
 const minPreviewWidth = 480
 const resizeHandleWidth = 8
 const desktopPaneBreakpoint = 1280
+
+const breakpointWidth = (breakpoint, configuredBreakpoints) => {
+    if (/^\d+$/.test(String(breakpoint || ''))) return Number(breakpoint)
+    return Number(configuredBreakpoints[mapBreakpointName(breakpoint)])
+}
+
+const breakpointPrecedence = (breakpoint) => ({ default: 0, mobile: 1, xs: 2, desktop: 0, sm: 1, tablet: 0, md: 1 }[breakpoint] ?? 1)
+
+const breakpointLabel = (breakpoint) => {
+    const canonical = mapBreakpointName(breakpoint)
+    if (canonical === 'xs') return 'Base (Mobile)'
+    return themeBreakpointDefinition(canonical)?.label || String(breakpoint || '').toUpperCase()
+}
+
+const hasThemeValue = (value) => value !== undefined && value !== null && value !== ''
 
 const fitPaneWidths = (workspaceWidth, sidebarWidth, inspectorWidth, sidebarCollapsed, inspectorCollapsed) => {
     if (workspaceWidth < desktopPaneBreakpoint) return { sidebarWidth, inspectorWidth }
@@ -99,7 +114,7 @@ const spacingRowIndexForChange = (rows, targetIds, breakpoints, viewportWidth) =
     if (!Number.isFinite(width)) return candidates[0].index
     const configuredBreakpoints = getBreakpoints({ breakpoints })
     const active = candidates
-        .map((candidate) => ({ ...candidate, width: Number(configuredBreakpoints[candidate.row.breakpoint]) }))
+        .map((candidate) => ({ ...candidate, width: breakpointWidth(candidate.row.breakpoint, configuredBreakpoints) }))
         .filter((candidate) => Number.isFinite(candidate.width) && candidate.width <= width)
         .sort((left, right) => right.width - left.width)[0]
     return active?.index ?? candidates[0].index
@@ -187,9 +202,10 @@ const imageBreakpointUsage = (asset, family, breakpoints) => {
         .map(([name, width]) => ({ name: name.toUpperCase(), key: name, width: Number(width) }))
         .filter((size) => Number.isFinite(size.width))
         .sort((left, right) => left.width - right.width)
-    const start = sizes.find((size) => size.key === asset.breakpoint)
+    const canonicalBreakpoint = mapBreakpointName(asset.breakpoint)
+    const start = sizes.find((size) => size.key === canonicalBreakpoint)
     if (!start) return { badge: asset.breakpoint.toUpperCase(), summary: `Configured for the ${asset.breakpoint.toUpperCase()} theme size.`, range: '' }
-    const familyStarts = new Set(family.map((candidate) => candidate.breakpoint))
+    const familyStarts = new Set(family.map((candidate) => mapBreakpointName(candidate.breakpoint)))
     const next = sizes.find((size) => size.width > start.width && familyStarts.has(size.key))
     const effectiveSizes = sizes.filter((size) => size.width >= start.width && (!next || size.width < next.width))
     const allSizes = effectiveSizes.length === sizes.length
@@ -241,7 +257,7 @@ const imageAspectsFor = (workspace) => {
 
 const effectiveBreakpointEntries = (entries, activeBreakpoint, breakpoints, keyForEntry) => {
     const configuredBreakpoints = getBreakpoints({ breakpoints })
-    const activeWidth = Number(configuredBreakpoints[activeBreakpoint])
+    const activeWidth = breakpointWidth(activeBreakpoint, configuredBreakpoints)
     if (!Number.isFinite(activeWidth)) return entries
 
     const globalEntries = entries.filter((entry) => !entry.breakpoint)
@@ -250,18 +266,49 @@ const effectiveBreakpointEntries = (entries, activeBreakpoint, breakpoints, keyF
     responsiveEntries.forEach((entry) => {
         const key = keyForEntry(entry)
         const current = entriesByTarget.get(key)
-        const entryWidth = Number(configuredBreakpoints[entry.breakpoint])
-        const currentWidth = Number(configuredBreakpoints[current?.breakpoint])
-        if (Number.isFinite(entryWidth) && entryWidth <= activeWidth && (!current || entryWidth > currentWidth)) {
+        const entryWidth = breakpointWidth(entry.breakpoint, configuredBreakpoints)
+        const currentWidth = breakpointWidth(current?.breakpoint, configuredBreakpoints)
+        const sameWidthWithHigherPrecedence = entryWidth === currentWidth
+            && breakpointPrecedence(entry.breakpoint) > breakpointPrecedence(current?.breakpoint)
+        if (Number.isFinite(entryWidth) && entryWidth <= activeWidth && (!current || entryWidth > currentWidth || sameWidthWithHigherPrecedence)) {
             entriesByTarget.set(key, entry)
         }
     })
     return [...globalEntries, ...entriesByTarget.values()]
 }
 
+const effectiveSpacingEntries = (entries, activeBreakpoint, breakpoints, fields) => {
+    const configuredBreakpoints = getBreakpoints({ breakpoints })
+    const activeWidth = breakpointWidth(activeBreakpoint, configuredBreakpoints)
+    if (!Number.isFinite(activeWidth)) return entries.map((entry) => ({ ...entry, fields }))
+
+    const globalEntries = entries.filter((entry) => !entry.breakpoint).map((entry) => ({ ...entry, fields }))
+    const selectedFields = new Map()
+    entries.filter((entry) => entry.breakpoint).forEach((entry) => {
+        const width = breakpointWidth(entry.breakpoint, configuredBreakpoints)
+        if (!Number.isFinite(width) || width > activeWidth) return
+        fields.forEach((field) => {
+            if (!hasThemeValue(entry.row.values[field])) return
+            const key = `${entry.row.targetId}:${field}`
+            const current = selectedFields.get(key)
+            const sameWidthWithHigherPrecedence = width === current?.width
+                && breakpointPrecedence(entry.breakpoint) > breakpointPrecedence(current.entry.breakpoint)
+            if (!current || width > current.width || sameWidthWithHigherPrecedence) selectedFields.set(key, { entry, field, width })
+        })
+    })
+
+    const grouped = new Map()
+    selectedFields.forEach(({ entry, field }) => {
+        const current = grouped.get(entry.index) || { ...entry, fields: [] }
+        current.fields.push(field)
+        grouped.set(entry.index, current)
+    })
+    return [...globalEntries, ...grouped.values()]
+}
+
 const isZeroCssValue = (value) => /^0(?:\.0+)?(?:px|rem|em|%|vh|vw)?$/i.test(String(value || '').trim())
 
-const ValueFields = ({ idPrefix, values, defaults, fields, labels, onChange, onRemove, disabled = false }) => (
+const ValueFields = ({ idPrefix, values, defaults, fields, labels, onChange, onRemove, onOverride, overrideLabel, disabled = false }) => (
     <div className="grid grid-cols-2 gap-2">
         {fields.map((field) => (
             <div key={field} className="min-w-0">
@@ -270,6 +317,7 @@ const ValueFields = ({ idPrefix, values, defaults, fields, labels, onChange, onR
                     <button type="button" aria-label={`Remove ${labels[field] || field}`} onClick={() => onRemove(field)} disabled={disabled} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
                 <input id={`${idPrefix}-${field}`} value={values[field] || defaults?.[field] || ''} onChange={(event) => onChange(field, event.target.value)} disabled={disabled} className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500" placeholder="Theme default" />
+                {onOverride && <button type="button" onClick={() => onOverride(field)} className="mt-1 w-full rounded border border-blue-300 bg-white px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50">Override {labels[field] || field} at {overrideLabel}</button>}
                 {!values[field] && defaults?.[field] && <p className="mt-0.5 text-[10px] text-gray-500">Theme default</p>}
             </div>
         ))}
@@ -531,11 +579,14 @@ const SemanticThemeWorkspace = ({
                 if (index >= 0 && workspace.constraints.editableSpacingProperties.includes(property)) {
                     updateWorkspace((next) => {
                         const source = next.spacing[index]
-                        if (source.breakpoint && source.breakpoint !== viewport) {
+                        const configuredBreakpoints = getBreakpoints(next)
+                        const sourceWidth = breakpointWidth(source.breakpoint, configuredBreakpoints)
+                        const activeWidth = breakpointWidth(viewport, configuredBreakpoints)
+                        if (source.breakpoint && sourceWidth !== activeWidth) {
                             next.spacing.push({
                                 ...source,
                                 breakpoint: viewport,
-                                values: { ...source.values, [property]: event.data.value },
+                                values: { [property]: event.data.value },
                             })
                         } else {
                             source.values[property] = event.data.value
@@ -732,11 +783,11 @@ const SemanticThemeWorkspace = ({
             ? row.groupIndex === selectedGroup.groupIndex
             : selectedTargetIds.includes(row.targetId)
     ))
-    const targetSpacing = effectiveBreakpointEntries(
+    const targetSpacing = effectiveSpacingEntries(
         matchingTargetSpacing.map((entry) => ({ ...entry, breakpoint: entry.row.breakpoint })),
         viewport,
         workspace.breakpoints,
-        (entry) => entry.row.targetId,
+        workspace.constraints.editableSpacingProperties,
     )
     const propertyKey = (kind, index, field) => `${kind}:${index}:${field}`
     const activeFields = (kind, index, row, fields) => selectedTarget
@@ -744,19 +795,22 @@ const SemanticThemeWorkspace = ({
         : fields.filter((field) => row.values[field] || addedThemeValues.has(propertyKey(kind, index, field)))
     const sectionLabel = (kind, row, breakpoint = row.breakpoint) => kind === 'typography'
         ? `Typography${row.element ? ` · ${selectedGroup?.elements?.find((element) => element.element === row.element)?.label || row.element}` : ''}`
-        : `Spacing${row.part ? ` · ${selectedGroup?.parts?.find((part) => part.part === row.part)?.label || row.part}` : ''}${breakpoint ? ` · ${themeBreakpointDefinition(breakpoint)?.label || breakpoint.toUpperCase()}` : ''}`
-    const createSpacingOverride = (row) => updateWorkspace((next) => {
-        const alreadyExists = next.spacing.some((candidate) => (
+        : `Spacing${row.part ? ` · ${selectedGroup?.parts?.find((part) => part.part === row.part)?.label || row.part}` : ''}${breakpoint ? ` · ${breakpointLabel(breakpoint)}` : ''}`
+    const createSpacingOverride = (row, field) => updateWorkspace((next) => {
+        const existing = next.spacing.find((candidate) => (
             candidate.targetId === row.targetId && candidate.breakpoint === viewport
         ))
-        if (!alreadyExists) next.spacing.push({ ...row, breakpoint: viewport, values: { ...row.values } })
+        const value = hasThemeValue(row.values[field]) ? row.values[field] : themeDefaults[row.targetId]?.[field]
+        if (!hasThemeValue(value)) return next
+        if (existing) existing.values[field] = value
+        else next.spacing.push({ ...row, breakpoint: viewport, values: { [field]: value } })
         return next
     })
     const addableThemeValues = selectedTarget ? [] : [
         ...targetTypography.flatMap(({ row, index }) => workspace.constraints.editableTypographyProperties
             .filter((field) => !row.values[field] && !addedThemeValues.has(propertyKey('typography', index, field)))
             .map((field) => ({ kind: 'typography', index, row, field, label: `${sectionLabel('typography', row)} · ${typographyLabels[field] || field}` }))),
-        ...targetSpacing.flatMap(({ row, index }) => workspace.constraints.editableSpacingProperties
+        ...targetSpacing.flatMap(({ row, index, fields = workspace.constraints.editableSpacingProperties }) => fields
             .filter((field) => !row.values[field] && !addedThemeValues.has(propertyKey('spacing', index, field)))
             .map((field) => ({ kind: 'spacing', index, row, field, label: `${sectionLabel('spacing', row)} · ${spacingLabels[field] || field}` }))),
     ]
@@ -918,10 +972,16 @@ const SemanticThemeWorkspace = ({
         }))
     }, [assetsByTargetId, imageAspects, selectedTarget, viewport, workspace.breakpoints])
     const imageBreakpointState = (asset) => {
-        const activeLabel = themeBreakpointDefinition(viewport)?.label || viewport.toUpperCase()
+        const activeLabel = breakpointLabel(viewport)
         if (!asset.breakpoint) return { activeLabel, sourceLabel: 'All breakpoints', isInherited: false, isGlobal: true }
-        const sourceLabel = themeBreakpointDefinition(asset.breakpoint)?.label || asset.breakpoint.toUpperCase()
-        return { activeLabel, sourceLabel, isInherited: asset.breakpoint !== viewport, isGlobal: false }
+        const sourceLabel = breakpointLabel(asset.breakpoint)
+        const configuredBreakpoints = getBreakpoints(workspace)
+        return {
+            activeLabel,
+            sourceLabel,
+            isInherited: breakpointWidth(asset.breakpoint, configuredBreakpoints) !== breakpointWidth(viewport, configuredBreakpoints),
+            isGlobal: false,
+        }
     }
 
     const themeImageEditor = selectedImageAspect && (
@@ -1089,11 +1149,12 @@ const SemanticThemeWorkspace = ({
                         const fields = activeFields('typography', index, row, workspace.constraints.editableTypographyProperties)
                         return fields.length > 0 && <section key={`type-${index}`} className="space-y-2 border-t border-gray-200 pt-3"><h3 className="text-sm font-medium text-gray-900">{sectionLabel('typography', row)}</h3><p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global value.</strong> Typography is the same at every breakpoint.</p><ValueFields idPrefix={`typography-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={typographyLabels} onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)} /></section>
                     })}
-                    {targetSpacing.map(({ row, index }) => {
-                        const fields = activeFields('spacing', index, row, workspace.constraints.editableSpacingProperties)
-                        const isInherited = Boolean(row.breakpoint && row.breakpoint !== viewport)
-                        const sourceLabel = themeBreakpointDefinition(row.breakpoint)?.label || row.breakpoint?.toUpperCase()
-                        const activeLabel = themeBreakpointDefinition(viewport)?.label || viewport.toUpperCase()
+                    {targetSpacing.map(({ row, index, fields: effectiveFields = workspace.constraints.editableSpacingProperties }) => {
+                        const fields = activeFields('spacing', index, row, effectiveFields)
+                        const configuredBreakpoints = getBreakpoints(workspace)
+                        const isInherited = Boolean(row.breakpoint && breakpointWidth(row.breakpoint, configuredBreakpoints) !== breakpointWidth(viewport, configuredBreakpoints))
+                        const sourceLabel = breakpointLabel(row.breakpoint)
+                        const activeLabel = breakpointLabel(viewport)
                         const editKey = `${index}:${viewport}`
                         const canEditSource = !isInherited || editableInheritedSpacing.has(editKey)
                         return fields.length > 0 && (
@@ -1102,16 +1163,15 @@ const SemanticThemeWorkspace = ({
                                 {row.breakpoint ? (isInherited
                                     ? <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950" role="status">
                                         <p><strong>Inherited at {activeLabel}.</strong> This value is defined at {sourceLabel}.</p>
-                                        <p>Editing the source also changes every larger breakpoint that inherits it. Create an override to change only {activeLabel} and larger sizes without their own value.</p>
-                                        <div className="grid gap-2 sm:grid-cols-2">
-                                            <button type="button" onClick={() => createSpacingOverride(row)} className="rounded-md bg-blue-600 px-2.5 py-2 font-medium text-white hover:bg-blue-700">Create {activeLabel} override</button>
+                                        <p>Editing the source also changes every larger breakpoint that inherits it. Override only the individual values that should change at {activeLabel}.</p>
+                                        <div>
                                             <button type="button" onClick={() => setEditableInheritedSpacing((current) => new Set(current).add(editKey))} className="rounded-md border border-amber-400 bg-white px-2.5 py-2 font-medium text-amber-950 hover:bg-amber-100">Edit source at {sourceLabel}</button>
                                         </div>
                                     </div>
                                     : <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Defined at {activeLabel}.</strong> Changes start here and are inherited by larger breakpoints without their own value.</p>)
                                     : <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global value.</strong> This spacing is the same at every breakpoint.</p>}
                                 <p className="text-xs text-gray-500">Margin and padding can also be changed by clicking their labels in the preview. On an inherited level, that creates an override here.</p>
-                                <ValueFields idPrefix={`spacing-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={spacingLabels} disabled={!canEditSource} onChange={(field, value) => updateWorkspace((next) => { next.spacing[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('spacing', index, row, field, spacingLabels[field] || field)} />
+                                <ValueFields idPrefix={`spacing-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={spacingLabels} disabled={!canEditSource} onOverride={isInherited && !canEditSource ? (field) => createSpacingOverride(row, field) : null} overrideLabel={activeLabel} onChange={(field, value) => updateWorkspace((next) => { next.spacing[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('spacing', index, row, field, spacingLabels[field] || field)} />
                             </section>
                         )
                     })}
