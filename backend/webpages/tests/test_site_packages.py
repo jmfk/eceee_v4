@@ -439,6 +439,10 @@ class SitePackageServiceTests(TestCase):
         binding.refresh_from_db()
         self.assertEqual(binding.local_root_id, local_root.id)
 
+        local_root.soft_delete(self.user, recursive=True)
+        with self.assertRaisesMessage(ValueError, "not linked"):
+            import_update()
+
     @patch("webpages.services.theme_remote.remote_site_request")
     def test_remote_import_rejects_invalid_zip_and_marks_job_failed(self, remote_request):
         connection = ThemeRemoteConnection.objects.create(
@@ -1080,6 +1084,52 @@ class SitePackageAPITests(APITestCase):
         self.assertEqual(job.options["connection_id"], str(connection.id))
         self.assertEqual(job.options["remote_site_key"], str(self.root.stable_key))
         delay.assert_called_once_with(str(job.id))
+
+    @patch("webpages.views.site_package_views.import_remote_site_package.delay")
+    @patch("webpages.views.site_package_views.remote_site_request")
+    def test_soft_deleted_remote_copy_is_not_listed_or_updateable(self, remote_request, delay):
+        connection = ThemeRemoteConnection.objects.create(
+            tenant=self.tenant,
+            name="Remote source",
+            base_url="https://remote.example",
+            remote_workspace="remote-workspace",
+            encrypted_access_key="not-used-by-this-test",
+            created_by=self.user,
+            updated_by=self.user,
+        )
+        remote_key = self.root.stable_key
+        RemoteSiteBinding.objects.create(
+            tenant=self.tenant,
+            connection=connection,
+            remote_root_key=remote_key,
+            local_root=self.root,
+        )
+        self.root.soft_delete(self.user, recursive=True)
+        remote_request.return_value = {
+            "results": [{"stableKey": str(remote_key), "title": "Remote site"}],
+        }
+
+        listed = self.client.post(
+            "/api/v1/webpages/site-packages/remote/sites/",
+            {"connectionId": str(connection.id)},
+            format="json",
+        )
+        rejected = self.client.post(
+            "/api/v1/webpages/site-packages/remote/imports/",
+            {
+                "connectionId": str(connection.id),
+                "remoteSiteKey": str(remote_key),
+                "mode": "update",
+                "localRootId": self.root.id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(listed.data["results"][0]["localCopies"], [])
+        self.assertEqual(rejected.status_code, 400)
+        self.assertIn("localRootId", rejected.data)
+        delay.assert_not_called()
 
     def test_import_jobs_are_scoped_to_the_selected_tenant(self):
         other_tenant = Tenant.objects.create(

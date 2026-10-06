@@ -1155,6 +1155,8 @@ class SitePackageImporter:
                 connection_id=options.get("connection_id"),
                 remote_root_key=options.get("remote_site_key"),
                 local_root_id=options.get("local_root_id"),
+                local_root__is_deleted=False,
+                local_root__parent__isnull=True,
             )
             .first()
         )

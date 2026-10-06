@@ -257,9 +257,12 @@ class RemoteSiteListView(APIView):
             result = remote_site_request(connection, "GET", "sites/")
         except (RemoteThemeError, RemoteCredentialConfigurationError) as exc:
             return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        bindings = RemoteSiteBinding.objects.filter(tenant=request.tenant, connection=connection).select_related(
-            "local_root"
-        )
+        bindings = RemoteSiteBinding.objects.filter(
+            tenant=request.tenant,
+            connection=connection,
+            local_root__is_deleted=False,
+            local_root__parent__isnull=True,
+        ).select_related("local_root")
         local_copies = {}
         for binding in bindings:
             local_copies.setdefault(str(binding.remote_root_key), []).append(
