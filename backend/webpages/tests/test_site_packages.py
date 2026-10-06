@@ -176,6 +176,10 @@ class SitePackageServiceTests(TestCase):
         self.assertEqual(media_manifest["files"][0]["source_id"], str(self.media.id))
 
     def test_v2_package_round_trip_preserves_page_and_media_taxonomy(self):
+        source_media_url = f"https://storage.test/{self.media.file_path}"
+        self.root.page_css_variables = {"heroImage": source_media_url}
+        self.root.page_custom_css = f".root-hero {{ background-image: url('{source_media_url}'); }}"
+        self.root.save(update_fields=["page_css_variables", "page_custom_css", "updated_at"])
         legacy_tag = MediaTag.objects.create(
             name="Portrait",
             slug="portrait",
@@ -204,10 +208,12 @@ class SitePackageServiceTests(TestCase):
             page=self.root,
             version_number=1,
             page_data={
-                "hero": {"fileUrl": f"https://storage.test/{self.media.file_path}"},
+                "hero": {"fileUrl": source_media_url},
                 "externalLogo": "https://cdn.example.net/logo.png",
             },
             widgets={},
+            page_css_variables={"heroImage": source_media_url},
+            page_custom_css=f".version-hero {{ background-image: url('{source_media_url}'); }}",
             tags=["Editorial"],
             created_by=self.user,
         )
@@ -251,7 +257,12 @@ class SitePackageServiceTests(TestCase):
         self.assertEqual(imported_version.tags, ["Editorial"])
         self.assertEqual(imported_version.canonical_tags.get().slug, "people")
         imported_media = MediaFile.objects.get(tenant=destination_tenant)
+        imported_media_url = storage.url(imported_media.file_path)
         self.assertEqual(imported_version.page_data["hero"]["fileUrl"], storage.url(imported_media.file_path))
+        self.assertEqual(imported_root.page_css_variables["heroImage"], imported_media_url)
+        self.assertIn(imported_media_url, imported_root.page_custom_css)
+        self.assertEqual(imported_version.page_css_variables["heroImage"], imported_media_url)
+        self.assertIn(imported_media_url, imported_version.page_custom_css)
         self.assertEqual(imported_media.tags.get().slug, "portrait")
         self.assertEqual(imported_media.canonical_tags.get().slug, "people")
         self.assertEqual(imported_media.collections.get().slug, "team")
@@ -305,7 +316,7 @@ class SitePackageServiceTests(TestCase):
         self.assertEqual(imported_root.hostnames, [])
 
     def test_remote_update_creates_drafts_and_is_idempotent_without_deleting_local_pages(self):
-        PageVersion.objects.create(
+        published_source_version = PageVersion.objects.create(
             page=self.root,
             version_number=1,
             effective_date=timezone.now() - timedelta(days=1),
@@ -381,7 +392,10 @@ class SitePackageServiceTests(TestCase):
         PageVersion.objects.create(
             page=self.root,
             version_number=2,
-            page_data={"heading": "Remote draft"},
+            page_data={
+                "heading": "Remote draft",
+                "featuredLink": {"currentVersionId": published_source_version.id},
+            },
             widgets={},
             theme=self.theme,
             created_by=self.user,
@@ -411,6 +425,10 @@ class SitePackageServiceTests(TestCase):
         imported_draft = local_root.versions.order_by("-version_number").first()
         self.assertIsNone(imported_draft.effective_date)
         self.assertEqual(imported_draft.page_data["heading"], "Remote draft")
+        self.assertEqual(
+            imported_draft.page_data["featuredLink"]["currentVersionId"],
+            local_root.versions.get(version_number=1).id,
+        )
         self.assertNotEqual(imported_draft.theme_id, original_local_theme_id)
         self.assertEqual(local_root.versions.get(version_number=1).theme_id, original_local_theme_id)
         self.assertTrue(WebPage.objects.filter(pk=local_only.pk).exists())

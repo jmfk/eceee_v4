@@ -87,6 +87,7 @@ class RemoteSiteBinding(models.Model):
     )
     page_map = models.JSONField(default=dict, blank=True)
     theme_map = models.JSONField(default=dict, blank=True)
+    version_map = models.JSONField(default=dict, blank=True)
     version_fingerprints = models.JSONField(default=dict, blank=True)
     last_remote_exported_at = models.DateTimeField(null=True, blank=True)
     last_synced_at = models.DateTimeField(null=True, blank=True)

@@ -46,6 +46,7 @@ class Migration(migrations.Migration):
                 ("remote_root_key", models.UUIDField()),
                 ("page_map", models.JSONField(blank=True, default=dict)),
                 ("theme_map", models.JSONField(blank=True, default=dict)),
+                ("version_map", models.JSONField(blank=True, default=dict)),
                 ("version_fingerprints", models.JSONField(blank=True, default=dict)),
                 ("last_remote_exported_at", models.DateTimeField(blank=True, null=True)),
                 ("last_synced_at", models.DateTimeField(blank=True, null=True)),
