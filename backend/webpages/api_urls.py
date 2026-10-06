@@ -81,6 +81,12 @@ from .views.simplified_layout_views import (
     validate_simplified_layout,
 )
 from .views.site_package_views import (
+    RemoteSiteImportView,
+    RemoteSiteListView,
+    RemoteSiteSourceExportDetailView,
+    RemoteSiteSourceExportDownloadView,
+    RemoteSiteSourceExportListView,
+    RemoteSiteSourceListView,
     SitePackageExportDetailView,
     SitePackageExportDownloadView,
     SitePackageExportListView,
@@ -404,6 +410,28 @@ urlpatterns = [
         "site-packages/imports/<uuid:job_id>/",
         SitePackageImportDetailView.as_view(),
         name="site-package-import-detail",
+    ),
+    path("site-packages/remote/sites/", RemoteSiteListView.as_view(), name="remote-site-list"),
+    path("site-packages/remote/imports/", RemoteSiteImportView.as_view(), name="remote-site-import"),
+    path(
+        "site-packages/remote-source/sites/",
+        RemoteSiteSourceListView.as_view(),
+        name="remote-site-source-list",
+    ),
+    path(
+        "site-packages/remote-source/exports/",
+        RemoteSiteSourceExportListView.as_view(),
+        name="remote-site-source-export-list",
+    ),
+    path(
+        "site-packages/remote-source/exports/<uuid:job_id>/",
+        RemoteSiteSourceExportDetailView.as_view(),
+        name="remote-site-source-export-detail",
+    ),
+    path(
+        "site-packages/remote-source/exports/<uuid:job_id>/download/",
+        RemoteSiteSourceExportDownloadView.as_view(),
+        name="remote-site-source-export-download",
     ),
     # Pydantic model schema endpoint for ConditionalGroupField
     re_path(

@@ -44,7 +44,20 @@ export const sitePackagesApi = {
 
     getImport: wrapApiCall(async (jobId) => {
         return api.get(endpoints.sitePackages.importDetail(jobId))
-    }, 'sitePackages.getImport')
+    }, 'sitePackages.getImport'),
+
+    listRemoteSites: wrapApiCall(async (connectionId) => {
+        return api.post(endpoints.sitePackages.remoteSites, { connectionId })
+    }, 'sitePackages.listRemoteSites'),
+
+    createRemoteImport: wrapApiCall(async ({ connectionId, remoteSiteKey, mode, localRootId = null }) => {
+        return api.post(endpoints.sitePackages.remoteImports, {
+            connectionId,
+            remoteSiteKey,
+            mode,
+            localRootId
+        })
+    }, 'sitePackages.createRemoteImport')
 }
 
 export default sitePackagesApi

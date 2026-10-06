@@ -24,6 +24,14 @@ const pageApiMocks = vi.hoisted(() => ({
     bulkDelete: vi.fn(() => Promise.resolve({})),
 }))
 
+const remoteMocks = vi.hoisted(() => ({
+    remoteConnections: vi.fn(() => Promise.resolve({ results: [] })),
+}))
+
+vi.mock('../../api/designerThemes', () => ({
+    designerThemesApi: remoteMocks,
+}))
+
 // Mock the API client to avoid browser dependencies
 vi.mock('../../api/client.js', () => ({
     api: {
@@ -231,14 +239,59 @@ describe('TreePageManager', () => {
         expect(addRootPageButton).toBeInTheDocument()
     })
 
-    it('opens site package ZIP import from root toolbar', async () => {
+    it('opens remote and ZIP site import from the root toolbar', async () => {
         renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
 
         const importButton = screen.getByTestId('import-site-package-button')
         fireEvent.click(importButton)
 
         expect(screen.getByText('Import Root Site')).toBeInTheDocument()
-        expect(screen.getByText('Creates a new root page tree from a site package ZIP.')).toBeInTheDocument()
+        expect(screen.getByText('Download a remote site or import a site package ZIP.')).toBeInTheDocument()
+        expect(screen.getByRole('tab', { name: 'Remote site' })).toHaveAttribute('aria-selected', 'true')
+        expect(screen.getByRole('tab', { name: 'ZIP file' })).toBeInTheDocument()
+        expect(await screen.findByText('No remote connections are configured. Add one in Designer themes first.')).toBeInTheDocument()
+    })
+
+    it('lists remote sites and only offers updates for linked local copies', async () => {
+        remoteMocks.remoteConnections.mockResolvedValueOnce({
+            results: [{ id: 'connection-1', name: 'Production', isDefault: true }],
+        })
+        api.post.mockImplementation((url) => {
+            if (url.includes('/site-packages/remote/sites/')) {
+                return Promise.resolve({
+                    data: {
+                        results: [{
+                            stableKey: '9ad84b80-4f5f-4a7d-9a2f-a737f35d6ebc',
+                            title: 'Remote Site',
+                            hostnames: ['remote.example'],
+                            pageCount: 4,
+                            localCopies: [{ bindingId: 'binding-1', localRootId: 17, title: 'Local Copy' }],
+                        }],
+                    },
+                })
+            }
+            return Promise.resolve({ data: { id: 'job-1', status: 'pending' } })
+        })
+        api.get.mockImplementation((url) => {
+            if (url.includes('/site-packages/imports/job-1/')) {
+                return Promise.resolve({ data: { id: 'job-1', kind: 'import', status: 'completed', progress: {} } })
+            }
+            return Promise.resolve({ data: [] })
+        })
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        fireEvent.click(screen.getByTestId('import-site-package-button'))
+        fireEvent.click(await screen.findByRole('button', { name: 'Load sites' }))
+
+        expect(await screen.findByText('Remote Site')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Download as new site' })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Update Local Copy' }))
+        await waitFor(() => {
+            expect(api.post).toHaveBeenCalledWith(
+                expect.stringContaining('/site-packages/remote/imports/'),
+                expect.objectContaining({ mode: 'update', localRootId: 17 }),
+            )
+        })
     })
 
     it('shows root site package export actions for root pages', async () => {

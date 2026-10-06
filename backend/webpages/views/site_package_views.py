@@ -3,17 +3,23 @@
 from datetime import timedelta
 
 from django.db.models import Q
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework import permissions, status
+from rest_framework import authentication, permissions, serializers, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.machine_api_keys import MachineAPIKeyAuthentication
+from core.models import MachineAPIKey
 from core.permissions import HasTenantAccess
 from file_manager.storage import S3MediaStorage
-from webpages.models import SitePackageJob, WebPage
+from webpages.models import RemoteSiteBinding, SitePackageJob, ThemeRemoteAccessKey, WebPage
+from webpages.models.theme_remote import SITE_TRANSFER_CAPABILITY
 from webpages.serializers import (
+    RemoteSiteImportCreateSerializer,
+    RemoteSiteListSerializer,
     SitePackageExportCreateSerializer,
     SitePackageImportCreateSerializer,
     SitePackageJobSerializer,
@@ -22,7 +28,62 @@ from webpages.services.site_package import (
     build_site_package_export_object_key,
     get_site_package_download_filename,
 )
-from webpages.tasks import export_site_package, import_site_package
+from webpages.services.theme_remote import RemoteThemeError, remote_site_request
+from webpages.services.theme_remote_credentials import (
+    RemoteCredentialConfigurationError,
+    ThemeRemoteAccessKeyAuthentication,
+)
+from webpages.tasks import export_site_package, import_remote_site_package, import_site_package
+
+
+def _has_site_transfer(request):
+    if isinstance(request.auth, ThemeRemoteAccessKey):
+        return SITE_TRANSFER_CAPABILITY in set(request.auth.capabilities or [])
+    if request.auth is None:
+        return request.tenant.user_has_access(request.user)
+    # Machine API-key scope is checked by MachineAPIKeyAuthentication.
+    return isinstance(request.auth, MachineAPIKey)
+
+
+def _remote_owner_options(request):
+    if isinstance(request.auth, ThemeRemoteAccessKey):
+        return {"remote_access_key_id": str(request.auth.id)}
+    if isinstance(request.auth, MachineAPIKey):
+        return {"machine_api_key_id": str(request.auth.id)}
+    return {}
+
+
+def _remote_source_job(request, job_id, *, completed=False):
+    filters = {
+        "id": job_id,
+        "kind": SitePackageJob.KIND_EXPORT,
+        "root_page__tenant": request.tenant,
+    }
+    if completed:
+        filters["status"] = SitePackageJob.STATUS_COMPLETED
+    if isinstance(request.auth, ThemeRemoteAccessKey):
+        filters["options__remote_access_key_id"] = str(request.auth.id)
+    elif isinstance(request.auth, MachineAPIKey):
+        filters["options__machine_api_key_id"] = str(request.auth.id)
+    else:
+        filters["created_by"] = request.user
+    return get_object_or_404(SitePackageJob.objects.select_related("root_page"), **filters)
+
+
+class RemoteSiteSourceMixin:
+    authentication_classes = [
+        MachineAPIKeyAuthentication,
+        ThemeRemoteAccessKeyAuthentication,
+        authentication.SessionAuthentication,
+    ]
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if not _has_site_transfer(request):
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("This access key is not permitted to transfer sites.")
 
 
 class SitePackageExportListView(APIView):
@@ -117,6 +178,129 @@ class SitePackageImportDetailView(APIView):
     def get(self, request, job_id):
         job = _get_job(request, job_id, SitePackageJob.KIND_IMPORT)
         return Response(SitePackageJobSerializer(job).data)
+
+
+class RemoteSiteSourceListView(RemoteSiteSourceMixin, APIView):
+    def get(self, request):
+        roots = WebPage.objects.filter(tenant=request.tenant, parent__isnull=True, is_deleted=False).order_by("title")
+        results = []
+        for root in roots:
+            page_count = 0
+            queue = [root]
+            while queue:
+                page = queue.pop(0)
+                page_count += 1
+                queue.extend(page.children.filter(is_deleted=False).only("id"))
+            results.append(
+                {
+                    "stableKey": str(root.stable_key),
+                    "title": root.title,
+                    "hostnames": root.hostnames or [],
+                    "updatedAt": root.updated_at,
+                    "pageCount": page_count,
+                }
+            )
+        return Response({"results": results})
+
+
+class RemoteSiteSourceExportListView(RemoteSiteSourceMixin, APIView):
+    def post(self, request):
+        stable_key = request.data.get("stableKey") or request.data.get("stable_key")
+        if not stable_key:
+            raise serializers.ValidationError({"stableKey": "This field is required."})
+        root = get_object_or_404(
+            WebPage,
+            tenant=request.tenant,
+            stable_key=stable_key,
+            parent__isnull=True,
+            is_deleted=False,
+        )
+        job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_EXPORT,
+            status=SitePackageJob.STATUS_PENDING,
+            root_page=root,
+            created_by=request.user,
+            object_key=build_site_package_export_object_key(root),
+            options={
+                "include_media": True,
+                "include_themes": True,
+                "source": "remote",
+                **_remote_owner_options(request),
+            },
+            expires_at=timezone.now() + timedelta(hours=24),
+        )
+        export_site_package.delay(str(job.id))
+        return Response(SitePackageJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
+
+
+class RemoteSiteSourceExportDetailView(RemoteSiteSourceMixin, APIView):
+    def get(self, request, job_id):
+        job = _remote_source_job(request, job_id)
+        return Response(SitePackageJobSerializer(job).data)
+
+
+class RemoteSiteSourceExportDownloadView(RemoteSiteSourceMixin, APIView):
+    def get(self, request, job_id):
+        job = _remote_source_job(request, job_id, completed=True)
+        file_obj = S3MediaStorage()._open(job.object_key, "rb")
+        return FileResponse(file_obj, as_attachment=True, filename=get_site_package_download_filename(job))
+
+
+class RemoteSiteListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
+
+    def post(self, request):
+        serializer = RemoteSiteListSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        connection = serializer.validated_data["connection"]
+        try:
+            result = remote_site_request(connection, "GET", "sites/")
+        except (RemoteThemeError, RemoteCredentialConfigurationError) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        bindings = RemoteSiteBinding.objects.filter(tenant=request.tenant, connection=connection).select_related(
+            "local_root"
+        )
+        local_copies = {}
+        for binding in bindings:
+            local_copies.setdefault(str(binding.remote_root_key), []).append(
+                {"bindingId": str(binding.id), "localRootId": binding.local_root_id, "title": binding.local_root.title}
+            )
+        return Response(
+            {
+                "results": [
+                    {**item, "localCopies": local_copies.get(str(item.get("stableKey")), [])}
+                    for item in result.get("results", [])
+                ]
+            }
+        )
+
+
+class RemoteSiteImportView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
+
+    def post(self, request):
+        serializer = RemoteSiteImportCreateSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            status=SitePackageJob.STATUS_PENDING,
+            root_page_id=data.get("local_root_id"),
+            created_by=request.user,
+            options={
+                "tenant_id": str(request.tenant.id),
+                "source": "remote",
+                "mode": data["mode"],
+                "connection_id": str(data["connection"].id),
+                "remote_site_key": str(data["remote_site_key"]),
+                "local_root_id": data.get("local_root_id"),
+                "preserve_publication_status": data["mode"] == "copy",
+            },
+            progress={"phase": "queued"},
+            expires_at=timezone.now() + timedelta(hours=24),
+        )
+        import_remote_site_package.delay(str(job.id))
+        return Response(SitePackageJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
 
 
 def _get_job(request, job_id, kind):

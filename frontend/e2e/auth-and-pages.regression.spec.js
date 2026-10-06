@@ -41,6 +41,26 @@ test.describe('CMS auth and page management regressions', () => {
     await expect(page.getByText('Live', { exact: true })).toBeVisible()
     await expect(page.getByText('1 root page')).toBeVisible()
   })
+
+  test('downloads a remote site and then updates its linked local copy', async ({ page }) => {
+    await mockCmsApi(page, { authenticated: true })
+    await seedAuthenticatedSession(page)
+    await page.goto('/pages')
+
+    await page.getByTestId('import-site-package-button').click()
+    await expect(page.getByRole('heading', { name: 'Import Root Site' })).toBeVisible()
+    await page.getByRole('button', { name: 'Load sites' }).click()
+    await expect(page.getByText('Remote Summer Study')).toBeVisible()
+    await page.getByRole('button', { name: 'Download as new site' }).click()
+    await expect(page.getByText('Download Remote Summer Study', { exact: true })).toBeVisible()
+    await expect(page.getByText('Completed', { exact: true })).toBeVisible()
+
+    await page.getByTestId('import-site-package-button').click()
+    await page.getByRole('button', { name: 'Load sites' }).click()
+    await page.getByRole('button', { name: 'Update Remote Summer Study' }).click()
+    await expect(page.getByText('Update Remote Summer Study', { exact: true })).toBeVisible()
+    await expect(page.getByText('Completed with 1 warning(s)', { exact: true })).toBeVisible()
+  })
   for (const viewport of [
     { name: 'small phone', width: 320, height: 720 },
     { name: 'phone', width: 375, height: 812 },

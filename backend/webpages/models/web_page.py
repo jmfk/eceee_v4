@@ -11,6 +11,8 @@ WebPage Model
 Core page entity supporting hierarchical organization and inheritance.
 """
 
+import uuid
+
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
@@ -24,6 +26,8 @@ class WebPage(models.Model):
     Pages can have parent-child relationships for content organization.
     Root pages (without parent) can be associated with hostnames for multi-site support.
     """
+
+    stable_key = models.UUIDField(default=uuid.uuid4, editable=False, db_index=True)
 
     # Hierarchy support
     parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.CASCADE, related_name="children")
@@ -173,6 +177,12 @@ class WebPage(models.Model):
             models.Index(fields=["tenant_id"], name="webpages_tenant_idx"),
             GinIndex(fields=["hostnames"], name="webpages_hostnames_gin_idx"),
             GinIndex(fields=["cached_root_hostnames"], name="webpages_root_hosts_gin"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("tenant", "stable_key"),
+                name="unique_page_lineage_per_tenant",
+            )
         ]
 
     def get_latest_version(self):

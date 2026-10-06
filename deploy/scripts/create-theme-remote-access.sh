@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Create or rotate the production access key used by local Designer theme sync.
-# Usage: THEME_WORKSPACE=workspace THEME_ADMIN=username make prod-theme-access-key
+# Usage: THEME_WORKSPACE=workspace THEME_ADMIN=username THEME_ACCESS_CAPABILITIES=theme|site|both make prod-theme-access-key
 
 set -euo pipefail
 
@@ -8,6 +8,7 @@ PROD_HOST="${1:-root@139.162.154.219}"
 PROD_DIR="${2:-/srv/eceee_v4}"
 THEME_WORKSPACE="${THEME_WORKSPACE:-}"
 THEME_ADMIN="${THEME_ADMIN:-}"
+THEME_ACCESS_CAPABILITIES="${THEME_ACCESS_CAPABILITIES:-theme}"
 
 if [[ ! "$THEME_WORKSPACE" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
     echo "[theme-access] THEME_WORKSPACE must be a lowercase workspace identifier." >&2
@@ -25,9 +26,14 @@ if [ "${#THEME_ADMIN}" -gt 150 ]; then
     echo "[theme-access] THEME_ADMIN must be at most 150 characters." >&2
     exit 2
 fi
+if [[ ! "$THEME_ACCESS_CAPABILITIES" =~ ^(theme|site|both)$ ]]; then
+    echo "[theme-access] THEME_ACCESS_CAPABILITIES must be theme, site, or both." >&2
+    exit 2
+fi
 
 if [ "${THEME_ACCESS_CONFIRM:-}" != "yes" ]; then
-    echo "This creates or rotates the production theme-sync key named 'Local development'."
+    echo "This creates or rotates the production transfer key named 'Local development'."
+    echo "Capabilities: $THEME_ACCESS_CAPABILITIES"
     echo "Any previous key with that name will stop working."
     read -r -p "Type yes to continue: " answer
     if [ "$answer" != "yes" ]; then
@@ -39,7 +45,7 @@ fi
 echo "[theme-access] Creating a key for workspace '$THEME_WORKSPACE'..."
 echo "[theme-access] The final output line is secret. Copy it directly to the local Designer form."
 
-printf -v remote_command 'bash -s -- %q %q %q' "$PROD_DIR" "$THEME_WORKSPACE" "$THEME_ADMIN"
+printf -v remote_command 'bash -s -- %q %q %q %q' "$PROD_DIR" "$THEME_WORKSPACE" "$THEME_ADMIN" "$THEME_ACCESS_CAPABILITIES"
 # The three client-side values are shell-escaped with printf %q above.
 # shellcheck disable=SC2029
 ssh "$PROD_HOST" "$remote_command" <<'REMOTE_SCRIPT'
@@ -48,6 +54,7 @@ set -euo pipefail
 PROD_DIR="$1"
 THEME_WORKSPACE="$2"
 THEME_ADMIN="$3"
+THEME_ACCESS_CAPABILITIES="$4"
 LOCK_FILE="/mnt/data/.eceee-production-operation.lock"
 
 cd "$PROD_DIR"
@@ -58,6 +65,12 @@ if ! flock -n 200; then
 fi
 
 compose=(docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env)
+capability_args=(--capability theme.transfer)
+if [ "$THEME_ACCESS_CAPABILITIES" = "site" ]; then
+    capability_args=(--capability site.transfer)
+elif [ "$THEME_ACCESS_CAPABILITIES" = "both" ]; then
+    capability_args+=(--capability site.transfer)
+fi
 
 if ! "${compose[@]}" exec -T backend python manage.py shell -c \
     'from django.conf import settings; raise SystemExit(0 if settings.THEME_SYNC_ENABLED else 1)' </dev/null
@@ -70,5 +83,6 @@ fi
 "${compose[@]}" exec -T backend python manage.py setup_theme_remote_access \
     --workspace "$THEME_WORKSPACE" \
     --created-by "$THEME_ADMIN" \
+    "${capability_args[@]}" \
     --name "Local development" </dev/null
 REMOTE_SCRIPT

@@ -55,3 +55,47 @@ def remote_sync_request(remote_url, workspace, token, action, payload=None):
         return response.json()
     except ValueError as exc:
         raise RemoteThemeError("The remote site returned an invalid response.") from exc
+
+
+def remote_site_request(connection, method, path, payload=None, stream=False):
+    """Call a bounded site-transfer endpoint on a saved remote connection."""
+    from webpages.services.theme_remote_credentials import decrypt_access_key
+
+    base = validate_remote_url(connection.base_url)
+    url = urljoin(base, f"api/v1/webpages/site-packages/remote-source/{path.lstrip('/')}")
+    token = decrypt_access_key(connection.encrypted_access_key)
+    try:
+        response = requests.request(
+            method,
+            url,
+            json=payload if payload is not None else None,
+            headers={
+                "Authorization": f"ThemeKey {token}",
+                "X-Tenant-ID": connection.remote_workspace,
+                "Accept": "application/zip" if stream else "application/json",
+            },
+            timeout=(5, 60),
+            allow_redirects=False,
+            stream=stream,
+        )
+    except requests.RequestException as exc:
+        raise RemoteThemeError("The remote site could not be reached.") from exc
+    if 300 <= response.status_code < 400:
+        response.close()
+        raise RemoteThemeError("The remote site redirected the request. Configure its final URL instead.")
+    if response.status_code >= 400:
+        response.close()
+        message = "The remote site rejected the request."
+        if response.status_code in {401, 403}:
+            message = "The remote credentials do not include site transfer access."
+        elif response.status_code == 404:
+            message = "The remote site or export could not be found."
+        raise RemoteThemeError(message)
+    if stream:
+        return response
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise RemoteThemeError("The remote site returned an invalid response.") from exc
+    finally:
+        response.close()

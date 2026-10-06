@@ -29,6 +29,7 @@ import {
     Trash2
 } from 'lucide-react'
 import { pagesApi, sitePackagesApi, versionsApi } from '../api'
+import { designerThemesApi } from '../api/designerThemes'
 import { deletePage } from '../api/pages'
 import PageTreeNode from './PageTreeNode'
 import TreeImporterModalV2 from './TreeImporterModalV2'
@@ -921,6 +922,36 @@ const TreePageManager = () => {
         }
     }, [addNotification, pollSitePackageJob, queryClient, showError, upsertSitePackageJob])
 
+    const handleImportRemoteSite = useCallback(async ({ connectionId, remoteSiteKey, mode, localRootId, title }) => {
+        const actionLabel = mode === 'update' ? `Update ${title}` : `Download ${title}`
+        try {
+            const job = await sitePackagesApi.createRemoteImport({ connectionId, remoteSiteKey, mode, localRootId })
+            setShowSitePackageImportModal(false)
+            upsertSitePackageJob({ ...job, label: actionLabel })
+            pollSitePackageJob({
+                jobId: job.id,
+                getJob: sitePackagesApi.getImport,
+                onCompleted: async (completedJob) => {
+                    upsertSitePackageJob({ ...completedJob, label: actionLabel })
+                    queryClient.removeQueries({ queryKey: ['pages'] })
+                    queryClient.removeQueries({ queryKey: ['page-children'] })
+                    await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
+                    const warningCount = completedJob.progress?.warnings?.length || 0
+                    addNotification(
+                        warningCount ? `${actionLabel} completed with ${warningCount} warning(s)` : `${actionLabel} completed`,
+                        warningCount ? 'warning' : 'success',
+                        `remote-site-${job.id}`
+                    )
+                }
+            }).catch((error) => {
+                upsertSitePackageJob({ ...job, status: 'failed', label: actionLabel, errors: [error.message] })
+            })
+        } catch (error) {
+            showError(error, 'error')
+            throw error
+        }
+    }, [addNotification, pollSitePackageJob, queryClient, showError, upsertSitePackageJob])
+
     // Clear clipboard
     const clearClipboard = () => {
         addNotification('Clipboard cleared', 'info', 'clipboard')
@@ -1750,6 +1781,7 @@ const TreePageManager = () => {
                 isOpen={showSitePackageImportModal}
                 onClose={() => setShowSitePackageImportModal(false)}
                 onImport={handleImportRootPackage}
+                onRemoteImport={handleImportRemoteSite}
             />
 
             <SitePackageExportModal
@@ -1763,9 +1795,18 @@ const TreePageManager = () => {
 
 const SitePackageJobsPanel = ({ jobs, onDismiss }) => {
     const getStatusText = (job) => {
-        if (job.status === 'completed') return job.downloadUrl ? 'Ready to download' : 'Completed'
+        if (job.status === 'completed') {
+            const warnings = job.progress?.warnings?.length || 0
+            if (warnings) return `Completed with ${warnings} warning(s)`
+            return job.downloadUrl ? 'Ready to download' : 'Completed'
+        }
         if (job.status === 'failed') return Array.isArray(job.errors) && job.errors.length > 0 ? job.errors[job.errors.length - 1] : 'Failed'
-        if (job.status === 'running') return 'Running'
+        if (job.status === 'running') {
+            if (job.progress?.phase === 'remote_export') return 'Preparing remote package'
+            if (job.progress?.phase === 'downloading') return 'Downloading remote package'
+            if (job.progress?.phase === 'importing') return 'Importing site'
+            return 'Running'
+        }
         return 'Queued'
     }
 
@@ -1922,18 +1963,39 @@ const SitePackageExportModal = ({ rootPage, onClose, onExport }) => {
     )
 }
 
-const SitePackageImportModal = ({ isOpen, onClose, onImport }) => {
+const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) => {
+    const [source, setSource] = useState('remote')
     const [file, setFile] = useState(null)
     const [preservePublicationStatus, setPreservePublicationStatus] = useState(true)
     const [isImporting, setIsImporting] = useState(false)
     const [error, setError] = useState('')
+    const [connections, setConnections] = useState([])
+    const [connectionId, setConnectionId] = useState('')
+    const [remoteSites, setRemoteSites] = useState([])
+    const [loadingConnections, setLoadingConnections] = useState(false)
+    const [loadingRemotes, setLoadingRemotes] = useState(false)
+    const [hasLoadedRemoteSites, setHasLoadedRemoteSites] = useState(false)
 
     useEffect(() => {
         if (isOpen) {
+            setSource('remote')
             setFile(null)
             setPreservePublicationStatus(true)
             setIsImporting(false)
             setError('')
+            setConnections([])
+            setConnectionId('')
+            setRemoteSites([])
+            setLoadingConnections(true)
+            setHasLoadedRemoteSites(false)
+            designerThemesApi.remoteConnections()
+                .then((result) => {
+                    const items = result.results || []
+                    setConnections(items)
+                    setConnectionId(items.find((item) => item.isDefault)?.id || items[0]?.id || '')
+                })
+                .catch((loadError) => setError(loadError.message || 'Could not load remote connections.'))
+                .finally(() => setLoadingConnections(false))
         }
     }, [isOpen])
 
@@ -1956,16 +2018,47 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport }) => {
         }
     }
 
+    const loadRemoteSites = async () => {
+        if (!connectionId) return
+        setLoadingRemotes(true)
+        setHasLoadedRemoteSites(false)
+        setError('')
+        try {
+            const result = await sitePackagesApi.listRemoteSites(connectionId)
+            setRemoteSites(result.results || [])
+        } catch (loadError) {
+            setError(loadError.message || 'Could not load remote sites. Check the connection and its site.transfer access.')
+        } finally {
+            setLoadingRemotes(false)
+            setHasLoadedRemoteSites(true)
+        }
+    }
+
+    const startRemoteImport = async (site, mode, localRootId = null) => {
+        setIsImporting(true)
+        setError('')
+        try {
+            await onRemoteImport({
+                connectionId,
+                remoteSiteKey: site.stableKey,
+                mode,
+                localRootId,
+                title: site.title,
+            })
+        } catch (importError) {
+            setError(importError.message || 'Could not start the remote site import.')
+            setIsImporting(false)
+        }
+    }
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
-                <form onSubmit={handleSubmit}>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                <div>
                     <div className="flex items-center justify-between p-6 border-b border-gray-200">
                         <div>
                             <h2 className="text-xl font-semibold text-gray-900">Import Root Site</h2>
-                            <p className="text-sm text-gray-600 mt-1">
-                                Creates a new root page tree from a site package ZIP.
-                            </p>
+                            <p className="text-sm text-gray-600 mt-1">Download a remote site or import a site package ZIP.</p>
                         </div>
                         <button
                             type="button"
@@ -1978,6 +2071,26 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport }) => {
                         </button>
                     </div>
 
+                    <div className="px-6 pt-4">
+                        <div className="flex gap-5 border-b border-gray-200" role="tablist" aria-label="Import source">
+                            {[
+                                ['remote', 'Remote site'],
+                                ['zip', 'ZIP file'],
+                            ].map(([value, label]) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={source === value}
+                                    onClick={() => { setSource(value); setError('') }}
+                                    className={`pb-2 text-sm font-medium ${source === value ? 'border-b-2 border-blue-600 text-blue-700' : 'text-gray-600'}`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="p-6 space-y-4">
                         {error && (
                             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -1985,6 +2098,73 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport }) => {
                             </div>
                         )}
 
+                        {source === 'remote' ? <>
+                            {loadingConnections ? (
+                                <p className="inline-flex items-center gap-2 text-sm text-gray-600">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Loading remote connections
+                                </p>
+                            ) : connections.length === 0 ? (
+                                <p className="text-sm text-gray-600">No remote connections are configured. Add one in Designer themes first.</p>
+                            ) : <div className="flex items-end gap-3">
+                                <label className="min-w-0 flex-1 text-sm font-medium text-gray-700">
+                                    Remote connection
+                                    <select
+                                        value={connectionId}
+                                        onChange={(event) => { setConnectionId(event.target.value); setRemoteSites([]); setHasLoadedRemoteSites(false) }}
+                                        disabled={isImporting}
+                                        className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal"
+                                    >
+                                        {connections.map((connection) => <option key={connection.id} value={connection.id}>{connection.name}</option>)}
+                                    </select>
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={loadRemoteSites}
+                                    disabled={!connectionId || loadingRemotes || isImporting}
+                                    className="inline-flex min-h-10 items-center gap-2 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                                >
+                                    {loadingRemotes && <Loader2 className="h-4 w-4 animate-spin" />}
+                                    Load sites
+                                </button>
+                            </div>}
+                            {!loadingRemotes && connectionId && remoteSites.length === 0 && connections.length > 0 && (
+                                <p className="text-sm text-gray-600">
+                                    {hasLoadedRemoteSites
+                                        ? 'No root sites are available through this connection.'
+                                        : 'Load the remote sites available to this connection.'}
+                                </p>
+                            )}
+                            {remoteSites.length > 0 && <div className="divide-y divide-gray-200">
+                                {remoteSites.map((site) => <div key={site.stableKey} className="py-4 first:pt-0">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="font-medium text-gray-900">{site.title}</p>
+                                            <p className="text-xs text-gray-500">{site.hostnames?.join(', ') || 'No hostname'} · {site.pageCount} pages</p>
+                                            {site.updatedAt && <p className="mt-1 text-xs text-gray-500">Updated {new Date(site.updatedAt).toLocaleString()}</p>}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => startRemoteImport(site, 'copy')}
+                                            disabled={isImporting}
+                                            className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:opacity-50"
+                                        >
+                                            Download as new site
+                                        </button>
+                                    </div>
+                                    {site.localCopies?.length > 0 && <div className="mt-3 flex flex-wrap gap-2">
+                                        {site.localCopies.map((copy) => <button
+                                            key={copy.bindingId}
+                                            type="button"
+                                            onClick={() => startRemoteImport(site, 'update', copy.localRootId)}
+                                            disabled={isImporting}
+                                            className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800 disabled:opacity-50"
+                                        >
+                                            Update {copy.title}
+                                        </button>)}
+                                    </div>}
+                                </div>)}
+                            </div>}
+                        </> : <form id="site-package-zip-form" onSubmit={handleSubmit} className="space-y-4">
                         <label className="block">
                             <span className="block text-sm font-medium text-gray-700 mb-1">Site package ZIP</span>
                             <input
@@ -2006,6 +2186,7 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport }) => {
                             />
                             <span>Preserve publication status</span>
                         </label>
+                        </form>}
                     </div>
 
                     <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
@@ -2017,16 +2198,17 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport }) => {
                         >
                             Cancel
                         </button>
-                        <button
+                        {source === 'zip' && <button
                             type="submit"
+                            form="site-package-zip-form"
                             disabled={isImporting || !file}
                             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                         >
                             {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                             {isImporting ? 'Uploading...' : 'Import Root'}
-                        </button>
+                        </button>}
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     )
