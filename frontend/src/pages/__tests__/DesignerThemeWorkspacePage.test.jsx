@@ -590,7 +590,7 @@ describe('DesignerThemeWorkspacePage', () => {
         responsiveWorkspace.spacing = [
             responsiveWorkspace.spacing[0],
             { ...responsiveWorkspace.spacing[1], breakpoint: 'xs', values: { padding: '8px' } },
-            { ...responsiveWorkspace.spacing[1], breakpoint: 'md', values: { padding: '24px' } },
+            { ...responsiveWorkspace.spacing[1], breakpoint: 'md', values: { marginBottom: '16px', padding: '24px' } },
         ]
         mocks.workspace.mockResolvedValue(responsiveWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
@@ -613,7 +613,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(mocks.save.mock.calls[0][1].spacing[0].values.padding).toBeUndefined()
         expect(mocks.save.mock.calls[0][1].spacing[1].values.padding).toBe('8px')
         expect(mocks.save.mock.calls[0][1].spacing[2].values.padding).toBe('24px')
-        expect(mocks.save.mock.calls[0][1].spacing[3]).toEqual(expect.objectContaining({ breakpoint: 'xl', values: expect.objectContaining({ padding: '32px' }) }))
+        expect(mocks.save.mock.calls[0][1].spacing[3]).toEqual(expect.objectContaining({ breakpoint: 'xl', values: { padding: '32px' } }))
     })
 
     it('uses the theme breakpoints as the global preview and inspector selector', async () => {
@@ -653,6 +653,37 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('heading', { name: 'Spacing · Content · Small (Mobile)' })).toBeInTheDocument()
         expect(screen.getByDisplayValue('12px')).toBeInTheDocument()
         expect(screen.queryByDisplayValue('48px')).not.toBeInTheDocument()
+    })
+
+    it('keeps legacy breakpoint spacing and images available at their canonical levels', async () => {
+        const legacyWorkspace = structuredClone(workspace)
+        legacyWorkspace.spacing = [
+            legacyWorkspace.spacing[0],
+            { ...legacyWorkspace.spacing[1], breakpoint: 'mobile', values: { padding: '12px' } },
+        ]
+        legacyWorkspace.assets = [
+            ...legacyWorkspace.assets.filter((asset) => !asset.assetKey.startsWith('design:0:hero:')),
+            {
+                ...legacyWorkspace.assets.find((asset) => asset.assetKey === 'design:0:hero:sm:background'),
+                assetKey: 'design:0:hero:mobile:background',
+                breakpoint: 'mobile',
+            },
+        ]
+        mocks.workspace.mockResolvedValue(legacyWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+
+        const iframe = screen.getByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-designer-preview', targetId: 'group:0:part:content-widget', kind: 'part', label: 'Content' },
+            source: iframe.contentWindow,
+        }))
+        expect(screen.getByText(/defined at Base \(Mobile\)/i)).toBeInTheDocument()
+        expect(screen.getByDisplayValue('12px')).toBeDisabled()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Theme images' }))
+        fireEvent.click(screen.getByRole('button', { name: /Select image aspect Article/ }))
+        expect(screen.getByRole('button', { name: 'Replace Article hero mobile source at Base (Mobile)' })).toBeInTheDocument()
     })
 
     it('shows only relevant values after clicking a visible element', async () => {
@@ -778,6 +809,9 @@ describe('DesignerThemeWorkspacePage', () => {
     })
 
     it('shows theme properties without mixing image replacement into element editing', async () => {
+        const propertyWorkspace = structuredClone(workspace)
+        propertyWorkspace.spacing[1].values.marginBottom = '16px'
+        mocks.workspace.mockResolvedValue(propertyWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         await waitFor(() => {
@@ -793,14 +827,17 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('heading', { name: 'Typography · Heading 1' })).toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Spacing · Content · Extra Large' })).toBeInTheDocument()
         expect(screen.getByText(/Inherited at Extra Large/)).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Create Extra Large override' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Override Inner spacing at Extra Large' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Edit source at Medium (Tablet)' })).toBeInTheDocument()
         expect(screen.getByDisplayValue('24px')).toBeDisabled()
-        fireEvent.click(screen.getByRole('button', { name: 'Edit source at Medium (Tablet)' }))
-        expect(screen.getByDisplayValue('24px')).toBeEnabled()
-        fireEvent.click(screen.getByRole('button', { name: 'Create Extra Large override' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Override Inner spacing at Extra Large' }))
         expect(screen.getByText(/Defined at Extra Large/)).toBeInTheDocument()
+        expect(screen.getByText(/This value is defined at Medium \(Tablet\)/)).toBeInTheDocument()
         expect(screen.getByDisplayValue('24px')).toBeEnabled()
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        const override = mocks.save.mock.calls[0][1].spacing.find((row) => row.breakpoint === 'xl')
+        expect(override.values).toEqual({ padding: '24px' })
         expect(screen.getByLabelText('brand value')).toBeInTheDocument()
     })
 

@@ -32,13 +32,14 @@ export function getBreakpoints(theme) {
 /**
  * Map old breakpoint names to new semantic names (backward compatibility)
  * @param {string} oldName - Old breakpoint name (mobile, tablet, desktop)
- * @returns {string} New semantic name (sm, md, lg, xl)
+ * @returns {string} Canonical breakpoint name (xs, sm, md, lg, xl)
  */
 export function mapBreakpointName(oldName) {
     const mapping = {
-        'mobile': 'sm',
+        'default': 'xs',
+        'mobile': 'xs',
         'tablet': 'md',
-        'desktop': 'lg',
+        'desktop': 'sm',
     };
     return mapping[oldName] || oldName;
 }
