@@ -604,7 +604,7 @@ const MediaInsertModal = ({
 
                             {/* Configuration Form */}
                             <div className="space-y-6">
-                                {/* Image Style (Gallery/Carousel) */}
+                                {/* Image style presentation */}
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-1.5">
@@ -637,7 +637,7 @@ const MediaInsertModal = ({
                                         {availableImageStyles.map(style => (
                                             <option key={style.value} value={style.value}>
                                                 {style.label}
-                                                {style.styleType && ` (${style.styleType})`}
+                                                {style.styleType && ` (${style.styleType === 'carousel' ? 'Carousel' : 'Image / Gallery'})`}
                                                 {style.description ? ` - ${style.description}` : ''}
                                             </option>
                                         ))}

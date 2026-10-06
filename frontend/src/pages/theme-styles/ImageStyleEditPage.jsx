@@ -380,7 +380,7 @@ const ImageStyleEditPage = () => {
                                     {name || styleKey}
                                 </div>
                                 <div className="text-sm text-gray-600 mt-1">
-                                    Theme: {themeData.name} · Type: {styleType === 'carousel' ? 'Carousel' : 'Gallery'}
+                                    Theme: {themeData.name} · Type: {styleType === 'carousel' ? 'Carousel' : 'Image / Gallery'}
                                 </div>
                             </div>
                         </div>
@@ -473,7 +473,7 @@ const ImageStyleEditPage = () => {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Style Type *
+                                        Presentation Type *
                                     </label>
                                     <div className="flex gap-2">
                                         <button
@@ -484,7 +484,7 @@ const ImageStyleEditPage = () => {
                                                 }`}
                                         >
                                             <Grid3X3 className="h-4 w-4" />
-                                            Gallery
+                                            Image / Gallery
                                         </button>
                                         <button
                                             onClick={() => setStyleType('carousel')}
@@ -496,6 +496,9 @@ const ImageStyleEditPage = () => {
                                             <Play className="h-4 w-4" />
                                             Carousel
                                         </button>
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                        Image / Gallery supports either a single image or multiple images. Lightbox is configured separately below.
                                     </div>
                                 </div>
                                 <div>
@@ -923,4 +926,3 @@ const ImageStyleEditPage = () => {
 };
 
 export default ImageStyleEditPage;
-

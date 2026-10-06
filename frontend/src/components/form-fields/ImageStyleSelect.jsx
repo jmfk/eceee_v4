@@ -203,7 +203,7 @@ const ImageStyleSelect = ({
                                         ? 'bg-purple-100 text-purple-700' 
                                         : 'bg-blue-100 text-blue-700'
                                 }`}>
-                                    {style.styleType === 'carousel' ? 'Carousel' : 'Gallery'}
+                                    {style.styleType === 'carousel' ? 'Carousel' : 'Image / Gallery'}
                                 </span>
                                 <span>{style.description || 'Custom style'}</span>
                             </>

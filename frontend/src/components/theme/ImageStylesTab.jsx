@@ -224,7 +224,7 @@ const ImageStylesTab = forwardRef(({ imageStyles, onChange, onDirty, themeId }, 
                                         ? 'bg-purple-100 text-purple-700' 
                                         : 'bg-blue-100 text-blue-700'
                                 }`}>
-                                    {style.styleType === 'carousel' ? 'Carousel' : 'Gallery'}
+                                    {style.styleType === 'carousel' ? 'Carousel' : 'Image / Gallery'}
                                 </span>
                                 <span className="px-2 py-1 rounded bg-gray-100 text-gray-700">
                                     {style.usageType === 'standard' ? 'Standard' : 
@@ -272,4 +272,3 @@ const ImageStylesTab = forwardRef(({ imageStyles, onChange, onDirty, themeId }, 
 ImageStylesTab.displayName = 'ImageStylesTab';
 
 export default ImageStylesTab;
-
