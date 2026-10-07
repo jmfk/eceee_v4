@@ -166,13 +166,20 @@ class RemoteObjectSourcePreflightView(RemoteObjectSourceMixin, APIView):
         root_ids = request.data.get("root_ids") or request.data.get("rootIds") or []
         if not root_ids:
             raise serializers.ValidationError({"rootIds": "Select at least one root object."})
-        return Response(build_preflight(request.tenant, root_ids))
+        try:
+            preflight = build_preflight(request.tenant, root_ids)
+        except ValueError as exc:
+            raise serializers.ValidationError({"rootIds": str(exc)}) from exc
+        return Response(preflight)
 
 
 class RemoteObjectSourceExportListView(RemoteObjectSourceMixin, APIView):
     def post(self, request):
         root_ids = request.data.get("root_ids") or request.data.get("rootIds") or []
-        preflight = build_preflight(request.tenant, root_ids)
+        try:
+            preflight = build_preflight(request.tenant, root_ids)
+        except ValueError as exc:
+            raise serializers.ValidationError({"rootIds": str(exc)}) from exc
         if not preflight["limits"]["within_limits"]:
             raise serializers.ValidationError({"rootIds": "The selection exceeds the object transfer limits."})
         job = ObjectTransferJob.objects.create(

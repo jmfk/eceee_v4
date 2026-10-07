@@ -2,18 +2,24 @@ import io
 import json
 import zipfile
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from celery.exceptions import Retry
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework import serializers
 
 from content.models import Namespace
 from core.models import Tenant
 from file_manager.models import MediaCollection, MediaFile, MediaTag
 from object_storage.models import ObjectInstance, ObjectTransferJob, ObjectTypeDefinition, ObjectVersion
-from object_storage.remote_views import _decorate_preflight
+from object_storage.remote_views import (
+    RemoteObjectSourceExportListView,
+    RemoteObjectSourcePreflightView,
+    _decorate_preflight,
+)
 from object_storage.services.object_transfer import (
     MAX_ARCHIVE_BYTES,
     MAX_UNCOMPRESSED_BYTES,
@@ -155,6 +161,18 @@ class ObjectTransferServiceTests(TestCase):
         self.root.current_version = version
         self.root.version = 1
         self.root.save(update_fields=["current_version", "version", "updated_at"])
+
+    def test_source_views_return_validation_error_for_invalid_root_selection(self):
+        request = SimpleNamespace(data={"rootIds": [self.root.id]}, tenant=self.tenant)
+        error = ValueError("One or more selected root objects are unavailable.")
+
+        for view_class in (RemoteObjectSourcePreflightView, RemoteObjectSourceExportListView):
+            with self.subTest(view=view_class.__name__):
+                with patch("object_storage.remote_views.build_preflight", side_effect=error):
+                    with self.assertRaises(serializers.ValidationError) as raised:
+                        view_class().post(request)
+
+                self.assertEqual(str(raised.exception.detail["rootIds"]), str(error))
 
     def test_catalog_limits_roots_and_graph_follows_children_and_references(self):
         catalog = candidate_catalog(self.tenant, [{"object_type": self.root_type.name, "limit": 1}])
