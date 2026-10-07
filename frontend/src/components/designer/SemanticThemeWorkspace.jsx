@@ -40,6 +40,7 @@ const breakpointLabel = (breakpoint) => {
 }
 
 const hasThemeValue = (value) => value !== undefined && value !== null && value !== ''
+const targetFocusKey = (target) => `${target?.widgetId || ''}:${target?.id || ''}`
 
 const fitPaneWidths = (workspaceWidth, sidebarWidth, inspectorWidth, sidebarCollapsed, inspectorCollapsed) => {
     if (workspaceWidth < desktopPaneBreakpoint) return { sidebarWidth, inspectorWidth }
@@ -635,6 +636,7 @@ const SemanticThemeWorkspace = ({
                     label: option.label,
                     displayLabel: option.displayLabel || option.label,
                     parentId: option.parentId || '',
+                    parentWidgetId: option.parentWidgetId || '',
                     depth: Number.isFinite(option.depth) ? option.depth : 0,
                     widgetType: option.widgetType || '',
                     widgetId: option.widgetId || '',
@@ -676,18 +678,18 @@ const SemanticThemeWorkspace = ({
                 ancestors,
                 descendants,
             }
-            if (pendingInspectorSelectionRef.current === target.id) pendingInspectorSelectionRef.current = null
+            if (pendingInspectorSelectionRef.current === targetFocusKey(target)) pendingInspectorSelectionRef.current = null
             const currentRoot = inspectorRootRef.current
             const targetBelongsToCurrentRoot = currentRoot && (
-                currentRoot.id === target.id
-                || currentRoot.descendants?.some((descendant) => descendant.id === target.id)
+                targetFocusKey(currentRoot) === targetFocusKey(target)
+                || currentRoot.descendants?.some((descendant) => targetFocusKey(descendant) === targetFocusKey(target))
             )
             if (targetBelongsToCurrentRoot) {
-                const updatedRoot = currentRoot.id === target.id
+                const updatedRoot = targetFocusKey(currentRoot) === targetFocusKey(target)
                     ? { ...target, descendants: target.descendants.length ? target.descendants : currentRoot.descendants }
                     : {
                         ...currentRoot,
-                        descendants: currentRoot.descendants.map((descendant) => descendant.id === target.id
+                        descendants: currentRoot.descendants.map((descendant) => targetFocusKey(descendant) === targetFocusKey(target)
                             ? { ...descendant, ...target, descendants: descendant.descendants || [] }
                             : descendant),
                     }
@@ -699,7 +701,7 @@ const SemanticThemeWorkspace = ({
             }
             if (event.data.action !== 'contentChange') {
                 setHighlightedTargetId('')
-                setOpenTargetId(targetBelongsToCurrentRoot && currentRoot.id !== target.id ? target.id : '')
+                setOpenTargetId(targetBelongsToCurrentRoot && targetFocusKey(currentRoot) !== targetFocusKey(target) ? targetFocusKey(target) : '')
                 setSelectionFocusVersion((current) => current + 1)
             }
             setThemeDefaults((current) => ({
@@ -908,30 +910,33 @@ const SemanticThemeWorkspace = ({
             inspectorRootRef.current = normalizedTarget
             setInspectorRoot(normalizedTarget)
         }
-        pendingInspectorSelectionRef.current = target.id
+        pendingInspectorSelectionRef.current = targetFocusKey(target)
         setSelectedTarget(normalizedTarget)
         setHighlightedTargetId('')
         setSelectionExpanded(true)
-        setOpenTargetId(replaceInspectorRoot || target.id === inspectorRootRef.current?.id ? '' : target.id)
+        setOpenTargetId(replaceInspectorRoot || targetFocusKey(target) === targetFocusKey(inspectorRootRef.current) ? '' : targetFocusKey(target))
         setSelectionFocusVersion((current) => current + 1)
         iframeRef.current?.contentWindow?.postMessage({
             source: 'eceee-render-host',
             action: 'selectTarget',
             targetId: target.id,
+            ...(target.widgetId ? { widgetId: target.widgetId } : {}),
         }, '*')
     }
     const toggleTargetHighlight = (target) => {
-        const active = highlightedTargetId !== target.id
-        setHighlightedTargetId(active ? target.id : '')
+        const targetKey = targetFocusKey(target)
+        const active = highlightedTargetId !== targetKey
+        setHighlightedTargetId(active ? targetKey : '')
         iframeRef.current?.contentWindow?.postMessage({
             source: 'eceee-render-host',
             action: 'highlightTarget',
             targetId: target.id,
             active,
+            ...(target.widgetId ? { widgetId: target.widgetId } : {}),
         }, '*')
     }
     const toggleTargetAccordion = (target) => {
-        if (selectedTarget?.id === target.id && openTargetId === target.id) {
+        if (targetFocusKey(selectedTarget) === targetFocusKey(target) && openTargetId === targetFocusKey(target)) {
             setOpenTargetId('')
             return
         }
@@ -1212,11 +1217,15 @@ const SemanticThemeWorkspace = ({
     )
 
     const childTargets = [...new Map((inspectorRoot?.descendants || [])
-        .filter((target) => target.id !== inspectorRoot?.id)
-        .map((target) => [target.id, target])).values()]
+        .filter((target) => targetFocusKey(target) !== targetFocusKey(inspectorRoot))
+        .map((target) => [targetFocusKey(target), target])).values()]
     const childTargetsByParent = childTargets.reduce((targetsByParent, target) => {
-        const parentId = target.parentId !== target.id && childTargets.some((candidate) => candidate.id === target.parentId) ? target.parentId : inspectorRoot?.id || ''
-        targetsByParent.set(parentId, [...(targetsByParent.get(parentId) || []), target])
+        const parent = target.parentId !== target.id && childTargets.find((candidate) => (
+            candidate.id === target.parentId
+            && (!target.parentWidgetId || candidate.widgetId === target.parentWidgetId)
+        ))
+        const parentKey = parent ? targetFocusKey(parent) : targetFocusKey(inspectorRoot)
+        targetsByParent.set(parentKey, [...(targetsByParent.get(parentKey) || []), target])
         return targetsByParent
     }, new Map())
     const targetAlternatives = [...(selectedTarget?.alternatives?.length ? selectedTarget.alternatives : selectedTarget ? [selectedTarget] : []).reduce((alternatives, alternative) => {
@@ -1325,19 +1334,20 @@ const SemanticThemeWorkspace = ({
                     {!targetTypography.length && !targetSpacing.length && !relevantColors.length && selectedTarget.kind !== 'element' && selectedTarget.kind !== 'asset' && <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500">Choose a more specific text or image inside this area to edit its details.</p>}
                         </>
                         return <>
-                            {selectedTarget.id === inspectorRoot?.id && <div key={`root-${selectionFocusVersion}`} className={`designer-inspector-focus space-y-3 ${childTargets.length > 0 ? 'shrink-0' : 'min-h-0 flex-1 overflow-y-auto'}`}>{fields}</div>}
+                            {targetFocusKey(selectedTarget) === targetFocusKey(inspectorRoot) && <div key={`root-${selectionFocusVersion}`} className={`designer-inspector-focus space-y-3 ${childTargets.length > 0 ? 'shrink-0' : 'min-h-0 flex-1 overflow-y-auto'}`}>{fields}</div>}
                             {childTargets.length > 0 && <section className="flex min-h-0 flex-1 flex-col border-t border-gray-200 pt-3">
                                 <h3 className="mb-2 shrink-0 text-sm font-medium text-gray-900">Elements inside</h3>
                                 <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain border-y border-gray-200" role="tree" aria-label="Element hierarchy">
                                     {(() => {
-                                        const renderTargetTree = (parentId, level = 1) => (childTargetsByParent.get(parentId) || []).map((child) => {
-                                        const isSelected = selectedTarget.id === child.id
-                                        const isOpen = openTargetId === child.id
-                                        const isHighlighted = highlightedTargetId === child.id
+                                        const renderTargetTree = (parentKey, level = 1) => (childTargetsByParent.get(parentKey) || []).map((child) => {
+                                        const childKey = targetFocusKey(child)
+                                        const isSelected = targetFocusKey(selectedTarget) === childKey
+                                        const isOpen = openTargetId === childKey
+                                        const isHighlighted = highlightedTargetId === childKey
                                         const childLabel = child.displayLabel || child.label
-                                        const panelId = `element-editor-${child.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
-                                        const nestedTargets = childTargetsByParent.get(child.id) || []
-                                        return <div key={child.id} role="treeitem" aria-label={childLabel} aria-level={level} aria-selected={isSelected} className="min-w-0 border-b border-gray-200 last:border-b-0">
+                                        const panelId = `element-editor-${childKey.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+                                        const nestedTargets = childTargetsByParent.get(childKey) || []
+                                        return <div key={childKey} role="treeitem" aria-label={childLabel} aria-level={level} aria-selected={isSelected} className="min-w-0 border-b border-gray-200 last:border-b-0">
                                             <article className="min-w-0">
                                                 <div className={`flex min-w-0 items-stretch ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
                                                     <button
@@ -1364,12 +1374,12 @@ const SemanticThemeWorkspace = ({
                                                         <Focus className="h-4 w-4" />
                                                     </button>
                                                 </div>
-                                                {isOpen && isSelected && <div key={`${child.id}-${selectionFocusVersion}`} id={panelId} role="region" aria-label={`${child.label} settings`} className="designer-inspector-focus space-y-3 border-t border-blue-100 bg-blue-50/30 px-2 py-3">{fields}</div>}
+                                                {isOpen && isSelected && <div key={`${childKey}-${selectionFocusVersion}`} id={panelId} role="region" aria-label={`${child.label} settings`} className="designer-inspector-focus space-y-3 border-t border-blue-100 bg-blue-50/30 px-2 py-3">{fields}</div>}
                                             </article>
-                                            {nestedTargets.length > 0 && <div role="group" className="ml-4 border-l border-gray-300 pl-2">{renderTargetTree(child.id, level + 1)}</div>}
+                                            {nestedTargets.length > 0 && <div role="group" className="ml-4 border-l border-gray-300 pl-2">{renderTargetTree(childKey, level + 1)}</div>}
                                         </div>
                                         })
-                                        return renderTargetTree(inspectorRoot?.id || '')
+                                        return renderTargetTree(targetFocusKey(inspectorRoot))
                                     })()}
                                 </div>
                             </section>}

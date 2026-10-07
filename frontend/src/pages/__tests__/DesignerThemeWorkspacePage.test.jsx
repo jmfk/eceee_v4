@@ -572,8 +572,8 @@ describe('DesignerThemeWorkspacePage', () => {
                     source: 'eceee-designer-preview', action: 'editText', targetId: 'content:0', kind: 'element', label: 'Rich text',
                     text: '<p>Editable copy</p>', editable: true, richText: true,
                     descendants: [
-                        { id: 'group:0:element:h1', kind: 'element', label: 'Heading 1', displayLabel: 'Heading 1: “Editable copy”', parentId: 'content:0', depth: 1, text: 'Editable copy', editable: false },
-                        { id: 'group:0:element:p', kind: 'element', label: 'Paragraph', displayLabel: 'Paragraph: “More copy”', parentId: 'group:0:element:h1', depth: 2, text: 'More copy', editable: true },
+                        { id: 'group:0:element:h1', kind: 'element', label: 'Heading 1', displayLabel: 'Heading 1: “Editable copy”', parentId: 'content:0', depth: 1, text: 'Editable copy', editable: false, widgetId: 'content-1' },
+                        { id: 'group:0:element:p', kind: 'element', label: 'Paragraph', displayLabel: 'Paragraph: “More copy”', parentId: 'group:0:element:h1', depth: 2, text: 'More copy', editable: true, widgetId: 'content-1' },
                     ],
                 },
                 source: iframe.contentWindow,
@@ -600,6 +600,7 @@ describe('DesignerThemeWorkspacePage', () => {
             action: 'highlightTarget',
             targetId: 'group:0:element:h1',
             active: true,
+            widgetId: 'content-1',
         }, '*')
         expect(screen.getByRole('button', { name: 'Stop highlighting Heading 1: “Editable copy”' })).toHaveAttribute('aria-pressed', 'true')
         expect(screen.getByRole('button', { name: 'Stop highlighting Heading 1: “Editable copy”' }).querySelector('.lucide-focus')).toBeInTheDocument()
@@ -613,6 +614,7 @@ describe('DesignerThemeWorkspacePage', () => {
             source: 'eceee-render-host',
             action: 'selectTarget',
             targetId: 'group:0:element:h1',
+            widgetId: 'content-1',
         }, '*')
         fireEvent.click(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' }))
         expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-expanded', 'false')
@@ -624,7 +626,7 @@ describe('DesignerThemeWorkspacePage', () => {
         fireEvent(window, new MessageEvent('message', {
             data: {
                 source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:h1',
-                kind: 'element', label: 'Heading 1', text: 'Editable copy', editable: false,
+                kind: 'element', label: 'Heading 1', text: 'Editable copy', editable: false, widgetId: 'content-1',
             },
             source: iframe.contentWindow,
         }))
@@ -634,7 +636,7 @@ describe('DesignerThemeWorkspacePage', () => {
         fireEvent(window, new MessageEvent('message', {
             data: {
                 source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:p',
-                kind: 'element', label: 'Paragraph', text: 'More copy', editable: true,
+                kind: 'element', label: 'Paragraph', text: 'More copy', editable: true, widgetId: 'content-1',
             },
             source: iframe.contentWindow,
         }))
@@ -646,12 +648,43 @@ describe('DesignerThemeWorkspacePage', () => {
         fireEvent(window, new MessageEvent('message', {
             data: {
                 source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:p',
-                kind: 'element', label: 'Paragraph', text: 'More copy', editable: true,
+                kind: 'element', label: 'Paragraph', text: 'More copy', editable: true, widgetId: 'content-1',
             },
             source: iframe.contentWindow,
         }))
         expect(screen.getByRole('region', { name: 'Paragraph settings' })).not.toBe(firstParagraphPanel)
         expect(screen.getByRole('heading', { name: 'Paragraph' })).toBeInTheDocument()
+    })
+
+    it('keeps repeated element targets separate for each widget instance', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'layout:main_layout:slot:main', kind: 'layoutSlot', label: 'Main content',
+                descendants: [
+                    { id: 'widget:first', kind: 'widget', label: 'First content', parentId: 'layout:main_layout:slot:main', depth: 1, widgetId: 'first' },
+                    { id: 'paragraph', kind: 'element', label: 'Paragraph', displayLabel: 'Paragraph: “First copy”', parentId: 'widget:first', parentWidgetId: 'first', depth: 2, widgetId: 'first' },
+                    { id: 'widget:second', kind: 'widget', label: 'Second content', parentId: 'layout:main_layout:slot:main', depth: 1, widgetId: 'second' },
+                    { id: 'paragraph', kind: 'element', label: 'Paragraph', displayLabel: 'Paragraph: “Second copy”', parentId: 'widget:second', parentWidgetId: 'second', depth: 2, widgetId: 'second' },
+                ],
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(screen.getByRole('treeitem', { name: 'Paragraph: “First copy”' })).toBeInTheDocument()
+        const secondParagraph = screen.getByRole('button', { name: 'Edit Paragraph: “Second copy”' })
+        fireEvent.click(secondParagraph)
+
+        expect(secondParagraph).toHaveAttribute('aria-pressed', 'true')
+        expect(postMessage).toHaveBeenCalledWith({
+            source: 'eceee-render-host', action: 'selectTarget',
+            targetId: 'paragraph', widgetId: 'second',
+        }, '*')
     })
 
     it('identifies layout slots separately from selected elements', async () => {
