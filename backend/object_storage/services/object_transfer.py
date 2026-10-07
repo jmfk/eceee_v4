@@ -152,6 +152,10 @@ def collect_type_definitions(objects):
 
 def candidate_catalog(tenant, selections):
     results = []
+    tenant_root_type_ids = ObjectInstance.objects.filter(
+        tenant=tenant,
+        parent__isnull=True,
+    ).values("object_type_id")
     for selection in selections:
         type_name = str(selection.get("object_type") or "").strip()
         try:
@@ -159,7 +163,11 @@ def candidate_catalog(tenant, selections):
         except (TypeError, ValueError):
             requested_limit = 100
         limit = min(max(requested_limit, 1), MAX_CANDIDATES_PER_TYPE)
-        obj_type = ObjectTypeDefinition.objects.filter(name=type_name, is_active=True).first()
+        obj_type = ObjectTypeDefinition.objects.filter(
+            name=type_name,
+            is_active=True,
+            id__in=tenant_root_type_ids,
+        ).first()
         if not obj_type:
             continue
         roots = ObjectInstance.objects.filter(tenant=tenant, object_type=obj_type, parent__isnull=True).order_by(

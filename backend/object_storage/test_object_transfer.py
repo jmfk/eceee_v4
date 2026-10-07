@@ -181,6 +181,46 @@ class ObjectTransferServiceTests(TestCase):
             graph = collect_object_graph(self.tenant, [self.root.id])
         self.assertEqual({item.id for item in graph}, {self.root.id, self.child.id, self.related.id})
 
+    def test_catalog_does_not_expose_types_from_another_tenant(self):
+        foreign_user = User.objects.create_user("foreign-object-transfer")
+        foreign_tenant = Tenant.objects.create(
+            name="Foreign object transfer",
+            identifier="foreign-object-transfer",
+            created_by=foreign_user,
+        )
+        foreign_namespace = Namespace.objects.create(
+            name="Foreign object transfer namespace",
+            slug="foreign-object-transfer",
+            tenant=foreign_tenant,
+            created_by=foreign_user,
+        )
+        foreign_type = ObjectTypeDefinition.objects.create(
+            name="foreign-transfer-root",
+            label="Foreign root",
+            plural_label="Foreign roots",
+            namespace=foreign_namespace,
+            schema={"type": "object", "properties": {"secret": {"type": "string"}}},
+            slot_configuration={"slots": []},
+            created_by=foreign_user,
+        )
+        ObjectInstance.objects.create(
+            tenant=foreign_tenant,
+            object_type=foreign_type,
+            title="Foreign root",
+            slug="foreign-root",
+            created_by=foreign_user,
+        )
+
+        catalog = candidate_catalog(
+            self.tenant,
+            [
+                {"object_type": self.root_type.name, "limit": 1},
+                {"object_type": foreign_type.name, "limit": 1},
+            ],
+        )
+
+        self.assertEqual([group["object_type"]["name"] for group in catalog], [self.root_type.name])
+
     def test_preflight_counts_referenced_managed_media(self):
         result = build_preflight(self.tenant, [self.root.id])
         self.assertEqual(result["object_count"], 3)
