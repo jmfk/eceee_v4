@@ -771,7 +771,7 @@ class ObjectInstance(MPTTModel):
             widgets=widgets_data,
             created_by=self.created_by,
             created_at=timezone.now(),
-            comment="Initial version with pre-defined widgets",
+            change_description="Initial version with pre-defined widgets",
         )
 
         # Set as current version
