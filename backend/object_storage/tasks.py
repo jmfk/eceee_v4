@@ -12,10 +12,27 @@ from django.utils import timezone
 
 from file_manager.storage import S3MediaStorage
 from object_storage.models import ObjectTransferJob
-from object_storage.services.object_transfer import ObjectPackageExporter, ObjectPackageImporter, validate_package
+from object_storage.services.object_transfer import (
+    MAX_ARCHIVE_BYTES,
+    ObjectPackageExporter,
+    ObjectPackageImporter,
+    validate_package,
+)
 from webpages.services.theme_remote import RemoteTransportError, remote_object_request
 
 logger = logging.getLogger(__name__)
+
+
+def _stream_package_response(response, destination):
+    total = 0
+    for chunk in response.iter_content(chunk_size=1024 * 1024):
+        if not chunk:
+            continue
+        total += len(chunk)
+        if total > MAX_ARCHIVE_BYTES:
+            raise ValueError("The remote object package exceeds the safe archive download limit.")
+        destination.write(chunk)
+    return total
 
 
 @shared_task
@@ -77,14 +94,8 @@ def import_remote_object_package(self, job_id):
         response = remote_object_request(job.connection, "GET", f"exports/{remote_job_id}/download/", stream=True)
         package_file = tempfile.SpooledTemporaryFile(max_size=25 * 1024 * 1024)
         try:
-            total = 0
             try:
-                for chunk in response.iter_content(chunk_size=1024 * 1024):
-                    if chunk:
-                        total += len(chunk)
-                        if total > 2 * 1024 * 1024 * 1024:
-                            raise ValueError("The remote object package exceeds the 2 GB transfer limit.")
-                        package_file.write(chunk)
+                total = _stream_package_response(response, package_file)
             finally:
                 response.close()
             package_file.seek(0)

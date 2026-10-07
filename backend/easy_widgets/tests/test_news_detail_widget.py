@@ -2,11 +2,16 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.contrib.auth.models import User
 from django.template.loader import render_to_string
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
+from django.utils import timezone as django_timezone
 
+from content.models import Namespace
+from core.models import Tenant
 from easy_widgets.widgets.news_detail import NewsDetailWidget
 from easy_widgets.widgets.sidebar_top_news import SidebarTopNewsWidget
+from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
 from webpages.renderers import WebPageRenderer
 
 
@@ -152,3 +157,50 @@ class NewsExcerptNormalizationTests(SimpleTestCase):
     def test_sidebar_prefers_summary_to_legacy_excerpt(self):
         excerpt = SidebarTopNewsWidget._get_excerpt({"summary": "Canonical summary", "excerpt": "Legacy excerpt"}, 120)
         self.assertEqual(excerpt, "Canonical summary")
+
+
+class NewsDetailWidgetTenantTests(TestCase):
+    def test_same_slug_lookup_is_scoped_to_the_rendering_tenant(self):
+        user = User.objects.create_user("tenant-news-detail")
+        local_tenant = Tenant.objects.create(name="Local", identifier="news-local", created_by=user)
+        foreign_tenant = Tenant.objects.create(name="Foreign", identifier="news-foreign", created_by=user)
+        namespace = Namespace.objects.create(
+            name="News",
+            slug="tenant-news",
+            tenant=local_tenant,
+            created_by=user,
+        )
+        object_type = ObjectTypeDefinition.objects.create(
+            name="tenant-news-detail",
+            label="News",
+            plural_label="News",
+            namespace=namespace,
+            created_by=user,
+        )
+        local = ObjectInstance.objects.create(
+            tenant=local_tenant,
+            object_type=object_type,
+            title="Local article",
+            slug="shared",
+            created_by=user,
+        )
+        foreign = ObjectInstance.objects.create(
+            tenant=foreign_tenant,
+            object_type=object_type,
+            title="Foreign article",
+            slug="shared",
+            created_by=user,
+        )
+        for obj in (local, foreign):
+            ObjectVersion.objects.create(
+                object_instance=obj,
+                version_number=1,
+                data={},
+                widgets={},
+                effective_date=django_timezone.now(),
+                created_by=user,
+            )
+
+        result, _version = NewsDetailWidget()._get_news_object("shared", [object_type.id], local_tenant)
+
+        self.assertEqual(result, local)

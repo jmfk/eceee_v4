@@ -458,6 +458,11 @@ class DesignerRemoteConnectionDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         access_key = data.pop("access_key", None)
+        credential_scheme = data.get("credential_scheme", connection.credential_scheme)
+        if credential_scheme != connection.credential_scheme and not access_key:
+            raise serializers.ValidationError(
+                {"accessKey": "Enter a new access key when changing the credential type."}
+            )
         make_default = data.pop("is_default", connection.is_default)
         if make_default:
             ThemeRemoteConnection.objects.filter(tenant=tenant, is_default=True).exclude(pk=connection.pk).update(

@@ -148,12 +148,12 @@ class LegacyNewsRepository:
 
         news_type = self.object_types["news"]
         obj, created = ObjectInstance.objects.get_or_create(
+            tenant=self.tenant,
             object_type=news_type,
             slug=payload.slug,
             defaults={
                 "title": payload.title,
                 "status": "published",
-                "tenant": self.tenant,
                 "created_by": self.user,
                 "metadata": payload.metadata,
             },
@@ -251,17 +251,21 @@ class LegacyNewsRepository:
                     continue
                 seen.add(key)
                 slug = slugify(name)[:290] or "legacy-term"
-                collision = ObjectInstance.objects.filter(object_type=self.object_types[type_name], slug=slug).first()
+                collision = ObjectInstance.objects.filter(
+                    tenant=self.tenant,
+                    object_type=self.object_types[type_name],
+                    slug=slug,
+                ).first()
                 if collision and collision.title.casefold() != key:
                     digest = hashlib.sha256(name.encode("utf-8")).hexdigest()[:8]
                     slug = f"{slug[:281]}-{digest}"
                 obj, _ = ObjectInstance.objects.get_or_create(
+                    tenant=self.tenant,
                     object_type=self.object_types[type_name],
                     slug=slug,
                     defaults={
                         "title": name,
                         "status": "published",
-                        "tenant": self.tenant,
                         "created_by": self.user,
                         "metadata": {"legacy": True},
                     },

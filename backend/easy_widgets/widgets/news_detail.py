@@ -144,7 +144,9 @@ class NewsDetailWidget(BaseWidget):
             }
 
         # Try to find the object in configured ObjectTypes
-        obj, published_version = self._get_news_object(slug, news_config.object_types)
+        current_page = context.get("current_page") or context.get("page")
+        tenant = getattr(current_page, "tenant", None)
+        obj, published_version = self._get_news_object(slug, news_config.object_types, tenant)
         if not obj or not published_version:
             # Slug exists but doesn't match any of this widget's configured ObjectTypes
             # This is normal - another detail widget might handle it
@@ -207,14 +209,17 @@ class NewsDetailWidget(BaseWidget):
 
         return template_config
 
-    def _get_news_object(self, slug: str, object_type_ids: List[int]):
+    def _get_news_object(self, slug: str, object_type_ids: List[int], tenant):
         """Get published news object by slug and object types using date-based logic"""
         from object_storage.models import ObjectInstance
+
+        if tenant is None:
+            return None, None
 
         try:
             # Step 1: Get the object - don't filter by status, use date-based publishing
             obj = (
-                ObjectInstance.objects.filter(slug=slug, object_type_id__in=object_type_ids)
+                ObjectInstance.objects.filter(tenant=tenant, slug=slug, object_type_id__in=object_type_ids)
                 .select_related("object_type")
                 .first()
             )
