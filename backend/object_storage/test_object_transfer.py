@@ -17,6 +17,7 @@ from object_storage.services.object_transfer import (
     build_preflight,
     candidate_catalog,
     collect_object_graph,
+    rebuild_imported_reverse_relationships,
 )
 from object_storage.tasks import cleanup_expired_object_packages
 from taxonomy.models import Tag as TaxonomyTag
@@ -160,6 +161,26 @@ class ObjectTransferServiceTests(TestCase):
         result = build_preflight(self.tenant, [self.root.id])
         self.assertEqual(result["object_count"], 3)
         self.assertEqual(result["media_count"], 1)
+
+    def test_reverse_relationship_rebuild_is_tenant_scoped(self):
+        self.root.relationships = [{"type": "related", "object_id": self.related.id}]
+        self.root.save(update_fields=["relationships", "updated_at"])
+        foreign_tenant = Tenant.objects.create(name="Foreign", identifier="foreign-relations", created_by=self.user)
+        foreign_source = ObjectInstance.objects.create(
+            tenant=foreign_tenant,
+            object_type=self.root_type,
+            title="Foreign source",
+            slug="root",
+            relationships=[{"type": "foreign", "object_id": self.related.id}],
+            created_by=self.user,
+        )
+
+        with patch.object(ObjectInstance, "rebuild_related_from", side_effect=AssertionError("Use the bulk rebuild")):
+            rebuild_imported_reverse_relationships(self.tenant, [self.related])
+
+        self.related.refresh_from_db()
+        self.assertEqual(self.related.related_from, [{"type": "related", "object_id": self.root.id}])
+        self.assertNotIn(foreign_source.id, [item["object_id"] for item in self.related.related_from])
 
     def test_package_round_trip_restores_changed_object_and_media_tags(self):
         storage = MemoryStorage()

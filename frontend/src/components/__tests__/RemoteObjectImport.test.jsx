@@ -1,7 +1,7 @@
 import React from 'react'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RemoteObjectImport from '../RemoteObjectImport'
 
 const mocks = vi.hoisted(() => ({
@@ -36,6 +36,10 @@ describe('RemoteObjectImport', () => {
         mocks.listImports.mockResolvedValue({ results: [] })
     })
 
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
     it('restores an active import job after reload', async () => {
         mocks.listImports.mockResolvedValue({
             results: [{ id: 'job-1', status: 'running', progress: { phase: 'downloading' } }],
@@ -45,6 +49,38 @@ describe('RemoteObjectImport', () => {
 
         expect(await screen.findByText('Importing · downloading')).toBeInTheDocument()
         expect(mocks.listImports).toHaveBeenCalledOnce()
+    })
+
+    it('continues polling after a transient status error', async () => {
+        vi.useFakeTimers()
+        const onCompleted = vi.fn()
+        mocks.listImports.mockResolvedValue({
+            results: [{ id: 'job-1', status: 'running', progress: { phase: 'downloading' } }],
+        })
+        mocks.getImport
+            .mockRejectedValueOnce(new Error('Temporary network error'))
+            .mockResolvedValueOnce({ id: 'job-1', status: 'completed', progress: { phase: 'completed' } })
+
+        render(<RemoteObjectImport onClose={vi.fn()} onCompleted={onCompleted} />)
+        await act(async () => {})
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(1500)
+        })
+        expect(mocks.getImport).toHaveBeenCalledTimes(1)
+        expect(screen.getByText(/Temporary network error/)).toBeInTheDocument()
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(3000)
+        })
+        expect(mocks.getImport).toHaveBeenCalledTimes(2)
+        expect(screen.getByText('Import completed')).toBeInTheDocument()
+        expect(onCompleted).toHaveBeenCalledOnce()
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(10000)
+        })
+        expect(mocks.getImport).toHaveBeenCalledTimes(2)
     })
 
     it('requires explicit resolutions for every conflict', async () => {
