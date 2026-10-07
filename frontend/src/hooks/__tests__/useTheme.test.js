@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getFrontendThemeCSSUrl } from '../useTheme'
+import { getEditorThemeCSSUrl, getFrontendThemeCSSUrl, supportsCSSScope } from '../useTheme'
 
 describe('getFrontendThemeCSSUrl', () => {
     it('requests CSS scoped to the CMS content area', () => {
@@ -20,5 +20,15 @@ describe('getFrontendThemeCSSUrl', () => {
 
         expect(parsedUrl.searchParams.get('frontend_scoped')).toBe('true')
         expect(parsedUrl.searchParams.has('v')).toBe(false)
+    })
+})
+
+describe('editor theme CSS helpers', () => {
+    it('uses the authenticated page-version stylesheet endpoint', () => {
+        expect(getEditorThemeCSSUrl(83)).toBe('/api/v1/webpages/versions/83/editor-styles/')
+    })
+
+    it('reports unsupported CSS scope without throwing', () => {
+        expect(typeof supportsCSSScope()).toBe('boolean')
     })
 })

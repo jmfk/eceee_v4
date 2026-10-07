@@ -305,7 +305,7 @@ const ObjectWidgetFactory = ({
 
                 {/* Core Widget Content */}
                 <div className="widget-content overflow-hidden border border-gray-200 border-t-0 rounded-b">
-                    <div className="cms-content-isolated">
+                    <div>
                         <CoreWidgetComponent
                             config={widget.config || {}}
                             mode="editor"
@@ -448,7 +448,7 @@ const ObjectWidgetFactory = ({
             data-object-type={objectType?.name}
             data-slot-name={actualSlotName}
         >
-            <div className="cms-content-isolated">
+            <div>
                 <CoreWidgetComponent
                     config={widget.config || {}}
                     mode={mode}

@@ -4,7 +4,7 @@ PageVersion ViewSet for managing page versions with workflow support.
 
 from django.db import transaction
 from django.db.models import Q
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -15,7 +15,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
 from ..filters import PageVersionFilter
-from ..models import PageVersion, WebPage
+from ..models import PageTheme, PageVersion, WebPage
 from ..serializers import PageVersionComparisonSerializer, PageVersionListSerializer, PageVersionSerializer
 from ..services.page_version_workflow import (
     PageVersionWorkflowService,
@@ -24,6 +24,8 @@ from ..services.page_version_workflow import (
     WorkflowError,
     workflow_payload,
 )
+from ..services.editor_css import compile_editor_css
+from ..services.theme_css_generator import ThemeCSSGenerator
 
 
 class PageVersionViewSet(
@@ -210,6 +212,38 @@ class PageVersionViewSet(
                 queryset = queryset.none()
 
         return queryset
+
+    @action(detail=True, methods=["get"], url_path="editor-styles")
+    def editor_styles(self, request, pk=None):
+        """Return the complete site stylesheet isolated to this editor canvas."""
+        version = self.get_object()
+        theme = version.theme
+        if theme is None and version.page.parent_id:
+            theme = version.page.parent.get_effective_theme()
+        if theme is None:
+            theme = PageTheme.get_default_theme(tenant=version.page.tenant)
+
+        css_parts = []
+        if theme is not None:
+            css_parts.append(ThemeCSSGenerator().generate_complete_css(theme, frontend_scoped=False))
+
+        if version.enable_css_injection:
+            if version.page_css_variables:
+                variables = [":root {"]
+                for name, value in version.page_css_variables.items():
+                    variable_name = name if name.startswith("--") else f"--{name}"
+                    variables.append(f"  {variable_name}: {value};")
+                variables.append("}")
+                css_parts.append("\n".join(variables))
+            if version.page_custom_css:
+                css_parts.append(f"/* Page CSS */\n{version.page_custom_css}")
+
+        scope_id = f"version-{version.pk}"
+        root_selector = f'.eceee-theme-scope[data-eceee-theme-scope="{scope_id}"]'
+        css = compile_editor_css("\n\n".join(filter(None, css_parts)), root_selector=root_selector)
+        response = HttpResponse(css, content_type="text/css; charset=utf-8")
+        response["Cache-Control"] = "no-store"
+        return response
 
     def _page_queryset(self):
         queryset = WebPage.objects.all()

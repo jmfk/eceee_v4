@@ -15,7 +15,7 @@ import { WIDGET_ACTIONS } from '../utils/widgetConstants';
 import { useNotificationContext } from './NotificationManager';
 import { useRenderTracker, useEffectTracker, useStabilityTracker } from '../utils/debugHooks';
 import ImportDialog from './ImportDialog';
-import { useTheme } from '../hooks/useTheme';
+import { useEditorThemeStyles } from '../hooks/useTheme';
 import { createWidgetElement as createSharedWidgetElement } from '../utils/widgetRenderer';
 
 const ContentEditor = forwardRef(({
@@ -57,10 +57,12 @@ const ContentEditor = forwardRef(({
   // Get page ID from webpageData (the main page record)
   const pageId = webpageData?.id;
 
-  // Apply theme CSS using the useTheme hook (theme is derived from pageId)
-  useTheme({
-    pageId,
-    enabled: !!pageId
+  const versionId = pageVersionData?.versionId || pageVersionData?.id;
+  const versionRevision = pageVersionData?.editRevision || pageVersionData?.updatedAt || pageVersionData?.updated_at;
+  const { error: themeStyleError, scopeId: themeScopeId } = useEditorThemeStyles({
+    versionId,
+    revision: versionRevision,
+    enabled: !!versionId
   });
 
   // Get current widgets from pageVersionData (only source of widgets)
@@ -695,7 +697,15 @@ const ContentEditor = forwardRef(({
   }
 
   return (
-    <div className={`content-editor relative h-full flex flex-col ${className}`}>
+    <div
+      className={`content-editor eceee-theme-scope relative h-full flex flex-col ${className}`}
+      data-eceee-theme-scope={themeScopeId || undefined}
+    >
+      {themeStyleError && (
+        <div className="eceee-editor-ui border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">
+          {themeStyleError.message}
+        </div>
+      )}
       {isLoading && (
         <div className="absolute inset-0 bg-white/75 flex items-center justify-center z-10">
           <div className="text-gray-600">Loading layout...</div>

@@ -469,12 +469,19 @@ div[style*="z-index"] {
   font-style: var(--blockquote-style, italic);
 }
 
-/* Theme CSS Isolation System */
-/* Prevent cms-content from being applied to nested structures accidentally */
-.cms-content-isolated {
-  /* Reset to create clean boundary - theme won't leak through */
-  all: revert;
-  display: block;
+/* Lower boundary for site CSS inside the direct-DOM editor. Explicit inherited
+   values keep controls stable even when a theme sets typography on the scope root. */
+.eceee-editor-ui {
+  color: #374151;
+  direction: ltr;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 1.25rem;
+  text-align: left;
+  text-transform: none;
 }
 
 .theme-content code {

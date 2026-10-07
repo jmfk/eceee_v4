@@ -144,7 +144,9 @@ const ReactLayoutRenderer = forwardRef(({
     // Path variables for dynamic content
     pathVariables = {},
     simulatedPath,
-    onSimulatedPathChange
+    onSimulatedPathChange,
+    themeScopeId,
+    themeStyleError
 }, ref) => {
 
     // Get UDC context (but use shared componentId from PageEditor)
@@ -1536,10 +1538,18 @@ const ReactLayoutRenderer = forwardRef(({
         );
     }
 
-    // Render the layout component
-    // Make this div act like an iframe - break out of parent constraints and use full viewport width
+    // Render the direct-DOM editor canvas at the full available width.
     return (
-        <div className="react-layout-renderer w-full h-full relative cms-content" data-testid="page-editor-surface">
+        <div
+            className="react-layout-renderer eceee-theme-scope w-full h-full relative cms-content"
+            data-eceee-theme-scope={themeScopeId || undefined}
+            data-testid="page-editor-surface"
+        >
+            {themeStyleError && (
+                <div className="eceee-editor-ui border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">
+                    {themeStyleError.message}
+                </div>
+            )}
             {/* Bulk Action Toolbar - Floating */}
             {selectedCount > 0 && (
                 <>
@@ -1547,7 +1557,7 @@ const ReactLayoutRenderer = forwardRef(({
                         // Collapsed: Small floating button in top right
                         <button
                             onClick={() => setIsToolbarCollapsed(false)}
-                            className="fixed top-4 right-4 z-[10005] bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg transition-all hover:scale-110 flex items-center justify-center"
+                            className="eceee-editor-ui fixed top-4 right-4 z-[10005] bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg transition-all hover:scale-110 flex items-center justify-center"
                             title={`${selectedCount} widget${selectedCount !== 1 ? 's' : ''} selected - Click to expand`}
                         >
                             <div className="flex items-center gap-2">
@@ -1557,7 +1567,7 @@ const ReactLayoutRenderer = forwardRef(({
                         </button>
                     ) : (
                         // Expanded: Full toolbar
-                        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[10005] bg-white border border-gray-300 rounded-lg shadow-xl px-4 py-2 flex items-center gap-3">
+                        <div className="eceee-editor-ui fixed top-4 left-1/2 transform -translate-x-1/2 z-[10005] bg-white border border-gray-300 rounded-lg shadow-xl px-4 py-2 flex items-center gap-3">
                             <span className="text-sm font-medium text-gray-700">
                                 {selectedCount} widget{selectedCount !== 1 ? 's' : ''} selected
                             </span>

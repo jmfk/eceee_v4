@@ -4,7 +4,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
-from webpages.models import PageVersion, WebPage
+from webpages.models import PageTheme, PageVersion, WebPage
 
 
 class PageVersionCoreTest(TestCase):
@@ -140,6 +140,43 @@ class PageVersionAPISimpleTest(APITestCase):
         else:
             results = data
         self.assertGreater(len(results), 0)
+
+    def test_editor_styles_are_complete_scoped_and_not_cached(self):
+        theme = PageTheme.objects.create(
+            name="Editor CSS Theme",
+            tenant=self.tenant,
+            created_by=self.user,
+            colors={"primary": "#123456"},
+            custom_css="body .site-heading { color: var(--primary); } .widget-header { color: hotpink; }",
+        )
+        self.draft.theme = theme
+        self.draft.page_css_variables = {"content-width": "72rem"}
+        self.draft.page_custom_css = ".page-only { max-width: var(--content-width); }"
+        self.draft.save(update_fields=["theme", "page_css_variables", "page_custom_css"])
+
+        url = reverse("api:pageversion-editor-styles", kwargs={"pk": self.draft.pk})
+        response = self.client.get(url)
+        css = response.content.decode()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "text/css; charset=utf-8")
+        self.assertEqual(response["Cache-Control"], "no-store")
+        self.assertIn(
+            f'@scope (.eceee-theme-scope[data-eceee-theme-scope="version-{self.draft.pk}"]) ' "to (.eceee-editor-ui)",
+            css,
+        )
+        self.assertIn(":scope {", css)
+        self.assertIn("--primary: #123456", css)
+        self.assertIn("--content-width: 72rem", css)
+        self.assertIn(".page-only", css)
+
+    def test_editor_styles_require_authentication(self):
+        self.client.force_authenticate(user=None)
+        url = reverse("api:pageversion-editor-styles", kwargs={"pk": self.draft.pk})
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_direct_version_creation_is_not_allowed(self):
         """Working copies must be created through the page workflow endpoint."""

@@ -8,7 +8,7 @@
 import React, { forwardRef, useState, useEffect } from 'react';
 import ReactLayoutRenderer from './ReactLayoutRenderer';
 import { getDefaultLayout } from '../../utils/defaultLayout';
-import { useTheme } from '../../hooks/useTheme';
+import { useEditorThemeStyles } from '../../hooks/useTheme';
 
 const PageContentEditor = forwardRef(({
     layoutJson,
@@ -51,16 +51,17 @@ const PageContentEditor = forwardRef(({
     }, []);
 
     // Extract layout name from layoutJson or use default
-    const pageId = webpageData?.id;
+    const versionId = currentVersion?.id || pageVersionData?.versionId || pageVersionData?.id;
+    const versionRevision = pageVersionData?.editRevision || pageVersionData?.updatedAt || pageVersionData?.updated_at;
     const layoutName = layoutJson?.layout?.name ||
         layoutJson?.name ||
         pageVersionData?.codeLayout ||
         defaultLayoutName;  // Use default layout from backend
 
-    // Apply theme CSS - ensures theme loads even on pages with no widgets
-    useTheme({
-        pageId: pageId,
-        enabled: applyPageTheme && !!pageId
+    const { error: themeStyleError, scopeId: themeScopeId } = useEditorThemeStyles({
+        versionId,
+        revision: versionRevision,
+        enabled: applyPageTheme && !!versionId
     });
 
     // Use local widgets from PageEditor (fast local state)
@@ -104,6 +105,8 @@ const PageContentEditor = forwardRef(({
             pathVariables={pathVariables}
             simulatedPath={simulatedPath}
             onSimulatedPathChange={onSimulatedPathChange}
+            themeScopeId={applyPageTheme ? themeScopeId : null}
+            themeStyleError={themeStyleError}
             {...otherProps}
         />
     );

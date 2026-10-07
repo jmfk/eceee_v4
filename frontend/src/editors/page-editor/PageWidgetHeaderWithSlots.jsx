@@ -187,7 +187,7 @@ const PageWidgetHeaderWithSlots = ({
     const canAdd = canAddWidget && (!maxWidgets || widgetCount < maxWidgets)
 
     return (
-        <div className={`widget-header page-editor-header px-3 py-2 flex items-center justify-between ${isInherited ? 'bg-amber-50 border-2 border-amber-300' : 'bg-gray-100 border border-gray-200'} ${isSelected ? 'ring-2 ring-blue-500' : ''} ${isCut ? 'opacity-60' : ''} ${className}`}>
+        <div className={`eceee-editor-ui widget-header page-editor-header px-3 py-2 flex items-center justify-between ${isInherited ? 'bg-amber-50 border-2 border-amber-300' : 'bg-gray-100 border border-gray-200'} ${isSelected ? 'ring-2 ring-blue-500' : ''} ${isCut ? 'opacity-60' : ''} ${className}`}>
             {/* Left side - Widget info and slot label */}
             <div className="flex items-center space-x-2">
                 {/* Selection checkbox */}
