@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { PUBLIC_RENDER_CSS } from '../../rendering/publicRenderCss'
 import { buildEditorThemeCSS, compileEditorCSS } from '../editorThemeCSS'
 
 const options = {
@@ -121,6 +122,8 @@ describe('buildEditorThemeCSS', () => {
         expect(result).toContain('.content-widget { box-sizing: border-box; width: 100%; min-height: 32px;')
         expect(result).toContain('.banner-body.mode-header .banner-text')
         expect(result).toContain('.section-collapsed .expand-banner')
+        expect(result).toContain('.nav-container { display: flex; flex-direction: column;')
+        expect(PUBLIC_RENDER_CSS).not.toContain('.content-widget{box-sizing:border-box')
     })
 
     it('omits page-level CSS when injection is disabled', () => {
