@@ -100,6 +100,21 @@ def collect_object_graph(tenant, root_ids):
     return list(collected.values())
 
 
+def collect_type_definitions(objects):
+    """Collect object types plus the topology types they reference."""
+    collected = {}
+    queue = deque(obj.object_type for obj in objects)
+    while queue:
+        obj_type = queue.popleft()
+        if obj_type.id in collected:
+            continue
+        collected[obj_type.id] = obj_type
+        queue.extend(obj_type.allowed_child_types.all())
+        if obj_type.browser_group_id:
+            queue.append(obj_type.browser_group)
+    return collected
+
+
 def candidate_catalog(tenant, selections):
     results = []
     for selection in selections:
@@ -313,7 +328,7 @@ def build_preflight(tenant, root_ids):
                 external_urls.add(value)
     media = MediaFile.objects.filter(tenant=tenant, id__in=media_ids, is_deleted=False)
     media_bytes = media.aggregate(total=Sum("file_size"))["total"] or 0
-    types = {obj.object_type_id: obj.object_type for obj in objects}
+    types = collect_type_definitions(objects)
     namespaces = {}
     for obj_type in types.values():
         if obj_type.namespace_id:
@@ -391,7 +406,7 @@ class ObjectPackageExporter:
                 "collections__canonical_tags",
             )
         )
-        type_map = {obj.object_type_id: obj.object_type for obj in objects}
+        type_map = collect_type_definitions(objects)
         object_ids = {obj.id for obj in objects}
         payload = {
             "types": [serialize_type(value) for value in sorted(type_map.values(), key=lambda value: value.name)],
@@ -557,23 +572,43 @@ def _namespace(tenant, user, data, resolutions=None):
     )
 
 
-def _remap_object_reference(value, object_map, skipped_ids):
+def _remap_object_reference(value, object_map, skipped_ids, require_mapping=True):
     if isinstance(value, dict):
         candidate = value.get("object_id") or value.get("objectId") or value.get("id")
-        if candidate is not None and str(candidate) in skipped_ids:
-            return None
+        if candidate is not None:
+            mapped_candidate = object_map.get(str(candidate))
+            if mapped_candidate is None:
+                return None
+            return {
+                key: (
+                    mapped_candidate
+                    if key in {"object_id", "objectId", "id"}
+                    else _remap_object_reference(item, object_map, skipped_ids, require_mapping=False)
+                )
+                for key, item in value.items()
+            }
         return {
-            key: _remap_object_reference(item, object_map, skipped_ids)
+            key: _remap_object_reference(item, object_map, skipped_ids, require_mapping=require_mapping)
             for key, item in value.items()
             if str(item) not in skipped_ids
         }
     if isinstance(value, list):
         return [
-            mapped for item in value if (mapped := _remap_object_reference(item, object_map, skipped_ids)) is not None
+            mapped
+            for item in value
+            if (
+                mapped := _remap_object_reference(
+                    item,
+                    object_map,
+                    skipped_ids,
+                    require_mapping=require_mapping,
+                )
+            )
+            is not None
         ]
     if str(value) in object_map:
         return object_map[str(value)]
-    if str(value) in skipped_ids:
+    if str(value) in skipped_ids or require_mapping:
         return None
     return value
 
@@ -697,9 +732,8 @@ class ObjectPackageImporter:
                 raise ValueError(f"Local object type {data['name']} is not compatible with the remote definition.")
             if differs and resolution == "skip":
                 continue
-            if differs and resolution == "update":
-                if type_has_foreign_tenant_usage(existing, tenant):
-                    raise ValueError(f"Object type {data['name']} is used by another workspace and cannot be updated.")
+            if resolution == "update" and existing and type_has_foreign_tenant_usage(existing, tenant):
+                raise ValueError(f"Object type {data['name']} is used by another workspace and cannot be updated.")
             if differs and resolution not in {"keep", "update"}:
                 raise ValueError(f"Resolve the object type conflict for {data['name']} before importing.")
             namespace = _namespace(tenant, user, data.get("namespace"), namespace_resolutions)
