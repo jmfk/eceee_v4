@@ -298,6 +298,23 @@ const effectiveSpacingEntries = (entries, activeBreakpoint, breakpoints, fields)
         })
     })
 
+    ;[
+        ['margin', ['marginTop', 'marginRight', 'marginBottom', 'marginLeft']],
+        ['padding', ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']],
+    ].forEach(([shorthandField, directionalFields]) => {
+        directionalFields.forEach((field) => {
+            selectedFields.forEach((directional, key) => {
+                if (directional.field !== field) return
+                const shorthand = selectedFields.get(`${directional.entry.row.targetId}:${shorthandField}`)
+                if (!shorthand || shorthand.entry.index === directional.entry.index) return
+                const shorthandWins = shorthand.width > directional.width
+                    || shorthand.width === directional.width
+                        && breakpointPrecedence(shorthand.entry.breakpoint) > breakpointPrecedence(directional.entry.breakpoint)
+                if (shorthandWins) selectedFields.delete(key)
+            })
+        })
+    })
+
     const grouped = new Map()
     selectedFields.forEach(({ entry, field }) => {
         const current = grouped.get(entry.index) || { ...entry, fields: [] }
@@ -699,11 +716,12 @@ const SemanticThemeWorkspace = ({
                 if (event.data.command === 'replaceImage' && event.data.file instanceof File) {
                     if (target.kind === 'asset') {
                         const asset = workspace.assets.find((candidate) => `asset:${candidate.assetKey}` === target.id)
-                        if (asset) void replaceAsset(
-                            asset,
-                            event.data.file,
-                            asset.breakpoint && asset.breakpoint !== viewport ? viewport : null,
-                        )
+                        if (asset) {
+                            const configuredBreakpoints = getBreakpoints({ breakpoints: workspace.breakpoints })
+                            const isInherited = asset.breakpoint
+                                && breakpointWidth(asset.breakpoint, configuredBreakpoints) !== breakpointWidth(viewport, configuredBreakpoints)
+                            void replaceAsset(asset, event.data.file, isInherited ? viewport : null)
+                        }
                     } else if (target.kind === 'previewImage' && viewId && target.sourceUrl) {
                         void replacePreviewImage?.(viewId, target.sourceUrl, target.sourcePath, target.sourceMatchIndex, event.data.file)
                     }
