@@ -296,6 +296,12 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 
 In development only, Django derives a local encryption key from `SECRET_KEY` when the setting is absent. Production intentionally refuses to save or use remote credentials without the explicit encryption key.
 
+### Remote object structures
+
+The Object Browser can pull selected top-level object trees from a saved remote site. For this workflow, save the connection with credential type **Machine API key**. The key on the remote installation must be bound to the intended workspace and have both `object.read` and `object.transfer` scopes. A legacy theme access key cannot read or export objects.
+
+The import wizard first selects object types and a per-type candidate limit (maximum 500), then exact roots. Preflight includes descendants, outgoing object references, versions, managed media, legacy and canonical media tags, and media collections. A transfer is limited to 10,000 objects and 2 GB of uncompressed media. Packages expire after 24 hours.
+
 ## API Endpoints
 
 The sync service uses these backend endpoints:

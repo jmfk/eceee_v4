@@ -36,12 +36,23 @@ class ThemeRemoteAccessKey(models.Model):
 
 
 class ThemeRemoteConnection(models.Model):
+    CREDENTIAL_THEME_KEY = "theme_key"
+    CREDENTIAL_API_KEY = "api_key"
+    CREDENTIAL_SCHEME_CHOICES = [
+        (CREDENTIAL_THEME_KEY, "Theme key"),
+        (CREDENTIAL_API_KEY, "Machine API key"),
+    ]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey("core.Tenant", on_delete=models.CASCADE, related_name="theme_remote_connections")
     name = models.CharField(max_length=120)
     base_url = models.URLField(max_length=500)
     remote_workspace = models.CharField(max_length=100)
     encrypted_access_key = models.TextField(editable=False)
+    credential_scheme = models.CharField(
+        max_length=20,
+        choices=CREDENTIAL_SCHEME_CHOICES,
+        default=CREDENTIAL_THEME_KEY,
+    )
     is_default = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     created_by = models.ForeignKey(
