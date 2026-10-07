@@ -1918,6 +1918,8 @@ def replace_designer_asset(
                             "file_url",
                             "publicUrl",
                             "public_url",
+                            "imgproxyBaseUrl",
+                            "imgproxy_base_url",
                             "filename",
                             "size",
                             "width",

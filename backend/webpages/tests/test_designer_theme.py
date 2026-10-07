@@ -1052,6 +1052,10 @@ class DesignerThemeApiTests(TestCase):
         return_value="theme_images/1/designer_drafts/1/hero-xl.png",
     )
     def test_inherited_image_can_be_overridden_at_the_active_breakpoint(self, _save, _url):
+        source = self.theme.design_groups["groups"][0]["layoutProperties"]["hero"]["md"]["images"]["background"]
+        source["imgproxyBaseUrl"] = "https://storage.test/theme_images/inherited-hero.png"
+        source["imgproxy_base_url"] = "https://storage.test/theme_images/inherited-hero-snake.png"
+        self.theme.save(update_fields=["design_groups"])
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data
         upload = SimpleUploadedFile(
@@ -1077,6 +1081,8 @@ class DesignerThemeApiTests(TestCase):
         layout = self.theme.designer_draft.snapshot["design_groups"]["groups"][0]["layoutProperties"]["hero"]
         self.assertNotIn("url", layout["md"]["images"]["background"])
         self.assertEqual(layout["xl"]["images"]["background"]["url"], asset["url"])
+        self.assertNotIn("imgproxyBaseUrl", layout["xl"]["images"]["background"])
+        self.assertNotIn("imgproxy_base_url", layout["xl"]["images"]["background"])
 
     def test_only_tenant_admin_can_manage_assignments(self):
         url = f"/api/v1/webpages/themes/{self.other_theme.id}/designer-assignments/"
