@@ -131,4 +131,34 @@ describe('buildEditorThemeCSS', () => {
         expect(result).toContain('.theme-rule')
         expect(result).not.toContain('.page-rule')
     })
+
+    it('keeps modern and legacy design-group targeting in the complete stylesheet', () => {
+        const result = buildEditorThemeCSS({
+            scopeId: 'version-83',
+            theme: {
+                designGroups: {
+                    groups: [
+                        {
+                            widgetTypes: ['easy_widgets.ContentWidget'],
+                            slots: ['main'],
+                            elements: { h1: { color: 'red' } },
+                        },
+                        {
+                            widget_type: 'easy_widgets.BannerWidget',
+                            slot: 'sidebar',
+                            elements: { h2: { color: 'blue' } },
+                        },
+                        {
+                            widgetType: 'easy_widgets.LegacyWidget',
+                            elements: { p: { color: 'green' } },
+                        },
+                    ],
+                },
+            },
+        })
+
+        expect(result).toContain('.slot-main > .widget-type-easy-widgets-contentwidget h1')
+        expect(result).toContain('.slot-sidebar > .widget-type-easy-widgets-bannerwidget h2')
+        expect(result).toContain('.widget-type-easy-widgets-legacywidget p')
+    })
 })
