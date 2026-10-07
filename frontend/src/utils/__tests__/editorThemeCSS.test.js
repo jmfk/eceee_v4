@@ -118,6 +118,9 @@ describe('buildEditorThemeCSS', () => {
         expect(result).toContain(':scope .custom')
         expect(result).toContain('.page-only')
         expect(result).toContain('.two-columns-widget')
+        expect(result).toContain('.content-widget { box-sizing: border-box; width: 100%; min-height: 32px;')
+        expect(result).toContain('.banner-body.mode-header .banner-text')
+        expect(result).toContain('.section-collapsed .expand-banner')
     })
 
     it('omits page-level CSS when injection is disabled', () => {
