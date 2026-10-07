@@ -313,6 +313,35 @@ describe('RenderFrameRuntime designer overlay', () => {
         ])
     })
 
+    it('keeps slot-only design group elements inside their configured slots', async () => {
+        const slottedWorkspace = structuredClone(workspace)
+        slottedWorkspace.catalog.layouts[0].slots = [
+            { name: 'main', label: 'Main content' },
+            { name: 'footer', label: 'Footer' },
+        ]
+        slottedWorkspace.catalog.designGroups = [{
+            id: 'footer-text', label: 'Footer text',
+            widgetTypes: [], slots: ['footer'],
+            parts: [], elements: [{ id: 'footer-paragraph', element: 'p', label: 'Footer paragraph' }], assetKeys: [],
+        }]
+        const sourceModel = createPageRenderModel({
+            layout: 'main_layout',
+            widgets: {
+                main: [{ id: 'main-content', type: 'easy_widgets.ContentWidget', config: { content: '<p>Main copy</p>' } }],
+                footer: [{ id: 'footer-content', type: 'easy_widgets.ContentWidget', config: { content: '<p>Footer copy</p>' } }],
+            },
+        })
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: slottedWorkspace, viewId: 'page-main', sourceModel }))
+
+        const mainParagraph = await screen.findByText('Main copy')
+        const footerParagraph = await screen.findByText('Footer copy')
+        await waitFor(() => expect(footerParagraph.dataset.designerTargets).toContain('footer-paragraph'))
+
+        expect(mainParagraph).not.toHaveAttribute('data-designer-targets')
+        expect(footerParagraph.dataset.designerTargets).toContain('footer-paragraph')
+    })
+
     it('edits a rich text field as one sanitized HTML value after double-click', async () => {
         const editableWorkspace = structuredClone(workspace)
         editableWorkspace.previewContent.views[0].texts = { 'content:0': '<h1>Saved example heading</h1>' }

@@ -475,7 +475,13 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             roots.add(node)
         })
         if (!(group.widgetTypes || []).length) {
-            registerElements(root)
+            if (allowedSlots.size) {
+                allowedSlots.forEach((slot) => {
+                    root.querySelectorAll<HTMLElement>(`.slot-${normalizeCssName(slot)}`).forEach(registerElements)
+                })
+            } else {
+                registerElements(root)
+            }
             return
         }
         roots.forEach((groupRoot) => {
