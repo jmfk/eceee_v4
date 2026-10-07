@@ -331,16 +331,49 @@ class ThemeVersionApiTests(TestCase):
         connection.refresh_from_db()
         self.assertTrue(connection.is_default)
 
+    def test_changing_credential_scheme_requires_a_new_access_key(self):
+        connection = ThemeRemoteConnection.objects.create(
+            tenant=self.tenant,
+            name="Production",
+            base_url="https://remote.example",
+            remote_workspace="remote",
+            encrypted_access_key=encrypt_access_key("theme-secret"),
+            credential_scheme=ThemeRemoteConnection.CREDENTIAL_THEME_KEY,
+            is_default=True,
+            created_by=self.user,
+            updated_by=self.user,
+        )
+        url = f"/api/v1/webpages/designer/remote-connections/{connection.id}/"
+
+        response = self.client.patch(
+            url,
+            {"credential_scheme": ThemeRemoteConnection.CREDENTIAL_API_KEY},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        connection.refresh_from_db()
+        self.assertEqual(connection.credential_scheme, ThemeRemoteConnection.CREDENTIAL_THEME_KEY)
+
+        response = self.client.patch(
+            url,
+            {
+                "credential_scheme": ThemeRemoteConnection.CREDENTIAL_API_KEY,
+                "access_key": "machine-secret",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        connection.refresh_from_db()
+        self.assertEqual(connection.credential_scheme, ThemeRemoteConnection.CREDENTIAL_API_KEY)
+
     def test_workspace_admin_manages_remote_access_keys_without_persisting_plaintext(self):
         created = self.client.post(
             "/api/v1/webpages/remote-sites/access-keys/",
             {
                 "name": "Local development",
                 "capabilities": ["theme.transfer", "site.transfer", "site.transfer"],
-            },
-            format="json",
-        )
-
         self.assertEqual(created.status_code, 201, created.data)
         self.assertEqual(created["Cache-Control"], "private, no-store")
         self.assertTrue(created.data["secret"].startswith("eceee_theme_"))

@@ -4,10 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from content.models import Namespace
-from content_migration.legacy_news.repository import (
-    LegacyNewsDefinitionError,
-    LegacyNewsRepository,
-)
+from content_migration.legacy_news.repository import LegacyNewsDefinitionError, LegacyNewsRepository
 from content_migration.legacy_news.transformer import LegacyNewsPayload
 from core.models import Tenant
 from object_storage.models import ObjectInstance, ObjectTypeDefinition
@@ -162,6 +159,32 @@ class LegacyNewsRepositoryDefinitionTest(TestCase):
         _, _, unchanged = repository.upsert(updated_payload)
         self.assertFalse(unchanged)
         self.assertEqual(ObjectInstance.objects.get(pk=obj.pk).versions.count(), 1)
+
+    def test_upsert_ignores_same_type_and_slug_in_another_tenant(self):
+        foreign_tenant = Tenant.objects.create(
+            name="Foreign Legacy News",
+            identifier="foreign-legacy-news",
+            created_by=self.user,
+        )
+        ObjectInstance.objects.create(
+            tenant=foreign_tenant,
+            object_type=self.definitions["news"],
+            title="Foreign article",
+            slug="shared-article",
+            created_by=self.user,
+        )
+        payload = LegacyNewsPayload(
+            title="Local article",
+            slug="shared-article",
+            data={"presentationalPublishingDate": "2026-09-30T00:00:00+00:00"},
+            widgets={"main": []},
+            metadata={"legacy": True},
+        )
+
+        obj, created, _changed = self.repository().upsert(payload)
+
+        self.assertTrue(created)
+        self.assertEqual(obj.tenant, self.tenant)
 
     def test_marks_relationship_repairs_as_changed_without_extra_version(self):
         repository = self.repository()

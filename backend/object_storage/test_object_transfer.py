@@ -2,7 +2,7 @@ import io
 import json
 import zipfile
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from celery.exceptions import Retry
 from django.contrib.auth.models import User
@@ -14,6 +14,8 @@ from core.models import Tenant
 from file_manager.models import MediaCollection, MediaFile, MediaTag
 from object_storage.models import ObjectInstance, ObjectTransferJob, ObjectTypeDefinition, ObjectVersion
 from object_storage.services.object_transfer import (
+    MAX_ARCHIVE_BYTES,
+    MAX_UNCOMPRESSED_BYTES,
     ObjectPackageExporter,
     ObjectPackageImporter,
     build_preflight,
@@ -21,7 +23,7 @@ from object_storage.services.object_transfer import (
     collect_object_graph,
     rebuild_imported_reverse_relationships,
 )
-from object_storage.tasks import cleanup_expired_object_packages, import_remote_object_package
+from object_storage.tasks import _stream_package_response, cleanup_expired_object_packages, import_remote_object_package
 from taxonomy.models import Tag as TaxonomyTag
 from webpages.services.theme_remote import RemoteTransportError
 
@@ -191,6 +193,19 @@ class ObjectTransferServiceTests(TestCase):
             with zipfile.ZipFile(io.BytesIO(), "w", zipfile.ZIP_DEFLATED) as package:
                 with self.assertRaisesMessage(ValueError, "exceeds safety limits"):
                     ObjectPackageExporter(export_job, storage=storage).write_package(package)
+
+    def test_archive_download_limit_allows_zip_overhead(self):
+        response = Mock()
+        response.iter_content.return_value = [b"abc", b"def"]
+        destination = io.BytesIO()
+
+        self.assertGreater(MAX_ARCHIVE_BYTES, MAX_UNCOMPRESSED_BYTES)
+        with patch("object_storage.tasks.MAX_ARCHIVE_BYTES", 6):
+            self.assertEqual(_stream_package_response(response, destination), 6)
+
+        with patch("object_storage.tasks.MAX_ARCHIVE_BYTES", 5):
+            with self.assertRaisesMessage(ValueError, "safe archive download limit"):
+                _stream_package_response(response, io.BytesIO())
 
     def test_export_includes_transitive_type_topology_dependencies(self):
         browser_type = ObjectTypeDefinition.objects.create(

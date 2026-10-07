@@ -25,6 +25,8 @@ MAX_CANDIDATES_PER_TYPE = 500
 MAX_OBJECTS = 10_000
 MAX_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024
 MAX_ENTRIES = 25_000
+# Bound ZIP headers and worst-case deflate overhead separately from member sizes.
+MAX_ARCHIVE_BYTES = MAX_UNCOMPRESSED_BYTES + 64 * 1024 * 1024
 UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 
