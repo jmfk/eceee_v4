@@ -5,7 +5,9 @@ import zipfile
 from types import SimpleNamespace
 
 from django.test import SimpleTestCase
+from rest_framework import serializers
 
+from object_storage.remote_views import _validate_type_resolutions
 from object_storage.services.object_transfer import (
     PACKAGE_VERSION,
     _remap,
@@ -30,6 +32,27 @@ class ObjectTransferHelperTests(SimpleTestCase):
         self.assertEqual(result["related"], [50])
         self.assertEqual(result["rating"], 5)
         self.assertEqual(result["image"], destination_media_id)
+
+    def test_remap_drops_object_references_missing_from_the_import_graph(self):
+        result = _remap(
+            {"related": [5, 999, {"object_id": 6, "label": "Known"}, {"id": 998, "label": "Missing"}]},
+            {"5": 50, "6": 60},
+            {},
+            {"related"},
+        )
+
+        self.assertEqual(result["related"], [50, {"object_id": 60, "label": "Known"}])
+
+    def test_type_resolutions_must_match_reported_conflicts_and_allowed_actions(self):
+        conflicts = [{"name": "article", "compatible": False, "usedByOtherTenants": True}]
+
+        _validate_type_resolutions(conflicts, {"article": "skip"})
+        with self.assertRaises(serializers.ValidationError):
+            _validate_type_resolutions(conflicts, {"unreported": "update"})
+        with self.assertRaises(serializers.ValidationError):
+            _validate_type_resolutions(conflicts, {"article": "update"})
+        with self.assertRaises(serializers.ValidationError):
+            _validate_type_resolutions(conflicts, ["article"])
 
     def test_remap_rewrites_media_ids_embedded_in_html(self):
         source_media_id = "0f598bec-ad32-486c-98ab-a004d827db08"

@@ -108,6 +108,29 @@ def _decorate_preflight(tenant, result):
     }
 
 
+def _validate_type_resolutions(conflicts, resolutions):
+    if not isinstance(resolutions, dict):
+        raise serializers.ValidationError({"typeResolutions": "Expected an object keyed by object type name."})
+    conflicts_by_name = {item["name"]: item for item in conflicts}
+    unexpected = sorted(set(resolutions) - set(conflicts_by_name))
+    if unexpected:
+        raise serializers.ValidationError(
+            {"typeResolutions": [f"{name} is not an object type conflict." for name in unexpected]}
+        )
+    invalid = []
+    for name, resolution in resolutions.items():
+        conflict = conflicts_by_name[name]
+        allowed = {"skip"}
+        if conflict["compatible"]:
+            allowed.add("keep")
+        if not conflict["usedByOtherTenants"]:
+            allowed.add("update")
+        if not isinstance(resolution, str) or resolution not in allowed:
+            invalid.append(f"{resolution} is not allowed for {name}.")
+    if invalid:
+        raise serializers.ValidationError({"typeResolutions": invalid})
+
+
 class RemoteObjectSourceMixin:
     authentication_classes = [MachineAPIKeyAuthentication, authentication.SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
@@ -239,6 +262,10 @@ class RemoteObjectImportListView(APIView):
         namespace_resolutions = (
             request.data.get("namespaceResolutions") or request.data.get("namespace_resolutions") or {}
         )
+        if not isinstance(namespace_resolutions, dict):
+            raise serializers.ValidationError(
+                {"namespaceResolutions": "Expected an object keyed by remote namespace slug."}
+            )
         try:
             preflight = _decorate_preflight(
                 request.tenant,
@@ -248,6 +275,7 @@ class RemoteObjectImportListView(APIView):
             return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         if not preflight.get("limits", {}).get("withinLimits", preflight.get("limits", {}).get("within_limits", True)):
             raise serializers.ValidationError({"rootIds": "The selection exceeds the object transfer limits."})
+        _validate_type_resolutions(preflight["type_conflicts"], type_resolutions)
         unresolved_types = [
             item["name"] for item in preflight["type_conflicts"] if item["name"] not in type_resolutions
         ]

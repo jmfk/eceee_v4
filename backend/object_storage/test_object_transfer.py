@@ -1,4 +1,5 @@
 import io
+import json
 import zipfile
 from datetime import timedelta
 from unittest.mock import patch
@@ -163,6 +164,44 @@ class ObjectTransferServiceTests(TestCase):
         result = build_preflight(self.tenant, [self.root.id])
         self.assertEqual(result["object_count"], 3)
         self.assertEqual(result["media_count"], 1)
+
+    def test_export_includes_transitive_type_topology_dependencies(self):
+        browser_type = ObjectTypeDefinition.objects.create(
+            name="transfer-browser",
+            label="Browser",
+            plural_label="Browsers",
+            namespace=self.namespace,
+            created_by=self.user,
+        )
+        unused_child_type = ObjectTypeDefinition.objects.create(
+            name="transfer-unused-child",
+            label="Unused child",
+            plural_label="Unused children",
+            namespace=self.namespace,
+            browser_group=browser_type,
+            created_by=self.user,
+        )
+        self.root_type.allowed_child_types.add(unused_child_type)
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file) as package:
+            payload = json.loads(package.read("objects.json"))
+
+        self.assertEqual(
+            {item["name"] for item in payload["types"]},
+            {self.root_type.name, self.child_type.name, unused_child_type.name, browser_type.name},
+        )
 
     def test_reverse_relationship_rebuild_is_tenant_scoped(self):
         self.root.relationships = [{"type": "related", "object_id": self.related.id}]
@@ -420,6 +459,38 @@ class ObjectTransferServiceTests(TestCase):
 
         self.root_type.refresh_from_db()
         self.assertEqual(self.root_type.namespace, foreign_namespace)
+
+    def test_import_cannot_force_update_an_unchanged_type_used_by_another_tenant(self):
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+        foreign_tenant = Tenant.objects.create(name="Foreign", identifier="foreign-unchanged", created_by=self.user)
+        ObjectInstance.objects.create(
+            tenant=foreign_tenant,
+            object_type=self.root_type,
+            title="Foreign root",
+            slug="foreign-root",
+            created_by=self.user,
+        )
+        import_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"type_resolutions": {self.root_type.name: "update"}},
+        )
+
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            with self.assertRaisesMessage(ValueError, "used by another workspace"):
+                ObjectPackageImporter(import_job, storage=storage).import_package(package)
 
     @patch("object_storage.tasks.remote_object_request", side_effect=RemoteTransportError("Temporary failure"))
     def test_import_job_retries_transport_errors_without_marking_failed(self, remote_request):
