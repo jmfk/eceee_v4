@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from ..filters import PageVersionFilter
 from ..models import PageTheme, PageVersion, WebPage
 from ..serializers import PageVersionComparisonSerializer, PageVersionListSerializer, PageVersionSerializer
+from ..services.editor_css import compile_editor_css
 from ..services.page_version_workflow import (
     PageVersionWorkflowService,
     ScheduleConflictError,
@@ -24,7 +25,6 @@ from ..services.page_version_workflow import (
     WorkflowError,
     workflow_payload,
 )
-from ..services.editor_css import compile_editor_css
 from ..services.theme_css_generator import ThemeCSSGenerator
 
 
