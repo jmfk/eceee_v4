@@ -22,7 +22,7 @@ const editableTextLabel = (node: HTMLElement) => {
 }
 
 const FRAME_CSS = `${PUBLIC_RENDER_CSS}
-.designer-preview [data-designer-target]{cursor:pointer}.designer-guides [data-designer-target]{outline:1px dashed rgba(100,116,139,.5)!important;outline-offset:-1px}[data-designer-target].designer-selected{outline:3px solid #2563eb!important;outline-offset:-3px!important}[data-designer-target].designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:0 0 0 3px rgba(245,158,11,.2)!important}[data-designer-target].designer-selected.designer-highlighted{outline:3px solid #2563eb!important;outline-offset:-3px!important;box-shadow:0 0 0 4px #f59e0b!important}.designer-guides .designer-hovered:not(.designer-selected):not(.designer-highlighted){outline:2px dotted #2563eb!important;outline-offset:-2px!important}
+.designer-preview [data-designer-target]{cursor:pointer}[data-designer-target].designer-selected{outline:3px solid #2563eb!important;outline-offset:-3px!important}[data-designer-target].designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:0 0 0 3px rgba(245,158,11,.2)!important}[data-designer-target].designer-selected.designer-highlighted{outline:3px solid #2563eb!important;outline-offset:-3px!important;box-shadow:0 0 0 4px #f59e0b!important}.designer-guides .designer-hovered:not(.designer-selected):not(.designer-highlighted){outline:2px dotted #2563eb!important;outline-offset:-2px!important}
 .designer-context-menu{position:fixed!important;z-index:2147483647!important;min-width:180px!important;max-width:260px!important;padding:6px!important;border:1px solid #d1d5db!important;border-radius:8px!important;background:#fff!important;box-shadow:0 10px 24px rgba(15,23,42,.2)!important;color:#111827!important;font:500 13px/1.35 system-ui,sans-serif!important}.designer-context-menu-title{overflow:hidden!important;padding:5px 8px 7px!important;color:#6b7280!important;font-size:11px!important;font-weight:600!important;text-overflow:ellipsis!important;white-space:nowrap!important}.designer-context-menu button{display:block!important;width:100%!important;padding:7px 8px!important;border:0!important;border-radius:5px!important;background:transparent!important;color:#111827!important;font:inherit!important;text-align:left!important;cursor:pointer!important}.designer-context-menu button:hover,.designer-context-menu button:focus-visible{background:#eff6ff!important;color:#1d4ed8!important;outline:none!important}
 .designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483644!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483645!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483645!important;transform:translate(-50%,-50%);padding:2px 3px!important;border:0!important;border-radius:3px!important;background:#fff!important;font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;box-shadow:0 0 0 1px rgba(255,255,255,.9)!important}.designer-spacing-value[data-editable="true"]{pointer-events:auto!important;cursor:pointer!important;box-shadow:0 0 0 1px currentColor!important}.designer-spacing-value[data-editable="true"]:hover,.designer-spacing-value[data-editable="true"]:focus-visible{outline:2px solid #2563eb!important;outline-offset:1px!important}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}.designer-spacing-editor{position:fixed!important;z-index:2147483647!important;display:flex!important;gap:4px!important;padding:5px!important;border:1px solid #93c5fd!important;border-radius:6px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.22)!important}.designer-spacing-editor input{width:72px!important;padding:5px 6px!important;border:1px solid #d1d5db!important;border-radius:4px!important;font:500 12px/1.2 system-ui,sans-serif!important}.designer-spacing-editor button{padding:5px 7px!important;border:0!important;border-radius:4px!important;background:#2563eb!important;color:#fff!important;font:600 12px/1.2 system-ui,sans-serif!important;cursor:pointer!important}
 `
@@ -39,6 +39,11 @@ const editableValue = (node: HTMLElement, richText = isRichTextNode(node)) => ri
 const nodeTargets = (node: HTMLElement) => {
     try { return JSON.parse(node.dataset.designerTargets || '[]') } catch { return [] }
 }
+
+const findTargetNode = (root: ParentNode, targetId: string, widgetId = '') => [...root.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => (
+    (!widgetId || node.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId === widgetId)
+    && nodeTargets(node).some((target: any) => target.id === targetId)
+))
 
 const compactText = (node: HTMLElement) => (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim()
 
@@ -64,10 +69,15 @@ const descendantTargets = (node: HTMLElement) => {
     return [...node.querySelectorAll<HTMLElement>('[data-designer-target]')].map((descendant) => {
         const targets = nodeTargets(descendant)
         const primary = targets[0]
-        if (!primary?.id || seen.has(primary.id)) return null
-        seen.add(primary.id)
+        const widgetNode = descendant.closest<HTMLElement>('[data-widget-id]')
+        const widgetType = widgetNode?.dataset.widgetType || ''
+        const widgetId = widgetNode?.dataset.widgetId || ''
+        const instanceKey = `${widgetId}:${primary?.id || ''}`
+        if (!primary?.id || seen.has(instanceKey)) return null
+        seen.add(instanceKey)
         const parentNode = descendant.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
         const parentId = parentNode && (parentNode === node || node.contains(parentNode)) ? nodeTargets(parentNode)[0]?.id || '' : ''
+        const parentWidgetId = parentNode?.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''
         let depth = 1
         let ancestor = parentNode
         while (ancestor && ancestor !== node) {
@@ -79,15 +89,18 @@ const descendantTargets = (node: HTMLElement) => {
             ...primary,
             displayLabel: descendantDisplayLabel(descendant, primary),
             parentId,
+            parentWidgetId,
             depth,
-            widgetType: descendant.closest<HTMLElement>('[data-widget-type]')?.dataset.widgetType || '',
-            widgetId: descendant.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || '',
+            widgetType,
+            widgetId,
             text: editableValue(descendant, richText),
             richText,
             sourceUrl: primary.sourceUrl || (descendant instanceof HTMLImageElement ? descendant.currentSrc || descendant.src : ''),
             computedStyles: computedThemeValues(descendant),
             alternatives: targets.map((target: any) => ({
                 ...target,
+                widgetType: target.widgetType || widgetType,
+                widgetId: target.widgetId || widgetId,
                 text: editableValue(descendant, Boolean(target.richText || richText)),
                 richText: Boolean(target.richText || richText),
                 computedStyles: computedThemeValues(descendant),
@@ -134,7 +147,14 @@ const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['design
         sourcePath: primary.sourcePath || [],
         sourceMatchIndex: primary.sourceMatchIndex ?? 0,
         computedStyles: computedThemeValues(node),
-        alternatives: targets.map((target: any) => ({ ...target, text: editableValue(node, Boolean(target.richText || richText)), richText: Boolean(target.richText || richText), computedStyles: computedThemeValues(node) })),
+        alternatives: targets.map((target: any) => ({
+            ...target,
+            widgetType: target.widgetType || widgetNode?.dataset.widgetType || '',
+            widgetId: target.widgetId || widgetNode?.dataset.widgetId || '',
+            text: editableValue(node, Boolean(target.richText || richText)),
+            richText: Boolean(target.richText || richText),
+            computedStyles: computedThemeValues(node),
+        })),
         ancestors: designer ? ancestorTargets(node, designer) : [],
         descendants: descendantTargets(node),
         ...extra,
@@ -154,7 +174,12 @@ const registerTarget = (node: HTMLElement, target: any, primary = false) => {
     node.dataset.designerLabel = targets[0].label
 }
 
-type DesignerFocusState = { selectedTargetId: string, highlightedTargetId: string }
+type DesignerFocusState = {
+    selectedTargetId: string
+    selectedWidgetId: string
+    highlightedTargetId: string
+    highlightedWidgetId: string
+}
 
 const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusState: DesignerFocusState) => {
     const designer = model.designer
@@ -517,9 +542,12 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         })
     }
 
-    const findTargetNode = (targetId: string) => [...root.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => nodeTargets(node).some((target: any) => target.id === targetId))
-    const restoredSelection = focusState.selectedTargetId ? findTargetNode(focusState.selectedTargetId) : null
-    const restoredHighlight = focusState.highlightedTargetId ? findTargetNode(focusState.highlightedTargetId) : null
+    const restoredSelection = focusState.selectedTargetId
+        ? findTargetNode(root, focusState.selectedTargetId, focusState.selectedWidgetId)
+        : null
+    const restoredHighlight = focusState.highlightedTargetId
+        ? findTargetNode(root, focusState.highlightedTargetId, focusState.highlightedWidgetId)
+        : null
     if (restoredSelection) {
         restoredSelection.classList.add('designer-selected')
         selectedNode = restoredSelection
@@ -528,7 +556,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     restoredHighlight?.classList.add('designer-highlighted')
 
     root.querySelectorAll<HTMLElement>('[data-designer-target]').forEach((node) => {
-        const click = (event: Event) => { if (!node.isContentEditable) event.preventDefault(); event.stopPropagation(); root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected')); root.querySelectorAll('.designer-highlighted').forEach((highlighted) => highlighted.classList.remove('designer-highlighted')); node.classList.add('designer-selected'); selectedNode = node; focusState.selectedTargetId = nodeTargets(node)[0]?.id || ''; focusState.highlightedTargetId = ''; showSpacing(node); postDesignerEvent(node, designer) }
+        const click = (event: Event) => { if (!node.isContentEditable) event.preventDefault(); event.stopPropagation(); root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected')); root.querySelectorAll('.designer-highlighted').forEach((highlighted) => highlighted.classList.remove('designer-highlighted')); node.classList.add('designer-selected'); selectedNode = node; focusState.selectedTargetId = nodeTargets(node)[0]?.id || ''; focusState.selectedWidgetId = node.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''; focusState.highlightedTargetId = ''; focusState.highlightedWidgetId = ''; showSpacing(node); postDesignerEvent(node, designer) }
         let primaryTarget: any = null
         try { primaryTarget = JSON.parse(node.dataset.designerTargets || '[]')[0] } catch { primaryTarget = null }
         const activateEditing = (event?: Event) => {
@@ -578,7 +606,9 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         eventNode.classList.add('designer-selected')
         selectedNode = eventNode
         focusState.selectedTargetId = primary.id
+        focusState.selectedWidgetId = eventNode.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''
         focusState.highlightedTargetId = ''
+        focusState.highlightedWidgetId = ''
         showSpacing(eventNode)
         postDesignerEvent(eventNode, designer, 'select', primary)
 
@@ -712,7 +742,7 @@ export const RenderFrameRuntime = () => {
     const [model, setModel] = useState<RenderPageModel | null>(null)
     const modelRef = useRef<RenderPageModel | null>(null)
     const rootRef = useRef<HTMLDivElement>(null)
-    const focusStateRef = useRef<DesignerFocusState>({ selectedTargetId: '', highlightedTargetId: '' })
+    const focusStateRef = useRef<DesignerFocusState>({ selectedTargetId: '', selectedWidgetId: '', highlightedTargetId: '', highlightedWidgetId: '' })
 
     useEffect(() => {
         const receive = (event: MessageEvent<RenderFrameMessage>) => {
@@ -724,12 +754,12 @@ export const RenderFrameRuntime = () => {
             }
             if (event.data.action === 'selectTarget' && event.data.targetId) {
                 focusStateRef.current.selectedTargetId = event.data.targetId
+                focusStateRef.current.selectedWidgetId = event.data.widgetId || ''
                 focusStateRef.current.highlightedTargetId = ''
+                focusStateRef.current.highlightedWidgetId = ''
                 document.querySelectorAll('.designer-selected').forEach((node) => node.classList.remove('designer-selected'))
                 document.querySelectorAll('.designer-highlighted').forEach((node) => node.classList.remove('designer-highlighted'))
-                const match = [...document.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => {
-                    try { return JSON.parse(node.dataset.designerTargets || '[]').some((target: any) => target.id === event.data.targetId) } catch { return false }
-                })
+                const match = findTargetNode(document, event.data.targetId, event.data.widgetId)
                 match?.classList.add('designer-selected')
                 match?.dispatchEvent(new CustomEvent('designerselect', { bubbles: true }))
                 const preferredTarget = match ? nodeTargets(match).find((target: any) => target.id === event.data.targetId) : null
@@ -738,11 +768,10 @@ export const RenderFrameRuntime = () => {
             }
             if (event.data.action === 'highlightTarget') {
                 focusStateRef.current.highlightedTargetId = event.data.active && event.data.targetId ? event.data.targetId : ''
+                focusStateRef.current.highlightedWidgetId = event.data.active ? event.data.widgetId || '' : ''
                 document.querySelectorAll('.designer-highlighted').forEach((node) => node.classList.remove('designer-highlighted'))
                 if (event.data.active && event.data.targetId) {
-                    const match = [...document.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => {
-                        try { return nodeTargets(node).some((target: any) => target.id === event.data.targetId) } catch { return false }
-                    })
+                    const match = findTargetNode(document, event.data.targetId, event.data.widgetId)
                     match?.classList.add('designer-highlighted')
                     match?.scrollIntoView?.({ block: 'nearest' })
                 }

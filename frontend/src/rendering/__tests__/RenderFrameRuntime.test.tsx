@@ -186,6 +186,8 @@ describe('RenderFrameRuntime designer overlay', () => {
         const bannerText = await screen.findByText('Selectable banner')
         const bannerWidget = bannerText.closest('[data-widget-id="banner-1"]') as HTMLElement
         await waitFor(() => expect(bannerWidget).toHaveAttribute('data-designer-target', 'widget:banner-1'))
+        expect(bannerWidget).not.toHaveClass('designer-selected', 'designer-highlighted')
+        expect(getComputedStyle(bannerWidget).outlineStyle).not.toBe('dashed')
         fireEvent.click(bannerText)
 
         expect(bannerWidget).toHaveClass('designer-selected')
@@ -198,6 +200,67 @@ describe('RenderFrameRuntime designer overlay', () => {
             widgetId: 'banner-1',
             widgetType: 'easy_widgets.BannerWidget',
         }), '*')
+        postMessage.mockRestore()
+    })
+
+    it('scopes repeated design targets to the requested widget instance', async () => {
+        const repeatedWorkspace = structuredClone(workspace)
+        repeatedWorkspace.catalog.designGroups[0].elements = [{ id: 'paragraph', element: 'p', label: 'Paragraph' }]
+        const sourceModel = createPageRenderModel({
+            layout: 'main_layout',
+            widgets: {
+                main: [
+                    { id: 'first-content', type: 'easy_widgets.ContentWidget', config: { content: '<p>First copy</p>' } },
+                    { id: 'second-content', type: 'easy_widgets.ContentWidget', config: { content: '<p>Second copy</p>' } },
+                ],
+            },
+        })
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        const renderModel = createDesignerRenderModel({
+            workspace: repeatedWorkspace,
+            viewId: 'page-main',
+            sourceModel,
+            contentEditable: false,
+        })
+        sendModel(renderModel)
+
+        const firstParagraph = await screen.findByText('First copy')
+        const secondParagraph = await screen.findByText('Second copy')
+        await waitFor(() => {
+            expect(firstParagraph).toHaveAttribute('data-designer-target', 'paragraph')
+            expect(secondParagraph).toHaveAttribute('data-designer-target', 'paragraph')
+        })
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-render-host', action: 'selectTarget',
+                targetId: 'paragraph', widgetId: 'second-content',
+            },
+            source: window.parent,
+        }))
+        expect(secondParagraph).toHaveClass('designer-selected')
+        expect(firstParagraph).not.toHaveClass('designer-selected')
+        await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'select',
+            targetId: 'paragraph', widgetId: 'second-content',
+        }), '*'))
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-render-host', action: 'highlightTarget',
+                targetId: 'paragraph', widgetId: 'first-content', active: true,
+            },
+            source: window.parent,
+        }))
+        expect(firstParagraph).toHaveClass('designer-highlighted')
+        expect(secondParagraph).toHaveClass('designer-selected')
+
+        sendModel({ ...renderModel })
+        await waitFor(() => {
+            expect(screen.getByText('First copy')).toHaveClass('designer-highlighted')
+            expect(screen.getByText('Second copy')).toHaveClass('designer-selected')
+        })
         postMessage.mockRestore()
     })
 
