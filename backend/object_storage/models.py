@@ -625,7 +625,7 @@ class ObjectInstance(MPTTModel):
         if not self.slug:
             self.slug = slugify(self.title)
 
-        # Ensure slug is unique within the object type
+        # Ensure slug is unique within the tenant and object type
         if is_new:  # New object
             from django.db import transaction
 
@@ -634,7 +634,7 @@ class ObjectInstance(MPTTModel):
                 counter = 1
                 while (
                     ObjectInstance.objects.select_for_update()
-                    .filter(object_type=self.object_type, slug=self.slug)
+                    .filter(tenant_id=self.tenant_id, object_type=self.object_type, slug=self.slug)
                     .exists()
                 ):
                     self.slug = f"{original_slug}-{counter}"
