@@ -101,6 +101,7 @@ class DesignerPlaceholderSerializer(serializers.Serializer):
     width = serializers.IntegerField(min_value=16, max_value=8000)
     height = serializers.IntegerField(min_value=16, max_value=8000)
     draft_version = serializers.IntegerField(min_value=1)
+    target_breakpoint = serializers.CharField(max_length=50, required=False)
 
     def validate(self, attrs):
         if attrs["width"] * attrs["height"] > MAX_IMAGE_PIXELS:
@@ -838,6 +839,7 @@ class DesignerThemePlaceholderView(APIView):
                     "requiredWidth": width,
                     "requiredHeight": height,
                 },
+                target_breakpoint=data.get("target_breakpoint"),
             )
         except DesignerDraftConflict as exc:
             return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)

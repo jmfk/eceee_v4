@@ -643,8 +643,10 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             selection?.collapseToEnd()
         })
 
-        const assetTargets = targets.filter((target) => target.kind === 'asset')
-        const imageTargets = assetTargets.length ? assetTargets : targets.filter((target) => target.kind === 'previewImage')
+        const assetTarget = targets.find((target) => target.kind === 'asset')
+        if (assetTarget) addAction('Edit image in inspector', assetTarget, 'inspect')
+
+        const imageTargets = targets.filter((target) => target.kind === 'previewImage')
         imageTargets.forEach((target) => addAction(imageTargets.length > 1 ? `Replace ${target.label}` : 'Replace image', target, 'replaceImage', () => {
             const input = document.createElement('input')
             input.type = 'file'

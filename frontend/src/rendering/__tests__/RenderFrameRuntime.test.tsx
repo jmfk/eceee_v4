@@ -356,6 +356,35 @@ describe('RenderFrameRuntime designer overlay', () => {
         postMessage.mockRestore()
     })
 
+    it('opens theme images in the inspector instead of replacing an ambiguous breakpoint', async () => {
+        const imageWorkspace = structuredClone(workspace)
+        imageWorkspace.catalog.designGroups[0].assetKeys = ['design:0:content-widget:md:background']
+        imageWorkspace.assets = [{
+            assetKey: 'design:0:content-widget:md:background',
+            displayName: 'Article background',
+            part: 'content-widget',
+        }]
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: imageWorkspace, viewId: 'page-main', contentEditable: true }))
+
+        const heading = await screen.findByRole('heading', { name: 'Overridden heading' })
+        fireEvent.contextMenu(heading, { clientX: 48, clientY: 64 })
+
+        const menu = screen.getByRole('menu')
+        expect(within(menu).queryByRole('menuitem', { name: 'Replace image' })).not.toBeInTheDocument()
+        fireEvent.click(within(menu).getByRole('menuitem', { name: 'Edit image in inspector' }))
+
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview',
+            action: 'contextAction',
+            command: 'inspect',
+            kind: 'asset',
+            targetId: 'asset:design:0:content-widget:md:background',
+        }), '*')
+        postMessage.mockRestore()
+    })
+
     it('runs rich text toolbar commands against the active field', async () => {
         const execCommand = vi.fn()
         Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand })
