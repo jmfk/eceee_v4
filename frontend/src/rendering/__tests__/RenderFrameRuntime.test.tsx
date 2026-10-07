@@ -269,10 +269,12 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(screen.getByText('First copy')).not.toHaveClass('designer-highlighted')
         expect(screen.getByText('Second copy')).not.toHaveClass('designer-selected')
 
+        fireEvent.click(screen.getByText('First copy'))
+        expect(screen.getByText('First copy')).toHaveClass('designer-selected')
         sendModel({ ...renderModel })
         await waitFor(() => {
             expect(screen.getByText('First copy')).not.toHaveClass('designer-highlighted')
-            expect(screen.getByText('Second copy')).not.toHaveClass('designer-selected')
+            expect(screen.getByText('First copy')).toHaveClass('designer-selected')
         })
         postMessage.mockRestore()
     })

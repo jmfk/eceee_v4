@@ -803,7 +803,10 @@ export const RenderFrameRuntime = () => {
                 match?.scrollIntoView?.({ block: 'nearest' })
             }
             if (event.data.action === 'clearTarget') {
-                focusStateRef.current = { selectedTargetId: '', selectedWidgetId: '', highlightedTargetId: '', highlightedWidgetId: '' }
+                focusStateRef.current.selectedTargetId = ''
+                focusStateRef.current.selectedWidgetId = ''
+                focusStateRef.current.highlightedTargetId = ''
+                focusStateRef.current.highlightedWidgetId = ''
                 document.querySelectorAll('.designer-selected,.designer-highlighted').forEach((node) => node.classList.remove('designer-selected', 'designer-highlighted'))
                 rootRef.current?.dispatchEvent(new CustomEvent('designerclear'))
             }
