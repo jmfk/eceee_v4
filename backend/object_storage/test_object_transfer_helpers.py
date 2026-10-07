@@ -6,7 +6,13 @@ from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 
-from object_storage.services.object_transfer import PACKAGE_VERSION, _remap, type_is_compatible, validate_package
+from object_storage.services.object_transfer import (
+    PACKAGE_VERSION,
+    _remap,
+    type_definition_differs,
+    type_is_compatible,
+    validate_package,
+)
 
 
 class ObjectTransferHelperTests(SimpleTestCase):
@@ -80,6 +86,32 @@ class ObjectTransferHelperTests(SimpleTestCase):
 
         remote["slot_configuration"]["slots"][0]["widgetControls"] = [{"widgetType": "content"}]
         local.slot_configuration["slots"].append({"name": "sidebar", "required": True})
+        self.assertFalse(type_is_compatible(local, remote))
+
+    def test_type_compatibility_includes_child_and_browser_topology(self):
+        children = SimpleNamespace(values_list=lambda *_args, **_kwargs: ["child", "optional-child"])
+        local = SimpleNamespace(
+            hierarchy_level="both",
+            schema={"type": "object", "properties": {}},
+            slot_configuration={"slots": []},
+            allowed_child_types=children,
+            browser_group=SimpleNamespace(name="content"),
+        )
+        remote = {
+            "hierarchy_level": "both",
+            "schema": {"type": "object", "properties": {}},
+            "slot_configuration": {"slots": []},
+            "allowed_child_types": ["child"],
+            "browser_group": "content",
+        }
+
+        self.assertTrue(type_is_compatible(local, remote))
+        self.assertTrue(type_definition_differs(local, remote))
+
+        remote["allowed_child_types"] = ["missing-child"]
+        self.assertFalse(type_is_compatible(local, remote))
+        remote["allowed_child_types"] = ["child"]
+        remote["browser_group"] = "other"
         self.assertFalse(type_is_compatible(local, remote))
 
     def test_package_requires_a_complete_checksum_manifest(self):

@@ -20,6 +20,7 @@ from object_storage.services.object_transfer import (
     build_preflight,
     candidate_catalog,
     serialize_type,
+    type_definition_differs,
     type_has_foreign_tenant_usage,
     type_is_compatible,
 )
@@ -70,10 +71,7 @@ def _decorate_preflight(tenant, result):
             "hierarchy_level": remote_type.get("hierarchy_level") or remote_type.get("hierarchyLevel"),
         }
         local = ObjectTypeDefinition.objects.filter(name=remote_type["name"]).first()
-        if local and any(
-            getattr(local, field) != normalized_type.get(field)
-            for field in ("schema", "slot_configuration", "hierarchy_level")
-        ):
+        if local and type_definition_differs(local, normalized_type):
             conflicts.append(
                 {
                     "name": remote_type["name"],
