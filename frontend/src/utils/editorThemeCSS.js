@@ -120,7 +120,11 @@ const serializeDeclarations = (style, keyframeNames) => Array.from(style).map(pr
 
 const serializeRule = (rule, keyframeNames) => {
     if (rule.type === 1) {
-        return `${rewriteDocumentRoots(rule.selectorText)} { ${serializeDeclarations(rule.style, keyframeNames)} }`
+        const declarations = serializeDeclarations(rule.style, keyframeNames)
+        const nestedRules = rule.cssRules
+            ? Array.from(rule.cssRules).map(child => serializeRule(child, keyframeNames)).join(' ')
+            : ''
+        return `${rewriteDocumentRoots(rule.selectorText)} { ${[declarations, nestedRules].filter(Boolean).join(' ')} }`
     }
     if (rule.type === 7) {
         const name = keyframeNames.get(rule.name) || rule.name
