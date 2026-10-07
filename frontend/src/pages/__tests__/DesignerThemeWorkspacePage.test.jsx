@@ -1024,6 +1024,54 @@ describe('DesignerThemeWorkspacePage', () => {
         }, '*')
     })
 
+    it('keeps repeated breadcrumb targets scoped to their widget instance', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'shared-group', kind: 'group', label: 'Inner content', widgetId: 'inner',
+                path: [
+                    { id: 'shared-group', kind: 'group', label: 'Outer content', widgetId: 'outer' },
+                    { id: 'shared-group', kind: 'group', label: 'Inner content', widgetId: 'inner' },
+                ],
+            },
+            source: iframe.contentWindow,
+        }))
+
+        const pathItems = within(screen.getByRole('navigation', { name: 'Element path' })).getAllByRole('listitem')
+        expect(pathItems).toHaveLength(2)
+        expect(pathItems[0]).toHaveTextContent('Outer content')
+        expect(pathItems[0].querySelector('[aria-current="page"]')).toBeNull()
+        expect(pathItems[1]).toHaveTextContent('Inner content')
+        expect(pathItems[1].querySelector('[aria-current="page"]')).toBeInTheDocument()
+    })
+
+    it('clears the preview target when the content source changes', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'group:0:element:h1', kind: 'element', label: 'Heading 1', widgetId: 'content-1',
+            },
+            source: iframe.contentWindow,
+        }))
+        postMessage.mockClear()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Select Article card' }))
+
+        expect(postMessage).toHaveBeenCalledWith({
+            source: 'eceee-render-host', action: 'clearTarget',
+        }, '*')
+        expect(screen.queryByText('Selected element')).not.toBeInTheDocument()
+    })
+
     it('hides technical alternatives that all have the same user-facing name', async () => {
         const duplicatedWorkspace = structuredClone(workspace)
         duplicatedWorkspace.catalog.designGroups[0].parts[0].label = 'Content widget container'

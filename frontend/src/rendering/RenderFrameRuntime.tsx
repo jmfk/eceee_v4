@@ -740,6 +740,12 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         selectedNode = node
         showSpacing(node)
     }
+    const clearFocus = () => {
+        selectedNode = null
+        closeContextMenu()
+        closeSpacingEditor()
+        clearGuides()
+    }
     const refreshGuides = () => {
         const node = spacingEditor?.node || hoveredNode || selectedNode
         if (node && root.contains(node)) showSpacing(node)
@@ -747,6 +753,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     root.addEventListener('mouseover', over)
     root.addEventListener('mouseout', out)
     root.addEventListener('designerselect', selectFromInspector)
+    root.addEventListener('designerclear', clearFocus)
     window.addEventListener('scroll', refreshGuides, true)
     window.addEventListener('resize', refreshGuides)
     cleanups.push(() => {
@@ -760,6 +767,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         root.removeEventListener('mouseover', over)
         root.removeEventListener('mouseout', out)
         root.removeEventListener('designerselect', selectFromInspector)
+        root.removeEventListener('designerclear', clearFocus)
         window.removeEventListener('scroll', refreshGuides, true)
         window.removeEventListener('resize', refreshGuides)
     })
@@ -793,6 +801,11 @@ export const RenderFrameRuntime = () => {
                 const preferredTarget = match ? nodeTargets(match).find((target: any) => target.id === event.data.targetId) : null
                 if (match && preferredTarget) postDesignerEvent(match, modelRef.current?.designer, 'select', preferredTarget)
                 match?.scrollIntoView?.({ block: 'nearest' })
+            }
+            if (event.data.action === 'clearTarget') {
+                focusStateRef.current = { selectedTargetId: '', selectedWidgetId: '', highlightedTargetId: '', highlightedWidgetId: '' }
+                document.querySelectorAll('.designer-selected,.designer-highlighted').forEach((node) => node.classList.remove('designer-selected', 'designer-highlighted'))
+                rootRef.current?.dispatchEvent(new CustomEvent('designerclear'))
             }
             if (event.data.action === 'highlightTarget') {
                 focusStateRef.current.highlightedTargetId = event.data.active && event.data.targetId ? event.data.targetId : ''

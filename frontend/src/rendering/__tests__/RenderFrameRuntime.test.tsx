@@ -261,6 +261,19 @@ describe('RenderFrameRuntime designer overlay', () => {
             expect(screen.getByText('First copy')).toHaveClass('designer-highlighted')
             expect(screen.getByText('Second copy')).toHaveClass('designer-selected')
         })
+
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-host', action: 'clearTarget' },
+            source: window.parent,
+        }))
+        expect(screen.getByText('First copy')).not.toHaveClass('designer-highlighted')
+        expect(screen.getByText('Second copy')).not.toHaveClass('designer-selected')
+
+        sendModel({ ...renderModel })
+        await waitFor(() => {
+            expect(screen.getByText('First copy')).not.toHaveClass('designer-highlighted')
+            expect(screen.getByText('Second copy')).not.toHaveClass('designer-selected')
+        })
         postMessage.mockRestore()
     })
 

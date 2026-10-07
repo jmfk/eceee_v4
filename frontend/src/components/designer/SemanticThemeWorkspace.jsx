@@ -520,6 +520,10 @@ const SemanticThemeWorkspace = ({
         inspectorRootRef.current = null
         setInspectorRoot(null)
         setOpenTargetId('')
+        setHighlightedTargetId('')
+        iframeRef.current?.contentWindow?.postMessage({
+            source: 'eceee-render-host', action: 'clearTarget',
+        }, '*')
     }, [selectedTarget])
 
     const demoOptions = useMemo(() => previewContent.views.map((view) => ({
@@ -1239,7 +1243,7 @@ const SemanticThemeWorkspace = ({
     }, new Map()).values()]
     const elementPathCandidates = (selectedTarget?.path?.length ? selectedTarget.path : targetAlternatives.slice().reverse())
         .filter((alternative) => !assetsByTargetId.has(alternative.id))
-    const selectedPathIndex = elementPathCandidates.findIndex((alternative) => alternative.id === selectedTarget?.id)
+    const selectedPathIndex = elementPathCandidates.findIndex((alternative) => targetFocusKey(alternative) === targetFocusKey(selectedTarget))
     const elementPath = selectedPathIndex >= 0 ? elementPathCandidates.slice(0, selectedPathIndex + 1) : elementPathCandidates
     const targetAssetAlternatives = targetAlternatives.filter((alternative) => assetsByTargetId.has(alternative.id))
     const richTextToolClass = 'inline-flex h-8 min-w-8 items-center justify-center rounded border border-gray-300 bg-white px-2 text-xs text-gray-700 hover:bg-gray-50'
@@ -1289,8 +1293,8 @@ const SemanticThemeWorkspace = ({
                         {elementPathCandidates.length > 1 && <nav aria-label="Element path">
                             <ol className="flex min-w-0 flex-wrap items-center gap-y-1 text-sm text-gray-600">
                                 {elementPath.map((alternative, index) => {
-                                    const isCurrent = alternative.id === selectedTarget.id
-                                    return <li key={alternative.id} className="flex min-w-0 items-center">
+                                    const isCurrent = targetFocusKey(alternative) === targetFocusKey(selectedTarget)
+                                    return <li key={targetFocusKey(alternative)} className="flex min-w-0 items-center">
                                         {index > 0 && <ChevronRight aria-hidden="true" className="mx-1 h-3.5 w-3.5 shrink-0 text-gray-400" />}
                                         {isCurrent
                                             ? <span aria-current="page" className="max-w-48 truncate font-semibold text-blue-800" title={alternative.label}>{alternative.label}</span>
