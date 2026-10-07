@@ -769,6 +769,27 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(savedSpacing.find((row) => row.breakpoint === 'sm').values.padding).toBe('32px')
     })
 
+    it('does not show an inherited directional value overridden by a later shorthand', async () => {
+        const responsiveWorkspace = structuredClone(workspace)
+        responsiveWorkspace.spacing = [
+            responsiveWorkspace.spacing[0],
+            { ...responsiveWorkspace.spacing[1], breakpoint: 'md', values: { paddingLeft: '40px' } },
+            { ...responsiveWorkspace.spacing[1], breakpoint: 'xl', values: { padding: '10px' } },
+        ]
+        mocks.workspace.mockResolvedValue(responsiveWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+
+        const iframe = screen.getByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:part:content-widget', kind: 'part', label: 'Content' },
+            source: iframe.contentWindow,
+        }))
+
+        expect(screen.getByDisplayValue('10px')).toBeInTheDocument()
+        expect(screen.queryByDisplayValue('40px')).not.toBeInTheDocument()
+    })
+
     it('uses the theme breakpoints as the global preview and inspector selector', async () => {
         const responsiveWorkspace = structuredClone(workspace)
         responsiveWorkspace.breakpoints = { xs: 0, sm: 600, md: 820, lg: 1100, xl: 1440 }
@@ -1305,6 +1326,36 @@ describe('DesignerThemeWorkspacePage', () => {
             replacement,
             2,
             'xl',
+        ))
+    })
+
+    it('replaces a legacy image source when its breakpoint matches the active level', async () => {
+        const legacyWorkspace = structuredClone(workspace)
+        legacyWorkspace.assets = legacyWorkspace.assets.map((asset) => asset.assetKey === 'design:0:hero:md:background'
+            ? { ...asset, assetKey: 'design:0:hero:tablet:background', breakpoint: 'tablet' }
+            : asset)
+        mocks.workspace.mockResolvedValue(legacyWorkspace)
+        mocks.replaceAsset.mockResolvedValue({ ...legacyWorkspace, draftVersion: 3, hasDraftChanges: true })
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        fireEvent.click(screen.getByRole('button', { name: 'Medium (Tablet) preview at 768px' }))
+        const { iframe, postMessage } = await readyPreview()
+        postMessage.mockRestore()
+        const replacement = new File(['hero'], 'hero.png', { type: 'image/png' })
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'contextAction', command: 'replaceImage',
+                targetId: 'asset:design:0:hero:tablet:background', kind: 'asset', label: 'Article hero', file: replacement,
+            },
+            source: iframe.contentWindow,
+        }))
+
+        await waitFor(() => expect(mocks.replaceAsset).toHaveBeenCalledWith(
+            '7',
+            'design:0:hero:tablet:background',
+            replacement,
+            2,
         ))
     })
 
