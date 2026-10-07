@@ -307,29 +307,14 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                         continue;
                     }
 
-                    // Build selectors using layout part classes
-                    // For widget root elements (parts ending in '-widget' or named 'container'),
-                    // the widget-type class and part class are on the SAME element,
-                    // so we use a same-element selector (no space).
-                    // Exception: 'content-widget' is a descendant in our current template structure.
-                    // For child elements, we use descendant selectors (with space).
-                    const isRootElement = (part.endsWith('-widget') || part === 'container') && part !== 'content-widget';
-
-                    const partSelectors = baseSelectors.map(base => {
-                        if (base) {
-                            if (isRootElement) {
-                                // Root element: both classes on same div
-                                // .slot-main .widget-type-{type}.{part}.variants:modifier
-                                return `${base}.${part}${variantsSelector}${cssModifier}`;
-                            } else {
-                                // Child element: descendant selector
-                                // .slot-main .widget-type-{type} .{part}.variants:modifier
-                                return `${base} .${part}${variantsSelector}${cssModifier}`;
-                            }
-                        } else {
-                            // Fallback for global layout parts
-                            return `.${part}${variantsSelector}${cssModifier}`;
-                        }
+                    // React widgets are not uniform: a layout-part class can be on
+                    // the widget-type element itself or on a descendant. Cover both
+                    // DOM shapes without requiring backend registry metadata.
+                    const partSelectors = baseSelectors.flatMap(base => {
+                        const partSelector = `.${part}${variantsSelector}${cssModifier}`;
+                        return base
+                            ? [`${base}${partSelector}`, `${base} ${partSelector}`]
+                            : [partSelector];
                     }).join(',\n');
 
                     // Convert properties to CSS (skip 'images' field and special color vars)

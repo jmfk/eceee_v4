@@ -123,6 +123,12 @@ describe('buildEditorThemeCSS', () => {
         expect(result).toContain('.banner-body.mode-header .banner-text')
         expect(result).toContain('.section-collapsed .expand-banner')
         expect(result).toContain('.nav-container { display: flex; flex-direction: column;')
+        expect(result).toContain('.bio-widget--column .bio-widget__container')
+        expect(result).toContain('.forms-widget input[type="text"]')
+        expect(result).toContain('.content-card-body.image-size-rectangle .content-card-image')
+        expect(result).toContain('.table-widget.table-no-borders th')
+        expect(result).toContain('.two-columns-widget.two-col-ratio-5-1')
+        expect(result).toContain('--form-padding: 2rem')
         expect(PUBLIC_RENDER_CSS).not.toContain('.content-widget{box-sizing:border-box')
     })
 
