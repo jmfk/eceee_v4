@@ -1,6 +1,7 @@
 import io
-import json
 import zipfile
+from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -17,6 +18,7 @@ from object_storage.services.object_transfer import (
     candidate_catalog,
     collect_object_graph,
 )
+from object_storage.tasks import cleanup_expired_object_packages
 from taxonomy.models import Tag as TaxonomyTag
 
 
@@ -150,7 +152,8 @@ class ObjectTransferServiceTests(TestCase):
     def test_catalog_limits_roots_and_graph_follows_children_and_references(self):
         catalog = candidate_catalog(self.tenant, [{"object_type": self.root_type.name, "limit": 1}])
         self.assertEqual([item["id"] for item in catalog[0]["candidates"]], [self.root.id])
-        graph = collect_object_graph(self.tenant, [self.root.id])
+        with patch.object(ObjectInstance, "get_descendants", side_effect=AssertionError("Use direct children")):
+            graph = collect_object_graph(self.tenant, [self.root.id])
         self.assertEqual({item.id for item in graph}, {self.root.id, self.child.id, self.related.id})
 
     def test_preflight_counts_referenced_managed_media(self):
@@ -185,9 +188,116 @@ class ObjectTransferServiceTests(TestCase):
 
         self.root.refresh_from_db()
         self.assertEqual(self.root.title, "Root")
-        self.assertIn(str(self.root.id), result["object_map"].values())
+        self.assertIn(self.root.id, result["object_map"].values())
         imported_media = MediaFile.objects.get(pk=self.media.pk)
         self.assertEqual(list(imported_media.tags.values_list("slug", flat=True)), ["portrait"])
         self.assertEqual(list(imported_media.canonical_tags.values_list("slug", flat=True)), ["people"])
         self.assertEqual(list(imported_media.collections.values_list("slug", flat=True)), ["portraits"])
         self.assertEqual(result["created_versions"], 0)
+
+    def test_repeated_import_does_not_duplicate_multiple_versions(self):
+        draft = ObjectVersion.objects.create(
+            object_instance=self.root,
+            version_number=2,
+            data={"related": [self.related.id], "title": "Draft"},
+            widgets={},
+            created_by=self.user,
+            effective_date=timezone.now() + timedelta(days=1),
+        )
+        self.root.current_version = draft
+        self.root.version = 2
+        self.root.save(update_fields=["current_version", "version", "updated_at"])
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+
+        for _attempt in range(2):
+            import_job = ObjectTransferJob.objects.create(
+                tenant=self.tenant,
+                kind=ObjectTransferJob.KIND_IMPORT,
+                created_by=self.user,
+                options={"type_resolutions": {}},
+            )
+            package_file.seek(0)
+            with zipfile.ZipFile(package_file, "r") as package:
+                result = ObjectPackageImporter(import_job, storage=storage).import_package(package)
+            self.assertEqual(result["created_versions"], 0)
+
+        self.root.refresh_from_db()
+        self.assertEqual(self.root.versions.count(), 2)
+        self.assertEqual(self.root.current_version_id, draft.id)
+
+    def test_import_cannot_update_type_owned_by_another_tenant(self):
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+
+        foreign_tenant = Tenant.objects.create(name="Foreign", identifier="foreign", created_by=self.user)
+        foreign_namespace = Namespace.objects.create(
+            name="Foreign namespace",
+            slug="foreign",
+            tenant=foreign_tenant,
+            created_by=self.user,
+        )
+        self.root_type.namespace = foreign_namespace
+        self.root_type.schema = {"type": "object", "properties": {}}
+        self.root_type.save(update_fields=["namespace", "schema", "updated_at"])
+        import_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"type_resolutions": {self.root_type.name: "update"}},
+        )
+
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            with self.assertRaisesMessage(ValueError, "used by another workspace"):
+                ObjectPackageImporter(import_job, storage=storage).import_package(package)
+
+        self.root_type.refresh_from_db()
+        self.assertEqual(self.root_type.namespace, foreign_namespace)
+
+    @patch("object_storage.tasks.S3MediaStorage")
+    def test_cleanup_processes_oldest_expired_jobs_first(self, storage_class):
+        now = timezone.now()
+        oldest = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            object_key="oldest.zip",
+            expires_at=now - timedelta(days=2),
+        )
+        ObjectTransferJob.objects.bulk_create(
+            [
+                ObjectTransferJob(
+                    tenant=self.tenant,
+                    kind=ObjectTransferJob.KIND_EXPORT,
+                    created_by=self.user,
+                    object_key=f"newer-{index}.zip",
+                    expires_at=now - timedelta(days=1),
+                )
+                for index in range(100)
+            ]
+        )
+
+        self.assertEqual(cleanup_expired_object_packages(batch_size=100), 100)
+
+        oldest.refresh_from_db()
+        self.assertEqual(oldest.object_key, "")
+        storage_class.return_value.delete.assert_any_call("oldest.zip")

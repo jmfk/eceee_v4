@@ -20,12 +20,24 @@ const RemoteObjectImport = ({ onClose, onCompleted }) => {
     const [job, setJob] = useState(null)
 
     useEffect(() => {
-        designerThemesApi.remoteConnections().then(result => {
-            const apiConnections = (result.results || []).filter(item => item.credentialScheme === 'api_key')
+        let mounted = true
+        Promise.all([
+            designerThemesApi.remoteConnections(),
+            objectTransfersApi.listImports().catch(() => ({ results: [] })),
+        ]).then(([connectionResult, importResult]) => {
+            if (!mounted) return
+            const apiConnections = (connectionResult.results || []).filter(item => item.credentialScheme === 'api_key')
+            const activeJob = (importResult.results || []).find(item => ['pending', 'running'].includes(item.status))
             setConnections(apiConnections)
             setConnectionId(apiConnections.find(item => item.isDefault)?.id || apiConnections[0]?.id || '')
+            setJob(activeJob || null)
             setBusy('')
-        }).catch(value => { setError(errorText(value)); setBusy('') })
+        }).catch(value => {
+            if (!mounted) return
+            setError(errorText(value))
+            setBusy('')
+        })
+        return () => { mounted = false }
     }, [])
 
     useEffect(() => {
@@ -68,8 +80,8 @@ const RemoteObjectImport = ({ onClose, onCompleted }) => {
         try {
             const result = await objectTransfersApi.preflight(connectionId, selected)
             setPreflight(result)
-            setResolutions(Object.fromEntries((result.typeConflicts || []).map(item => [item.name, item.compatible ? 'keep' : (item.usedByOtherTenants ? 'skip' : 'update')])))
-            setNamespaceResolutions(Object.fromEntries((result.namespaceConflicts || []).map(item => [item.slug, result.destinationNamespaces?.[0]?.slug || ''])))
+            setResolutions({})
+            setNamespaceResolutions({})
         } catch (value) { setError(errorText(value)) } finally { setBusy('') }
     }
 
@@ -78,6 +90,9 @@ const RemoteObjectImport = ({ onClose, onCompleted }) => {
         try { setJob(await objectTransfersApi.createImport(connectionId, selected, resolutions, namespaceResolutions)) }
         catch (value) { setError(errorText(value)); setBusy('') }
     }
+
+    const hasUnresolvedConflicts = (preflight?.typeConflicts || []).some(conflict => !resolutions[conflict.name])
+        || (preflight?.namespaceConflicts || []).some(conflict => !namespaceResolutions[conflict.slug])
 
     return (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10" role="dialog" aria-modal="true" aria-labelledby="remote-object-title">
@@ -105,7 +120,8 @@ const RemoteObjectImport = ({ onClose, onCompleted }) => {
                         {(preflight.externalUrls || []).length > 0 && <p className="mt-2 text-sm text-amber-700">{preflight.externalUrls.length} external URLs will remain unchanged.</p>}
                         {(preflight.typeConflicts || []).map(conflict => <label key={conflict.name} className="mt-3 block text-sm text-gray-700">
                             Resolve {conflict.name}
-                            <select value={resolutions[conflict.name]} onChange={event => setResolutions(current => ({ ...current, [conflict.name]: event.target.value }))} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2">
+                            <select value={resolutions[conflict.name] || ''} onChange={event => setResolutions(current => ({ ...current, [conflict.name]: event.target.value }))} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2">
+                                <option value="">Choose how to resolve this type</option>
                                 {conflict.compatible && <option value="keep">Keep compatible local definition</option>}
                                 {!conflict.usedByOtherTenants && <option value="update">Use remote definition</option>}
                                 <option value="skip">Skip this type</option>
@@ -118,7 +134,7 @@ const RemoteObjectImport = ({ onClose, onCompleted }) => {
                                 {(preflight.destinationNamespaces || []).map(namespace => <option key={namespace.slug} value={namespace.slug}>{namespace.name}</option>)}
                             </select>
                         </label>)}
-                        <button type="button" disabled={busy || preflight.limits?.withinLimits === false || Object.values(namespaceResolutions).some(value => !value)} onClick={startImport} className="mt-5 inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"><Download className="h-4 w-4" />Start import</button>
+                        <button type="button" disabled={busy || preflight.limits?.withinLimits === false || hasUnresolvedConflicts} onClick={startImport} className="mt-5 inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"><Download className="h-4 w-4" />Start import</button>
                     </section>}
                 </div>}
 

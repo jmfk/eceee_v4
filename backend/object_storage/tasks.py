@@ -20,7 +20,11 @@ logger = logging.getLogger(__name__)
 @shared_task
 def cleanup_expired_object_packages(batch_size=100):
     storage = S3MediaStorage()
-    jobs = ObjectTransferJob.objects.filter(expires_at__lt=timezone.now()).exclude(object_key="")[:batch_size]
+    jobs = (
+        ObjectTransferJob.objects.filter(expires_at__lt=timezone.now())
+        .exclude(object_key="")
+        .order_by("expires_at")[:batch_size]
+    )
     cleaned = 0
     for job in jobs:
         storage.delete(job.object_key)

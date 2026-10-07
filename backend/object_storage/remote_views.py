@@ -20,6 +20,7 @@ from object_storage.services.object_transfer import (
     build_preflight,
     candidate_catalog,
     serialize_type,
+    type_has_foreign_tenant_usage,
     type_is_compatible,
 )
 from object_storage.tasks import export_object_package, import_remote_object_package
@@ -77,9 +78,7 @@ def _decorate_preflight(tenant, result):
                 {
                     "name": remote_type["name"],
                     "compatible": type_is_compatible(local, normalized_type),
-                    "usedByOtherTenants": ObjectInstance.objects.filter(object_type=local)
-                    .exclude(tenant=tenant)
-                    .exists(),
+                    "usedByOtherTenants": type_has_foreign_tenant_usage(local, tenant),
                 }
             )
     namespace_conflicts = []
