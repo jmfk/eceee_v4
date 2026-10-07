@@ -164,6 +164,33 @@ class ObjectTransferServiceTests(TestCase):
         result = build_preflight(self.tenant, [self.root.id])
         self.assertEqual(result["object_count"], 3)
         self.assertEqual(result["media_count"], 1)
+        self.assertEqual(result["limits"]["entry_count"], 3)
+        self.assertGreater(result["limits"]["uncompressed_bytes"], result["media_bytes"])
+
+        with patch("object_storage.services.object_transfer.MAX_ENTRIES", 2):
+            limited_result = build_preflight(self.tenant, [self.root.id])
+
+        self.assertFalse(limited_result["limits"]["within_limits"])
+
+        with patch("object_storage.services.object_transfer.MAX_UNCOMPRESSED_BYTES", result["media_bytes"]):
+            size_limited_result = build_preflight(self.tenant, [self.root.id])
+
+        self.assertFalse(size_limited_result["limits"]["within_limits"])
+
+    def test_export_rejects_packages_over_the_entry_limit(self):
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+
+        with patch("object_storage.services.object_transfer.MAX_ENTRIES", 2):
+            with zipfile.ZipFile(io.BytesIO(), "w", zipfile.ZIP_DEFLATED) as package:
+                with self.assertRaisesMessage(ValueError, "exceeds safety limits"):
+                    ObjectPackageExporter(export_job, storage=storage).write_package(package)
 
     def test_export_includes_transitive_type_topology_dependencies(self):
         browser_type = ObjectTypeDefinition.objects.create(
@@ -201,6 +228,52 @@ class ObjectTransferServiceTests(TestCase):
         self.assertEqual(
             {item["name"] for item in payload["types"]},
             {self.root_type.name, self.child_type.name, unused_child_type.name, browser_type.name},
+        )
+
+    def test_skipped_type_is_not_restored_in_updated_type_topology(self):
+        skipped_type = ObjectTypeDefinition.objects.create(
+            name="transfer-skipped-child",
+            label="Skipped child",
+            plural_label="Skipped children",
+            namespace=self.namespace,
+            schema={"type": "object", "properties": {"remote": {"type": "string"}}},
+            created_by=self.user,
+        )
+        self.root_type.allowed_child_types.add(skipped_type)
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+
+        self.root_type.allowed_child_types.remove(skipped_type)
+        skipped_type.schema = {"type": "object", "properties": {"local": {"type": "string"}}}
+        skipped_type.save(update_fields=["schema", "updated_at"])
+        import_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "type_resolutions": {
+                    self.root_type.name: "update",
+                    skipped_type.name: "skip",
+                }
+            },
+        )
+
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            ObjectPackageImporter(import_job, storage=storage).import_package(package)
+
+        self.assertEqual(
+            set(self.root_type.allowed_child_types.values_list("name", flat=True)),
+            {self.child_type.name},
         )
 
     def test_reverse_relationship_rebuild_is_tenant_scoped(self):
@@ -293,6 +366,41 @@ class ObjectTransferServiceTests(TestCase):
         self.assertEqual(list(imported_media.canonical_tags.values_list("slug", flat=True)), ["people"])
         self.assertEqual(list(imported_media.collections.values_list("slug", flat=True)), ["portraits"])
         self.assertEqual(result["created_versions"], 0)
+
+    def test_import_reuses_media_tag_with_same_name_and_different_slug(self):
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+
+        MediaTag.objects.get(namespace=self.namespace, slug="portrait").delete()
+        local_tag = MediaTag.objects.create(
+            namespace=self.namespace,
+            name="Portrait",
+            slug="local-portrait",
+            created_by=self.user,
+        )
+        import_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"type_resolutions": {}},
+        )
+
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            ObjectPackageImporter(import_job, storage=storage).import_package(package)
+
+        self.assertEqual(list(self.media.tags.values_list("id", flat=True)), [local_tag.id])
+        collection = self.media.collections.get(slug="portraits")
+        self.assertEqual(list(collection.tags.values_list("id", flat=True)), [local_tag.id])
 
     def test_repeated_import_does_not_duplicate_multiple_versions(self):
         draft = ObjectVersion.objects.create(
