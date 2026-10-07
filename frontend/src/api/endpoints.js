@@ -76,7 +76,6 @@ export const endpoints = {
         base: `${BASE_PATH}/webpages/versions`,
         list: `${BASE_PATH}/webpages/versions/`,
         detail: (id) => `${BASE_PATH}/webpages/versions/${id}/`,
-        editorStyles: (id) => `${BASE_PATH}/webpages/versions/${id}/editor-styles/`,
         publish: (id) => `${BASE_PATH}/webpages/versions/${id}/publish/`,
         createDraft: (id) => `${BASE_PATH}/webpages/versions/${id}/create_draft/`,
         restore: (id) => `${BASE_PATH}/webpages/versions/${id}/restore/`,

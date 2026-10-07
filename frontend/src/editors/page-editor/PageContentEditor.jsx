@@ -52,7 +52,6 @@ const PageContentEditor = forwardRef(({
 
     // Extract layout name from layoutJson or use default
     const versionId = currentVersion?.id || pageVersionData?.versionId || pageVersionData?.id;
-    const versionRevision = pageVersionData?.editRevision || pageVersionData?.updatedAt || pageVersionData?.updated_at;
     const layoutName = layoutJson?.layout?.name ||
         layoutJson?.name ||
         pageVersionData?.codeLayout ||
@@ -60,7 +59,10 @@ const PageContentEditor = forwardRef(({
 
     const { error: themeStyleError, scopeId: themeScopeId } = useEditorThemeStyles({
         versionId,
-        revision: versionRevision,
+        theme: pageVersionData?.effectiveTheme || currentVersion?.effectiveTheme || webpageData?.effectiveTheme,
+        pageCssVariables: pageVersionData?.pageCssVariables,
+        pageCustomCss: pageVersionData?.pageCustomCss,
+        enableCssInjection: pageVersionData?.enableCssInjection !== false,
         enabled: applyPageTheme && !!versionId
     });
 
