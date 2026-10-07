@@ -32,6 +32,41 @@ describe('compileEditorCSS', () => {
         expect(result).toContain('@supports (display: subgrid)')
     })
 
+    it('preserves CSS nesting inside style rules', () => {
+        const style = declarations => Object.assign(Object.keys(declarations), {
+            getPropertyValue: property => declarations[property],
+            getPropertyPriority: () => '',
+        })
+        const nestedRule = {
+            type: 1,
+            cssText: '&:hover { color: blue; }',
+            selectorText: '&:hover',
+            style: style({ color: 'blue' }),
+        }
+        const rootRule = {
+            type: 1,
+            cssText: '.card { color: red; &:hover { color: blue; } }',
+            selectorText: '.card',
+            style: style({ color: 'red' }),
+            cssRules: [nestedRule],
+        }
+        const OriginalCSSStyleSheet = globalThis.CSSStyleSheet
+        globalThis.CSSStyleSheet = class {
+            replaceSync() {
+                this.cssRules = [rootRule]
+            }
+        }
+
+        let result
+        try {
+            result = compileEditorCSS('.card {}', options)
+        } finally {
+            globalThis.CSSStyleSheet = OriginalCSSStyleSheet
+        }
+
+        expect(result).toContain('.card { color: red; &:hover { color: blue; }')
+    })
+
     it('namespaces keyframes and their animation references', () => {
         const result = compileEditorCSS(
             '@keyframes spin { to { transform: rotate(1turn); } } .loader { animation: spin 1s linear; animation-name: spin; }',
