@@ -81,8 +81,14 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
         const groupSlot = group.slot;
 
         // Check if group applies to the current context
-        const widgetMatch = widgetType === null || groupWidgetType === undefined || groupWidgetType === widgetType;
-        const slotMatch = slot === null || groupSlot === undefined || groupSlot === slot;
+        const widgetMatch = widgetType === null
+            || groupWidgetType === null
+            || groupWidgetType === undefined
+            || groupWidgetType === widgetType;
+        const slotMatch = slot === null
+            || groupSlot === null
+            || groupSlot === undefined
+            || groupSlot === slot;
 
         // AND relationship: both must match if specified
         return widgetMatch && slotMatch;

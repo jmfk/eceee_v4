@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync, readdirSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { PUBLIC_RENDER_CSS } from '../../rendering/publicRenderCss'
 import { buildEditorThemeCSS, compileEditorCSS } from '../editorThemeCSS'
+
+const testDir = dirname(fileURLToPath(import.meta.url))
+const frontendRoot = resolve(testDir, '../../..')
+const widgetSourcesDir = resolve(frontendRoot, '../backend/easy_widgets/widgets')
+const editorWidgetBaseCSS = readFileSync(resolve(frontendRoot, 'src/styles/editorWidgetBase.css'), 'utf8')
+const normalizeCSS = css => css.replace(/\s+/g, ' ').trim()
 
 const options = {
     rootSelector: '.eceee-theme-scope[data-eceee-theme-scope="version-83"]',
@@ -92,6 +101,32 @@ describe('compileEditorCSS', () => {
 })
 
 describe('buildEditorThemeCSS', () => {
+    it('keeps the frontend widget baseline aligned with backend widget definitions', () => {
+        const normalizedBaseline = normalizeCSS(editorWidgetBaseCSS)
+        let widgetCSSCount = 0
+        let variableCount = 0
+
+        for (const filename of readdirSync(widgetSourcesDir).filter(name => name.endsWith('.py'))) {
+            const source = readFileSync(resolve(widgetSourcesDir, filename), 'utf8')
+            const widgetCSSMatch = source.match(/^\s{4}widget_css\s*=\s*(?:"""([\s\S]*?)"""|'''([\s\S]*?)''')/m)
+            const widgetCSS = normalizeCSS(widgetCSSMatch?.[1] || widgetCSSMatch?.[2] || '')
+
+            if (widgetCSS) {
+                widgetCSSCount += 1
+                expect(normalizedBaseline, `${filename} widget_css`).toContain(widgetCSS)
+            }
+
+            const variablesMatch = source.match(/^\s{4}css_variables\s*=\s*\{([\s\S]*?)^\s{4}\}/m)
+            for (const match of variablesMatch?.[1]?.matchAll(/["']([^"']+)["']\s*:\s*["']([^"']*)["']/g) || []) {
+                variableCount += 1
+                expect(editorWidgetBaseCSS, `${filename} css_variables`).toContain(`--${match[1]}: ${match[2]};`)
+            }
+        }
+
+        expect(widgetCSSCount).toBeGreaterThan(0)
+        expect(variableCount).toBeGreaterThan(0)
+    })
+
     it('builds theme and page CSS from the loaded frontend model', () => {
         const result = buildEditorThemeCSS({
             scopeId: 'version-83',

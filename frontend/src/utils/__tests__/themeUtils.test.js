@@ -17,4 +17,30 @@ describe('generateDesignGroupsCSS', () => {
         expect(css).toContain('.widget-type-easy-widgets-formswidget.forms-widget')
         expect(css).toContain('.widget-type-easy-widgets-formswidget .forms-widget')
     })
+
+    it('keeps untargeted groups when filtering for a widget and slot', () => {
+        const css = generateDesignGroupsCSS({
+            groups: [
+                {
+                    widgetType: null,
+                    slot: null,
+                    elements: { h1: { color: 'red' } },
+                },
+                {
+                    widgetType: 'easy_widgets.ContentWidget',
+                    slot: 'main',
+                    elements: { p: { color: 'blue' } },
+                },
+                {
+                    widgetType: 'easy_widgets.BannerWidget',
+                    slot: 'sidebar',
+                    elements: { h2: { color: 'green' } },
+                },
+            ],
+        }, {}, '', 'easy_widgets.ContentWidget', 'main')
+
+        expect(css).toContain('h1 {')
+        expect(css).toContain('.slot-main > .widget-type-easy-widgets-contentwidget p')
+        expect(css).not.toContain('easy-widgets-bannerwidget')
+    })
 })
