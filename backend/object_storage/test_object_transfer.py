@@ -13,6 +13,7 @@ from content.models import Namespace
 from core.models import Tenant
 from file_manager.models import MediaCollection, MediaFile, MediaTag
 from object_storage.models import ObjectInstance, ObjectTransferJob, ObjectTypeDefinition, ObjectVersion
+from object_storage.remote_views import _decorate_preflight
 from object_storage.services.object_transfer import (
     MAX_ARCHIVE_BYTES,
     MAX_UNCOMPRESSED_BYTES,
@@ -178,6 +179,68 @@ class ObjectTransferServiceTests(TestCase):
             size_limited_result = build_preflight(self.tenant, [self.root.id])
 
         self.assertFalse(size_limited_result["limits"]["within_limits"])
+
+    def test_round_trip_includes_and_rewrites_media_referenced_by_url(self):
+        for obj_type in (self.root_type, self.child_type):
+            obj_type.namespace = None
+            obj_type.save(update_fields=["namespace", "updated_at"])
+        source_url = self.media.get_absolute_url()
+        source_storage_url = self.media.get_file_url()
+        external_url = "https://cdn.example/remote-only.jpg"
+        self.root.current_version.data = {"image": source_url, "download": source_storage_url}
+        self.root.current_version.widgets = {"main": [{"config": {"content": f'<img src="{external_url}">'}}]}
+        self.root.current_version.save(update_fields=["data", "widgets", "updated_at"])
+
+        preflight = build_preflight(self.tenant, [self.root.id])
+
+        self.assertEqual(preflight["media_count"], 1)
+        self.assertEqual(preflight["external_urls"], [external_url])
+
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+
+        destination_tenant = Tenant.objects.create(
+            name="Media destination",
+            identifier="media-destination",
+            created_by=self.user,
+        )
+        destination_namespace = Namespace.objects.create(
+            name="Media destination namespace",
+            slug="media-destination",
+            tenant=destination_tenant,
+            created_by=self.user,
+        )
+        import_job = ObjectTransferJob.objects.create(
+            tenant=destination_tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"namespace_resolutions": {self.namespace.slug: destination_namespace.slug}},
+        )
+
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            ObjectPackageImporter(import_job, storage=storage).import_package(package)
+
+        imported = ObjectInstance.objects.get(
+            tenant=destination_tenant,
+            object_type=self.root_type,
+            slug=self.root.slug,
+        )
+        imported_media = MediaFile.objects.get(tenant=destination_tenant)
+        self.assertEqual(imported.current_version.data["image"], imported_media.get_absolute_url())
+        self.assertEqual(imported.current_version.data["download"], imported_media.get_file_url())
+        self.assertEqual(
+            imported.current_version.widgets["main"][0]["config"]["content"], f'<img src="{external_url}">'
+        )
 
     def test_export_rejects_packages_over_the_entry_limit(self):
         storage = MemoryStorage()
@@ -498,6 +561,9 @@ class ObjectTransferServiceTests(TestCase):
         self.assertEqual(self.root.version, 2)
 
     def test_import_preserves_same_slug_in_another_tenant_and_remains_idempotent(self):
+        for obj_type in (self.root_type, self.child_type):
+            obj_type.namespace = None
+            obj_type.save(update_fields=["namespace", "updated_at"])
         storage = MemoryStorage()
         storage.files[self.media.file_path] = b"image"
         export_job = ObjectTransferJob.objects.create(
@@ -544,6 +610,115 @@ class ObjectTransferServiceTests(TestCase):
         )
         self.assertEqual(imported_roots.count(), 1)
         self.assertEqual(imported_roots.get().slug, self.root.slug)
+
+    def test_import_rejects_unchanged_type_owned_by_another_tenant(self):
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+        remote_preflight = build_preflight(self.tenant, [self.root.id])
+
+        foreign_tenant = Tenant.objects.create(
+            name="Foreign type owner",
+            identifier="foreign-type-owner",
+            created_by=self.user,
+        )
+        foreign_namespace = Namespace.objects.create(
+            name="Foreign type namespace",
+            slug="foreign-type-namespace",
+            tenant=foreign_tenant,
+            created_by=self.user,
+        )
+        self.root_type.namespace = foreign_namespace
+        self.root_type.save(update_fields=["namespace", "updated_at"])
+
+        decorated = _decorate_preflight(self.tenant, remote_preflight)
+        conflict = next(item for item in decorated["type_conflicts"] if item["name"] == self.root_type.name)
+        self.assertFalse(conflict["compatible"])
+        self.assertTrue(conflict["usedByOtherTenants"])
+
+        import_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"type_resolutions": {}},
+        )
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            with self.assertRaisesMessage(ValueError, "used by another workspace"):
+                ObjectPackageImporter(import_job, storage=storage).import_package(package)
+
+    def test_new_import_does_not_keep_automatic_default_widget_version(self):
+        obj_type = ObjectTypeDefinition.objects.create(
+            name="transfer-precreated-widget",
+            label="Pre-created widget",
+            plural_label="Pre-created widgets",
+            namespace=None,
+            schema={"type": "object", "properties": {}},
+            slot_configuration={
+                "slots": [
+                    {
+                        "name": "main",
+                        "label": "Main",
+                        "widgetControls": [
+                            {
+                                "widgetType": "easy_widgets.ContentWidget",
+                                "preCreate": True,
+                                "defaultConfig": {"content": "Remote content"},
+                            }
+                        ],
+                    }
+                ]
+            },
+            created_by=self.user,
+        )
+        source = ObjectInstance.objects.create(
+            tenant=self.tenant,
+            object_type=obj_type,
+            title="Widget root",
+            slug="widget-root",
+            created_by=self.user,
+        )
+        source.refresh_from_db()
+        self.assertEqual(source.versions.count(), 1)
+        source_widgets = source.current_version.widgets
+        storage = MemoryStorage()
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [source.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+
+        destination_tenant = Tenant.objects.create(
+            name="Widget destination",
+            identifier="widget-destination",
+            created_by=self.user,
+        )
+        import_job = ObjectTransferJob.objects.create(
+            tenant=destination_tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={},
+        )
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            ObjectPackageImporter(import_job, storage=storage).import_package(package)
+
+        imported = ObjectInstance.objects.get(tenant=destination_tenant, object_type=obj_type, slug=source.slug)
+        self.assertEqual(imported.versions.count(), 1)
+        self.assertEqual(imported.current_version.version_number, 1)
+        self.assertEqual(imported.current_version.widgets, source_widgets)
 
     def test_import_cannot_update_type_owned_by_another_tenant(self):
         storage = MemoryStorage()

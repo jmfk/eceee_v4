@@ -21,6 +21,7 @@ from object_storage.services.object_transfer import (
     candidate_catalog,
     serialize_type,
     type_definition_differs,
+    type_has_foreign_namespace,
     type_has_foreign_tenant_usage,
     type_is_compatible,
 )
@@ -70,12 +71,13 @@ def _decorate_preflight(tenant, result):
             "slot_configuration": remote_type.get("slot_configuration") or remote_type.get("slotConfiguration"),
             "hierarchy_level": remote_type.get("hierarchy_level") or remote_type.get("hierarchyLevel"),
         }
-        local = ObjectTypeDefinition.objects.filter(name=remote_type["name"]).first()
-        if local and type_definition_differs(local, normalized_type):
+        local = ObjectTypeDefinition.objects.filter(name=remote_type["name"]).select_related("namespace").first()
+        foreign_namespace = local and type_has_foreign_namespace(local, tenant)
+        if local and (type_definition_differs(local, normalized_type) or foreign_namespace):
             conflicts.append(
                 {
                     "name": remote_type["name"],
-                    "compatible": type_is_compatible(local, normalized_type),
+                    "compatible": not foreign_namespace and type_is_compatible(local, normalized_type),
                     "usedByOtherTenants": type_has_foreign_tenant_usage(local, tenant),
                 }
             )

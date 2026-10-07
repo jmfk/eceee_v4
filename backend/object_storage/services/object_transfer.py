@@ -28,6 +28,7 @@ MAX_ENTRIES = 25_000
 # Bound ZIP headers and worst-case deflate overhead separately from member sizes.
 MAX_ARCHIVE_BYTES = MAX_UNCOMPRESSED_BYTES + 64 * 1024 * 1024
 UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+URL_RE = re.compile(r"https?://[^\s\"'<>\\)]+", re.IGNORECASE)
 
 
 def _json_default(value):
@@ -73,6 +74,31 @@ def _reference_ids(value):
             yield from _reference_ids(item)
     elif isinstance(value, int) or (isinstance(value, str) and value.isdigit()):
         yield value
+
+
+def _collect_media_files(tenant, versions):
+    texts = [text for version in versions for text in _walk({"data": version.data, "widgets": version.widgets})]
+    media_ids = {match.lower() for text in texts for match in UUID_RE.findall(text)}
+    joined = "\n".join(texts)
+    if joined:
+        candidates = MediaFile.objects.filter(tenant=tenant, is_deleted=False).select_related("namespace")
+        for media in candidates.only(
+            "id",
+            "file_path",
+            "file_url",
+            "original_filename",
+            "content_type",
+            "slug",
+            "namespace__slug",
+        ):
+            references = (media.file_path, media.file_url, media.get_absolute_url())
+            if any(reference and reference in joined for reference in references):
+                media_ids.add(str(media.id))
+    return list(
+        MediaFile.objects.filter(tenant=tenant, id__in=media_ids, is_deleted=False)
+        .select_related("namespace")
+        .prefetch_related("tags", "canonical_tags", "collections__tags", "collections__canonical_tags")
+    )
 
 
 def collect_object_graph(tenant, root_ids):
@@ -253,10 +279,15 @@ def type_definition_differs(local, remote):
 
 def type_has_foreign_tenant_usage(obj_type, tenant):
     """Return true when changing a global type would affect another tenant."""
+    return (
+        type_has_foreign_namespace(obj_type, tenant)
+        or ObjectInstance.objects.filter(object_type=obj_type).exclude(tenant=tenant).exists()
+    )
+
+
+def type_has_foreign_namespace(obj_type, tenant):
     namespace_tenant_id = obj_type.namespace.tenant_id if obj_type.namespace_id else None
-    return (namespace_tenant_id is not None and namespace_tenant_id != tenant.id) or ObjectInstance.objects.filter(
-        object_type=obj_type
-    ).exclude(tenant=tenant).exists()
+    return namespace_tenant_id is not None and namespace_tenant_id != tenant.id
 
 
 def serialize_media(media):
@@ -267,6 +298,9 @@ def serialize_media(media):
         "description": media.description,
         "original_filename": media.original_filename,
         "file_path": media.file_path,
+        "file_url": media.file_url,
+        "storage_url": media.get_file_url(),
+        "canonical_url": media.get_absolute_url(),
         "file_size": media.file_size,
         "content_type": media.content_type,
         "file_hash": media.file_hash,
@@ -379,18 +413,20 @@ def _build_manifest(root_ids, objects, versions, media_files, icon_count, checks
 def build_preflight(tenant, root_ids):
     objects = collect_object_graph(tenant, root_ids)
     versions = [version for obj in objects for version in selected_versions(obj)]
-    media_ids = set()
-    external_urls = set()
-    for version in versions:
-        for value in _walk({"data": version.data, "widgets": version.widgets}):
-            media_ids.update(match.lower() for match in UUID_RE.findall(value))
-            if value.startswith(("http://", "https://")) and "/files/" not in value:
-                external_urls.add(value)
-    media = list(
-        MediaFile.objects.filter(tenant=tenant, id__in=media_ids, is_deleted=False)
-        .select_related("namespace")
-        .prefetch_related("tags", "canonical_tags", "collections__tags", "collections__canonical_tags")
-    )
+    texts = [text for version in versions for text in _walk({"data": version.data, "widgets": version.widgets})]
+    media = _collect_media_files(tenant, versions)
+    owned_references = {
+        reference
+        for item in media
+        for reference in (item.file_path, item.file_url, item.get_absolute_url())
+        if reference
+    }
+    external_urls = {
+        url
+        for text in texts
+        for url in URL_RE.findall(text)
+        if not any(reference in url or url in reference for reference in owned_references)
+    }
     media_bytes = sum(item.file_size or 0 for item in media)
     types = collect_type_definitions(objects)
     namespaces = {}
@@ -478,20 +514,7 @@ class ObjectPackageExporter:
         root_ids = [int(value) for value in self.job.options.get("root_ids", [])]
         objects = collect_object_graph(self.job.tenant, root_ids)
         versions = [version for obj in objects for version in selected_versions(obj)]
-        media_ids = set()
-        for version in versions:
-            for text in _walk({"data": version.data, "widgets": version.widgets}):
-                media_ids.update(UUID_RE.findall(text))
-        media_files = list(
-            MediaFile.objects.filter(tenant=self.job.tenant, id__in=media_ids, is_deleted=False)
-            .select_related("namespace")
-            .prefetch_related(
-                "tags",
-                "canonical_tags",
-                "collections__tags",
-                "collections__canonical_tags",
-            )
-        )
+        media_files = _collect_media_files(self.job.tenant, versions)
         type_map = collect_type_definitions(objects)
         payload = _build_payload(objects, media_files, type_map)
         objects_json = json.dumps(payload, default=_json_default).encode()
@@ -661,16 +684,24 @@ def _remap_object_reference(value, object_map, skipped_ids, require_mapping=True
     return value
 
 
-def _remap(value: Any, object_map, media_map, reference_fields=None, skipped_ids=None):
+def _remap(
+    value: Any,
+    object_map,
+    media_map,
+    reference_fields=None,
+    skipped_ids=None,
+    media_replacements=None,
+):
     reference_fields = reference_fields or set()
     skipped_ids = skipped_ids or set()
+    media_replacements = media_replacements or {}
     if isinstance(value, dict):
         result = {}
         for key, item in value.items():
             if key in reference_fields or key in {"object_id", "objectId"}:
                 mapped = _remap_object_reference(item, object_map, skipped_ids)
             else:
-                mapped = _remap(item, object_map, media_map, reference_fields, skipped_ids)
+                mapped = _remap(item, object_map, media_map, reference_fields, skipped_ids, media_replacements)
             if mapped is not None:
                 result[key] = mapped
         return result
@@ -678,10 +709,14 @@ def _remap(value: Any, object_map, media_map, reference_fields=None, skipped_ids
         return [
             mapped
             for item in value
-            if (mapped := _remap(item, object_map, media_map, reference_fields, skipped_ids)) is not None
+            if (mapped := _remap(item, object_map, media_map, reference_fields, skipped_ids, media_replacements))
+            is not None
         ]
     if isinstance(value, str):
-        return UUID_RE.sub(lambda match: str(media_map.get(match.group(0).lower(), match.group(0))), value)
+        value = UUID_RE.sub(lambda match: str(media_map.get(match.group(0).lower(), match.group(0))), value)
+        for source, destination in sorted(media_replacements.items(), key=lambda item: len(item[0]), reverse=True):
+            value = value.replace(source, destination)
+        return value
     if str(value) in media_map:
         return media_map[str(value)]
     return value
@@ -737,6 +772,7 @@ class ObjectPackageImporter:
         self.storage = storage or S3MediaStorage()
         self.created_media_paths = []
         self.created_type_icon_paths = []
+        self.media_replacements = {}
 
     def run(self):
         self.job.mark_running(phase="importing")
@@ -776,10 +812,13 @@ class ObjectPackageImporter:
             differs = existing and type_definition_differs(existing, data)
             resolution = resolutions.get(data["name"], "keep")
             compatible = existing and type_is_compatible(existing, data)
+            foreign_namespace = existing and type_has_foreign_namespace(existing, tenant)
             if differs and resolution == "keep" and not compatible:
                 raise ValueError(f"Local object type {data['name']} is not compatible with the remote definition.")
-            if differs and resolution == "skip":
+            if resolution == "skip" and (differs or foreign_namespace):
                 continue
+            if foreign_namespace:
+                raise ValueError(f"Object type {data['name']} is used by another workspace and cannot be reused.")
             if resolution == "update" and existing and type_has_foreign_tenant_usage(existing, tenant):
                 raise ValueError(f"Object type {data['name']} is used by another workspace and cannot be updated.")
             if differs and resolution not in {"keep", "update"}:
@@ -837,12 +876,16 @@ class ObjectPackageImporter:
             obj_type = type_map.get(data["type"])
             if not obj_type:
                 continue
-            obj, _created = ObjectInstance.objects.get_or_create(
+            obj, created = ObjectInstance.objects.get_or_create(
                 tenant=tenant,
                 object_type=obj_type,
                 slug=data["slug"],
                 defaults={"title": data["title"], "status": data["status"], "created_by": user},
             )
+            if created and obj.current_version_id:
+                obj.versions.all().delete()
+                obj.current_version = None
+                obj.version = 1
             affected_reverse_target_ids.update(_relationship_target_ids(obj.relationships))
             obj.title = data["title"]
             obj.status = data["status"]
@@ -871,6 +914,7 @@ class ObjectPackageImporter:
                 media_map,
                 {"object_id", "objectId"},
                 skipped_ids,
+                self.media_replacements,
             )
             obj.relationships = [item for item in obj.relationships if item.get("object_id") is not None]
             affected_reverse_target_ids.update(_relationship_target_ids(obj.relationships))
@@ -887,6 +931,7 @@ class ObjectPackageImporter:
                         media_map,
                         reference_fields,
                         skipped_ids,
+                        self.media_replacements,
                     ),
                     "widgets": _remap(
                         version_data.get("widgets", {}),
@@ -894,6 +939,7 @@ class ObjectPackageImporter:
                         media_map,
                         {"object_id", "objectId"},
                         skipped_ids,
+                        self.media_replacements,
                     ),
                     "effective_date": (
                         parse_datetime(version_data.get("effective_date"))
@@ -1051,7 +1097,18 @@ class ObjectPackageImporter:
                 collections.append(collection)
             if collections:
                 existing.collections.add(*collections)
-            result[str(data["source_id"])] = str(existing.id)
+            source_id = str(data["source_id"])
+            result[source_id] = str(existing.id)
+            destination_url = existing.get_absolute_url()
+            destination_storage_url = existing.get_file_url()
+            for source, destination in (
+                (data.get("file_path"), existing.file_path),
+                (data.get("file_url"), existing.file_url or destination_storage_url),
+                (data.get("storage_url"), destination_storage_url),
+                (data.get("canonical_url"), destination_url),
+            ):
+                if source:
+                    self.media_replacements[source] = destination
         return result
 
     def _get_or_create_media_tag(self, data, namespace):
