@@ -77,12 +77,12 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
 
     // Find applicable groups
     const applicableGroups = designGroups.groups.filter(group => {
-        const groupWidgetType = group.widget_type || group.widgetType;
+        const groupWidgetType = group.widgetType || group.widget_type;
         const groupSlot = group.slot;
 
         // Check if group applies to the current context
-        const widgetMatch = groupWidgetType === null || groupWidgetType === undefined || groupWidgetType === widgetType;
-        const slotMatch = groupSlot === null || groupSlot === undefined || groupSlot === slot;
+        const widgetMatch = widgetType === null || groupWidgetType === undefined || groupWidgetType === widgetType;
+        const slotMatch = slot === null || groupSlot === undefined || groupSlot === slot;
 
         // AND relationship: both must match if specified
         return widgetMatch && slotMatch;
@@ -108,9 +108,11 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
         } else {
             // Widget/Slot mode (default)
             // Get widget types and slots (handle both new array format and old single value)
-            const widgetTypes = group.widget_types?.length > 0
-                ? group.widget_types
-                : (group.widget_type ? [group.widget_type] : []);
+            const widgetTypes = group.widgetTypes?.length > 0
+                ? group.widgetTypes
+                : (group.widget_types?.length > 0
+                    ? group.widget_types
+                    : [group.widgetType || group.widget_type].filter(Boolean));
             const slots = group.slots?.length > 0
                 ? group.slots
                 : (group.slot ? [group.slot] : []);
