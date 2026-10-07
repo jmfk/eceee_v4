@@ -29,14 +29,14 @@ def validate_remote_url(value):
     return value
 
 
-def remote_sync_request(remote_url, workspace, token, action, payload=None):
+def remote_sync_request(remote_url, workspace, token, action, payload=None, auth_scheme="ThemeKey"):
     base = validate_remote_url(remote_url)
     url = urljoin(base, f"api/v1/webpages/themes/sync/{action}/")
     try:
         response = requests.post(
             url,
             json=payload or {},
-            headers={"Authorization": f"ThemeKey {token}", "X-Tenant-ID": workspace, "Accept": "application/json"},
+            headers={"Authorization": f"{auth_scheme} {token}", "X-Tenant-ID": workspace, "Accept": "application/json"},
             timeout=(5, 30),
             allow_redirects=False,
         )
@@ -70,7 +70,7 @@ def remote_site_request(connection, method, path, payload=None, stream=False):
             url,
             json=payload if payload is not None else None,
             headers={
-                "Authorization": f"ThemeKey {token}",
+                "Authorization": f"{'ApiKey' if connection.credential_scheme == 'api_key' else 'ThemeKey'} {token}",
                 "X-Tenant-ID": connection.remote_workspace,
                 "Accept": "application/zip" if stream else "application/json",
             },
@@ -91,6 +91,49 @@ def remote_site_request(connection, method, path, payload=None, stream=False):
         elif response.status_code == 404:
             message = "The remote site or export could not be found."
         raise RemoteThemeError(message)
+    if stream:
+        return response
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise RemoteThemeError("The remote site returned an invalid response.") from exc
+    finally:
+        response.close()
+
+
+def remote_object_request(connection, method, path, payload=None, stream=False):
+    """Call object-transfer endpoints using a saved general machine API key."""
+    from webpages.services.theme_remote_credentials import decrypt_access_key
+
+    if connection.credential_scheme != "api_key":
+        raise RemoteThemeError("Object transfer requires a saved machine API key.")
+    base = validate_remote_url(connection.base_url)
+    url = urljoin(base, f"api/v1/objects/remote-source/{path.lstrip('/')}")
+    token = decrypt_access_key(connection.encrypted_access_key)
+    try:
+        response = requests.request(
+            method,
+            url,
+            json=payload if payload is not None else None,
+            headers={
+                "Authorization": f"ApiKey {token}",
+                "X-Tenant-ID": connection.remote_workspace,
+                "Accept": "application/zip" if stream else "application/json",
+            },
+            timeout=(5, 60),
+            allow_redirects=False,
+            stream=stream,
+        )
+    except requests.RequestException as exc:
+        raise RemoteThemeError("The remote site could not be reached.") from exc
+    if 300 <= response.status_code < 400:
+        response.close()
+        raise RemoteThemeError("The remote site redirected the request. Configure its final URL instead.")
+    if response.status_code >= 400:
+        response.close()
+        if response.status_code in {401, 403}:
+            raise RemoteThemeError("The remote credentials do not include object transfer access.")
+        raise RemoteThemeError("The remote object transfer request failed.")
     if stream:
         return response
     try:

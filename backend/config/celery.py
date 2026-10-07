@@ -40,6 +40,7 @@ app.conf.task_routes = {
     "webpages.tasks.export_site_package": {"queue": "default"},
     "webpages.tasks.import_site_package": {"queue": "default"},
     "webpages.tasks.refresh_scheduled_publication_caches": {"queue": "maintenance"},
+    "object_storage.tasks.cleanup_expired_object_packages": {"queue": "maintenance"},
     # Default queue for other tasks
     "*": {"queue": "default"},
 }
@@ -83,6 +84,10 @@ app.conf.beat_schedule = {
         "task": "file_manager.tasks.cleanup_deleted_files",
         "schedule": crontab(hour=3, minute=0),
         "args": (30, 100),  # 30 days retention, batch size 100
+    },
+    "cleanup-expired-object-packages": {
+        "task": "object_storage.tasks.cleanup_expired_object_packages",
+        "schedule": crontab(hour=3, minute=20),
     },
     # Cancel stuck tasks every 30 minutes
     "cancel-stuck-tasks": {

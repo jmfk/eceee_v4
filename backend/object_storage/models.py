@@ -10,6 +10,8 @@ This system complements the hierarchical page system by providing flexible,
 database-driven object types for content like news, blogs, events, etc.
 """
 
+import uuid
+
 from django.contrib.auth.models import User
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
@@ -585,7 +587,12 @@ class ObjectInstance(MPTTModel):
             models.Index(fields=["current_version"]),
             models.Index(fields=["tenant_id"], name="objectinstance_tenant_idx"),
         ]
-        constraints = [models.UniqueConstraint(fields=["slug", "object_type"], name="unique_slug_per_object_type")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "slug", "object_type"],
+                name="unique_slug_per_object_type_tenant",
+            )
+        ]
 
     class MPTTMeta:
         order_insertion_by = ["title"]
@@ -1693,3 +1700,63 @@ class ObjectVersion(models.Model):
             "is_published": self.is_published(),
             "publication_status": self.get_publication_status(),
         }
+
+
+class ObjectTransferJob(models.Model):
+    """Tracks bounded remote object package export and import work."""
+
+    KIND_EXPORT = "export"
+    KIND_IMPORT = "import"
+    KIND_CHOICES = [(KIND_EXPORT, "Export"), (KIND_IMPORT, "Import")]
+    STATUS_PENDING = "pending"
+    STATUS_RUNNING = "running"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_RUNNING, "Running"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.CASCADE, related_name="object_transfer_jobs")
+    connection = models.ForeignKey(
+        "webpages.ThemeRemoteConnection",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="object_transfer_jobs",
+    )
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    object_key = models.CharField(max_length=500, blank=True)
+    options = models.JSONField(default=dict, blank=True)
+    progress = models.JSONField(default=dict, blank=True)
+    errors = models.JSONField(default=list, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="object_transfer_jobs")
+    expires_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["tenant", "kind", "status"], name="objtransfer_tenant_idx"),
+            models.Index(fields=["expires_at"], name="objtransfer_expiry_idx"),
+        ]
+
+    def mark_running(self, **progress):
+        self.status = self.STATUS_RUNNING
+        self.progress = {**(self.progress or {}), **progress}
+        self.save(update_fields=["status", "progress", "updated_at"])
+
+    def mark_completed(self, **progress):
+        self.status = self.STATUS_COMPLETED
+        self.progress = {**(self.progress or {}), **progress}
+        self.save(update_fields=["status", "progress", "object_key", "updated_at"])
+
+    def mark_failed(self, error):
+        self.status = self.STATUS_FAILED
+        self.errors = [*(self.errors or []), str(error)]
+        self.save(update_fields=["status", "errors", "updated_at"])

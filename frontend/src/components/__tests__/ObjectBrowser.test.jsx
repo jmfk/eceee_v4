@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
     search: vi.fn(),
     deleteObject: vi.fn(),
     updateRelationships: vi.fn(),
+    remoteConnections: vi.fn(),
 }))
 
 vi.mock('react-router-dom', async () => {
@@ -39,6 +40,19 @@ vi.mock('../../api/objectStorage', () => ({
 
 vi.mock('../../api', () => ({
     namespacesApi: { list: vi.fn().mockResolvedValue([]) },
+}))
+
+vi.mock('../../api/designerThemes', () => ({
+    designerThemesApi: { remoteConnections: mocks.remoteConnections },
+}))
+
+vi.mock('../../api/objectTransfers', () => ({
+    objectTransfersApi: {
+        catalog: vi.fn(),
+        preflight: vi.fn(),
+        createImport: vi.fn(),
+        getImport: vi.fn(),
+    },
 }))
 
 vi.mock('../../contexts/GlobalNotificationContext', () => ({
@@ -119,6 +133,7 @@ describe('ObjectBrowser grouped type list', () => {
         mocks.getRoots.mockResolvedValue({ data: { results: [] } })
         mocks.search.mockResolvedValue({ data: { results: [] } })
         mocks.updateRelationships.mockResolvedValue({ data: {} })
+        mocks.remoteConnections.mockResolvedValue({ results: [] })
     })
 
     it('loads unpaginated browser group choices and saves the selected group', async () => {
@@ -188,5 +203,14 @@ describe('ObjectBrowser grouped type list', () => {
         await waitFor(() => {
             expect(mocks.search).toHaveBeenCalledWith('climate', { type: 'news', search: 'climate' })
         })
+    })
+
+    it('opens the remote object import from the type overview', async () => {
+        renderBrowser()
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Import remote objects' }))
+
+        expect(await screen.findByRole('dialog', { name: 'Import remote objects' })).toBeInTheDocument()
+        expect(await screen.findByText(/No remote site has a machine API key/)).toBeInTheDocument()
     })
 })

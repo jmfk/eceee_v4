@@ -11,6 +11,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from config.celery import app
 from core.machine_api_keys import (
+    OBJECT_READ,
+    OBJECT_TRANSFER,
     SERVER_FULL_ACCESS,
     SITE_TRANSFER,
     THEME_READ,
@@ -373,6 +375,10 @@ class MachineAPIKeyAuthenticationTest(TestCase):
         self.assertEqual(_required_scope(request), THEME_TRANSFER)
         request.path = "/api/v1/webpages/site-packages/remote-source/sites/"
         self.assertEqual(_required_scope(request), SITE_TRANSFER)
+        request.path = "/api/v1/objects/remote-source/catalog/"
+        self.assertEqual(_required_scope(request), OBJECT_READ)
+        request.path = "/api/v1/objects/remote-source/exports/job/download/"
+        self.assertEqual(_required_scope(request), OBJECT_TRANSFER)
         request.path = "/api/v1/webpages/designer/theme-exports/job/download/"
         self.assertEqual(_required_scope(request), THEME_READ)
         request.method = "POST"

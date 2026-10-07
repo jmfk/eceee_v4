@@ -32,6 +32,7 @@ export { previewSizesApi } from './previewSizes.js'
 export { mediaApi, mediaTagsApi, mediaCollectionsApi } from './media.js'
 export { objectTypesApi, objectInstancesApi, objectVersionsApi } from './objectStorage.js'
 export { sitePackagesApi } from './sitePackages.js'
+export { objectTransfersApi } from './objectTransfers.js'
 export { designerThemesApi } from './designerThemes.js'
 export { default as pageImportApi } from './pageImport.js'
 

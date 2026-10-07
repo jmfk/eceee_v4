@@ -195,6 +195,10 @@ class DesignerRemoteConnectionSerializer(serializers.Serializer):
     remote_workspace = serializers.CharField(max_length=100)
     access_key = serializers.CharField(max_length=500, trim_whitespace=False, write_only=True, required=False)
     is_default = serializers.BooleanField(default=False)
+    credential_scheme = serializers.ChoiceField(
+        choices=ThemeRemoteConnection.CREDENTIAL_SCHEME_CHOICES,
+        default=ThemeRemoteConnection.CREDENTIAL_THEME_KEY,
+    )
 
 
 def _theme(request, theme_id):
@@ -384,6 +388,7 @@ def _connection_data(connection):
         "isDefault": connection.is_default,
         "isActive": connection.is_active,
         "hasAccessKey": bool(connection.encrypted_access_key),
+        "credentialScheme": connection.credential_scheme,
         "updatedAt": connection.updated_at,
     }
 
@@ -395,7 +400,8 @@ def _remote_connection(request, connection_id):
 
 def _remote_request(connection, action, payload=None):
     token = decrypt_access_key(connection.encrypted_access_key)
-    return remote_sync_request(connection.base_url, connection.remote_workspace, token, action, payload)
+    scheme = "ApiKey" if connection.credential_scheme == ThemeRemoteConnection.CREDENTIAL_API_KEY else "ThemeKey"
+    return remote_sync_request(connection.base_url, connection.remote_workspace, token, action, payload, scheme)
 
 
 class DesignerRemoteConnectionsView(APIView):

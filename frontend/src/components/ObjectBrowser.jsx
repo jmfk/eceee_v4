@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
-import { Search, ArrowLeft, Plus, ChevronRight, AlertCircle, Image, FolderOpen, Trash2 } from 'lucide-react'
+import { Search, ArrowLeft, Plus, ChevronRight, AlertCircle, Image, FolderOpen, Trash2, Download } from 'lucide-react'
 import { objectTypesApi, objectInstancesApi } from '../api/objectStorage'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import DeleteConfirmationModal from './DeleteConfirmationModal'
@@ -9,6 +9,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import ContextualHelpLink from './help/ContextualHelpLink'
 import OptimizedImage from './media/OptimizedImage'
 import { buildObjectTypeGroups } from './objectBrowserGrouping'
+import RemoteObjectImport from './RemoteObjectImport'
 
 const objectTypeTestId = (objectType) => (
     (objectType.name || objectType.label || 'object-type')
@@ -32,6 +33,7 @@ const ObjectBrowser = () => {
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, instance: null })
+    const [showRemoteImport, setShowRemoteImport] = useState(false)
 
     const { addNotification } = useGlobalNotifications()
     const queryClient = useQueryClient()
@@ -236,6 +238,7 @@ const ObjectBrowser = () => {
                                         <ContextualHelpLink topicId="objects" label="Open Objects help" className="ml-2" />
                                     </div>
                                 </div>
+                                <button type="button" onClick={() => setShowRemoteImport(true)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><Download className="h-4 w-4" />Import remote objects</button>
                             </div>
                         </div>
 
@@ -348,6 +351,7 @@ const ObjectBrowser = () => {
 
                 {/* Delete Confirmation Modal */}
                 {renderModal()}
+                {showRemoteImport && <RemoteObjectImport onClose={() => setShowRemoteImport(false)} onCompleted={() => queryClient.invalidateQueries({ queryKey: ['objectInstances'] })} />}
 
             </>
         )

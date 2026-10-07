@@ -1,0 +1,1 @@
+"""Object storage domain services."""

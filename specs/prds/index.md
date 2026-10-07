@@ -19,3 +19,4 @@
 | PRD-0017 | [Public Next publisher cutover](0017-public-publisher-cutover.md) | in-progress | [ADR-0019](../adrs/active/0019-public-host-next-publisher.md) |
 | PRD-0015 | [Unified remote site settings](0015-remote-site-settings.md) | completed | [ADR-0008](../adrs/active/0008-encrypted-workspace-remote-connections.md), [ADR-0017](../adrs/active/0017-browser-managed-remote-access-keys.md) |
 | PRD-0016 | [Assessed site imports with selectable dependencies](0016-assessed-site-imports.md) | completed | [ADR-0018](../adrs/active/0018-assessed-import-plans.md) |
+| PRD-0018 | [Remote object structure import](0018-remote-object-structure-import.md) | started | [ADR-0020](../adrs/active/0020-bounded-remote-object-packages.md) |

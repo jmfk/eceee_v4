@@ -15,7 +15,18 @@ THEME_WRITE = "theme.write"
 THEME_VERSION = "theme.version"
 THEME_TRANSFER = "theme.transfer"
 SITE_TRANSFER = "site.transfer"
-ALLOWED_SCOPES = {SERVER_FULL_ACCESS, THEME_READ, THEME_WRITE, THEME_VERSION, THEME_TRANSFER, SITE_TRANSFER}
+OBJECT_READ = "object.read"
+OBJECT_TRANSFER = "object.transfer"
+ALLOWED_SCOPES = {
+    SERVER_FULL_ACCESS,
+    THEME_READ,
+    THEME_WRITE,
+    THEME_VERSION,
+    THEME_TRANSFER,
+    SITE_TRANSFER,
+    OBJECT_READ,
+    OBJECT_TRANSFER,
+}
 AUTH_SCHEME = b"ApiKey"
 MACHINE_DENIED_PREFIXES = (
     "/api/v1/auth/",
@@ -46,6 +57,10 @@ def _required_scope(request):
         return THEME_TRANSFER
     if request.path.startswith("/api/v1/webpages/site-packages/remote-source/"):
         return SITE_TRANSFER
+    if request.path.startswith("/api/v1/objects/remote-source/exports/"):
+        return OBJECT_TRANSFER
+    if request.path.startswith("/api/v1/objects/remote-source/"):
+        return OBJECT_READ
     if request.path.startswith("/api/v1/webpages/designer/theme-exports/"):
         return THEME_READ
     if request.path == "/api/v1/webpages/designer/themes/compare/" or (
