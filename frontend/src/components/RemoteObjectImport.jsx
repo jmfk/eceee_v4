@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, Check, Download, X } from 'lucide-react'
 import { designerThemesApi } from '../api/designerThemes'
 import { objectTransfersApi } from '../api/objectTransfers'
@@ -18,6 +18,11 @@ const RemoteObjectImport = ({ onClose, onCompleted }) => {
     const [busy, setBusy] = useState('connections')
     const [error, setError] = useState('')
     const [job, setJob] = useState(null)
+    const onCompletedRef = useRef(onCompleted)
+
+    useEffect(() => {
+        onCompletedRef.current = onCompleted
+    }, [onCompleted])
 
     useEffect(() => {
         let mounted = true
@@ -42,17 +47,34 @@ const RemoteObjectImport = ({ onClose, onCompleted }) => {
 
     useEffect(() => {
         if (!job || ['completed', 'failed'].includes(job.status)) return undefined
-        const timer = window.setTimeout(async () => {
+        let cancelled = false
+        let timer
+        let retryDelay = 1500
+        const poll = async () => {
             try {
                 const next = await objectTransfersApi.getImport(job.id)
+                if (cancelled) return
+                setError('')
                 setJob(next)
-                if (next.status === 'completed') onCompleted?.(next)
+                if (next.status === 'completed') {
+                    onCompletedRef.current?.(next)
+                    return
+                }
+                if (next.status === 'failed') return
+                retryDelay = 1500
             } catch (value) {
+                if (cancelled) return
                 setError(errorText(value))
+                retryDelay = Math.min(retryDelay * 2, 10000)
             }
-        }, 1500)
-        return () => window.clearTimeout(timer)
-    }, [job, onCompleted])
+            timer = window.setTimeout(poll, retryDelay)
+        }
+        timer = window.setTimeout(poll, retryDelay)
+        return () => {
+            cancelled = true
+            window.clearTimeout(timer)
+        }
+    }, [job?.id])
 
     const selectedTypes = useMemo(() => Object.keys(limits), [limits])
 

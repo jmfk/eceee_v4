@@ -163,23 +163,51 @@ def serialize_type(obj_type):
 
 def type_is_compatible(local, remote):
     """Return true when remote fields and slots fit the local contract."""
-    local_properties = (local.schema or {}).get("properties", {})
-    remote_properties = (remote.get("schema") or {}).get("properties", {})
+    local_schema = local.schema or {}
+    remote_schema = remote.get("schema") or {}
+    if local_schema.get("type", "object") != remote_schema.get("type", "object"):
+        return False
+    local_root_constraints = {
+        key: value for key, value in local_schema.items() if key not in {"properties", "required"}
+    }
+    remote_root_constraints = {
+        key: value for key, value in remote_schema.items() if key not in {"properties", "required"}
+    }
+    if local_root_constraints != remote_root_constraints:
+        return False
+    if local.hierarchy_level != (remote.get("hierarchy_level") or remote.get("hierarchyLevel")):
+        return False
+
+    local_properties = local_schema.get("properties", {})
+    remote_properties = remote_schema.get("properties", {})
+    local_required = set(local_schema.get("required", []))
+    remote_required = set(remote_schema.get("required", []))
+    if not local_required.issubset(remote_required):
+        return False
+
+    def normalized_definition(definition):
+        normalized = dict(definition)
+        if "componentType" in normalized and "component_type" not in normalized:
+            normalized["component_type"] = normalized.pop("componentType")
+        return normalized
+
     for name, definition in remote_properties.items():
         local_definition = local_properties.get(name)
-        if local_definition is None:
+        if local_definition is None or normalized_definition(local_definition) != normalized_definition(definition):
             return False
-        local_kind = (
-            local_definition.get("component_type")
-            or local_definition.get("componentType")
-            or local_definition.get("type")
-        )
-        remote_kind = definition.get("component_type") or definition.get("componentType") or definition.get("type")
-        if local_kind != remote_kind:
-            return False
-    local_slots = {item.get("name") for item in (local.slot_configuration or {}).get("slots", [])}
-    remote_slots = {item.get("name") for item in (remote.get("slot_configuration") or {}).get("slots", [])}
-    return remote_slots.issubset(local_slots)
+
+    local_slot_configuration = local.slot_configuration or {}
+    remote_slot_configuration = remote.get("slot_configuration") or remote.get("slotConfiguration") or {}
+    local_slot_constraints = {key: value for key, value in local_slot_configuration.items() if key != "slots"}
+    remote_slot_constraints = {key: value for key, value in remote_slot_configuration.items() if key != "slots"}
+    if local_slot_constraints != remote_slot_constraints:
+        return False
+
+    local_slots = {item.get("name"): item for item in local_slot_configuration.get("slots", []) if item.get("name")}
+    remote_slots = {item.get("name"): item for item in remote_slot_configuration.get("slots", []) if item.get("name")}
+    return all(local_slots.get(name) == definition for name, definition in remote_slots.items()) and not any(
+        definition.get("required") for name, definition in local_slots.items() if name not in remote_slots
+    )
 
 
 def type_has_foreign_tenant_usage(obj_type, tenant):
@@ -551,6 +579,37 @@ def _remap(value: Any, object_map, media_map, reference_fields=None, skipped_ids
     return value
 
 
+def rebuild_imported_reverse_relationships(tenant, objects):
+    """Rebuild reverse relationships for imported targets in one tenant-scoped pass."""
+    targets = {str(obj.id): obj for obj in objects}
+    if not targets:
+        return
+
+    reverse_relations = {target_id: [] for target_id in targets}
+    seen = {target_id: set() for target_id in targets}
+    sources = (
+        ObjectInstance.objects.filter(tenant=tenant)
+        .exclude(relationships=[])
+        .values_list("id", "relationships")
+        .iterator()
+    )
+    for source_id, relationships in sources:
+        for relationship in relationships or []:
+            target_id = str(relationship.get("object_id"))
+            if target_id not in targets or target_id == str(source_id):
+                continue
+            relation_key = (relationship.get("type"), source_id)
+            if relation_key in seen[target_id]:
+                continue
+            seen[target_id].add(relation_key)
+            reverse_relations[target_id].append({"type": relationship.get("type"), "object_id": source_id})
+
+    imported_objects = list(targets.values())
+    for target_id, obj in targets.items():
+        obj.related_from = reverse_relations[target_id]
+    ObjectInstance.objects.bulk_update(imported_objects, ["related_from"], batch_size=500)
+
+
 class ObjectPackageImporter:
     def __init__(self, job, storage=None):
         self.job = job
@@ -751,8 +810,7 @@ class ObjectPackageImporter:
                 obj.current_version = selected_version
                 obj.version = selected_version.version_number
                 obj.save(update_fields=["current_version", "version", "updated_at"])
-        for obj, _data in source_payloads.values():
-            obj.rebuild_related_from()
+        rebuild_imported_reverse_relationships(tenant, [obj for obj, _data in source_payloads.values()])
         return {"object_map": object_map, "media_map": media_map, "created_versions": created_versions}
 
     def _import_media(self, package, media_payload):

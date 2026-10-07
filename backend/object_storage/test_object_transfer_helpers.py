@@ -2,10 +2,11 @@ import hashlib
 import io
 import json
 import zipfile
+from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 
-from object_storage.services.object_transfer import PACKAGE_VERSION, _remap, validate_package
+from object_storage.services.object_transfer import PACKAGE_VERSION, _remap, type_is_compatible, validate_package
 
 
 class ObjectTransferHelperTests(SimpleTestCase):
@@ -38,6 +39,48 @@ class ObjectTransferHelperTests(SimpleTestCase):
         self.assertNotIn(source_media_id, result["content"])
         self.assertEqual(result["content"].count(destination_media_id), 2)
         self.assertIn(unrelated_id, result["content"])
+
+    def test_type_compatibility_accepts_only_safe_local_supersets(self):
+        base_field = {"type": "string", "maxLength": 100}
+        local = SimpleNamespace(
+            hierarchy_level="both",
+            schema={
+                "type": "object",
+                "properties": {"title": base_field, "note": {"type": "string"}},
+                "required": ["title"],
+            },
+            slot_configuration={"slots": [{"name": "body", "widgetControls": [{"widgetType": "content"}]}]},
+        )
+        remote = {
+            "hierarchy_level": "both",
+            "schema": {
+                "type": "object",
+                "properties": {"title": base_field},
+                "required": ["title"],
+            },
+            "slot_configuration": {"slots": [{"name": "body", "widgetControls": [{"widgetType": "content"}]}]},
+        }
+
+        self.assertTrue(type_is_compatible(local, remote))
+
+        local.schema["required"].append("note")
+        self.assertFalse(type_is_compatible(local, remote))
+        local.schema["required"].remove("note")
+
+        remote["schema"]["properties"]["title"] = {"type": "string", "maxLength": 200}
+        self.assertFalse(type_is_compatible(local, remote))
+        remote["schema"]["properties"]["title"] = base_field
+
+        remote["schema"]["additionalProperties"] = False
+        self.assertFalse(type_is_compatible(local, remote))
+        remote["schema"].pop("additionalProperties")
+
+        remote["slot_configuration"]["slots"][0]["widgetControls"] = [{"widgetType": "image"}]
+        self.assertFalse(type_is_compatible(local, remote))
+
+        remote["slot_configuration"]["slots"][0]["widgetControls"] = [{"widgetType": "content"}]
+        local.slot_configuration["slots"].append({"name": "sidebar", "required": True})
+        self.assertFalse(type_is_compatible(local, remote))
 
     def test_package_requires_a_complete_checksum_manifest(self):
         payload = json.dumps({"types": [], "objects": [], "media": []}).encode()
