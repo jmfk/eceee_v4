@@ -1,238 +1,98 @@
-/**
- * Theme Application Hook
- * 
- * Provides theme CSS injection for content editors and widget previews.
- * Loads complete CSS from backend's ThemeCSSGenerator instead of generating client-side.
- * Uses ThemeCSSManager for reference counting to prevent CSS removal conflicts.
- */
+/** Theme data and editor-only stylesheet hooks. */
 
-import { useEffect, useRef, useCallback, useMemo, useContext } from 'react'
+import { useContext, useEffect, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { pagesApi } from '../api'
+import { endpoints } from '../api/endpoints'
 import UnifiedDataContext from '../contexts/unified-data/context/UnifiedDataContext'
 import { themeCSSManager } from '../utils/themeCSSManager'
 
 export const getFrontendThemeCSSUrl = (themeData) => {
     const params = new URLSearchParams({ frontend_scoped: 'true' })
     const version = Date.parse(themeData?.updatedAt || themeData?.updated_at)
-
-    if (!Number.isNaN(version)) {
-        params.set('v', String(version))
-    }
-
+    if (!Number.isNaN(version)) params.set('v', String(version))
     return `/api/v1/webpages/themes/${themeData.id}/styles.css?${params.toString()}`
 }
 
-/**
- * Hook for applying themes to content areas
- * @param {Object} options - Configuration options
- * @param {number} options.pageId - Page ID to fetch effectiveTheme from (required, includes inheritance)
- * @param {string} options.scopeSelector - CSS selector to scope theme to (default: '.cms-content')
- * @param {boolean} options.enabled - Whether theme application is enabled
- * @returns {Object} Theme application utilities
- */
-export const useTheme = ({
-    pageId = null,
-    scopeSelector = '.cms-content',
-    enabled = true
-} = {}) => {
-    // Validate required parameter - only error if hook is enabled
-    if (enabled && !pageId) {
-        console.error('useTheme: pageId is required. No theme CSS will be injected.')
+export const getEditorThemeCSSUrl = (versionId) => endpoints.versions.editorStyles(versionId)
+
+export const supportsCSSScope = () => {
+    if (typeof CSSStyleSheet === 'undefined') return false
+    try {
+        const sheet = new CSSStyleSheet()
+        sheet.replaceSync('@scope (.scope-test) { .child { color: red; } }')
+        return sheet.cssRules.length === 1 && sheet.cssRules[0].cssText.trimStart().startsWith('@scope')
+    } catch {
+        return false
     }
+}
 
-    const currentThemeIdRef = useRef(null)
-    const componentIdRef = useRef(`theme-user-${Math.random().toString(36).substr(2, 9)}`)
-
-    // Fetch page data to get effectiveTheme (includes inheritance)
-    const { data: pageData, isLoading: fetchingPage } = useQuery({
+/** Fetch the effective theme configuration without injecting CSS. */
+export const useThemeData = ({ pageId = null, enabled = true } = {}) => {
+    const { data: pageData, isLoading, error } = useQuery({
         queryKey: ['page-for-theme', pageId],
-        queryFn: async () => {
-            const response = await pagesApi.get(pageId);
-            return response;
-        },
+        queryFn: () => pagesApi.get(pageId),
         enabled: enabled && !!pageId,
-        staleTime: 5 * 60 * 1000
-    });
-
-    const pageTheme = pageData?.effectiveTheme;
-
-    // Try to get theme from UDC as fallback
-    const udcContext = useContext(UnifiedDataContext)
-    let udcTheme = null
-    
-    if (udcContext) {
-        const { state } = udcContext
-        const currentVersionId = state.metadata.currentVersionId
-
-        if (currentVersionId) {
-            const version = state.versions[currentVersionId]
-
-            // Use effectiveTheme if available (includes inherited theme)
-            if (version?.effectiveTheme) {
-                udcTheme = version.effectiveTheme
-            }
-            // Fallback to explicit theme by ID
-            else if (version?.theme) {
-                const pageThemeId = version.theme
-                // Try to find theme in UDC themes cache
-                udcTheme = state.themes[pageThemeId]
-            }
-        }
-    }
-
-    // PRIORITY 1: Page's effectiveTheme (from page API - includes inheritance)
-    // PRIORITY 2: UDC effectiveTheme (fallback for when page data not yet loaded)
-    const theme = pageTheme || udcTheme
-    const isLoading = fetchingPage
-
-    // Fetch complete CSS from backend's ThemeCSSGenerator
-    const { data: themeCSS, isLoading: fetchingCSS, error } = useQuery({
-        queryKey: ['theme-css', theme?.id, 'frontend-scoped'],
-        queryFn: async () => {
-            if (!theme?.id) return null
-
-            // Fetch complete CSS from backend endpoint
-            const url = getFrontendThemeCSSUrl(theme)
-            const response = await fetch(url)
-            if (!response.ok) {
-                throw new Error(`Failed to fetch theme CSS: ${response.statusText}`)
-            }
-            return await response.text()
-        },
-        enabled: enabled && !!theme?.id,
-        staleTime: 10 * 60 * 1000, // 10 minutes
-        cacheTime: 30 * 60 * 1000, // 30 minutes
+        staleTime: 5 * 60 * 1000,
     })
 
-    // Generate component ID for reference tracking
-    const componentId = useMemo(() => componentIdRef.current, [])
+    const udcContext = useContext(UnifiedDataContext)
+    const udcTheme = useMemo(() => {
+        if (!udcContext) return null
+        const { state } = udcContext
+        const version = state.versions[state.metadata.currentVersionId]
+        return version?.effectiveTheme || (version?.theme ? state.themes[version.theme] : null)
+    }, [udcContext])
 
-    /**
-     * Register/unregister theme with CSS manager when theme changes
-     */
-    useEffect(() => {
-        if (!enabled || !theme || !themeCSS || isLoading || fetchingCSS) {
-            return
-        }
-
-        const newThemeId = theme.id
-
-        // If theme changed, unregister old theme first
-        if (currentThemeIdRef.current && currentThemeIdRef.current !== newThemeId) {
-            themeCSSManager.unregister(currentThemeIdRef.current, componentId)
-        }
-
-        // Register new theme with CSS manager
-        themeCSSManager.register(newThemeId, themeCSS, scopeSelector, componentId)
-        currentThemeIdRef.current = newThemeId
-
-        // Cleanup: unregister when component unmounts or theme changes
-        return () => {
-            if (currentThemeIdRef.current) {
-                themeCSSManager.unregister(currentThemeIdRef.current, componentId)
-            }
-        }
-    }, [theme, themeCSS, enabled, isLoading, fetchingCSS, scopeSelector, componentId])
-
-    /**
-     * Cleanup on disable
-     */
-    useEffect(() => {
-        if (!enabled && currentThemeIdRef.current) {
-            themeCSSManager.unregister(currentThemeIdRef.current, componentId)
-            currentThemeIdRef.current = null
-        }
-    }, [enabled, componentId])
-
-    /**
-     * Manual theme application (for dynamic theme switching)
-     * Fetches CSS from backend and applies it
-     */
-    const applyTheme = useCallback(async (themeData) => {
-        if (!enabled || !themeData?.id) return
-
-        try {
-            // Fetch complete CSS from backend
-            const response = await fetch(getFrontendThemeCSSUrl(themeData))
-            if (!response.ok) {
-                throw new Error(`Failed to fetch theme CSS: ${response.statusText}`)
-            }
-            const css = await response.text()
-
-            // Unregister old theme
-            if (currentThemeIdRef.current) {
-                themeCSSManager.unregister(currentThemeIdRef.current, componentId)
-            }
-
-            // Register new theme
-            themeCSSManager.register(themeData.id, css, scopeSelector, componentId)
-            currentThemeIdRef.current = themeData.id
-        } catch (error) {
-            console.error('Failed to apply theme:', error)
-        }
-    }, [enabled, scopeSelector, componentId])
-
-    /**
-     * Get CSS class name for theme content areas
-     */
-    const getThemeClassName = useCallback(() => {
-        return scopeSelector.replace('.', '')
-    }, [scopeSelector])
-
-    /**
-     * Remove theme CSS (for backward compatibility)
-     */
-    const removeTheme = useCallback(() => {
-        if (currentThemeIdRef.current) {
-            themeCSSManager.unregister(currentThemeIdRef.current, componentId)
-            currentThemeIdRef.current = null
-        }
-    }, [componentId])
-
+    const theme = pageData?.effectiveTheme || udcTheme
     return {
         theme,
-        currentTheme: theme,  // Alias for backward compatibility
-        isLoading: (isLoading || fetchingCSS) && enabled,
+        currentTheme: theme,
+        isLoading: isLoading && enabled,
         error: error && enabled ? error : null,
-        applyTheme,
-        removeTheme,
-        getThemeClassName,
-        isThemeApplied: theme?.id ? themeCSSManager.isInjected(theme.id) : false,
-        // Keep for backward compatibility but fetch from backend instead
-        generateThemeCSS: async (themeData) => {
-            if (!themeData?.id) return ''
-            try {
-                const response = await fetch(getFrontendThemeCSSUrl(themeData))
-                if (!response.ok) return ''
-                return await response.text()
-            } catch {
-                return ''
-            }
-        }
     }
 }
 
-/**
- * Hook for applying themes specifically to widget content
- * Uses a widget-specific scope selector
- */
-export const useWidgetTheme = (options = {}) => {
-    return useTheme({
-        scopeSelector: '.widget-content',
-        ...options
+/** Fetch and inject the backend-compiled stylesheet for one page version canvas. */
+export const useEditorThemeStyles = ({ versionId = null, revision = null, enabled = true } = {}) => {
+    const componentIdRef = useRef(`editor-theme-${Math.random().toString(36).slice(2, 11)}`)
+    const styleKey = versionId ? `version-${versionId}` : null
+    const scopeSupported = supportsCSSScope()
+
+    const unsupportedError = enabled && versionId && !scopeSupported
+        ? new Error('This browser cannot safely isolate site CSS. Theme styling is disabled in the editor.')
+        : null
+
+    const { data: css, isLoading, error } = useQuery({
+        queryKey: ['editor-theme-css', versionId, revision],
+        queryFn: async () => {
+            const response = await fetch(getEditorThemeCSSUrl(versionId))
+            if (!response.ok) throw new Error(`Failed to fetch editor CSS: ${response.statusText}`)
+            return response.text()
+        },
+        enabled: enabled && !!versionId && scopeSupported,
+        staleTime: 0,
+        gcTime: 5 * 60 * 1000,
     })
+
+    useEffect(() => {
+        if (!enabled || !styleKey || !css || !scopeSupported) return undefined
+        const componentId = componentIdRef.current
+        themeCSSManager.register(styleKey, css, '.eceee-theme-scope', componentId)
+        return () => themeCSSManager.unregister(styleKey, componentId)
+    }, [css, enabled, scopeSupported, styleKey])
+
+    return {
+        isLoading: isLoading && enabled,
+        error: unsupportedError || (error && enabled ? error : null),
+        isThemeApplied: styleKey ? themeCSSManager.isInjected(styleKey) : false,
+        scopeId: styleKey,
+    }
 }
 
-/**
- * Hook for applying themes specifically to content editors
- * Uses a content-editor-specific scope selector  
- */
-export const useContentEditorTheme = (options = {}) => {
-    return useTheme({
-        scopeSelector: '.content-editor-theme',
-        ...options
-    })
-}
+/** Backwards-compatible data hook. CSS ownership now belongs to the editor canvas. */
+export const useTheme = useThemeData
+export const useWidgetTheme = useThemeData
+export const useContentEditorTheme = useThemeData
 
-export default useTheme
+export default useThemeData

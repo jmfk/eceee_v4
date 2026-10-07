@@ -400,7 +400,7 @@ const WidgetSlot = ({
                 {editable && !isSlotPreviewMode && (
                     <div
                         key={name}
-                        className="relative border px-4 py-2 transition-colors border-gray-200 "
+                        className="eceee-editor-ui relative border px-4 py-2 transition-colors border-gray-200 "
                         data-slot-name={name}
                         data-slot-title={label}
                     >
@@ -447,7 +447,7 @@ const WidgetSlot = ({
 
                 {/* Floating Preview Exit Button - Only show in preview mode, visible on hover */}
                 {isSlotPreviewMode && editable && !isHiddenEmptySlot && (
-                    <div className="absolute top-2 right-2 z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <div className="eceee-editor-ui absolute top-2 right-2 z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                         <button
                             onClick={handleSlotPreviewToggle}
                             className="bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-colors shadow-lg"
@@ -468,7 +468,7 @@ const WidgetSlot = ({
                             <button
                                 type="button"
                                 onClick={handleSlotPreviewToggle}
-                                className="hidden-empty-slot-bar w-full min-h-6 px-3 py-1 border border-dashed border-gray-300 bg-gray-50 text-xs font-medium text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center justify-center"
+                                className="eceee-editor-ui hidden-empty-slot-bar w-full min-h-6 px-3 py-1 border border-dashed border-gray-300 bg-gray-50 text-xs font-medium text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center justify-center"
                                 title={`Show ${label || name} slot`}
                                 aria-label={`Show ${label || name} slot`}
                                 data-hidden-empty-slot="true"
@@ -513,7 +513,7 @@ const WidgetSlot = ({
 
                                         {/* Add Widget Section - Show when in merge mode with inherited widgets but no local widgets */}
                                         {slotRules.mergeMode && Array.isArray(displayInheritedWidgets) && displayInheritedWidgets.length > 0 && displayLocalWidgets.length === 0 && (
-                                            <div className="add-widget-section text-center py-8 border-2 border-dashed border-blue-300 bg-blue-50">
+                                            <div className="eceee-editor-ui add-widget-section text-center py-8 border-2 border-dashed border-blue-300 bg-blue-50">
                                                 <button
                                                     onClick={handleAddWidget}
                                                     className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -530,7 +530,7 @@ const WidgetSlot = ({
                                         {/* Empty slot handling - only when NO inherited AND NO local widgets */}
                                         {(!Array.isArray(displayInheritedWidgets) || displayInheritedWidgets.length === 0) && displayLocalWidgets.length === 0 && (
                                             <div
-                                                className={`empty-slot text-center py-12 text-gray-500 border-2 border-dashed ${pasteModeActive ? 'border-purple-500 bg-purple-50 cursor-pointer hover:bg-purple-100' : 'border-gray-300'} relative`}
+                                                className={`eceee-editor-ui empty-slot text-center py-12 text-gray-500 border-2 border-dashed ${pasteModeActive ? 'border-purple-500 bg-purple-50 cursor-pointer hover:bg-purple-100' : 'border-gray-300'} relative`}
                                                 onClick={(e) => {
                                                     if (pasteModeActive && onPasteAtPosition) {
                                                         const pastePath = widgetPath.length === 0 ? [] : slotPath;

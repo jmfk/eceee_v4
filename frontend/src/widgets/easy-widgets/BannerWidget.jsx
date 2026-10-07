@@ -420,7 +420,7 @@ const BannerWidget = ({
                             setEditingField('backgroundImage')
                             setShowImageModal(true)
                         }}
-                        className="absolute top-2 right-2 p-1.5 bg-white/70 hover:bg-white/90 rounded-md shadow-md opacity-80 hover:opacity-100 transition-all"
+                        className="eceee-editor-ui absolute top-2 right-2 p-1.5 bg-white/70 hover:bg-white/90 rounded-md shadow-md opacity-80 hover:opacity-100 transition-all"
                         title="Edit background image"
                         style={{ zIndex: 10000, pointerEvents: 'auto' }}
                     >
@@ -431,7 +431,7 @@ const BannerWidget = ({
                             {/* Mode toggle button */}
                             <button
                                 onClick={handleModeToggle}
-                                className="absolute top-2 right-2 z-10 px-2 py-1 text-xs bg-white/90 hover:bg-white border border-gray-300 rounded shadow-sm flex items-center gap-1 transition-colors"
+                                className="eceee-editor-ui absolute top-2 right-2 z-10 px-2 py-1 text-xs bg-white/90 hover:bg-white border border-gray-300 rounded shadow-sm flex items-center gap-1 transition-colors"
                                 title={`Switch to ${bannerMode === 'header' ? 'Text' : 'Header'} mode`}
                                 type="button"
                             >
@@ -457,7 +457,7 @@ const BannerWidget = ({
                                         setEditingField('image1')
                                         setShowImageModal(true)
                                     }}
-                                    className={`absolute top-2 p-1.5 bg-white/70 hover:bg-white/90 rounded-md shadow-md opacity-0 group-hover/image:opacity-80 transition-all z-[100] ${backgroundImage ? 'right-14' : 'right-2'}`}
+                                    className={`eceee-editor-ui absolute top-2 p-1.5 bg-white/70 hover:bg-white/90 rounded-md shadow-md opacity-0 group-hover/image:opacity-80 transition-all z-[100] ${backgroundImage ? 'right-14' : 'right-2'}`}
                                     title="Edit image"
                                     style={{ pointerEvents: 'auto' }}
                                 >

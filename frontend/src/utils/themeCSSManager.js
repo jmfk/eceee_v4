@@ -6,7 +6,7 @@
  * Only removes theme CSS when all components using it have unmounted.
  */
 
-class ThemeCSSManager {
+export class ThemeCSSManager {
     constructor() {
         // Cache for theme CSS content
         this.themeCSSCache = new Map() // themeId -> cssContent
@@ -24,7 +24,7 @@ class ThemeCSSManager {
     /**
      * Register a component's use of a theme
      * Increments reference count and injects CSS if needed
-     * @param {number} themeId - Theme ID
+     * @param {number|string} themeId - Theme or editor stylesheet key
      * @param {string} cssContent - Theme CSS content
      * @param {string} scopeSelector - CSS selector to scope theme to
      * @param {string} componentId - Optional component identifier for debugging
@@ -47,8 +47,15 @@ class ThemeCSSManager {
             this.componentRefs.get(themeId).add(componentId)
         }
 
+        const existingCSS = this.themeCSSCache.get(themeId)
+
         // Cache CSS content
         this.themeCSSCache.set(themeId, cssContent)
+
+        // Refresh an already-mounted stylesheet when its working version changes.
+        if (this.injectedThemes.has(themeId) && existingCSS !== cssContent) {
+            this.injectedThemes.get(themeId).textContent = cssContent
+        }
 
         // Only inject if not already injected
         if (!this.injectedThemes.has(themeId)) {
@@ -96,7 +103,8 @@ class ThemeCSSManager {
             return
         }
 
-        const styleId = `theme-content-${themeId}`
+        const safeThemeId = String(themeId).replace(/[^a-zA-Z0-9_-]/g, '-')
+        const styleId = `theme-content-${safeThemeId}`
 
         // Remove existing style element if present (shouldn't happen with ref counting)
         const existingStyle = document.getElementById(styleId)
@@ -176,4 +184,3 @@ export const themeCSSManager = new ThemeCSSManager()
 if (typeof window !== 'undefined') {
     window.__themeCSSManager = themeCSSManager
 }
-

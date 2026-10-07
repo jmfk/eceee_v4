@@ -112,7 +112,7 @@ const ObjectWidgetHeader = ({
     }
 
     return showControls ? (
-        <div className={`widget-header object-editor-header bg-gray-100 border border-gray-200 rounded-t px-3 py-2 flex items-center justify-between ${className}`}>
+        <div className={`eceee-editor-ui widget-header object-editor-header bg-gray-100 border border-gray-200 rounded-t px-3 py-2 flex items-center justify-between ${className}`}>
             {/* Left side - Widget info and constraints */}
             <div className="flex items-center space-x-3">
                 {/* Selection checkbox */}

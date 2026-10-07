@@ -120,6 +120,25 @@ describe('page editor active/legacy boundaries', () => {
         expect(pageEditorSource).not.toMatch(/from ['"][^'"]*\/ContentEditor(?:\.jsx)?['"]/)
     })
 
+    it('uses native theme scope boundaries instead of the legacy reset wrapper', () => {
+        const rendererSource = readSource('src/editors/page-editor/ReactLayoutRenderer.jsx')
+        const pageHeaderSource = readSource('src/editors/page-editor/PageWidgetHeader.jsx')
+        const slottedHeaderSource = readSource('src/editors/page-editor/PageWidgetHeaderWithSlots.jsx')
+        const slotSource = readSource('src/layouts/easy-layouts/WidgetSlot.jsx')
+        const pageFactorySource = readSource('src/editors/page-editor/PageWidgetFactory.jsx')
+        const objectFactorySource = readSource('src/editors/object-editor/ObjectWidgetFactory.jsx')
+        const globalCSS = readSource('src/index.css')
+
+        expect(rendererSource).toContain('eceee-theme-scope')
+        expect(rendererSource).toContain('data-eceee-theme-scope')
+        expect(pageHeaderSource).toContain('eceee-editor-ui')
+        expect(slottedHeaderSource).toContain('eceee-editor-ui')
+        expect(slotSource).toContain('eceee-editor-ui')
+        expect(pageFactorySource).not.toContain('cms-content-isolated')
+        expect(objectFactorySource).not.toContain('cms-content-isolated')
+        expect(globalCSS).not.toContain('.cms-content-isolated')
+    })
+
     it('finalizes cross-version cut sources only after the destination save', () => {
         const pageEditorSource = readSource('src/components/PageEditor.jsx')
         const destinationSaveIndex = pageEditorSource.indexOf('const saveResult = await smartSave(')

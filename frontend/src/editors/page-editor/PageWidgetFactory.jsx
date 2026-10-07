@@ -311,7 +311,7 @@ const PageWidgetFactory = ({
                 >
                     {/* Replace button - only visible on hover, positioned at top-right */}
                     {showReplaceButton && (
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                        <div className="eceee-editor-ui absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                             <button
                                 onClick={() => {
                                     // Open widget selection modal to choose a replacement widget
@@ -337,7 +337,7 @@ const PageWidgetFactory = ({
                     )}
 
                     {/* Core Widget Content - render the actual widget in display mode */}
-                    <div className="cms-content-isolated">
+                    <div>
                         <WidgetErrorBoundary
                             widgetType={widget.type}
                             mode="display"
@@ -503,14 +503,14 @@ const PageWidgetFactory = ({
 
                 {/* Paste Mode Markers - only show if this widget is the currently hovered one */}
                 {pasteModeActive && showPasteMarkers && hoveredWidgetId === actualWidgetId && pasteHoverPosition === 'before' && (
-                    <div className="absolute -top-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
+                    <div className="eceee-editor-ui absolute -top-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
                         <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-purple-500 text-white text-xs px-2 py-0.5 rounded-t whitespace-nowrap">
                             Paste here
                         </div>
                     </div>
                 )}
                 {pasteModeActive && showPasteMarkers && hoveredWidgetId === actualWidgetId && pasteHoverPosition === 'after' && (
-                    <div className="absolute -bottom-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
+                    <div className="eceee-editor-ui absolute -bottom-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
                         <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full bg-purple-500 text-white text-xs px-2 py-0.5 rounded-b whitespace-nowrap">
                             Paste here
                         </div>
@@ -519,7 +519,7 @@ const PageWidgetFactory = ({
 
                     {/* Core Widget Content */}
                 <div className="widget-content overflow-hidden border border-gray-200 border-t-0">
-                    <div className="cms-content-isolated">
+                    <div>
                         <WidgetErrorBoundary
                             widgetType={widget.type}
                             mode="editor"
@@ -661,7 +661,7 @@ const PageWidgetFactory = ({
             data-widget-id={widget.id}
             data-version-id={versionId}
         >
-            <div className="cms-content-isolated">
+            <div>
                 <WidgetErrorBoundary
                     widgetType={widget.type}
                     mode={mode}

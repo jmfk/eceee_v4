@@ -304,7 +304,7 @@ const HeroWidget = ({
                         setEditingField('image')
                         setShowImageModal(true)
                     }}
-                    className="absolute top-2 right-2 p-1.5 bg-white/70 hover:bg-white/90 rounded-md shadow-md opacity-0 group-hover:opacity-80 transition-all z-10"
+                    className="eceee-editor-ui absolute top-2 right-2 p-1.5 bg-white/70 hover:bg-white/90 rounded-md shadow-md opacity-0 group-hover:opacity-80 transition-all z-10"
                     title="Edit background image"
                 >
                     <Layers className="w-4 h-4 text-gray-600" />
