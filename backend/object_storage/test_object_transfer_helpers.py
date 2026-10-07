@@ -24,6 +24,21 @@ class ObjectTransferHelperTests(SimpleTestCase):
         self.assertEqual(result["rating"], 5)
         self.assertEqual(result["image"], destination_media_id)
 
+    def test_remap_rewrites_media_ids_embedded_in_html(self):
+        source_media_id = "0f598bec-ad32-486c-98ab-a004d827db08"
+        destination_media_id = "686236c1-bb66-4518-992b-9cb36c4de42a"
+        unrelated_id = "58fd91a6-8a3c-4601-80aa-1085c668aab8"
+        html = (
+            f'<div data-media-id="{source_media_id}">'
+            f'<img src="/media/{source_media_id}/preview/" data-other="{unrelated_id}"></div>'
+        )
+
+        result = _remap({"content": html}, {}, {source_media_id: destination_media_id})
+
+        self.assertNotIn(source_media_id, result["content"])
+        self.assertEqual(result["content"].count(destination_media_id), 2)
+        self.assertIn(unrelated_id, result["content"])
+
     def test_package_requires_a_complete_checksum_manifest(self):
         payload = json.dumps({"types": [], "objects": [], "media": []}).encode()
         file_obj = io.BytesIO()

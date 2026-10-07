@@ -235,6 +235,94 @@ class ObjectTransferServiceTests(TestCase):
         self.assertEqual(self.root.versions.count(), 2)
         self.assertEqual(self.root.current_version_id, draft.id)
 
+    def test_unchanged_import_does_not_rewind_to_matching_historical_version(self):
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+
+        local_version = ObjectVersion.objects.create(
+            object_instance=self.root,
+            version_number=2,
+            data={"title": "Local work"},
+            widgets={},
+            created_by=self.user,
+        )
+        self.root.current_version = local_version
+        self.root.version = 2
+        self.root.save(update_fields=["current_version", "version", "updated_at"])
+        import_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"type_resolutions": {}},
+        )
+
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            result = ObjectPackageImporter(import_job, storage=storage).import_package(package)
+
+        self.root.refresh_from_db()
+        self.assertEqual(result["created_versions"], 0)
+        self.assertEqual(self.root.versions.count(), 2)
+        self.assertEqual(self.root.current_version_id, local_version.id)
+        self.assertEqual(self.root.version, 2)
+
+    def test_import_preserves_same_slug_in_another_tenant_and_remains_idempotent(self):
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+
+        destination_tenant = Tenant.objects.create(
+            name="Destination",
+            identifier="destination",
+            created_by=self.user,
+        )
+        destination_namespace = Namespace.objects.create(
+            name="Destination namespace",
+            slug="destination",
+            tenant=destination_tenant,
+            is_default=True,
+            created_by=self.user,
+        )
+        options = {
+            "type_resolutions": {},
+            "namespace_resolutions": {self.namespace.slug: destination_namespace.slug},
+        }
+
+        for _attempt in range(2):
+            import_job = ObjectTransferJob.objects.create(
+                tenant=destination_tenant,
+                kind=ObjectTransferJob.KIND_IMPORT,
+                created_by=self.user,
+                options=options,
+            )
+            package_file.seek(0)
+            with zipfile.ZipFile(package_file, "r") as package:
+                ObjectPackageImporter(import_job, storage=storage).import_package(package)
+
+        imported_roots = ObjectInstance.objects.filter(
+            tenant=destination_tenant,
+            object_type=self.root_type,
+        )
+        self.assertEqual(imported_roots.count(), 1)
+        self.assertEqual(imported_roots.get().slug, self.root.slug)
+
     def test_import_cannot_update_type_owned_by_another_tenant(self):
         storage = MemoryStorage()
         storage.files[self.media.file_path] = b"image"

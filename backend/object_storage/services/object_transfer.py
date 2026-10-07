@@ -544,6 +544,8 @@ def _remap(value: Any, object_map, media_map, reference_fields=None, skipped_ids
             for item in value
             if (mapped := _remap(item, object_map, media_map, reference_fields, skipped_ids)) is not None
         ]
+    if isinstance(value, str):
+        return UUID_RE.sub(lambda match: str(media_map.get(match.group(0).lower(), match.group(0))), value)
     if str(value) in media_map:
         return media_map[str(value)]
     return value
@@ -695,6 +697,7 @@ class ObjectPackageImporter:
             reference_fields = _reference_field_names(obj.object_type)
             existing_versions = list(obj.versions.order_by("version_number"))
             selected_version = obj.current_version
+            selected_version_created = False
             for version_data in data.get("versions", []):
                 version_payload = {
                     "data": _remap(
@@ -731,6 +734,7 @@ class ObjectPackageImporter:
                 )
                 if matching_version:
                     selected_version = matching_version
+                    selected_version_created = False
                     continue
                 number = (existing_versions[-1].version_number if existing_versions else 0) + 1
                 selected_version = ObjectVersion.objects.create(
@@ -741,8 +745,9 @@ class ObjectPackageImporter:
                     **version_payload,
                 )
                 existing_versions.append(selected_version)
+                selected_version_created = True
                 created_versions += 1
-            if selected_version and obj.current_version_id != selected_version.id:
+            if selected_version_created and obj.current_version_id != selected_version.id:
                 obj.current_version = selected_version
                 obj.version = selected_version.version_number
                 obj.save(update_fields=["current_version", "version", "updated_at"])
