@@ -5,11 +5,12 @@ import json
 import os
 import re
 import zipfile
+from collections import deque
 from typing import Any
 
 from django.core.files import File
 from django.db import transaction
-from django.db.models import Max, Sum
+from django.db.models import Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
@@ -17,9 +18,8 @@ from django.utils.text import slugify
 from content.models import Namespace
 from file_manager.models import MediaCollection, MediaFile, MediaTag
 from file_manager.storage import S3MediaStorage, system_storage
+from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
 from taxonomy.models import Tag as TaxonomyTag
-
-from object_storage.models import ObjectInstance, ObjectTransferJob, ObjectTypeDefinition, ObjectVersion
 
 PACKAGE_VERSION = "object-transfer/1"
 MAX_CANDIDATES_PER_TYPE = 500
@@ -79,15 +79,15 @@ def collect_object_graph(tenant, root_ids):
     if len(roots) != len(set(root_ids)):
         raise ValueError("One or more selected root objects are unavailable.")
     collected = {}
-    queue = list(roots)
+    queue = deque(roots)
     while queue:
-        obj = queue.pop(0)
+        obj = queue.popleft()
         if obj.id in collected:
             continue
         collected[obj.id] = obj
         if len(collected) > MAX_OBJECTS:
             raise ValueError(f"The selection expands beyond the {MAX_OBJECTS} object limit.")
-        queue.extend(obj.get_descendants().filter(tenant=tenant).select_related("object_type"))
+        queue.extend(obj.children.filter(tenant=tenant).select_related("object_type"))
         related_ids = {
             rel.get("object_id") for rel in (obj.relationships or []) if isinstance(rel, dict) and rel.get("object_id")
         }
@@ -180,6 +180,14 @@ def type_is_compatible(local, remote):
     local_slots = {item.get("name") for item in (local.slot_configuration or {}).get("slots", [])}
     remote_slots = {item.get("name") for item in (remote.get("slot_configuration") or {}).get("slots", [])}
     return remote_slots.issubset(local_slots)
+
+
+def type_has_foreign_tenant_usage(obj_type, tenant):
+    """Return true when changing a global type would affect another tenant."""
+    namespace_tenant_id = obj_type.namespace.tenant_id if obj_type.namespace_id else None
+    return (namespace_tenant_id is not None and namespace_tenant_id != tenant.id) or ObjectInstance.objects.filter(
+        object_type=obj_type
+    ).exclude(tenant=tenant).exists()
 
 
 def serialize_media(media):
@@ -331,13 +339,14 @@ class ObjectPackageExporter:
             )
         )
         type_map = {obj.object_type_id: obj.object_type for obj in objects}
+        object_ids = {obj.id for obj in objects}
         payload = {
             "types": [serialize_type(value) for value in sorted(type_map.values(), key=lambda value: value.name)],
             "objects": [
                 {
                     "source_id": obj.id,
                     "type": obj.object_type.name,
-                    "parent_source_id": obj.parent_id if obj.parent_id in {item.id for item in objects} else None,
+                    "parent_source_id": obj.parent_id if obj.parent_id in object_ids else None,
                     "title": obj.title,
                     "slug": obj.slug,
                     "status": obj.status,
@@ -591,8 +600,7 @@ class ObjectPackageImporter:
             if differs and resolution == "skip":
                 continue
             if differs and resolution == "update":
-                foreign_use = ObjectInstance.objects.filter(object_type=existing).exclude(tenant=tenant).exists()
-                if foreign_use:
+                if type_has_foreign_tenant_usage(existing, tenant):
                     raise ValueError(f"Object type {data['name']} is used by another workspace and cannot be updated.")
             if differs and resolution not in {"keep", "update"}:
                 raise ValueError(f"Resolve the object type conflict for {data['name']} before importing.")
@@ -685,6 +693,8 @@ class ObjectPackageImporter:
             obj.relationships = [item for item in obj.relationships if item.get("object_id") is not None]
             obj.save(update_fields=["parent", "relationships", "updated_at"])
             reference_fields = _reference_field_names(obj.object_type)
+            existing_versions = list(obj.versions.order_by("version_number"))
+            selected_version = obj.current_version
             for version_data in data.get("versions", []):
                 version_payload = {
                     "data": _remap(
@@ -701,29 +711,41 @@ class ObjectPackageImporter:
                         {"object_id", "objectId"},
                         skipped_ids,
                     ),
-                    "effective_date": parse_datetime(version_data.get("effective_date"))
-                    if version_data.get("effective_date")
-                    else None,
-                    "expiry_date": parse_datetime(version_data.get("expiry_date"))
-                    if version_data.get("expiry_date")
-                    else None,
+                    "effective_date": (
+                        parse_datetime(version_data.get("effective_date"))
+                        if version_data.get("effective_date")
+                        else None
+                    ),
+                    "expiry_date": (
+                        parse_datetime(version_data.get("expiry_date")) if version_data.get("expiry_date") else None
+                    ),
                     "is_featured": version_data.get("is_featured", False),
                 }
-                current = obj.current_version
-                if current and all(getattr(current, key) == value for key, value in version_payload.items()):
+                matching_version = next(
+                    (
+                        version
+                        for version in reversed(existing_versions)
+                        if all(getattr(version, key) == value for key, value in version_payload.items())
+                    ),
+                    None,
+                )
+                if matching_version:
+                    selected_version = matching_version
                     continue
-                number = (obj.versions.aggregate(value=Max("version_number"))["value"] or 0) + 1
-                version = ObjectVersion.objects.create(
+                number = (existing_versions[-1].version_number if existing_versions else 0) + 1
+                selected_version = ObjectVersion.objects.create(
                     object_instance=obj,
                     version_number=number,
                     created_by=user,
                     change_description="Remote object import",
                     **version_payload,
                 )
-                obj.current_version = version
-                obj.version = number
-                obj.save(update_fields=["current_version", "version", "updated_at"])
+                existing_versions.append(selected_version)
                 created_versions += 1
+            if selected_version and obj.current_version_id != selected_version.id:
+                obj.current_version = selected_version
+                obj.version = selected_version.version_number
+                obj.save(update_fields=["current_version", "version", "updated_at"])
         for obj, _data in source_payloads.values():
             obj.rebuild_related_from()
         return {"object_map": object_map, "media_map": media_map, "created_versions": created_versions}

@@ -282,6 +282,7 @@ class ThemeVersionApiTests(TestCase):
                 "secret-token",
                 "pull",
                 None,
+                "ThemeKey",
             )
         create_response = self.client.post(
             "/api/v1/webpages/designer/remote-connections/",

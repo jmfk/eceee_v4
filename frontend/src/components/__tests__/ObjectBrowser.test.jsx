@@ -51,6 +51,7 @@ vi.mock('../../api/objectTransfers', () => ({
         catalog: vi.fn(),
         preflight: vi.fn(),
         createImport: vi.fn(),
+        listImports: vi.fn().mockResolvedValue({ results: [] }),
         getImport: vi.fn(),
     },
 }))
