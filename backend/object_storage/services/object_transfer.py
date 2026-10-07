@@ -10,7 +10,6 @@ from typing import Any
 
 from django.core.files import File
 from django.db import transaction
-from django.db.models import Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
@@ -316,6 +315,65 @@ def serialize_media(media):
     }
 
 
+def _build_payload(objects, media_files, type_map):
+    object_ids = {obj.id for obj in objects}
+    return {
+        "types": [serialize_type(value) for value in sorted(type_map.values(), key=lambda value: value.name)],
+        "objects": [
+            {
+                "source_id": obj.id,
+                "type": obj.object_type.name,
+                "parent_source_id": obj.parent_id if obj.parent_id in object_ids else None,
+                "title": obj.title,
+                "slug": obj.slug,
+                "status": obj.status,
+                "metadata": obj.metadata,
+                "relationships": obj.relationships,
+                "publish_date": obj.publish_date,
+                "unpublish_date": obj.unpublish_date,
+                "versions": [
+                    {
+                        "source_id": version.id,
+                        "version_number": version.version_number,
+                        "data": version.data,
+                        "widgets": version.widgets,
+                        "change_description": version.change_description,
+                        "effective_date": version.effective_date,
+                        "expiry_date": version.expiry_date,
+                        "is_featured": version.is_featured,
+                    }
+                    for version in selected_versions(obj)
+                ],
+            }
+            for obj in objects
+        ],
+        "media": [serialize_media(media) for media in media_files],
+    }
+
+
+def _media_member_name(media):
+    return f"media/{media.id}/{os.path.basename(media.file_path)}"
+
+
+def _type_icon_member_name(obj_type):
+    return f"type-icons/{slugify(obj_type.name)}/{os.path.basename(obj_type.icon_image.name)}"
+
+
+def _build_manifest(root_ids, objects, versions, media_files, icon_count, checksums):
+    return {
+        "package_version": PACKAGE_VERSION,
+        "exported_at": timezone.now(),
+        "root_ids": root_ids,
+        "counts": {
+            "objects": len(objects),
+            "versions": len(versions),
+            "media": len(media_files),
+            "type_icons": icon_count,
+        },
+        "checksums": checksums,
+    }
+
+
 def build_preflight(tenant, root_ids):
     objects = collect_object_graph(tenant, root_ids)
     versions = [version for obj in objects for version in selected_versions(obj)]
@@ -326,8 +384,12 @@ def build_preflight(tenant, root_ids):
             media_ids.update(match.lower() for match in UUID_RE.findall(value))
             if value.startswith(("http://", "https://")) and "/files/" not in value:
                 external_urls.add(value)
-    media = MediaFile.objects.filter(tenant=tenant, id__in=media_ids, is_deleted=False)
-    media_bytes = media.aggregate(total=Sum("file_size"))["total"] or 0
+    media = list(
+        MediaFile.objects.filter(tenant=tenant, id__in=media_ids, is_deleted=False)
+        .select_related("namespace")
+        .prefetch_related("tags", "canonical_tags", "collections__tags", "collections__canonical_tags")
+    )
+    media_bytes = sum(item.file_size or 0 for item in media)
     types = collect_type_definitions(objects)
     namespaces = {}
     for obj_type in types.values():
@@ -337,18 +399,33 @@ def build_preflight(tenant, root_ids):
                 "slug": obj_type.namespace.slug,
                 "description": obj_type.namespace.description,
             }
-    for item in media.select_related("namespace"):
+    for item in media:
         namespaces[item.namespace.slug] = {
             "name": item.namespace.name,
             "slug": item.namespace.slug,
             "description": item.namespace.description,
         }
+    payload_bytes = json.dumps(_build_payload(objects, media, types), default=_json_default).encode()
+    checksums = {"objects.json": "0" * 64}
+    checksums.update({_media_member_name(item): "0" * 64 for item in media})
+    icon_bytes = 0
+    icon_count = 0
+    for obj_type in types.values():
+        if not obj_type.icon_image:
+            continue
+        checksums[_type_icon_member_name(obj_type)] = "0" * 64
+        icon_bytes += obj_type.icon_image.size
+        icon_count += 1
+    entry_count = len(media) + icon_count + 2
+    manifest = _build_manifest(root_ids, objects, versions, media, icon_count, checksums)
+    manifest_bytes = json.dumps(manifest, default=_json_default).encode()
+    uncompressed_bytes = len(payload_bytes) + media_bytes + icon_bytes + len(manifest_bytes)
     return {
         "object_count": len(objects),
         "version_count": len(versions),
-        "media_count": media.count(),
+        "media_count": len(media),
         "media_bytes": media_bytes,
-        "type_icon_count": sum(bool(item.icon_image) for item in types.values()),
+        "type_icon_count": icon_count,
         "type_count": len(types),
         "types": [serialize_type(item) for item in sorted(types.values(), key=lambda value: value.name)],
         "namespaces": sorted(namespaces.values(), key=lambda value: value["slug"]),
@@ -359,8 +436,15 @@ def build_preflight(tenant, root_ids):
         "external_urls": sorted(external_urls),
         "limits": {
             "max_objects": MAX_OBJECTS,
+            "max_entries": MAX_ENTRIES,
             "max_uncompressed_bytes": MAX_UNCOMPRESSED_BYTES,
-            "within_limits": len(objects) <= MAX_OBJECTS and media_bytes <= MAX_UNCOMPRESSED_BYTES,
+            "entry_count": entry_count,
+            "uncompressed_bytes": uncompressed_bytes,
+            "within_limits": (
+                len(objects) <= MAX_OBJECTS
+                and entry_count <= MAX_ENTRIES
+                and uncompressed_bytes <= MAX_UNCOMPRESSED_BYTES
+            ),
         },
     }
 
@@ -407,86 +491,48 @@ class ObjectPackageExporter:
             )
         )
         type_map = collect_type_definitions(objects)
-        object_ids = {obj.id for obj in objects}
-        payload = {
-            "types": [serialize_type(value) for value in sorted(type_map.values(), key=lambda value: value.name)],
-            "objects": [
-                {
-                    "source_id": obj.id,
-                    "type": obj.object_type.name,
-                    "parent_source_id": obj.parent_id if obj.parent_id in object_ids else None,
-                    "title": obj.title,
-                    "slug": obj.slug,
-                    "status": obj.status,
-                    "metadata": obj.metadata,
-                    "relationships": obj.relationships,
-                    "publish_date": obj.publish_date,
-                    "unpublish_date": obj.unpublish_date,
-                    "versions": [
-                        {
-                            "source_id": version.id,
-                            "version_number": version.version_number,
-                            "data": version.data,
-                            "widgets": version.widgets,
-                            "change_description": version.change_description,
-                            "effective_date": version.effective_date,
-                            "expiry_date": version.expiry_date,
-                            "is_featured": version.is_featured,
-                        }
-                        for version in selected_versions(obj)
-                    ],
-                }
-                for obj in objects
-            ],
-            "media": [serialize_media(media) for media in media_files],
-        }
+        payload = _build_payload(objects, media_files, type_map)
         objects_json = json.dumps(payload, default=_json_default).encode()
+        icon_types = [obj_type for obj_type in type_map.values() if obj_type.icon_image]
+        entry_count = len(media_files) + len(icon_types) + 2
+        if entry_count > MAX_ENTRIES:
+            raise ValueError("The object package exceeds safety limits.")
         package.writestr("objects.json", objects_json)
         checksums = {"objects.json": hashlib.sha256(objects_json).hexdigest()}
-        total_media = 0
+        total_uncompressed = len(objects_json)
         for media in media_files:
-            total_media += media.file_size or 0
-            if total_media > MAX_UNCOMPRESSED_BYTES:
-                raise ValueError("The selected media exceeds the 2 GB transfer limit.")
             file_obj = self.storage._open(media.file_path, "rb")
             try:
-                member = f"media/{media.id}/{os.path.basename(media.file_path)}"
+                member = _media_member_name(media)
                 digest = hashlib.sha256()
                 with package.open(member, "w", force_zip64=True) as destination:
                     while chunk := file_obj.read(1024 * 1024):
+                        total_uncompressed += len(chunk)
+                        if total_uncompressed > MAX_UNCOMPRESSED_BYTES:
+                            raise ValueError("The object package exceeds safety limits.")
                         digest.update(chunk)
                         destination.write(chunk)
                 checksums[member] = digest.hexdigest()
             finally:
                 file_obj.close()
         icon_count = 0
-        for obj_type in type_map.values():
-            if not obj_type.icon_image:
-                continue
-            member = f"type-icons/{slugify(obj_type.name)}/{os.path.basename(obj_type.icon_image.name)}"
+        for obj_type in icon_types:
+            member = _type_icon_member_name(obj_type)
             digest = hashlib.sha256()
             with obj_type.icon_image.open("rb") as source, package.open(member, "w", force_zip64=True) as destination:
                 while chunk := source.read(1024 * 1024):
-                    total_media += len(chunk)
-                    if total_media > MAX_UNCOMPRESSED_BYTES:
-                        raise ValueError("The selected media exceeds the 2 GB transfer limit.")
+                    total_uncompressed += len(chunk)
+                    if total_uncompressed > MAX_UNCOMPRESSED_BYTES:
+                        raise ValueError("The object package exceeds safety limits.")
                     digest.update(chunk)
                     destination.write(chunk)
             checksums[member] = digest.hexdigest()
             icon_count += 1
-        manifest = {
-            "package_version": PACKAGE_VERSION,
-            "exported_at": timezone.now(),
-            "root_ids": root_ids,
-            "counts": {
-                "objects": len(objects),
-                "versions": len(versions),
-                "media": len(media_files),
-                "type_icons": icon_count,
-            },
-            "checksums": checksums,
-        }
-        package.writestr("manifest.json", json.dumps(manifest, default=_json_default))
+        manifest = _build_manifest(root_ids, objects, versions, media_files, icon_count, checksums)
+        manifest_json = json.dumps(manifest, default=_json_default).encode()
+        if total_uncompressed + len(manifest_json) > MAX_UNCOMPRESSED_BYTES:
+            raise ValueError("The object package exceeds safety limits.")
+        package.writestr("manifest.json", manifest_json)
         return manifest
 
 
@@ -775,9 +821,9 @@ class ObjectPackageImporter:
                 pending_relations.append((existing, data))
         for obj_type, data in pending_relations:
             obj_type.allowed_child_types.set(
-                ObjectTypeDefinition.objects.filter(name__in=data.get("allowed_child_types", []))
+                type_map[name] for name in data.get("allowed_child_types", []) if name in type_map
             )
-            obj_type.browser_group = ObjectTypeDefinition.objects.filter(name=data.get("browser_group")).first()
+            obj_type.browser_group = type_map.get(data.get("browser_group"))
             obj_type.save(update_fields=["browser_group", "updated_at"])
 
         media_map = self._import_media(package, payload.get("media", []))
@@ -954,12 +1000,7 @@ class ObjectPackageImporter:
                     uploaded_by=self.job.created_by,
                 )
             media_tags = [
-                MediaTag.objects.get_or_create(
-                    namespace=existing.namespace,
-                    slug=item["slug"],
-                    defaults={**item, "created_by": self.job.created_by},
-                )[0]
-                for item in data.get("media_tags", [])
+                self._get_or_create_media_tag(item, existing.namespace) for item in data.get("media_tags", [])
             ]
             canonical = [
                 TaxonomyTag.objects.get_or_create(
@@ -989,12 +1030,7 @@ class ObjectPackageImporter:
                     },
                 )
                 collection_tags = [
-                    MediaTag.objects.get_or_create(
-                        namespace=existing.namespace,
-                        slug=tag["slug"],
-                        defaults={**tag, "created_by": self.job.created_by},
-                    )[0]
-                    for tag in item.get("media_tags", [])
+                    self._get_or_create_media_tag(tag, existing.namespace) for tag in item.get("media_tags", [])
                 ]
                 if collection_tags:
                     collection.tags.add(*collection_tags)
@@ -1015,3 +1051,20 @@ class ObjectPackageImporter:
                 existing.collections.add(*collections)
             result[str(data["source_id"])] = str(existing.id)
         return result
+
+    def _get_or_create_media_tag(self, data, namespace):
+        slug = slugify(data.get("slug") or data.get("name")) or "tag"
+        name = data.get("name") or slug
+        tag = MediaTag.objects.filter(namespace=namespace, slug=slug).first()
+        if tag is None:
+            tag = MediaTag.objects.filter(namespace=namespace, name=name).first()
+        if tag is None:
+            tag = MediaTag.objects.create(
+                namespace=namespace,
+                name=name,
+                slug=slug,
+                color=data.get("color") or "#3B82F6",
+                description=data.get("description", ""),
+                created_by=self.job.created_by,
+            )
+        return tag
