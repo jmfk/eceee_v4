@@ -103,8 +103,15 @@ def _collect_media_files(tenant, versions):
 
 
 def collect_object_graph(tenant, root_ids):
+    if not isinstance(root_ids, list) or any(
+        isinstance(value, bool) or not isinstance(value, int) or value < 1 for value in root_ids
+    ):
+        raise ValueError("Root object IDs must be provided as a list of positive integers.")
+    if len(root_ids) > MAX_OBJECTS:
+        raise ValueError(f"The selection exceeds the {MAX_OBJECTS} root object limit.")
+    root_ids = set(root_ids)
     roots = list(ObjectInstance.objects.filter(tenant=tenant, parent__isnull=True, id__in=root_ids))
-    if len(roots) != len(set(root_ids)):
+    if len(roots) != len(root_ids):
         raise ValueError("One or more selected root objects are unavailable.")
     collected = {}
     queue = deque(roots)

@@ -3,15 +3,18 @@ import io
 import json
 import zipfile
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.test import SimpleTestCase
 from rest_framework import serializers
 
 from object_storage.remote_views import _validate_type_resolutions
 from object_storage.services.object_transfer import (
+    MAX_OBJECTS,
     PACKAGE_VERSION,
     _reference_field_names,
     _remap,
+    collect_object_graph,
     type_definition_differs,
     type_is_compatible,
     validate_package,
@@ -19,6 +22,13 @@ from object_storage.services.object_transfer import (
 
 
 class ObjectTransferHelperTests(SimpleTestCase):
+    def test_root_limit_is_checked_before_querying_objects(self):
+        with patch("object_storage.services.object_transfer.ObjectInstance.objects.filter") as object_filter:
+            with self.assertRaisesMessage(ValueError, f"exceeds the {MAX_OBJECTS} root object limit"):
+                collect_object_graph(SimpleNamespace(), list(range(1, MAX_OBJECTS + 2)))
+
+        object_filter.assert_not_called()
+
     def test_canonical_object_reference_field_is_remapped(self):
         obj_type = SimpleNamespace(
             schema={
