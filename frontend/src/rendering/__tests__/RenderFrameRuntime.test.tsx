@@ -82,10 +82,157 @@ describe('RenderFrameRuntime designer overlay', () => {
         await waitFor(() => expect(heading).toHaveAttribute('data-designer-target', 'heading'))
         expect((heading as HTMLElement).contentEditable).not.toBe('true')
         expect(heading).toHaveAttribute('data-designer-target', 'heading')
-        expect(document.querySelector('[data-designer-target="article"]')).toBeTruthy()
+        expect(document.querySelector('[data-designer-targets*="article"]')).toBeTruthy()
         expect(document.querySelector('[data-designer-target="layout:main_layout:slot:main"]')).toBeTruthy()
         expect(document.querySelector('.page-editor-widget,.widget-header')).toBeNull()
         expect([...document.querySelectorAll('style')].some((style) => style.textContent?.includes('rgb(1,2,3)'))).toBe(true)
+    })
+
+    it('exposes global text targets inside a structural slot for read-only content', async () => {
+        const globalWorkspace = structuredClone(workspace)
+        globalWorkspace.catalog.designGroups = [{
+            id: 'global-type', label: 'Global typography', widgetTypes: [], slots: [], parts: [], assetKeys: [],
+            elements: [{ id: 'global-heading', element: 'h1', label: 'Heading 1' }],
+        }]
+        globalWorkspace.catalog.layouts[0].slots = [
+            { name: 'hero', label: 'Hero' },
+            { name: 'main', label: 'Main content' },
+        ]
+        const sourceModel = createPageRenderModel({
+            layout: 'main_layout',
+            widgets: {
+                hero: [{ id: 'hero', type: 'easy_widgets.HeroWidget', config: { header: 'Selectable hero heading' } }],
+                main: [],
+            },
+        })
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        const renderModel = createDesignerRenderModel({
+            workspace: globalWorkspace,
+            viewId: 'page-main',
+            sourceModel,
+            contentEditable: false,
+        })
+        sendModel(renderModel)
+
+        const heading = await screen.findByRole('heading', { name: 'Selectable hero heading' })
+        await waitFor(() => expect(heading).toHaveAttribute('data-designer-target', 'global-heading'))
+        const heroSlot = heading.closest('.slot-hero') as HTMLElement
+        fireEvent.click(heroSlot)
+
+        await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview',
+            action: 'select',
+            targetId: 'layout:main_layout:slot:hero',
+            descendants: expect.arrayContaining([expect.objectContaining({
+                id: 'global-heading',
+                label: 'Heading 1',
+                displayLabel: 'Heading 1: “Selectable hero heading”',
+                parentId: 'widget:hero',
+                depth: 2,
+            })]),
+        }), '*'))
+
+        postMessage.mockClear()
+        fireEvent.click(heading)
+        expect(heading).toHaveClass('designer-selected')
+        expect(heroSlot).not.toHaveClass('designer-selected')
+        await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview',
+            action: 'select',
+            targetId: 'global-heading',
+        }), '*'))
+
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-host', action: 'highlightTarget', targetId: 'global-heading', active: true },
+            source: window.parent,
+        }))
+        expect(heading).toHaveClass('designer-selected', 'designer-highlighted')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-host', action: 'highlightTarget', targetId: 'global-heading', active: false },
+            source: window.parent,
+        }))
+        expect(heading).toHaveClass('designer-selected')
+        expect(heading).not.toHaveClass('designer-highlighted')
+
+        sendModel({ ...renderModel })
+        await waitFor(() => expect(screen.getByRole('heading', { name: 'Selectable hero heading' })).toHaveClass('designer-selected'))
+        postMessage.mockRestore()
+    })
+
+    it('makes a widget selectable even when the theme has no design group for it', async () => {
+        const bannerWorkspace = structuredClone(workspace)
+        bannerWorkspace.catalog.designGroups = []
+        const sourceModel = createPageRenderModel({
+            layout: 'main_layout',
+            widgets: {
+                main: [{
+                    id: 'banner-1',
+                    type: 'easy_widgets.BannerWidget',
+                    config: { bannerMode: 'text', textContent: '<p>Selectable banner</p>' },
+                }],
+            },
+        })
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({
+            workspace: bannerWorkspace,
+            viewId: 'page-main',
+            sourceModel,
+            contentEditable: false,
+        }))
+
+        const bannerText = await screen.findByText('Selectable banner')
+        const bannerWidget = bannerText.closest('[data-widget-id="banner-1"]') as HTMLElement
+        await waitFor(() => expect(bannerWidget).toHaveAttribute('data-designer-target', 'widget:banner-1'))
+        fireEvent.click(bannerText)
+
+        expect(bannerWidget).toHaveClass('designer-selected')
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview',
+            action: 'select',
+            targetId: 'widget:banner-1',
+            kind: 'widget',
+            label: 'Banner widget',
+            widgetId: 'banner-1',
+            widgetType: 'easy_widgets.BannerWidget',
+        }), '*')
+        postMessage.mockRestore()
+    })
+
+    it('applies a design group only to widgets in the configured layout slots', async () => {
+        const slottedWorkspace = structuredClone(workspace)
+        slottedWorkspace.catalog.layouts[0].slots = [
+            { name: 'main', label: 'Main content' },
+            { name: 'footer', label: 'Footer' },
+        ]
+        slottedWorkspace.catalog.designGroups = [{
+            id: 'footer-content', label: 'Content · Footer',
+            widgetTypes: ['easy_widgets.ContentWidget'], slots: ['footer'],
+            parts: [], elements: [], assetKeys: [],
+        }]
+        const sourceModel = createPageRenderModel({
+            layout: 'main_layout',
+            widgets: {
+                main: [{ id: 'main-content', type: 'easy_widgets.ContentWidget', config: { content: '<p>Main copy</p>' } }],
+                footer: [{ id: 'footer-content', type: 'easy_widgets.ContentWidget', config: { content: '<p>Footer copy</p>' } }],
+            },
+        })
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: slottedWorkspace, viewId: 'page-main', sourceModel }))
+
+        const mainWidget = (await screen.findByText('Main copy')).closest('[data-widget-id="main-content"]') as HTMLElement
+        const footerWidget = (await screen.findByText('Footer copy')).closest('[data-widget-id="footer-content"]') as HTMLElement
+        await waitFor(() => expect(footerWidget.dataset.designerTargets).toContain('footer-content'))
+
+        expect(JSON.parse(mainWidget.dataset.designerTargets || '[]')).toEqual([
+            expect.objectContaining({ id: 'widget:main-content', kind: 'widget' }),
+        ])
+        expect(JSON.parse(footerWidget.dataset.designerTargets || '[]')).toEqual([
+            expect.objectContaining({ id: 'widget:footer-content', kind: 'widget' }),
+            expect.objectContaining({ id: 'footer-content', kind: 'group' }),
+        ])
     })
 
     it('edits a rich text field as one sanitized HTML value after double-click', async () => {
@@ -245,6 +392,47 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(changes).toHaveLength(1)
         expect(changes[0][0]).toEqual(expect.objectContaining({ targetId: 'content:0', text: expect.stringContaining('Changed link'), richText: true }))
         expect(heading.querySelector('a')).toBe(link)
+        postMessage.mockRestore()
+    })
+
+    it('selects and marks the closest nested Designer element when it is clicked', async () => {
+        const nestedWorkspace = {
+            ...structuredClone(workspace),
+            previewContent: { views: [{
+                id: 'nested-targets', layout: 'main_layout', texts: {},
+                content: { widgets: { main: [{
+                    id: 'nested-target-widget', type: 'easy_widgets.ContentWidget',
+                    config: { content: '<h3>Container <a href="#details">Nested link</a></h3>' },
+                }] } },
+            }] },
+            catalog: {
+                ...structuredClone(workspace.catalog),
+                designGroups: [{
+                    id: 'nested-group', label: 'Nested content', widgetTypes: ['easy_widgets.ContentWidget'],
+                    parts: [], assetKeys: [],
+                    elements: [
+                        { id: 'nested-heading', element: 'h3', label: 'Heading' },
+                        { id: 'nested-link', element: 'a', label: 'Link' },
+                    ],
+                }],
+            },
+        }
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: nestedWorkspace, viewId: 'nested-targets' }))
+
+        const link = await screen.findByRole('link', { name: 'Nested link' })
+        const heading = link.closest('h3')!
+        fireEvent.click(link)
+
+        expect(link).toHaveClass('designer-selected')
+        expect(heading).not.toHaveClass('designer-selected')
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview',
+            action: 'select',
+            targetId: 'nested-link',
+            label: 'Link',
+        }), '*')
         postMessage.mockRestore()
     })
 

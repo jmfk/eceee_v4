@@ -470,10 +470,11 @@ describe('DesignerThemeWorkspacePage', () => {
             layout: 'main_layout',
         })
         mocks.workspace.mockResolvedValue(longWorkspace)
-        const user = userEvent.setup()
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        await user.click(screen.getByRole('tab', { name: 'Your sites' }))
+        await act(async () => {
+            fireEvent.click(screen.getByRole('tab', { name: 'Your sites' }))
+        })
 
         const navigationItem = screen.getByRole('button', { name: `Select conference.example — ${longTitle}` })
         const adaptiveLabel = within(navigationItem).getByTitle(longTitle)
@@ -559,7 +560,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(inspectorPane).not.toHaveClass('hidden')
     })
 
-    it('offers rich text commands after a preview double-click and lists nested elements as accordions', async () => {
+    it('keeps nested elements as accordions and opens the matching item when preview focus changes', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
@@ -570,7 +571,10 @@ describe('DesignerThemeWorkspacePage', () => {
                 data: {
                     source: 'eceee-designer-preview', action: 'editText', targetId: 'content:0', kind: 'element', label: 'Rich text',
                     text: '<p>Editable copy</p>', editable: true, richText: true,
-                    descendants: [{ id: 'group:0:element:h1', kind: 'element', label: 'Heading 1', text: 'Editable copy', editable: false }],
+                    descendants: [
+                        { id: 'group:0:element:h1', kind: 'element', label: 'Heading 1', displayLabel: 'Heading 1: “Editable copy”', parentId: 'content:0', depth: 1, text: 'Editable copy', editable: false },
+                        { id: 'group:0:element:p', kind: 'element', label: 'Paragraph', displayLabel: 'Paragraph: “More copy”', parentId: 'group:0:element:h1', depth: 2, text: 'More copy', editable: true },
+                    ],
                 },
                 source: iframe.contentWindow,
             }))
@@ -582,7 +586,126 @@ describe('DesignerThemeWorkspacePage', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Add link' }))
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ source: 'eceee-render-host', action: 'formatText', targetId: 'content:0', command: 'createLink', value: 'https://example.com/article' }), '*')
         expect(screen.getByText('Elements inside')).toBeInTheDocument()
-        expect(screen.getByText('Heading 1')).toBeInTheDocument()
+        const elementHierarchy = screen.getByRole('tree', { name: 'Element hierarchy' })
+        expect(elementHierarchy).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto')
+        expect(elementHierarchy.closest('section')).toHaveClass('min-h-0', 'flex-1', 'flex-col')
+        expect(document.getElementById('selected-element-editor')).toHaveClass('min-h-0', 'flex-1', 'overflow-hidden')
+        expect(screen.getByRole('button', { name: 'Edit Paragraph: “More copy”' })).toHaveAttribute('aria-expanded', 'false')
+        expect(screen.getByRole('treeitem', { name: /Paragraph: “More copy”/ })).toHaveAttribute('aria-level', '2')
+        const highlightButton = screen.getByRole('button', { name: 'Highlight Heading 1: “Editable copy”' })
+        expect(highlightButton.querySelector('.lucide-focus')).toBeInTheDocument()
+        fireEvent.click(highlightButton)
+        expect(postMessage).toHaveBeenCalledWith({
+            source: 'eceee-render-host',
+            action: 'highlightTarget',
+            targetId: 'group:0:element:h1',
+            active: true,
+        }, '*')
+        expect(screen.getByRole('button', { name: 'Stop highlighting Heading 1: “Editable copy”' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByRole('button', { name: 'Stop highlighting Heading 1: “Editable copy”' }).querySelector('.lucide-focus')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' }))
+        expect(screen.getByRole('heading', { name: 'Heading 1: “Editable copy”' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByRole('button', { name: 'Highlight Heading 1: “Editable copy”' })).toHaveAttribute('aria-pressed', 'false')
+        expect(screen.getByRole('region', { name: 'Heading 1 settings' })).toHaveClass('designer-inspector-focus')
+        expect(postMessage).toHaveBeenCalledWith({
+            source: 'eceee-render-host',
+            action: 'selectTarget',
+            targetId: 'group:0:element:h1',
+        }, '*')
+        fireEvent.click(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' }))
+        expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-expanded', 'false')
+        expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.queryByRole('region', { name: 'Heading 1 settings' })).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' }))
+        expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByRole('region', { name: 'Heading 1 settings' })).toBeInTheDocument()
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:h1',
+                kind: 'element', label: 'Heading 1', text: 'Editable copy', editable: false,
+            },
+            source: iframe.contentWindow,
+        }))
+        expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByRole('button', { name: 'Edit Paragraph: “More copy”' })).toBeInTheDocument()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:p',
+                kind: 'element', label: 'Paragraph', text: 'More copy', editable: true,
+            },
+            source: iframe.contentWindow,
+        }))
+        expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-expanded', 'false')
+        expect(screen.getByRole('button', { name: 'Edit Paragraph: “More copy”' })).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByRole('button', { name: 'Edit Paragraph: “More copy”' })).toHaveAttribute('aria-pressed', 'true')
+        const firstParagraphPanel = screen.getByRole('region', { name: 'Paragraph settings' })
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:p',
+                kind: 'element', label: 'Paragraph', text: 'More copy', editable: true,
+            },
+            source: iframe.contentWindow,
+        }))
+        expect(screen.getByRole('region', { name: 'Paragraph settings' })).not.toBe(firstParagraphPanel)
+        expect(screen.getByRole('heading', { name: 'Paragraph' })).toBeInTheDocument()
+    })
+
+    it('identifies layout slots separately from selected elements', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select', targetId: 'layout:main_layout:slot:hero',
+                kind: 'layoutSlot', label: 'Hero', editable: false,
+                descendants: [{
+                    id: 'group:0:element:h1', kind: 'element', label: 'Heading 1',
+                    displayLabel: 'Heading 1: “Example headline”', parentId: 'layout:main_layout:slot:hero',
+                    depth: 1, text: 'Example headline', editable: false,
+                }],
+            },
+            source: iframe.contentWindow,
+        }))
+
+        await waitFor(() => expect(screen.getByText('Selected layout slot')).toBeInTheDocument())
+        expect(screen.getByRole('heading', { name: 'Hero' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Collapse Hero settings' })).toBeInTheDocument()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:h1',
+                kind: 'element', label: 'Heading 1', text: 'Example headline', editable: false,
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(screen.getByText('Selected element')).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Heading 1' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Collapse Heading 1 settings' })).toBeInTheDocument()
+    })
+
+    it('identifies widget selections separately from slots and elements', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select', targetId: 'widget:banner-1',
+                kind: 'widget', label: 'Banner widget', widgetId: 'banner-1',
+                widgetType: 'easy_widgets.BannerWidget', editable: false,
+            },
+            source: iframe.contentWindow,
+        }))
+
+        await waitFor(() => expect(screen.getByText('Selected widget')).toBeInTheDocument())
+        expect(screen.getByRole('heading', { name: 'Banner widget' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Collapse Banner widget settings' })).toBeInTheDocument()
     })
 
     it('applies a clicked preview spacing label to the nearest target and active breakpoint', async () => {
@@ -797,9 +920,11 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByLabelText('Letter spacing')).toBeInTheDocument()
         expect(screen.getByLabelText('Inner spacing')).toBeInTheDocument()
         expect(screen.queryByLabelText('Add theme value')).not.toBeInTheDocument()
+        expect(screen.getByLabelText('Font family').closest('div')?.parentElement).toHaveClass('grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))]')
+        expect(screen.getByRole('region', { name: 'Theme inspector' }).querySelector('fieldset')).toHaveClass('min-w-0', 'overflow-x-hidden')
     })
 
-    it('offers nested elements as alternatives when they share the clicked area', async () => {
+    it('shows the nested element path as a clickable breadcrumb', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         await waitFor(() => {
@@ -820,22 +945,64 @@ describe('DesignerThemeWorkspacePage', () => {
                 },
                 source: iframe.contentWindow,
             }))
-            expect(screen.getByRole('heading', { name: 'Choose what to edit' })).toBeInTheDocument()
+            expect(screen.getByRole('navigation', { name: 'Element path' })).toBeInTheDocument()
         })
 
-        expect(screen.getByText('These elements share the same area.')).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Link' })).toHaveAttribute('aria-pressed', 'true')
-        expect(screen.getByRole('button', { name: 'List item' })).toBeInTheDocument()
+        const elementPath = screen.getByRole('navigation', { name: 'Element path' })
+        expect(within(elementPath).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Bullet list', 'List item', 'Link'])
+        expect(within(elementPath).getByText('Link')).toHaveAttribute('aria-current', 'page')
+        expect(within(elementPath).getByRole('button', { name: 'List item' })).toBeInTheDocument()
         const iframe = screen.getByTitle('Live theme preview')
         const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
-        fireEvent.click(screen.getByRole('button', { name: 'Bullet list' }))
+        fireEvent.click(within(elementPath).getByRole('button', { name: 'Bullet list' }))
         expect(screen.getByRole('heading', { name: 'Bullet list' })).toBeInTheDocument()
+        expect(within(screen.getByRole('navigation', { name: 'Element path' })).getByText('Bullet list')).toHaveAttribute('aria-current', 'page')
         expect(screen.queryByLabelText('Preview text')).not.toBeInTheDocument()
         expect(postMessage).toHaveBeenCalledWith({
             source: 'eceee-render-host',
             action: 'selectTarget',
             targetId: 'group:0:element:ul',
         }, '*')
+    })
+
+    it('hides technical alternatives that all have the same user-facing name', async () => {
+        const duplicatedWorkspace = structuredClone(workspace)
+        duplicatedWorkspace.catalog.designGroups[0].parts[0].label = 'Content widget container'
+        duplicatedWorkspace.catalog.designGroups.push(
+            {
+                ...structuredClone(duplicatedWorkspace.catalog.designGroups[0]),
+                id: 'group:2', groupIndex: 2, label: 'Secondary content',
+                parts: [{ id: 'group:2:part:content-widget', part: 'content-widget', label: 'Content widget container', breakpoints: ['md'] }],
+            },
+        )
+        duplicatedWorkspace.spacing.push(
+            { targetId: 'group:1:part:content-widget', scope: 'layout', groupIndex: 1, groupName: 'Callout', part: 'content-widget', breakpoint: 'md', values: { padding: '20px' } },
+            { targetId: 'group:2:part:content-widget', scope: 'layout', groupIndex: 2, groupName: 'Secondary content', part: 'content-widget', breakpoint: 'md', values: { padding: '28px' } },
+        )
+        mocks.workspace.mockResolvedValue(duplicatedWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview',
+                action: 'select',
+                targetId: 'group:0:part:content-widget',
+                kind: 'part',
+                label: 'Content widget container',
+                alternatives: [
+                    { id: 'group:0:part:content-widget', kind: 'part', label: 'Content widget container' },
+                    { id: 'group:1:part:content-widget', kind: 'part', label: 'Content widget container' },
+                    { id: 'group:2:part:content-widget', kind: 'part', label: 'Content widget container' },
+                ],
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(screen.getByRole('heading', { name: 'Content widget container' })).toBeInTheDocument()
+        expect(screen.queryByRole('heading', { name: 'Choose what to edit' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Content widget container' })).not.toBeInTheDocument()
+        expect(screen.getAllByRole('heading', { name: 'Spacing · Content widget container · Extra Large' })).toHaveLength(1)
     })
 
     it('shows theme properties without mixing image replacement into element editing', async () => {
@@ -906,17 +1073,14 @@ describe('DesignerThemeWorkspacePage', () => {
 
     it('edits theme identity and uploads preview and favicon images from Theme details', async () => {
         mocks.replaceAsset.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 4, hasDraftChanges: true })
-        const user = userEvent.setup()
         const { container } = renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
 
-        await user.click(screen.getByRole('button', { name: 'Theme details' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Theme details' }))
         expect(screen.getByRole('heading', { name: 'Theme details' })).toBeInTheDocument()
         const nameInput = screen.getByRole('textbox', { name: /^Name/ })
-        await user.clear(nameInput)
-        await user.type(nameInput, 'Editorial 2027')
-        await user.clear(screen.getByLabelText('Description'))
-        await user.type(screen.getByLabelText('Description'), 'A renewed editorial theme')
+        fireEvent.change(nameInput, { target: { value: 'Editorial 2027' } })
+        fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'A renewed editorial theme' } })
         expect(screen.getByRole('heading', { level: 1, name: 'Editorial 2027' })).toBeInTheDocument()
 
         fireEvent.click(screen.getByRole('button', { name: /save draft/i }))

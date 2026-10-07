@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileText, Image as ImageIcon, Italic, Link2, List, ListOrdered, Loader2, Search, Settings2, Trash2 } from 'lucide-react'
+import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileText, Focus, Image as ImageIcon, Italic, Link2, List, ListOrdered, Loader2, Search, Settings2, Trash2 } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel, designerPreviewImageReferences } from '../../rendering/adapters'
@@ -310,7 +310,7 @@ const effectiveSpacingEntries = (entries, activeBreakpoint, breakpoints, fields)
 const isZeroCssValue = (value) => /^0(?:\.0+)?(?:px|rem|em|%|vh|vw)?$/i.test(String(value || '').trim())
 
 const ValueFields = ({ idPrefix, values, defaults, fields, labels, onChange, onRemove, onOverride, overrideLabel, disabled = false }) => (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-2">
         {fields.map((field) => (
             <div key={field} className="min-w-0">
                 <div className="flex items-center justify-between gap-2">
@@ -345,6 +345,10 @@ const SemanticThemeWorkspace = ({
         || '',
     )
     const [selectedTarget, setSelectedTarget] = useState(null)
+    const [inspectorRoot, setInspectorRoot] = useState(null)
+    const [openTargetId, setOpenTargetId] = useState('')
+    const [highlightedTargetId, setHighlightedTargetId] = useState('')
+    const [selectionFocusVersion, setSelectionFocusVersion] = useState(0)
     const [addedThemeValues, setAddedThemeValues] = useState(() => new Set())
     const [editableInheritedSpacing, setEditableInheritedSpacing] = useState(() => new Set())
     const [themeDefaults, setThemeDefaults] = useState({})
@@ -367,6 +371,8 @@ const SemanticThemeWorkspace = ({
     const sidebarResizeRef = useRef(null)
     const inspectorResizeRef = useRef(null)
     const iframeRef = useRef(null)
+    const inspectorRootRef = useRef(null)
+    const pendingInspectorSelectionRef = useRef(null)
     const previewFrameRef = useRef(null)
     const uploadRefs = useRef({})
     const [previewFrameWidth, setPreviewFrameWidth] = useState(1280)
@@ -490,6 +496,14 @@ const SemanticThemeWorkspace = ({
         setSelectedTarget(null)
     }, [previewTextResetVersion])
 
+    useEffect(() => {
+        if (selectedTarget) return
+        pendingInspectorSelectionRef.current = null
+        inspectorRootRef.current = null
+        setInspectorRoot(null)
+        setOpenTargetId('')
+    }, [selectedTarget])
+
     const demoOptions = useMemo(() => previewContent.views.map((view) => ({
         value: String(view.id),
         label: view.label,
@@ -597,19 +611,27 @@ const SemanticThemeWorkspace = ({
                 }
                 return
             }
-            const normalizeTarget = (option) => ({
-                id: option.id,
-                kind: option.kind,
-                label: option.label,
-                text: option.text || '',
-                editable: option.editable !== false,
-                richText: option.richText === true,
-                sourceUrl: option.sourceUrl || '',
-                sourceOccurrence: option.sourceOccurrence ?? 0,
-                sourcePath: Array.isArray(option.sourcePath) ? option.sourcePath : [],
-                sourceMatchIndex: option.sourceMatchIndex ?? 0,
-                computedStyles: option.computedStyles || {},
-            })
+            function normalizeTarget(option) {
+                return {
+                    id: option.id,
+                    kind: option.kind,
+                    label: option.label,
+                    displayLabel: option.displayLabel || option.label,
+                    parentId: option.parentId || '',
+                    depth: Number.isFinite(option.depth) ? option.depth : 0,
+                    widgetType: option.widgetType || '',
+                    widgetId: option.widgetId || '',
+                    text: option.text || '',
+                    editable: option.editable !== false,
+                    richText: option.richText === true,
+                    sourceUrl: option.sourceUrl || '',
+                    sourceOccurrence: option.sourceOccurrence ?? 0,
+                    sourcePath: Array.isArray(option.sourcePath) ? option.sourcePath : [],
+                    sourceMatchIndex: option.sourceMatchIndex ?? 0,
+                    computedStyles: option.computedStyles || {},
+                    alternatives: Array.isArray(option.alternatives) ? option.alternatives.map(normalizeTarget) : [],
+                }
+            }
             const alternatives = Array.isArray(event.data.alternatives)
                 ? event.data.alternatives.filter((option) => option?.id && option?.label).map(normalizeTarget)
                 : []
@@ -623,6 +645,8 @@ const SemanticThemeWorkspace = ({
                 id: event.data.targetId,
                 kind: event.data.kind,
                 label: event.data.label,
+                widgetType: event.data.widgetType || '',
+                widgetId: event.data.widgetId || '',
                 text: event.data.text || '',
                 editable: event.data.editable !== false,
                 richText: event.data.richText === true,
@@ -634,6 +658,32 @@ const SemanticThemeWorkspace = ({
                 alternatives,
                 ancestors,
                 descendants,
+            }
+            if (pendingInspectorSelectionRef.current === target.id) pendingInspectorSelectionRef.current = null
+            const currentRoot = inspectorRootRef.current
+            const targetBelongsToCurrentRoot = currentRoot && (
+                currentRoot.id === target.id
+                || currentRoot.descendants?.some((descendant) => descendant.id === target.id)
+            )
+            if (targetBelongsToCurrentRoot) {
+                const updatedRoot = currentRoot.id === target.id
+                    ? { ...target, descendants: target.descendants.length ? target.descendants : currentRoot.descendants }
+                    : {
+                        ...currentRoot,
+                        descendants: currentRoot.descendants.map((descendant) => descendant.id === target.id
+                            ? { ...descendant, ...target, descendants: descendant.descendants || [] }
+                            : descendant),
+                    }
+                inspectorRootRef.current = updatedRoot
+                setInspectorRoot(updatedRoot)
+            } else {
+                inspectorRootRef.current = target
+                setInspectorRoot(target)
+            }
+            if (event.data.action !== 'contentChange') {
+                setHighlightedTargetId('')
+                setOpenTargetId(targetBelongsToCurrentRoot && currentRoot.id !== target.id ? target.id : '')
+                setSelectionFocusVersion((current) => current + 1)
             }
             setThemeDefaults((current) => ({
                 ...current,
@@ -767,7 +817,6 @@ const SemanticThemeWorkspace = ({
 
     const selectedTargetIds = [...new Set([
         selectedTarget?.id,
-        ...(selectedTarget?.alternatives || []).map((target) => target.id),
         ...(selectedTarget?.ancestors || []).map((target) => target.id),
     ].filter(Boolean))]
     const selectedGroupIndex = Number(selectedTargetIds.map((id) => id.match(/^group:(\d+)/)?.[1]).find((value) => value !== undefined))
@@ -828,17 +877,52 @@ const SemanticThemeWorkspace = ({
         return () => window.clearTimeout(timer)
     }, [addedThemeValues, preview.css, workspace])
     const relevantColors = (selectedGroup?.colorNames || []).map((name) => ({ name, index: workspace.colors.findIndex((color) => color.name === name) })).filter(({ index }) => index >= 0)
-    const chooseTargetAlternative = (alternative) => {
-        const asset = assetsByTargetId.get(alternative.id)
+    const selectTargetFromInspector = (target, { replaceInspectorRoot = false } = {}) => {
+        const asset = assetsByTargetId.get(target.id)
         if (asset) setSelectedImageAspectKey(imageAspectKey(asset))
-        setSelectedTarget({ ...alternative, alternatives: [alternative], ancestors: [], descendants: [] })
+        const normalizedTarget = {
+            ...target,
+            alternatives: target.alternatives?.length ? target.alternatives : [target],
+            ancestors: target.ancestors || [],
+            descendants: target.descendants || [],
+        }
+        if (replaceInspectorRoot) {
+            inspectorRootRef.current = normalizedTarget
+            setInspectorRoot(normalizedTarget)
+        }
+        pendingInspectorSelectionRef.current = target.id
+        setSelectedTarget(normalizedTarget)
+        setHighlightedTargetId('')
         setSelectionExpanded(true)
+        setOpenTargetId(replaceInspectorRoot || target.id === inspectorRootRef.current?.id ? '' : target.id)
+        setSelectionFocusVersion((current) => current + 1)
         iframeRef.current?.contentWindow?.postMessage({
             source: 'eceee-render-host',
             action: 'selectTarget',
-            targetId: alternative.id,
+            targetId: target.id,
         }, '*')
     }
+    const toggleTargetHighlight = (target) => {
+        const active = highlightedTargetId !== target.id
+        setHighlightedTargetId(active ? target.id : '')
+        iframeRef.current?.contentWindow?.postMessage({
+            source: 'eceee-render-host',
+            action: 'highlightTarget',
+            targetId: target.id,
+            active,
+        }, '*')
+    }
+    const toggleTargetAccordion = (target) => {
+        if (selectedTarget?.id === target.id && openTargetId === target.id) {
+            setOpenTargetId('')
+            return
+        }
+        selectTargetFromInspector(target)
+    }
+    const chooseTargetAlternative = (alternative) => selectTargetFromInspector({
+        ...alternative,
+        alternatives: selectedTarget?.alternatives || [alternative],
+    }, { replaceInspectorRoot: true })
 
     const updateSelectedExampleText = (text) => {
         if (!selectedView || !selectedTarget) return
@@ -1040,10 +1124,10 @@ const SemanticThemeWorkspace = ({
         </section>
     )
 
-    const renderTargetAlternative = (alternative) => {
+    const renderTargetAssetAlternative = (alternative) => {
         const asset = assetsByTargetId.get(alternative.id)
         if (asset && !isAssetActiveAtBreakpoint(asset)) return null
-        if (!asset) return <button key={alternative.id} type="button" aria-pressed={alternative.id === selectedTarget.id} onClick={() => chooseTargetAlternative(alternative)} className={`rounded-md border px-3 py-2 text-left text-sm ${alternative.id === selectedTarget.id ? 'border-blue-500 bg-blue-50 font-medium text-blue-800' : 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50'}`}>{alternative.label}</button>
+        if (!asset) return null
 
         const width = asset.width || asset.requiredWidth || asset.recommendedWidth
         const height = asset.height || asset.requiredHeight
@@ -1109,27 +1193,54 @@ const SemanticThemeWorkspace = ({
         </section>
     )
 
-    const childTargets = (selectedTarget?.descendants || []).filter((target) => !selectedTargetIds.includes(target.id))
+    const childTargets = [...new Map((inspectorRoot?.descendants || [])
+        .filter((target) => target.id !== inspectorRoot?.id)
+        .map((target) => [target.id, target])).values()]
+    const childTargetsByParent = childTargets.reduce((targetsByParent, target) => {
+        const parentId = target.parentId !== target.id && childTargets.some((candidate) => candidate.id === target.parentId) ? target.parentId : inspectorRoot?.id || ''
+        targetsByParent.set(parentId, [...(targetsByParent.get(parentId) || []), target])
+        return targetsByParent
+    }, new Map())
+    const targetAlternatives = [...(selectedTarget?.alternatives?.length ? selectedTarget.alternatives : selectedTarget ? [selectedTarget] : []).reduce((alternatives, alternative) => {
+        const asset = assetsByTargetId.get(alternative.id)
+        if (asset && !isAssetActiveAtBreakpoint(asset)) return alternatives
+        const displayKey = asset ? `asset:${alternative.id}` : alternative.label.trim().toLocaleLowerCase()
+        const existing = alternatives.get(displayKey)
+        if (!existing || alternative.id === selectedTarget.id) alternatives.set(displayKey, alternative)
+        return alternatives
+    }, new Map()).values()]
+    const elementPathCandidates = targetAlternatives.filter((alternative) => !assetsByTargetId.has(alternative.id)).reverse()
+    const selectedPathIndex = elementPathCandidates.findIndex((alternative) => alternative.id === selectedTarget?.id)
+    const elementPath = selectedPathIndex >= 0 ? elementPathCandidates.slice(0, selectedPathIndex + 1) : elementPathCandidates
+    const targetAssetAlternatives = targetAlternatives.filter((alternative) => assetsByTargetId.has(alternative.id))
     const richTextToolClass = 'inline-flex h-8 min-w-8 items-center justify-center rounded border border-gray-300 bg-white px-2 text-xs text-gray-700 hover:bg-gray-50'
+    const selectedTargetTypeLabel = selectedTarget?.kind === 'layoutSlot'
+        ? 'Selected layout slot'
+        : selectedTarget?.kind === 'widget'
+            ? 'Selected widget'
+            : 'Selected element'
+    const selectedTargetLabel = selectedTarget?.displayLabel || selectedTarget?.label
 
     const selectedEditor = selectedTarget && (
-        <section className="border-b border-gray-200 bg-white">
+        <section className="flex min-h-0 flex-1 flex-col border-b border-gray-200 bg-white">
             <button
                 type="button"
                 aria-expanded={selectionExpanded}
                 aria-controls="selected-element-editor"
-                aria-label={`${selectionExpanded ? 'Collapse' : 'Expand'} ${selectedTarget.label} settings`}
+                aria-label={`${selectionExpanded ? 'Collapse' : 'Expand'} ${selectedTargetLabel} settings`}
                 onClick={() => setSelectionExpanded((current) => !current)}
-                className="flex w-full items-center gap-2 bg-blue-50 px-3 py-2 text-left hover:bg-blue-100"
+                className="flex w-full shrink-0 items-center gap-2 bg-blue-50 px-3 py-2 text-left hover:bg-blue-100"
             >
                 <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Selected element</p>
-                    <h2 className="truncate text-base font-semibold text-gray-900">{selectedTarget.label}</h2>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{selectedTargetTypeLabel}</p>
+                    <h2 className="truncate text-base font-semibold text-gray-900">{selectedTargetLabel}</h2>
                 </div>
                 <ChevronDown className={`h-4 w-4 shrink-0 text-blue-700 transition-transform ${selectionExpanded ? 'rotate-180' : ''}`} />
             </button>
             {selectionExpanded && (
-                <div id="selected-element-editor" className="space-y-3 border-t border-blue-200 p-2">
+                <div id="selected-element-editor" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden border-t border-blue-200 p-2">
+                    {(() => {
+                        const fields = <>
                     {contentMode === 'demo' && selectedTarget.kind === 'element' && selectedTarget.editable && <section className="space-y-2">
                         <div><h3 className="text-sm font-medium text-gray-900">Example text</h3><p className="mt-0.5 text-xs text-gray-500">Double-click the text in the preview to edit it directly.</p></div>
                         {selectedTarget.richText ? <div className="flex flex-wrap items-center gap-1" role="toolbar" aria-label="Rich text formatting">
@@ -1145,7 +1256,22 @@ const SemanticThemeWorkspace = ({
                         </div> : <textarea aria-label="Example text" value={selectedTarget.text || ''} onChange={(event) => updateSelectedExampleText(event.target.value)} rows={3} className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900" />}
                         <button type="button" onClick={persistSelectedExampleText} disabled={disabled} className="rounded bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">Save example text</button>
                     </section>}
-                    {(selectedTarget.alternatives?.length > 1 || selectedTarget.kind === 'asset') && <section className="space-y-1.5"><h3 className="text-sm font-medium text-gray-900">Choose what to edit</h3><p className="text-xs text-gray-500">These elements share the same area.</p>{(selectedTarget.alternatives || [selectedTarget]).some((alternative) => assetsByTargetId.has(alternative.id)) && <p className="text-xs text-gray-500">Images can be uploaded or replaced directly.</p>}<div className="grid gap-1">{(selectedTarget.alternatives?.length ? selectedTarget.alternatives : [selectedTarget]).map(renderTargetAlternative)}</div></section>}
+                    {(elementPathCandidates.length > 1 || targetAssetAlternatives.length > 0) && <section className="space-y-2">
+                        {elementPathCandidates.length > 1 && <nav aria-label="Element path">
+                            <ol className="flex min-w-0 flex-wrap items-center gap-y-1 text-sm text-gray-600">
+                                {elementPath.map((alternative, index) => {
+                                    const isCurrent = alternative.id === selectedTarget.id
+                                    return <li key={alternative.id} className="flex min-w-0 items-center">
+                                        {index > 0 && <ChevronRight aria-hidden="true" className="mx-1 h-3.5 w-3.5 shrink-0 text-gray-400" />}
+                                        {isCurrent
+                                            ? <span aria-current="page" className="max-w-48 truncate font-semibold text-blue-800" title={alternative.label}>{alternative.label}</span>
+                                            : <button type="button" onClick={() => chooseTargetAlternative(alternative)} className="max-w-48 truncate rounded px-1 py-0.5 text-left text-gray-600 hover:bg-gray-100 hover:text-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" title={`Select ${alternative.label}`}>{alternative.label}</button>}
+                                    </li>
+                                })}
+                            </ol>
+                        </nav>}
+                        {targetAssetAlternatives.length > 0 && <div className="space-y-1.5"><p className="text-xs text-gray-500">Images can be uploaded or replaced directly.</p><div className="grid gap-1">{targetAssetAlternatives.map(renderTargetAssetAlternative)}</div></div>}
+                    </section>}
                     {targetTypography.map(({ row, index }) => {
                         const fields = activeFields('typography', index, row, workspace.constraints.editableTypographyProperties)
                         return fields.length > 0 && <section key={`type-${index}`} className="space-y-2 border-t border-gray-200 pt-3"><h3 className="text-sm font-medium text-gray-900">{sectionLabel('typography', row)}</h3><p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global value.</strong> Typography is the same at every breakpoint.</p><ValueFields idPrefix={`typography-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={typographyLabels} onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)} /></section>
@@ -1165,7 +1291,7 @@ const SemanticThemeWorkspace = ({
                                     ? <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950" role="status">
                                         <p><strong>Inherited at {activeLabel}.</strong> This value is defined at {sourceLabel}.</p>
                                         <p>Editing the source also changes every larger breakpoint that inherits it. Override only the individual values that should change at {activeLabel}.</p>
-                                        <div>
+                                        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] gap-2">
                                             <button type="button" onClick={() => setEditableInheritedSpacing((current) => new Set(current).add(editKey))} className="rounded-md border border-amber-400 bg-white px-2.5 py-2 font-medium text-amber-950 hover:bg-amber-100">Edit source at {sourceLabel}</button>
                                         </div>
                                     </div>
@@ -1178,8 +1304,59 @@ const SemanticThemeWorkspace = ({
                     })}
                     {addableThemeValues.length > 0 && <section className="border-t border-gray-200 pt-4"><label htmlFor="add-theme-value" className="text-xs font-semibold uppercase tracking-wide text-gray-500">Add theme value</label><select id="add-theme-value" value="" onChange={(event) => addThemeValue(event.target.value)} className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"><option value="">Choose a value…</option>{addableThemeValues.map((value) => <option key={propertyKey(value.kind, value.index, value.field)} value={propertyKey(value.kind, value.index, value.field)}>{value.label}</option>)}</select></section>}
                     {relevantColors.length > 0 && <section className="space-y-3 border-t border-gray-200 pt-4"><h3 className="font-medium text-gray-900">Colors used here</h3><p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global values.</strong> Colors are the same at every breakpoint.</p>{relevantColors.map(({ name, index }) => <label key={name} className="flex items-center gap-3"><input type="color" value={/^#[0-9a-f]{6}$/i.test(workspace.colors[index].value) ? workspace.colors[index].value : '#000000'} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="h-10 w-12 rounded border border-gray-300" /><span className="min-w-0 flex-1 text-sm font-medium">{name}</span><input aria-label={`${name} value`} value={workspace.colors[index].value} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="w-28 rounded-md border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>)}</section>}
-                    {childTargets.length > 0 && <section className="border-t border-gray-200 pt-3"><h3 className="mb-2 text-sm font-medium text-gray-900">Elements inside</h3><div className="divide-y divide-gray-200 border-y border-gray-200">{childTargets.map((child) => <details key={child.id} className="group py-1"><summary className="flex cursor-pointer list-none items-center gap-2 py-1 text-sm text-gray-800"><ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" /><span className="min-w-0 flex-1 truncate">{child.label}</span></summary><div className="pb-2 pl-5"><button type="button" onClick={() => chooseTargetAlternative(child)} className="text-xs font-medium text-blue-700 hover:underline">Edit this element</button></div></details>)}</div></section>}
                     {!targetTypography.length && !targetSpacing.length && !relevantColors.length && selectedTarget.kind !== 'element' && selectedTarget.kind !== 'asset' && <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500">Choose a more specific text or image inside this area to edit its details.</p>}
+                        </>
+                        return <>
+                            {selectedTarget.id === inspectorRoot?.id && <div key={`root-${selectionFocusVersion}`} className={`designer-inspector-focus space-y-3 ${childTargets.length > 0 ? 'shrink-0' : 'min-h-0 flex-1 overflow-y-auto'}`}>{fields}</div>}
+                            {childTargets.length > 0 && <section className="flex min-h-0 flex-1 flex-col border-t border-gray-200 pt-3">
+                                <h3 className="mb-2 shrink-0 text-sm font-medium text-gray-900">Elements inside</h3>
+                                <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain border-y border-gray-200" role="tree" aria-label="Element hierarchy">
+                                    {(() => {
+                                        const renderTargetTree = (parentId, level = 1) => (childTargetsByParent.get(parentId) || []).map((child) => {
+                                        const isSelected = selectedTarget.id === child.id
+                                        const isOpen = openTargetId === child.id
+                                        const isHighlighted = highlightedTargetId === child.id
+                                        const childLabel = child.displayLabel || child.label
+                                        const panelId = `element-editor-${child.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+                                        const nestedTargets = childTargetsByParent.get(child.id) || []
+                                        return <div key={child.id} role="treeitem" aria-label={childLabel} aria-level={level} aria-selected={isSelected} className="min-w-0 border-b border-gray-200 last:border-b-0">
+                                            <article className="min-w-0">
+                                                <div className={`flex min-w-0 items-stretch ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
+                                                    <button
+                                                        type="button"
+                                                        aria-expanded={isOpen}
+                                                        aria-controls={panelId}
+                                                        aria-pressed={isSelected}
+                                                        aria-label={`Edit ${childLabel}`}
+                                                        onClick={() => toggleTargetAccordion(child)}
+                                                        className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-sm transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${isSelected ? 'font-medium text-blue-800' : 'text-gray-800 hover:bg-gray-50 hover:text-gray-950'}`}
+                                                    >
+                                                        <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                                                        <span className="min-w-0 flex-1 truncate" title={childLabel}>{childLabel}</span>
+                                                        {isSelected && <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-blue-700">Selected</span>}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`${isHighlighted ? 'Stop highlighting' : 'Highlight'} ${childLabel}`}
+                                                        aria-pressed={isHighlighted}
+                                                        title={`${isHighlighted ? 'Stop highlighting' : 'Highlight'} in preview`}
+                                                        onClick={() => toggleTargetHighlight(child)}
+                                                        className={`my-1.5 mr-1.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${isHighlighted ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 bg-white text-gray-500 hover:border-amber-400 hover:text-amber-700'}`}
+                                                    >
+                                                        <Focus className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                                {isOpen && isSelected && <div key={`${child.id}-${selectionFocusVersion}`} id={panelId} role="region" aria-label={`${child.label} settings`} className="designer-inspector-focus space-y-3 border-t border-blue-100 bg-blue-50/30 px-2 py-3">{fields}</div>}
+                                            </article>
+                                            {nestedTargets.length > 0 && <div role="group" className="ml-4 border-l border-gray-300 pl-2">{renderTargetTree(child.id, level + 1)}</div>}
+                                        </div>
+                                        })
+                                        return renderTargetTree(inspectorRoot?.id || '')
+                                    })()}
+                                </div>
+                            </section>}
+                        </>
+                    })()}
                 </div>
             )}
         </section>
@@ -1300,12 +1477,12 @@ const SemanticThemeWorkspace = ({
             </div>
             <section aria-label="Theme inspector" className={`${mobilePane === 'preview' || inspectorCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-l border-gray-200 bg-white xl:col-start-5 xl:row-start-1 xl:border-l-0`}>
                 <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Inspector</span><button type="button" aria-label="Collapse theme inspector" onClick={() => setInspectorCollapsed(true)} className="hidden rounded p-1 text-gray-500 hover:bg-gray-100 xl:block"><ChevronRight className="h-4 w-4" /></button></div>
-                <fieldset disabled={disabled} className="min-h-0 flex-1 overflow-y-auto p-2">
+                <fieldset disabled={disabled} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-2">
                     {workspaceView === 'details'
                         ? themeDetailsEditor
                         : workspaceView === 'images'
                             ? <div className="space-y-6">{imageAspectNavigation}{themeImageEditor}</div>
-                            : <div className="space-y-3">{selectedEditor || <div className="flex min-h-32 items-center justify-center border border-dashed border-gray-300 p-3 text-center text-sm text-gray-500">Select an element in the preview to edit its text, images, typography, spacing, and colors.</div>}{exampleImageEditor}</div>}
+                            : <div className="flex min-h-0 flex-1 flex-col gap-3">{selectedEditor || <div className="flex min-h-32 items-center justify-center border border-dashed border-gray-300 p-3 text-center text-sm text-gray-500">Select an element in the preview to edit its text, images, typography, spacing, and colors.</div>}{exampleImageEditor}</div>}
                 </fieldset>
             </section>
         </main>
