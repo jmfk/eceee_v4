@@ -205,9 +205,34 @@ def type_is_compatible(local, remote):
 
     local_slots = {item.get("name"): item for item in local_slot_configuration.get("slots", []) if item.get("name")}
     remote_slots = {item.get("name"): item for item in remote_slot_configuration.get("slots", []) if item.get("name")}
-    return all(local_slots.get(name) == definition for name, definition in remote_slots.items()) and not any(
-        definition.get("required") for name, definition in local_slots.items() if name not in remote_slots
-    )
+    slots_compatible = all(
+        local_slots.get(name) == definition for name, definition in remote_slots.items()
+    ) and not any(definition.get("required") for name, definition in local_slots.items() if name not in remote_slots)
+    if not slots_compatible:
+        return False
+
+    local_children = _local_allowed_child_type_names(local)
+    remote_children = set(remote.get("allowed_child_types") or remote.get("allowedChildTypes") or [])
+    local_browser_group = getattr(getattr(local, "browser_group", None), "name", None)
+    remote_browser_group = remote.get("browser_group") or remote.get("browserGroup")
+    return remote_children.issubset(local_children) and local_browser_group == remote_browser_group
+
+
+def _local_allowed_child_type_names(obj_type):
+    relation = getattr(obj_type, "allowed_child_types", None)
+    if relation is None:
+        return set()
+    return set(relation.values_list("name", flat=True))
+
+
+def type_definition_differs(local, remote):
+    """Compare the complete structural contract used by imported objects."""
+    if any(getattr(local, field) != remote.get(field) for field in ("schema", "slot_configuration", "hierarchy_level")):
+        return True
+    remote_children = set(remote.get("allowed_child_types") or remote.get("allowedChildTypes") or [])
+    remote_browser_group = remote.get("browser_group") or remote.get("browserGroup")
+    local_browser_group = getattr(getattr(local, "browser_group", None), "name", None)
+    return _local_allowed_child_type_names(local) != remote_children or local_browser_group != remote_browser_group
 
 
 def type_has_foreign_tenant_usage(obj_type, tenant):
@@ -610,6 +635,19 @@ def rebuild_imported_reverse_relationships(tenant, objects):
     ObjectInstance.objects.bulk_update(imported_objects, ["related_from"], batch_size=500)
 
 
+def _relationship_target_ids(relationships):
+    target_ids = set()
+    for relationship in relationships or []:
+        if not isinstance(relationship, dict):
+            continue
+        value = relationship.get("object_id")
+        try:
+            target_ids.add(int(value))
+        except (TypeError, ValueError):
+            continue
+    return target_ids
+
+
 class ObjectPackageImporter:
     def __init__(self, job, storage=None):
         self.job = job
@@ -652,8 +690,7 @@ class ObjectPackageImporter:
         for data in payload["types"]:
             existing = ObjectTypeDefinition.objects.filter(name=data["name"]).first()
             created = existing is None
-            comparable = ("schema", "slot_configuration", "hierarchy_level")
-            differs = existing and any(getattr(existing, field) != data.get(field) for field in comparable)
+            differs = existing and type_definition_differs(existing, data)
             resolution = resolutions.get(data["name"], "keep")
             compatible = existing and type_is_compatible(existing, data)
             if differs and resolution == "keep" and not compatible:
@@ -712,6 +749,7 @@ class ObjectPackageImporter:
         media_map = self._import_media(package, payload.get("media", []))
         object_map = {}
         source_payloads = {}
+        affected_reverse_target_ids = set()
         skipped_ids = {str(item["source_id"]) for item in payload["objects"] if item["type"] not in type_map}
         for data in payload["objects"]:
             obj_type = type_map.get(data["type"])
@@ -723,6 +761,7 @@ class ObjectPackageImporter:
                 slug=data["slug"],
                 defaults={"title": data["title"], "status": data["status"], "created_by": user},
             )
+            affected_reverse_target_ids.update(_relationship_target_ids(obj.relationships))
             obj.title = data["title"]
             obj.status = data["status"]
             obj.metadata = data.get("metadata", {})
@@ -752,6 +791,7 @@ class ObjectPackageImporter:
                 skipped_ids,
             )
             obj.relationships = [item for item in obj.relationships if item.get("object_id") is not None]
+            affected_reverse_target_ids.update(_relationship_target_ids(obj.relationships))
             obj.save(update_fields=["parent", "relationships", "updated_at"])
             reference_fields = _reference_field_names(obj.object_type)
             existing_versions = list(obj.versions.order_by("version_number"))
@@ -810,7 +850,14 @@ class ObjectPackageImporter:
                 obj.current_version = selected_version
                 obj.version = selected_version.version_number
                 obj.save(update_fields=["current_version", "version", "updated_at"])
-        rebuild_imported_reverse_relationships(tenant, [obj for obj, _data in source_payloads.values()])
+        imported_objects = [obj for obj, _data in source_payloads.values()]
+        imported_ids = {obj.id for obj in imported_objects}
+        affected_targets = list(
+            ObjectInstance.objects.filter(tenant=tenant, id__in=affected_reverse_target_ids).exclude(
+                id__in=imported_ids
+            )
+        )
+        rebuild_imported_reverse_relationships(tenant, [*imported_objects, *affected_targets])
         return {"object_map": object_map, "media_map": media_map, "created_versions": created_versions}
 
     def _import_media(self, package, media_payload):

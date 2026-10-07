@@ -12,6 +12,10 @@ class RemoteThemeError(Exception):
     pass
 
 
+class RemoteTransportError(RemoteThemeError):
+    """A retryable failure while communicating with a remote installation."""
+
+
 def validate_remote_url(value):
     value = value.strip().rstrip("/") + "/"
     parsed = urlparse(value)
@@ -41,7 +45,7 @@ def remote_sync_request(remote_url, workspace, token, action, payload=None, auth
             allow_redirects=False,
         )
     except requests.RequestException as exc:
-        raise RemoteThemeError("The remote site could not be reached.") from exc
+        raise RemoteTransportError("The remote site could not be reached.") from exc
     if 300 <= response.status_code < 400:
         raise RemoteThemeError("The remote site redirected the request. Configure its final URL instead.")
     if response.status_code >= 400:
@@ -79,7 +83,7 @@ def remote_site_request(connection, method, path, payload=None, stream=False):
             stream=stream,
         )
     except requests.RequestException as exc:
-        raise RemoteThemeError("The remote site could not be reached.") from exc
+        raise RemoteTransportError("The remote site could not be reached.") from exc
     if 300 <= response.status_code < 400:
         response.close()
         raise RemoteThemeError("The remote site redirected the request. Configure its final URL instead.")
@@ -125,7 +129,7 @@ def remote_object_request(connection, method, path, payload=None, stream=False):
             stream=stream,
         )
     except requests.RequestException as exc:
-        raise RemoteThemeError("The remote site could not be reached.") from exc
+        raise RemoteTransportError("The remote site could not be reached.") from exc
     if 300 <= response.status_code < 400:
         response.close()
         raise RemoteThemeError("The remote site redirected the request. Configure its final URL instead.")

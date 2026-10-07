@@ -19,6 +19,8 @@ class TypedTagUpgradeMigrationTests(TransactionTestCase):
                 continue
             if app_label == "file_manager":
                 migration_name = "0013_make_tenant_required_on_mediafile"
+            elif app_label == "object_storage":
+                migration_name = "0024_objecttypedefinition_browser_group"
             elif app_label == "webpages":
                 migration_name = "0071_pagetheme_designer_preview"
             target = (app_label, migration_name)

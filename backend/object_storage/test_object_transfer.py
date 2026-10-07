@@ -3,6 +3,7 @@ import zipfile
 from datetime import timedelta
 from unittest.mock import patch
 
+from celery.exceptions import Retry
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
@@ -19,8 +20,9 @@ from object_storage.services.object_transfer import (
     collect_object_graph,
     rebuild_imported_reverse_relationships,
 )
-from object_storage.tasks import cleanup_expired_object_packages
+from object_storage.tasks import cleanup_expired_object_packages, import_remote_object_package
 from taxonomy.models import Tag as TaxonomyTag
+from webpages.services.theme_remote import RemoteTransportError
 
 
 class MemoryStorage:
@@ -181,6 +183,43 @@ class ObjectTransferServiceTests(TestCase):
         self.related.refresh_from_db()
         self.assertEqual(self.related.related_from, [{"type": "related", "object_id": self.root.id}])
         self.assertNotIn(foreign_source.id, [item["object_id"] for item in self.related.related_from])
+
+    def test_import_clears_reverse_relationships_removed_from_existing_objects(self):
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+
+        local_target = ObjectInstance.objects.create(
+            tenant=self.tenant,
+            object_type=self.child_type,
+            title="Local target",
+            slug="local-target",
+            created_by=self.user,
+            related_from=[{"type": "local", "object_id": self.root.id}],
+        )
+        self.root.relationships = [{"type": "local", "object_id": local_target.id}]
+        self.root.save(update_fields=["relationships", "updated_at"])
+        import_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"type_resolutions": {}},
+        )
+
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            ObjectPackageImporter(import_job, storage=storage).import_package(package)
+
+        local_target.refresh_from_db()
+        self.assertEqual(local_target.related_from, [])
 
     def test_package_round_trip_restores_changed_object_and_media_tags(self):
         storage = MemoryStorage()
@@ -381,6 +420,38 @@ class ObjectTransferServiceTests(TestCase):
 
         self.root_type.refresh_from_db()
         self.assertEqual(self.root_type.namespace, foreign_namespace)
+
+    @patch("object_storage.tasks.remote_object_request", side_effect=RemoteTransportError("Temporary failure"))
+    def test_import_job_retries_transport_errors_without_marking_failed(self, remote_request):
+        job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+
+        with patch.object(import_remote_object_package, "retry", side_effect=Retry()) as retry:
+            with self.assertRaises(Retry):
+                import_remote_object_package.run(str(job.id))
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, ObjectTransferJob.STATUS_RUNNING)
+        self.assertEqual(job.errors, [])
+        remote_request.assert_called_once()
+        retry.assert_called_once()
+
+    @patch("object_storage.tasks.remote_object_request")
+    def test_import_job_does_not_repeat_a_terminal_job(self, remote_request):
+        job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            status=ObjectTransferJob.STATUS_COMPLETED,
+            created_by=self.user,
+            progress={"phase": "completed"},
+        )
+
+        self.assertEqual(import_remote_object_package.run(str(job.id)), {"phase": "completed"})
+        remote_request.assert_not_called()
 
     @patch("object_storage.tasks.S3MediaStorage")
     def test_cleanup_processes_oldest_expired_jobs_first(self, storage_class):
