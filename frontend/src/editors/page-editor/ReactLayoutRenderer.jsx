@@ -1541,7 +1541,7 @@ const ReactLayoutRenderer = forwardRef(({
     // Render the direct-DOM editor canvas at the full available width.
     return (
         <div
-            className="react-layout-renderer eceee-theme-scope w-full h-full relative cms-content"
+            className="react-layout-renderer eceee-theme-scope site-renderer w-full h-full relative cms-content"
             data-eceee-theme-scope={themeScopeId || undefined}
             data-testid="page-editor-surface"
         >

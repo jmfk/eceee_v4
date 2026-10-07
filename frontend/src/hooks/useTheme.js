@@ -3,18 +3,9 @@
 import { useContext, useEffect, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { pagesApi } from '../api'
-import { endpoints } from '../api/endpoints'
 import UnifiedDataContext from '../contexts/unified-data/context/UnifiedDataContext'
+import { buildEditorThemeCSS } from '../utils/editorThemeCSS'
 import { themeCSSManager } from '../utils/themeCSSManager'
-
-export const getFrontendThemeCSSUrl = (themeData) => {
-    const params = new URLSearchParams({ frontend_scoped: 'true' })
-    const version = Date.parse(themeData?.updatedAt || themeData?.updated_at)
-    if (!Number.isNaN(version)) params.set('v', String(version))
-    return `/api/v1/webpages/themes/${themeData.id}/styles.css?${params.toString()}`
-}
-
-export const getEditorThemeCSSUrl = (versionId) => endpoints.versions.editorStyles(versionId)
 
 export const supportsCSSScope = () => {
     if (typeof CSSStyleSheet === 'undefined') return false
@@ -53,8 +44,15 @@ export const useThemeData = ({ pageId = null, enabled = true } = {}) => {
     }
 }
 
-/** Fetch and inject the backend-compiled stylesheet for one page version canvas. */
-export const useEditorThemeStyles = ({ versionId = null, revision = null, enabled = true } = {}) => {
+/** Compile and inject one page version's stylesheet entirely in the browser. */
+export const useEditorThemeStyles = ({
+    versionId = null,
+    theme = null,
+    pageCssVariables = null,
+    pageCustomCss = '',
+    enableCssInjection = true,
+    enabled = true,
+} = {}) => {
     const componentIdRef = useRef(`editor-theme-${Math.random().toString(36).slice(2, 11)}`)
     const styleKey = versionId ? `version-${versionId}` : null
     const scopeSupported = supportsCSSScope()
@@ -63,17 +61,31 @@ export const useEditorThemeStyles = ({ versionId = null, revision = null, enable
         ? new Error('This browser cannot safely isolate site CSS. Theme styling is disabled in the editor.')
         : null
 
-    const { data: css, isLoading, error } = useQuery({
-        queryKey: ['editor-theme-css', versionId, revision],
-        queryFn: async () => {
-            const response = await fetch(getEditorThemeCSSUrl(versionId))
-            if (!response.ok) throw new Error(`Failed to fetch editor CSS: ${response.statusText}`)
-            return response.text()
-        },
-        enabled: enabled && !!versionId && scopeSupported,
-        staleTime: 0,
-        gcTime: 5 * 60 * 1000,
-    })
+    const { css, compileError } = useMemo(() => {
+        if (!enabled || !styleKey || !scopeSupported) return { css: '', compileError: null }
+        try {
+            return {
+                css: buildEditorThemeCSS({
+                    theme,
+                    pageCssVariables,
+                    pageCustomCss,
+                    enableCssInjection,
+                    scopeId: styleKey,
+                }),
+                compileError: null,
+            }
+        } catch (error) {
+            return { css: '', compileError: error }
+        }
+    }, [
+        enableCssInjection,
+        enabled,
+        pageCssVariables,
+        pageCustomCss,
+        scopeSupported,
+        styleKey,
+        theme,
+    ])
 
     useEffect(() => {
         if (!enabled || !styleKey || !css || !scopeSupported) return undefined
@@ -83,8 +95,8 @@ export const useEditorThemeStyles = ({ versionId = null, revision = null, enable
     }, [css, enabled, scopeSupported, styleKey])
 
     return {
-        isLoading: isLoading && enabled,
-        error: unsupportedError || (error && enabled ? error : null),
+        isLoading: false,
+        error: unsupportedError || compileError,
         isThemeApplied: styleKey ? themeCSSManager.isInjected(styleKey) : false,
         scopeId: styleKey,
     }

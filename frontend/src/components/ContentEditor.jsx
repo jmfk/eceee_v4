@@ -58,10 +58,12 @@ const ContentEditor = forwardRef(({
   const pageId = webpageData?.id;
 
   const versionId = pageVersionData?.versionId || pageVersionData?.id;
-  const versionRevision = pageVersionData?.editRevision || pageVersionData?.updatedAt || pageVersionData?.updated_at;
   const { error: themeStyleError, scopeId: themeScopeId } = useEditorThemeStyles({
     versionId,
-    revision: versionRevision,
+    theme: pageVersionData?.effectiveTheme || webpageData?.effectiveTheme,
+    pageCssVariables: pageVersionData?.pageCssVariables,
+    pageCustomCss: pageVersionData?.pageCustomCss,
+    enableCssInjection: pageVersionData?.enableCssInjection !== false,
     enabled: !!versionId
   });
 
@@ -698,7 +700,7 @@ const ContentEditor = forwardRef(({
 
   return (
     <div
-      className={`content-editor eceee-theme-scope relative h-full flex flex-col ${className}`}
+      className={`content-editor eceee-theme-scope site-renderer relative h-full flex flex-col ${className}`}
       data-eceee-theme-scope={themeScopeId || undefined}
     >
       {themeStyleError && (

@@ -1,0 +1,99 @@
+import { describe, expect, it } from 'vitest'
+import { buildEditorThemeCSS, compileEditorCSS } from '../editorThemeCSS'
+
+const options = {
+    rootSelector: '.eceee-theme-scope[data-eceee-theme-scope="version-83"]',
+    namespace: 'eceee-version-83-',
+}
+
+describe('compileEditorCSS', () => {
+    it('rewrites document roots without corrupting classes, ids, or attributes', () => {
+        const result = compileEditorCSS(
+            '.body, #html, [data-part="body"] { color: red; } body .copy { color: blue; }',
+            options,
+        )
+
+        expect(result).toContain('.body, #html, [data-part="body"]')
+        expect(result).toContain(':scope .copy')
+        expect(result).not.toContain('.:scope')
+        expect(result).not.toContain('#:scope')
+        expect(result).not.toContain('data-part=":scope"')
+    })
+
+    it('keeps nested rules within one native scope', () => {
+        const result = compileEditorCSS(
+            '@media (min-width: 40rem) { body .card { display: grid; } } @supports (display: subgrid) { .card { grid-template-columns: subgrid; } }',
+            options,
+        )
+
+        expect(result.match(/@scope/g)).toHaveLength(1)
+        expect(result).toContain('@media (min-width: 40rem)')
+        expect(result).toContain(':scope .card')
+        expect(result).toContain('@supports (display: subgrid)')
+    })
+
+    it('namespaces keyframes and their animation references', () => {
+        const result = compileEditorCSS(
+            '@keyframes spin { to { transform: rotate(1turn); } } .loader { animation: spin 1s linear; animation-name: spin; }',
+            options,
+        )
+
+        expect(result).toContain('@keyframes eceee-version-83-spin')
+        expect(result).toContain('animation: eceee-version-83-spin 1s linear')
+        expect(result).toContain('animation-name: eceee-version-83-spin')
+        expect(result).not.toMatch(/@keyframes spin\b/)
+    })
+
+    it('drops external imports because they cannot inherit the scope boundary', () => {
+        const result = compileEditorCSS(
+            '@import url("https://fonts.googleapis.com/css2?family=Inter"); @import url("https://example.com/site.css"); h1 { color: red; }',
+            options,
+        )
+
+        expect(result).not.toContain('fonts.googleapis.com')
+        expect(result).not.toContain('example.com')
+    })
+})
+
+describe('buildEditorThemeCSS', () => {
+    it('builds theme and page CSS from the loaded frontend model', () => {
+        const result = buildEditorThemeCSS({
+            scopeId: 'version-83',
+            theme: {
+                fonts: { googleFonts: [{ family: 'Inter', variants: ['400', '700'] }] },
+                colors: { primary: '#123456' },
+                designGroups: {
+                    groups: [{
+                        elements: { h1: { color: 'primary' } },
+                    }],
+                },
+                componentStyles: {
+                    card: { css: '.card { display: grid; }' },
+                },
+                customCss: 'body .custom { margin: 0; }',
+            },
+            pageCssVariables: { contentWidth: '72rem' },
+            pageCustomCss: '.page-only { max-width: var(--contentWidth); }',
+        })
+
+        expect(result).toContain('--primary: #123456')
+        expect(result).toContain('fonts.googleapis.com')
+        expect(result).toContain('--contentWidth: 72rem')
+        expect(result).toContain('.card')
+        expect(result).toContain(':scope .custom')
+        expect(result).toContain('.page-only')
+        expect(result).toContain('.two-columns-widget')
+    })
+
+    it('omits page-level CSS when injection is disabled', () => {
+        const result = buildEditorThemeCSS({
+            scopeId: 'version-83',
+            theme: { customCss: '.theme-rule { color: blue; }' },
+            pageCustomCss: '.page-rule { color: red; }',
+            enableCssInjection: false,
+        })
+
+        expect(result).toContain('.theme-rule')
+        expect(result).not.toContain('.page-rule')
+    })
+})

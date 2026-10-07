@@ -548,14 +548,6 @@ export async function mockCmsApi(page, {
       return json(route, clone(editorState.version))
     }
 
-    if (pageEditor && url.pathname === '/api/v1/webpages/versions/201/editor-styles/' && method === 'GET') {
-      return route.fulfill({
-        status: 200,
-        contentType: 'text/css; charset=utf-8',
-        body: '@scope (.eceee-theme-scope[data-eceee-theme-scope="version-201"]) to (.eceee-editor-ui) { :scope { --playwright-editor-theme: active; } }',
-      })
-    }
-
     if (pageEditor && url.pathname === '/api/v1/webpages/pages/101/working-copy/save/' && method === 'PATCH') {
       const body = request.postDataJSON()
       if (body.expectedRevision != null && body.expectedRevision !== editorState.version.editRevision) {
