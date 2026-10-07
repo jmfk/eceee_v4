@@ -354,6 +354,77 @@ class ObjectTransferServiceTests(TestCase):
             {self.child_type.name},
         )
 
+    def test_skipping_a_type_also_skips_its_descendant_subtree(self):
+        for obj_type in (self.root_type, self.child_type):
+            obj_type.namespace = None
+            obj_type.save(update_fields=["namespace", "updated_at"])
+        skipped_type = ObjectTypeDefinition.objects.create(
+            name="transfer-skipped-parent",
+            label="Skipped parent",
+            plural_label="Skipped parents",
+            namespace=None,
+            schema={"type": "object", "properties": {"remote": {"type": "string"}}},
+            created_by=self.user,
+        )
+        skipped_parent = ObjectInstance.objects.create(
+            tenant=self.tenant,
+            object_type=skipped_type,
+            parent=self.root,
+            title="Skipped parent",
+            slug="skipped-parent",
+            created_by=self.user,
+        )
+        ObjectInstance.objects.create(
+            tenant=self.tenant,
+            object_type=self.child_type,
+            parent=skipped_parent,
+            title="Skipped descendant",
+            slug="skipped-descendant",
+            created_by=self.user,
+        )
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+
+        skipped_type.schema = {"type": "object", "properties": {"local": {"type": "string"}}}
+        skipped_type.save(update_fields=["schema", "updated_at"])
+        destination_tenant = Tenant.objects.create(
+            name="Skipped subtree destination",
+            identifier="skipped-subtree-destination",
+            created_by=self.user,
+        )
+        destination_namespace = Namespace.objects.create(
+            name="Skipped subtree destination",
+            slug="skipped-subtree-destination",
+            tenant=destination_tenant,
+            created_by=self.user,
+        )
+        import_job = ObjectTransferJob.objects.create(
+            tenant=destination_tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "type_resolutions": {skipped_type.name: "skip"},
+                "namespace_resolutions": {self.namespace.slug: destination_namespace.slug},
+            },
+        )
+
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            ObjectPackageImporter(import_job, storage=storage).import_package(package)
+
+        self.assertTrue(ObjectInstance.objects.filter(tenant=destination_tenant, slug=self.root.slug).exists())
+        self.assertFalse(ObjectInstance.objects.filter(tenant=destination_tenant, slug="skipped-parent").exists())
+        self.assertFalse(ObjectInstance.objects.filter(tenant=destination_tenant, slug="skipped-descendant").exists())
+
     def test_reverse_relationship_rebuild_is_tenant_scoped(self):
         self.root.relationships = [{"type": "related", "object_id": self.related.id}]
         self.root.save(update_fields=["relationships", "updated_at"])
@@ -479,6 +550,35 @@ class ObjectTransferServiceTests(TestCase):
         self.assertEqual(list(self.media.tags.values_list("id", flat=True)), [local_tag.id])
         collection = self.media.collections.get(slug="portraits")
         self.assertEqual(list(collection.tags.values_list("id", flat=True)), [local_tag.id])
+
+    def test_import_restores_soft_deleted_media_with_the_same_hash(self):
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+
+        self.assertTrue(self.media.delete(user=self.user))
+        import_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"type_resolutions": {}},
+        )
+
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            ObjectPackageImporter(import_job, storage=storage).import_package(package)
+
+        restored = MediaFile.objects.get(pk=self.media.pk)
+        self.assertFalse(restored.is_deleted)
+        self.assertEqual(restored.file_hash, self.media.file_hash)
 
     def test_repeated_import_does_not_duplicate_multiple_versions(self):
         draft = ObjectVersion.objects.create(

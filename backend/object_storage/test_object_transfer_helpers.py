@@ -10,6 +10,7 @@ from rest_framework import serializers
 from object_storage.remote_views import _validate_type_resolutions
 from object_storage.services.object_transfer import (
     PACKAGE_VERSION,
+    _reference_field_names,
     _remap,
     type_definition_differs,
     type_is_compatible,
@@ -18,6 +19,22 @@ from object_storage.services.object_transfer import (
 
 
 class ObjectTransferHelperTests(SimpleTestCase):
+    def test_canonical_object_reference_field_is_remapped(self):
+        obj_type = SimpleNamespace(
+            schema={
+                "properties": {
+                    "related": {"type": "array", "field_type": "object_reference"},
+                    "rating": {"type": "integer", "field_type": "integer"},
+                }
+            }
+        )
+
+        reference_fields = _reference_field_names(obj_type)
+        result = _remap({"related": [5], "rating": 5}, {"5": 50}, {}, reference_fields)
+
+        self.assertEqual(reference_fields, {"related"})
+        self.assertEqual(result, {"related": [50], "rating": 5})
+
     def test_remap_changes_only_schema_declared_object_references(self):
         source_media_id = "0f598bec-ad32-486c-98ab-a004d827db08"
         destination_media_id = "686236c1-bb66-4518-992b-9cb36c4de42a"

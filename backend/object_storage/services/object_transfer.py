@@ -58,7 +58,8 @@ def _reference_field_names(obj_type):
     return {
         name
         for name, definition in ((obj_type.schema or {}).get("properties") or {}).items()
-        if (definition.get("component_type") or definition.get("componentType")) == "object_reference"
+        if (definition.get("field_type") or definition.get("component_type") or definition.get("componentType"))
+        == "object_reference"
     }
 
 
@@ -872,9 +873,18 @@ class ObjectPackageImporter:
         source_payloads = {}
         affected_reverse_target_ids = set()
         skipped_ids = {str(item["source_id"]) for item in payload["objects"] if item["type"] not in type_map}
+        children_by_parent = {}
+        for item in payload["objects"]:
+            children_by_parent.setdefault(str(item.get("parent_source_id")), []).append(str(item["source_id"]))
+        skipped_queue = deque(skipped_ids)
+        while skipped_queue:
+            for descendant_id in children_by_parent.get(skipped_queue.popleft(), []):
+                if descendant_id not in skipped_ids:
+                    skipped_ids.add(descendant_id)
+                    skipped_queue.append(descendant_id)
         for data in payload["objects"]:
             obj_type = type_map.get(data["type"])
-            if not obj_type:
+            if not obj_type or str(data["source_id"]) in skipped_ids:
                 continue
             obj, created = ObjectInstance.objects.get_or_create(
                 tenant=tenant,
@@ -992,17 +1002,34 @@ class ObjectPackageImporter:
         result = {}
         for data in media_payload:
             destination_hash = data["file_hash"]
-            existing = MediaFile.objects.filter(
-                tenant=self.job.tenant, file_hash=destination_hash, is_deleted=False
-            ).first()
+            existing = (
+                MediaFile.objects.with_deleted()
+                .filter(
+                    tenant=self.job.tenant,
+                    file_hash=destination_hash,
+                )
+                .first()
+            )
+            if existing and existing.is_deleted:
+                existing.restore(self.job.created_by)
             if not existing:
-                if MediaFile.objects.filter(file_hash=destination_hash).exclude(tenant=self.job.tenant).exists():
+                if (
+                    MediaFile.objects.with_deleted()
+                    .filter(file_hash=destination_hash)
+                    .exclude(tenant=self.job.tenant)
+                    .exists()
+                ):
                     destination_hash = hashlib.sha256(f"{data['file_hash']}:{self.job.tenant_id}".encode()).hexdigest()
-                    existing = MediaFile.objects.filter(
-                        tenant=self.job.tenant,
-                        file_hash=destination_hash,
-                        is_deleted=False,
-                    ).first()
+                    existing = (
+                        MediaFile.objects.with_deleted()
+                        .filter(
+                            tenant=self.job.tenant,
+                            file_hash=destination_hash,
+                        )
+                        .first()
+                    )
+                    if existing and existing.is_deleted:
+                        existing.restore(self.job.created_by)
             if not existing:
                 member = next(
                     (name for name in package.namelist() if name.startswith(f"media/{data['source_id']}/")), None
