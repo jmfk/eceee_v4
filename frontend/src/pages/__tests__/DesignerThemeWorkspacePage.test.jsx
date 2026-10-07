@@ -616,6 +616,36 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(mocks.save.mock.calls[0][1].spacing[3]).toEqual(expect.objectContaining({ breakpoint: 'xl', values: { padding: '32px' } }))
     })
 
+    it('edits the canonical breakpoint when legacy and canonical rows share a width', async () => {
+        const responsiveWorkspace = structuredClone(workspace)
+        responsiveWorkspace.spacing = [
+            responsiveWorkspace.spacing[0],
+            { ...responsiveWorkspace.spacing[1], breakpoint: 'desktop', values: { padding: '12px' } },
+            { ...responsiveWorkspace.spacing[1], breakpoint: 'sm', values: { padding: '16px' } },
+        ]
+        mocks.workspace.mockResolvedValue(responsiveWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        fireEvent.click(screen.getByRole('button', { name: 'Small (Mobile) preview at 640px' }))
+        const { iframe, postMessage } = await readyPreview()
+        postMessage.mockRestore()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'spacingChange',
+                targetIds: ['group:0:part:content-widget'],
+                property: 'padding', value: '32px', viewportWidth: 640,
+            },
+            source: iframe.contentWindow,
+        }))
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        const savedSpacing = mocks.save.mock.calls[0][1].spacing
+        expect(savedSpacing.find((row) => row.breakpoint === 'desktop').values.padding).toBe('12px')
+        expect(savedSpacing.find((row) => row.breakpoint === 'sm').values.padding).toBe('32px')
+    })
+
     it('uses the theme breakpoints as the global preview and inspector selector', async () => {
         const responsiveWorkspace = structuredClone(workspace)
         responsiveWorkspace.breakpoints = { xs: 0, sm: 600, md: 820, lg: 1100, xl: 1440 }

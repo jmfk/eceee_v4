@@ -116,7 +116,8 @@ const spacingRowIndexForChange = (rows, targetIds, breakpoints, viewportWidth) =
     const active = candidates
         .map((candidate) => ({ ...candidate, width: breakpointWidth(candidate.row.breakpoint, configuredBreakpoints) }))
         .filter((candidate) => Number.isFinite(candidate.width) && candidate.width <= width)
-        .sort((left, right) => right.width - left.width)[0]
+        .sort((left, right) => right.width - left.width
+            || breakpointPrecedence(right.row.breakpoint) - breakpointPrecedence(left.row.breakpoint))[0]
     return active?.index ?? candidates[0].index
 }
 
