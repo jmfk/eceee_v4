@@ -1127,6 +1127,38 @@ class DesignerThemeApiTests(TestCase):
         live_asset = self.theme.design_groups["groups"][0]["layoutProperties"]["hero"]["md"]["images"]["background"]
         self.assertNotIn("url", live_asset)
 
+    @patch(
+        "webpages.services.designer_theme.system_storage.url",
+        return_value="https://storage.test/theme_images/hero-xl-placeholder.png",
+    )
+    @patch(
+        "webpages.services.designer_theme.system_storage.save",
+        return_value="theme_images/1/designer_assets/hero-xl-placeholder.png",
+    )
+    def test_placeholder_can_override_only_the_active_breakpoint(self, _save, _url):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+
+        response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/placeholder/",
+            {
+                "assetKey": "design:0:hero:md:background",
+                "displayName": "XL hero",
+                "width": 1600,
+                "height": 900,
+                "draftVersion": workspace["draftVersion"],
+                "targetBreakpoint": "xl",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        asset = next(item for item in response.data["assets"] if item["assetKey"] == "design:0:hero:xl:background")
+        self.assertTrue(asset["isPlaceholder"])
+        layout = self.theme.designer_draft.snapshot["design_groups"]["groups"][0]["layoutProperties"]["hero"]
+        self.assertNotIn("url", layout["md"]["images"]["background"])
+        self.assertEqual(layout["xl"]["images"]["background"]["url"], asset["url"])
+
     @patch("webpages.views.designer_theme_views.generate_placeholder_png")
     def test_placeholder_rejects_oversized_dimensions_before_generation(self, generate_placeholder):
         self.authenticate(self.designer)

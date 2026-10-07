@@ -1094,6 +1094,7 @@ describe('DesignerThemeWorkspacePage', () => {
 
     it('keeps the preview visible while editing images in the right inspector', async () => {
         mocks.replaceAsset.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 3, hasDraftChanges: true })
+        mocks.createPlaceholder.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 3, hasDraftChanges: true })
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
 
@@ -1110,9 +1111,20 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByText('Used for theme size: SM.')).not.toBeInTheDocument()
         expect(screen.queryByText('Shown from 640 px to 767 px wide.')).not.toBeInTheDocument()
 
+        expect(screen.getByRole('button', { name: 'Create Article hero source placeholder at Medium (Tablet)' })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Create Extra Large placeholder override for Article hero' }))
+        await waitFor(() => expect(mocks.createPlaceholder).toHaveBeenCalledWith('7', {
+            assetKey: 'design:0:hero:md:background',
+            displayName: 'Article hero',
+            width: 1600,
+            height: 900,
+            draftVersion: 2,
+            targetBreakpoint: 'xl',
+        }))
+
         const override = new File(['xl'], 'hero-xl.png', { type: 'image/png' })
         fireEvent.change(screen.getByLabelText('New Extra Large image override for Article hero'), { target: { files: [override] } })
-        await waitFor(() => expect(mocks.replaceAsset).toHaveBeenCalledWith('7', 'design:0:hero:md:background', override, 2, 'xl'))
+        await waitFor(() => expect(mocks.replaceAsset).toHaveBeenCalledWith('7', 'design:0:hero:md:background', override, 3, 'xl'))
 
         fireEvent.click(screen.getByRole('button', { name: /Select image aspect Callout/ }))
         expect(screen.getByText('All sizes')).toBeInTheDocument()
@@ -1332,8 +1344,7 @@ describe('DesignerThemeWorkspacePage', () => {
         )
     })
 
-    it('replaces a theme asset from a preview context action', async () => {
-        mocks.replaceAsset.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 3, hasDraftChanges: true })
+    it('opens a theme asset context action in the inspector without replacing it', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const { iframe, postMessage } = await readyPreview()
@@ -1353,43 +1364,8 @@ describe('DesignerThemeWorkspacePage', () => {
             source: iframe.contentWindow,
         }))
 
-        await waitFor(() => expect(mocks.replaceAsset).toHaveBeenCalledWith(
-            '7',
-            'design:0:hero:md:background',
-            replacement,
-            2,
-            'xl',
-        ))
-    })
-
-    it('replaces a legacy image source when its breakpoint matches the active level', async () => {
-        const legacyWorkspace = structuredClone(workspace)
-        legacyWorkspace.assets = legacyWorkspace.assets.map((asset) => asset.assetKey === 'design:0:hero:md:background'
-            ? { ...asset, assetKey: 'design:0:hero:tablet:background', breakpoint: 'tablet' }
-            : asset)
-        mocks.workspace.mockResolvedValue(legacyWorkspace)
-        mocks.replaceAsset.mockResolvedValue({ ...legacyWorkspace, draftVersion: 3, hasDraftChanges: true })
-        renderWithStateProviders(<DesignerThemeWorkspacePage />)
-        await screen.findByRole('heading', { name: 'Editorial' })
-        fireEvent.click(screen.getByRole('button', { name: 'Medium (Tablet) preview at 768px' }))
-        const { iframe, postMessage } = await readyPreview()
-        postMessage.mockRestore()
-        const replacement = new File(['hero'], 'hero.png', { type: 'image/png' })
-
-        fireEvent(window, new MessageEvent('message', {
-            data: {
-                source: 'eceee-designer-preview', action: 'contextAction', command: 'replaceImage',
-                targetId: 'asset:design:0:hero:tablet:background', kind: 'asset', label: 'Article hero', file: replacement,
-            },
-            source: iframe.contentWindow,
-        }))
-
-        await waitFor(() => expect(mocks.replaceAsset).toHaveBeenCalledWith(
-            '7',
-            'design:0:hero:tablet:background',
-            replacement,
-            2,
-        ))
+        expect(await screen.findByRole('heading', { name: 'Article hero' })).toBeInTheDocument()
+        expect(mocks.replaceAsset).not.toHaveBeenCalled()
     })
 
     it('replaces an example image from a preview context action', async () => {

@@ -195,7 +195,7 @@ const DesignerThemeWorkspacePage = () => {
         finally { setSaving(false) }
     }
 
-    const createPlaceholder = async (asset) => {
+    const createPlaceholder = async (asset, targetBreakpoint = null) => {
         const draft = placeholderDrafts[asset.assetKey] || {}
         const width = Number(draft.width || asset.requiredWidth)
         const height = Number(draft.height || asset.requiredHeight)
@@ -207,13 +207,15 @@ const DesignerThemeWorkspacePage = () => {
         try {
             const current = dirty || hasPendingPreviewTexts ? await saveDraft({ silent: true, manageSaving: false }) : workspace
             if (!current) return
-            const result = await designerThemesApi.createPlaceholder(themeId, {
+            const payload = {
                 assetKey: asset.assetKey,
                 displayName: draft.displayName || asset.displayName,
                 width,
                 height,
                 draftVersion: current.draftVersion,
-            })
+            }
+            if (targetBreakpoint) payload.targetBreakpoint = targetBreakpoint
+            const result = await designerThemesApi.createPlaceholder(themeId, payload)
             setWorkspace(result)
             setDirty(false)
             addNotification({ type: 'success', message: `${draft.displayName || asset.displayName} placeholder created` })
