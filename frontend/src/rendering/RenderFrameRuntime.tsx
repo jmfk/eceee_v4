@@ -628,6 +628,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         event.stopPropagation()
         closeContextMenu()
         root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected'))
+        root.querySelectorAll('.designer-highlighted').forEach((highlighted) => highlighted.classList.remove('designer-highlighted'))
         eventNode.classList.add('designer-selected')
         selectedNode = eventNode
         focusState.selectedTargetId = primary.id

@@ -339,9 +339,15 @@ describe('RenderFrameRuntime designer overlay', () => {
         const heading = await screen.findByRole('heading', { name: 'Overridden heading' })
         const richText = heading.closest('.content-widget') as HTMLElement
         const focus = vi.spyOn(richText, 'focus')
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-host', action: 'highlightTarget', targetId: 'heading', active: true },
+            source: window.parent,
+        }))
+        expect(heading).toHaveClass('designer-highlighted')
         fireEvent.contextMenu(heading, { clientX: 48, clientY: 64 })
 
         const menu = screen.getByRole('menu', { name: 'Actions for Heading' })
+        expect(heading).not.toHaveClass('designer-highlighted')
         expect(menu).toHaveStyle({ left: '48px', top: '64px' })
         expect(within(menu).getByRole('menuitem', { name: 'Edit text' })).toBeInTheDocument()
         fireEvent.click(within(menu).getByRole('menuitem', { name: 'Edit text' }))
