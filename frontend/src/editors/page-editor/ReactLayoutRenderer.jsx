@@ -1612,7 +1612,7 @@ const ReactLayoutRenderer = forwardRef(({
             {pasteError && (
                 <div
                     role="alert"
-                    className="mx-4 mb-4 flex items-start justify-between gap-3 rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                    className="eceee-editor-ui mx-4 mb-4 flex items-start justify-between gap-3 rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
                 >
                     <span>{pasteError}</span>
                     <button

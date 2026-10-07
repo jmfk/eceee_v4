@@ -253,7 +253,7 @@ const BioWidget = memo(({
                                     setEditingField('image')
                                     setShowImageModal(true)
                                 }}
-                                className="absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-lg shadow-lg opacity-0 group-hover/image:opacity-100 transition-opacity z-10"
+                                className="eceee-editor-ui absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-lg shadow-lg opacity-0 group-hover/image:opacity-100 transition-opacity z-10"
                                 title="Edit bio image"
                             >
                                 <ImagePlus className="w-5 h-5 text-gray-700" />

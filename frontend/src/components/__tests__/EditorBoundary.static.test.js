@@ -127,6 +127,8 @@ describe('page editor active/legacy boundaries', () => {
         const slotSource = readSource('src/layouts/easy-layouts/WidgetSlot.jsx')
         const pageFactorySource = readSource('src/editors/page-editor/PageWidgetFactory.jsx')
         const objectFactorySource = readSource('src/editors/object-editor/ObjectWidgetFactory.jsx')
+        const bioWidgetSource = readSource('src/widgets/easy-widgets/BioWidget.jsx')
+        const contentCardWidgetSource = readSource('src/widgets/easy-widgets/ContentCardWidget.jsx')
         const globalCSS = readSource('src/index.css')
 
         expect(rendererSource).toContain('eceee-theme-scope')
@@ -136,6 +138,9 @@ describe('page editor active/legacy boundaries', () => {
         expect(slotSource).toContain('eceee-editor-ui')
         expect(pageFactorySource).not.toContain('cms-content-isolated')
         expect(objectFactorySource).not.toContain('cms-content-isolated')
+        expect(rendererSource).toMatch(/pasteError[\s\S]*?className="eceee-editor-ui/)
+        expect(bioWidgetSource).toContain('eceee-editor-ui absolute top-2 right-2')
+        expect(contentCardWidgetSource).toContain('eceee-editor-ui absolute top-2 right-2')
         expect(globalCSS).not.toContain('.cms-content-isolated')
     })
 
