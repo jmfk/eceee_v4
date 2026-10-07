@@ -525,6 +525,10 @@ describe('RenderFrameRuntime designer overlay', () => {
             targetId: 'nested-link',
             label: 'Link',
         }), '*')
+        const selection = postMessage.mock.calls
+            .map(([message]) => message)
+            .find((message) => message?.action === 'select' && message?.targetId === 'nested-link')
+        expect(selection?.path?.slice(-2).map((target: any) => target.id)).toEqual(['nested-heading', 'nested-link'])
         postMessage.mockRestore()
     })
 

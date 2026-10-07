@@ -991,6 +991,11 @@ describe('DesignerThemeWorkspacePage', () => {
                     label: 'Link',
                     text: 'Programme',
                     editable: true,
+                    path: [
+                        { id: 'group:0:element:ul', kind: 'element', label: 'Bullet list', text: 'Programme\nPanels', editable: false },
+                        { id: 'group:0:element:li', kind: 'element', label: 'List item', text: 'Programme', editable: true },
+                        { id: 'group:0:element:a', kind: 'element', label: 'Link', text: 'Programme', editable: true },
+                    ],
                     alternatives: [
                         { id: 'group:0:element:a', kind: 'element', label: 'Link', text: 'Programme', editable: true },
                         { id: 'group:0:element:li', kind: 'element', label: 'List item', text: 'Programme', editable: true },
