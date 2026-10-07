@@ -4,8 +4,8 @@ Theme CSS Generator Service
 Generates complete CSS from all theme components and manages caching.
 """
 
-from django.core.cache import cache
 from django.conf import settings
+from django.core.cache import cache
 
 from .editor_css import compile_editor_css
 

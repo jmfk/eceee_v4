@@ -4,7 +4,6 @@ import re
 
 import tinycss2
 
-
 EDITOR_THEME_SCOPE = ".eceee-theme-scope"
 EDITOR_UI_LIMIT = ".eceee-editor-ui"
 
