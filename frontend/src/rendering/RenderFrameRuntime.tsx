@@ -109,6 +109,30 @@ const descendantTargets = (node: HTMLElement) => {
     }).filter(Boolean).slice(0, 100)
 }
 
+const targetPath = (node: HTMLElement, preferredTarget?: any) => {
+    const path: any[] = []
+    const seen = new Set<string>()
+    let current: HTMLElement | null = node
+    let first = true
+    while (current) {
+        const target = first && preferredTarget ? preferredTarget : nodeTargets(current)[0]
+        const widgetNode = current.closest<HTMLElement>('[data-widget-id]')
+        const widgetId = target?.widgetId || widgetNode?.dataset.widgetId || ''
+        const key = `${widgetId}:${target?.id || ''}`
+        if (target?.id && !seen.has(key)) {
+            seen.add(key)
+            path.unshift({
+                ...target,
+                widgetType: target.widgetType || widgetNode?.dataset.widgetType || '',
+                widgetId,
+            })
+        }
+        first = false
+        current = current.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
+    }
+    return path
+}
+
 const ancestorTargets = (node: HTMLElement, designer: NonNullable<RenderPageModel['designer']>) => {
     const seen = new Set<string>()
     const ancestors: any[] = []
@@ -155,6 +179,7 @@ const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['design
             richText: Boolean(target.richText || richText),
             computedStyles: computedThemeValues(node),
         })),
+        path: targetPath(node, primary),
         ancestors: designer ? ancestorTargets(node, designer) : [],
         descendants: descendantTargets(node),
         ...extra,

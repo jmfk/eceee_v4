@@ -649,6 +649,7 @@ const SemanticThemeWorkspace = ({
                     sourceMatchIndex: option.sourceMatchIndex ?? 0,
                     computedStyles: option.computedStyles || {},
                     alternatives: Array.isArray(option.alternatives) ? option.alternatives.map(normalizeTarget) : [],
+                    path: Array.isArray(option.path) ? option.path.map(normalizeTarget) : [],
                 }
             }
             const alternatives = Array.isArray(event.data.alternatives)
@@ -675,6 +676,9 @@ const SemanticThemeWorkspace = ({
                 sourceMatchIndex: event.data.sourceMatchIndex ?? 0,
                 computedStyles: event.data.computedStyles || {},
                 alternatives,
+                path: Array.isArray(event.data.path)
+                    ? event.data.path.filter((option) => option?.id && option?.label).map(normalizeTarget)
+                    : [],
                 ancestors,
                 descendants,
             }
@@ -934,10 +938,15 @@ const SemanticThemeWorkspace = ({
         }
         selectTargetFromInspector(target)
     }
-    const chooseTargetAlternative = (alternative) => selectTargetFromInspector({
-        ...alternative,
-        alternatives: selectedTarget?.alternatives || [alternative],
-    }, { replaceInspectorRoot: true })
+    const chooseTargetAlternative = (alternative) => {
+        const currentPath = selectedTarget?.path || []
+        const pathIndex = currentPath.findIndex((target) => targetFocusKey(target) === targetFocusKey(alternative))
+        selectTargetFromInspector({
+            ...alternative,
+            alternatives: selectedTarget?.alternatives || [alternative],
+            path: pathIndex >= 0 ? currentPath : alternative.path || [],
+        }, { replaceInspectorRoot: true })
+    }
 
     const updateSelectedExampleText = (text) => {
         if (!selectedView || !selectedTarget) return
@@ -1228,7 +1237,8 @@ const SemanticThemeWorkspace = ({
         if (!existing || alternative.id === selectedTarget.id) alternatives.set(displayKey, alternative)
         return alternatives
     }, new Map()).values()]
-    const elementPathCandidates = targetAlternatives.filter((alternative) => !assetsByTargetId.has(alternative.id)).reverse()
+    const elementPathCandidates = (selectedTarget?.path?.length ? selectedTarget.path : targetAlternatives.slice().reverse())
+        .filter((alternative) => !assetsByTargetId.has(alternative.id))
     const selectedPathIndex = elementPathCandidates.findIndex((alternative) => alternative.id === selectedTarget?.id)
     const elementPath = selectedPathIndex >= 0 ? elementPathCandidates.slice(0, selectedPathIndex + 1) : elementPathCandidates
     const targetAssetAlternatives = targetAlternatives.filter((alternative) => assetsByTargetId.has(alternative.id))
