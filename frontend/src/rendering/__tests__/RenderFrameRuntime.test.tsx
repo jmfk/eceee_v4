@@ -199,6 +199,7 @@ describe('RenderFrameRuntime designer overlay', () => {
             source: window.parent,
         }))
         expect(heading).toHaveClass('designer-selected', 'designer-highlighted')
+        expect(getComputedStyle(heading).outline).toBe('3px solid #2563eb')
 
         fireEvent(window, new MessageEvent('message', {
             data: { source: 'eceee-render-host', action: 'highlightTarget', targetId: 'global-heading', active: false },
