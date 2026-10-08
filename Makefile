@@ -4,20 +4,26 @@
 -include .env
 export
 
-DOCKER_COMPOSE ?= docker-compose
-DOCKER_COMPOSE_BIN := $(firstword $(DOCKER_COMPOSE))
+DOCKER_COMPOSE ?= docker compose
 COMPOSE_DEV_FILES ?= -f docker-compose.dev.yml
 COMPOSE_INFRA_FILES ?= -f docker-compose.infra.yml
 COMPOSE_TEST_FILES ?= -f docker-compose.test-infra.yml
 COMPOSE_DEV = $(DOCKER_COMPOSE) $(COMPOSE_DEV_FILES)
 COMPOSE_INFRA = $(DOCKER_COMPOSE) $(COMPOSE_INFRA_FILES)
 COMPOSE_TEST = $(DOCKER_COMPOSE) $(COMPOSE_TEST_FILES)
+DEV_SERVICES := backend frontend celery-worker
 PY_LINT_BASE ?= origin/main
 
 # Global help request check
 HELP_REQUESTED := $(filter --help -h help,$(MAKECMDGOALS))
+ifneq ($(filter help,$(MAKECMDGOALS)),)
+ifneq ($(filter-out help,$(MAKECMDGOALS)),)
+$(error Use 'make help-TARGET'; combining 'help' with another goal would also run that goal)
+endif
+endif
 
-# Reserved local host ports (port-space-registry block 10100-10199)
+# Canonical checkout defaults. The ignored .env overrides these with the current
+# checkout's machine port registry assignments.
 FRONTEND_PORT ?= 10100
 BACKEND_PORT ?= 10101
 ECEEE_IMGPROXY_PORT ?= 10106
@@ -32,8 +38,10 @@ SHARED_MINIO_API_PORT ?= 10302
 SHARED_MINIO_CONSOLE_PORT ?= 10303
 
 # Help print helper
+HELP_MAKEFILES = $(filter Makefile %.mk,$(MAKEFILE_LIST))
+
 define print_help
-	grep -hE '^$(1):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36mUsage:\033[0m make %s %s\n", $$1, $$2}'
+	grep -hE '^$(1):.*?## .*$$' $(HELP_MAKEFILES) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36mUsage:\033[0m make %s %s\n", $$1, $$2}'
 endef
 
 # Help check helper
@@ -44,8 +52,34 @@ define check_help
 	fi
 endef
 
-.PHONY: help help-% install backend frontend playwright-service theme-sync migrate createsuperuser sample-content sample-pages sample-data sample-clean demo-reset-site demo-site migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images import-schemas import-schemas-dry import-schemas-force import-schema legacy-db-tunnel legacy-news-sample-dry legacy-news-database-dry test test-build test-parallel backend-test backend-news-test backend-test-parallel prepare-frontend-e2e frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test backend-lint frontend-lint lint docker-up docker-down infra-up infra-down infra-restart restart clean playwright-test playwright-down playwright-logs sync-from sync-to clear-layout-cache clear-layout-cache-all tailwind-build tailwind-watch create-api-token get-jwt-token list-api-tokens test-api-auth create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant howto-script-editor howto-auth-prod howto-voices howto-video-demo howto-video-demo-both howto-video-edit howto-video-demo-all howto-video-demo-all-both howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both --help -h check-servers check-conf check-db configure-local-infra shared-infra-check use-external-infra prepare-test-infra test-infra-down refresh-db-collation prod-preflight prod-deploy prod-rollback prod-backup prod-backfill-typed-tags prod-theme-access-key validate-typed-tags-backup validate-prod-typed-tags-backup prod-logs prod-status prod-audit-tenant-access prod-ssh prod-shell
+.PHONY: help help-% --help -h
+.PHONY: install dev dev-build dev-stop dev-logs dev-status servers backend frontend shell
+.PHONY: playwright-service playwright-down playwright-logs playwright-test theme-sync
 .PHONY: publisher-dev publisher-manifest publisher-manifest-check
+.PHONY: migrations migrate requirements createsuperuser changepassword
+.PHONY: sample-content sample-pages sample-data sample-clean demo-reset-site demo-site
+.PHONY: migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only
+.PHONY: migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images
+.PHONY: import-schemas import-schemas-dry import-schemas-force import-schema
+.PHONY: legacy-db-tunnel legacy-news-sample-dry legacy-news-database-dry fix-minio-permissions
+.PHONY: create-api-token get-jwt-token list-api-tokens test-api-auth
+.PHONY: create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant
+.PHONY: test test-build test-parallel backend-test backend-news-test backend-test-parallel frontend-test
+.PHONY: prepare-test-infra test-infra-down refresh-db-collation prepare-frontend-e2e
+.PHONY: frontend-e2e-test frontend-admin-e2e-test frontend-public-e2e-test regression-test
+.PHONY: backend-lint frontend-lint lint
+.PHONY: howto-script-editor howto-auth-prod howto-voices howto-video-edit
+.PHONY: howto-video-demo howto-video-demo-both howto-video-demo-all howto-video-demo-all-both
+.PHONY: howto-video-prod howto-video-prod-both howto-video-prod-all howto-video-prod-all-both
+.PHONY: docker-up docker-down restart clean infra-up infra-down infra-restart
+.PHONY: configure-local-infra local-dev-check shared-infra-check use-external-infra
+.PHONY: check-servers check-conf check-db clear-layout-cache clear-layout-cache-all
+.PHONY: tailwind-build tailwind-watch sync-from sync-to
+.PHONY: prod-preflight prod-deploy prod-restart prod-env prod-rollback prod-backup
+.PHONY: prod-backfill-typed-tags prod-theme-access-key validate-typed-tags-backup
+.PHONY: validate-prod-typed-tags-backup prod-logs prod-status prod-audit-tenant-access
+.PHONY: prod-logs-caddy prod-shell-caddy prod-ssh prod-shell prod-bash
+.PHONY: prod-fix-image-permissions prod-explain-image-problem
 
 # Dummy targets for help flags
 --help:
@@ -59,20 +93,25 @@ endef
 help-%: ## Show help for a specific target
 	@$(call print_help,$*)
 
-help: ## Show this help message (use: make help [target])
+help: ## Show this help message (use: make help-TARGET for one target)
 	@if [ -n "$(filter-out help,$(MAKECMDGOALS))" ]; then \
 		for target in $(filter-out help,$(MAKECMDGOALS)); do \
-			grep -hE "^$$target:.*?## " $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36mUsage for %s:\033[0m make %s %s\n", $$1, $$1, $$2}'; \
+			grep -hE "^$$target:.*?## " $(HELP_MAKEFILES) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36mUsage for %s:\033[0m make %s %s\n", $$1, $$1, $$2}'; \
 		done; \
 	else \
 		echo "Available make targets:"; \
 		echo ""; \
 		echo "Development Environment:"; \
+		echo "  dev               Start backend, frontend, worker, and imgproxy in background"; \
+		echo "  dev-build         Rebuild images, then start the development stack"; \
+		echo "  dev-stop          Stop application containers without touching shared services"; \
+		echo "  dev-logs          Follow application logs"; \
+		echo "  dev-status        Show containers and endpoint health"; \
 		echo "  install           Install backend and frontend dependencies"; \
-		echo "  servers           Start database, Redis, MinIO, and ImgProxy services"; \
+		echo "  servers           Compatibility alias for dev"; \
 		echo "  backend           Start Django backend server"; \
 		echo "  frontend          Start React frontend dev server"; \
-		echo "  publisher-dev     Start standalone Next publisher on summerstudy.localhost:10115"; \
+		echo "  publisher-dev     Start standalone Next publisher on its registered port"; \
 		echo "  publisher-manifest Regenerate publisher CSS/widget metadata"; \
 		echo "  publisher-manifest-check Verify checked-in publisher CSS/widget metadata"; \
 		echo "  playwright-service Start Playwright website rendering service"; \
@@ -104,7 +143,7 @@ help: ## Show this help message (use: make help [target])
 		echo "  get-jwt-token USER=username [SERVER=url]    Get JWT token for user (expires in 60min)"; \
 		echo "  list-api-tokens [SERVER=url]                List all API tokens"; \
 		echo "  test-api-auth TOKEN=token [SERVER=url]      Test API token authentication"; \
-		echo "  Note: SERVER defaults to http://localhost:10101"; \
+		echo "  Note: SERVER defaults to http://localhost:$(BACKEND_PORT)"; \
 		echo ""; \
 		echo "Sample Data:"; \
 		echo "  sample-content    Create sample content (10 items)"; \
@@ -157,7 +196,7 @@ help: ## Show this help message (use: make help [target])
 		echo "  howto-video-prod-all-both Generate all prod help videos in Swedish and English"; \
 		echo ""; \
 		echo "Docker Management:"; \
-		echo "  docker-up         Start all services with Docker Compose"; \
+		echo "  docker-up         Compatibility alias for dev-build"; \
 		echo "  docker-down       Stop all Docker Compose services"; \
 		echo "  restart           Restart all Docker Compose services"; \
 		echo "  playwright-down   Stop Playwright service"; \
@@ -191,7 +230,6 @@ help: ## Show this help message (use: make help [target])
 		echo ""; \
 		echo "Usage:"; \
 		echo "  make <target>          Run a specific target"; \
-		echo "  make help <target>     Show help for a specific target"; \
 		echo "  make help-<target>     Show help for a specific target"; \
 	fi
 
@@ -200,19 +238,37 @@ install:
 	cd backend && pip install -r requirements.txt
 	cd frontend && npm install
 
-servers: infra-up
+# Preferred local development workflow. Shared PostgreSQL, Redis, and MinIO are
+# lifecycle-owned by ../shared-local-infrastructure and are never stopped here.
+dev: infra-up ## Start the development stack in the background.
+	VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) $(COMPOSE_DEV) up -d $(DEV_SERVICES)
+
+dev-build: infra-up ## Rebuild images and start the development stack.
+	VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) $(COMPOSE_DEV) up -d --build $(DEV_SERVICES)
+
+dev-stop: ## Stop application containers without touching shared services.
+	$(COMPOSE_DEV) stop $(DEV_SERVICES)
+
+dev-logs: ## Follow backend, frontend, and worker logs.
+	$(COMPOSE_DEV) logs -f --tail=100 $(DEV_SERVICES)
+
+dev-status: ## Show development containers and endpoint health.
+	$(COMPOSE_DEV) ps $(DEV_SERVICES)
+	@$(MAKE) --no-print-directory check-servers
+
+servers: dev ## Backwards-compatible alias for dev.
 
 # Run Django backend server
 backend:
 	@BP="$${BACKEND_PORT:-10101}"; \
 	 echo "🚀 Starting Backend on http://localhost:$$BP (internal: 8000)"; \
-	 docker-compose -f docker-compose.dev.yml up backend
+	 $(COMPOSE_DEV) up backend
 
 # Run React frontend dev server
 frontend:
 	@FP="$${FRONTEND_PORT:-10100}"; \
 	 echo "🚀 Starting Frontend on http://localhost:$$FP (internal: 3000)"; \
-	 VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) docker-compose -f docker-compose.dev.yml up frontend
+	 VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) $(COMPOSE_DEV) up frontend
 
 publisher-dev: ## Start the standalone publisher with HMR on the reserved local port
 	@if [ -z "$(DATABASE_URL)" ]; then echo "DATABASE_URL is required in the ignored repository .env" >&2; exit 1; fi
@@ -227,34 +283,34 @@ publisher-manifest-check: ## Verify publisher CSS/widget metadata is current
 
 # Run Playwright website rendering service
 playwright-service:
-	cd playwright-service && docker-compose up -d
+	cd playwright-service && docker compose up -d
 
 # Run theme sync service
 theme-sync:
-	docker-compose -f docker-compose.dev.yml up theme-sync
+	$(COMPOSE_DEV) up theme-sync
 
 # Run Django migrations
 migrations:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py makemigrations
+	$(COMPOSE_DEV) exec backend python manage.py makemigrations
 
 migrate:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate
+	$(COMPOSE_DEV) exec backend python manage.py migrate
 
 requirements:
-	docker-compose -f docker-compose.dev.yml exec backend pip install -r requirements.txt
+	$(COMPOSE_DEV) exec backend pip install -r requirements.txt
 
 
 # Create Django superuser
 createsuperuser:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py createsuperuser
+	$(COMPOSE_DEV) exec backend python manage.py createsuperuser
 
 changepassword:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py changepassword admin
+	$(COMPOSE_DEV) exec backend python manage.py changepassword admin
 
 # API Token Management
-SERVER ?= http://localhost:10101
+SERVER ?= http://localhost:$(BACKEND_PORT)
 HOWTO_PROD_BASE_URL ?= https://app.eceee.org
-HOWTO_DEMO_BASE_URL ?= http://localhost:10100
+HOWTO_DEMO_BASE_URL ?= http://localhost:$(FRONTEND_PORT)
 HOWTO_AUTH_STATE ?= .auth/eceee-prod-storage-state.json
 HOWTO_LANGUAGE ?= sv
 HOWTO_TRANSLATION_PROVIDER ?=
@@ -274,8 +330,8 @@ HOWTO_EXTRA_FLAGS ?=
 HOWTO_SCRIPT_EDITOR_PATH ?= /help/script-editor
 DEMO_EXPORT ?= demo/summerstudy.eceee.org-20260525-181814-871e39ea.zip
 DEMO_DB ?= eceee_demo
-DEMO_BACKEND_PORT ?= 10101
-DEMO_FRONTEND_PORT ?= 10100
+DEMO_BACKEND_PORT ?= $(BACKEND_PORT)
+DEMO_FRONTEND_PORT ?= $(FRONTEND_PORT)
 DEMO_HOSTNAMES ?= localhost,127.0.0.1
 DEMO_USER ?= demo
 DEMO_PASSWORD ?= demo
@@ -309,8 +365,8 @@ create-api-token: ## Create DRF token for user (use: make create-api-token USER=
 	@if echo "$(SERVER)" | grep -q "^http://localhost\|^http://127.0.0.1"; then \
 		echo "Creating DRF token for user: $(USER) on local server"; \
 		echo ""; \
-		TOKEN=$$(docker-compose -f docker-compose.dev.yml exec -T backend python manage.py drf_create_token $(USER) 2>/dev/null | grep -o '[a-f0-9]\{40\}' | head -1 || \
-			docker-compose -f docker-compose.dev.yml exec backend python manage.py drf_create_token $(USER) 2>/dev/null | grep -o '[a-f0-9]\{40\}' | head -1); \
+		TOKEN=$$($(COMPOSE_DEV) exec -T backend python manage.py drf_create_token $(USER) 2>/dev/null | grep -o '[a-f0-9]\{40\}' | head -1 || \
+			$(COMPOSE_DEV) exec backend python manage.py drf_create_token $(USER) 2>/dev/null | grep -o '[a-f0-9]\{40\}' | head -1); \
 		if [ -n "$$TOKEN" ]; then \
 			echo ""; \
 			echo "✓ Token created successfully!"; \
@@ -357,8 +413,8 @@ get-jwt-token: ## Get JWT token for user (use: make get-jwt-token USER=username 
 list-api-tokens: ## List all API tokens (use: make list-api-tokens [SERVER=url])
 	@if echo "$(SERVER)" | grep -q "^http://localhost\|^http://127.0.0.1"; then \
 		echo "Listing all API tokens from local server..."; \
-		docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from rest_framework.authtoken.models import Token; from django.contrib.auth.models import User; print('\nAPI Tokens:'); print('=' * 80); [print(f'{user.username:20} | {Token.objects.get_or_create(user=user)[0].key:40} | EXISTS') for user in User.objects.all().order_by('username')]; print('=' * 80); print(f'\nTotal users: {User.objects.count()}')" || \
-		docker-compose -f docker-compose.dev.yml exec backend python manage.py shell -c "from rest_framework.authtoken.models import Token; from django.contrib.auth.models import User; print('\nAPI Tokens:'); print('=' * 80); [print(f'{user.username:20} | {Token.objects.get_or_create(user=user)[0].key:40} | EXISTS') for user in User.objects.all().order_by('username')]; print('=' * 80); print(f'\nTotal users: {User.objects.count()}')"; \
+		$(COMPOSE_DEV) exec -T backend python manage.py shell -c "from rest_framework.authtoken.models import Token; from django.contrib.auth.models import User; print('\nAPI Tokens:'); print('=' * 80); [print(f'{user.username:20} | {Token.objects.get_or_create(user=user)[0].key:40} | EXISTS') for user in User.objects.all().order_by('username')]; print('=' * 80); print(f'\nTotal users: {User.objects.count()}')" || \
+		$(COMPOSE_DEV) exec backend python manage.py shell -c "from rest_framework.authtoken.models import Token; from django.contrib.auth.models import User; print('\nAPI Tokens:'); print('=' * 80); [print(f'{user.username:20} | {Token.objects.get_or_create(user=user)[0].key:40} | EXISTS') for user in User.objects.all().order_by('username')]; print('=' * 80); print(f'\nTotal users: {User.objects.count()}')"; \
 	else \
 		echo "Error: Token listing only available on local server via Docker"; \
 		echo "For production, tokens must be managed through Django admin or API"; \
@@ -373,12 +429,12 @@ create-tenant: ## Create a new tenant (use: make create-tenant NAME="Tenant Name
 		exit 1; \
 	fi
 	@echo "Creating tenant: $(NAME) with identifier: $(IDENTIFIER)"
-	@docker-compose -f docker-compose.dev.yml exec backend python manage.py create_tenant --name "$(NAME)" --identifier "$(IDENTIFIER)" || \
+	@$(COMPOSE_DEV) exec backend python manage.py create_tenant --name "$(NAME)" --identifier "$(IDENTIFIER)" || \
 		(echo "Error: Failed to create tenant." && exit 1)
 
 list-tenants: ## List all tenants
 	@echo "Listing all tenants..."
-	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; tenants = Tenant.objects.all().order_by('name'); print('\nTenants:'); print('=' * 100); print('UUID                                 | Name                            | Identifier          | Status'); print('-' * 100); [print(f'{str(t.id):36} | {t.name:30} | {t.identifier:20} | {\"Active\" if t.is_active else \"Inactive\"}') for t in tenants]; print('=' * 100); print(f'\nTotal tenants: {Tenant.objects.count()}')" || (echo "Error: Failed to list tenants." && exit 1)
+	@$(COMPOSE_DEV) exec -T backend python manage.py shell -c "from core.models import Tenant; tenants = Tenant.objects.all().order_by('name'); print('\nTenants:'); print('=' * 100); print('UUID                                 | Name                            | Identifier          | Status'); print('-' * 100); [print(f'{str(t.id):36} | {t.name:30} | {t.identifier:20} | {\"Active\" if t.is_active else \"Inactive\"}') for t in tenants]; print('=' * 100); print(f'\nTotal tenants: {Tenant.objects.count()}')" || (echo "Error: Failed to list tenants." && exit 1)
 
 show-tenant: ## Show tenant details (use: make show-tenant ID=uuid or IDENTIFIER=identifier)
 	$(call check_help,show-tenant)
@@ -387,7 +443,7 @@ show-tenant: ## Show tenant details (use: make show-tenant ID=uuid or IDENTIFIER
 		$(call print_help,show-tenant); \
 		exit 1; \
 	fi
-	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import json; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); print(f'\nTenant Details:'); print('=' * 80); print(f'ID:          {tenant.id}'); print(f'Name:        {tenant.name}'); print(f'Identifier:  {tenant.identifier}'); print(f'Active:      {tenant.is_active}'); print(f'Created:     {tenant.created_at}'); print(f'Updated:     {tenant.updated_at}'); print(f'Created by:  {tenant.created_by.username if tenant.created_by else \"N/A\"}'); print(f'\nSettings:'); print(json.dumps(tenant.settings, indent=2) if tenant.settings else '  (empty)'); print(f'\nThemes: {tenant.themes.count()}'); [print(f'  - {theme.name} (v{theme.sync_version})') for theme in tenant.themes.all()[:10]]; print(f'  ... and {tenant.themes.count() - 10} more' if tenant.themes.count() > 10 else ''); print('=' * 80)" || (echo "Error: Failed to show tenant." && exit 1)
+	@$(COMPOSE_DEV) exec -T backend python manage.py shell -c "from core.models import Tenant; import json; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); print(f'\nTenant Details:'); print('=' * 80); print(f'ID:          {tenant.id}'); print(f'Name:        {tenant.name}'); print(f'Identifier:  {tenant.identifier}'); print(f'Active:      {tenant.is_active}'); print(f'Created:     {tenant.created_at}'); print(f'Updated:     {tenant.updated_at}'); print(f'Created by:  {tenant.created_by.username if tenant.created_by else \"N/A\"}'); print(f'\nSettings:'); print(json.dumps(tenant.settings, indent=2) if tenant.settings else '  (empty)'); print(f'\nThemes: {tenant.themes.count()}'); [print(f'  - {theme.name} (v{theme.sync_version})') for theme in tenant.themes.all()[:10]]; print(f'  ... and {tenant.themes.count() - 10} more' if tenant.themes.count() > 10 else ''); print('=' * 80)" || (echo "Error: Failed to show tenant." && exit 1)
 
 activate-tenant: ## Activate a tenant (use: make activate-tenant ID=uuid or IDENTIFIER=identifier)
 	$(call check_help,activate-tenant)
@@ -396,7 +452,7 @@ activate-tenant: ## Activate a tenant (use: make activate-tenant ID=uuid or IDEN
 		$(call print_help,activate-tenant); \
 		exit 1; \
 	fi
-	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); tenant.is_active = True; tenant.save(); print(f'✓ Tenant \"{tenant.name}\" (identifier: {tenant.identifier}) activated')" || (echo "Error: Failed to activate tenant." && exit 1)
+	@$(COMPOSE_DEV) exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); tenant.is_active = True; tenant.save(); print(f'✓ Tenant \"{tenant.name}\" (identifier: {tenant.identifier}) activated')" || (echo "Error: Failed to activate tenant." && exit 1)
 
 deactivate-tenant: ## Deactivate a tenant (use: make deactivate-tenant ID=uuid or IDENTIFIER=identifier)
 	$(call check_help,deactivate-tenant)
@@ -405,7 +461,7 @@ deactivate-tenant: ## Deactivate a tenant (use: make deactivate-tenant ID=uuid o
 		$(call print_help,deactivate-tenant); \
 		exit 1; \
 	fi
-	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); tenant.is_active = False; tenant.save(); print(f'✓ Tenant \"{tenant.name}\" (identifier: {tenant.identifier}) deactivated')" || (echo "Error: Failed to deactivate tenant." && exit 1)
+	@$(COMPOSE_DEV) exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); tenant.is_active = False; tenant.save(); print(f'✓ Tenant \"{tenant.name}\" (identifier: {tenant.identifier}) deactivated')" || (echo "Error: Failed to deactivate tenant." && exit 1)
 
 tenant-themes: ## List themes for a tenant (use: make tenant-themes ID=uuid or IDENTIFIER=identifier)
 	$(call check_help,tenant-themes)
@@ -414,7 +470,7 @@ tenant-themes: ## List themes for a tenant (use: make tenant-themes ID=uuid or I
 		$(call print_help,tenant-themes); \
 		exit 1; \
 	fi
-	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); print(f'\nThemes for tenant: {tenant.name} (identifier: {tenant.identifier})'); print('=' * 80); themes = tenant.themes.all().order_by('name'); [print(f'{t.id:5} | {t.name:30} | v{t.sync_version:5} | {\"Active\" if t.is_active else \"Inactive\"}{\" (Default)\" if t.is_default else \"\"}') for t in themes] if themes.exists() else print('  (no themes)'); print('=' * 80); print(f'\nTotal themes: {themes.count()}')" || (echo "Error: Failed to list tenant themes." && exit 1)
+	@$(COMPOSE_DEV) exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); print(f'\nThemes for tenant: {tenant.name} (identifier: {tenant.identifier})'); print('=' * 80); themes = tenant.themes.all().order_by('name'); [print(f'{t.id:5} | {t.name:30} | v{t.sync_version:5} | {\"Active\" if t.is_active else \"Inactive\"}{\" (Default)\" if t.is_default else \"\"}') for t in themes] if themes.exists() else print('  (no themes)'); print('=' * 80); print(f'\nTotal themes: {themes.count()}')" || (echo "Error: Failed to list tenant themes." && exit 1)
 
 delete-tenant: ## Delete a tenant (use: make delete-tenant ID=uuid or IDENTIFIER=identifier [FORCE=yes])
 	$(call check_help,delete-tenant)
@@ -428,7 +484,7 @@ delete-tenant: ## Delete a tenant (use: make delete-tenant ID=uuid or IDENTIFIER
 		echo "Press Ctrl+C to cancel, or Enter to continue..."; \
 		read confirm; \
 	fi
-	@docker-compose -f docker-compose.dev.yml exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); theme_count = tenant.themes.count(); tenant_name = tenant.name; tenant_identifier = tenant.identifier; tenant.delete(); print(f'✓ Tenant \"{tenant_name}\" (identifier: {tenant_identifier}) deleted'); print(f'  Deleted {theme_count} associated theme(s)')" || (echo "Error: Failed to delete tenant." && exit 1)
+	@$(COMPOSE_DEV) exec -T backend python manage.py shell -c "from core.models import Tenant; import uuid; tenant = Tenant.objects.get(id=uuid.UUID('$(ID)')) if '$(ID)' else Tenant.objects.get(identifier='$(IDENTIFIER)'); theme_count = tenant.themes.count(); tenant_name = tenant.name; tenant_identifier = tenant.identifier; tenant.delete(); print(f'✓ Tenant \"{tenant_name}\" (identifier: {tenant_identifier}) deleted'); print(f'  Deleted {theme_count} associated theme(s)')" || (echo "Error: Failed to delete tenant." && exit 1)
 
 test-api-auth: ## Test API token authentication (use: make test-api-auth TOKEN=token [SERVER=url])
 	$(call check_help,test-api-auth)
@@ -476,49 +532,49 @@ test-api-auth: ## Test API token authentication (use: make test-api-auth TOKEN=t
 
 # Create sample data
 sample-content:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py create_sample_content --count 10 --verbose
+	$(COMPOSE_DEV) exec backend python manage.py create_sample_content --count 10 --verbose
 
 sample-pages:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py create_sample_pages --verbose
+	$(COMPOSE_DEV) exec backend python manage.py create_sample_pages --verbose
 
 sample-data: sample-content sample-pages
 
 sample-clean:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py create_sample_content --clean --count 10 --verbose
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py create_sample_pages --clear --verbose
+	$(COMPOSE_DEV) exec backend python manage.py create_sample_content --clean --count 10 --verbose
+	$(COMPOSE_DEV) exec backend python manage.py create_sample_pages --clear --verbose
 
 # Migration commands for camelCase conversion
 migrate-to-camelcase-dry:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_to_camelcase --dry-run --backup
+	$(COMPOSE_DEV) exec backend python manage.py migrate_to_camelcase --dry-run --backup
 
 migrate-to-camelcase:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_to_camelcase --backup
+	$(COMPOSE_DEV) exec backend python manage.py migrate_to_camelcase --backup
 
 migrate-schemas-only:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_to_camelcase --schemas-only --backup
+	$(COMPOSE_DEV) exec backend python manage.py migrate_to_camelcase --schemas-only --backup
 
 migrate-pagedata-only:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_to_camelcase --pagedata-only --backup
+	$(COMPOSE_DEV) exec backend python manage.py migrate_to_camelcase --pagedata-only --backup
 
 migrate-widgets-only:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_to_camelcase --widgets-only --backup
+	$(COMPOSE_DEV) exec backend python manage.py migrate_to_camelcase --widgets-only --backup
 
 # Widget Image Migration
 migrate-widget-images-dry:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_widget_images --dry-run --verbose
+	$(COMPOSE_DEV) exec backend python manage.py migrate_widget_images --dry-run --verbose
 
 migrate-widget-images:
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py migrate_widget_images --backup
+	$(COMPOSE_DEV) exec backend python manage.py migrate_widget_images --backup
 
 # Object Type Schema Management
 import-schemas: ## Import all JSON schemas to ObjectTypeDefinitions
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py import_schemas
+	$(COMPOSE_DEV) exec backend python manage.py import_schemas
 
 import-schemas-dry: ## Preview schema import without saving (dry run)
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py import_schemas --dry-run
+	$(COMPOSE_DEV) exec backend python manage.py import_schemas --dry-run
 
 import-schemas-force: ## Import/update all schemas without confirmation prompts
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py import_schemas --force
+	$(COMPOSE_DEV) exec backend python manage.py import_schemas --force
 
 import-schema: ## Import single schema file (use: make import-schema FILE=news.json NAME=news)
 	$(call check_help,import-schema)
@@ -527,7 +583,7 @@ import-schema: ## Import single schema file (use: make import-schema FILE=news.j
 		$(call print_help,import-schema); \
 		exit 1; \
 	fi
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py import_schemas \
+	$(COMPOSE_DEV) exec backend python manage.py import_schemas \
 		--file scripts/migration/schemas/$(FILE) \
 		--name $(NAME)
 
@@ -541,7 +597,7 @@ legacy-news-database-dry: ## Read legacy News counts through the tunnel without 
 	@cd backend && python manage.py migrate_legacy_news --database --tenant "$(TENANT)" --dry-run --env-file ../.env.local
 
 fix-minio-permissions: ## Fix permissions on all MinIO assets (local)
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py fix_minio_permissions
+	$(COMPOSE_DEV) exec backend python manage.py fix_minio_permissions
 
 prod-fix-image-permissions: ## Fix permissions on all MinIO assets (production)
 	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec backend python manage.py fix_minio_permissions"
@@ -550,488 +606,15 @@ prod-explain-image-problem: ## Debug imgproxy 403 for a URL (use: make prod-expl
 	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec backend python manage.py explain_imgproxy_problem '$(URL)'"
 
 shell:
-	docker-compose -f docker-compose.dev.yml exec backend bash
+	$(COMPOSE_DEV) exec backend bash
 
-# Start and validate the local services required by make test.
-prepare-test-infra:
-	@command -v docker >/dev/null 2>&1 || (echo "Error: Docker is required to run tests."; exit 1)
-	@if [ -z "$(CI)" ] && [ -z "$(SKIP_PORT_REGISTRY_CHECK)" ]; then \
-		python3 scripts/configure_orbstack.py --backend-port "$(BACKEND_PORT)" --frontend-port "$(FRONTEND_PORT)" --check-only >/dev/null; \
-	fi
-	@set -e; \
-	echo "Starting isolated ephemeral test infrastructure..."; \
-	$(COMPOSE_TEST) up -d test-db test-redis test-minio test-minio-init; \
-	$(COMPOSE_INFRA) up -d imgproxy; \
-	echo "Waiting for Postgres..."; \
-	i=0; \
-	until $(COMPOSE_TEST) exec -T test-db pg_isready -U postgres -d eceee_v4_test >/dev/null 2>&1; do \
-		i=$$((i + 1)); \
-		if [ $$i -ge 30 ]; then echo "Error: Postgres did not become ready."; exit 1; fi; \
-		sleep 1; \
-	done
-
-test-infra-down: ## Stop and remove only ECEEE's disposable test services and data.
-	$(COMPOSE_TEST) down -v
-
-# Clear stale local Postgres collation metadata before creating Django test databases.
-refresh-db-collation: prepare-test-infra
-	$(COMPOSE_TEST) exec -T test-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
-		-c "UPDATE pg_database SET datcollversion = NULL WHERE datname IN ('template1', 'postgres', 'test_eceee_v4_test');" >/dev/null
-
-# Run backend tests
-backend-test: prepare-test-infra refresh-db-collation
-	$(COMPOSE_DEV) run --rm --no-deps -T \
-		-e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres \
-		-e POSTGRES_DB=eceee_v4_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=test-only \
-		-e POSTGRES_HOST=test-db -e POSTGRES_PORT=5432 \
-		-e DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test \
-		-e REDIS_URL=redis://test-redis:6379/0 \
-		-e AWS_ACCESS_KEY_ID=test-eceee -e AWS_SECRET_ACCESS_KEY=test-eceee-secret \
-		-e AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
-		backend python manage.py test --keepdb --verbosity=2 --failfast --noinput
-
-# Run the focused News migration suite against PostgreSQL. Historical migrations
-# contain PostgreSQL-native ArrayFields and therefore cannot be validated on SQLite.
-backend-news-test: prepare-test-infra refresh-db-collation
-	$(COMPOSE_DEV) run --rm --no-deps -T \
-		-e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres \
-		-e POSTGRES_DB=eceee_v4_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=test-only \
-		-e POSTGRES_HOST=test-db -e POSTGRES_PORT=5432 \
-		-e DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test \
-		-e REDIS_URL=redis://test-redis:6379/0 \
-		-e AWS_ACCESS_KEY_ID=test-eceee -e AWS_SECRET_ACCESS_KEY=test-eceee-secret \
-		-e AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
-		backend pytest \
-			content_migration/tests/test_migrate_legacy_news_command.py \
-			content_migration/tests/test_legacy_news_ai_tags.py \
-			content_migration/tests/test_legacy_news_database.py \
-			content_migration/tests/test_legacy_news_extractor.py \
-			content_migration/tests/test_legacy_news_fetcher.py \
-			content_migration/tests/test_legacy_news_preview.py \
-			content_migration/tests/test_legacy_news_repository.py \
-			content_migration/tests/test_legacy_news_transformer.py \
-			easy_widgets/tests/test_content_widget.py \
-			easy_widgets/tests/test_news_detail_widget.py \
-			easy_widgets/tests/test_table_widget.py -q
-
-# Run backend tests in parallel once the suite is stable.
-backend-test-parallel: prepare-test-infra refresh-db-collation
-	$(COMPOSE_DEV) run --rm --no-deps -T \
-		-e DJANGO_TESTING=1 -e DJANGO_TEST_DATABASE=postgres \
-		-e POSTGRES_DB=eceee_v4_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=test-only \
-		-e POSTGRES_HOST=test-db -e POSTGRES_PORT=5432 \
-		-e DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test \
-		-e REDIS_URL=redis://test-redis:6379/0 \
-		-e AWS_ACCESS_KEY_ID=test-eceee -e AWS_SECRET_ACCESS_KEY=test-eceee-secret \
-		-e AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
-		backend python manage.py test --keepdb --parallel auto --verbosity=2 --failfast --noinput
-
-# Run frontend tests
-frontend-test: prepare-test-infra
-	$(COMPOSE_DEV) run --rm --no-deps -T frontend npm run test:run -- --bail=1
-
-# Run all tests
-test: backend-test frontend-test
-
-# Rebuild app containers before running all tests.
-test-build: TEST_UP_FLAGS=--build
-test-build: test
-
-# Run the full suite with parallel backend tests.
-test-parallel: backend-test-parallel frontend-test
-
-# Populate the platform-specific node_modules volumes used by the frontend and
-# Playwright runner. The frontend image uses musl while Playwright uses glibc.
-prepare-frontend-e2e:
-	$(COMPOSE_DEV) run --rm --no-deps -T frontend npm ci
-	$(COMPOSE_DEV) run --rm --no-deps -T frontend-e2e npm ci
-
-# Run admin browser regression tests
-frontend-admin-e2e-test: prepare-frontend-e2e
-	$(COMPOSE_DEV) up -d --force-recreate frontend
-	@FP=$${FRONTEND_PORT:-10100}; \
-	echo "Waiting for frontend on http://127.0.0.1:$$FP..."; \
-	i=0; \
-	until curl -fsS "http://127.0.0.1:$$FP/" >/dev/null 2>&1; do \
-		i=$$((i + 1)); \
-		if [ $$i -ge 60 ]; then echo "Error: frontend did not become ready."; exit 1; fi; \
-		sleep 1; \
-	done
-	$(COMPOSE_DEV) run --rm --no-deps -T \
-		-e PLAYWRIGHT_BASE_URL=http://frontend:3000 \
-		frontend-e2e npm run test:e2e:admin
-
-# Start and seed the Django public renderer without installing browser dependencies.
-.PHONY: prepare-public-e2e-backend
-prepare-public-e2e-backend: prepare-test-infra
-	DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test \
-	POSTGRES_DB=eceee_v4_test POSTGRES_USER=postgres POSTGRES_PASSWORD=test-only \
-	POSTGRES_HOST=test-db POSTGRES_PORT=5432 \
-	REDIS_URL=redis://test-redis:6379/0 \
-	AWS_ACCESS_KEY_ID=test-eceee AWS_SECRET_ACCESS_KEY=test-eceee-secret \
-	AWS_S3_ENDPOINT_URL=http://test-minio:9000 \
-	AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
-	$(COMPOSE_DEV) up $(TEST_UP_FLAGS) -d --force-recreate backend
-	@BP=$${BACKEND_PORT:-10101}; \
-	echo "Waiting for backend on http://127.0.0.1:$$BP..."; \
-	i=0; \
-	until curl -fsS "http://127.0.0.1:$$BP/health/" >/dev/null 2>&1; do \
-		i=$$((i + 1)); \
-		if [ $$i -ge 60 ]; then echo "Error: backend did not become ready."; exit 1; fi; \
-		sleep 1; \
-	done
-	$(COMPOSE_DEV) exec -T backend python manage.py seed_public_regression_site --hostname public-regression.test
-
-# Run public browser regression tests against the Django public renderer.
-frontend-public-e2e-test: prepare-public-e2e-backend prepare-frontend-e2e
-	$(COMPOSE_DEV) run --rm --no-deps -T \
-		-e PLAYWRIGHT_PUBLIC_BASE_URL=http://public-regression.test:8000 \
-		frontend-e2e npm run test:e2e:public
-
-# Run frontend browser regression tests, public side first
-frontend-e2e-test: frontend-public-e2e-test frontend-admin-e2e-test
-
-# Run browser regression tests
-regression-test: frontend-e2e-test
-
-# Test Playwright service endpoints
-playwright-test:
-	cd playwright-service && python test_service.py
-
-# Lint backend Python code
-backend-lint:
-	@files=$$(git diff --name-only --diff-filter=ACMRT $(PY_LINT_BASE)...HEAD -- 'backend/*.py' 'backend/**/*.py' ':(exclude)backend/**/migrations/**' | sed 's#^backend/##' | tr '\n' ' '); \
-	if [ -z "$$(echo "$$files" | xargs)" ]; then \
-		echo "No changed backend Python files to lint."; \
-		exit 0; \
-	fi; \
-	echo "Linting changed backend Python files: $$files"; \
-	$(COMPOSE_DEV) run --rm --no-deps -T backend sh -c "black --check $$files && isort --check-only $$files && flake8 $$files"
-
-# Lint frontend code
-frontend-lint:
-	cd frontend && npm run lint
-
-howto-script-editor: ## Start the local video script editor (use: make howto-script-editor [FP=10100])
-ifneq ($(HELP_REQUESTED),)
-	@$(call print_help,howto-script-editor)
-else
-	@FP="$${FP:-$${FRONTEND_PORT:-10100}}"; \
-	if [ -z "$$FP" ]; then FP="10100"; fi; \
-	echo "🎬 Starting video script editor on http://localhost:$$FP$(HOWTO_SCRIPT_EDITOR_PATH)"; \
-	cd frontend && VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) npm run dev -- --host 0.0.0.0 --port "$$FP" --strictPort --open "$(HOWTO_SCRIPT_EDITOR_PATH)"
-endif
-
-howto-auth-prod: ## Prompt for production username/password and save auth state for help videos
-ifneq ($(HELP_REQUESTED),)
-	@$(call print_help,howto-auth-prod)
-else
-	@AUTH_STATE="$(HOWTO_AUTH_STATE)"; \
-	case "$$AUTH_STATE" in /*) ;; *) AUTH_STATE="$(CURDIR)/$$AUTH_STATE";; esac; \
-	mkdir -p "$$(dirname "$$AUTH_STATE")"; \
-	npm run howto:auth -- --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE"
-endif
-
-howto-voices: ## List Swedish ElevenLabs voice candidates from repo-root .env
-ifneq ($(HELP_REQUESTED),)
-	@$(call print_help,howto-voices)
-else
-	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
-		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
-		exit 1; \
-	fi
-	npm run howto:voices -- --language "$(HOWTO_LANGUAGE)" $(HOWTO_EXTRA_FLAGS)
-endif
-
-howto-video-demo: ## Generate one narrated help video against local demo (use: make howto-video-demo MD=frontend/src/docs/how-to/pages/create-page.md)
-ifneq ($(HELP_REQUESTED),)
-	@$(call print_help,howto-video-demo)
-else
-	@if [ -z "$(GUIDE)" ] && [ -z "$(HOWTO_MD)" ]; then \
-		echo "❌ GUIDE or MD is required."; \
-		echo "   Example: make howto-video-demo MD=frontend/src/docs/how-to/pages/add-subpage-under-venue-travel.md"; \
-		echo "   Legacy:  make howto-video-demo GUIDE=pages-create"; \
-		exit 1; \
-	fi
-	@if [ -n "$(HOWTO_MD)" ] && [ ! -f "$(HOWTO_MD)" ]; then \
-		echo "❌ Markdown file not found: $(HOWTO_MD)"; \
-		exit 1; \
-	fi
-	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
-		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
-		exit 1; \
-	fi
-	@REQUESTED_LANGUAGE="$(HOWTO_LANGUAGE)"; \
-	if [ "$(HOWTO_LANGUAGE_ORIGIN)" = "file" ] && [ -n "$(HOWTO_MD)" ]; then \
-		MD_LANGUAGE=$$(awk -F: '/^language:[[:space:]]*/ { value=$$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$$/, "", value); gsub(/^["'"'"']|["'"'"']$$/, "", value); print value; exit }' "$(HOWTO_MD)"); \
-		if [ -n "$$MD_LANGUAGE" ]; then REQUESTED_LANGUAGE="$$MD_LANGUAGE"; fi; \
-	fi; \
-	if [ "$$REQUESTED_LANGUAGE" != "en" ] && [ -n "$(filter 1 true yes,$(HOWTO_USE_SCRIPT_TRANSLATION))" ]; then \
-		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "anthropic" ] && [ -z "$$ANTHROPIC_API_KEY" ]; then \
-			echo "❌ ANTHROPIC_API_KEY is missing. Add it to repo-root .env for $$REQUESTED_LANGUAGE translation."; \
-			exit 1; \
-		fi; \
-		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ -z "$$OPENAI_API_KEY" ]; then \
-			echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $$REQUESTED_LANGUAGE translation."; \
-			exit 1; \
-		fi; \
-	fi
-	@REQUESTED_LANGUAGE="$(HOWTO_LANGUAGE)"; \
-	if [ "$(HOWTO_LANGUAGE_ORIGIN)" = "file" ] && [ -n "$(HOWTO_MD)" ]; then \
-		MD_LANGUAGE=$$(awk -F: '/^language:[[:space:]]*/ { value=$$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$$/, "", value); gsub(/^["'"'"']|["'"'"']$$/, "", value); print value; exit }' "$(HOWTO_MD)"); \
-		if [ -n "$$MD_LANGUAGE" ]; then REQUESTED_LANGUAGE="$$MD_LANGUAGE"; fi; \
-	fi; \
-	VOICE_ID="$${HOWTO_VOICE_ID:-$${ELEVENLABS_VOICE_ID:-}}"; \
-	case "$$REQUESTED_LANGUAGE" in \
-		sv|sv-*|swe|swedish) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_SWE:-$${ELEVENLABS_VOICE_ID_SV:-}}}" ;; \
-		en|en-*|eng|english) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_ENG:-$${ELEVENLABS_VOICE_ID_EN:-}}}" ;; \
-	esac; \
-	if [ -z "$$VOICE_ID" ]; then \
-		echo "❌ Voice ID is missing for HOWTO_LANGUAGE=$$REQUESTED_LANGUAGE. Set ELEVENLABS_VOICE_ID_SWE or ELEVENLABS_VOICE_ID_ENG in repo-root .env."; \
-		exit 1; \
-	fi
-	@REQUESTED_LANGUAGE="$(HOWTO_LANGUAGE)"; \
-	if [ "$(HOWTO_LANGUAGE_ORIGIN)" = "file" ] && [ -n "$(HOWTO_MD)" ]; then \
-		MD_LANGUAGE=$$(awk -F: '/^language:[[:space:]]*/ { value=$$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$$/, "", value); gsub(/^["'"'"']|["'"'"']$$/, "", value); print value; exit }' "$(HOWTO_MD)"); \
-		if [ -n "$$MD_LANGUAGE" ]; then REQUESTED_LANGUAGE="$$MD_LANGUAGE"; fi; \
-	fi; \
-	DOCS_DIR="$(HOWTO_DOCS_DIR)"; \
-	if [ -z "$$DOCS_DIR" ]; then \
-		case "$$REQUESTED_LANGUAGE" in \
-			en|en-*|eng|english) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to" ;; \
-			*) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to-translations/$$REQUESTED_LANGUAGE" ;; \
-		esac; \
-	fi; \
-	case "$$DOCS_DIR" in /*) ;; *) DOCS_DIR="$(CURDIR)/$$DOCS_DIR";; esac; \
-	if [ ! -d "$$DOCS_DIR" ]; then \
-		echo "❌ Docs folder not found for HOWTO_LANGUAGE=$$REQUESTED_LANGUAGE: $$DOCS_DIR"; \
-		echo "   Create the translated markdown first, or set HOWTO_DOCS_DIR=frontend/src/docs/how-to"; \
-		exit 1; \
-	fi; \
-	OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_DIR)"; \
-	if [ "$(HOWTO_DEMO_OUTPUT_DIR_ORIGIN)" = "file" ]; then OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/$$REQUESTED_LANGUAGE"; fi; \
-	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
-	GUIDE_ID="$(GUIDE)"; \
-	if [ -n "$(HOWTO_MD)" ]; then \
-		GUIDE_ID=$$(awk -F: '/^id:[[:space:]]*/ { value=$$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$$/, "", value); gsub(/^["'"'"']|["'"'"']$$/, "", value); print value; exit }' "$(HOWTO_MD)"); \
-		if [ -z "$$GUIDE_ID" ]; then \
-			echo "❌ Could not read frontmatter id from $(HOWTO_MD)"; \
-			exit 1; \
-		fi; \
-		echo "🎬 Generating demo video for $$GUIDE_ID from $(HOWTO_MD)"; \
-	else \
-		echo "🎬 Generating demo video for $$GUIDE_ID"; \
-	fi; \
-	echo "📚 Using $$REQUESTED_LANGUAGE markdown from $$DOCS_DIR"; \
-	mkdir -p "$$OUTPUT_DIR"; \
-	cd frontend && \
-	npm run howto:video -- --guide "$$GUIDE_ID" --base-url "$(HOWTO_DEMO_BASE_URL)" --docs-dir "$$DOCS_DIR" --output-dir "$$OUTPUT_DIR" --public-dir "$$OUTPUT_DIR" --format mp4 --voice elevenlabs --language "$$REQUESTED_LANGUAGE" $(HOWTO_TRANSLATE_FLAGS) --sfx $(HOWTO_EXTRA_FLAGS)
-endif
-
-howto-video-demo-both: ## Generate one narrated help video against local demo in Swedish and English (use: make howto-video-demo-both MD=frontend/src/docs/how-to/pages/create-page.md)
-ifneq ($(HELP_REQUESTED),)
-	@$(call print_help,howto-video-demo-both)
-else
-	@if [ -z "$(GUIDE)" ] && [ -z "$(HOWTO_MD)" ]; then \
-		echo "❌ GUIDE or MD is required."; \
-		echo "   Example: make howto-video-demo-both MD=frontend/src/docs/how-to/pages/add-subpage-under-venue-travel.md"; \
-		exit 1; \
-	fi
-	$(MAKE) howto-video-demo GUIDE="$(GUIDE)" MD="$(HOWTO_MD)" HOWTO_LANGUAGE=en HOWTO_DEMO_OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/en"
-	$(MAKE) howto-video-demo GUIDE="$(GUIDE)" MD="$(HOWTO_MD)" HOWTO_LANGUAGE=sv HOWTO_DEMO_OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/sv"
-endif
-
-howto-video-demo-all: ## Generate all narrated help videos against local demo
-ifneq ($(HELP_REQUESTED),)
-	@$(call print_help,howto-video-demo-all)
-else
-	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
-		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
-		exit 1; \
-	fi
-	@DOCS_DIR="$(HOWTO_DOCS_DIR)"; \
-	if [ -z "$$DOCS_DIR" ]; then \
-		case "$(HOWTO_LANGUAGE)" in \
-			en|en-*|eng|english) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to" ;; \
-			*) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to-translations/$(HOWTO_LANGUAGE)" ;; \
-		esac; \
-	fi; \
-	case "$$DOCS_DIR" in /*) ;; *) DOCS_DIR="$(CURDIR)/$$DOCS_DIR";; esac; \
-	if [ ! -d "$$DOCS_DIR" ]; then \
-		echo "❌ Docs folder not found for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE): $$DOCS_DIR"; \
-		exit 1; \
-	fi; \
-	OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_DIR)"; \
-	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
-	mkdir -p "$$OUTPUT_DIR"; \
-	cd frontend && \
-	npm run howto:video:all -- --base-url "$(HOWTO_DEMO_BASE_URL)" --docs-dir "$$DOCS_DIR" --output-dir "$$OUTPUT_DIR" --public-dir "$$OUTPUT_DIR" --voice elevenlabs --language "$(HOWTO_LANGUAGE)" $(HOWTO_TRANSLATE_FLAGS) --sfx $(HOWTO_EXTRA_FLAGS)
-endif
-
-howto-video-demo-all-both: ## Generate all narrated help videos against local demo in Swedish and English
-ifneq ($(HELP_REQUESTED),)
-	@$(call print_help,howto-video-demo-all-both)
-else
-	$(MAKE) howto-video-demo-all HOWTO_LANGUAGE=en HOWTO_DEMO_OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/en"
-	$(MAKE) howto-video-demo-all HOWTO_LANGUAGE=sv HOWTO_DEMO_OUTPUT_DIR="$(HOWTO_DEMO_OUTPUT_BASE_DIR)/sv"
-endif
-
-howto-video-edit: ## Trim an existing rendered MP4 (use: make howto-video-edit VIDEO=frontend/public/howto-videos/editor-preview/sv/file.mp4 CUTS=0:10 [OUTPUT=edited.mp4])
-ifneq ($(HELP_REQUESTED),)
-	@$(call print_help,howto-video-edit)
-else
-	@if [ -z "$(HOWTO_VIDEO)" ]; then \
-		echo "❌ VIDEO is required. Example: make howto-video-edit VIDEO=frontend/public/howto-videos/editor-preview/sv/pages-pages-create.mp4 CUTS=0:10"; \
-		exit 1; \
-	fi
-	@if [ -z "$(HOWTO_VIDEO_CUTS)" ]; then \
-		echo "❌ CUTS is required. Example: CUTS=0:10 or CUTS=0:10,45.5:48"; \
-		exit 1; \
-	fi
-	@INPUT="$(HOWTO_VIDEO)"; \
-	OUTPUT="$(HOWTO_VIDEO_OUTPUT)"; \
-	case "$$INPUT" in /*) ;; *) INPUT="$(CURDIR)/$$INPUT";; esac; \
-	if [ -n "$$OUTPUT" ]; then case "$$OUTPUT" in /*) ;; *) OUTPUT="$(CURDIR)/$$OUTPUT";; esac; fi; \
-	if [ -n "$$OUTPUT" ]; then \
-		cd frontend && node scripts/edit-howto-video.mjs --input "$$INPUT" --cuts "$(HOWTO_VIDEO_CUTS)" --output "$$OUTPUT"; \
-	else \
-		cd frontend && node scripts/edit-howto-video.mjs --input "$$INPUT" --cuts "$(HOWTO_VIDEO_CUTS)"; \
-	fi
-endif
-
-howto-video-prod: ## Generate one narrated help video from production (use: make howto-video-prod GUIDE=pages-create)
-ifneq ($(HELP_REQUESTED),)
-	@$(call print_help,howto-video-prod)
-else
-	@if [ -z "$(GUIDE)" ]; then \
-		echo "❌ GUIDE is required. Example: make howto-video-prod GUIDE=pages-create"; \
-		exit 1; \
-	fi
-	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
-		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
-		exit 1; \
-	fi
-	@if [ "$(HOWTO_LANGUAGE)" != "en" ] && [ -n "$(filter 1 true yes,$(HOWTO_USE_SCRIPT_TRANSLATION))" ]; then \
-		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "anthropic" ] && [ -z "$$ANTHROPIC_API_KEY" ]; then \
-			echo "❌ ANTHROPIC_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
-			exit 1; \
-		fi; \
-		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ -z "$$OPENAI_API_KEY" ]; then \
-			echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
-			exit 1; \
-		fi; \
-	fi
-	@VOICE_ID="$${HOWTO_VOICE_ID:-$${ELEVENLABS_VOICE_ID:-}}"; \
-	case "$(HOWTO_LANGUAGE)" in \
-		sv|sv-*|swe|swedish) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_SWE:-$${ELEVENLABS_VOICE_ID_SV:-}}}" ;; \
-		en|en-*|eng|english) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_ENG:-$${ELEVENLABS_VOICE_ID_EN:-}}}" ;; \
-	esac; \
-	if [ -z "$$VOICE_ID" ]; then \
-		echo "❌ Voice ID is missing for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE). Set ELEVENLABS_VOICE_ID_SWE or ELEVENLABS_VOICE_ID_ENG in repo-root .env."; \
-		exit 1; \
-	fi
-	@AUTH_STATE="$(HOWTO_AUTH_STATE)"; \
-	case "$$AUTH_STATE" in /*) ;; *) AUTH_STATE="$(CURDIR)/$$AUTH_STATE";; esac; \
-	if [ ! -f "$$AUTH_STATE" ]; then \
-		echo "❌ Auth state not found: $$AUTH_STATE"; \
-		echo "Run: make howto-auth-prod"; \
-		exit 1; \
-	fi; \
-	DOCS_DIR="$(HOWTO_DOCS_DIR)"; \
-	if [ -z "$$DOCS_DIR" ]; then \
-		case "$(HOWTO_LANGUAGE)" in \
-			en|en-*|eng|english) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to" ;; \
-			*) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to-translations/$(HOWTO_LANGUAGE)" ;; \
-		esac; \
-	fi; \
-	case "$$DOCS_DIR" in /*) ;; *) DOCS_DIR="$(CURDIR)/$$DOCS_DIR";; esac; \
-	if [ ! -d "$$DOCS_DIR" ]; then \
-		echo "❌ Docs folder not found for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE): $$DOCS_DIR"; \
-		exit 1; \
-	fi; \
-	OUTPUT_DIR="$(HOWTO_OUTPUT_DIR)"; \
-	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
-	mkdir -p "$$OUTPUT_DIR"; \
-	npm run howto:video -- --guide "$(GUIDE)" --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --docs-dir "$$DOCS_DIR" --output-dir "$$OUTPUT_DIR" --public-dir "$$OUTPUT_DIR" --format mp4 --voice elevenlabs --language "$(HOWTO_LANGUAGE)" $(HOWTO_TRANSLATE_FLAGS) --sfx $(HOWTO_EXTRA_FLAGS)
-endif
-
-howto-video-prod-both: ## Generate one narrated help video from production in Swedish and English (use: make howto-video-prod-both GUIDE=pages-create)
-ifneq ($(HELP_REQUESTED),)
-	@$(call print_help,howto-video-prod-both)
-else
-	@if [ -z "$(GUIDE)" ]; then \
-		echo "❌ GUIDE is required. Example: make howto-video-prod-both GUIDE=pages-create"; \
-		exit 1; \
-	fi
-	$(MAKE) howto-video-prod GUIDE="$(GUIDE)" HOWTO_LANGUAGE=sv HOWTO_OUTPUT_DIR="$(HOWTO_OUTPUT_BASE_DIR)/sv"
-	$(MAKE) howto-video-prod GUIDE="$(GUIDE)" HOWTO_LANGUAGE=en HOWTO_OUTPUT_DIR="$(HOWTO_OUTPUT_BASE_DIR)/en"
-endif
-
-howto-video-prod-all: ## Generate all narrated help videos from production
-ifneq ($(HELP_REQUESTED),)
-	@$(call print_help,howto-video-prod-all)
-else
-	@if [ -z "$$ELEVENLABS_API_KEY" ]; then \
-		echo "❌ ELEVENLABS_API_KEY is missing. Add it to repo-root .env."; \
-		exit 1; \
-	fi
-	@if [ "$(HOWTO_LANGUAGE)" != "en" ] && [ -n "$(filter 1 true yes,$(HOWTO_USE_SCRIPT_TRANSLATION))" ]; then \
-		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "anthropic" ] && [ -z "$$ANTHROPIC_API_KEY" ]; then \
-			echo "❌ ANTHROPIC_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
-			exit 1; \
-		fi; \
-		if [ "$(HOWTO_TRANSLATION_PROVIDER)" = "openai" ] && [ -z "$$OPENAI_API_KEY" ]; then \
-			echo "❌ OPENAI_API_KEY is missing. Add it to repo-root .env for $(HOWTO_LANGUAGE) translation."; \
-			exit 1; \
-		fi; \
-	fi
-	@VOICE_ID="$${HOWTO_VOICE_ID:-$${ELEVENLABS_VOICE_ID:-}}"; \
-	case "$(HOWTO_LANGUAGE)" in \
-		sv|sv-*|swe|swedish) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_SWE:-$${ELEVENLABS_VOICE_ID_SV:-}}}" ;; \
-		en|en-*|eng|english) VOICE_ID="$${VOICE_ID:-$${ELEVENLABS_VOICE_ID_ENG:-$${ELEVENLABS_VOICE_ID_EN:-}}}" ;; \
-	esac; \
-	if [ -z "$$VOICE_ID" ]; then \
-		echo "❌ Voice ID is missing for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE). Set ELEVENLABS_VOICE_ID_SWE or ELEVENLABS_VOICE_ID_ENG in repo-root .env."; \
-		exit 1; \
-	fi
-	@AUTH_STATE="$(HOWTO_AUTH_STATE)"; \
-	case "$$AUTH_STATE" in /*) ;; *) AUTH_STATE="$(CURDIR)/$$AUTH_STATE";; esac; \
-	if [ ! -f "$$AUTH_STATE" ]; then \
-		echo "❌ Auth state not found: $$AUTH_STATE"; \
-		echo "Run: make howto-auth-prod"; \
-		exit 1; \
-	fi; \
-	DOCS_DIR="$(HOWTO_DOCS_DIR)"; \
-	if [ -z "$$DOCS_DIR" ]; then \
-		case "$(HOWTO_LANGUAGE)" in \
-			en|en-*|eng|english) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to" ;; \
-			*) DOCS_DIR="$(CURDIR)/frontend/src/docs/how-to-translations/$(HOWTO_LANGUAGE)" ;; \
-		esac; \
-	fi; \
-	case "$$DOCS_DIR" in /*) ;; *) DOCS_DIR="$(CURDIR)/$$DOCS_DIR";; esac; \
-	if [ ! -d "$$DOCS_DIR" ]; then \
-		echo "❌ Docs folder not found for HOWTO_LANGUAGE=$(HOWTO_LANGUAGE): $$DOCS_DIR"; \
-		exit 1; \
-	fi; \
-	OUTPUT_DIR="$(HOWTO_OUTPUT_DIR)"; \
-	case "$$OUTPUT_DIR" in /*) ;; *) OUTPUT_DIR="$(CURDIR)/$$OUTPUT_DIR";; esac; \
-	mkdir -p "$$OUTPUT_DIR"; \
-	npm run howto:video:all -- --base-url "$(HOWTO_PROD_BASE_URL)" --storage-state "$$AUTH_STATE" --docs-dir "$$DOCS_DIR" --output-dir "$$OUTPUT_DIR" --public-dir "$$OUTPUT_DIR" --voice elevenlabs --language "$(HOWTO_LANGUAGE)" $(HOWTO_TRANSLATE_FLAGS) --sfx $(HOWTO_EXTRA_FLAGS)
-endif
-
-howto-video-prod-all-both: ## Generate all narrated help videos from production in Swedish and English
-ifneq ($(HELP_REQUESTED),)
-	@$(call print_help,howto-video-prod-all-both)
-else
-	$(MAKE) howto-video-prod-all HOWTO_LANGUAGE=sv HOWTO_OUTPUT_DIR="$(HOWTO_OUTPUT_BASE_DIR)/sv"
-	$(MAKE) howto-video-prod-all HOWTO_LANGUAGE=en HOWTO_OUTPUT_DIR="$(HOWTO_OUTPUT_BASE_DIR)/en"
-endif
+include make/tests.mk
+include make/howto.mk
 # Lint backend and frontend code
 lint: backend-lint frontend-lint
 
-# Start all services with Docker Compose
-docker-up: infra-up
-	VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) $(COMPOSE_DEV) up --build backend frontend celery-worker
+# Backwards-compatible alias. Prefer dev-build for an explicit rebuild.
+docker-up: dev-build
 
 # Stop all Docker Compose services
 docker-down:
@@ -1040,25 +623,25 @@ docker-down:
 
 # Restart all Docker Compose services
 restart:
-	$(COMPOSE_DEV) restart
+	$(COMPOSE_DEV) restart $(DEV_SERVICES)
 	$(COMPOSE_INFRA) restart imgproxy
 
 # Stop Playwright service
 playwright-down:
-	cd playwright-service && docker-compose down
+	cd playwright-service && docker compose down
 
 # View Playwright service logs
 playwright-logs:
-	cd playwright-service && docker-compose logs -f
+	cd playwright-service && docker compose logs -f
 
 # Clean Python, Node, and Docker artifacts
 clean:
 	find backend -type d -name '__pycache__' -exec rm -rf {} +
 	rm -rf backend/*.pyc backend/*.pyo backend/.pytest_cache
 	rm -rf frontend/node_modules frontend/dist
-	docker compose -f docker-compose.dev.yml down -v
-	docker compose -f docker-compose.infra.yml down
-	docker compose -f docker-compose.test-infra.yml down -v
+	$(COMPOSE_DEV) down -v
+	$(COMPOSE_INFRA) down
+	$(COMPOSE_TEST) down -v
 	cd playwright-service && docker compose down -v
 
 # ECEEE Components Sync Commands
@@ -1072,27 +655,30 @@ clean:
 
 # Environment & Health Checks
 configure-local-infra: ## Configure ignored .env for the shared OrbStack services.
-	python3 scripts/configure_orbstack.py --backend-port "$(BACKEND_PORT)" --frontend-port "$(FRONTEND_PORT)"
+	python3 scripts/configure_orbstack.py
 
 shared-infra-check: ## Validate OrbStack, shared endpoints, and ECEEE's local configuration.
-	python3 scripts/configure_orbstack.py --backend-port "$(BACKEND_PORT)" --frontend-port "$(FRONTEND_PORT)" --check-only
+	python3 scripts/configure_orbstack.py --check-only
 
-infra-up: shared-infra-check ## Start only ECEEE-owned stateless infrastructure.
-	docker compose -f docker-compose.infra.yml up -d imgproxy
+local-dev-check: ## Validate this checkout's runtime without rewriting local credentials.
+	python3 scripts/configure_orbstack.py --runtime-check
+
+infra-up: local-dev-check ## Start only ECEEE-owned stateless infrastructure.
+	$(COMPOSE_INFRA) up -d imgproxy
 
 infra-down: ## Stop only ECEEE-owned stateless infrastructure.
-	docker compose -f docker-compose.infra.yml down
+	$(COMPOSE_INFRA) down
 
 infra-restart: shared-infra-check ## Restart only ECEEE-owned stateless infrastructure.
-	docker compose -f docker-compose.infra.yml restart imgproxy
+	$(COMPOSE_INFRA) restart imgproxy
 
 clear-layout-cache: ## Clear layout-related caches to force refresh
 	@echo "🧹 Clearing layout caches..."
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py clear_layout_cache
+	$(COMPOSE_DEV) exec backend python manage.py clear_layout_cache
 
 clear-layout-cache-all: ## Clear all caches (nuclear option)
 	@echo "🧹 Clearing ALL caches..."
-	docker-compose -f docker-compose.dev.yml exec backend python manage.py clear_layout_cache --all
+	$(COMPOSE_DEV) exec backend python manage.py clear_layout_cache --all
 
 check-servers: ## Check if backend and frontend servers are up
 	@echo "🔍 Checking status of services..."
@@ -1126,7 +712,7 @@ check-servers: ## Check if backend and frontend servers are up
 use-external-infra: configure-local-infra ## Backwards-compatible alias for configure-local-infra.
 
 check-conf: ## Check current database and server configuration
-	python3 scripts/configure_orbstack.py --backend-port "$(BACKEND_PORT)" --frontend-port "$(FRONTEND_PORT)" --check-only
+	python3 scripts/configure_orbstack.py --check-only
 
 check-db: check-conf ## Alias for check-conf
 
@@ -1139,80 +725,4 @@ tailwind-watch: ## Watch and rebuild Tailwind CSS on changes
 	@echo "👀 Watching Tailwind CSS for changes..."
 	cd backend && npx tailwindcss -i ./static/css/tailwind.input.css -o ./static/css/tailwind.output.css --watch
 
-# ============================================================
-# Production Deployment (runs on remote VPS via SSH)
-# Override PROD_HOST only when the canonical production SSH endpoint changes.
-# ============================================================
-PROD_HOST ?= root@139.162.154.219
-PROD_DIR  ?= /srv/eceee_v4
-TAG       ?=
-RUN_ID    ?= typed-tags-v1
-CANARY_SIZE ?= 100
-BACKUP_FILE ?=
-KEEP_BACKUP ?= 0
-LOCAL_BACKUP_DIR ?=
-THEME_WORKSPACE ?=
-THEME_ADMIN ?=
-export RUN_ID CANARY_SIZE THEME_WORKSPACE THEME_ADMIN
-
-prod-preflight: ## Run checks required before production deploy (use: make prod-preflight [TAG=v0.x.x|hash])
-	bash deploy/scripts/preflight.sh "$(TAG)"
-
-prod-deploy: ## Run checks, then deploy to production (use: make prod-deploy [TAG=v0.x.x|hash])
-	@set -e; \
-	DEPLOY_REF=$$(bash deploy/scripts/resolve-deploy-ref.sh "$(TAG)"); \
-	echo "Resolved deploy ref: $$DEPLOY_REF"; \
-	bash deploy/scripts/preflight.sh "$$DEPLOY_REF"; \
-	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)" --deploy "$$DEPLOY_REF"
-
-prod-restart: ## Sync deploy/.env and restart production containers
-	bash deploy/scripts/setup-env.sh "$(PROD_HOST)" "$(PROD_DIR)" --restart
-
-prod-env: ## Securely push local deploy/.env to production
-	bash deploy/scripts/setup-env.sh $(PROD_HOST) $(PROD_DIR)
-
-prod-rollback: ## Rollback to previous deployment
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash deploy/scripts/rollback.sh"
-
-prod-backup: ## Run ad-hoc production DB backup
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash deploy/scripts/backup.sh"
-
-prod-theme-access-key: ## Create/rotate prod theme key (THEME_WORKSPACE=id THEME_ADMIN=username)
-	bash deploy/scripts/create-theme-remote-access.sh "$(PROD_HOST)" "$(PROD_DIR)"
-
-prod-backfill-typed-tags: ## Run maintenance-window typed-tag backfill (optional: RUN_ID=... CANARY_SIZE=...)
-	@case "$$RUN_ID" in ""|*[!A-Za-z0-9_-]*) echo "RUN_ID must contain only letters, numbers, underscores, and hyphens" >&2; exit 2;; esac
-	@[ "$${#RUN_ID}" -le 100 ] || (echo "RUN_ID must be at most 100 characters" >&2; exit 2)
-	@case "$$CANARY_SIZE" in ""|0*|*[!0-9]*) echo "CANARY_SIZE must be a positive integer without leading zeros" >&2; exit 2;; esac
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && bash deploy/scripts/backfill-typed-tags.sh '$$RUN_ID' '$$CANARY_SIZE'"
-
-validate-typed-tags-backup: ## Restore and validate a local production backup (BACKUP_FILE=/absolute/path.sql.gz)
-	@test -n "$(BACKUP_FILE)" || (echo "BACKUP_FILE is required" >&2; exit 2)
-	bash deploy/scripts/validate-typed-tags-backup.sh "$(BACKUP_FILE)"
-
-validate-prod-typed-tags-backup: ## Create, fetch, validate, and delete a fresh production backup (KEEP_BACKUP=1 to retain)
-	KEEP_BACKUP="$(KEEP_BACKUP)" LOCAL_BACKUP_DIR="$(LOCAL_BACKUP_DIR)" bash deploy/scripts/fetch-and-validate-typed-tags-backup.sh "$(PROD_HOST)" "$(PROD_DIR)"
-
-prod-logs: ## Tail production logs (use: make prod-logs [SERVICE=backend])
-	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env logs -f --tail=100 $(SERVICE)"
-
-prod-status: ## Show production container status
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env ps"
-
-prod-audit-tenant-access: ## Audit tenant migration lockout risk without writing production data
-	ssh $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -T db sh -lc 'psql -v ON_ERROR_STOP=1 -U \"\$$POSTGRES_USER\" -d \"\$$POSTGRES_DB\"'" < deploy/scripts/audit-tenant-access.sql
-
-prod-logs-caddy: ## Tail production Caddy logs
-	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env logs -f --tail=100 caddy"
-
-prod-shell-caddy: ## Open shell in production Caddy container
-	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec caddy sh"
-
-prod-ssh: ## SSH into production server
-	ssh $(PROD_HOST)
-
-prod-shell: ## Open Django shell in production
-	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec backend python manage.py shell"
-
-prod-bash: ## Open bash shell in production backend container
-	ssh -t $(PROD_HOST) "cd $(PROD_DIR) && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec backend bash"
+include make/production.mk

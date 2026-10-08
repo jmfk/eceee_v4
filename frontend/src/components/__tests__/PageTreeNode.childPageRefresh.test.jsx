@@ -195,13 +195,16 @@ describe('PageTreeNode - Child Page Refresh', () => {
         )
 
         const view = render(renderNode(page))
-        expect(screen.getByRole('button', { name: 'Expand Changing Page' })).toBeDisabled()
+        expect(screen.queryByRole('button', { name: 'Expand Changing Page' })).not.toBeInTheDocument()
+        expect(screen.getByTestId('page-tree-expand-spacer-changing-page')).toBeInTheDocument()
 
         view.rerender(renderNode({ ...page, childrenCount: 1 }))
         expect(screen.getByRole('button', { name: 'Expand Changing Page' })).toBeEnabled()
+        expect(screen.queryByTestId('page-tree-expand-spacer-changing-page')).not.toBeInTheDocument()
 
         view.rerender(renderNode(page))
-        expect(screen.getByRole('button', { name: 'Expand Changing Page' })).toBeDisabled()
+        expect(screen.queryByRole('button', { name: 'Expand Changing Page' })).not.toBeInTheDocument()
+        expect(screen.getByTestId('page-tree-expand-spacer-changing-page')).toBeInTheDocument()
     })
 
 })

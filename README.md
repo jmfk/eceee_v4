@@ -16,13 +16,27 @@ A comprehensive, AI-assisted development environment featuring Django backend, R
 
 ```bash
 make configure-local-infra
-make servers
+make dev
 ```
 
-`configure-local-infra` writes the ignored mode-0600 `.env` from provider-managed credentials. `make servers` starts only ECEEE-owned application containers and imgproxy; PostgreSQL, Redis, and MinIO remain lifecycle-owned by `../shared-local-infrastructure`.
+`configure-local-infra` reads this checkout's assigned ports from the machine port
+registry and writes the ignored mode-0600 `.env` from provider-managed
+credentials. `make dev` starts the ECEEE-owned backend, frontend, Celery worker,
+and imgproxy in the background. PostgreSQL, Redis, and MinIO remain
+lifecycle-owned by `../shared-local-infrastructure`.
+
+Use `make dev-build` after Dockerfile or dependency changes, `make dev-status`
+for container and endpoint health, `make dev-logs` to follow application logs,
+and `make dev-stop` to stop only the application containers. `make servers` and
+`make docker-up` remain compatibility aliases for `dev` and `dev-build`.
+`make local-dev-check` validates an existing checkout-specific runtime without
+rewriting its database identity or credentials; `make shared-infra-check`
+performs the stricter provider-managed canonical configuration check.
 
 For Git worktrees that are not next to the provider repository, set
 `SHARED_LOCAL_INFRA_ROOT` to its absolute path when running the Make targets.
+If the port registry helper is installed outside its standard Codex location,
+set `PORT_SPACE_REGISTRY_SCRIPT` to its absolute path.
 
 ## 📋 Project Overview
 
@@ -175,16 +189,20 @@ See [Frontend Refactoring Guide](docs/FRONTEND_REFACTORING_GUIDE.md) for detaile
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Frontend | http://localhost:10100 | React application |
-| Backend API | http://localhost:10101 | Django REST API |
-| Admin Panel | http://localhost:10101/admin/ | Django admin interface |
-| API Docs | http://localhost:10101/api/docs/ | Interactive API documentation |
+| Frontend | `$FRONTEND_PORT` (registered per checkout) | React application |
+| Backend API | `$BACKEND_PORT` (registered per checkout) | Django REST API |
+| Admin Panel | `http://localhost:$BACKEND_PORT/admin/` | Django admin interface |
+| API Docs | `http://localhost:$BACKEND_PORT/api/docs/` | Interactive API documentation |
 | MinIO API | http://localhost:10302 | Shared S3-compatible object storage |
 | MinIO Console | http://localhost:10303 | Shared object storage administration |
-| Imgproxy | http://localhost:10106 | Image transformation service |
-| Playwright renderer | http://localhost:10107 | Website rendering service |
+| Imgproxy | `$ECEEE_IMGPROXY_PORT` (registered per checkout) | Image transformation service |
+| Playwright renderer | `$ECEEE_PLAYWRIGHT_PORT` (registered per checkout) | Website rendering service |
 
-ECEEE owns the local application range `10100-10199` in the machine-wide port registry. Shared services use their provider-owned range `10300-10309`; ECEEE does not start, stop, reset, or delete those containers or volumes.
+Each checkout owns its assigned local application range in the machine-wide port
+registry. The canonical checkout currently uses `10100-10199`; additional
+checkouts use their own registered blocks. Shared services use their
+provider-owned range `10300-10309`; ECEEE does not start, stop, reset, or delete
+those containers or volumes.
 
 ### Database Access
 

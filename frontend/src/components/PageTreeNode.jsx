@@ -6,8 +6,6 @@ import {
     ChevronDown,
     ChevronUp,
     FileText,
-    Folder,
-    FolderOpen,
     Edit,
     Scissors,
     Trash2,
@@ -90,11 +88,14 @@ const PublicationStatusIcon = memo(({
 
     return (
         <Tooltip text={tooltipText} position="top">
-            <div className="flex items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
                 <span className="flex min-h-8 min-w-8 shrink-0 cursor-help items-center justify-center" aria-label={tooltipText}>
                     {getStatusIcon()}
                 </span>
-                <span className={`text-xs font-medium ${getStatusTextColor()}`}>
+                <span
+                    data-testid="page-publication-status-label"
+                    className={`hidden whitespace-nowrap text-xs font-medium lg:inline ${getStatusTextColor()}`}
+                >
                     {getStatusText()}
                 </span>
             </div>
@@ -611,16 +612,6 @@ const PageTreeNode = memo(({
         onEdit?.({ ...page, editorTab: 'settings' })
     }
 
-    // Folder icon based on state
-    const getFolderIcon = () => {
-        if (!hasChildren) {
-            return <FileText className="w-4 h-4 text-gray-500" />
-        }
-        return isExpanded ?
-            <FolderOpen className="w-4 h-4 text-blue-500" /> :
-            <Folder className="w-4 h-4 text-blue-500" />
-    }
-
     const secondaryActions = [
         {
             label: 'Publishing & history',
@@ -673,7 +664,7 @@ const PageTreeNode = memo(({
             <div
                 data-testid={`page-tree-node-${pageTestId}`}
                 className={`
-                    page-tree-row flex flex-wrap items-start gap-x-2 px-2 ${rowHeight === 'spacious' ? 'py-4' : 'py-2.5'} ${isSelected ? 'hover:bg-blue-200' : 'hover:bg-gray-50'} group relative
+                    page-tree-row flex flex-nowrap items-center gap-x-2 px-2 ${rowHeight === 'spacious' ? 'py-4' : 'py-2.5'} ${isSelected ? 'hover:bg-blue-200' : 'hover:bg-gray-50'} group relative
                     ${isCut && isSelected ? 'opacity-70 bg-orange-100 border-l-4 border-blue-500 ring-2 ring-orange-300' : ''}
                     ${isCut && !isSelected ? 'opacity-60 bg-orange-50' : ''}
                     ${isCopied && isSelected && !isCut ? 'opacity-70 bg-green-100 border-l-4 border-blue-500 ring-2 ring-green-300' : ''}
@@ -695,36 +686,40 @@ const PageTreeNode = memo(({
                 }}
                 onClick={handleRowClick}
             >
-                {/* Expand/collapse button */}
-                <button
-                    type="button"
-                    data-testid={`page-tree-expand-${pageTestId}`}
-                    onClick={(e) => {
-                        e.stopPropagation()
-                        handleToggleExpand()
-                    }}
-                    className={`
-                            flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded transition-all duration-200 hover:shadow-sm xl:min-h-8 xl:min-w-8
-                            ${!hasChildren ? 'opacity-30 cursor-default' : 'hover:bg-gray-200'}
-                        `}
-                    disabled={isLoading || !hasChildren}
-                    aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${page.title}`}
-                    aria-expanded={hasChildren ? isExpanded : undefined}
-                >
-                    {isLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                    ) : isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-gray-600" />
-                    ) : (
-                        <ChevronRight className="w-4 h-4 text-gray-600" />
-                    )}
-                </button>
+                {/* Expand/collapse button, or an equal-width spacer for leaf pages */}
+                {hasChildren ? (
+                    <button
+                        type="button"
+                        data-testid={`page-tree-expand-${pageTestId}`}
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            handleToggleExpand()
+                        }}
+                        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded transition-all duration-200 hover:bg-gray-200 hover:shadow-sm xl:min-h-8 xl:min-w-8"
+                        disabled={isLoading}
+                        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${page.title}`}
+                        aria-expanded={isExpanded}
+                    >
+                        {isLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                        ) : isExpanded ? (
+                            <ChevronDown className="w-4 h-4 text-gray-600" />
+                        ) : (
+                            <ChevronRight className="w-4 h-4 text-gray-600" />
+                        )}
+                    </button>
+                ) : (
+                    <span
+                        data-testid={`page-tree-expand-spacer-${pageTestId}`}
+                        className="min-h-11 min-w-11 shrink-0 xl:min-h-8 xl:min-w-8"
+                        aria-hidden="true"
+                    />
+                )}
 
                 {/* Page content area */}
-                <div className="min-w-0 flex-1 xl:flex xl:items-center xl:gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-2 xl:gap-3">
                     {/* Page identity */}
-                    <div data-testid={`page-tree-identity-${pageTestId}`} className="flex min-w-0 items-start gap-2 xl:flex-1 xl:items-center">
-                        <div className="flex min-h-8 shrink-0 items-center">{getFolderIcon()}</div>
+                    <div data-testid={`page-tree-identity-${pageTestId}`} className="flex min-w-0 flex-1 items-center gap-2">
                         {page.isSearchResult && (
                             <div className="flex min-h-8 shrink-0 items-center">
                                 <Search className="w-3 h-3 text-blue-500" />
@@ -778,7 +773,7 @@ const PageTreeNode = memo(({
                     </div>
 
                     {/* Publication and version metadata */}
-                    <div data-testid={`page-tree-metadata-${pageTestId}`} className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 pl-10 xl:mt-0 xl:shrink-0 xl:pl-0">
+                    <div data-testid={`page-tree-metadata-${pageTestId}`} className="flex shrink-0 items-center gap-1.5">
                         <PublicationStatusIcon
                             workflowState={page.workflowState}
                             scheduledEffectiveDate={page.scheduledEffectiveDate}
@@ -812,7 +807,7 @@ const PageTreeNode = memo(({
                 </div>
 
                 {/* Primary actions stay visible; secondary actions collapse below xl. */}
-                <div data-testid={`page-tree-primary-actions-${pageTestId}`} className="mt-1 flex w-full shrink-0 items-center justify-end gap-1 pl-10 sm:mt-0 sm:w-auto sm:pl-0">
+                <div data-testid={`page-tree-primary-actions-${pageTestId}`} className="flex shrink-0 items-center justify-end gap-1">
                     <Tooltip text="Edit" position="top">
                         <button
                             type="button"
