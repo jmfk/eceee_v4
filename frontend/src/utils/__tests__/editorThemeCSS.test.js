@@ -219,6 +219,22 @@ describe('shared TypeScript theme CSS', () => {
         expect(result).not.toContain('@scope')
     })
 
+    it('includes gallery and carousel style collections', () => {
+        const result = buildThemeCSS({
+            theme: {
+                galleryStyles: {
+                    logos: { css: '.partner-logos { gap: 1rem; }' },
+                },
+                carouselStyles: {
+                    hero: { css: '.hero-carousel { min-height: 20rem; }' },
+                },
+            },
+        })
+
+        expect(result).toContain('.partner-logos { gap: 1rem; }')
+        expect(result).toContain('.hero-carousel { min-height: 20rem; }')
+    })
+
     it('applies unsaved Designer values to the full theme configuration', () => {
         const theme = buildDesignerTheme({
             themeConfig: {
