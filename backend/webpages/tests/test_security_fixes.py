@@ -15,12 +15,14 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.test.client import RequestFactory
+from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
 
 from core.models import Tenant
 from webpages.middleware import DynamicHostValidationMiddleware
 from webpages.models import WebPage
+from webpages.views.webpage_views import WebPageViewSet
 
 
 class ManagementCommandSecurityTest(TestCase):
@@ -322,6 +324,27 @@ class HostnameNormalizationTest(TestCase):
             with self.subTest(hostname=hostname):
                 result = page._extract_port_from_hostname(hostname)
                 self.assertEqual(result, expected_port)
+
+
+class WebPageThrottleConfigurationTest(SimpleTestCase):
+    def test_page_reads_only_use_the_general_user_throttle(self):
+        view = WebPageViewSet()
+        view.request = RequestFactory().get("/api/v1/webpages/pages/")
+
+        self.assertEqual(
+            [type(throttle) for throttle in view.get_throttles()],
+            [UserRateThrottle],
+        )
+
+    def test_page_writes_also_use_the_modification_scope(self):
+        view = WebPageViewSet()
+        view.request = RequestFactory().post("/api/v1/webpages/pages/")
+
+        self.assertEqual(
+            [type(throttle) for throttle in view.get_throttles()],
+            [UserRateThrottle, ScopedRateThrottle],
+        )
+        self.assertEqual(view.throttle_scope, "webpage_modifications")
 
 
 class RateLimitingTest(TestCase):

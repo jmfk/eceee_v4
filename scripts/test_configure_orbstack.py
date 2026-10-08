@@ -13,6 +13,40 @@ SPEC.loader.exec_module(configure_orbstack)
 
 
 class DotenvHelpersTests(unittest.TestCase):
+    def test_checkout_redis_namespace_is_unique_and_acl_compatible(self):
+        self.assertEqual(
+            configure_orbstack.checkout_redis_namespace(Path("/tmp/eceee_v4_2")),
+            "eceee_v4:eceee_v4_2",
+        )
+        self.assertEqual(
+            configure_orbstack.checkout_redis_namespace(Path("/tmp/ECEEE feature!")),
+            "eceee_v4:eceee-feature",
+        )
+
+    def test_checkout_postgres_identity_uses_the_checkout_name(self):
+        self.assertEqual(
+            configure_orbstack.checkout_postgres_identity(Path("/tmp/ECEEE v4_2")),
+            ("eceee_v4_2", "local_eceee_v4_2"),
+        )
+
+    def test_isolated_postgres_config_is_preserved_for_this_checkout(self):
+        present = {
+            "POSTGRES_DB": "eceee_v4_2",
+            "POSTGRES_USER": "local_eceee_v4_2",
+            "POSTGRES_PASSWORD": "not-printed",
+        }
+
+        self.assertTrue(
+            configure_orbstack.has_isolated_postgres_config(
+                present, Path("/tmp/eceee_v4_2")
+            )
+        )
+        self.assertFalse(
+            configure_orbstack.has_isolated_postgres_config(
+                present, Path("/tmp/eceee_v4_3")
+            )
+        )
+
     def test_parse_dotenv_values_accepts_export_and_empty_values(self):
         values = configure_orbstack.parse_dotenv_values(
             "export PRESENT=value\nEMPTY=\n# COMMENTED=ignored\n"

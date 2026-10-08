@@ -105,6 +105,35 @@ def validate_registered_ports(
         )
 
 
+def checkout_redis_namespace(project_root: Path = ROOT) -> str:
+    """Return an ACL-compatible Redis namespace unique to this checkout."""
+    checkout = re.sub(r"[^a-z0-9_-]+", "-", project_root.name.lower()).strip("-_")
+    if not checkout:
+        raise SystemExit("cannot derive a Redis namespace from the checkout path")
+    return f"eceee_v4:{checkout}"
+
+
+def checkout_postgres_identity(project_root: Path = ROOT) -> tuple[str, str]:
+    """Return the conventional database and role names for an isolated checkout."""
+    database = re.sub(r"[^a-z0-9_]+", "_", project_root.name.lower()).strip("_")
+    if not database:
+        raise SystemExit("cannot derive a PostgreSQL identity from the checkout path")
+    return database, f"local_{database}"
+
+
+def has_isolated_postgres_config(
+    present: dict[str, str], project_root: Path = ROOT
+) -> bool:
+    """Check whether the current env already targets this checkout's clone."""
+    database, user = checkout_postgres_identity(project_root)
+    return (
+        database != "eceee_v4"
+        and present.get("POSTGRES_DB") == database
+        and present.get("POSTGRES_USER") == user
+        and bool(present.get("POSTGRES_PASSWORD"))
+    )
+
+
 def read_secret(path: Path) -> str:
     if not path.is_file() or path.is_symlink():
         raise SystemExit(f"missing or unsafe provider secret file: {path}")
@@ -223,6 +252,7 @@ def main() -> int:
             )
         expected_public_values = {
             "COMPOSE_PROJECT_NAME": ROOT.name.replace("_", "-"),
+            "ECEEE_REDIS_NAMESPACE": checkout_redis_namespace(),
             "FRONTEND_PORT": str(frontend_port),
             "BACKEND_PORT": str(backend_port),
             "ECEEE_IMGPROXY_PORT": str(registered_ports["imgproxy"]),
@@ -246,9 +276,6 @@ def main() -> int:
         return 0
 
     password_root = provider / "secrets" / "projects"
-    postgres_password = read_secret(
-        password_root / ("eceee-v4-demo.password" if args.demo else "eceee-v4.password")
-    )
     redis_password = read_secret(password_root / "eceee-v4.redis.password")
     minio_secret = read_secret(password_root / "eceee-v4.minio.secret-key")
 
@@ -259,8 +286,21 @@ def main() -> int:
             "local .env needs imgproxy credentials; run make configure-local-infra"
         )
 
-    postgres_database = "eceee_demo" if args.demo else "eceee_v4"
-    postgres_user = "local_eceee_demo" if args.demo else "local_eceee_v4"
+    checkout_database, checkout_user = checkout_postgres_identity()
+    preserve_isolated_database = not args.demo and has_isolated_postgres_config(
+        present
+    )
+    if preserve_isolated_database:
+        postgres_database = checkout_database
+        postgres_user = checkout_user
+        postgres_password = present["POSTGRES_PASSWORD"]
+    else:
+        postgres_database = "eceee_demo" if args.demo else "eceee_v4"
+        postgres_user = "local_eceee_demo" if args.demo else "local_eceee_v4"
+        postgres_password = read_secret(
+            password_root
+            / ("eceee-v4-demo.password" if args.demo else "eceee-v4.password")
+        )
     updates = {
         "COMPOSE_PROJECT_NAME": ROOT.name.replace("_", "-"),
         "FRONTEND_PORT": str(frontend_port),
@@ -280,7 +320,7 @@ def main() -> int:
             "redis://eceee_v4:"
             f"{quote(redis_password, safe='')}@host.docker.internal:10301/0"
         ),
-        "ECEEE_REDIS_NAMESPACE": "eceee_v4",
+        "ECEEE_REDIS_NAMESPACE": checkout_redis_namespace(),
         "AWS_ACCESS_KEY_ID": "eceee-v4",
         "AWS_SECRET_ACCESS_KEY": minio_secret,
         "AWS_STORAGE_BUCKET_NAME": "eceee-media",

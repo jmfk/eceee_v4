@@ -10,7 +10,7 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
-from rest_framework.throttling import UserRateThrottle
+from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
 
 from ..filters import WebPageFilter
 from ..models import PageVersion, WebPage
@@ -19,7 +19,7 @@ from ..services.page_version_workflow import normalize_change_summary
 
 
 class WebPageViewSet(viewsets.ModelViewSet):
-    """ViewSet for managing web pages with rate limiting for hostname operations."""
+    """ViewSet for managing web pages with additional write throttling."""
 
     queryset = (
         WebPage.objects.select_related(
@@ -34,7 +34,6 @@ class WebPageViewSet(viewsets.ModelViewSet):
     )
 
     permission_classes = [permissions.IsAuthenticated]
-    # Rate limiting for hostname management security
     throttle_classes = [UserRateThrottle]
     throttle_scope = "webpage_modifications"
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -52,6 +51,13 @@ class WebPageViewSet(viewsets.ModelViewSet):
         "sort_order",
         "id",
     ]
+
+    def get_throttles(self):
+        """Apply the modification scope only to requests that change pages."""
+        throttles = super().get_throttles()
+        if self.request.method not in permissions.SAFE_METHODS:
+            throttles.append(ScopedRateThrottle())
+        return throttles
 
     @staticmethod
     def _legacy_publication_response():
