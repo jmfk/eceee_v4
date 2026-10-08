@@ -306,7 +306,7 @@ export const EditorNavItemModal = ({
 
     return (
         <div
-            className="fixed inset-0 z-[10080] flex items-center justify-center bg-black/40 p-4"
+            className="eceee-editor-ui fixed inset-0 z-[10080] flex items-center justify-center bg-black/40 p-4"
             onMouseDown={(event) => {
                 if (event.target === event.currentTarget) {
                     onClose?.()

@@ -262,7 +262,7 @@ const PageWidgetFactory = ({
     if (!CoreWidgetComponent) {
         // Fallback for unsupported widgets
         return (
-            <div className={`widget-item unsupported ${className}`}>
+            <div className={`eceee-editor-ui widget-item unsupported ${className}`}>
                 <div className="bg-red-50 border border-red-200 p-4">
                     <div className="flex items-center space-x-3">
                         <div className="bg-red-100 w-10 h-10 flex items-center justify-center text-red-600 border">
@@ -599,7 +599,7 @@ const PageWidgetFactory = ({
                 {/* PageEditor-specific Preview Modal */}
                 {showPreview && (
                     <div
-                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010]"
+                        className="eceee-editor-ui fixed inset-0 bg-black/50 flex items-center justify-center z-[10010]"
                         onClick={handleClosePreview}
                     >
                         <div

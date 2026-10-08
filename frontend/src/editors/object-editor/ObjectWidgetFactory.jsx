@@ -251,14 +251,14 @@ const ObjectWidgetFactory = ({
             >
                 {/* Paste Mode Markers */}
                 {pasteModeActive && hoveredWidgetId === actualWidgetId && pasteHoverPosition === 'before' && (
-                    <div className="absolute -top-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
+                    <div className="eceee-editor-ui absolute -top-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
                         <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-purple-500 text-white text-xs px-2 py-0.5 rounded-t whitespace-nowrap">
                             Paste here
                         </div>
                     </div>
                 )}
                 {pasteModeActive && hoveredWidgetId === actualWidgetId && pasteHoverPosition === 'after' && (
-                    <div className="absolute -bottom-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
+                    <div className="eceee-editor-ui absolute -bottom-1 left-0 right-0 h-1 bg-purple-500 z-[10006] pointer-events-none">
                         <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full bg-purple-500 text-white text-xs px-2 py-0.5 rounded-b whitespace-nowrap">
                             Paste here
                         </div>
@@ -296,7 +296,7 @@ const ObjectWidgetFactory = ({
 
                 {/* Slot requirement indicator */}
                 {slotConfig?.required && (
-                    <div className="absolute top-2 left-2 z-10">
+                    <div className="eceee-editor-ui absolute top-2 left-2 z-10">
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">
                             Required
                         </span>
@@ -327,7 +327,7 @@ const ObjectWidgetFactory = ({
                 {/* ObjectEditor-specific Preview Modal */}
                 {showPreview && (
                     <div
-                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                        className="eceee-editor-ui fixed inset-0 bg-black/50 flex items-center justify-center z-50"
                         onClick={handleClosePreview}
                     >
                         <div
@@ -390,7 +390,7 @@ const ObjectWidgetFactory = ({
                 />
             </div>
         ) : (
-            <div className={`widget-item unsupported ${className}`}>
+            <div className={`eceee-editor-ui widget-item unsupported ${className}`}>
                 <div className="bg-red-50 border border-red-200 rounded p-4">
                     <div className="flex items-center space-x-3">
                         <div className="bg-red-100 rounded-lg w-10 h-10 flex items-center justify-center text-red-600 border">
