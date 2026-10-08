@@ -313,9 +313,9 @@ const HeroWidget = ({
                     <Layers className="w-4 h-4 text-gray-600" />
                 </button>
                 <div className="hero-content">
-                    <div ref={beforeTextContainerRef} />
-                    <div ref={headerContainerRef} />
-                    <div ref={afterTextContainerRef} />
+                    <div ref={beforeTextContainerRef} style={{ display: 'contents' }} />
+                    <div ref={headerContainerRef} style={{ display: 'contents' }} />
+                    <div ref={afterTextContainerRef} style={{ display: 'contents' }} />
                 </div>
                 {/* Media Insert Modal */}
                 {showImageModal && (
