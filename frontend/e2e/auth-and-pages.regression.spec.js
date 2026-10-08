@@ -154,12 +154,13 @@ test.describe('CMS auth and page management regressions', () => {
       await expect(page.getByTestId(`page-tree-node-${rootId}`)).toBeVisible()
       await page.getByTestId(`page-tree-expand-${rootId}`).click()
       await expect(page.getByTestId(`page-tree-node-${childId}`)).toBeVisible()
-      await expect(
-        page.getByTestId('page-tree-node-draft-registration-details').getByText('Not published', { exact: true })
-      ).toBeVisible()
-      await expect(
-        page.getByTestId('page-tree-node-scheduled-venue-travel').getByText(/^Scheduled ·/)
-      ).toBeVisible()
+      const draftRow = page.getByTestId('page-tree-node-draft-registration-details')
+      await expect(draftRow.getByLabel(/^Not published\./)).toBeVisible()
+      await expect(draftRow.getByTestId('page-publication-status-label')).toBeHidden()
+
+      const scheduledRow = page.getByTestId('page-tree-node-scheduled-venue-travel')
+      await expect(scheduledRow.getByLabel(/^Scheduled ·/)).toBeVisible()
+      await expect(scheduledRow.getByTestId('page-publication-status-label')).toBeHidden()
       await expect(page.getByLabel('Missing hostname')).toBeVisible()
       await page.getByTestId(`page-tree-expand-${childId}`).click()
       await expect(page.getByTestId(`page-tree-node-${nestedId}`)).toBeVisible()
