@@ -286,6 +286,7 @@ describe('canonical widget update ownership', () => {
         expect(container.querySelector('.hero-content > div > h1.hero-header')).toHaveTextContent('Hero title')
         expect(container.querySelector('.hero-content > div > p.hero-before-text.before-text')).toHaveTextContent('Before')
         expect(container.querySelector('.hero-content > div > p.hero-after-text.after-text')).toHaveTextContent('After')
+        expect([...container.querySelectorAll('.hero-content > div')].every((wrapper) => wrapper.style.display === 'contents')).toBe(true)
     })
 
     it('HeroWidget hydrates external UDC updates without echoing user edits', async () => {

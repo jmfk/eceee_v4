@@ -677,7 +677,9 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         ? findTargetNode(root, focusState.highlightedTargetId, focusState.highlightedWidgetId, focusState.highlightedInstanceId)
         : null
     if (restoredSelection) {
-        applySelectionClasses(root, restoredSelection)
+        const restoredTarget = nodeTargets(restoredSelection)
+            .find((target: any) => target.id === focusState.selectedTargetId)
+        applySelectionClasses(root, restoredSelection, restoredTarget)
         selectedNode = restoredSelection
         showSpacing(restoredSelection)
     }
