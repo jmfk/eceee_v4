@@ -264,18 +264,6 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                             }
                         }
 
-                        // Handle special color variables for navbar and footer
-                        if (part === 'navbar-widget' || part === 'footer-widget') {
-                            const partName = part.replace('-widget', '');
-                            if (bpProps.backgroundColor) {
-                                const varName = `--${partName}-bg-color-${bpKey}`;
-                                cssVariables.push(`  ${varName}: ${bpProps.backgroundColor};`);
-                            }
-                            if (bpProps.color) {
-                                const varName = `--${partName}-text-color-${bpKey}`;
-                                cssVariables.push(`  ${varName}: ${bpProps.color};`);
-                            }
-                        }
                     }
                 }
             }
@@ -323,15 +311,10 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                             : [partSelector];
                     }).join(',\n');
 
-                    // Convert properties to CSS (skip 'images' field and special color vars)
+                    // Convert properties to CSS (skip 'images' field)
                     const cssRules = [];
                     for (const [prop, value] of Object.entries(bpProps)) {
                         if (prop === 'images') continue; // Skip images - handled as CSS variables
-
-                        // Skip backgroundColor and color for navbar/footer - handled as CSS variables
-                        if (part === 'navbar-widget' || part === 'footer-widget') {
-                            if (prop === 'backgroundColor' || prop === 'color') continue;
-                        }
 
                         // Handle composite image properties (backgroundImage with url field)
                         if (prop === 'backgroundImage' && value && typeof value === 'object' && value.url) {
