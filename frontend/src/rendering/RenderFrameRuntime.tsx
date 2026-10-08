@@ -14,11 +14,11 @@ const DESIGNER_STYLE_PROPERTIES: Record<string, string> = {
     padding: 'padding', paddingTop: 'padding-top', paddingRight: 'padding-right', paddingBottom: 'padding-bottom', paddingLeft: 'padding-left',
 }
 
-const EDITABLE_TEXT_SELECTOR = 'a,blockquote,code,em,h1,h2,h3,h4,h5,h6,li,p,pre,span,strong'
+const EDITABLE_TEXT_SELECTOR = 'a,blockquote,caption,code,em,h1,h2,h3,h4,h5,h6,li,p,pre,span,strong'
 const RICH_TEXT_SELECTOR = '.content-widget,.banner-text,.object-data-preview-field dd'
 const editableTextLabel = (node: HTMLElement) => {
     if (/^H[1-6]$/.test(node.tagName)) return `Heading ${node.tagName.slice(1)} text`
-    return ({ A: 'Link text', BLOCKQUOTE: 'Quote text', CODE: 'Code text', LI: 'List item text', P: 'Paragraph text', PRE: 'Preformatted text' } as Record<string, string>)[node.tagName] || 'Text'
+    return ({ A: 'Link text', BLOCKQUOTE: 'Quote text', CAPTION: 'Table caption', CODE: 'Code text', LI: 'List item text', P: 'Paragraph text', PRE: 'Preformatted text' } as Record<string, string>)[node.tagName] || 'Text'
 }
 
 const FRAME_CSS = `${PUBLIC_RENDER_CSS}

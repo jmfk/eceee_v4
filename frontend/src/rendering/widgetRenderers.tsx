@@ -205,7 +205,7 @@ const ContentCardRender: WidgetRenderComponent = ({ widget }) => {
         className={`content-card-widget widget-type-easy-widgets-contentcardwidget cms-content${value(config, 'showBorder', 'show_border') === false ? ' border-disabled' : ''}`}
         id={value(config, 'anchor') || undefined}
     >
-        {header && <div className="content-card-header"><TextWithBreaks>{header}</TextWithBreaks></div>}
+        {header && <h2 className="content-card-header"><TextWithBreaks>{header}</TextWithBreaks></h2>}
         <div className={`content-card-body image-size-${imageSize}`}>
             <SafeHtml className="content-card-text" html={content} />
             {imageUrl(image) && <div className="content-card-images">
@@ -280,8 +280,8 @@ const TableRender: WidgetRenderComponent = ({ widget }) => {
     ].filter(Boolean).join(' ')
     const columnWidths = asArray<string>(value(config, 'columnWidths', 'column_widths'))
     return <div className={className}>
-        {value(config, 'caption') && <div className="table-caption text-sm text-gray-600 mb-2">{value(config, 'caption')}</div>}
         <table className={`${value(config, 'tableWidth', 'table_width') === 'full' ? 'w-full' : ''}${showBorders ? ' border' : ''}`} style={{ borderCollapse: 'collapse', borderColor: showBorders ? '#d1d5db' : undefined }}>
+            {value(config, 'caption') && <caption className="table-caption text-sm text-gray-600 mb-2">{value(config, 'caption')}</caption>}
             {columnWidths.length > 0 && <colgroup>{columnWidths.map((width, index) => <col key={index} style={{ width }} />)}</colgroup>}
             <tbody>{rows.map((row, rowIndex) => {
                 const normalizedRow = Array.isArray(row) ? { cells: row.map((content) => ({ content })) } : row
@@ -520,7 +520,7 @@ const FormRender: WidgetRenderComponent = ({ widget, context }) => {
     return <div className="widget-type-easy-widgets-formswidget" data-widget-type="forms">
         {value(config, 'title', 'formTitle', 'form_title') && <header className="form-header">
             <h2 className="form-title">{value(config, 'title', 'formTitle', 'form_title')}</h2>
-            {value(config, 'description', 'formDescription', 'form_description') && <div className="form-description">{value(config, 'description', 'formDescription', 'form_description')}</div>}
+            {value(config, 'description', 'formDescription', 'form_description') && <p className="form-description">{value(config, 'description', 'formDescription', 'form_description')}</p>}
         </header>}
         {publicWithoutHandler
             ? <div className="dynamic-form forms-widget" data-form-status="submission-unavailable">{contents}</div>
@@ -648,7 +648,7 @@ const NewsListRender: WidgetRenderComponent = ({ widget, context }) => {
             {showImage && <div className="news-featured-image"><ImageView source={fields.image} alt={item.title || ''} /></div>}
             <div className="news-content"><div className="news-meta"><span className="news-type">{fields.objectType.label || fields.objectType.name}</span>{fields.pinned && <span className="pinned-badge">Pinned</span>}{showDate && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{formatDisplayDate(fields.publishDate)}</time>}</div>
                 <h3 className="news-title"><PreviewLink href={fields.path}>{item.title || `Article ${index + 1}`}</PreviewLink></h3>
-                {showExcerpt && excerpt && <div className="news-excerpt">{excerpt}</div>}
+                {showExcerpt && excerpt && <p className="news-excerpt">{excerpt}</p>}
                 <div className="news-footer"><PreviewLink className="read-more" href={fields.path}>Read more →</PreviewLink></div>
             </div>
         </article>
@@ -751,7 +751,7 @@ const TopNewsPlugRender: WidgetRenderComponent = ({ widget }) => {
             {fields.image && <div className="news-image"><ImageView source={fields.image} alt={item.title || ''} /></div>}
             <div className="news-body"><div className="news-meta">{showType && <span className="news-type-badge">{fields.objectType.label || fields.objectType.name}</span>}{showDate && fields.publishDate && <time className="news-date" dateTime={fields.publishDate}>{formatDisplayDate(fields.publishDate, 'short')}</time>}</div>
                 <h3 className="news-title"><PreviewLink href={fields.path}>{item.title || `Article ${index + 1}`}</PreviewLink></h3>
-                {showExcerpt && excerpt && <div className="news-excerpt">{excerpt}</div>}
+                {showExcerpt && excerpt && <p className="news-excerpt">{excerpt}</p>}
                 <div className="news-footer"><PreviewLink className="read-more" href={fields.path}>Read more</PreviewLink></div>
             </div>
         </article>

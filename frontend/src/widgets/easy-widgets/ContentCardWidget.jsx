@@ -177,6 +177,7 @@ const ContentCardWidget = ({
                     onChange: handleHeaderChange,
                     placeholder: 'Enter card header...',
                     element: 'h2',
+                    className: 'content-card-header header',
                     allowedButtons: undefined,
                     allowedFormats: undefined,
                     pageId: pageId,
@@ -327,7 +328,7 @@ const ContentCardWidget = ({
                     id={configRef.current.anchor || undefined}
                     style={{ height: '310px', marginBottom: '40px' }}
                 >
-                    <div className="content-card-header header" ref={headerContainerRef} />
+                    <div ref={headerContainerRef} style={{ display: 'contents' }} />
 
                     <div className={bodyClasses}>
                         <div className="content-card-text content" ref={contentContainerRef} />
@@ -394,14 +395,14 @@ const ContentCardWidget = ({
                 style={{ height: '310px' }}
             >
                 {configRef.current.header && (
-                    <div className="content-card-header header">
+                    <h2 className="content-card-header header">
                         {configRef.current.header.split('\n').map((line, idx) => (
                             <React.Fragment key={idx}>
                                 {line}
                                 {idx < configRef.current.header.split('\n').length - 1 && <br />}
                             </React.Fragment>
                         ))}
-                    </div>
+                    </h2>
                 )}
 
                 <div className={bodyClasses}>

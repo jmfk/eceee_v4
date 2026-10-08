@@ -12,7 +12,7 @@ import DesignGroupsInfoModal from '../../components/DesignGroupsInfoModal'
 const HeaderWidget = ({ config = {}, mode = 'preview' }) => {
     // Simple markup, styled by design groups CSS
     return (
-        <div className="widget-type-header header-widget"></div>
+        <header className="widget-type-header header-widget"></header>
     )
 }
 

@@ -130,6 +130,7 @@ describe('PageRenderer', () => {
             },
         })
         const { container } = render(<PageRenderer model={model} />)
+        expect(container.querySelector('.header-widget')?.tagName).toBe('HEADER')
         expect(container.querySelector('.header-widget.widget-type-header')).toBeTruthy()
         expect(container.querySelector('.hero-widget')).toHaveStyle({ backgroundImage: "url('https://example.com/hero.jpg')" })
         expect(container.querySelector('.hero-content > .hero-header')).toHaveTextContent('Hero')
@@ -736,6 +737,8 @@ describe('PageRenderer', () => {
             } }] },
         })
         const { container } = render(<PageRenderer model={model} />)
+        expect(screen.getByText('Canonical table').tagName).toBe('CAPTION')
+        expect(screen.getByText('Canonical table').parentElement?.tagName).toBe('TABLE')
         expect(screen.getByRole('columnheader', { name: 'Person' })).toBeInTheDocument()
         expect(screen.getByRole('cell', { name: 'Ada' })).toHaveAttribute('colspan', '2')
         expect(screen.getByRole('cell', { name: 'Ada' })).toHaveClass('cell-v-middle')
@@ -791,6 +794,7 @@ describe('PageRenderer', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'form', type: 'easy_widgets.FormsWidget', config: {
                 title: 'Canonical form',
+                description: 'Tell us what you need',
                 fields: [
                     { name: 'phone', label: 'Phone', type: 'phone' },
                     { name: 'count', label: 'Count', type: 'number' },
@@ -805,6 +809,8 @@ describe('PageRenderer', () => {
             } }] },
         })
         render(<PageRenderer model={model} />)
+        expect(screen.getByRole('heading', { name: 'Canonical form', level: 2 })).toBeInTheDocument()
+        expect(screen.getByText('Tell us what you need').tagName).toBe('P')
         expect(screen.getByLabelText('Phone')).toHaveAttribute('type', 'tel')
         expect(screen.getByLabelText('Count')).toHaveAttribute('type', 'number')
         expect(screen.getByLabelText('Message').tagName).toBe('TEXTAREA')
@@ -892,7 +898,7 @@ describe('PageRenderer', () => {
             } }] },
         })
         const { container } = render(<PageRenderer model={model} />)
-        expect(container.querySelector('.content-card-header')).toHaveTextContent('Card heading')
+        expect(container.querySelector('.content-card-header')).toMatchObject({ tagName: 'H2', textContent: 'Card heading' })
         expect(container.querySelector('.content-card-body.image-size-rectangle .content-card-text')).toHaveTextContent('Card body')
         expect(container.querySelector('.content-card-images .content-card-image')).toHaveAttribute('src', '/card.jpg')
     })

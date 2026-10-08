@@ -189,9 +189,9 @@ const NewsListWidget = ({
                                 </div>
 
                                 {config.showExcerpts && (
-                                    <div className="news-excerpt">
+                                    <p className="news-excerpt">
                                         {getExcerpt(item)}
-                                    </div>
+                                    </p>
                                 )}
 
                                 <div className="news-footer">
@@ -238,4 +238,3 @@ NewsListWidget.metadata = {
 };
 
 export default NewsListWidget;
-

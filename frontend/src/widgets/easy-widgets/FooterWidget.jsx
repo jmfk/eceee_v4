@@ -214,7 +214,7 @@ const FooterWidget = ({
         const widgets = slotsData.content || [];
 
         return (
-            <div className="footer-widget border border-gray-200 mb-4 relative group" style={footerStyle}>
+            <footer className="footer-widget border border-gray-200 mb-4 relative group" style={footerStyle}>
                 {/* Background image edit icon */}
                 <button
                     onClick={() => {
@@ -287,7 +287,7 @@ const FooterWidget = ({
                         customTitle="Edit Footer Background Image"
                     />
                 )}
-            </div>
+            </footer>
         );
     }
 

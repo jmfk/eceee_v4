@@ -10,9 +10,9 @@
 
 <div class="content-card-widget widget-type-{{ widget_type.css_class_name }} cms-content{% if not config.show_border %} border-disabled{% endif %}"{% if config.anchor %} id="{{ config.anchor }}"{% endif %}>
     {% if config.header %}
-    <div class="content-card-header">
+    <h2 class="content-card-header">
         {{ config.header|linebreaksbr }}
-    </div>
+    </h2>
     {% endif %}
     <div class="content-card-body image-size-{{ config.image_size|default:'square' }}">
         <div class="content-card-text">
