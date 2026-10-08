@@ -94,4 +94,20 @@ describe('generateDesignGroupsCSS', () => {
         expect(css).not.toContain('--footer-bg-color-')
         expect(css).not.toContain('--footer-text-color-')
     })
+
+    it('renders numeric custom breakpoints defined by Theme Designer', () => {
+        const css = generateDesignGroupsCSS({
+            groups: [{
+                widgetTypes: ['easy_widgets.FooterWidget'],
+                layoutProperties: {
+                    'footer-widget': {
+                        900: { padding: '3rem' },
+                    },
+                },
+            }],
+        })
+
+        expect(css).toContain('@media (min-width: 900px)')
+        expect(css).toContain('padding: 3rem;')
+    })
 })

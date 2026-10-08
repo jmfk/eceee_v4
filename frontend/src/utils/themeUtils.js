@@ -277,8 +277,18 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
 
             // Now generate regular CSS properties for layout parts
             for (const [part, partBreakpoints] of Object.entries(group.layoutProperties)) {
+                const standardBreakpoints = ['xs', 'sm', 'md', 'lg', 'xl'];
+                const customBreakpoints = Object.keys(partBreakpoints)
+                    .filter(key => /^\d+$/.test(key));
+                const layoutBreakpoints = [...standardBreakpoints, ...customBreakpoints]
+                    .sort((left, right) => {
+                        const leftValue = /^\d+$/.test(left) ? Number(left) : bps[left];
+                        const rightValue = /^\d+$/.test(right) ? Number(right) : bps[right];
+                        return leftValue - rightValue;
+                    });
+
                 // Mobile-first approach: Handle each breakpoint in order
-                for (const bpKey of ['xs', 'sm', 'md', 'lg', 'xl']) {
+                for (const bpKey of layoutBreakpoints) {
                     // Get properties for this breakpoint with legacy support
                     let bpProps = {};
 
@@ -362,7 +372,7 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                         cssParts.push(rule);
                     } else {
                         // Media query for larger breakpoints (mobile-first)
-                        const bpPx = bps[bpKey];
+                        const bpPx = /^\d+$/.test(bpKey) ? Number(bpKey) : bps[bpKey];
                         const rule = `@media (min-width: ${bpPx}px) {\n  ${partSelectors} {\n${cssRules.map(r => `  ${r}`).join('\n')}\n  }\n}`;
                         cssParts.push(rule);
                     }
