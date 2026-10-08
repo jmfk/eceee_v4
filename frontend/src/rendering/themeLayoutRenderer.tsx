@@ -103,7 +103,7 @@ export const validateLayoutDefinition = (layout: unknown): layout is ThemeLayout
             slots.push(node.slot_key)
         }
         const containsSlot = (candidate: ThemeLayoutNode): boolean => candidate.type === 'slot' || candidate.children.some(containsSlot)
-        if (containsSlot(node) && Object.values(node.styles || {}).some((styles) => styles?.display === 'none')) return false
+        if (containsSlot(node) && Object.values(node.styles || {}).some((styles) => String(styles?.display || '').trim().toLowerCase() === 'none')) return false
         return node.children.every((child) => visit(child, depth + 1))
     }
     return visit(value.root, 1) && slots.length === new Set(slots).size

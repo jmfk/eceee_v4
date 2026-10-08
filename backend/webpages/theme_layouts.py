@@ -634,7 +634,9 @@ def validate_theme_layouts(document):
             for child in children:
                 child_contains_slot = visit(child, depth + 1) or child_contains_slot
             contains_slot = node_type == "slot" or child_contains_slot
-            if contains_slot and any(values.get("display") == "none" for values in styles.values()):
+            if contains_slot and any(
+                str(values.get("display", "")).strip().lower() == "none" for values in styles.values()
+            ):
                 raise ValidationError(f"{path}.root cannot hide a node that contains a slot.")
             return contains_slot
 
@@ -652,6 +654,56 @@ def validate_theme_layouts(document):
     return document
 
 
+def validate_layout_widgets(theme, layout_key, widgets):
+    """Enforce persisted slot limits and widget allow/deny policies."""
+    if not theme or not layout_key or not isinstance(widgets, dict):
+        return widgets
+    layout = next(
+        (item for item in (theme.layouts or {}).get("items", []) if item.get("key") == layout_key),
+        None,
+    )
+    if not layout:
+        return widgets
+
+    def matches(widget_type, patterns):
+        return any(
+            pattern == "*"
+            or widget_type == pattern
+            or (pattern.endswith(".*") and widget_type.startswith(pattern[:-1]))
+            for pattern in patterns
+        )
+
+    errors = []
+    slots = layout.get("slots", {})
+    for slot_key, items in widgets.items():
+        if not isinstance(items, list):
+            errors.append(f"Slot '{slot_key}' widgets must be a list.")
+            continue
+        if not items:
+            continue
+        policy = slots.get(slot_key)
+        if policy is None:
+            errors.append(f"Slot '{slot_key}' is not declared by layout '{layout_key}'.")
+            continue
+        maximum = policy.get("max_widgets")
+        if maximum is not None and len(items) > maximum:
+            errors.append(f"Slot '{slot_key}' allows at most {maximum} widgets.")
+        allowed = policy.get("allowed_widget_types")
+        disallowed = policy.get("disallowed_widget_types") or []
+        for widget in items:
+            widget_type = widget.get("type") if isinstance(widget, dict) else None
+            if not isinstance(widget_type, str) or not widget_type.strip():
+                errors.append(f"Every widget in slot '{slot_key}' must have a type.")
+                continue
+            if allowed and not matches(widget_type, allowed):
+                errors.append(f"Widget type '{widget_type}' is not allowed in slot '{slot_key}'.")
+            elif disallowed and matches(widget_type, disallowed):
+                errors.append(f"Widget type '{widget_type}' is not allowed in slot '{slot_key}'.")
+    if errors:
+        raise ValidationError(errors)
+    return widgets
+
+
 def theme_layout_usage(theme):
     """Return conservative usage counts for layout and slot compatibility checks."""
     from django.db.models import Q
@@ -659,9 +711,33 @@ def theme_layout_usage(theme):
     from webpages.models import PageDataSchema, PageVersion
 
     usage = {}
+    default_theme = type(theme).get_default_theme(tenant=theme.tenant)
     versions = PageVersion.objects.filter(page__tenant=theme.tenant).filter(Q(theme=theme) | Q(theme__isnull=True))
     for version in versions.only("page_id", "layout_key", "code_layout", "widgets"):
+        effective_theme = version.theme
+        if effective_theme is None:
+            current = version.page.parent
+            include_parent_drafts = not version.is_published()
+            while current and effective_theme is None:
+                parent_version = (
+                    current.get_latest_version() if include_parent_drafts else current.get_current_published_version()
+                )
+                effective_theme = parent_version.theme if parent_version and parent_version.theme else None
+                current = current.parent
+            effective_theme = effective_theme or default_theme
+        if effective_theme is None or effective_theme.pk != theme.pk:
+            continue
         key = version.layout_key or version.code_layout
+        current = version.page.parent
+        include_parent_drafts = not version.is_published()
+        while not key and current:
+            parent_version = (
+                current.get_latest_version() if include_parent_drafts else current.get_current_published_version()
+            )
+            key = (parent_version.layout_key or parent_version.code_layout) if parent_version else ""
+            current = current.parent
+        if not key:
+            key = (effective_theme.layouts or {}).get("default_layout_key")
         if not key:
             continue
         entry = usage.setdefault(key, {"page_ids": set(), "version_count": 0, "schema_count": 0, "slots": {}})

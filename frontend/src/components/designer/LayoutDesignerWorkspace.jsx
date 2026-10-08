@@ -72,12 +72,12 @@ const documentError = (document) => {
     return invalid ? `Layout “${invalid.label || invalid.key || 'Untitled'}” has an invalid tree or slot definition.` : ''
 }
 
-const TreeNode = ({ node, selectedId, onSelect, onDragStart, onDrop, depth = 0 }) => (
+const TreeNode = ({ node, selectedId, onSelect, onDragStart, onDrop, disabled = false, depth = 0 }) => (
     <li>
-        <button type="button" draggable onDragStart={(event) => onDragStart(event, node.id)} onDragOver={(event) => { if (node.type !== 'slot') event.preventDefault() }} onDrop={(event) => onDrop(event, node.id)} onClick={() => onSelect(node.id)} aria-current={selectedId === node.id ? 'true' : undefined} className={`flex min-h-8 w-full items-center gap-2 rounded px-2 py-1 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${selectedId === node.id ? 'bg-blue-50 font-medium text-blue-800' : 'text-gray-700 hover:bg-gray-100'}`} style={{ paddingLeft: `${8 + depth * 14}px` }}>
+        <button type="button" draggable={!disabled} disabled={disabled} onDragStart={(event) => { if (!disabled) onDragStart(event, node.id) }} onDragOver={(event) => { if (!disabled && node.type !== 'slot') event.preventDefault() }} onDrop={(event) => { if (!disabled) onDrop(event, node.id) }} onClick={() => onSelect(node.id)} aria-current={selectedId === node.id ? 'true' : undefined} className={`flex min-h-8 w-full items-center gap-2 rounded px-2 py-1 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 ${selectedId === node.id ? 'bg-blue-50 font-medium text-blue-800' : 'text-gray-700 hover:bg-gray-100'}`} style={{ paddingLeft: `${8 + depth * 14}px` }}>
             <span className="truncate">{node.label || (node.type === 'slot' ? `Slot · ${node.slot_key}` : node.type)}</span>
         </button>
-        {node.children.length > 0 && <ul>{node.children.map((child) => <TreeNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} onDragStart={onDragStart} onDrop={onDrop} depth={depth + 1} />)}</ul>}
+        {node.children.length > 0 && <ul>{node.children.map((child) => <TreeNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} onDragStart={onDragStart} onDrop={onDrop} disabled={disabled} depth={depth + 1} />)}</ul>}
     </li>
 )
 
@@ -241,6 +241,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
     }, [initialLayoutKey])
 
     const commit = (next, selection = {}) => {
+        if (disabled) return false
         const error = documentError(next)
         if (error) {
             setJsonError(error)
@@ -257,6 +258,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
     }
 
     const restoreHistory = (source, setSource, setTarget) => {
+        if (disabled) return
         const previous = source.at(-1)
         if (!previous) return
         setSource(source.slice(0, -1))
@@ -270,6 +272,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
 
     useEffect(() => {
         const onKeyDown = (event) => {
+            if (disabled) return
             if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return
             event.preventDefault()
             if (event.shiftKey) restoreHistory(redoStack, setRedoStack, setUndoStack)
@@ -277,7 +280,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
         }
         window.addEventListener('keydown', onKeyDown)
         return () => window.removeEventListener('keydown', onKeyDown)
-    }, [layouts, redoStack, undoStack])
+    }, [disabled, layouts, redoStack, undoStack])
 
     const updateLayout = (updater, selection) => {
         const next = clone(layouts)
@@ -458,6 +461,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
 
     useEffect(() => {
         const onStructureKeyDown = (event) => {
+            if (disabled) return
             const tag = event.target?.tagName?.toLowerCase()
             if (['input', 'textarea', 'select'].includes(tag)) return
             if (event.altKey && event.key === 'ArrowUp') { event.preventDefault(); move(-1) }
@@ -469,7 +473,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
         }
         window.addEventListener('keydown', onStructureKeyDown)
         return () => window.removeEventListener('keydown', onStructureKeyDown)
-    }, [layouts, selectedLayoutId, selectedNodeId])
+    }, [disabled, layouts, selectedLayoutId, selectedNodeId])
 
     const applyJson = () => {
         try {
@@ -518,7 +522,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
         {jsonError && <div role="alert" className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">{jsonError}</div>}
         {mode === 'json' ? <section className="flex min-h-0 flex-1 flex-col p-4">
             <label htmlFor="theme-layout-json" className="mb-2 text-sm font-medium text-gray-800">Canonical layout document</label>
-            <textarea id="theme-layout-json" spellCheck="false" value={jsonText} onChange={(event) => { setJsonText(event.target.value); setJsonError('') }} className="min-h-0 flex-1 resize-none rounded border border-gray-300 bg-white p-4 font-mono text-xs leading-5 text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" />
+            <textarea id="theme-layout-json" spellCheck="false" value={jsonText} disabled={disabled} onChange={(event) => { setJsonText(event.target.value); setJsonError('') }} className="min-h-0 flex-1 resize-none rounded border border-gray-300 bg-white p-4 font-mono text-xs leading-5 text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:bg-gray-100" />
             <div className="mt-3 flex justify-end"><button type="button" onClick={applyJson} disabled={disabled} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">Apply JSON</button></div>
         </section> : <div
             ref={workspaceRef}
@@ -546,14 +550,14 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
                     <button type="button" onClick={deleteLayout} disabled={disabled || ['main_layout', 'landing_page', 'error_layout'].includes(selectedLayout.key)} className={iconButton} aria-label="Delete unused layout"><Trash2 className="h-4 w-4" /></button>
                 </div>
                 <div className="mt-5 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Structure</h3><select aria-label="Node to add" defaultValue="" onChange={(event) => { if (event.target.value) addNode(event.target.value); event.target.value = '' }} disabled={disabled} className="rounded border border-gray-300 bg-white px-2 py-1 text-xs"><option value="" disabled>Add…</option>{nodeTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select></div>
-                <ul className="mt-2"><TreeNode node={selectedLayout.root} selectedId={selectedNodeId} onSelect={selectStructureNode} onDragStart={(event, nodeId) => event.dataTransfer.setData('text/layout-node', nodeId)} onDrop={(event, targetId) => { event.preventDefault(); reparentNode(event.dataTransfer.getData('text/layout-node'), targetId) }} /></ul>
+                <ul className="mt-2"><TreeNode node={selectedLayout.root} selectedId={selectedNodeId} onSelect={selectStructureNode} onDragStart={(event, nodeId) => event.dataTransfer.setData('text/layout-node', nodeId)} onDrop={(event, targetId) => { event.preventDefault(); reparentNode(event.dataTransfer.getData('text/layout-node'), targetId) }} disabled={disabled} /></ul>
                 <div className="mt-3 flex flex-wrap gap-1 border-t border-gray-200 pt-3">
-                    <button type="button" onClick={() => move(-1)} className={iconButton} aria-label="Move node up"><ArrowUp className="h-4 w-4" /></button>
-                    <button type="button" onClick={() => move(1)} className={iconButton} aria-label="Move node down"><ArrowDown className="h-4 w-4" /></button>
-                    <button type="button" onClick={indent} className={iconButton} aria-label="Indent node"><ArrowRightFromLine className="h-4 w-4" /></button>
-                    <button type="button" onClick={outdent} className={iconButton} aria-label="Outdent node"><ArrowLeftFromLine className="h-4 w-4" /></button>
-                    <button type="button" onClick={duplicateNode} className={iconButton} aria-label="Duplicate node"><Copy className="h-4 w-4" /></button>
-                    <button type="button" onClick={deleteNode} className={iconButton} aria-label="Delete unused node"><Trash2 className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => move(-1)} disabled={disabled} className={iconButton} aria-label="Move node up"><ArrowUp className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => move(1)} disabled={disabled} className={iconButton} aria-label="Move node down"><ArrowDown className="h-4 w-4" /></button>
+                    <button type="button" onClick={indent} disabled={disabled} className={iconButton} aria-label="Indent node"><ArrowRightFromLine className="h-4 w-4" /></button>
+                    <button type="button" onClick={outdent} disabled={disabled} className={iconButton} aria-label="Outdent node"><ArrowLeftFromLine className="h-4 w-4" /></button>
+                    <button type="button" onClick={duplicateNode} disabled={disabled} className={iconButton} aria-label="Duplicate node"><Copy className="h-4 w-4" /></button>
+                    <button type="button" onClick={deleteNode} disabled={disabled} className={iconButton} aria-label="Delete unused node"><Trash2 className="h-4 w-4" /></button>
                 </div>
                 </>}
             </aside>
@@ -639,7 +643,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
                     {!inspectorCollapsed && <h2 className="truncate text-sm font-semibold text-gray-900">{inspectingLayout ? 'Layout inspector' : selected?.node.label || (selected?.node.type === 'slot' ? `Slot · ${selected.node.slot_key}` : selected?.node.type || 'Inspector')}</h2>}
                     <button type="button" onClick={() => setInspectorCollapsed((current) => !current)} className={iconButton} aria-label={inspectorCollapsed ? 'Expand layout inspector' : 'Collapse layout inspector'} aria-expanded={!inspectorCollapsed} title={inspectorCollapsed ? 'Expand layout inspector' : 'Collapse layout inspector'}>{inspectorCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}</button>
                 </div>
-                {!inspectorCollapsed && <>
+                {!inspectorCollapsed && <fieldset disabled={disabled} className="contents">
                 {inspectingLayout && <div className="mt-4 space-y-4">
                     <label className="block text-xs font-medium text-gray-700">Layout label<input value={selectedLayout.label} onChange={(event) => updateLayout((layout) => ({ ...layout, label: event.target.value }))} className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm" /></label>
                     <label className="block text-xs font-medium text-gray-700">Description<textarea value={selectedLayout.description || ''} onChange={(event) => updateLayout((layout) => ({ ...layout, description: event.target.value }))} rows="2" className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm" /></label>
@@ -700,7 +704,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
                         })}
                     </div>
                 </div>}
-                </>}
+                </fieldset>}
             </aside>
         </div>}
     </main>

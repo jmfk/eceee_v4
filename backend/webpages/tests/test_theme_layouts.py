@@ -1,13 +1,21 @@
 from copy import deepcopy
+from importlib import import_module
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase
+from django.contrib.auth.models import User
+from django.test import SimpleTestCase, TestCase
+
+from core.models import Tenant
+from webpages.models import PageTheme, WebPage
+from webpages.serializers import PageVersionSerializer
 
 from webpages.theme_layouts import (
     default_theme_layouts,
     legacy_compatibility_layout,
+    theme_layout_usage,
+    validate_layout_widgets,
     validate_layout_compatibility,
     validate_theme_layouts,
 )
@@ -48,6 +56,13 @@ class ThemeLayoutValidationTests(SimpleTestCase):
     def test_nodes_containing_slots_cannot_be_hidden(self):
         document = deepcopy(default_theme_layouts())
         document["items"][0]["root"]["styles"]["sm"] = {"display": "none"}
+
+        with self.assertRaisesMessage(ValidationError, "cannot hide"):
+            validate_theme_layouts(document)
+
+    def test_hidden_slot_detection_normalizes_css_keywords(self):
+        document = deepcopy(default_theme_layouts())
+        document["items"][0]["root"]["styles"]["sm"] = {"display": " NONE "}
 
         with self.assertRaisesMessage(ValidationError, "cannot hide"):
             validate_theme_layouts(document)
@@ -102,3 +117,104 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         document["items"].append(legacy_compatibility_layout("article_layout", {"lead", "main"}))
 
         self.assertIs(validate_theme_layouts(document), document)
+
+    def test_widget_policies_reject_disallowed_types_and_enforce_finite_limits(self):
+        theme = SimpleNamespace(layouts=default_theme_layouts())
+
+        with self.assertRaisesMessage(ValidationError, "not allowed"):
+            validate_layout_widgets(
+                theme,
+                "main_layout",
+                {"main": [{"type": "easy_widgets.HeaderWidget"}]},
+            )
+        with self.assertRaisesMessage(ValidationError, "at most 1"):
+            validate_layout_widgets(
+                theme,
+                "main_layout",
+                {"header": [{"type": "easy_widgets.HeaderWidget"}, {"type": "easy_widgets.HeaderWidget"}]},
+            )
+
+        widgets = {"main": [{"type": "easy_widgets.ContentWidget"}] * 21}
+        self.assertEqual(len(validate_layout_widgets(theme, "main_layout", widgets)["main"]), 21)
+
+    def test_widget_policies_reject_malformed_slot_and_widget_shapes(self):
+        theme = SimpleNamespace(layouts=default_theme_layouts())
+
+        with self.assertRaisesMessage(ValidationError, "must be a list"):
+            validate_layout_widgets(theme, "main_layout", {"main": {}})
+        with self.assertRaisesMessage(ValidationError, "must have a type"):
+            validate_layout_widgets(theme, "main_layout", {"main": [{"config": {}}]})
+
+    def test_error_schema_consolidation_rejects_distinct_active_contracts(self):
+        migration = import_module("webpages.migrations.0082_consolidate_error_layouts")
+        schemas = [
+            SimpleNamespace(is_active=True, schema={"properties": {"code": {"type": "string"}}}),
+            SimpleNamespace(is_active=True, schema={"properties": {"retry": {"type": "boolean"}}}),
+        ]
+
+        with self.assertRaisesMessage(RuntimeError, "different page-data schemas"):
+            migration.ensure_compatible_error_schemas(schemas)
+
+        schemas[1].schema = deepcopy(schemas[0].schema)
+        migration.ensure_compatible_error_schemas(schemas)
+
+
+class ThemeLayoutUsageTests(TestCase):
+    def test_inherited_versions_are_counted_only_for_their_effective_theme(self):
+        user = User.objects.create_user("layout-usage", password="test")
+        tenant = Tenant.objects.create(name="Layout usage", identifier="layout-usage", created_by=user)
+        unrelated = PageTheme.objects.create(tenant=tenant, name="Unrelated", is_default=True, created_by=user)
+        inherited = PageTheme.objects.create(tenant=tenant, name="Inherited", created_by=user)
+        parent = WebPage.objects.create(
+            tenant=tenant, title="Parent", slug="parent", created_by=user, last_modified_by=user
+        )
+        child = WebPage.objects.create(
+            tenant=tenant, parent=parent, title="Child", slug="child", created_by=user, last_modified_by=user
+        )
+        parent_version = parent.create_version(user, "Parent draft")
+        parent_version.theme = inherited
+        parent_version.layout_key = "main_layout"
+        parent_version.save(update_fields=["theme", "layout_key"])
+        child.create_version(user, "Child draft")
+
+        self.assertNotIn("main_layout", theme_layout_usage(unrelated))
+        self.assertIn(str(child.id), theme_layout_usage(inherited)["main_layout"]["page_ids"])
+
+    def test_page_version_serializer_enforces_database_layout_widget_policy(self):
+        user = User.objects.create_user("layout-policy", password="test")
+        tenant = Tenant.objects.create(name="Layout policy", identifier="layout-policy", created_by=user)
+        theme = PageTheme.objects.create(tenant=tenant, name="Policy theme", is_default=True, created_by=user)
+        page = WebPage.objects.create(
+            tenant=tenant, title="Policy page", slug="policy", created_by=user, last_modified_by=user
+        )
+        version = page.create_version(user, "Policy draft")
+        version.theme = theme
+        version.layout_key = "main_layout"
+        version.save(update_fields=["theme", "layout_key"])
+
+        serializer = PageVersionSerializer(
+            version,
+            data={"widgets": {"main": [{"type": "easy_widgets.HeaderWidget", "config": {}}]}},
+            partial=True,
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("widgets", serializer.errors)
+
+    def test_page_version_serializer_revalidates_existing_widgets_when_layout_changes(self):
+        user = User.objects.create_user("layout-change-policy", password="test")
+        tenant = Tenant.objects.create(name="Layout change policy", identifier="layout-change-policy", created_by=user)
+        theme = PageTheme.objects.create(tenant=tenant, name="Policy theme", is_default=True, created_by=user)
+        page = WebPage.objects.create(
+            tenant=tenant, title="Policy page", slug="policy-change", created_by=user, last_modified_by=user
+        )
+        version = page.create_version(user, "Policy draft")
+        version.theme = theme
+        version.layout_key = "error_layout"
+        version.widgets = {"visual": [{"type": "easy_widgets.ImageWidget", "config": {}}]}
+        version.save(update_fields=["theme", "layout_key", "widgets"])
+
+        serializer = PageVersionSerializer(version, data={"layoutKey": "main_layout"}, partial=True)
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("widgets", serializer.errors)

@@ -22,7 +22,6 @@ const PageWidgetSelectionModal = ({
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
-    const [showAllWidgets, setShowAllWidgets] = useState(false); // Override filtering
 
     // Fetch available widget types
     useEffect(() => {
@@ -45,19 +44,6 @@ const PageWidgetSelectionModal = ({
 
     // Filter widgets based on allowed types, disallowed types, search, and category
     const filteredWidgets = availableWidgets.filter(widget => {
-        // If override is active, skip type filtering
-        if (showAllWidgets) {
-            const matchesSearch = !searchTerm ||
-                widget.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                widget.description?.toLowerCase().includes(searchTerm.toLowerCase());
-
-            const matchesCategory = selectedCategory === 'all' ||
-                widget.category === selectedCategory ||
-                (selectedCategory === 'core' && widget.type.startsWith('easy_widgets.'));
-
-            return matchesSearch && matchesCategory;
-        }
-
         // Check if widget type is allowed in this slot
         let isAllowed;
         
@@ -161,8 +147,8 @@ const PageWidgetSelectionModal = ({
                         />
                     </div>
 
-                    {/* Override Checkbox and Category Filter */}
-                    <div className="flex items-center justify-between gap-4">
+                    {/* Category Filter */}
+                    <div className="flex items-center gap-4">
                         <div className="flex flex-wrap gap-2 flex-1">
                             {categories.map(category => (
                                 <button
@@ -177,24 +163,6 @@ const PageWidgetSelectionModal = ({
                             </button>
                         ))}
                         </div>
-                        
-                        {/* Override checkbox */}
-                        {(allowedWidgetTypes.length > 0 && !allowedWidgetTypes.includes('*')) || disallowedWidgetTypes ? (
-                            <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
-                                <input
-                                    type="checkbox"
-                                    checked={showAllWidgets}
-                                    onChange={(e) => setShowAllWidgets(e.target.checked)}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                />
-                                <span className="text-sm text-gray-700">Show All Widgets</span>
-                                {showAllWidgets && (
-                                    <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
-                                        Override Active
-                                    </span>
-                                )}
-                            </label>
-                        ) : null}
                     </div>
                 </div>
 

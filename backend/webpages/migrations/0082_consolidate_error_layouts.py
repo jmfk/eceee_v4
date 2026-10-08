@@ -11,6 +11,19 @@ from webpages.error_page_defaults import ERROR_PAGE_CONTENT, error_page_widgets
 LEGACY_ERROR_LAYOUTS = {"error_403", "error_404", "error_500", "error_503"}
 
 
+def ensure_compatible_error_schemas(schemas):
+    """Refuse to discard distinct active error-page data contracts."""
+    active = [schema for schema in schemas if schema.is_active]
+    if len(active) < 2:
+        return
+    expected = active[0].schema
+    if any(schema.schema != expected for schema in active[1:]):
+        raise RuntimeError(
+            "Active legacy error layouts use different page-data schemas. "
+            "Reconcile them before consolidating to error_layout."
+        )
+
+
 def normalize_layout_document(document):
     if not isinstance(document, dict):
         document = webpages.theme_layouts.default_theme_layouts()
@@ -62,6 +75,7 @@ def consolidate_error_layouts(apps, schema_editor):
 
     schemas = list(PageDataSchema.objects.filter(scope="layout", layout_key__in=LEGACY_ERROR_LAYOUTS).order_by("id"))
     keeper = PageDataSchema.objects.filter(scope="layout", layout_key="error_layout", is_active=True).first()
+    ensure_compatible_error_schemas([*([keeper] if keeper else []), *schemas])
     for schema in schemas:
         if schema.is_active:
             if keeper is not None:
@@ -120,4 +134,6 @@ def consolidate_error_layouts(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [("webpages", "0081_normalize_required_layout_labels")]
 
+    # Product rollout is intentionally forward-only. Production recovery uses the
+    # pre-deploy backup and a corrected roll-forward migration, not migration reversal.
     operations = [migrations.RunPython(consolidate_error_layouts, migrations.RunPython.noop)]

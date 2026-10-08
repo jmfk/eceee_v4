@@ -30,6 +30,7 @@ const WidgetSlot = ({
     behavior = {},
     // Legacy props for backward compatibility
     allowedWidgetTypes = ['*'],
+    disallowedWidgetTypes = null,
     maxWidgets = 20, // Increased default
     required = false,
     onShowWidgetModal,
@@ -61,6 +62,7 @@ const WidgetSlot = ({
     // Extract behavior props with defaults
     const {
         allowedWidgetTypes: behaviorAllowedTypes = allowedWidgetTypes,
+        disallowedWidgetTypes: behaviorDisallowedTypes = disallowedWidgetTypes,
         maxWidgets: behaviorMaxWidgets = maxWidgets,
         required: behaviorRequired = required,
         slotType: behaviorSlotType = slotType
@@ -68,6 +70,7 @@ const WidgetSlot = ({
 
     // Use the extracted values
     const finalAllowedWidgetTypes = behaviorAllowedTypes;
+    const finalDisallowedWidgetTypes = behaviorDisallowedTypes;
     const finalMaxWidgets = behaviorMaxWidgets;
     const finalRequired = behaviorRequired;
     const finalSlotType = behaviorSlotType;
@@ -237,7 +240,7 @@ const WidgetSlot = ({
             // Determine which widget types are allowed for this slot
             // Priority: allowed_types/inheritableTypes > disallowed_types
             let allowedTypes = finalAllowedWidgetTypes;
-            let disallowedTypes = null;
+            let disallowedTypes = finalDisallowedWidgetTypes;
 
             // Check for allowed_types in slot rules
             const hasAllowedTypes = slotRules.allowedTypes !== undefined && slotRules.allowedTypes.length > 0;
@@ -287,6 +290,7 @@ const WidgetSlot = ({
 
         // Determine allowed widget types for this slot (same logic as handleAddWidget)
         let allowedTypes = finalAllowedWidgetTypes;
+        let disallowedTypes = finalDisallowedWidgetTypes;
         const hasAllowedTypes = slotRules.allowedTypes !== undefined && slotRules.allowedTypes.length > 0;
 
         if (slotRules.inheritableTypes !== undefined) {
@@ -300,6 +304,7 @@ const WidgetSlot = ({
         } else if (slotRules.disallowedTypes !== undefined && slotRules.disallowedTypes.length > 0) {
             // Note: disallowedTypes filtering is handled in the widget modal
             allowedTypes = ['*'];
+            disallowedTypes = slotRules.disallowedTypes;
         }
 
         try {
@@ -346,6 +351,7 @@ const WidgetSlot = ({
                         slotMetadata={{
                             label,
                             allowedWidgetTypes: allowedTypes,
+                            disallowedWidgetTypes: disallowedTypes,
                             maxWidgets: finalMaxWidgets
                         }}
                         // Path variables for dynamic content
@@ -436,7 +442,7 @@ const WidgetSlot = ({
                                     maxWidgets={finalMaxWidgets}
                                     onAddWidget={handleWidgetAction}
                                     onClearSlot={onClearSlot}
-                                    onShowWidgetModal={onShowWidgetModal}
+                                    onShowWidgetModal={handleAddWidget}
                                     onImportContent={onImportContent}
                                 />
                             </div>

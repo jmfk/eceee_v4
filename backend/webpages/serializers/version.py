@@ -321,6 +321,13 @@ class PageVersionSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"layoutKey": f"Layout '{effective_key}' is not defined by the effective theme."}
                 )
+            if {"widgets", "layout_key", "code_layout", "theme"}.intersection(attrs):
+                from webpages.theme_layouts import validate_layout_widgets
+
+                try:
+                    validate_layout_widgets(effective_theme, effective_key, attrs.get("widgets", self.instance.widgets))
+                except DjangoValidationError as exc:
+                    raise serializers.ValidationError({"widgets": exc.messages}) from exc
         if "page_data" in attrs:
             attrs["page_data"] = validate_page_data_for_version(
                 self.instance,
