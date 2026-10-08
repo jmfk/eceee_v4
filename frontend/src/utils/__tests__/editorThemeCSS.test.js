@@ -219,6 +219,17 @@ describe('shared TypeScript theme CSS', () => {
         expect(result).not.toContain('@scope')
     })
 
+    it('falls back to legacy CSS variables when the modern color palette is empty', () => {
+        const result = buildThemeCSS({
+            theme: {
+                colors: {},
+                cssVariables: { legacyBrand: '#654321' },
+            },
+        })
+
+        expect(result).toContain('--legacyBrand: #654321;')
+    })
+
     it('includes gallery and carousel style collections', () => {
         const result = buildThemeCSS({
             theme: {
