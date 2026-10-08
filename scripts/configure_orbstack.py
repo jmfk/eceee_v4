@@ -9,11 +9,13 @@ never prints credential values.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import secrets
 import socket
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from urllib.parse import quote
@@ -26,14 +28,69 @@ DEFAULT_PROVIDER = Path(
 ).expanduser()
 ENV_FILE = ROOT / ".env"
 TEMPLATE = ROOT / ".env.template"
-REGISTERED_FRONTEND_PORT = 10100
-REGISTERED_BACKEND_PORT = 10101
+DEFAULT_PORT_REGISTRY_SCRIPT = Path(
+    os.environ.get(
+        "PORT_SPACE_REGISTRY_SCRIPT",
+        Path.home()
+        / ".codex"
+        / "skills"
+        / "port-space-registry"
+        / "scripts"
+        / "port_space_registry.py",
+    )
+).expanduser()
 
 
-def validate_registered_ports(frontend_port: int, backend_port: int) -> None:
+def load_registered_ports(
+    project_root: Path = ROOT,
+    registry_script: Path = DEFAULT_PORT_REGISTRY_SCRIPT,
+) -> dict[str, int]:
+    if not registry_script.is_file():
+        raise SystemExit(
+            "machine port registry helper not found; set PORT_SPACE_REGISTRY_SCRIPT"
+        )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(registry_script),
+            "get",
+            "--project",
+            str(project_root.resolve()),
+            "--json",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            "this checkout has no readable machine port registry reservation"
+        )
+
+    try:
+        payload = json.loads(result.stdout)
+        ports = {name: int(port) for name, port in payload["ports"].items()}
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise SystemExit("machine port registry returned invalid project data") from exc
+
+    missing = {"frontend", "backend", "imgproxy", "playwright-renderer"} - ports.keys()
+    if missing:
+        raise SystemExit(
+            "machine port registry is missing required labels: "
+            + ", ".join(sorted(missing))
+        )
+    return ports
+
+
+def validate_registered_ports(
+    frontend_port: int,
+    backend_port: int,
+    registered_ports: dict[str, int],
+) -> None:
     expected = {
-        "frontend": REGISTERED_FRONTEND_PORT,
-        "backend": REGISTERED_BACKEND_PORT,
+        "frontend": registered_ports["frontend"],
+        "backend": registered_ports["backend"],
     }
     actual = {"frontend": frontend_port, "backend": backend_port}
     mismatches = [
@@ -109,27 +166,25 @@ def check_port(name: str, port: int) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--provider-root", type=Path, default=DEFAULT_PROVIDER)
-    parser.add_argument("--backend-port", type=int, default=10101)
-    parser.add_argument("--frontend-port", type=int, default=10100)
-    parser.add_argument("--check-only", action="store_true")
+    parser.add_argument("--backend-port", type=int)
+    parser.add_argument("--frontend-port", type=int)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--check-only", action="store_true")
+    mode.add_argument("--runtime-check", action="store_true")
     parser.add_argument("--demo", action="store_true")
     args = parser.parse_args()
     provider = args.provider_root.resolve()
+    registered_ports = load_registered_ports()
+    frontend_port = args.frontend_port or registered_ports["frontend"]
+    backend_port = args.backend_port or registered_ports["backend"]
 
-    validate_registered_ports(args.frontend_port, args.backend_port)
+    validate_registered_ports(frontend_port, backend_port, registered_ports)
 
     context = subprocess.run(
         ["docker", "context", "show"], text=True, capture_output=True, check=False
     ).stdout.strip()
     if context != "orbstack":
         raise SystemExit("local ECEEE development requires the orbstack Docker context")
-
-    password_root = provider / "secrets" / "projects"
-    postgres_password = read_secret(
-        password_root / ("eceee-v4-demo.password" if args.demo else "eceee-v4.password")
-    )
-    redis_password = read_secret(password_root / "eceee-v4.redis.password")
-    minio_secret = read_secret(password_root / "eceee-v4.minio.secret-key")
 
     check_port("PostgreSQL", 10300)
     check_port("Redis", 10301)
@@ -144,6 +199,59 @@ def main() -> int:
     else:
         original = ""
     present = parse_dotenv_values(original)
+
+    if args.runtime_check:
+        if not ENV_FILE.exists() or ENV_FILE.stat().st_mode & 0o077:
+            raise SystemExit("local .env is missing or is not mode 0600")
+        required_keys = {
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_STORAGE_BUCKET_NAME",
+            "DATABASE_URL",
+            "IMGPROXY_KEY",
+            "IMGPROXY_SALT",
+            "POSTGRES_DB",
+            "POSTGRES_PASSWORD",
+            "POSTGRES_USER",
+            "REDIS_URL",
+        }
+        missing_keys = sorted(key for key in required_keys if not present.get(key))
+        if missing_keys:
+            raise SystemExit(
+                "local .env is missing required runtime variables: "
+                + ", ".join(missing_keys)
+            )
+        expected_public_values = {
+            "COMPOSE_PROJECT_NAME": ROOT.name.replace("_", "-"),
+            "FRONTEND_PORT": str(frontend_port),
+            "BACKEND_PORT": str(backend_port),
+            "ECEEE_IMGPROXY_PORT": str(registered_ports["imgproxy"]),
+            "ECEEE_PLAYWRIGHT_PORT": str(
+                registered_ports["playwright-renderer"]
+            ),
+        }
+        mismatched_keys = sorted(
+            key
+            for key, value in expected_public_values.items()
+            if present.get(key) != value
+        )
+        if mismatched_keys:
+            raise SystemExit(
+                "local .env does not match this checkout's registered runtime for: "
+                + ", ".join(mismatched_keys)
+            )
+        print("eceee-local-runtime=orbstack")
+        print("eceee-shared-services=postgres,redis,minio:reachable")
+        print("eceee-env=runtime-ready:mode-0600")
+        return 0
+
+    password_root = provider / "secrets" / "projects"
+    postgres_password = read_secret(
+        password_root / ("eceee-v4-demo.password" if args.demo else "eceee-v4.password")
+    )
+    redis_password = read_secret(password_root / "eceee-v4.redis.password")
+    minio_secret = read_secret(password_root / "eceee-v4.minio.secret-key")
+
     if args.check_only and not all(
         present.get(key) for key in ("IMGPROXY_KEY", "IMGPROXY_SALT")
     ):
@@ -154,11 +262,11 @@ def main() -> int:
     postgres_database = "eceee_demo" if args.demo else "eceee_v4"
     postgres_user = "local_eceee_demo" if args.demo else "local_eceee_v4"
     updates = {
-        "COMPOSE_PROJECT_NAME": "eceee-v4",
-        "FRONTEND_PORT": str(args.frontend_port),
-        "BACKEND_PORT": str(args.backend_port),
-        "ECEEE_IMGPROXY_PORT": "10106",
-        "ECEEE_PLAYWRIGHT_PORT": "10107",
+        "COMPOSE_PROJECT_NAME": ROOT.name.replace("_", "-"),
+        "FRONTEND_PORT": str(frontend_port),
+        "BACKEND_PORT": str(backend_port),
+        "ECEEE_IMGPROXY_PORT": str(registered_ports["imgproxy"]),
+        "ECEEE_PLAYWRIGHT_PORT": str(registered_ports["playwright-renderer"]),
         "POSTGRES_DB": postgres_database,
         "POSTGRES_USER": postgres_user,
         "POSTGRES_PASSWORD": postgres_password,
@@ -185,9 +293,14 @@ def main() -> int:
     if args.check_only:
         if not ENV_FILE.exists() or ENV_FILE.stat().st_mode & 0o077:
             raise SystemExit("local .env is missing or is not mode 0600")
-        if any(present.get(key) != value for key, value in updates.items()):
+        mismatched_keys = [
+            key for key, value in updates.items() if present.get(key) != value
+        ]
+        if mismatched_keys:
             raise SystemExit(
-                "local .env needs reconfiguration; run make configure-local-infra"
+                "local .env needs reconfiguration for: "
+                + ", ".join(sorted(mismatched_keys))
+                + "; run make configure-local-infra"
             )
         print("eceee-local-runtime=orbstack")
         print("eceee-shared-services=postgres,redis,minio:reachable")

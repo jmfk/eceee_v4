@@ -10,8 +10,8 @@ ECEEE is a consumer of the machine-wide services in the sibling `shared-local-in
 
    ```bash
    make configure-local-infra
-   make shared-infra-check
-   make servers
+   make local-dev-check
+   make dev
    ```
 
 The configuration helper reads provider-managed credentials without printing them, atomically updates the ignored repo-root `.env`, and sets mode 0600.
@@ -26,7 +26,11 @@ The configuration helper reads provider-managed credentials without printing the
 
 Do not run provider `down`, reset, or volume deletion commands from this project. `make infra-down` stops only ECEEE's imgproxy. `make clean` likewise leaves shared service containers and volumes untouched.
 
-The application ports are fixed by the machine registry: frontend `10100` and backend `10101`. Change the registry and this consumer contract together rather than overriding ports from the project.
+Application ports are assigned per checkout by the machine registry. The
+configuration helper resolves the current checkout's `frontend`, `backend`,
+`imgproxy`, and `playwright-renderer` labels instead of assuming the canonical
+checkout's ports. Change the registry assignment rather than overriding ports
+ad hoc in `.env`.
 
 `make demo-reset-site` is the only destructive shared-database workflow. It is hard-limited to the separately admitted disposable database `eceee_demo`; it cannot reset `eceee_v4` or any other consumer database.
 
@@ -38,8 +42,14 @@ PostgreSQL-backed tests use `docker-compose.test-infra.yml`, which has isolated,
 
 ## Health checks
 
-- `make shared-infra-check` validates OrbStack, provider endpoints, secret-file permissions, and the local `.env` contract without printing credentials.
+- `make local-dev-check` validates OrbStack, registered checkout ports, provider
+  endpoints, secret-variable presence, and `.env` permissions without comparing
+  or printing credential values.
+- `make shared-infra-check` additionally verifies the canonical
+  provider-managed ECEEE database and credential contract.
 - `make check-servers` reports the shared services plus the ECEEE application endpoints.
 - `make check-conf` validates the local consumer contract.
+- `make dev`, `make dev-build`, `make dev-stop`, `make dev-logs`, and
+  `make dev-status` are the supported application lifecycle commands.
 
 The old `make use-external-infra` name remains as a backwards-compatible alias for `make configure-local-infra`.
