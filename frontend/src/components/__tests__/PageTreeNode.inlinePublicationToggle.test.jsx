@@ -49,7 +49,8 @@ describe('PageTreeNode publication status', () => {
     ])('shows the aggregate %s state', (workflowState, label) => {
         renderPage(workflowState)
 
-        expect(screen.getByText(label)).toBeInTheDocument()
+        expect(screen.getByText(label)).toHaveClass('hidden', 'lg:inline', 'whitespace-nowrap')
+        expect(screen.getByLabelText(new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.`))).toBeInTheDocument()
     })
 
     it('accepts snake-case workflow states from the API', () => {
@@ -71,6 +72,9 @@ describe('PageTreeNode publication status', () => {
         const indicator = screen.getByLabelText(/Live\. Open the page editor to change publication/i)
         expect(indicator).toHaveClass('cursor-help')
         expect(indicator).not.toHaveClass('cursor-pointer')
+
+        await user.hover(indicator)
+        expect(await screen.findByText('Live. Open the page editor to change publication.')).toBeVisible()
 
         await user.click(indicator)
         expect(screen.getByText('Live')).toBeInTheDocument()

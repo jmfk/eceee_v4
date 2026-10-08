@@ -50,18 +50,19 @@ describe('PageTreeNode responsive actions and metadata', () => {
         vi.clearAllMocks()
     })
 
-    it('keeps long titles and publication metadata accessible in separate regions', () => {
+    it('keeps publication metadata on the row and collapses its label below large widths', () => {
         renderNode({ level: 6 })
 
-        expect(screen.getByTestId('page-tree-identity-long-published-page-title')).toBeInTheDocument()
-        expect(screen.getByTestId('page-tree-metadata-long-published-page-title')).toBeInTheDocument()
+        expect(screen.getByTestId('page-tree-identity-long-published-page-title')).toHaveClass('flex-1', 'min-w-0')
+        expect(screen.getByTestId('page-tree-metadata-long-published-page-title')).toHaveClass('shrink-0')
         expect(screen.getByTitle(responsivePage.title)).toHaveAccessibleName(`Edit ${responsivePage.title}`)
-        expect(screen.getByText('Live · unpublished changes')).toBeVisible()
+        expect(screen.getByText('Live · unpublished changes')).toHaveClass('hidden', 'lg:inline', 'whitespace-nowrap')
         expect(screen.queryByText('📗 v7')).not.toBeInTheDocument()
         expect(screen.queryByText('✏️ v8')).not.toBeInTheDocument()
         expect(screen.getByLabelText('Missing hostname')).toBeVisible()
 
         const row = screen.getByTestId('page-tree-node-long-published-page-title')
+        expect(row).toHaveClass('flex-nowrap', 'items-center')
         expect(row.style.getPropertyValue('--tree-indent-mobile')).toBe('44px')
         expect(row.style.getPropertyValue('--tree-indent-desktop')).toBe('152px')
     })
