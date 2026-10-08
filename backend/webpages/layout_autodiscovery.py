@@ -8,17 +8,19 @@ and have them automatically registered.
 
 import importlib
 import logging
+import sys
 from typing import List
+
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
-from .layout_registry import layout_registry, BaseLayout
+from .layout_registry import layout_registry
 
 logger = logging.getLogger(__name__)
 
 
-def autodiscover_layouts() -> None:
+def autodiscover_layouts(*, force_reload: bool = False) -> None:
     """
     Automatically discover and register layout classes from all Django apps.
 
@@ -36,6 +38,15 @@ def autodiscover_layouts() -> None:
             # Try to import the layouts module from this app
             layouts_module_name = f"{app_name}.layouts"
             layouts_module = importlib.import_module(layouts_module_name)
+            if force_reload:
+                child_modules = [
+                    module
+                    for name, module in tuple(sys.modules.items())
+                    if name.startswith(f"{layouts_module_name}.") and module is not None
+                ]
+                for child_module in child_modules:
+                    importlib.reload(child_module)
+                importlib.reload(layouts_module)
 
             logger.debug(f"Imported layouts module from {app_name}")
             discovered_count += 1
@@ -48,8 +59,6 @@ def autodiscover_layouts() -> None:
             # Other errors during import should be logged as warnings
             logger.warning(f"Error importing layouts from {app_name}: {e}")
             continue
-
-    total_layouts = len(layout_registry.list_layouts(active_only=False))
 
 
 def discover_layouts_in_app(app_name: str) -> List[str]:
@@ -99,10 +108,7 @@ def validate_layout_configuration() -> None:
             invalid_layouts.append(layout_name)
 
     if invalid_layouts:
-        raise ImproperlyConfigured(
-            f"Invalid layout configurations found: {', '.join(invalid_layouts)}"
-        )
-
+        raise ImproperlyConfigured(f"Invalid layout configurations found: {', '.join(invalid_layouts)}")
 
 
 def get_layout_summary() -> dict:
@@ -138,11 +144,10 @@ def reload_layouts() -> None:
     layout_registry.clear()
 
     # Rediscover all layouts
-    autodiscover_layouts()
+    autodiscover_layouts(force_reload=True)
 
     # Validate configurations
     validate_layout_configuration()
-
 
 
 # Settings for layout discovery behavior

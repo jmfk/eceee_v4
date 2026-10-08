@@ -27,6 +27,40 @@ class CodeLayoutViewSet(viewsets.ViewSet):
     """
 
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    legacy_error_layout_names = {"error_403", "error_404", "error_500", "error_503"}
+
+    @classmethod
+    def _canonical_registry_layout_data(cls, layouts):
+        canonical = []
+        seen = set()
+        layout_data = [layout.to_dict() for layout in layouts]
+        layout_data.sort(key=lambda data: data.get("name") in cls.legacy_error_layout_names)
+        for data in layout_data:
+            if data.get("name") in cls.legacy_error_layout_names:
+                data = {
+                    **data,
+                    "name": "error_layout",
+                    "description": "Shared layout for site-owned 403, 404, 500, and 503 pages",
+                }
+            if data.get("name") in seen:
+                continue
+            seen.add(data.get("name"))
+            canonical.append(data)
+        return canonical
+
+    @staticmethod
+    def _get_registry_layout(layout_name):
+        """Resolve shared database-era aliases against the legacy code registry."""
+        from ..layout_registry import layout_registry
+
+        layout = layout_registry.get_layout(layout_name)
+        if layout or layout_name != "error_layout":
+            return layout
+        for legacy_name in ("error_404", "error_403", "error_500", "error_503"):
+            layout = layout_registry.get_layout(legacy_name)
+            if layout:
+                return layout
+        return None
 
     def _get_api_version(self, request):
         """Get API version from request headers or query params"""
@@ -158,6 +192,8 @@ class CodeLayoutViewSet(viewsets.ViewSet):
                 {
                     "name": item.get("key"),
                     "description": item.get("description", ""),
+                    "template_name": "",
+                    "css_classes": "",
                     "slot_configuration": {
                         "slots": [
                             {"name": key, "title": config.get("label", key), **config}
@@ -172,20 +208,8 @@ class CodeLayoutViewSet(viewsets.ViewSet):
             ]
         else:
             layouts = layout_registry.list_layouts(active_only=active_only)
-            layout_data = [layout.to_dict() for layout in layouts]
-            legacy_error_names = {"error_403", "error_404", "error_500", "error_503"}
-            legacy_error = next((item for item in layout_data if item.get("name") in legacy_error_names), None)
-            has_shared_error = any(item.get("name") == "error_layout" for item in layout_data)
-            layout_data = [item for item in layout_data if item.get("name") not in legacy_error_names]
-            if legacy_error and not has_shared_error:
-                layout_data.append(
-                    {
-                        **legacy_error,
-                        "name": "error_layout",
-                        "description": "Shared layout for site-owned 403, 404, 500, and 503 pages",
-                    }
-                )
-                layout_data.sort(key=lambda item: item.get("name", ""))
+            layout_data = self._canonical_registry_layout_data(layouts)
+            layout_data.sort(key=lambda item: item.get("name", ""))
 
         # Use serializer for consistent formatting
         serializer_context = {
@@ -213,10 +237,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
         """Get a specific code-based layout by name"""
-
-        from ..layout_registry import layout_registry
-
-        layout = layout_registry.get_layout(pk)
+        layout = self._get_registry_layout(pk)
         if not layout:
             error_data = {"error": f"Layout '{pk}' not found"}
             return self._create_formatted_response(error_data, request, status.HTTP_404_NOT_FOUND)
@@ -227,7 +248,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         self._log_metrics(request, "detail", layout_name=pk)
 
         # Get layout data
-        layout_data = layout.to_dict()
+        layout_data = self._canonical_registry_layout_data([layout])[0]
 
         # Use serializer for consistent formatting
         serializer_context = {
@@ -252,7 +273,8 @@ class CodeLayoutViewSet(viewsets.ViewSet):
 
         active_only = request.query_params.get("active_only", "true").lower() == "true"
         layouts = layout_registry.list_layouts(active_only=active_only)
-        choices = [(layout.name, layout.name) for layout in layouts]
+        canonical_layouts = self._canonical_registry_layout_data(layouts)
+        choices = [(layout["name"], layout["name"]) for layout in canonical_layouts]
 
         response = self._create_formatted_response(choices, request)
         response = self._add_caching_headers(response)
@@ -279,7 +301,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         api_version = self._get_api_version(request)
 
         # Get layout data
-        layout_data = default_layout.to_dict()
+        layout_data = self._canonical_registry_layout_data([default_layout])[0]
 
         # Use serializer for consistent formatting
         serializer_context = {
@@ -297,16 +319,15 @@ class CodeLayoutViewSet(viewsets.ViewSet):
     @action(detail=True, methods=["get"])
     def template(self, request, pk=None):
         """Get template data for a specific layout"""
-        from ..layout_registry import layout_registry
         from ..utils.template_parser import LayoutSerializer as TemplateLayoutSerializer
 
-        layout = layout_registry.get_layout(pk)
+        layout = self._get_registry_layout(pk)
         if not layout:
             error_data = {"error": f"Layout '{pk}' not found"}
             return self._create_formatted_response(error_data, request, status.HTTP_404_NOT_FOUND)
 
         # Log metrics for template requests
-        logger.info(f"Template data request: {pk}")
+        logger.info(f"Template data request: template_data layout={pk}")
 
         # Get template data
         serializer = TemplateLayoutSerializer()
