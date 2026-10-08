@@ -35,6 +35,7 @@ class SemanticWidgetMarkupTests(SimpleTestCase):
 
         self.assertIn('<h2 class="form-title">Contact</h2>', html)
         self.assertIn('<p class="form-description">', html)
+        self.assertIn(".form-description {\n    color: #4a5568;\n    line-height: 1.6;\n    margin: 0;\n}", html)
         self.assertNotIn('<div class="form-description">', html)
 
     def test_top_news_excerpt_is_a_paragraph(self):

@@ -166,6 +166,10 @@ class TableWidget(BaseWidget):
         background-color: var(--table-bg, transparent);
     }
 
+    .table-widget .table-caption {
+        text-align: left;
+    }
+
     .table-widget th,
     .table-widget td {
         padding: var(--cell-padding, 0.75rem);
