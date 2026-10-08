@@ -366,7 +366,7 @@ const WidgetSlot = ({
             );
         } catch (error) {
             return (
-                <div key={uniqueKey} className="p-4 bg-red-50 border border-red-200">
+                <div key={uniqueKey} className="eceee-editor-ui p-4 bg-red-50 border border-red-200">
                     <p className="text-sm text-red-600">
                         Error rendering widget: {error.message}
                     </p>
@@ -580,7 +580,7 @@ const WidgetSlot = ({
         );
     } catch (error) {
         return (
-            <div className="widget-slot-error p-6 bg-red-50 border-2 border-red-300">
+            <div className="eceee-editor-ui widget-slot-error p-6 bg-red-50 border-2 border-red-300">
                 <div className="text-lg font-semibold text-red-800 mb-2">Slot Rendering Error</div>
                 <div className="text-sm text-red-600 mb-2">
                     Failed to render slot: <strong>{label || name}</strong>
