@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+from django.db import transaction
 from django.db.models import Q
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
@@ -12,7 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.machine_api_keys import MachineAPIKeyAuthentication
-from core.models import MachineAPIKey
+from core.models import MachineAPIKey, Tenant
 from core.permissions import HasTenantAccess
 from file_manager.storage import S3MediaStorage
 from webpages.models import RemoteSiteBinding, SitePackageJob, ThemeRemoteAccessKey, WebPage
@@ -27,6 +28,7 @@ from webpages.serializers import (
 from webpages.services.site_package import (
     build_site_package_export_object_key,
     find_site_package_conflicts,
+    find_site_package_import_in_progress,
     get_site_package_download_filename,
     inspect_site_package_upload,
 )
@@ -159,55 +161,77 @@ class SitePackageImportListView(APIView):
         except ValueError as exc:
             raise serializers.ValidationError({"siteZip": str(exc)}) from exc
 
-        conflicts = find_site_package_conflicts(tenant, identity) if tenant else []
-        mode = serializer.validated_data["mode"]
-        if conflicts and mode == "prompt":
-            return Response(
-                {
-                    "code": "site_already_exists",
-                    "message": f'“{identity["title"]}” already exists. Choose how to import it.',
-                    "sourceSite": identity,
-                    "existingSites": [
-                        {"id": item["id"], "title": item["title"], "slug": item["slug"]} for item in conflicts
-                    ],
-                },
-                status=status.HTTP_409_CONFLICT,
-            )
-        if mode == "update":
-            selected = next(
-                (item for item in conflicts if item["id"] == serializer.validated_data["existing_root_id"]),
-                None,
-            )
-            if selected is None:
-                raise serializers.ValidationError({"existingRootId": "The selected site does not match this package."})
-        else:
-            selected = None
-            mode = "clone" if mode == "clone" else "create"
+        with transaction.atomic():
+            if tenant:
+                Tenant.objects.select_for_update().only("id").get(id=tenant.id)
+            in_progress = find_site_package_import_in_progress(tenant, identity) if tenant else None
+            if in_progress:
+                return Response(
+                    {
+                        "code": "site_import_in_progress",
+                        "message": f'“{identity["title"]}” is already being imported.',
+                        "jobId": str(in_progress.id),
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
 
-        options = {
-            "preserve_publication_status": serializer.validated_data["preserve_publication_status"],
-            "mode": mode,
-            "source_root_key": identity["stable_key"],
-            "source_root_id": identity["source_id"],
-        }
-        if selected:
-            options["local_root_id"] = selected["id"]
-            if selected["binding_job_id"]:
-                options["source_binding_job_id"] = selected["binding_job_id"]
-        if tenant:
-            options["tenant_id"] = str(tenant.id)
-        job = SitePackageJob.objects.create(
-            kind=SitePackageJob.KIND_IMPORT,
-            status=SitePackageJob.STATUS_PENDING,
-            created_by=request.user,
-            options=options,
-            expires_at=timezone.now() + timedelta(hours=24),
-        )
-        object_key = f"site-packages/imports/{job.id}.zip"
-        S3MediaStorage()._save(object_key, serializer.validated_data["site_zip"])
-        job.object_key = object_key
-        job.save(update_fields=["object_key", "updated_at"])
-        import_site_package.delay(str(job.id))
+            conflicts = find_site_package_conflicts(tenant, identity) if tenant else []
+            mode = serializer.validated_data["mode"]
+            if conflicts and mode == "prompt":
+                return Response(
+                    {
+                        "code": "site_already_exists",
+                        "message": f'“{identity["title"]}” already exists. Choose how to import it.',
+                        "sourceSite": identity,
+                        "existingSites": [
+                            {"id": item["id"], "title": item["title"], "slug": item["slug"]} for item in conflicts
+                        ],
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if mode == "update":
+                selected = next(
+                    (item for item in conflicts if item["id"] == serializer.validated_data["existing_root_id"]),
+                    None,
+                )
+                if selected is None:
+                    raise serializers.ValidationError(
+                        {"existingRootId": "The selected site does not match this package."}
+                    )
+            else:
+                selected = None
+                mode = "clone" if mode == "clone" else "create"
+
+            options = {
+                "preserve_publication_status": serializer.validated_data["preserve_publication_status"],
+                "mode": mode,
+                "source_root_key": identity["stable_key"],
+                "source_root_id": identity["source_id"],
+                "source_package_hash": identity["package_hash"],
+            }
+            if selected:
+                options["local_root_id"] = selected["id"]
+                if selected["binding_job_id"]:
+                    options["source_binding_job_id"] = selected["binding_job_id"]
+            if tenant:
+                options["tenant_id"] = str(tenant.id)
+            job = SitePackageJob.objects.create(
+                kind=SitePackageJob.KIND_IMPORT,
+                status=SitePackageJob.STATUS_PENDING,
+                created_by=request.user,
+                options=options,
+                expires_at=timezone.now() + timedelta(hours=24),
+            )
+            object_key = f"site-packages/imports/{job.id}.zip"
+            job.object_key = object_key
+            job.save(update_fields=["object_key", "updated_at"])
+
+        try:
+            S3MediaStorage()._save(object_key, serializer.validated_data["site_zip"])
+            import_site_package.delay(str(job.id))
+        except Exception as exc:
+            job.mark_failed(exc)
+            raise
         return Response(SitePackageJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
 
 
