@@ -72,6 +72,15 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         with self.assertRaisesMessage(ValidationError, "only container, semantic, and slot"):
             validate_theme_layouts(document)
 
+    def test_validates_editor_only_presentation_colours(self):
+        document = deepcopy(default_theme_layouts())
+        document["items"][0]["root"]["presentation_color"] = "#14b8a6"
+        self.assertIs(validate_theme_layouts(document), document)
+
+        document["items"][0]["root"]["presentation_color"] = "not-a-colour"
+        with self.assertRaisesMessage(ValidationError, "presentation_color"):
+            validate_theme_layouts(document)
+
     def test_raw_css_and_markup_are_rejected(self):
         document = deepcopy(default_theme_layouts())
         document["items"][0]["root"]["styles"]["base"]["background_color"] = "red;}</style><script>"

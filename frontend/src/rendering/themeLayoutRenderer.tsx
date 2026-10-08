@@ -15,6 +15,7 @@ const propertyMap: Record<string, string> = {
 const allowedBreakpoints = new Set(['base', 'xs', 'sm', 'md', 'lg', 'xl'])
 const keyPattern = /^[a-z][a-z0-9_]{0,63}$/
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const presentationColorPattern = /^#[0-9a-f]{6}$/i
 const defaultBreakpoints: Record<string, number> = { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 }
 const safeValue = (value: string | number) => {
     const text = String(value).trim()
@@ -31,6 +32,7 @@ export const normalizeLayoutDefinition = (layout: any): ThemeLayoutDefinition | 
         id: String(node?.id || ''),
         type: node?.type,
         label: String(node?.label || ''),
+        presentation_color: node?.presentation_color || node?.presentationColor,
         children: Array.isArray(node?.children) ? node.children.map(normalizeNode) : [],
         styles: Object.fromEntries(Object.entries(node?.styles || {}).map(([breakpoint, values]) => [
             breakpoint,
@@ -82,6 +84,10 @@ export const validateLayoutDefinition = (layout: unknown): layout is ThemeLayout
         if (!Array.isArray(node.children)) return false
         if (node.type === 'semantic' && !semanticTags.has(node.tag || 'div')) return false
         if (node.label !== undefined && (typeof node.label !== 'string' || node.label.length > 100)) return false
+        if (node.presentation_color !== undefined && (
+            !['container', 'semantic', 'slot'].includes(node.type)
+            || !presentationColorPattern.test(node.presentation_color)
+        )) return false
         if (node.editable_parameters !== undefined && (
             !Array.isArray(node.editable_parameters)
             || node.editable_parameters.some((property) => !propertyMap[property])
@@ -152,16 +158,20 @@ export const layoutCanvasDimensionsCss = (layout: ThemeLayoutDefinition, breakpo
     ].join('')
 }
 
-const LayoutNode = ({ node, slots, renderSlot, designer }: { node: ThemeLayoutNode, slots: ThemeLayoutDefinition['slots'], renderSlot: LayoutRenderProps['renderSlot'], designer: boolean }) => {
+const LayoutNode = ({ node, slots, renderSlot, designer, layoutCanvas }: { node: ThemeLayoutNode, slots: ThemeLayoutDefinition['slots'], renderSlot: LayoutRenderProps['renderSlot'], designer: boolean, layoutCanvas: boolean }) => {
     const className = (node.class_names || []).join(' ') || undefined
     const label = node.label || (node.type === 'slot' ? String(slots[node.slot_key || '']?.label || node.slot_key || 'Slot') : node.type)
     const target = JSON.stringify([{ id: `layout-node:${node.id}`, layoutNodeId: node.id, kind: node.type === 'slot' ? 'slot' : 'element', label, editableParameters: node.editable_parameters || [] }])
-    if (node.type === 'slot') return <div className={className || `layout-slot slot-${node.slot_key}`} data-layout-node-id={node.id} data-layout-node-type={node.type} data-layout-node-label={label} data-slot-name={node.slot_key} data-designer-target={designer ? 'true' : undefined} data-designer-targets={designer ? target : undefined}>
+    const presentationProps = layoutCanvas && node.presentation_color ? {
+        'data-layout-presentation-color': node.presentation_color,
+        style: { '--layout-presentation-color': node.presentation_color } as React.CSSProperties,
+    } : {}
+    if (node.type === 'slot') return <div className={className || `layout-slot slot-${node.slot_key}`} data-layout-node-id={node.id} data-layout-node-type={node.type} data-layout-node-label={label} data-slot-name={node.slot_key} data-designer-target={designer ? 'true' : undefined} data-designer-targets={designer ? target : undefined} {...presentationProps}>
         {renderSlot(node.slot_key || '')}
     </div>
     const tag = node.type === 'semantic' ? (node.tag || 'div') : 'div'
-    return React.createElement(tag, { className, 'data-layout-node-id': node.id, 'data-layout-node-type': node.type, 'data-layout-node-label': label, 'data-designer-target': designer ? 'true' : undefined, 'data-designer-targets': designer ? target : undefined },
-        node.children.map((child) => <LayoutNode key={child.id} node={child} slots={slots} renderSlot={renderSlot} designer={designer} />))
+    return React.createElement(tag, { className, 'data-layout-node-id': node.id, 'data-layout-node-type': node.type, 'data-layout-node-label': label, 'data-designer-target': designer ? 'true' : undefined, 'data-designer-targets': designer ? target : undefined, ...presentationProps },
+        node.children.map((child) => <LayoutNode key={child.id} node={child} slots={slots} renderSlot={renderSlot} designer={designer} layoutCanvas={layoutCanvas} />))
 }
 
 export const ThemeLayoutRender = ({ model, renderSlot }: LayoutRenderProps) => {
@@ -170,6 +180,6 @@ export const ThemeLayoutRender = ({ model, renderSlot }: LayoutRenderProps) => {
     return <>
         <style data-theme-layout-css={layout.key}>{layoutDefinitionCss(layout, model.layoutBreakpoints)}</style>
         {model.designer?.layoutCanvas && <style data-theme-layout-canvas-dimensions={layout.key}>{layoutCanvasDimensionsCss(layout, model.layoutBreakpoints)}</style>}
-        <LayoutNode node={layout.root} slots={layout.slots} renderSlot={renderSlot} designer={Boolean(model.designer)} />
+        <LayoutNode node={layout.root} slots={layout.slots} renderSlot={renderSlot} designer={Boolean(model.designer)} layoutCanvas={Boolean(model.designer?.layoutCanvas)} />
     </>
 }

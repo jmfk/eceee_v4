@@ -9,7 +9,7 @@ const framePostMessage = vi.fn()
 vi.mock('../../../rendering/RenderFrame', () => ({
     default: ({ model, onMessage, style, frameRef }) => {
         if (frameRef) frameRef.current = { contentWindow: { postMessage: framePostMessage } }
-        return <button type="button" data-layout-canvas={String(model.designer.layoutCanvas)} data-empty-slots={String(Object.values(model.slots).every((items) => items.length === 0))} data-frame-width={style?.width} data-root-md-background={model.layoutDefinition.root.styles?.md?.background_color || ''} onClick={() => onMessage?.({ data: { source: 'eceee-designer-preview', action: 'select', targetId: `layout-node:${model.layoutDefinition.root.children[0].id}` } })}>Canvas · {model.layoutDefinition.label}</button>
+        return <button type="button" data-layout-canvas={String(model.designer.layoutCanvas)} data-empty-slots={String(Object.values(model.slots).every((items) => items.length === 0))} data-frame-width={style?.width} data-root-md-background={model.layoutDefinition.root.styles?.md?.background_color || ''} data-root-presentation-color={model.layoutDefinition.root.presentation_color || ''} onClick={() => onMessage?.({ data: { source: 'eceee-designer-preview', action: 'select', targetId: `layout-node:${model.layoutDefinition.root.children[0].id}` } })}>Canvas · {model.layoutDefinition.label}</button>
     },
 }))
 
@@ -174,14 +174,30 @@ describe('LayoutDesignerWorkspace', () => {
         expect(screen.getByLabelText('background color value')).toHaveValue('token:surface')
     })
 
+    it('sets and clears an editor-only presentation colour on the selected element', () => {
+        render(<Harness />)
+
+        expect(screen.getByText('Type default')).toBeInTheDocument()
+        fireEvent.change(screen.getByLabelText('Presentation color'), { target: { value: '#14b8a6' } })
+
+        expect(screen.getByText('#14b8a6')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-presentation-color', '#14b8a6')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Use default' }))
+        expect(screen.getByText('Type default')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-presentation-color', '')
+    })
+
     it('uses theme breakpoints for the canvas and provides fit and manual zoom', () => {
         render(<Harness />)
 
-        const breakpoint = screen.getByLabelText('Theme breakpoint')
-        expect(breakpoint).toHaveValue('md')
+        const breakpointGroup = screen.getByRole('group', { name: 'Theme breakpoint' })
+        const tabletBreakpoint = screen.getByRole('button', { name: 'Medium (Tablet) breakpoint at 768px' })
+        expect(breakpointGroup).toContainElement(tabletBreakpoint)
+        expect(tabletBreakpoint).toHaveAttribute('aria-pressed', 'true')
         expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-frame-width', '768px')
 
-        fireEvent.change(breakpoint, { target: { value: 'sm' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Small (Mobile) breakpoint at 640px' }))
         expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-frame-width', '640px')
         expect(screen.getByText('Editing SM')).toBeInTheDocument()
 

@@ -81,6 +81,7 @@ export interface ThemeLayoutNode {
     id: string
     type: ThemeLayoutNodeType
     label?: string
+    presentation_color?: string
     children: ThemeLayoutNode[]
     styles?: Record<string, Record<string, string | number>>
     class_names?: string[]

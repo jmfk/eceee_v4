@@ -587,6 +587,15 @@ def validate_theme_layouts(document):
             label = node.get("label", "")
             if not isinstance(label, str) or len(label) > 100:
                 raise ValidationError(f"{path}.root node label must be text no longer than 100 characters.")
+            presentation_color = node.get("presentation_color")
+            if presentation_color is not None and (
+                node_type not in EXTERNALLY_EDITABLE_NODE_TYPES
+                or not isinstance(presentation_color, str)
+                or not re.fullmatch(r"#[0-9A-Fa-f]{6}", presentation_color)
+            ):
+                raise ValidationError(
+                    f"{path}.root presentation_color must be a six-digit hex colour on a container, semantic, or slot."
+                )
             editable_parameters = node.get("editable_parameters", [])
             if editable_parameters:
                 _validate_string_list(editable_parameters, f"{path}.root node editable_parameters")
