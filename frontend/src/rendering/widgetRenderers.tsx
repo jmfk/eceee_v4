@@ -163,10 +163,10 @@ const ImageRender: WidgetRenderComponent = ({ widget }) => {
                 <div className={displayType === 'gallery' ? 'gallery-grid' : 'carousel-track'} style={displayType === 'gallery'
                     ? { gridTemplateColumns: `repeat(${value(config, 'galleryColumns', 'gallery_columns') || 3}, 1fr)` }
                     : { display: 'flex', transform: `translateX(-${currentIndex * 100}%)`, transition: 'transform 300ms ease' }}>
-                    {items.map((item, index) => <div className={displayType === 'gallery' ? 'gallery-item' : 'carousel-slide'} key={item.id || index} style={displayType === 'carousel' ? { flex: '0 0 100%' } : undefined}>
+                    {items.map((item, index) => <figure className={displayType === 'gallery' ? 'gallery-item' : 'carousel-slide'} key={item.id || index} style={displayType === 'carousel' ? { flex: '0 0 100%' } : undefined}>
                         <div className="image-container"><MediaView item={item} className={displayType === 'gallery' ? 'gallery-image' : 'carousel-image'} /></div>
-                        {value(config, 'showCaptions', 'show_captions') && (item.caption || item.title) && <div className={displayType === 'gallery' ? 'image-caption' : 'carousel-caption'}>{item.caption || item.title}</div>}
-                    </div>)}
+                        {value(config, 'showCaptions', 'show_captions') && (item.caption || item.title) && <figcaption className={displayType === 'gallery' ? 'image-caption' : 'carousel-caption'}>{item.caption || item.title}</figcaption>}
+                    </figure>)}
                 </div>
                 {displayType === 'carousel' && items.length > 1 && <>
                     <button type="button" className="carousel-prev" aria-label="Previous slide" onClick={() => setCurrentIndex((index) => (index - 1 + items.length) % items.length)}>←</button>
@@ -189,8 +189,10 @@ const ImageRender: WidgetRenderComponent = ({ widget }) => {
         ? source.altText || source.alt_text || source.alt || source.title || value(config, 'altText', 'alt_text', 'alt') || ''
         : value(config, 'altText', 'alt_text', 'alt') || ''
     return <div className={`image-widget widget-type-easy-widgets-imagewidget image-size-${value(config, 'size') || 'medium'} image-align-${value(config, 'alignment') || 'center'} cms-content`}>
-        <div className="image-container"><ImageView source={source} alt={alt} className="widget-image" /></div>
-        {value(config, 'caption') && <div className="image-caption">{value(config, 'caption')}</div>}
+        <figure className="image-container">
+            <ImageView source={source} alt={alt} className="widget-image" />
+            {value(config, 'caption') && <figcaption className="image-caption">{value(config, 'caption')}</figcaption>}
+        </figure>
     </div>
 }
 
@@ -571,7 +573,7 @@ const SectionRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
         <div className="slot-section-content" data-slot="content">
             {renderWidgets(content.slice(0, 1))}
             {expanded && <div className="section-remaining-content">{renderWidgets(content.slice(1))}</div>}
-            <button type="button" className={expanded ? 'section-banner contract-banner' : 'section-banner expand-banner'} onClick={toggleExpanded}>{expanded ? value(widget.config, 'contractText', 'contract_text') || 'Show less' : value(widget.config, 'expandText', 'expand_text') || 'Expand to read more'}</button>
+            <button type="button" className={expanded ? 'section-banner contract-banner' : 'section-banner expand-banner'} aria-expanded={expanded} onClick={toggleExpanded}>{expanded ? value(widget.config, 'contractText', 'contract_text') || 'Show less' : value(widget.config, 'expandText', 'expand_text') || 'Expand to read more'}</button>
         </div>
     </div></div>
 }

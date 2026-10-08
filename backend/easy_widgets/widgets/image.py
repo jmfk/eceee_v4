@@ -268,7 +268,13 @@ class ImageWidget(BaseWidget):
         box-shadow: var(--video-shadow, 0 4px 6px rgba(0, 0, 0, 0.1));
     }
 
-    .image-widget .caption {
+    .image-widget figure {
+        margin: 0;
+    }
+
+    .image-widget .caption,
+    .image-widget .image-caption,
+    .image-widget .carousel-caption {
         margin-top: var(--caption-margin-top, 0.5rem);
         font-size: var(--caption-font-size, 0.875rem);
         color: var(--caption-color, #6b7280);

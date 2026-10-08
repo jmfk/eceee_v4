@@ -478,20 +478,24 @@ const SectionWidget = ({
                                     </div>
 
                                     {/* Expand banner - shown when collapsed */}
-                                    <div
+                                    <button
+                                        type="button"
                                         className="section-banner expand-banner hidden section-collapsed:flex items-center justify-center p-4 mt-4 border-t border-gray-300 cursor-pointer select-none transition-opacity hover:opacity-80 font-medium"
                                         onClick={toggleSection}
+                                        aria-expanded={!isCollapsed}
                                     >
                                         <span>{config.expandText || 'Expand to read more'}</span>
-                                    </div>
+                                    </button>
 
                                     {/* Contract banner - shown when expanded */}
-                                    <div
+                                    <button
+                                        type="button"
                                         className="section-banner contract-banner flex section-collapsed:hidden items-center justify-center p-4 mt-4 border-t border-gray-300 cursor-pointer select-none transition-opacity hover:opacity-80 font-medium"
                                         onClick={toggleSection}
+                                        aria-expanded={!isCollapsed}
                                     >
                                         <span>{config.contractText || 'Show less'}</span>
-                                    </div>
+                                    </button>
                                 </>
                             )}
 

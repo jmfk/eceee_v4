@@ -60,3 +60,52 @@ class SemanticWidgetMarkupTests(SimpleTestCase):
 
         self.assertIn('<p class="news-excerpt">', html)
         self.assertNotIn('<div class="news-excerpt">', html)
+
+    def test_image_captions_describe_figures(self):
+        base_context = {
+            "widget_type": self.widget_type,
+            "widget": SimpleNamespace(id="image-1"),
+        }
+
+        for display_type in ("single", "gallery", "carousel"):
+            with self.subTest(display_type=display_type):
+                html = render_to_string(
+                    "easy_widgets/widgets/image.html",
+                    {
+                        **base_context,
+                        "config": {
+                            "display_type": display_type,
+                            "show_captions": True,
+                            "media_items": [
+                                {
+                                    "type": "image",
+                                    "src_url": "/image.webp",
+                                    "alt_text": "Example image",
+                                    "caption": "Image caption",
+                                }
+                            ],
+                        },
+                    },
+                )
+
+                self.assertIn("<figure", html)
+                self.assertIn("<figcaption", html)
+                self.assertNotIn('<div class="image-caption">', html)
+                self.assertNotIn('<div class="carousel-caption">', html)
+
+    def test_section_collapse_controls_are_buttons(self):
+        html = render_to_string(
+            "easy_widgets/widgets/section.html",
+            {
+                "widget_type": self.widget_type,
+                "config": {
+                    "enable_collapse": True,
+                    "start_expanded": False,
+                    "rendered_slots": {"content": []},
+                },
+            },
+        )
+
+        self.assertEqual(html.count('<button type="button" class="section-banner'), 2)
+        self.assertEqual(html.count('aria-expanded="false"'), 2)
+        self.assertNotIn('<div class="section-banner', html)

@@ -350,7 +350,7 @@ const ImageWidget = ({
                     const objectFitClass = getObjectFitClass(item);
 
                     return (
-                        <div key={index} className="gallery-item" style={gridStyle}>
+                        <figure key={index} className="gallery-item" style={gridStyle}>
                             {item.type === 'video' ? (
                                 <video
                                     className="w-full h-48 object-cover rounded cursor-pointer"
@@ -377,9 +377,9 @@ const ImageWidget = ({
                                 ) : null
                             )}
                             {(localConfig.showCaptions !== false) && item.caption && (
-                                <p className="text-sm text-gray-600 mt-1">{item.caption}</p>
+                                <figcaption className="text-sm text-gray-600 mt-1">{item.caption}</figcaption>
                             )}
-                        </div>
+                        </figure>
                     );
                 })}
             </div>
@@ -398,12 +398,12 @@ const ImageWidget = ({
                         style={{ transform: `translateX(-${currentIndex * 100}%)` }}
                     >
                         {items.map((item, index) => (
-                            <div key={index} className="w-full flex-shrink-0">
+                            <figure key={index} className="w-full flex-shrink-0 m-0">
                                 {renderMediaItem(item, index)}
                                 {(localConfig.showCaptions !== false) && item.caption && (
-                                    <p className="text-sm text-gray-600 mt-2 text-center">{item.caption}</p>
+                                    <figcaption className="text-sm text-gray-600 mt-2 text-center">{item.caption}</figcaption>
                                 )}
-                            </div>
+                            </figure>
                         ))}
                     </div>
                 </div>
@@ -569,12 +569,12 @@ const ImageWidget = ({
                         {items.length > 0 ? (
                             items.length === 1 ? (
                                 // Single image display regardless of displayType setting
-                                <div>
+                                <figure className="m-0">
                                     {renderMediaItem(items[0])}
                                     {(localConfig.showCaptions !== false) && items[0].caption && (
-                                        <p className="text-sm text-gray-600 mt-2 italic">{items[0].caption}</p>
+                                        <figcaption className="text-sm text-gray-600 mt-2 italic">{items[0].caption}</figcaption>
                                     )}
-                                </div>
+                                </figure>
                             ) : (
                                 // Multiple images: use displayType setting
                                 (localConfig.displayType || 'gallery') === 'carousel' ? renderCarousel() : renderGallery()
@@ -595,12 +595,12 @@ const ImageWidget = ({
             <div className={`image-widget ${alignmentClasses[resolvedImageStyle.alignment]} mx-auto`}>
                 {items.length === 1 ? (
                     // Single image display regardless of displayType setting
-                    <div>
+                    <figure className="m-0">
                         {renderMediaItem(items[0])}
                         {(localConfig.showCaptions !== false) && items[0].caption && (
-                            <p className="text-sm text-gray-600 mt-2">{items[0].caption}</p>
+                            <figcaption className="text-sm text-gray-600 mt-2">{items[0].caption}</figcaption>
                         )}
-                    </div>
+                    </figure>
                 ) : (
                     // Multiple images: use displayType setting
                     (localConfig.displayType || 'gallery') === 'carousel' ? renderCarousel() : renderGallery()

@@ -230,6 +230,7 @@ class SectionWidget(BaseWidget):
 
     .section-banner {
         display: flex;
+        width: 100%;
         align-items: center;
         justify-content: center;
         height: 30px;
@@ -239,6 +240,9 @@ class SectionWidget(BaseWidget):
         border-radius: 0;
         box-shadow: none;
         padding: 0;
+        background: transparent;
+        color: inherit;
+        font-family: inherit;
         cursor: pointer;
         user-select: none;
         transition: opacity 0.2s ease;
