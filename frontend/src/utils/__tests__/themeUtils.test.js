@@ -65,4 +65,33 @@ describe('generateDesignGroupsCSS', () => {
         expect(css).toContain('background-color: var(--orange5);')
         expect(css).toContain('color: var(--black);')
     })
+
+    it('renders footer palette colors directly at every breakpoint', () => {
+        const css = generateDesignGroupsCSS({
+            groups: [{
+                widgetTypes: ['easy_widgets.FooterWidget'],
+                layoutProperties: {
+                    'footer-widget': {
+                        xs: {
+                            backgroundColor: 'brand',
+                            color: 'onBrand',
+                        },
+                        md: {
+                            backgroundColor: 'brandDark',
+                        },
+                    },
+                },
+            }],
+        }, {
+            brand: '#0891b2',
+            brandDark: '#155e75',
+            onBrand: '#f9fafb',
+        })
+
+        expect(css).toContain('background-color: var(--brand);')
+        expect(css).toContain('color: var(--onBrand);')
+        expect(css).toContain('background-color: var(--brandDark);')
+        expect(css).not.toContain('--footer-bg-color-')
+        expect(css).not.toContain('--footer-text-color-')
+    })
 })
