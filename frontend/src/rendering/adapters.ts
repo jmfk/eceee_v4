@@ -84,10 +84,10 @@ const objectWidgetsForPreview = (widgets: Record<string, any[]> = {}, objectType
 }
 
 export const createPageRenderModel = ({
-    layout = 'main_layout', widgets = {}, inheritedWidgets = {}, slotInheritanceRules = {}, context = {}, themeCss = '', fontUrl = '',
+    layout = 'main_layout', layoutDefinition = null, layoutDefinitionRequired = false, layoutBreakpoints = undefined, widgets = {}, inheritedWidgets = {}, slotInheritanceRules = {}, context = {}, themeCss = '', fontUrl = '',
 }: any): RenderPageModel => {
     const slots: Record<string, RenderWidgetModel[]> = {}
-    const names = [...new Set([...(layoutSlots[layout] || []), ...Object.keys(widgets || {}), ...Object.keys(inheritedWidgets || {})])]
+    const names = [...new Set([...(layoutDefinition ? Object.keys(layoutDefinition.slots || {}) : layoutSlots[layout] || []), ...Object.keys(widgets || {}), ...Object.keys(inheritedWidgets || {})])]
     names.forEach((name) => {
         let merged
         try {
@@ -100,7 +100,7 @@ export const createPageRenderModel = ({
     if (layout === 'landing_page' && !slots.landingPage?.length && slots.landing_page?.length) {
         slots.landingPage = slots.landing_page
     }
-    return { layout, slots, context: { ...context, preview: true }, themeCss, fontUrl }
+    return { layout, layoutDefinition, layoutDefinitionRequired, layoutBreakpoints, slots, context: { ...context, preview: true }, themeCss, fontUrl }
 }
 
 export const createDesignerRenderModel = ({
@@ -112,6 +112,7 @@ export const createDesignerRenderModel = ({
     const document = view.content && typeof view.content === 'object' ? view.content : null
     const documentWidgets = document?.widgets && typeof document.widgets === 'object' ? document.widgets : null
     const layout = sourceModel?.layout || document?.codeLayout || view.layout || 'main_layout'
+    const layoutDefinition = workspace?.layouts?.items?.find((candidate: any) => candidate.key === layout) || null
     const slots: Record<string, RenderWidgetModel[]> = {}
     const catalogLayout = workspace?.catalog?.layouts?.find((candidate: any) => candidate.key === layout)
     const rawSlots = sourceModel?.slots || documentWidgets || {}
@@ -120,7 +121,7 @@ export const createDesignerRenderModel = ({
         ? { main: objectWidgetsForPreview(rawSlots, sourceModel?.context?.objectType || view.objectType) }
         : rawSlots
     const availableSlots = [...new Set([
-        ...(catalogLayout?.slots?.map((slot: any) => slot.name) || layoutSlots[layout] || ['main']),
+        ...(layoutDefinition ? Object.keys(layoutDefinition.slots || {}) : catalogLayout?.slots?.map((slot: any) => slot.name) || layoutSlots[layout] || ['main']),
         ...Object.keys(previewSlots),
     ])]
     availableSlots.forEach((slot: string) => {
@@ -197,6 +198,9 @@ export const createDesignerRenderModel = ({
 
     return {
         layout,
+        layoutDefinition,
+        layoutDefinitionRequired: Boolean(workspace?.layouts),
+        layoutBreakpoints: workspace?.breakpoints,
         slots,
         context: {
             ...(sourceModel?.context || {}),

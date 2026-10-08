@@ -65,6 +65,7 @@ from .views.designer_theme_views import (
     DesignerThemeWorkspaceView,
     ThemeDesignerAssignmentView,
 )
+from .views.layout_workspace_views import LayoutDiscardView, LayoutPublishView, LayoutWorkspaceView
 from .views.page_debug_views import PageDebugExportView
 from .views.page_import_views import ImportSinglePageView, ImportStatusView, ImportTreeView
 from .views.path_pattern_views import PathPatternViewSet
@@ -222,6 +223,9 @@ urlpatterns = [
     path("designer/themes/<int:theme_id>/publish/", DesignerThemePublishView.as_view(), name="designer-theme-publish"),
     path("designer/themes/<int:theme_id>/discard/", DesignerThemeDiscardView.as_view(), name="designer-theme-discard"),
     path("designer/themes/<int:theme_id>/undo/", DesignerThemeUndoView.as_view(), name="designer-theme-undo"),
+    path("layout-editor/themes/<int:theme_id>/workspace/", LayoutWorkspaceView.as_view(), name="layout-workspace"),
+    path("layout-editor/themes/<int:theme_id>/publish/", LayoutPublishView.as_view(), name="layout-publish"),
+    path("layout-editor/themes/<int:theme_id>/discard/", LayoutDiscardView.as_view(), name="layout-discard"),
     path(
         "designer/themes/<int:theme_id>/replace-asset/",
         DesignerThemeAssetView.as_view(),

@@ -4,9 +4,9 @@ PageDataSchema Model
 Stores JSON Schema definitions for validating and driving page_data forms.
 """
 
-from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db import models
 
 
 class PageDataSchema(models.Model):
@@ -34,6 +34,11 @@ class PageDataSchema(models.Model):
         blank=True,
         help_text="Name of the code-based layout this schema applies to (scope=layout)",
     )
+    layout_key = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text="Portable theme layout key this schema applies to (scope=layout)",
+    )
     schema = models.JSONField(help_text="JSON Schema draft-07+ definition")
     is_active = models.BooleanField(default=True)
 
@@ -47,6 +52,7 @@ class PageDataSchema(models.Model):
                 fields=["scope", "layout_name", "is_active"],
                 name="pds_scope_layout_active_idx",
             ),
+            models.Index(fields=["scope", "layout_key", "is_active"], name="pds_scope_key_active_idx"),
             models.Index(fields=["is_active"], name="pds_active_idx"),
         ]
         ordering = ["-updated_at", "name"]
@@ -63,6 +69,11 @@ class PageDataSchema(models.Model):
                 condition=models.Q(scope="layout", is_active=True),
                 name="unique_active_layout_schema",
             ),
+            models.UniqueConstraint(
+                fields=["scope", "layout_key"],
+                condition=models.Q(scope="layout", is_active=True),
+                name="unique_active_layout_key_schema",
+            ),
         ]
 
     def clean(self):
@@ -71,17 +82,36 @@ class PageDataSchema(models.Model):
             # System schema doesn't need name or layout_name
             self.name = ""
             self.layout_name = ""
+            self.layout_key = ""
         elif self.scope == self.SCOPE_LAYOUT:
             # Layout schema requires layout_name
-            if not self.layout_name:
-                raise ValidationError("Layout schema must specify a layout_name")
+            effective_key = self.layout_key or self.layout_name
+            if not effective_key:
+                raise ValidationError("Layout schema must specify a layout_key")
+            self.layout_key = effective_key
+            self.layout_name = effective_key
             if not self.name:
                 self.name = f"{self.layout_name} Schema"
 
     def __str__(self):
         if self.scope == self.SCOPE_LAYOUT:
-            return f"{self.layout_name} Layout Schema"
+            return f"{self.layout_key or self.layout_name} Layout Schema"
         return "System Schema"
+
+    def save(self, *args, **kwargs):
+        if self.scope == self.SCOPE_LAYOUT:
+            effective_key = self.layout_key or self.layout_name
+            if self.pk and self.layout_key != self.layout_name:
+                persisted = type(self).objects.filter(pk=self.pk).values("layout_key", "layout_name").first()
+                legacy_changed = persisted is not None and self.layout_name != persisted["layout_name"]
+                key_changed = persisted is not None and self.layout_key != persisted["layout_key"]
+                effective_key = self.layout_name if legacy_changed and not key_changed else self.layout_key
+            self.layout_key = effective_key
+            self.layout_name = effective_key
+            update_fields = kwargs.get("update_fields")
+            if update_fields and ({"layout_key", "layout_name"} & set(update_fields)):
+                kwargs["update_fields"] = [*update_fields, *({"layout_key", "layout_name"} - set(update_fields))]
+        super().save(*args, **kwargs)
 
     @classmethod
     def get_effective_schema_for_layout(cls, layout_name: str | None):
@@ -107,18 +137,15 @@ class PageDataSchema(models.Model):
             }
         }
         """
-        from django.db.models import Q
-
         # Get the single active system schema
-        system_schema_obj = cls.objects.filter(
-            scope=cls.SCOPE_SYSTEM, is_active=True
-        ).first()
+        system_schema_obj = cls.objects.filter(scope=cls.SCOPE_SYSTEM, is_active=True).first()
 
         layout_schema_obj = None
         if layout_name:
-            layout_schema_obj = cls.objects.filter(
-                scope=cls.SCOPE_LAYOUT, layout_name=layout_name, is_active=True
-            ).first()
+            layout_schema_obj = (
+                cls.objects.filter(scope=cls.SCOPE_LAYOUT, layout_key=layout_name, is_active=True).first()
+                or cls.objects.filter(scope=cls.SCOPE_LAYOUT, layout_name=layout_name, is_active=True).first()
+            )
 
         # Build grouped schema without merging
         grouped_schema = {"type": "object", "groups": {}}
@@ -132,13 +159,9 @@ class PageDataSchema(models.Model):
                     "properties": system_schema["properties"],
                 }
                 if system_schema.get("required"):
-                    grouped_schema["groups"]["system"]["required"] = system_schema[
-                        "required"
-                    ]
+                    grouped_schema["groups"]["system"]["required"] = system_schema["required"]
                 if system_schema.get("property_order"):
-                    grouped_schema["groups"]["system"]["property_order"] = (
-                        system_schema["property_order"]
-                    )
+                    grouped_schema["groups"]["system"]["property_order"] = system_schema["property_order"]
 
         # Add layout schema as a group if it exists
         if layout_schema_obj:
@@ -149,13 +172,9 @@ class PageDataSchema(models.Model):
                     "properties": layout_schema["properties"],
                 }
                 if layout_schema.get("required"):
-                    grouped_schema["groups"]["layout"]["required"] = layout_schema[
-                        "required"
-                    ]
+                    grouped_schema["groups"]["layout"]["required"] = layout_schema["required"]
                 if layout_schema.get("property_order"):
-                    grouped_schema["groups"]["layout"]["property_order"] = (
-                        layout_schema["property_order"]
-                    )
+                    grouped_schema["groups"]["layout"]["property_order"] = layout_schema["property_order"]
 
         # Return None if no groups were added
         if not grouped_schema["groups"]:

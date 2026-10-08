@@ -34,6 +34,7 @@ from webpages.services.theme_preview_content import (
     normalize_theme_preview_namespaces,
     rewrite_theme_library_image_urls,
 )
+from webpages.theme_layouts import default_theme_layouts, validate_theme_layouts
 
 PACKAGE_VERSION = "2.0"
 SUPPORTED_PACKAGE_VERSIONS = {"1.0", PACKAGE_VERSION}
@@ -428,6 +429,7 @@ def _serialize_version(version: PageVersion) -> Dict[str, Any]:
         "meta_title": version.meta_title,
         "meta_description": version.meta_description,
         "code_layout": version.code_layout,
+        "layout_key": version.layout_key,
         "page_data": version.page_data,
         "widgets": version.widgets,
         "theme_source_id": version.theme_id,
@@ -465,6 +467,7 @@ def _serialize_theme(theme: PageTheme) -> Dict[str, Any]:
         "design_groups": theme.design_groups,
         "component_styles": theme.component_styles,
         "designer_preview": theme.designer_preview,
+        "layouts": theme.layouts,
         "image_styles": theme.image_styles,
         "gallery_styles": theme.gallery_styles,
         "carousel_styles": theme.carousel_styles,
@@ -640,6 +643,7 @@ def restore_theme_transfer_package(encoded_package: str, theme: PageTheme, stora
             "design_groups",
             "component_styles",
             "designer_preview",
+            "layouts",
             "image_styles",
             "gallery_styles",
             "carousel_styles",
@@ -1297,6 +1301,7 @@ class SitePackageImporter:
                     meta_title=version_data.get("meta_title", ""),
                     meta_description=version_data.get("meta_description", ""),
                     code_layout=version_data.get("code_layout", ""),
+                    layout_key=version_data.get("layout_key") or version_data.get("code_layout", ""),
                     page_data=page_data_payload,
                     widgets=widgets_payload,
                     theme=theme,
@@ -1636,6 +1641,7 @@ class SitePackageImporter:
                     meta_title=version_data.get("meta_title", ""),
                     meta_description=version_data.get("meta_description", ""),
                     code_layout=version_data.get("code_layout", ""),
+                    layout_key=version_data.get("layout_key") or version_data.get("code_layout", ""),
                     page_data=_replace_in_json(version_data.get("page_data", {}), replacements),
                     widgets=_replace_in_json(version_data.get("widgets", {}), replacements),
                     theme=theme_map.get(version_data.get("theme_source_id")),
@@ -1836,6 +1842,8 @@ class SitePackageImporter:
 
     def _create_theme(self, package, data):
         destination_tenant = self._destination_tenant()
+        layouts = data.get("layouts") or default_theme_layouts()
+        validate_theme_layouts(layouts)
         theme = PageTheme.objects.create(
             tenant=destination_tenant,
             name=_unique_theme_name(data.get("name", "Imported Theme")),
@@ -1845,6 +1853,7 @@ class SitePackageImporter:
             design_groups=data.get("design_groups", {}),
             component_styles=data.get("component_styles", {}),
             designer_preview=normalize_theme_preview_namespaces(data.get("designer_preview", {}), destination_tenant),
+            layouts=layouts,
             image_styles=data.get("image_styles", {}),
             gallery_styles=data.get("gallery_styles", {}),
             carousel_styles=data.get("carousel_styles", {}),
@@ -1946,6 +1955,7 @@ class SitePackageImporter:
                 "colors",
                 "design_groups",
                 "component_styles",
+                "layouts",
                 "image_styles",
                 "gallery_styles",
                 "carousel_styles",

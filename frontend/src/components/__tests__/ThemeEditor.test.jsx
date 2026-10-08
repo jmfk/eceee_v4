@@ -25,6 +25,10 @@ vi.mock('react-router-dom', async () => {
     }
 })
 
+vi.mock('../LayoutEditor', () => ({
+    default: ({ themeId }) => <div data-testid="theme-layouts">Layouts for theme {themeId}</div>,
+}))
+
 const mockThemes = [
     {
         id: 1,
@@ -171,14 +175,17 @@ describe('ThemeEditor', () => {
     })
 
     it('renders the create route with current theme tabs and basic fields', async () => {
+        const user = userEvent.setup()
         routerMocks.params = { themeId: 'new' }
 
         renderThemeEditor()
 
         expect(await screen.findByRole('heading', { name: 'Create Theme' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Basic Info' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Colors' })).toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: 'Versions' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /general.*basic info/i })).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Foundations' }))
+        expect(screen.getByRole('menuitem', { name: 'Colors' })).toBeInTheDocument()
+        expect(screen.queryByRole('menuitem', { name: 'Versions' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('menuitem', { name: 'Layouts' })).not.toBeInTheDocument()
         expect(screen.getByText('Basic Information')).toBeInTheDocument()
         expect(screen.getByPlaceholderText('My Awesome Theme')).toBeInTheDocument()
         expect(screen.getByPlaceholderText('Brief description of this theme')).toBeInTheDocument()
@@ -208,6 +215,7 @@ describe('ThemeEditor', () => {
     })
 
     it('renders an existing theme in edit mode from the current route params', async () => {
+        const user = userEvent.setup()
         routerMocks.params = { themeId: '1' }
 
         renderThemeEditor()
@@ -216,7 +224,18 @@ describe('ThemeEditor', () => {
         expect(screen.getByPlaceholderText('My Awesome Theme')).toHaveValue('Blue Theme')
         expect(screen.getByPlaceholderText('Brief description of this theme')).toHaveValue('A professional blue color scheme')
         expect(screen.getByRole('button', { name: /clear css cache/i })).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Structure' }))
+        expect(screen.getByRole('menuitem', { name: 'Layouts' })).toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'Open in Designer' })).toHaveAttribute('href', '/designer/themes/1')
+    })
+
+    it('renders the selected theme layouts inside the Layouts tab', async () => {
+        routerMocks.params = { themeId: '1', tab: 'layouts' }
+
+        renderThemeEditor()
+
+        expect(await screen.findByRole('heading', { name: 'Edit: Blue Theme' })).toBeInTheDocument()
+        expect(screen.getByTestId('theme-layouts')).toHaveTextContent('Layouts for theme 1')
     })
 
     it('offers cross-theme imports for an existing theme', async () => {
@@ -235,7 +254,8 @@ describe('ThemeEditor', () => {
         renderThemeEditor()
 
         await screen.findByRole('heading', { name: 'Edit: Blue Theme' })
-        await user.click(screen.getByRole('button', { name: 'Colors' }))
+        await user.click(screen.getByRole('button', { name: 'Foundations' }))
+        await user.click(screen.getByRole('menuitem', { name: 'Colors' }))
 
         expect(routerMocks.navigate).toHaveBeenCalledWith('/settings/themes/1/colors')
     })

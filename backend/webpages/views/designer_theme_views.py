@@ -72,7 +72,7 @@ from webpages.services.theme_versions import (
 )
 from webpages.tasks import export_designer_theme
 
-DESIGNER_CASE_OPTIONS = {"ignore_fields": ("colors", "values", "texts", "images")}
+DESIGNER_CASE_OPTIONS = {"ignore_fields": ("colors", "values", "texts", "images", "layouts")}
 
 
 class DesignerJSONParser(CamelCaseJSONParser):

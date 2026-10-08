@@ -4,6 +4,7 @@ import { getRenderLayout, getRenderWidget } from './registry'
 import { normalizeCssName, RenderFailure, SafeHtml } from './primitives'
 import { renderMustache } from '../utils/mustacheRenderer'
 import type { RenderPageModel, RenderWidgetModel } from './types'
+import { normalizeLayoutDefinition, ThemeLayoutRender, validateLayoutDefinition } from './themeLayoutRenderer'
 
 class RenderBoundary extends Component<{ children: ReactNode, type: string }, { failed: boolean }> {
     state = { failed: false }
@@ -21,6 +22,7 @@ class RenderBoundary extends Component<{ children: ReactNode, type: string }, { 
 
 export const PageRenderer = ({ model }: { model: RenderPageModel }) => {
     const Layout = getRenderLayout(model.layout)
+    const layoutDefinition = normalizeLayoutDefinition(model.layoutDefinition)
 
     const renderWidgets = (widgets: RenderWidgetModel[]): ReactNode => (widgets || []).map((widget) => {
         const Widget = getRenderWidget(widget.type, Boolean(model.designer))
@@ -49,9 +51,24 @@ export const PageRenderer = ({ model }: { model: RenderPageModel }) => {
         </div>
     })
 
-    if (!Layout) return <RenderFailure message={`Unsupported layout: ${model.layout}`} />
+    const renderSlot = (name: string) => {
+        const camelName = name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
+        return renderWidgets(model.slots[name] || model.slots[camelName] || [])
+    }
+    if (layoutDefinition && validateLayoutDefinition(layoutDefinition)) {
+        return <div className="site-renderer cms-content" data-render-layout={layoutDefinition.key}>
+            <ThemeLayoutRender model={{ ...model, layoutDefinition }} renderSlot={renderSlot} />
+        </div>
+    }
+    if (model.layoutDefinitionRequired || model.layoutDefinition || !Layout) {
+        console.error(`Layout definition '${model.layout}' is missing or invalid; rendering non-empty slots in safe order.`)
+        return <div className="site-renderer cms-content" data-render-layout={model.layout}>
+        {model.context.mode !== 'public' && <RenderFailure message={`Layout ${model.layout} is unavailable. Content is shown in slot order.`} />}
+        <main className="layout-safe-fallback">{Object.entries(model.slots).filter(([, widgets]) => widgets?.length).map(([name, widgets]) => <section key={name} data-slot-name={name}>{renderWidgets(widgets)}</section>)}</main>
+    </div>
+    }
     return <div className="site-renderer cms-content" data-render-layout={model.layout}>
-        <Layout model={model} renderSlot={(name) => renderWidgets(model.slots[name] || [])} />
+        <Layout model={model} renderSlot={renderSlot} />
     </div>
 }
 

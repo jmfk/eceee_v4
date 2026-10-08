@@ -37,6 +37,7 @@ from ..services.theme_preview_content import (
     normalize_theme_preview_namespaces,
     rewrite_theme_library_image_urls,
 )
+from ..theme_layouts import default_theme_layouts, validate_theme_layouts
 from ..theme_service import ThemeService
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 THEME_CASE_OPTIONS = {
     "no_underscore_before_number": True,
-    "ignore_fields": ("designer_preview", "designerPreview"),
+    "ignore_fields": ("designer_preview", "designerPreview", "layouts"),
 }
 
 
@@ -101,6 +102,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "design_groups",
             "component_styles",
             "designer_preview",
+            "layouts",
             "table_templates",
             "css_variables",
             "html_elements",
@@ -133,6 +135,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "design_groups",
             "component_styles",
             "designer_preview",
+            "layouts",
             "table_templates",
             "css_variables",
             "html_elements",
@@ -1507,6 +1510,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 "design_groups": theme.design_groups,
                 "component_styles": theme.component_styles,
                 "designer_preview": theme.designer_preview,
+                "layouts": theme.layouts,
                 "image_styles": theme.image_styles,
                 "gallery_styles": theme.gallery_styles,
                 "carousel_styles": theme.carousel_styles,
@@ -1655,6 +1659,9 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     counter += 1
                     name = f"{base_name} ({counter})"
 
+                layouts = theme_data.get("layouts") or default_theme_layouts()
+                validate_theme_layouts(layouts)
+
                 # Create theme
                 new_theme = PageTheme.objects.create(
                     tenant=request.tenant,
@@ -1667,6 +1674,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     designer_preview=normalize_theme_preview_namespaces(
                         theme_data.get("designer_preview", {}), request.tenant
                     ),
+                    layouts=layouts,
                     image_styles=theme_data.get("image_styles", {}),
                     gallery_styles=theme_data.get("gallery_styles", {}),
                     carousel_styles=theme_data.get("carousel_styles", {}),

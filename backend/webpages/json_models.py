@@ -5,10 +5,11 @@ These models provide type-safe validation for JSON fields in various models,
 replacing ad-hoc JSON validation with structured pydantic models.
 """
 
-from typing import Optional, List, Dict, Any, Union, Tuple
-from pydantic import BaseModel, Field, validator, field_validator, model_validator
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+
+from pydantic import BaseModel, Field, field_validator, model_validator, validator
 
 
 class WidgetInheritanceBehavior(str, Enum):
@@ -66,6 +67,7 @@ class ThemeResponse(BaseModel):
     description: Optional[str] = None
     css_variables: Dict[str, str] = Field(default_factory=dict)
     is_active: bool = True
+    layouts: Dict[str, Any] = Field(default_factory=dict)
 
 
 class LayoutResponse(BaseModel):
@@ -89,6 +91,7 @@ class WebPageDetailResponse(BaseModel):
     sort_order: int = 0
     hostnames: List[str] = Field(default_factory=list)
     code_layout: Optional[str] = None
+    layout_key: Optional[str] = None
     theme: Optional[ThemeResponse] = None
     theme_id: Optional[int] = None
     publication_status: PublicationStatus
@@ -154,18 +157,14 @@ class PaginatedResponse(BaseModel):
 class PageWidgetData(BaseModel):
     """Individual widget configuration within a PageVersion"""
 
-    widget_type: Optional[str] = Field(
-        None, description="Name of the widget type (legacy)"
-    )
+    widget_type: Optional[str] = Field(None, description="Name of the widget type (legacy)")
     type: Optional[str] = Field(
         None,
         description="Widget type identifier (new format: easy_widgets.WidgetName)",
     )
     slot_name: str = Field(..., description="Slot where the widget is placed")
     sort_order: int = Field(0, description="Order within the slot")
-    configuration: Dict[str, Any] = Field(
-        default_factory=dict, description="Widget-specific configuration"
-    )
+    configuration: Dict[str, Any] = Field(default_factory=dict, description="Widget-specific configuration")
 
     @field_validator("widget_type", "type")
     def validate_widget_type(cls, v, info):
@@ -182,25 +181,17 @@ class PageWidgetData(BaseModel):
         return self
 
     # Optional metadata
-    id: Optional[str] = Field(
-        None, description="Unique identifier for the widget instance"
-    )
+    id: Optional[str] = Field(None, description="Unique identifier for the widget instance")
     inheritance_behavior: WidgetInheritanceBehavior = Field(
         WidgetInheritanceBehavior.INSERT_AFTER_PARENT,
         description="How this widget behaves with parent widgets",
     )
     is_visible: bool = Field(True, description="Whether the widget is visible")
-    is_active: bool = Field(
-        True, description="Whether the widget is active and should be rendered"
-    )
+    is_active: bool = Field(True, description="Whether the widget is active and should be rendered")
 
     # Backward compatibility - deprecated fields
-    inherit_from_parent: Optional[bool] = Field(
-        None, description="DEPRECATED: Use inheritance_behavior instead"
-    )
-    override_parent: Optional[bool] = Field(
-        None, description="DEPRECATED: Use inheritance_behavior instead"
-    )
+    inherit_from_parent: Optional[bool] = Field(None, description="DEPRECATED: Use inheritance_behavior instead")
+    override_parent: Optional[bool] = Field(None, description="DEPRECATED: Use inheritance_behavior instead")
 
 
 class PageDataSnapshot(BaseModel):
@@ -211,9 +202,8 @@ class PageDataSnapshot(BaseModel):
     slug: str = Field(..., description="Page slug")
     description: Optional[str] = Field(None, description="Page description")
     code_layout: Optional[str] = Field(None, description="Layout name")
-    css_variables: Optional[Dict[str, str]] = Field(
-        None, description="CSS custom properties"
-    )
+    layout_key: Optional[str] = Field(None, description="Portable theme layout key")
+    css_variables: Optional[Dict[str, str]] = Field(None, description="CSS custom properties")
 
     # SEO fields
     meta_title: Optional[str] = Field(None, description="SEO meta title")
@@ -254,26 +244,16 @@ class WidgetChange(BaseModel):
     widget_type: str = Field(..., description="Widget type name")
     slot_name: str = Field(..., description="Slot name")
     sort_order: Optional[int] = Field(None, description="Sort order")
-    old_configuration: Optional[Dict[str, Any]] = Field(
-        None, description="Previous configuration"
-    )
-    new_configuration: Optional[Dict[str, Any]] = Field(
-        None, description="New configuration"
-    )
+    old_configuration: Optional[Dict[str, Any]] = Field(None, description="Previous configuration")
+    new_configuration: Optional[Dict[str, Any]] = Field(None, description="New configuration")
 
 
 class ChangeSummary(BaseModel):
     """Summary of changes in a PageVersion"""
 
-    change_type: List[ChangeType] = Field(
-        default_factory=list, description="Types of changes made"
-    )
-    field_changes: List[FieldChange] = Field(
-        default_factory=list, description="Field-level changes"
-    )
-    widget_changes: List[WidgetChange] = Field(
-        default_factory=list, description="Widget-level changes"
-    )
+    change_type: List[ChangeType] = Field(default_factory=list, description="Types of changes made")
+    field_changes: List[FieldChange] = Field(default_factory=list, description="Field-level changes")
+    widget_changes: List[WidgetChange] = Field(default_factory=list, description="Widget-level changes")
     summary_text: Optional[str] = Field(None, description="Human-readable summary")
     changed_by: Optional[str] = Field(None, description="Username who made the changes")
     change_timestamp: Optional[str] = Field(None, description="When changes were made")
@@ -299,9 +279,7 @@ class ImageReference(BaseModel):
 class GalleryImages(BaseModel):
     """Collection of images for gallery display"""
 
-    images: List[ImageReference] = Field(
-        default_factory=list, description="List of images"
-    )
+    images: List[ImageReference] = Field(default_factory=list, description="List of images")
 
     @validator("images")
     def validate_images(cls, v):
@@ -319,17 +297,13 @@ class ExpertiseArea(BaseModel):
         None,
         description="Proficiency level (e.g., 'Expert', 'Advanced', 'Intermediate')",
     )
-    years_experience: Optional[int] = Field(
-        None, ge=0, le=100, description="Years of experience"
-    )
+    years_experience: Optional[int] = Field(None, ge=0, le=100, description="Years of experience")
 
 
 class ExpertiseAreas(BaseModel):
     """Collection of expertise areas for members"""
 
-    areas: List[ExpertiseArea] = Field(
-        default_factory=list, description="List of expertise areas"
-    )
+    areas: List[ExpertiseArea] = Field(default_factory=list, description="List of expertise areas")
 
     @validator("areas")
     def validate_areas(cls, v):
@@ -347,17 +321,13 @@ class AttachmentFile(BaseModel):
     file_size: Optional[int] = Field(None, description="File size in bytes")
     description: Optional[str] = Field(None, description="File description")
     upload_date: Optional[str] = Field(None, description="Upload timestamp")
-    uploaded_by: Optional[str] = Field(
-        None, description="Username who uploaded the file"
-    )
+    uploaded_by: Optional[str] = Field(None, description="Username who uploaded the file")
 
 
 class Attachments(BaseModel):
     """Collection of file attachments"""
 
-    files: List[AttachmentFile] = Field(
-        default_factory=list, description="List of attached files"
-    )
+    files: List[AttachmentFile] = Field(default_factory=list, description="List of attached files")
 
     @validator("files")
     def validate_files(cls, v):
@@ -374,9 +344,7 @@ class Attachments(BaseModel):
 class CSSVariables(BaseModel):
     """CSS custom properties for styling"""
 
-    variables: Dict[str, str] = Field(
-        default_factory=dict, description="CSS custom properties"
-    )
+    variables: Dict[str, str] = Field(default_factory=dict, description="CSS custom properties")
 
     @validator("variables")
     def validate_css_variables(cls, v):

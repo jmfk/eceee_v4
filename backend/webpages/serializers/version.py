@@ -109,6 +109,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
     page_id = serializers.SerializerMethodField()
     effective_theme = serializers.SerializerMethodField()
     theme_inheritance_info = serializers.SerializerMethodField()
+    layoutKey = serializers.CharField(source="layout_key", required=False, allow_blank=True)
 
     page = serializers.PrimaryKeyRelatedField(read_only=True)
 
@@ -141,6 +142,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "meta_title",
             "meta_description",
             "code_layout",
+            "layoutKey",
             "page_data",
             "widgets",
             "tags",
@@ -278,6 +280,47 @@ class PageVersionSerializer(serializers.ModelSerializer):
         return {"source": "default", "inherited_from": None}
 
     def validate(self, attrs):
+        if "layout_key" in attrs:
+            attrs["code_layout"] = attrs["layout_key"]
+        elif "code_layout" in attrs:
+            attrs["layout_key"] = attrs["code_layout"]
+        if self.instance:
+            effective_theme = (
+                attrs.get("theme", self.instance.theme) if attrs.get("theme", self.instance.theme) else None
+            )
+            if effective_theme is None:
+                current = self.instance.page.parent
+                while current and effective_theme is None:
+                    parent_version = (
+                        current.get_latest_version()
+                        if not self.instance.is_published()
+                        else current.get_current_published_version()
+                    )
+                    effective_theme = parent_version.theme if parent_version and parent_version.theme else None
+                    current = current.parent
+                effective_theme = effective_theme or PageTheme.get_default_theme(tenant=self.instance.page.tenant)
+
+            effective_key = attrs.get("layout_key", self.instance.layout_key or self.instance.code_layout)
+            current = self.instance.page.parent
+            while not effective_key and current:
+                parent_version = (
+                    current.get_latest_version()
+                    if not self.instance.is_published()
+                    else current.get_current_published_version()
+                )
+                effective_key = (parent_version.layout_key or parent_version.code_layout) if parent_version else ""
+                current = current.parent
+            if not effective_key and effective_theme:
+                effective_key = (effective_theme.layouts or {}).get("default_layout_key")
+            available = (
+                {item.get("key") for item in (effective_theme.layouts or {}).get("items", [])}
+                if effective_theme
+                else set()
+            )
+            if effective_key and effective_key not in available:
+                raise serializers.ValidationError(
+                    {"layoutKey": f"Layout '{effective_key}' is not defined by the effective theme."}
+                )
         if "page_data" in attrs:
             attrs["page_data"] = validate_page_data_for_version(
                 self.instance,
@@ -459,6 +502,7 @@ class MetadataUpdateSerializer(serializers.ModelSerializer):
         fields = [
             "version_title",
             "code_layout",
+            "layout_key",
             "theme",
             "meta_title",
             "meta_description",
@@ -466,6 +510,13 @@ class MetadataUpdateSerializer(serializers.ModelSerializer):
             "page_custom_css",
             "enable_css_injection",
         ]
+
+    def validate(self, attrs):
+        if "layout_key" in attrs:
+            attrs["code_layout"] = attrs["layout_key"]
+        elif "code_layout" in attrs:
+            attrs["layout_key"] = attrs["code_layout"]
+        return super().validate(attrs)
 
 
 class PublishingUpdateSerializer(serializers.ModelSerializer):

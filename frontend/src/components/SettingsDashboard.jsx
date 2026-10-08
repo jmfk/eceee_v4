@@ -16,7 +16,6 @@ import {
     Settings as Cog
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { layoutsApi } from '../api/layouts'
 import { themesApi } from '../api'
 import { objectTypesApi } from '../api/objectStorage'
 import { api } from '../api/client'
@@ -44,14 +43,6 @@ const StatCard = ({ title, count, icon: Icon, color, link, description }) => (
 
 const SettingsDashboard = () => {
     // Fetch counts
-    const { data: layouts = [] } = useQuery({
-        queryKey: ['layouts'],
-        queryFn: async () => {
-            const response = await layoutsApi.list()
-            return Array.isArray(response) ? response : response?.results || []
-        }
-    })
-
     const { data: themes = [] } = useQuery({
         queryKey: ['themes'],
         queryFn: async () => {
@@ -95,12 +86,12 @@ const SettingsDashboard = () => {
             description: 'Total managed web pages'
         },
         {
-            title: 'Layouts',
-            count: layouts.length,
+            title: 'Theme Layouts',
+            count: themes.reduce((count, theme) => count + (theme.layouts?.items?.length || 0), 0),
             icon: Grid3X3,
             color: 'bg-purple-500',
-            link: '/settings/layouts',
-            description: 'Page layout templates'
+            link: '/settings/themes',
+            description: 'Layouts managed inside themes'
         },
         {
             title: 'Themes',
@@ -222,4 +213,3 @@ const SettingsDashboard = () => {
 }
 
 export default SettingsDashboard
-

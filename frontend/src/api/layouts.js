@@ -19,8 +19,8 @@ export const layoutsApi = {
          * @param {boolean} activeOnly - Filter to active layouts only
          * @returns {Promise<Object>} Layouts list
          */
-        list: wrapApiCall(async (activeOnly = true) => {
-            const params = { active_only: activeOnly }
+        list: wrapApiCall(async (activeOnly = true, source = 'effective') => {
+            const params = { active_only: activeOnly, source }
             const queryString = buildQueryParams(params)
             return api.get(`${endpoints.layouts.list}${queryString}`)
         }, 'layouts.codeLayouts.list'),

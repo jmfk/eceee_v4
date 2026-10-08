@@ -226,7 +226,7 @@ const SettingsEditor = forwardRef<SettingsEditorHandle, SettingsEditorProps>(({
                                                 <span className="font-bold">Error Page Detected:</span> This slug ({slug}) will create a custom error page for HTTP {errorCode} ({errorName}) responses on this site.
                                             </div>
                                             <div className="text-xs text-blue-600 mt-1">
-                                                Consider using an error layout (error_404, error_500, etc.) for the best user experience.
+                                                Use the shared Error Page layout and customize the site-owned 403, 404, 500, and 503 pages.
                                             </div>
                                         </div>
                                     );

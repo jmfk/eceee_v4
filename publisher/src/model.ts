@@ -1,5 +1,6 @@
 import { compileThemeCss, fontImports, widgetVariantClasses } from './theme';
 import { responsiveImageSources, type ResponsiveImageOptions } from './imgproxy';
+import type { ThemeLayoutDefinition, ThemeLayoutDocument } from '../../frontend/src/rendering/types';
 
 export type DbId = string;
 
@@ -22,6 +23,7 @@ export interface Version {
   meta_title: string;
   meta_description: string;
   code_layout: string;
+  layout_key?: string;
   widgets: unknown;
   theme_id: DbId | null;
   enable_css_injection: boolean;
@@ -43,6 +45,7 @@ export interface Theme {
   breakpoints: Record<string, unknown>;
   custom_css: string;
   design_groups: Record<string, unknown>;
+  layouts?: ThemeLayoutDocument;
   html_elements: Record<string, unknown>;
   sync_version: number;
   updated_at: string;
@@ -151,6 +154,9 @@ export interface Widget {
 
 export interface PublishedPageModel {
   layout: string;
+  layoutDefinition?: ThemeLayoutDefinition | null;
+  layoutDefinitionRequired?: boolean;
+  layoutBreakpoints?: Record<string, number>;
   slots: Record<string, Widget[]>;
   context: {
     mode: 'public';
@@ -178,10 +184,6 @@ export interface PublishedPageModel {
 }
 
 type RawWidget = Record<string, unknown>;
-const LAYOUT_SLOTS: Record<string, string[]> = {
-  main_layout: ['header', 'navbar', 'hero', 'main', 'sidebar', 'footer'],
-  landing_page: ['header', 'navbar', 'hero', 'landing_page', 'footer'],
-};
 
 export function normalizeHostname(input: string): string | null {
   const host = input.trim().toLowerCase();
@@ -827,18 +829,18 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
     const chain = pages.flatMap((page, index) => versions[index]
       ? [{ page, version: versions[index]!, depth: pages.length - 1 - index }]
       : []);
-    const layout = [...chain].reverse().find(item => item.version.code_layout)?.version.code_layout || 'main_layout';
-    const slotNames = new Set([...(LAYOUT_SLOTS[layout] ?? []), ...chain.flatMap(item => Object.keys(object(item.version.widgets)))]);
-    let slots = Object.fromEntries([...slotNames].map(slot => [
-      slot,
-      mergeSlot(slot, chain, at),
-    ]));
-    if (slots.landing_page && !slots.landingPage) slots.landingPage = slots.landing_page;
-
     const explicitThemeId = [...chain].reverse().find(item => item.version.theme_id)?.version.theme_id;
     const theme = explicitThemeId
       ? await reader.theme(explicitThemeId, root.tenant_id)
       : await reader.defaultTheme(root.tenant_id);
+    const layout = [...chain].reverse().find(item => item.version.layout_key || item.version.code_layout)?.version;
+    const layoutKey = layout?.layout_key || layout?.code_layout || theme?.layouts?.default_layout_key || 'main_layout';
+    const layoutDefinition = theme?.layouts?.items?.find(item => item.key === layoutKey) || null;
+    const slotNames = new Set([
+      ...Object.keys(layoutDefinition?.slots || {}),
+      ...chain.flatMap(item => Object.keys(object(item.version.widgets))),
+    ]);
+    let slots = Object.fromEntries([...slotNames].map(slot => [slot, mergeSlot(slot, chain, at)]));
 
     const matchedPath = '/' + segments.slice(0, consumedSegments).join('/');
     slots = await resolvePublishedData(slots, reader, root.tenant_id, at, matchedPath || '/', pathVariables || {});
@@ -854,7 +856,10 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
     slots = prepareWidgets(slots, pagePaths, publicMedia.files, publicMedia.collections, theme, pages, navigationPages);
 
     return {
-      layout,
+      layout: layoutKey,
+      layoutDefinition,
+      layoutDefinitionRequired: Boolean(theme?.layouts),
+      layoutBreakpoints: theme?.breakpoints as Record<string, number> | undefined,
       slots,
       context: {
         mode: 'public',

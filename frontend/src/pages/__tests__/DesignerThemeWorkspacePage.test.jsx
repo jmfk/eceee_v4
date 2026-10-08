@@ -223,6 +223,55 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByTitle('Live theme preview')).not.toHaveAttribute('srcdoc')
     })
 
+    it('edits layout parameters explicitly exposed by a named layout element', async () => {
+        const layoutWorkspace = structuredClone(workspace)
+        layoutWorkspace.layouts = {
+            schema_version: 1,
+            default_layout_key: 'main_layout',
+            items: [{
+                id: '8ac4db5a-492f-4977-bf00-d21b8d72f08e',
+                key: 'main_layout',
+                label: 'Main layout',
+                status: 'active',
+                slots: { main: { label: 'Main content' } },
+                root: {
+                    id: '2d1ee676-3624-4ec8-aaf4-8874bea037f4',
+                    type: 'container',
+                    label: 'Site frame',
+                    editable_parameters: ['width', 'background_color'],
+                    styles: { base: { width: '100%' } },
+                    children: [{
+                        id: '114eff0f-f86f-4a10-8df5-27925804fc73',
+                        type: 'slot', slot_key: 'main', children: [], styles: {},
+                    }],
+                },
+            }],
+        }
+        mocks.workspace.mockResolvedValue(layoutWorkspace)
+
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        const iframe = await screen.findByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'layout-node:2d1ee676-3624-4ec8-aaf4-8874bea037f4',
+                kind: 'element', label: 'Site frame',
+                layoutNodeId: '2d1ee676-3624-4ec8-aaf4-8874bea037f4',
+                editableParameters: ['width', 'background_color'],
+            },
+            source: iframe.contentWindow,
+        }))
+
+        const width = await screen.findByLabelText('Site frame Width')
+        const background = screen.getByLabelText('Site frame Background color')
+        expect(width).toHaveValue('')
+        expect(width).toHaveAttribute('placeholder', 'Inherited')
+        expect(background).toHaveAttribute('placeholder', 'Inherited')
+
+        fireEvent.change(width, { target: { value: '90%' } })
+        expect(width).toHaveValue('90%')
+    })
+
     it('resizes both side panes with dragging and keyboard controls', async () => {
         const originalPointerEvent = window.PointerEvent
         Object.defineProperty(window, 'PointerEvent', { configurable: true, value: MouseEvent })

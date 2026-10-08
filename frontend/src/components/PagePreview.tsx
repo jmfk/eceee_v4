@@ -118,9 +118,14 @@ const PagePreview: React.FC<PagePreviewProps> = ({
             ?? pageVersionData?.enableCssInjection ?? pageVersionData?.enable_css_injection ?? true,
     }), [effectiveTheme, webpageData, pageVersionData]);
 
-    const layoutName = layoutData?.layout?.name || layoutData?.name || pageVersionData?.codeLayout || 'main_layout';
+    const layoutName = layoutData?.layout?.name || layoutData?.name || pageVersionData?.layoutKey || pageVersionData?.codeLayout
+        || effectiveTheme?.layouts?.default_layout_key || effectiveTheme?.layouts?.defaultLayoutKey || 'main_layout';
+    const layoutDefinition = effectiveTheme?.layouts?.items?.find((candidate: any) => candidate.key === layoutName) || null;
     const renderModel = useMemo(() => createPageRenderModel({
         layout: layoutName,
+        layoutDefinition,
+        layoutDefinitionRequired: Boolean(effectiveTheme?.layouts),
+        layoutBreakpoints: effectiveTheme?.breakpoints,
         widgets: localWidgets || pageVersionData?.widgets || {},
         inheritedWidgets,
         slotInheritanceRules,
@@ -135,7 +140,7 @@ const PagePreview: React.FC<PagePreviewProps> = ({
             simulatedPath,
             componentStyles: pageVersionData?.effectiveTheme?.componentStyles || pageVersionData?.effectiveTheme?.component_styles || {},
         },
-    }), [layoutName, localWidgets, pageVersionData, inheritedWidgets, slotInheritanceRules, themeCss, webpageData, pathVariables, simulatedPath]);
+    }), [layoutName, layoutDefinition, effectiveTheme?.breakpoints, localWidgets, pageVersionData, inheritedWidgets, slotInheritanceRules, themeCss, webpageData, pathVariables, simulatedPath]);
 
     useEffect(() => {
         let current = true;

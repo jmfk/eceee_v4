@@ -12,6 +12,18 @@ import { buildResolvedRenderModel } from '../rendering/directRender'
 import { googleFontsStylesheetUrl } from '../rendering/primitives'
 import { buildDesignerTheme, buildThemeCSS } from '../utils/editorThemeCSS'
 
+const workspaceDraftPayload = (workspace) => workspace ? ({
+    draftVersion: workspace.draftVersion,
+    name: workspace.name,
+    description: workspace.description || '',
+    colors: Object.fromEntries(workspace.colors.map((color) => [color.name, color.value])),
+    fonts: workspace.fonts.filter((font) => font.family.trim()).map((font) => ({ family: font.family, variants: font.variants, display: font.display })),
+    typography: workspace.typography.map((row) => ({ groupIndex: row.groupIndex, element: row.element, values: row.values })),
+    spacing: workspace.spacing.map((row) => ({ scope: row.scope, groupIndex: row.groupIndex, element: row.element, part: row.part, breakpoint: row.breakpoint, values: row.values })),
+}) : null
+
+const workspaceSignature = (workspace) => JSON.stringify(workspaceDraftPayload(workspace))
+
 const DesignerThemeWorkspacePage = () => {
     const { themeId } = useParams()
     const { addNotification } = useGlobalNotifications()
@@ -30,20 +42,13 @@ const DesignerThemeWorkspacePage = () => {
     const pendingPreviewTextsRef = useRef({})
     const [hasPendingPreviewTexts, setHasPendingPreviewTexts] = useState(false)
     const [previewTextResetVersion, setPreviewTextResetVersion] = useState(0)
+    const baselineSignatureRef = useRef('')
 
     const refreshPendingPreviewTextState = useCallback(() => {
         setHasPendingPreviewTexts(Object.values(pendingPreviewTextsRef.current).some((texts) => Object.keys(texts).length > 0))
     }, [])
 
-    const payload = useMemo(() => workspace ? ({
-        draftVersion: workspace.draftVersion,
-        name: workspace.name,
-        description: workspace.description || '',
-        colors: Object.fromEntries(workspace.colors.map((color) => [color.name, color.value])),
-        fonts: workspace.fonts.filter((font) => font.family.trim()).map((font) => ({ family: font.family, variants: font.variants, display: font.display })),
-        typography: workspace.typography.map((row) => ({ groupIndex: row.groupIndex, element: row.element, values: row.values })),
-        spacing: workspace.spacing.map((row) => ({ scope: row.scope, groupIndex: row.groupIndex, element: row.element, part: row.part, breakpoint: row.breakpoint, values: row.values })),
-    }) : null, [workspace])
+    const payload = useMemo(() => workspaceDraftPayload(workspace), [workspace])
     const preview = useMemo(() => {
         const theme = buildDesignerTheme(workspace)
         return {
@@ -51,6 +56,12 @@ const DesignerThemeWorkspacePage = () => {
             fontUrl: googleFontsStylesheetUrl(theme?.fonts),
         }
     }, [workspace])
+
+    const acceptWorkspace = useCallback((next) => {
+        baselineSignatureRef.current = workspaceSignature(next)
+        setWorkspace(next)
+        setDirty(false)
+    }, [])
 
     const loadWorkspace = useCallback(async () => {
         setLoading(true)
@@ -60,20 +71,20 @@ const DesignerThemeWorkspacePage = () => {
             pendingPreviewTextsRef.current = {}
             setHasPendingPreviewTexts(false)
             setPreviewTextResetVersion((current) => current + 1)
-            setWorkspace(result)
-            setDirty(false)
+            acceptWorkspace(result)
         } catch (err) {
             setError(err.message || 'Unable to open this Designer theme.')
         } finally {
             setLoading(false)
         }
-    }, [themeId])
+    }, [acceptWorkspace, themeId])
 
     useEffect(() => { loadWorkspace() }, [loadWorkspace])
 
     const updateWorkspace = (updater) => {
-        setWorkspace((current) => updater(structuredClone(current)))
-        setDirty(true)
+        const next = updater(structuredClone(workspace))
+        setWorkspace(next)
+        setDirty(workspaceSignature(next) !== baselineSignatureRef.current)
     }
 
     const saveDraft = async ({ silent = false, persistPreviewTexts = true, manageSaving = true } = {}) => {
@@ -88,8 +99,7 @@ const DesignerThemeWorkspacePage = () => {
         try {
             if (dirty) {
                 current = await designerThemesApi.save(themeId, payload)
-                setWorkspace(current)
-                setDirty(false)
+                acceptWorkspace(current)
             }
             if (persistPreviewTexts) {
                 for (const [viewId, pendingTexts] of Object.entries(pendingPreviewTextsRef.current)) {
@@ -101,7 +111,7 @@ const DesignerThemeWorkspacePage = () => {
                         ...pendingTexts,
                     }, current.draftVersion)
                     delete pendingPreviewTextsRef.current[viewId]
-                    setWorkspace(current)
+                    acceptWorkspace(current)
                     refreshPendingPreviewTextState()
                 }
             }
@@ -123,8 +133,7 @@ const DesignerThemeWorkspacePage = () => {
         setPublishing(true)
         try {
             const result = await designerThemesApi.publish(themeId, current.draftVersion)
-            setWorkspace(result)
-            setDirty(false)
+            acceptWorkspace(result)
             addNotification({ type: 'success', message: 'Designer draft published atomically' })
         } catch (err) {
             addNotification({ type: 'error', message: err.message || 'Draft could not be published' })
@@ -140,8 +149,7 @@ const DesignerThemeWorkspacePage = () => {
             pendingPreviewTextsRef.current = {}
             setHasPendingPreviewTexts(false)
             setPreviewTextResetVersion((current) => current + 1)
-            setWorkspace(result)
-            setDirty(false)
+            acceptWorkspace(result)
             addNotification({ type: 'success', message: 'Designer draft discarded' })
         } catch (err) {
             addNotification({ type: 'error', message: err.message || 'Draft could not be discarded' })
@@ -153,8 +161,7 @@ const DesignerThemeWorkspacePage = () => {
         setRestoring(true)
         try {
             const result = await designerThemesApi.undo(themeId, workspace.draftVersion, workspace.liveSyncVersion)
-            setWorkspace(result)
-            setDirty(false)
+            acceptWorkspace(result)
             addNotification({ type: 'success', message: 'Latest Designer publish restored' })
         } catch (err) {
             addNotification({ type: 'error', message: err.message || 'Published revision could not be restored' })
@@ -172,8 +179,7 @@ const DesignerThemeWorkspacePage = () => {
             const result = targetBreakpoint
                 ? await designerThemesApi.replaceAsset(themeId, asset.assetKey, file, current.draftVersion, targetBreakpoint)
                 : await designerThemesApi.replaceAsset(themeId, asset.assetKey, file, current.draftVersion)
-            setWorkspace(result)
-            setDirty(false)
+            acceptWorkspace(result)
             addNotification({ type: 'success', message: `${asset.displayName} replaced` })
         } catch (err) { addNotification({ type: 'error', message: err.message || 'Asset upload failed' }) }
         finally { setSaving(false) }
@@ -200,8 +206,7 @@ const DesignerThemeWorkspacePage = () => {
             }
             if (targetBreakpoint) payload.targetBreakpoint = targetBreakpoint
             const result = await designerThemesApi.createPlaceholder(themeId, payload)
-            setWorkspace(result)
-            setDirty(false)
+            acceptWorkspace(result)
             addNotification({ type: 'success', message: `${draft.displayName || asset.displayName} placeholder created` })
         } catch (err) { addNotification({ type: 'error', message: err.message || 'Placeholder could not be created' }) }
         finally { setSaving(false) }
@@ -214,8 +219,7 @@ const DesignerThemeWorkspacePage = () => {
             const current = dirty || hasPendingPreviewTexts ? await saveDraft({ silent: true, manageSaving: false }) : workspace
             if (!current) return null
             const result = await designerThemesApi.importPreviewSource(themeId, source.kind, source.id, current.draftVersion)
-            setWorkspace(result)
-            setDirty(false)
+            acceptWorkspace(result)
             addNotification({ type: 'success', message: `${source.kind === 'object' ? 'Object' : 'Page'} imported as theme example` })
             return result
         } catch (err) {
@@ -233,8 +237,7 @@ const DesignerThemeWorkspacePage = () => {
             const current = dirty || hasPendingPreviewTexts ? await saveDraft({ silent: true, manageSaving: false }) : workspace
             if (!current) return null
             const result = await designerThemesApi.deletePreviewContent(themeId, view.id, current.draftVersion)
-            setWorkspace(result)
-            setDirty(false)
+            acceptWorkspace(result)
             addNotification({ type: 'success', message: 'Theme example deleted' })
             return result
         } catch (err) {
@@ -251,8 +254,7 @@ const DesignerThemeWorkspacePage = () => {
             const current = dirty ? await saveDraft({ silent: true, persistPreviewTexts: false, manageSaving: false }) : workspace
             if (!current) return null
             const result = await designerThemesApi.savePreviewContent(themeId, viewId, texts, current.draftVersion)
-            setWorkspace(result)
-            setDirty(false)
+            acceptWorkspace(result)
             addNotification({ type: 'success', message: 'Example text saved' })
             return result
         } catch (err) {
@@ -270,8 +272,7 @@ const DesignerThemeWorkspacePage = () => {
             const current = dirty || hasPendingPreviewTexts ? await saveDraft({ silent: true, manageSaving: false }) : workspace
             if (!current) return null
             const result = await designerThemesApi.replacePreviewImage(themeId, viewId, sourceUrl, sourcePath, sourceMatchIndex, file, current.draftVersion)
-            setWorkspace(result)
-            setDirty(false)
+            acceptWorkspace(result)
             addNotification({ type: 'success', message: 'Example image replaced' })
             return result
         } catch (err) {

@@ -152,12 +152,6 @@ describe('SettingsManager', () => {
         expect(screen.getByTestId('settings-dashboard')).toBeInTheDocument()
     })
 
-    it('renders layout management from the layouts route', () => {
-        renderSettings('/settings/layouts')
-
-        expect(screen.getByTestId('layout-editor')).toBeInTheDocument()
-    })
-
     it('links settings sections to contextual how-to anchors', async () => {
         const user = userEvent.setup()
         renderSettings('/settings/themes')

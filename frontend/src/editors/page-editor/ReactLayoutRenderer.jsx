@@ -18,6 +18,8 @@ import { copyWidgetsToClipboard, cutWidgetsToClipboard } from '../../utils/clipb
 import { Clipboard, Scissors, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useClipboard } from '../../contexts/ClipboardContext';
 import { regenerateWidgetIds } from '../../utils/widgetIdentity';
+import WidgetSlot from '../../layouts/easy-layouts/WidgetSlot';
+import { normalizeLayoutDefinition, ThemeLayoutRender } from '../../rendering/themeLayoutRenderer';
 
 // Helper function to filter valid widgets
 const filterValidWidgets = (widgets) => {
@@ -1452,7 +1454,14 @@ const ReactLayoutRenderer = forwardRef(({
         }
     }, [clipboardData, widgets, onWidgetChange, publishUpdate, componentId, contextType, context, webpageData, versionId, prepareCutSourceWidgets, handleDeleteCutWidgets, clearClipboardState]);
 
-    // Get layout component
+    const effectiveTheme = pageVersionData?.effectiveTheme
+        || currentVersion?.effectiveTheme
+        || webpageData?.effectiveTheme;
+    const layoutDefinition = normalizeLayoutDefinition(
+        effectiveTheme?.layouts?.items?.find(layout => layout.key === layoutName) || null
+    );
+
+    // Get the legacy component only when no database layout is available.
     const LayoutComponent = getLayoutComponent(layoutName);
 
     // Expose methods to parent
@@ -1480,10 +1489,10 @@ const ReactLayoutRenderer = forwardRef(({
 
         // Layout-specific methods
         getLayoutName: () => layoutName,
-        getLayoutMetadata: () => getLayoutMetadata(layoutName),
+        getLayoutMetadata: () => layoutDefinition || getLayoutMetadata(layoutName),
         getCurrentWidgets: () => widgets,
         finalizePendingCutSources,
-    }), [widgets, layoutName, versionId, isPublished, finalizePendingCutSources]);
+    }), [widgets, layoutName, layoutDefinition, versionId, isPublished, finalizePendingCutSources]);
 
     // Calculate selected count for toolbar
     const selectedCount = getSelectedCount();
@@ -1521,8 +1530,13 @@ const ReactLayoutRenderer = forwardRef(({
         }
     }, [selectedCount]);
 
-    if (!LayoutComponent) {
-        const availableLayouts = Object.keys(LAYOUT_REGISTRY);
+    if (!LayoutComponent && !layoutDefinition) {
+        const availableLayouts = [
+            ...new Set([
+                ...Object.keys(LAYOUT_REGISTRY),
+                ...((effectiveTheme?.layouts?.items || []).map(layout => layout.key)),
+            ]),
+        ];
 
         return (
             <div className="layout-error bg-red-50 border border-red-200 rounded-lg p-8 max-w-2xl mx-auto mt-8">
@@ -1626,7 +1640,52 @@ const ReactLayoutRenderer = forwardRef(({
                 </div>
             )}
 
-            <LayoutComponent
+            {layoutDefinition ? (
+                <ThemeLayoutRender
+                    model={{
+                        layout: layoutName,
+                        layoutDefinition,
+                        layoutBreakpoints: effectiveTheme?.breakpoints,
+                        designer: true,
+                    }}
+                    renderSlot={(slotName) => {
+                        const policy = layoutDefinition.slots?.[slotName] || {};
+                        return (
+                            <WidgetSlot
+                                name={slotName}
+                                label={policy.label || slotName}
+                                description={policy.description || ''}
+                                widgets={widgets}
+                                onWidgetAction={handleWidgetAction}
+                                editable={editable}
+                                pageContext={pageContext}
+                                namespace={namespace}
+                                onShowWidgetModal={handleShowWidgetModal}
+                                onClearSlot={handleClearSlot}
+                                onImportContent={handleImportContent}
+                                behavior={{
+                                    allowedWidgetTypes: policy.allowed_widget_types || policy.allowedWidgetTypes || ['*'],
+                                    maxWidgets: policy.max_widgets ?? policy.maxWidgets ?? undefined,
+                                    required: Boolean(policy.required),
+                                    slotType: (policy.allows_inheritance ?? policy.allowsInheritance) ? 'inherited' : 'content',
+                                }}
+                                inheritedWidgets={inheritedWidgets}
+                                slotInheritanceRules={slotInheritanceRules}
+                                selectedWidgets={selectedWidgets}
+                                cutWidgets={cutWidgets}
+                                onToggleWidgetSelection={toggleWidgetSelection}
+                                isWidgetSelected={isWidgetSelected}
+                                isWidgetCut={isWidgetCut}
+                                onDeleteCutWidgets={handleDeleteCutWidgets}
+                                buildWidgetPath={buildWidgetPath}
+                                parseWidgetPath={parseWidgetPath}
+                                pasteModeActive={pasteModeActive}
+                                onPasteAtPosition={handlePasteAtPosition}
+                            />
+                        );
+                    }}
+                />
+            ) : <LayoutComponent
                 widgets={widgets}
                 onWidgetAction={handleWidgetAction}
                 editable={editable}
@@ -1651,7 +1710,7 @@ const ReactLayoutRenderer = forwardRef(({
                 // Paste mode props
                 pasteModeActive={pasteModeActive}
                 onPasteAtPosition={handlePasteAtPosition}
-            />
+            />}
 
             {/* Widget Selection Modal */}
             <PageWidgetSelectionModal

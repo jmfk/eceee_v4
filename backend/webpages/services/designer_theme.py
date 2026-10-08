@@ -29,6 +29,7 @@ from webpages.models import (
     WebPage,
 )
 from webpages.serializers.theme import PageThemeSerializer
+from webpages.theme_layouts import theme_layout_usage, validate_layout_compatibility, validate_theme_layouts
 
 TYPE_PROPERTIES = {
     "fontFamily",
@@ -757,6 +758,7 @@ def theme_designer_snapshot(theme):
         "fonts": copy.deepcopy(theme.fonts),
         "design_groups": copy.deepcopy(theme.design_groups),
         "designer_preview": copy.deepcopy(theme.designer_preview),
+        "layouts": copy.deepcopy(theme.layouts),
         "image": theme.image.name if theme.image else None,
         "site_icon": theme.site_icon.name if theme.site_icon else None,
     }
@@ -826,6 +828,7 @@ def apply_designer_snapshot(theme, snapshot):
     theme.fonts = copy.deepcopy(snapshot.get("fonts", {}))
     theme.design_groups = copy.deepcopy(snapshot.get("design_groups", {}))
     theme.designer_preview = copy.deepcopy(snapshot.get("designer_preview", theme.designer_preview))
+    theme.layouts = copy.deepcopy(snapshot.get("layouts", theme.layouts))
     theme.image.name = snapshot.get("image") or ""
     theme.site_icon.name = snapshot.get("site_icon") or ""
     return theme
@@ -1186,6 +1189,8 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
         "spacing": spacing,
         "assets": assets,
         "breakpoints": theme.get_breakpoints(),
+        "layouts": copy.deepcopy(theme.layouts),
+        "layoutUsage": theme_layout_usage(theme),
         "catalog": catalog,
         "previewContent": {"views": catalog["previewViews"]},
         "contentSources": designer_content_sources(theme) if include_tenant_content else [],
@@ -1234,7 +1239,7 @@ def _integer(value, field_name):
 def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=True):
     if not isinstance(payload, dict):
         raise ValidationError("Designer patch must be an object.")
-    allowed_top = {"sync_version", "name", "description", "colors", "fonts", "typography", "spacing"}
+    allowed_top = {"sync_version", "name", "description", "colors", "fonts", "typography", "spacing", "layouts"}
     unknown = set(payload) - allowed_top
     if unknown:
         raise ValidationError(f"Unsupported designer fields: {', '.join(sorted(unknown))}")
@@ -1312,6 +1317,18 @@ def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=Tr
         serializer = PageThemeSerializer(theme, data={"fonts": font_payload}, partial=True)
         serializer.is_valid(raise_exception=True)
         theme.fonts = font_payload
+
+    if "layouts" in payload:
+        try:
+            validate_theme_layouts(payload["layouts"])
+            validate_layout_compatibility(theme, payload["layouts"])
+        except Exception as exc:
+            from django.core.exceptions import ValidationError as DjangoValidationError
+
+            if isinstance(exc, DjangoValidationError):
+                raise ValidationError({"layouts": exc.messages}) from exc
+            raise
+        theme.layouts = copy.deepcopy(payload["layouts"])
 
     design_groups = copy.deepcopy(theme.design_groups or {"groups": []})
     groups = design_groups.get("groups", [])
@@ -1412,6 +1429,9 @@ def publish_designer_draft(theme_id, tenant, user, draft_version):
         if not draft.has_changes:
             raise DesignerDraftConflict("There are no draft changes to publish.")
 
+        draft_layouts = draft.snapshot.get("layouts", theme.layouts)
+        validate_theme_layouts(draft_layouts)
+        validate_layout_compatibility(theme, draft_layouts)
         create_revision(theme, user, "Publish Designer draft")
         apply_designer_snapshot(theme, draft.snapshot)
         if PageTheme.objects.filter(tenant=theme.tenant, name=theme.name).exclude(pk=theme.pk).exists():
@@ -1427,6 +1447,7 @@ def publish_designer_draft(theme_id, tenant, user, draft_version):
                         "fonts",
                         "design_groups",
                         "designer_preview",
+                        "layouts",
                         "image",
                         "site_icon",
                         "sync_source",
@@ -1453,6 +1474,60 @@ def publish_designer_draft(theme_id, tenant, user, draft_version):
                 "updated_at",
             ]
         )
+        return theme, draft
+
+
+def publish_layout_draft(theme_id, tenant, user, draft_version):
+    """Publish only the layout document without applying unrelated Designer draft fields."""
+    with transaction.atomic():
+        theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
+        if not user_can_design_theme(user, theme):
+            raise PermissionError
+        draft = ThemeDesignerDraft.objects.select_for_update().filter(theme=theme).first()
+        if not draft:
+            raise DesignerDraftConflict("There is no layout draft to publish.")
+        if draft.version != _integer(draft_version, "draftVersion"):
+            raise DesignerDraftConflict("The layout draft changed after you opened it.")
+        if draft.base_sync_version != theme.sync_version:
+            raise DesignerDraftConflict("The live theme changed after this layout draft was started.")
+
+        draft_layouts = copy.deepcopy(draft.snapshot.get("layouts", theme.layouts))
+        validate_theme_layouts(draft_layouts)
+        validate_layout_compatibility(theme, draft_layouts)
+        if draft_layouts == theme.layouts:
+            raise DesignerDraftConflict("There are no layout changes to publish.")
+
+        create_revision(theme, user, "Publish layout draft")
+        theme.layouts = draft_layouts
+        theme.sync_source = "web"
+        theme.save(update_fields=["layouts", "sync_source", "sync_version", "updated_at"])
+
+        draft.snapshot["layouts"] = copy.deepcopy(theme.layouts)
+        draft.base_sync_version = theme.sync_version
+        draft.version += 1
+        draft.has_changes = draft.snapshot != theme_designer_snapshot(theme)
+        draft.updated_by = user
+        draft.save(
+            update_fields=["snapshot", "base_sync_version", "version", "has_changes", "updated_by", "updated_at"]
+        )
+        return theme, draft
+
+
+def discard_layout_draft(theme_id, tenant, user, draft_version):
+    """Discard only staged layout edits while preserving other Designer draft work."""
+    with transaction.atomic():
+        theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
+        if not user_can_design_theme(user, theme):
+            raise PermissionError
+        draft = get_or_create_designer_draft(theme, user)
+        draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
+        if draft.version != _integer(draft_version, "draftVersion"):
+            raise DesignerDraftConflict("The layout draft changed after you opened it.")
+        draft.snapshot["layouts"] = copy.deepcopy(theme.layouts)
+        draft.version += 1
+        draft.has_changes = draft.snapshot != theme_designer_snapshot(theme)
+        draft.updated_by = user
+        draft.save(update_fields=["snapshot", "version", "has_changes", "updated_by", "updated_at"])
         return theme, draft
 
 
@@ -1493,6 +1568,7 @@ def undo_designer_publish(theme_id, tenant, user, draft_version, live_sync_versi
                         "fonts",
                         "design_groups",
                         "designer_preview",
+                        "layouts",
                         "image",
                         "site_icon",
                         "sync_source",

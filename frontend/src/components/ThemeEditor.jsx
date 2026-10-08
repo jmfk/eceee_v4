@@ -41,6 +41,8 @@ import PasteThemeDialog from './theme/PasteThemeDialog';
 import DesignerAccessPanel from './theme/DesignerAccessPanel';
 import PreviewViewsTab from './theme/PreviewViewsTab';
 import ThemeVersionsTab from './theme/ThemeVersionsTab';
+import LayoutEditor from './LayoutEditor';
+import ThemeEditorNavigation from './theme/ThemeEditorNavigation';
 
 const ThemeEditor = ({ onSave }) => {
     const { themeId, tab, imageFilename } = useParams();
@@ -647,18 +649,35 @@ const ThemeEditor = ({ onSave }) => {
         }
     };
 
-    const tabs = [
-        { id: 'basic', label: 'Basic Info' },
-        ...(!isCreating ? [{ id: 'versions', label: 'Versions' }] : []),
-        { id: 'images', label: 'Images' },
-        { id: 'fonts', label: 'Fonts' },
-        { id: 'colors', label: 'Colors' },
-        { id: 'breakpoints', label: 'Breakpoints' },
-        { id: 'typography', label: 'Design Groups' },
-        { id: 'component-styles', label: 'Component Styles' },
-        { id: 'preview-views', label: 'Preview Views' },
-        { id: 'image-styles', label: 'Image Styles' },
-        { id: 'table-templates', label: 'Table Templates' },
+    const tabGroups = [
+        {
+            id: 'general', label: 'General', items: [
+                { id: 'basic', label: 'Basic Info' },
+                ...(!isCreating ? [{ id: 'versions', label: 'Versions' }] : []),
+            ],
+        },
+        {
+            id: 'foundations', label: 'Foundations', items: [
+                { id: 'images', label: 'Images' },
+                { id: 'fonts', label: 'Fonts' },
+                { id: 'colors', label: 'Colors' },
+                { id: 'breakpoints', label: 'Breakpoints' },
+            ],
+        },
+        {
+            id: 'structure', label: 'Structure', items: [
+                ...(!isCreating ? [{ id: 'layouts', label: 'Layouts' }] : []),
+                { id: 'typography', label: 'Design Groups' },
+                { id: 'preview-views', label: 'Preview Views' },
+            ],
+        },
+        {
+            id: 'components', label: 'Components', items: [
+                { id: 'component-styles', label: 'Component Styles' },
+                { id: 'image-styles', label: 'Image Styles' },
+                { id: 'table-templates', label: 'Table Templates' },
+            ],
+        },
     ];
 
     if (currentView === 'list') {
@@ -935,27 +954,17 @@ const ThemeEditor = ({ onSave }) => {
                     </div>
                 </div>
 
-                {/* Tabs */}
-                <div className="px-6 flex gap-1 overflow-x-auto">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => navigate(`/settings/themes/${themeId}/${tab.id}`)}
-                            className={`px-4 py-2 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === tab.id
-                                ? 'border-blue-600 text-blue-600'
-                                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-                                }`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
+                <ThemeEditorNavigation
+                    groups={tabGroups}
+                    activeTab={activeTab}
+                    onSelect={(tabId) => navigate(`/settings/themes/${themeId}/${tabId}`)}
+                />
             </div>
 
             {/* Content */}
             <div className="p-6 max-w-7xl mx-auto">
                 {/* Tab Content */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className={`bg-white border border-gray-200 rounded-lg ${activeTab === 'layouts' ? 'overflow-hidden' : 'p-6'}`}>
                     {activeTab === 'basic' && (
                         <div className="space-y-6">
                             <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">Basic Information</div>
@@ -1127,6 +1136,10 @@ const ThemeEditor = ({ onSave }) => {
                             breakpoints={themeData?.breakpoints || {}}
                             onChange={(breakpoints) => updateThemeField('breakpoints', breakpoints)}
                         />
+                    )}
+
+                    {activeTab === 'layouts' && !isCreating && (
+                        <LayoutEditor themeId={themeId} />
                     )}
 
                     {activeTab === 'typography' && (

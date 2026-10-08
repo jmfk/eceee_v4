@@ -36,6 +36,7 @@ export interface ThemeResponse {
   description?: string;
   cssVariables: Record<string, string>;
   isActive: boolean;
+  layouts?: Record<string, any>;
 }
 
 export interface ThemeInheritanceInfo {
@@ -65,6 +66,7 @@ export interface WebPageDetailResponse {
   sortOrder: number;
   hostnames: string[];
   codeLayout?: string;
+  layoutKey?: string;
   theme?: ThemeResponse | null;
   themeId?: number | null;
   publicationStatus: PublicationStatus;
@@ -158,4 +160,4 @@ export interface PageFilters {
   parentIsnull?: boolean;
   publicationStatus?: PublicationStatus;
   ordering?: string;
-} 
+}
