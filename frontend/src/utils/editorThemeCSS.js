@@ -210,7 +210,9 @@ export const buildThemeCSS = ({
     pageCustomCss,
     enableCssInjection = true,
 }) => {
-    const colors = theme?.colors || theme?.cssVariables || {}
+    const colors = theme?.colors && Object.keys(theme.colors).length > 0
+        ? theme.colors
+        : theme?.cssVariables || {}
     const designGroups = theme?.designGroups || theme?.typography
     return [
         PUBLIC_RENDER_CSS,
