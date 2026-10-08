@@ -15,6 +15,14 @@ const DESIGNER_STYLE_PROPERTIES: Record<string, string> = {
 }
 
 const EDITABLE_TEXT_SELECTOR = 'a,blockquote,caption,code,em,figcaption,h1,h2,h3,h4,h5,h6,li,p,pre,span,strong'
+const ADDED_SEMANTIC_TEXT_SELECTOR = [
+    '.content-card-widget > .content-card-header',
+    '.widget-type-easy-widgets-formswidget .form-description',
+    '.news-list-widget .news-excerpt',
+    '.top-news-plug-widget .news-excerpt',
+    'caption',
+    'figcaption',
+].join(',')
 const RICH_TEXT_SELECTOR = '.content-widget,.banner-text,.object-data-preview-field dd'
 const editableTextLabel = (node: HTMLElement) => {
     if (/^H[1-6]$/.test(node.tagName)) return `Heading ${node.tagName.slice(1)} text`
@@ -612,7 +620,13 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         }
         node.contentEditable = 'false'
     })
-    root.querySelectorAll<HTMLElement>(EDITABLE_TEXT_SELECTOR).forEach((node) => {
+    const addedSemanticTextNodes = [...root.querySelectorAll<HTMLElement>(ADDED_SEMANTIC_TEXT_SELECTOR)]
+    const addedSemanticTextSet = new Set(addedSemanticTextNodes)
+    const editableTextNodes = [
+        ...[...root.querySelectorAll<HTMLElement>(EDITABLE_TEXT_SELECTOR)].filter((node) => !addedSemanticTextSet.has(node)),
+        ...addedSemanticTextNodes,
+    ]
+    editableTextNodes.forEach((node) => {
         if (!(node.innerText || node.textContent || '').trim()) return
         let targets: any[] = []
         try { targets = JSON.parse(node.dataset.designerTargets || '[]') } catch { targets = [] }
