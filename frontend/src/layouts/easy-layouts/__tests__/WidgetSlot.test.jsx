@@ -53,7 +53,7 @@ describe('WidgetSlot hidden empty restore bar', () => {
     })
 
     it('does not render the restore bar when preview mode has widgets', () => {
-        renderSlot({
+        const { container } = renderSlot({
             widgets: {
                 header: [
                     {
@@ -66,6 +66,7 @@ describe('WidgetSlot hidden empty restore bar', () => {
         })
 
         expect(screen.getByTestId('rendered-widget')).toHaveTextContent('easy_widgets.ContentWidget')
+        expect(screen.getByTestId('rendered-widget').parentElement).toBe(container.querySelector('.widget-slot'))
         expect(screen.queryByRole('button', { name: 'Show Page Header slot' })).not.toBeInTheDocument()
     })
 })
