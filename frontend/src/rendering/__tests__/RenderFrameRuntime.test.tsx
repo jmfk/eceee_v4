@@ -74,6 +74,33 @@ describe('RenderFrameRuntime navigation', () => {
 })
 
 describe('RenderFrameRuntime designer overlay', () => {
+    it('keeps saved positional text IDs stable when semantic targets are added', async () => {
+        const sourceModel = createPageRenderModel({
+            widgets: { main: [
+                {
+                    id: 'card',
+                    type: 'easy_widgets.ContentCardWidget',
+                    config: { header: 'New semantic target' },
+                },
+                {
+                    id: 'hero',
+                    type: 'easy_widgets.HeroWidget',
+                    config: { header: 'Existing editable heading' },
+                },
+            ] },
+        })
+        const renderModel = createDesignerRenderModel({ workspace, sourceModel, contentEditable: true })
+        renderModel.designer!.texts = { 'content:0': 'Saved heading text' }
+
+        render(<RenderFrameRuntime />)
+        sendModel(renderModel)
+
+        const existingHeading = await screen.findByRole('heading', { name: 'Saved heading text' })
+        const addedHeading = screen.getByRole('heading', { name: 'New semantic target' })
+        expect(existingHeading).toHaveAttribute('data-designer-target', 'content:0')
+        expect(addedHeading).toHaveAttribute('data-designer-target', 'content:1')
+    })
+
     it('exposes image captions as editable Designer targets', async () => {
         const postMessage = vi.spyOn(window, 'postMessage')
         const sourceModel = createPageRenderModel({
