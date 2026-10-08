@@ -696,20 +696,21 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
 
-        fireEvent(window, new MessageEvent('message', {
-            data: {
-                source: 'eceee-designer-preview', action: 'select', targetId: 'layout:main_layout:slot:hero',
-                kind: 'layoutSlot', label: 'Hero', editable: false,
-                descendants: [{
-                    id: 'group:0:element:h1', kind: 'element', label: 'Heading 1',
-                    displayLabel: 'Heading 1: “Example headline”', parentId: 'layout:main_layout:slot:hero',
-                    depth: 1, text: 'Example headline', editable: false,
-                }],
-            },
-            source: iframe.contentWindow,
-        }))
-
-        await waitFor(() => expect(screen.getByText('Selected layout slot')).toBeInTheDocument())
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: {
+                    source: 'eceee-designer-preview', action: 'select', targetId: 'layout:main_layout:slot:hero',
+                    kind: 'layoutSlot', label: 'Hero', editable: false,
+                    descendants: [{
+                        id: 'group:0:element:h1', kind: 'element', label: 'Heading 1',
+                        displayLabel: 'Heading 1: “Example headline”', parentId: 'layout:main_layout:slot:hero',
+                        depth: 1, text: 'Example headline', editable: false,
+                    }],
+                },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByText('Selected layout slot')).toBeInTheDocument()
+        })
         expect(screen.getByRole('heading', { name: 'Hero' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Collapse Hero settings' })).toBeInTheDocument()
 
@@ -731,16 +732,17 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
 
-        fireEvent(window, new MessageEvent('message', {
-            data: {
-                source: 'eceee-designer-preview', action: 'select', targetId: 'widget:banner-1',
-                kind: 'widget', label: 'Banner widget', widgetId: 'banner-1',
-                widgetType: 'easy_widgets.BannerWidget', editable: false,
-            },
-            source: iframe.contentWindow,
-        }))
-
-        await waitFor(() => expect(screen.getByText('Selected widget')).toBeInTheDocument())
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: {
+                    source: 'eceee-designer-preview', action: 'select', targetId: 'widget:banner-1',
+                    kind: 'widget', label: 'Banner widget', widgetId: 'banner-1',
+                    widgetType: 'easy_widgets.BannerWidget', editable: false,
+                },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByText('Selected widget')).toBeInTheDocument()
+        })
         expect(screen.getByRole('heading', { name: 'Banner widget' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Collapse Banner widget settings' })).toBeInTheDocument()
     })
@@ -818,12 +820,13 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
 
         const iframe = screen.getByTitle('Live theme preview')
-        fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:part:content-widget', kind: 'part', label: 'Content' },
-            source: iframe.contentWindow,
-        }))
-
-        expect(screen.getByDisplayValue('10px')).toBeInTheDocument()
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: { source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:part:content-widget', kind: 'part', label: 'Content' },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByDisplayValue('10px')).toBeInTheDocument()
+        })
         expect(screen.queryByDisplayValue('40px')).not.toBeInTheDocument()
     })
 
@@ -1033,17 +1036,20 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
 
-        fireEvent(window, new MessageEvent('message', {
-            data: {
-                source: 'eceee-designer-preview', action: 'select',
-                targetId: 'shared-group', kind: 'group', label: 'Inner content', widgetId: 'inner',
-                path: [
-                    { id: 'shared-group', kind: 'group', label: 'Outer content', widgetId: 'outer' },
-                    { id: 'shared-group', kind: 'group', label: 'Inner content', widgetId: 'inner' },
-                ],
-            },
-            source: iframe.contentWindow,
-        }))
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: {
+                    source: 'eceee-designer-preview', action: 'select',
+                    targetId: 'shared-group', kind: 'group', label: 'Inner content', widgetId: 'inner',
+                    path: [
+                        { id: 'shared-group', kind: 'group', label: 'Outer content', widgetId: 'outer' },
+                        { id: 'shared-group', kind: 'group', label: 'Inner content', widgetId: 'inner' },
+                    ],
+                },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByRole('navigation', { name: 'Element path' })).toBeInTheDocument()
+        })
 
         const pathItems = within(screen.getByRole('navigation', { name: 'Element path' })).getAllByRole('listitem')
         expect(pathItems).toHaveLength(2)
@@ -1094,23 +1100,25 @@ describe('DesignerThemeWorkspacePage', () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
-        fireEvent(window, new MessageEvent('message', {
-            data: {
-                source: 'eceee-designer-preview',
-                action: 'select',
-                targetId: 'group:0:part:content-widget',
-                kind: 'part',
-                label: 'Content widget container',
-                alternatives: [
-                    { id: 'group:0:part:content-widget', kind: 'part', label: 'Content widget container' },
-                    { id: 'group:1:part:content-widget', kind: 'part', label: 'Content widget container' },
-                    { id: 'group:2:part:content-widget', kind: 'part', label: 'Content widget container' },
-                ],
-            },
-            source: iframe.contentWindow,
-        }))
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: {
+                    source: 'eceee-designer-preview',
+                    action: 'select',
+                    targetId: 'group:0:part:content-widget',
+                    kind: 'part',
+                    label: 'Content widget container',
+                    alternatives: [
+                        { id: 'group:0:part:content-widget', kind: 'part', label: 'Content widget container' },
+                        { id: 'group:1:part:content-widget', kind: 'part', label: 'Content widget container' },
+                        { id: 'group:2:part:content-widget', kind: 'part', label: 'Content widget container' },
+                    ],
+                },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByRole('heading', { name: 'Content widget container' })).toBeInTheDocument()
+        })
 
-        expect(screen.getByRole('heading', { name: 'Content widget container' })).toBeInTheDocument()
         expect(screen.queryByRole('heading', { name: 'Choose what to edit' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Content widget container' })).not.toBeInTheDocument()
         expect(screen.getAllByRole('heading', { name: 'Spacing · Content widget container · Extra Large' })).toHaveLength(1)
