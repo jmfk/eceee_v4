@@ -6,8 +6,6 @@ import {
     ChevronDown,
     ChevronUp,
     FileText,
-    Folder,
-    FolderOpen,
     Edit,
     Scissors,
     Trash2,
@@ -614,16 +612,6 @@ const PageTreeNode = memo(({
         onEdit?.({ ...page, editorTab: 'settings' })
     }
 
-    // Folder icon based on state
-    const getFolderIcon = () => {
-        if (!hasChildren) {
-            return <FileText className="w-4 h-4 text-gray-500" />
-        }
-        return isExpanded ?
-            <FolderOpen className="w-4 h-4 text-blue-500" /> :
-            <Folder className="w-4 h-4 text-blue-500" />
-    }
-
     const secondaryActions = [
         {
             label: 'Publishing & history',
@@ -698,36 +686,40 @@ const PageTreeNode = memo(({
                 }}
                 onClick={handleRowClick}
             >
-                {/* Expand/collapse button */}
-                <button
-                    type="button"
-                    data-testid={`page-tree-expand-${pageTestId}`}
-                    onClick={(e) => {
-                        e.stopPropagation()
-                        handleToggleExpand()
-                    }}
-                    className={`
-                            flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded transition-all duration-200 hover:shadow-sm xl:min-h-8 xl:min-w-8
-                            ${!hasChildren ? 'opacity-30 cursor-default' : 'hover:bg-gray-200'}
-                        `}
-                    disabled={isLoading || !hasChildren}
-                    aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${page.title}`}
-                    aria-expanded={hasChildren ? isExpanded : undefined}
-                >
-                    {isLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                    ) : isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-gray-600" />
-                    ) : (
-                        <ChevronRight className="w-4 h-4 text-gray-600" />
-                    )}
-                </button>
+                {/* Expand/collapse button, or an equal-width spacer for leaf pages */}
+                {hasChildren ? (
+                    <button
+                        type="button"
+                        data-testid={`page-tree-expand-${pageTestId}`}
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            handleToggleExpand()
+                        }}
+                        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded transition-all duration-200 hover:bg-gray-200 hover:shadow-sm xl:min-h-8 xl:min-w-8"
+                        disabled={isLoading}
+                        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${page.title}`}
+                        aria-expanded={isExpanded}
+                    >
+                        {isLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                        ) : isExpanded ? (
+                            <ChevronDown className="w-4 h-4 text-gray-600" />
+                        ) : (
+                            <ChevronRight className="w-4 h-4 text-gray-600" />
+                        )}
+                    </button>
+                ) : (
+                    <span
+                        data-testid={`page-tree-expand-spacer-${pageTestId}`}
+                        className="min-h-11 min-w-11 shrink-0 xl:min-h-8 xl:min-w-8"
+                        aria-hidden="true"
+                    />
+                )}
 
                 {/* Page content area */}
                 <div className="flex min-w-0 flex-1 items-center gap-2 xl:gap-3">
                     {/* Page identity */}
                     <div data-testid={`page-tree-identity-${pageTestId}`} className="flex min-w-0 flex-1 items-center gap-2">
-                        <div className="flex min-h-8 shrink-0 items-center">{getFolderIcon()}</div>
                         {page.isSearchResult && (
                             <div className="flex min-h-8 shrink-0 items-center">
                                 <Search className="w-3 h-3 text-blue-500" />
