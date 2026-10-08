@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from djangorestframework_camel_case.render import CamelCaseJSONRenderer
 from rest_framework import authentication, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -29,6 +30,15 @@ from object_storage.tasks import export_object_package, import_remote_object_pac
 from webpages.models import ThemeRemoteConnection
 from webpages.services.theme_remote import RemoteThemeError, remote_object_request
 from webpages.services.theme_remote_credentials import RemoteCredentialConfigurationError
+
+
+class ObjectTransferJSONRenderer(CamelCaseJSONRenderer):
+    """Preserve object type contracts while camel-casing the API envelope."""
+
+    json_underscoreize = {
+        **CamelCaseJSONRenderer.json_underscoreize,
+        "ignore_fields": ("schema", "slot_configuration", "slotConfiguration"),
+    }
 
 
 def _admin(request):
@@ -136,6 +146,7 @@ def _validate_type_resolutions(conflicts, resolutions):
 class RemoteObjectSourceMixin:
     authentication_classes = [MachineAPIKeyAuthentication, authentication.SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
+    renderer_classes = [ObjectTransferJSONRenderer]
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)

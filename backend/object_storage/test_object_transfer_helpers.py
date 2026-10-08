@@ -8,7 +8,7 @@ from unittest.mock import patch
 from django.test import SimpleTestCase
 from rest_framework import serializers
 
-from object_storage.remote_views import _validate_type_resolutions
+from object_storage.remote_views import RemoteObjectSourcePreflightView, _validate_type_resolutions
 from object_storage.services.object_transfer import (
     MAX_OBJECTS,
     PACKAGE_VERSION,
@@ -22,6 +22,36 @@ from object_storage.services.object_transfer import (
 
 
 class ObjectTransferHelperTests(SimpleTestCase):
+    def test_source_renderer_preserves_object_type_contract_keys(self):
+        payload = {
+            "object_count": 1,
+            "types": [
+                {
+                    "schema": {
+                        "properties": {
+                            "hero_image": {
+                                "field_type": "object_reference",
+                                "relationship_type": "related_items",
+                            }
+                        }
+                    },
+                    "slot_configuration": {
+                        "slots": [{"widget_controls": [{"widget_type": "easy_widgets.ImageWidget"}]}]
+                    },
+                }
+            ],
+        }
+
+        renderer = RemoteObjectSourcePreflightView().get_renderers()[0]
+        rendered = json.loads(renderer.render(payload))
+
+        self.assertEqual(rendered["objectCount"], 1)
+        self.assertEqual(rendered["types"][0]["schema"], payload["types"][0]["schema"])
+        self.assertEqual(
+            rendered["types"][0]["slotConfiguration"],
+            payload["types"][0]["slot_configuration"],
+        )
+
     def test_root_limit_is_checked_before_querying_objects(self):
         with patch("object_storage.services.object_transfer.ObjectInstance.objects.filter") as object_filter:
             with self.assertRaisesMessage(ValueError, f"exceeds the {MAX_OBJECTS} root object limit"):
