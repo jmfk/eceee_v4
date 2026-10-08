@@ -31,10 +31,17 @@ export const sitePackagesApi = {
         return api.get(endpoints.sitePackages.imports)
     }, 'sitePackages.listImports'),
 
-    createImport: wrapApiCall(async ({ file, preservePublicationStatus = true }) => {
+    createImport: wrapApiCall(async ({
+        file,
+        preservePublicationStatus = true,
+        mode = 'prompt',
+        existingRootId = null
+    }) => {
         const formData = new FormData()
         formData.append('site_zip', file)
         formData.append('preservePublicationStatus', preservePublicationStatus ? 'true' : 'false')
+        formData.append('mode', mode)
+        if (existingRootId !== null) formData.append('existingRootId', String(existingRootId))
         return api.post(endpoints.sitePackages.imports, formData, {
             headers: {
                 'Content-Type': 'multipart/form-data'

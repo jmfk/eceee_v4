@@ -26,7 +26,9 @@ from webpages.serializers import (
 )
 from webpages.services.site_package import (
     build_site_package_export_object_key,
+    find_site_package_conflicts,
     get_site_package_download_filename,
+    inspect_site_package_upload,
 )
 from webpages.services.theme_remote import RemoteThemeError, remote_site_request
 from webpages.services.theme_remote_credentials import (
@@ -152,9 +154,46 @@ class SitePackageImportListView(APIView):
         serializer = SitePackageImportCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         tenant = getattr(request, "tenant", None)
+        try:
+            identity = inspect_site_package_upload(serializer.validated_data["site_zip"])
+        except ValueError as exc:
+            raise serializers.ValidationError({"siteZip": str(exc)}) from exc
+
+        conflicts = find_site_package_conflicts(tenant, identity) if tenant else []
+        mode = serializer.validated_data["mode"]
+        if conflicts and mode == "prompt":
+            return Response(
+                {
+                    "code": "site_already_exists",
+                    "message": f'“{identity["title"]}” already exists. Choose how to import it.',
+                    "sourceSite": identity,
+                    "existingSites": [
+                        {"id": item["id"], "title": item["title"], "slug": item["slug"]} for item in conflicts
+                    ],
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        if mode == "update":
+            selected = next(
+                (item for item in conflicts if item["id"] == serializer.validated_data["existing_root_id"]),
+                None,
+            )
+            if selected is None:
+                raise serializers.ValidationError({"existingRootId": "The selected site does not match this package."})
+        else:
+            selected = None
+            mode = "clone" if mode == "clone" else "create"
+
         options = {
             "preserve_publication_status": serializer.validated_data["preserve_publication_status"],
+            "mode": mode,
+            "source_root_key": identity["stable_key"],
+            "source_root_id": identity["source_id"],
         }
+        if selected:
+            options["local_root_id"] = selected["id"]
+            if selected["binding_job_id"]:
+                options["source_binding_job_id"] = selected["binding_job_id"]
         if tenant:
             options["tenant_id"] = str(tenant.id)
         job = SitePackageJob.objects.create(

@@ -109,7 +109,18 @@ class SitePackageExportCreateSerializer(serializers.Serializer):
 
 class SitePackageImportCreateSerializer(serializers.Serializer):
     site_zip = serializers.FileField()
-    preserve_publication_status = serializers.BooleanField(default=True)
+    preservePublicationStatus = serializers.BooleanField(
+        source="preserve_publication_status", default=True, write_only=True
+    )
+    mode = serializers.ChoiceField(choices=("prompt", "clone", "update"), default="prompt")
+    existingRootId = serializers.IntegerField(
+        source="existing_root_id", required=False, allow_null=True, write_only=True
+    )
+
+    def validate(self, attrs):
+        if attrs["mode"] == "update" and not attrs.get("existing_root_id"):
+            raise serializers.ValidationError({"existingRootId": "Choose the existing site to update."})
+        return attrs
 
 
 class RemoteSiteListSerializer(serializers.Serializer):
