@@ -191,6 +191,7 @@ class ContentCardWidget(BaseWidget):
     .content-card-header {
         box-sizing: border-box;
         height: 140px;
+        margin: 0;
         padding: 30px;
         font-size: 36px;
         font-family: 'Source Sans 3', sans-serif;

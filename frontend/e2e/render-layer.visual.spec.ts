@@ -49,6 +49,9 @@ for (const viewport of viewports) {
   test(`editor and designer render the shared fixtures at ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
     await openRender(page, model)
+    await expect(page.locator('.content-card-header').first()).toHaveCSS('margin', '0px')
+    await expect(page.locator('.form-description').first()).toHaveCSS('margin', '0px')
+    await expect(page.locator('.news-excerpt').first()).toHaveCSS('margin', '0px')
     await expect(page).toHaveScreenshot(`render-editor-${viewport.name}.png`, { fullPage: true, animations: 'disabled' })
 
     await openRender(page, designerModel)
