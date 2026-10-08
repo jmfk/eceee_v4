@@ -55,9 +55,9 @@ const document = {
     }],
 }
 
-const Harness = () => {
+const Harness = ({ disabled = false }) => {
     const [workspace, setWorkspace] = useState({ layouts: structuredClone(document), layoutUsage: {}, breakpoints: { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 } })
-    return <LayoutDesignerWorkspace workspace={workspace} viewport="md" updateWorkspace={(updater) => setWorkspace((current) => updater(structuredClone(current)))} disabled={false} />
+    return <LayoutDesignerWorkspace workspace={workspace} viewport="md" updateWorkspace={(updater) => setWorkspace((current) => updater(structuredClone(current)))} disabled={disabled} />
 }
 
 describe('LayoutDesignerWorkspace', () => {
@@ -186,6 +186,20 @@ describe('LayoutDesignerWorkspace', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Use default' }))
         expect(screen.getByText('Type default')).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-presentation-color', '')
+    })
+
+    it('blocks every document mutation while the workspace is disabled', () => {
+        render(<Harness disabled />)
+
+        expect(screen.getByRole('button', { name: 'Slot · main' })).toBeDisabled()
+        expect(screen.getByRole('button', { name: 'Move node down' })).toBeDisabled()
+        expect(screen.getByLabelText('Element name')).toBeDisabled()
+
+        fireEvent.change(screen.getByLabelText('Element name'), { target: { value: 'Must not persist' } })
+        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+        expect(screen.getByLabelText('Canonical layout document')).toBeDisabled()
     })
 
     it('uses theme breakpoints for the canvas and provides fit and manual zoom', () => {

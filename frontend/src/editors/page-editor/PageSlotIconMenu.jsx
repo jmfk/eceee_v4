@@ -46,7 +46,7 @@ const PageSlotIconMenu = ({
         }
     };
 
-    const canAddWidget = widgets.length < maxWidgets;
+    const canAddWidget = maxWidgets == null || widgets.length < maxWidgets;
     const hasWidgets = widgets.length > 0;
     const slotTestId = (slotName || 'slot')
         .toString()
@@ -58,7 +58,7 @@ const PageSlotIconMenu = ({
         <>
             <div className="flex items-center space-x-1">
                 {/* Import Content Button */}
-                {onImportContent && (
+                {onImportContent && canAddWidget && (
                     <button
                         data-testid={`page-slot-import-${slotTestId}`}
                         onClick={handleImportContentClick}

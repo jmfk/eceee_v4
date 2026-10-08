@@ -3,6 +3,7 @@ Site ZIP package export/import services.
 """
 
 import base64
+import copy
 import hashlib
 import io
 import json
@@ -34,10 +35,11 @@ from webpages.services.theme_preview_content import (
     normalize_theme_preview_namespaces,
     rewrite_theme_library_image_urls,
 )
-from webpages.theme_layouts import default_theme_layouts, validate_theme_layouts
+from webpages.theme_layouts import default_theme_layouts, legacy_compatibility_layout, validate_theme_layouts
 
 PACKAGE_VERSION = "2.0"
 SUPPORTED_PACKAGE_VERSIONS = {"1.0", PACKAGE_VERSION}
+LEGACY_ERROR_LAYOUT_KEYS = {"error_403", "error_404", "error_500", "error_503"}
 THEME_TRANSFER_MAX_FILES = 250
 THEME_TRANSFER_MAX_FILE_SIZE = 25 * 1024 * 1024
 THEME_TRANSFER_MAX_TOTAL_SIZE = 100 * 1024 * 1024
@@ -48,6 +50,122 @@ UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{
 URL_RE = re.compile(r"https?://[^\s\"'<>\\)]+", re.IGNORECASE)
 HTML_IMAGE_SRC_RE = re.compile(r"<img[^>]+src=[\"']([^\"']+)[\"']", re.IGNORECASE)
 IMAGE_URL_RE = re.compile(r"\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^\s]*)?$", re.IGNORECASE)
+
+
+def _canonical_imported_layout(layout_key, widgets):
+    """Normalize legacy layout references before they enter the new layout contract."""
+    key = layout_key or ""
+    if key not in LEGACY_ERROR_LAYOUT_KEYS:
+        return key, widgets
+    normalized = dict(widgets) if isinstance(widgets, dict) else widgets
+    if isinstance(normalized, dict):
+        for old_key, new_key in {
+            "branding": "visual",
+            "error_message": "message",
+            "helpful_content": "actions",
+        }.items():
+            values = normalized.pop(old_key, None)
+            if values:
+                normalized[new_key] = [*(normalized.get(new_key) or []), *values]
+    return "error_layout", normalized
+
+
+def _package_layout_references(pages_payload):
+    """Collect observed slots per canonical layout and source theme."""
+    references = {"unbound": {}, "by_theme": {}}
+    pages_by_id = {page.get("source_id"): page for page in pages_payload or []}
+
+    def inherited_theme_ids(page):
+        theme_ids = set()
+        parent_id = page.get("parent_source_id")
+        while parent_id is not None:
+            parent = pages_by_id.get(parent_id)
+            if not parent:
+                break
+            theme_ids.update(
+                version.get("theme_source_id")
+                for version in parent.get("versions", [])
+                if version.get("theme_source_id") is not None
+            )
+            if theme_ids:
+                break
+            parent_id = parent.get("parent_source_id")
+        return theme_ids
+
+    def inherited_layout_keys(page):
+        layout_keys = set()
+        parent_id = page.get("parent_source_id")
+        while parent_id is not None:
+            parent = pages_by_id.get(parent_id)
+            if not parent:
+                break
+            layout_keys.update(
+                version.get("layout_key") or version.get("code_layout")
+                for version in parent.get("versions", [])
+                if version.get("layout_key") or version.get("code_layout")
+            )
+            if layout_keys:
+                break
+            parent_id = parent.get("parent_source_id")
+        return layout_keys
+
+    for page in pages_payload or []:
+        for version in page.get("versions", []):
+            raw_key = version.get("layout_key") or version.get("code_layout") or ""
+            raw_keys = {raw_key} if raw_key else inherited_layout_keys(page)
+            if not raw_keys:
+                continue
+            theme_ids = (
+                {version["theme_source_id"]}
+                if version.get("theme_source_id") is not None
+                else inherited_theme_ids(page)
+            )
+            targets = (
+                [references["by_theme"].setdefault(str(theme_id), {}) for theme_id in theme_ids]
+                if theme_ids
+                else [references["unbound"]]
+            )
+            for inherited_key in raw_keys:
+                key, widgets = _canonical_imported_layout(inherited_key, version.get("widgets", {}))
+                for target in targets:
+                    target.setdefault(key, set()).update(widgets.keys() if isinstance(widgets, dict) else [])
+    return references
+
+
+def _with_compatibility_layouts(layouts, layout_references):
+    """Add observed legacy layouts without replacing a theme's native definitions."""
+    document = layouts or default_theme_layouts()
+    items = list(document.get("items", []))
+    existing = {item.get("key"): index for index, item in enumerate(items) if isinstance(item, dict)}
+    for key, slots in sorted((layout_references or {}).items()):
+        index = existing.get(key)
+        if index is None:
+            continue
+        current = items[index]
+        is_generated = current.get("description") == "Migrated from the legacy code-layout registry." and (
+            "legacy-layout-compatibility" in (current.get("root") or {}).get("class_names", [])
+        )
+        if is_generated:
+            missing_slots = set(slots) - set((current.get("slots") or {}).keys())
+            if missing_slots:
+                generated = legacy_compatibility_layout(key, missing_slots)
+                expanded = copy.deepcopy(current)
+                expanded.setdefault("slots", {}).update(generated["slots"])
+                expanded.setdefault("root", {}).setdefault("children", []).extend(generated["root"]["children"])
+                items[index] = expanded
+    additions = [
+        legacy_compatibility_layout(key, slots)
+        for key, slots in sorted((layout_references or {}).items())
+        if key not in existing
+    ]
+    if additions:
+        items.extend(additions)
+    if items != document.get("items", []):
+        document = {**document, "items": items}
+    validate_theme_layouts(document)
+    return document
+
+
 PAGE_REFERENCE_KEYS = {
     "pageId",
     "page_id",
@@ -1242,7 +1360,7 @@ class SitePackageImporter:
             return self._update_package(package, manifest)
 
         pages_payload = json.loads(package.read("pages.json").decode("utf-8"))["pages"]
-        theme_map = self._import_themes(package)
+        theme_map = self._import_themes(package, pages_payload)
         media_map = self._import_media(package)
         replacements = self._build_replacements(media_map)
 
@@ -1289,6 +1407,9 @@ class SitePackageImporter:
                 preserve_publication = (self.job.options or {}).get("preserve_publication_status", True)
                 page_data_payload = _replace_in_json(version_data.get("page_data", {}), replacements)
                 widgets_payload = _replace_in_json(version_data.get("widgets", {}), replacements)
+                imported_layout_key, widgets_payload = _canonical_imported_layout(
+                    version_data.get("layout_key") or version_data.get("code_layout", ""), widgets_payload
+                )
                 effective_date = (
                     self._parse_datetime(version_data.get("effective_date")) if preserve_publication else None
                 )
@@ -1300,8 +1421,8 @@ class SitePackageImporter:
                     change_summary=version_data.get("change_summary", {}),
                     meta_title=version_data.get("meta_title", ""),
                     meta_description=version_data.get("meta_description", ""),
-                    code_layout=version_data.get("code_layout", ""),
-                    layout_key=version_data.get("layout_key") or version_data.get("code_layout", ""),
+                    code_layout=imported_layout_key,
+                    layout_key=imported_layout_key,
                     page_data=page_data_payload,
                     widgets=widgets_payload,
                     theme=theme,
@@ -1452,7 +1573,7 @@ class SitePackageImporter:
         tenant = self._destination_tenant()
         pages_payload = json.loads(package.read("pages.json").decode("utf-8"))["pages"]
         binding = self._resolve_update_binding(tenant, pages_payload)
-        theme_map = self._import_themes_for_update(package, binding)
+        theme_map = self._import_themes_for_update(package, binding, pages_payload)
         media_map = self._import_media(package)
         replacements = self._build_replacements(media_map)
         warnings = list(manifest.get("warnings", []))
@@ -1629,6 +1750,10 @@ class SitePackageImporter:
                         superseded_version.expiry_date = replacement_cutoff
                         superseded_version.save(update_fields=["expiry_date", "updated_at"])
                 latest_number = page.versions.aggregate(maximum=models.Max("version_number"))["maximum"] or 0
+                widgets_payload = _replace_in_json(version_data.get("widgets", {}), replacements)
+                imported_layout_key, widgets_payload = _canonical_imported_layout(
+                    version_data.get("layout_key") or version_data.get("code_layout", ""), widgets_payload
+                )
                 version = PageVersion.objects.create(
                     page=page,
                     version_number=latest_number + 1,
@@ -1640,10 +1765,10 @@ class SitePackageImporter:
                     },
                     meta_title=version_data.get("meta_title", ""),
                     meta_description=version_data.get("meta_description", ""),
-                    code_layout=version_data.get("code_layout", ""),
-                    layout_key=version_data.get("layout_key") or version_data.get("code_layout", ""),
+                    code_layout=imported_layout_key,
+                    layout_key=imported_layout_key,
                     page_data=_replace_in_json(version_data.get("page_data", {}), replacements),
-                    widgets=_replace_in_json(version_data.get("widgets", {}), replacements),
+                    widgets=widgets_payload,
                     theme=theme_map.get(version_data.get("theme_source_id")),
                     page_css_variables=_replace_in_json(version_data.get("page_css_variables", {}), replacements),
                     page_custom_css=_replace_in_json(version_data.get("page_custom_css", ""), replacements),
@@ -1824,13 +1949,15 @@ class SitePackageImporter:
         namespace = Namespace.objects.filter(tenant=tenant, is_default=True).first()
         return namespace or Namespace.get_default()
 
-    def _import_themes(self, package: zipfile.ZipFile) -> Dict[int, PageTheme]:
+    def _import_themes(self, package: zipfile.ZipFile, pages_payload=None) -> Dict[int, PageTheme]:
         theme_map = {}
+        references = _package_layout_references(pages_payload)
         theme_files = [name for name in package.namelist() if name.startswith("themes/") and name.endswith(".json")]
         for theme_file in theme_files:
             data = json.loads(package.read(theme_file).decode("utf-8"))
+            observed = references["by_theme"].get(str(data["source_id"]), {})
             fingerprint = data.get("content_fingerprint") or _payload_fingerprint(data)
-            theme = self._create_theme(package, data)
+            theme = self._create_theme(package, data, observed)
             theme_map[data["source_id"]] = theme
             self.theme_source_fingerprints[str(data["source_id"])] = fingerprint
             if data.get("stable_key"):
@@ -1838,12 +1965,12 @@ class SitePackageImporter:
                     "id": theme.id,
                     "fingerprint": fingerprint,
                 }
+        self._augment_destination_default_theme(references["unbound"])
         return theme_map
 
-    def _create_theme(self, package, data):
+    def _create_theme(self, package, data, layout_references=None):
         destination_tenant = self._destination_tenant()
-        layouts = data.get("layouts") or default_theme_layouts()
-        validate_theme_layouts(layouts)
+        layouts = _with_compatibility_layouts(data.get("layouts"), layout_references)
         theme = PageTheme.objects.create(
             tenant=destination_tenant,
             name=_unique_theme_name(data.get("name", "Imported Theme")),
@@ -1869,12 +1996,14 @@ class SitePackageImporter:
         self._restore_theme_assets(package, theme, data)
         return theme
 
-    def _import_themes_for_update(self, package, binding):
+    def _import_themes_for_update(self, package, binding, pages_payload=None):
         theme_map = {}
+        references = _package_layout_references(pages_payload)
         next_binding_map = dict(binding.theme_map or {})
         theme_files = [name for name in package.namelist() if name.startswith("themes/") and name.endswith(".json")]
         for theme_file in theme_files:
             data = json.loads(package.read(theme_file).decode("utf-8"))
+            observed = references["by_theme"].get(str(data["source_id"]), {})
             stable_key = str(data.get("stable_key") or data["source_id"])
             fingerprint = data.get("content_fingerprint") or _payload_fingerprint(data)
             self.theme_source_fingerprints[str(data["source_id"])] = fingerprint
@@ -1915,11 +2044,26 @@ class SitePackageImporter:
                     if existing_fingerprint == fingerprint:
                         theme = existing_theme
             if theme is None:
-                theme = self._create_theme(package, data)
+                theme = self._create_theme(package, data, observed)
+            elif observed:
+                layouts = _with_compatibility_layouts(theme.layouts, observed)
+                if layouts != theme.layouts:
+                    theme.layouts = layouts
+                    theme.save(update_fields=["layouts"])
             next_binding_map[stable_key] = {"id": theme.id, "fingerprint": fingerprint}
             theme_map[data["source_id"]] = theme
+        self._augment_destination_default_theme(references["unbound"])
         binding.theme_map = next_binding_map
         return theme_map
+
+    def _augment_destination_default_theme(self, layout_references):
+        if not layout_references:
+            return
+        theme = PageTheme.get_default_theme(tenant=self._destination_tenant())
+        layouts = _with_compatibility_layouts(theme.layouts, layout_references)
+        if layouts != theme.layouts:
+            theme.layouts = layouts
+            theme.save(update_fields=["layouts"])
 
     def _restore_theme_assets(self, package, theme: PageTheme, data: Dict[str, Any]):
         prefix = f"themes/assets/{data['source_id']}/"

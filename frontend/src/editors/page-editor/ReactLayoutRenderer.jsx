@@ -93,7 +93,7 @@ const removeWidgetAtPathFromWidgetMap = (widgetMap, pathParts) => {
     };
 }
 
-const removeCutMetadataFromWidgetMap = (widgetMap, cutMetadata) => {
+export const removeCutMetadataFromWidgetMap = (widgetMap, cutMetadata) => {
     let updatedWidgets = widgetMap || {};
 
     if (cutMetadata?.widgetPaths && Array.isArray(cutMetadata.widgetPaths)) {
@@ -120,6 +120,26 @@ const removeCutMetadataFromWidgetMap = (widgetMap, cutMetadata) => {
 
     return updatedWidgets;
 }
+
+export const validateSlotWidgetAddition = (policy = {}, currentCount, addedWidgets, removedCount = 0) => {
+    const maximum = policy.max_widgets ?? policy.maxWidgets;
+    if (maximum != null && currentCount - removedCount + addedWidgets.length > maximum) {
+        return `This slot allows at most ${maximum} widget${maximum === 1 ? '' : 's'}.`;
+    }
+    const allowed = policy.allowed_widget_types || policy.allowedWidgetTypes;
+    const disallowed = policy.disallowed_widget_types || policy.disallowedWidgetTypes || [];
+    const matches = (type, patterns = []) => {
+        const widgetType = String(type || '');
+        return patterns.some((pattern) => (
+            pattern === '*' || widgetType === pattern
+            || (pattern.endsWith('.*') && widgetType.startsWith(pattern.slice(0, -1)))
+        ));
+    };
+    const invalid = addedWidgets.find((widget) => (
+        (allowed?.length && !matches(widget.type, allowed)) || matches(widget.type, disallowed)
+    ));
+    return invalid ? `Widget type “${invalid.type}” is not allowed in this slot.` : null;
+};
 
 const ReactLayoutRenderer = forwardRef(({
     layoutName = 'main_layout',  // Default to main_layout (available layout)
@@ -157,6 +177,12 @@ const ReactLayoutRenderer = forwardRef(({
     // Get version context
     const versionId = currentVersion?.id || pageVersionData?.versionId;
     const isPublished = pageVersionData?.publicationStatus === 'published';
+    const effectiveTheme = pageVersionData?.effectiveTheme
+        || currentVersion?.effectiveTheme
+        || webpageData?.effectiveTheme;
+    const layoutDefinition = normalizeLayoutDefinition(
+        effectiveTheme?.layouts?.items?.find(layout => layout.key === layoutName) || null
+    );
 
     // Use shared componentId from PageEditor (for component group coordination)
     const componentId = sharedComponentId || `react-layout-renderer-${versionId || 'unknown'}`;
@@ -954,6 +980,12 @@ const ReactLayoutRenderer = forwardRef(({
 
         // Add imported widgets to the slot
         const currentSlotWidgets = widgets[importSlotName] || [];
+        const policy = layoutDefinition?.slots?.[importSlotName] || {};
+        const policyError = validateSlotWidgetAddition(policy, currentSlotWidgets.length, importedWidgets);
+        if (policyError) {
+            setPasteError(policyError);
+            return;
+        }
         const updatedWidgets = {
             ...widgets,
             [importSlotName]: [...currentSlotWidgets, ...importedWidgets]
@@ -986,7 +1018,7 @@ const ReactLayoutRenderer = forwardRef(({
                 updatedFields: ['title', 'tags'],
             });
         }
-    }, [importSlotName, widgets, onWidgetChange, publishUpdate, componentId, contextType]);
+    }, [importSlotName, widgets, onWidgetChange, publishUpdate, componentId, contextType, layoutDefinition]);
 
     // Bulk action handlers
     const handleCopySelected = useCallback(async () => {
@@ -1047,7 +1079,7 @@ const ReactLayoutRenderer = forwardRef(({
         await refreshClipboard();
     }, [getSelectedWidgets, context, webpageData, versionId, refreshClipboard]);
 
-    const handleDeleteCutWidgets = useCallback(async (cutMetadata, preparedSource = null) => {
+    const handleDeleteCutWidgets = useCallback(async (cutMetadata, preparedSource = null, destinationWidgets = null) => {
         // Delete widgets that were cut and pasted
         // Supports both new format (widgetPaths) and old format (widgets object)
 
@@ -1073,7 +1105,7 @@ const ReactLayoutRenderer = forwardRef(({
         }
 
         // For same-page operations, update local widgets
-        const updatedWidgets = { ...widgets };
+        const updatedWidgets = { ...(destinationWidgets || widgets) };
         let hasChanges = false;
 
         // Handle new format with widget paths
@@ -1210,7 +1242,10 @@ const ReactLayoutRenderer = forwardRef(({
         }
 
         if (hasChanges && onWidgetChange) {
-            onWidgetChange(updatedWidgets, { sourceId: 'cut-operation' });
+            onWidgetChange(
+                removeCutMetadataFromWidgetMap(destinationWidgets || widgets, cutMetadata),
+                { sourceId: 'cut-operation' }
+            );
         }
 
         // Clear cut state and selection
@@ -1230,6 +1265,7 @@ const ReactLayoutRenderer = forwardRef(({
         const widgetsToPaste = clipboardData.data;
         const isCut = clipboardData.operation === 'cut';
         let preparedCutSource = null;
+        let pastedWidgetMap = null;
 
         if (isCut && clipboardData.metadata) {
             const sourcePageId = clipboardData.metadata.pageId;
@@ -1257,6 +1293,29 @@ const ReactLayoutRenderer = forwardRef(({
 
         // Determine if this is a nested slot paste
         const isNested = widgetPath.length > 0;
+
+        if (!isNested && layoutDefinition) {
+            const policy = layoutDefinition.slots?.[slotName] || {};
+            const currentCount = (widgets[slotName] || []).length;
+            const currentPageId = context?.pageId || webpageData?.id;
+            const sameSource = isCut && !isDifferentWidgetSourceContext({
+                sourcePageId: clipboardData.metadata?.pageId,
+                sourceVersionId: clipboardData.metadata?.versionId,
+                currentPageId,
+                currentVersionId: versionId
+            });
+            const removedFromTarget = sameSource
+                ? (clipboardData.metadata?.widgetPaths || []).filter((path) => {
+                    const parts = String(path).split('/');
+                    return parts.length === 2 && parts[0] === slotName;
+                }).length
+                : 0;
+            const policyError = validateSlotWidgetAddition(policy, currentCount, pastedWidgets, removedFromTarget);
+            if (policyError) {
+                setPasteError(policyError);
+                return;
+            }
+        }
 
         if (isNested) {
             // NORMALIZE PATH: Determine if path targets a slot or a widget
@@ -1390,6 +1449,7 @@ const ReactLayoutRenderer = forwardRef(({
                 ...widgets,
                 [topSlotName]: updatedTopLevelWidgets
             };
+            pastedWidgetMap = updatedWidgets;
 
             if (onWidgetChange) {
                 onWidgetChange(updatedWidgets);
@@ -1415,6 +1475,7 @@ const ReactLayoutRenderer = forwardRef(({
                 ...widgets,
                 [slotName]: slotWidgets
             };
+            pastedWidgetMap = updatedWidgets;
 
             if (onWidgetChange) {
                 onWidgetChange(updatedWidgets);
@@ -1439,7 +1500,7 @@ const ReactLayoutRenderer = forwardRef(({
         // Handle cut operation - delete from source
         if (isCut && clipboardData.metadata) {
             try {
-                await handleDeleteCutWidgets(clipboardData.metadata, preparedCutSource);
+                await handleDeleteCutWidgets(clipboardData.metadata, preparedCutSource, pastedWidgetMap);
             } catch (error) {
                 setPasteError(
                     `Widget was pasted, but the cut source was not removed: ${error?.message || 'The source version could not be updated.'}`
@@ -1452,14 +1513,7 @@ const ReactLayoutRenderer = forwardRef(({
         if (!keepClipboard || isCut) {
             await clearClipboardState();
         }
-    }, [clipboardData, widgets, onWidgetChange, publishUpdate, componentId, contextType, context, webpageData, versionId, prepareCutSourceWidgets, handleDeleteCutWidgets, clearClipboardState]);
-
-    const effectiveTheme = pageVersionData?.effectiveTheme
-        || currentVersion?.effectiveTheme
-        || webpageData?.effectiveTheme;
-    const layoutDefinition = normalizeLayoutDefinition(
-        effectiveTheme?.layouts?.items?.find(layout => layout.key === layoutName) || null
-    );
+    }, [clipboardData, widgets, onWidgetChange, publishUpdate, componentId, contextType, context, webpageData, versionId, prepareCutSourceWidgets, handleDeleteCutWidgets, clearClipboardState, layoutDefinition]);
 
     // Get the legacy component only when no database layout is available.
     const LayoutComponent = getLayoutComponent(layoutName);
@@ -1665,7 +1719,8 @@ const ReactLayoutRenderer = forwardRef(({
                                 onImportContent={handleImportContent}
                                 behavior={{
                                     allowedWidgetTypes: policy.allowed_widget_types || policy.allowedWidgetTypes || ['*'],
-                                    maxWidgets: policy.max_widgets ?? policy.maxWidgets ?? undefined,
+                                    disallowedWidgetTypes: policy.disallowed_widget_types || policy.disallowedWidgetTypes || null,
+                                    maxWidgets: Object.hasOwn(policy, 'max_widgets') ? policy.max_widgets : policy.maxWidgets,
                                     required: Boolean(policy.required),
                                     slotType: (policy.allows_inheritance ?? policy.allowsInheritance) ? 'inherited' : 'content',
                                 }}
@@ -1720,6 +1775,7 @@ const ReactLayoutRenderer = forwardRef(({
                 slotName={selectedSlotForModal}
                 slotLabel={selectedSlotMetadata?.label || selectedSlotForModal}
                 allowedWidgetTypes={selectedSlotMetadata?.allowedWidgetTypes}
+                disallowedWidgetTypes={selectedSlotMetadata?.disallowedWidgetTypes}
             />
 
             <ImportDialog

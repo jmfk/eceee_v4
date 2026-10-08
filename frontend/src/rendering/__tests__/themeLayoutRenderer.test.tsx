@@ -107,7 +107,7 @@ describe('theme layout rendering', () => {
 
     it('rejects responsive hiding of a subtree that contains a slot', () => {
         const invalid = structuredClone(layout)
-        invalid.root.styles = { md: { display: 'none' } }
+        invalid.root.styles = { md: { display: ' NONE ' } }
 
         expect(validateLayoutDefinition(invalid)).toBe(false)
     })

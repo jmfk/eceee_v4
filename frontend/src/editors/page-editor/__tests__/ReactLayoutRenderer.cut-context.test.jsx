@@ -1,7 +1,11 @@
 import React from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import ReactLayoutRenderer, { isDifferentWidgetSourceContext } from '../ReactLayoutRenderer'
+import ReactLayoutRenderer, {
+    isDifferentWidgetSourceContext,
+    removeCutMetadataFromWidgetMap,
+    validateSlotWidgetAddition
+} from '../ReactLayoutRenderer'
 
 const publishUpdateMock = vi.hoisted(() => vi.fn())
 const getStateMock = vi.hoisted(() => vi.fn())
@@ -147,6 +151,39 @@ const baseProps = {
     context: { pageId: 'page-1' },
     sharedComponentId: 'renderer-test'
 }
+
+describe('database layout slot policy', () => {
+    const contentWidget = { type: 'easy_widgets.ContentWidget' }
+
+    it('rejects disallowed bulk imports and finite-limit overflow', () => {
+        expect(validateSlotWidgetAddition(
+            { disallowed_widget_types: ['easy_widgets.ContentWidget'] },
+            0,
+            [contentWidget]
+        )).toContain('not allowed')
+        expect(validateSlotWidgetAddition({ max_widgets: 1 }, 1, [contentWidget])).toContain('at most 1')
+    })
+
+    it('allows a same-slot cut to replace the widgets removed from a full slot', () => {
+        expect(validateSlotWidgetAddition({ max_widgets: 1 }, 1, [contentWidget], 1)).toBeNull()
+    })
+
+    it('removes a cut source from the composed destination without dropping the pasted replacement', () => {
+        const composed = removeCutMetadataFromWidgetMap(
+            {
+                main: [
+                    { id: 'source', type: 'easy_widgets.ContentWidget' },
+                    { id: 'pasted', type: 'easy_widgets.ContentWidget' }
+                ]
+            },
+            { widgetPaths: ['main/source'] }
+        )
+
+        expect(composed.main).toEqual([
+            expect.objectContaining({ id: 'pasted', type: 'easy_widgets.ContentWidget' })
+        ])
+    })
+})
 
 const renderRenderer = (props = {}) => {
     const ref = React.createRef()

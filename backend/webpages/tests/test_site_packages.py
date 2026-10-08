@@ -35,7 +35,10 @@ from webpages.services.site_package import (
     MultipartUploadWriter,
     SitePackageExporter,
     SitePackageImporter,
+    _canonical_imported_layout,
+    _package_layout_references,
     _remap_structured_references,
+    _with_compatibility_layouts,
     build_site_package_export_filename,
     build_theme_transfer_package,
     inspect_site_package_upload,
@@ -318,6 +321,148 @@ class SitePackageServiceTests(TestCase):
 
         self.assertEqual(imported_root.title, "Legacy root")
         self.assertEqual(imported_root.hostnames, [])
+
+    def test_legacy_error_layout_references_are_canonicalized(self):
+        key, widgets = _canonical_imported_layout(
+            "error_404",
+            {
+                "branding": [{"type": "easy_widgets.ImageWidget"}],
+                "error_message": [{"type": "easy_widgets.HeadlineWidget"}],
+                "helpful_content": [{"type": "easy_widgets.ContentWidget"}],
+            },
+        )
+
+        self.assertEqual(key, "error_layout")
+        self.assertEqual(set(widgets), {"visual", "message", "actions"})
+
+    def test_legacy_theme_import_seeds_referenced_custom_layout_and_observed_slots(self):
+        theme_data = {"source_id": self.theme.id, "name": "Legacy theme"}
+        pages_payload = [
+            {
+                "versions": [
+                    {
+                        "theme_source_id": self.theme.id,
+                        "code_layout": "article_layout",
+                        "widgets": {"lead": [], "main": [{"type": "easy_widgets.ContentWidget"}]},
+                    }
+                ]
+            }
+        ]
+        package_buffer = io.BytesIO()
+        with zipfile.ZipFile(package_buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr(f"themes/{self.theme.id}.json", json.dumps(theme_data))
+        package_buffer.seek(0)
+        import_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id)},
+        )
+
+        with zipfile.ZipFile(package_buffer, "r") as package:
+            imported_theme = SitePackageImporter(import_job, storage=MemoryStorage())._import_themes(
+                package, pages_payload
+            )[self.theme.id]
+
+        imported_layout = next(item for item in imported_theme.layouts["items"] if item["key"] == "article_layout")
+        self.assertEqual(set(imported_layout["slots"]), {"lead", "main"})
+
+    def test_legacy_unbound_layout_is_seeded_on_destination_default_theme(self):
+        pages_payload = [
+            {
+                "versions": [
+                    {
+                        "theme_source_id": None,
+                        "code_layout": "article_layout",
+                        "widgets": {"main": [{"type": "easy_widgets.ContentWidget"}]},
+                    }
+                ]
+            }
+        ]
+        package_buffer = io.BytesIO()
+        with zipfile.ZipFile(package_buffer, "w", zipfile.ZIP_DEFLATED):
+            pass
+        package_buffer.seek(0)
+        import_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id)},
+        )
+
+        with zipfile.ZipFile(package_buffer, "r") as package:
+            SitePackageImporter(import_job, storage=MemoryStorage())._import_themes(package, pages_payload)
+
+        default_theme = PageTheme.get_default_theme(tenant=self.tenant)
+        imported_layout = next(item for item in default_theme.layouts["items"] if item["key"] == "article_layout")
+        self.assertEqual(set(imported_layout["slots"]), {"main"})
+
+    def test_legacy_inherited_layout_is_seeded_on_ancestor_theme(self):
+        pages_payload = [
+            {
+                "source_id": 100,
+                "parent_source_id": None,
+                "versions": [{"theme_source_id": self.theme.id, "code_layout": "main_layout", "widgets": {}}],
+            },
+            {
+                "source_id": 101,
+                "parent_source_id": 100,
+                "versions": [
+                    {
+                        "theme_source_id": None,
+                        "code_layout": "article_layout",
+                        "widgets": {"main": [{"type": "easy_widgets.ContentWidget"}]},
+                    }
+                ],
+            },
+        ]
+        theme_data = {"source_id": self.theme.id, "name": "Inherited legacy theme"}
+        package_buffer = io.BytesIO()
+        with zipfile.ZipFile(package_buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr(f"themes/{self.theme.id}.json", json.dumps(theme_data))
+        package_buffer.seek(0)
+        import_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id)},
+        )
+
+        with zipfile.ZipFile(package_buffer, "r") as package:
+            imported_theme = SitePackageImporter(import_job, storage=MemoryStorage())._import_themes(
+                package, pages_payload
+            )[self.theme.id]
+
+        imported_layout = next(item for item in imported_theme.layouts["items"] if item["key"] == "article_layout")
+        self.assertEqual(set(imported_layout["slots"]), {"main"})
+
+    def test_inherited_layout_collects_slots_from_child_content(self):
+        pages_payload = [
+            {
+                "source_id": 100,
+                "parent_source_id": None,
+                "versions": [
+                    {"theme_source_id": self.theme.id, "code_layout": "article_layout", "widgets": {"main": []}}
+                ],
+            },
+            {
+                "source_id": 101,
+                "parent_source_id": 100,
+                "versions": [{"theme_source_id": None, "code_layout": "", "widgets": {"sidebar": []}}],
+            },
+        ]
+        references = _package_layout_references(pages_payload)
+
+        self.assertEqual(references["by_theme"][str(self.theme.id)]["article_layout"], {"main", "sidebar"})
+
+    def test_generated_compatibility_layout_expands_with_new_observed_slots(self):
+        first = _with_compatibility_layouts(self.theme.layouts, {"article_layout": {"main"}})
+        generated = next(item for item in first["items"] if item["key"] == "article_layout")
+        generated["label"] = "Customized article"
+        generated["root"]["styles"]["base"]["gap"] = "24px"
+        expanded = _with_compatibility_layouts(first, {"article_layout": {"sidebar"}})
+
+        layout = next(item for item in expanded["items"] if item["key"] == "article_layout")
+        self.assertEqual(set(layout["slots"]), {"main", "sidebar"})
+        self.assertEqual(layout["label"], "Customized article")
+        self.assertEqual(layout["root"]["styles"]["base"]["gap"], "24px")
 
     def test_remote_update_creates_drafts_and_is_idempotent_without_deleting_local_pages(self):
         published_source_version = PageVersion.objects.create(

@@ -113,3 +113,38 @@ describe('WidgetSlot empty-slot paste paths', () => {
         )
     })
 })
+
+describe('WidgetSlot database policies', () => {
+    it('keeps null widget limits unlimited and forwards disallowed types', () => {
+        const onShowWidgetModal = vi.fn()
+        const widgets = {
+            main: Array.from({ length: 20 }, (_, index) => ({
+                id: `widget-${index}`,
+                type: 'easy_widgets.ContentWidget',
+                config: {},
+            })),
+        }
+        render(
+            <WidgetSlot
+                name="main"
+                label="Main"
+                widgets={widgets}
+                editable={true}
+                slotMode="edit"
+                behavior={{
+                    allowedWidgetTypes: ['*'],
+                    disallowedWidgetTypes: ['easy_widgets.HeaderWidget'],
+                    maxWidgets: null,
+                }}
+                onShowWidgetModal={onShowWidgetModal}
+            />
+        )
+
+        fireEvent.click(screen.getByTitle('Add widget to slot'))
+
+        expect(onShowWidgetModal).toHaveBeenCalledWith('main', expect.objectContaining({
+            disallowedWidgetTypes: ['easy_widgets.HeaderWidget'],
+            maxWidgets: null,
+        }))
+    })
+})
