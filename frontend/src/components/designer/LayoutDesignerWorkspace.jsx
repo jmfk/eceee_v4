@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Braces, Copy, Maximize2, Minus, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
+import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Braces, Copy, Maximize2, Minus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { validateLayoutDefinition } from '../../rendering/themeLayoutRenderer'
@@ -15,9 +15,11 @@ const minInspectorWidth = 280
 const maxInspectorWidth = 600
 const minCanvasWidth = 400
 const resizeHandleWidth = 8
+const collapsedPanelWidth = 44
 const uuid = () => crypto.randomUUID()
 const clone = (value) => structuredClone(value)
 const splitList = (value) => String(value || '').split(/[\n,]/).map((item) => item.trim()).filter(Boolean)
+const colorPickerValue = (value, fallback) => /^#[0-9a-f]{6}$/i.test(String(value || '').trim()) ? String(value).trim() : fallback
 const breakpointCanvasWidth = (entries, key) => {
     const index = entries.findIndex(([breakpoint]) => breakpoint === key)
     const minimum = Number(entries[index]?.[1] || 0)
@@ -96,6 +98,8 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
     const [redoStack, setRedoStack] = useState([])
     const [structureWidth, setStructureWidth] = useState(defaultStructureWidth)
     const [inspectorWidth, setInspectorWidth] = useState(defaultInspectorWidth)
+    const [structureCollapsed, setStructureCollapsed] = useState(false)
+    const [inspectorCollapsed, setInspectorCollapsed] = useState(false)
     const [isResizingStructure, setIsResizingStructure] = useState(false)
     const [isResizingInspector, setIsResizingInspector] = useState(false)
     const [zoomMode, setZoomMode] = useState('fit')
@@ -154,13 +158,15 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
 
     const clampStructureWidth = (width) => {
         const workspaceWidth = workspaceRef.current?.getBoundingClientRect().width || window.innerWidth
-        const availableMaximum = workspaceWidth - inspectorWidth - minCanvasWidth - resizeHandleWidth * 2
+        const currentInspectorWidth = inspectorCollapsed ? collapsedPanelWidth : inspectorWidth
+        const availableMaximum = workspaceWidth - currentInspectorWidth - minCanvasWidth - resizeHandleWidth * 2
         return Math.min(Math.max(minStructureWidth, availableMaximum), maxStructureWidth, Math.max(minStructureWidth, width))
     }
 
     const clampInspectorWidth = (width) => {
         const workspaceWidth = workspaceRef.current?.getBoundingClientRect().width || window.innerWidth
-        const availableMaximum = workspaceWidth - structureWidth - minCanvasWidth - resizeHandleWidth * 2
+        const currentStructureWidth = structureCollapsed ? collapsedPanelWidth : structureWidth
+        const availableMaximum = workspaceWidth - currentStructureWidth - minCanvasWidth - resizeHandleWidth * 2
         return Math.min(Math.max(minInspectorWidth, availableMaximum), maxInspectorWidth, Math.max(minInspectorWidth, width))
     }
 
@@ -514,15 +520,23 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
             <div className="mt-3 flex justify-end"><button type="button" onClick={applyJson} disabled={disabled} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">Apply JSON</button></div>
         </section> : <div
             ref={workspaceRef}
-            className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[var(--layout-structure-width)_var(--layout-resize-handle-width)_minmax(400px,1fr)_var(--layout-resize-handle-width)_var(--layout-inspector-width)]"
+            className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[var(--layout-structure-width)_var(--layout-structure-handle-width)_minmax(400px,1fr)_var(--layout-inspector-handle-width)_var(--layout-inspector-width)]"
             style={{
-                '--layout-structure-width': `${structureWidth}px`,
-                '--layout-inspector-width': `${inspectorWidth}px`,
-                '--layout-resize-handle-width': `${resizeHandleWidth}px`,
+                '--layout-structure-width': `${structureCollapsed ? collapsedPanelWidth : structureWidth}px`,
+                '--layout-inspector-width': `${inspectorCollapsed ? collapsedPanelWidth : inspectorWidth}px`,
+                '--layout-structure-handle-width': `${structureCollapsed ? 0 : resizeHandleWidth}px`,
+                '--layout-inspector-handle-width': `${inspectorCollapsed ? 0 : resizeHandleWidth}px`,
             }}
         >
-            <aside className="min-h-0 overflow-y-auto border-r border-gray-200 bg-white p-3 xl:col-start-1 xl:border-r-0">
-                <div className="flex items-center justify-between"><h2 className="text-sm font-semibold text-gray-900">Layouts</h2><button type="button" onClick={addLayout} disabled={disabled} className={iconButton} aria-label="Create layout"><Plus className="h-4 w-4" /></button></div>
+            <aside className={`min-h-0 overflow-y-auto border-r border-gray-200 bg-white xl:col-start-1 xl:border-r-0 ${structureCollapsed ? 'overflow-hidden p-1.5' : 'p-3'}`}>
+                <div className={`flex items-center ${structureCollapsed ? 'justify-center' : 'justify-between'}`}>
+                    {!structureCollapsed && <h2 className="text-sm font-semibold text-gray-900">Layouts</h2>}
+                    <div className="flex items-center gap-1">
+                        {!structureCollapsed && <button type="button" onClick={addLayout} disabled={disabled} className={iconButton} aria-label="Create layout"><Plus className="h-4 w-4" /></button>}
+                        <button type="button" onClick={() => setStructureCollapsed((current) => !current)} className={iconButton} aria-label={structureCollapsed ? 'Expand layout structure panel' : 'Collapse layout structure panel'} aria-expanded={!structureCollapsed} title={structureCollapsed ? 'Expand layout structure panel' : 'Collapse layout structure panel'}>{structureCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}</button>
+                    </div>
+                </div>
+                {!structureCollapsed && <>
                 <ul className="mt-2 space-y-1">{layouts.items.map((layout) => <li key={layout.id}><button type="button" onClick={() => inspectLayout(layout)} aria-current={layout.id === selectedLayout.id ? 'true' : undefined} className={`w-full rounded px-2 py-2 text-left text-sm ${layout.id === selectedLayout.id ? 'bg-blue-50 text-blue-800' : 'text-gray-700 hover:bg-gray-100'}`}><span className="block truncate font-medium">{layout.label}</span><span className="block text-[11px] opacity-65">{layout.key}{layout.key === layouts.default_layout_key ? ' · default' : ''}{layout.status === 'archived' ? ' · archived' : ''}</span></button></li>)}</ul>
                 <div className="mt-4 flex gap-1 border-t border-gray-200 pt-3">
                     <button type="button" onClick={duplicateLayout} disabled={disabled} className={iconButton} aria-label="Duplicate layout"><Copy className="h-4 w-4" /></button>
@@ -539,6 +553,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
                     <button type="button" onClick={duplicateNode} className={iconButton} aria-label="Duplicate node"><Copy className="h-4 w-4" /></button>
                     <button type="button" onClick={deleteNode} className={iconButton} aria-label="Delete unused node"><Trash2 className="h-4 w-4" /></button>
                 </div>
+                </>}
             </aside>
             <div
                 role="separator"
@@ -559,7 +574,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
                     event.preventDefault()
                     setStructureWidth((current) => clampStructureWidth(current + (event.key === 'ArrowRight' ? 16 : -16)))
                 }}
-                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 xl:col-start-2 xl:flex ${isResizingStructure ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
+                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 xl:col-start-2 ${structureCollapsed ? 'xl:hidden' : 'xl:flex'} ${isResizingStructure ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
             >
                 <span className={`h-10 w-0.5 rounded-full ${isResizingStructure ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-500 group-focus:bg-blue-500'}`} />
             </div>
@@ -607,12 +622,16 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
                     event.preventDefault()
                     setInspectorWidth((current) => clampInspectorWidth(current + (event.key === 'ArrowLeft' ? 16 : -16)))
                 }}
-                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 xl:col-start-4 xl:flex ${isResizingInspector ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
+                className={`group hidden touch-none cursor-col-resize items-center justify-center border-x border-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 xl:col-start-4 ${inspectorCollapsed ? 'xl:hidden' : 'xl:flex'} ${isResizingInspector ? 'bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}`}
             >
                 <span className={`h-10 w-0.5 rounded-full ${isResizingInspector ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-500 group-focus:bg-blue-500'}`} />
             </div>
-            <aside className="min-h-0 overflow-y-auto border-l border-gray-200 bg-white p-4 xl:col-start-5 xl:border-l-0">
-                <h2 className="text-sm font-semibold text-gray-900">{inspectingLayout ? 'Layout inspector' : selected?.node.label || (selected?.node.type === 'slot' ? `Slot · ${selected.node.slot_key}` : selected?.node.type || 'Inspector')}</h2>
+            <aside className={`min-h-0 overflow-y-auto border-l border-gray-200 bg-white xl:col-start-5 xl:border-l-0 ${inspectorCollapsed ? 'overflow-hidden p-1.5' : 'p-4'}`}>
+                <div className={`flex items-center ${inspectorCollapsed ? 'justify-center' : 'justify-between gap-2'}`}>
+                    {!inspectorCollapsed && <h2 className="truncate text-sm font-semibold text-gray-900">{inspectingLayout ? 'Layout inspector' : selected?.node.label || (selected?.node.type === 'slot' ? `Slot · ${selected.node.slot_key}` : selected?.node.type || 'Inspector')}</h2>}
+                    <button type="button" onClick={() => setInspectorCollapsed((current) => !current)} className={iconButton} aria-label={inspectorCollapsed ? 'Expand layout inspector' : 'Collapse layout inspector'} aria-expanded={!inspectorCollapsed} title={inspectorCollapsed ? 'Expand layout inspector' : 'Collapse layout inspector'}>{inspectorCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}</button>
+                </div>
+                {!inspectorCollapsed && <>
                 {inspectingLayout && <div className="mt-4 space-y-4">
                     <label className="block text-xs font-medium text-gray-700">Layout label<input value={selectedLayout.label} onChange={(event) => updateLayout((layout) => ({ ...layout, label: event.target.value }))} className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm" /></label>
                     <label className="block text-xs font-medium text-gray-700">Description<textarea value={selectedLayout.description || ''} onChange={(event) => updateLayout((layout) => ({ ...layout, description: event.target.value }))} rows="2" className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm" /></label>
@@ -654,7 +673,8 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
                             return <div key={field} className="grid grid-cols-[1fr_1.2fr] items-center gap-2 text-xs text-gray-600">
                                 <label htmlFor={`layout-style-${selected.node.id}-${activeStyleBreakpoint}-${field}`} className="capitalize">{fieldLabel}</label>
                                 <div className="flex min-w-0">
-                                    <input id={`layout-style-${selected.node.id}-${activeStyleBreakpoint}-${field}`} aria-label={`${fieldLabel} value`} value={selected.node.styles?.[activeStyleBreakpoint]?.[field] ?? ''} onChange={(event) => updateNode((node) => { const styles = clone(node.styles || {}); styles[activeStyleBreakpoint] = { ...(styles[activeStyleBreakpoint] || {}) }; if (event.target.value) styles[activeStyleBreakpoint][field] = event.target.value; else delete styles[activeStyleBreakpoint][field]; return { ...node, styles } })} className={`min-w-0 flex-1 border border-gray-300 px-2 py-1.5 text-xs ${externallyEditableNodeTypes.has(selected.node.type) ? 'rounded-l' : 'rounded'}`} />
+                                    {['background_color', 'color'].includes(field) && <input type="color" aria-label={`Pick ${fieldLabel}`} value={colorPickerValue(selected.node.styles?.[activeStyleBreakpoint]?.[field], field === 'color' ? '#111827' : '#ffffff')} onChange={(event) => updateNode((node) => { const styles = clone(node.styles || {}); styles[activeStyleBreakpoint] = { ...(styles[activeStyleBreakpoint] || {}), [field]: event.target.value }; return { ...node, styles } })} className="h-[30px] w-9 shrink-0 cursor-pointer rounded-l border border-r-0 border-gray-300 bg-white p-1" />}
+                                    <input id={`layout-style-${selected.node.id}-${activeStyleBreakpoint}-${field}`} aria-label={`${fieldLabel} value`} value={selected.node.styles?.[activeStyleBreakpoint]?.[field] ?? ''} onChange={(event) => updateNode((node) => { const styles = clone(node.styles || {}); styles[activeStyleBreakpoint] = { ...(styles[activeStyleBreakpoint] || {}) }; if (event.target.value) styles[activeStyleBreakpoint][field] = event.target.value; else delete styles[activeStyleBreakpoint][field]; return { ...node, styles } })} className={`min-w-0 flex-1 border border-gray-300 px-2 py-1.5 text-xs ${['background_color', 'color'].includes(field) ? externallyEditableNodeTypes.has(selected.node.type) ? '' : 'rounded-r' : externallyEditableNodeTypes.has(selected.node.type) ? 'rounded-l' : 'rounded'}`} />
                                     {externallyEditableNodeTypes.has(selected.node.type) && <label title={`Expose ${fieldLabel} in the Theme Designer`} className="inline-flex w-9 shrink-0 cursor-pointer items-center justify-center rounded-r border border-l-0 border-gray-300 bg-gray-50 hover:bg-gray-100">
                                         <input type="checkbox" aria-label={`Expose ${fieldLabel} in Theme Designer`} checked={(selected.node.editable_parameters || []).includes(field)} onChange={(event) => updateNode((node) => { const parameters = new Set(node.editable_parameters || []); if (event.target.checked) parameters.add(field); else parameters.delete(field); return { ...node, editable_parameters: [...parameters] } })} />
                                     </label>}
@@ -663,6 +683,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
                         })}
                     </div>
                 </div>}
+                </>}
             </aside>
         </div>}
     </main>

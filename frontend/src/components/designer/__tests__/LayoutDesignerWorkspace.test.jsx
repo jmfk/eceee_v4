@@ -9,7 +9,7 @@ const framePostMessage = vi.fn()
 vi.mock('../../../rendering/RenderFrame', () => ({
     default: ({ model, onMessage, style, frameRef }) => {
         if (frameRef) frameRef.current = { contentWindow: { postMessage: framePostMessage } }
-        return <button type="button" data-layout-canvas={String(model.designer.layoutCanvas)} data-empty-slots={String(Object.values(model.slots).every((items) => items.length === 0))} data-frame-width={style?.width} onClick={() => onMessage?.({ data: { source: 'eceee-designer-preview', action: 'select', targetId: `layout-node:${model.layoutDefinition.root.children[0].id}` } })}>Canvas · {model.layoutDefinition.label}</button>
+        return <button type="button" data-layout-canvas={String(model.designer.layoutCanvas)} data-empty-slots={String(Object.values(model.slots).every((items) => items.length === 0))} data-frame-width={style?.width} data-root-md-background={model.layoutDefinition.root.styles?.md?.background_color || ''} onClick={() => onMessage?.({ data: { source: 'eceee-designer-preview', action: 'select', targetId: `layout-node:${model.layoutDefinition.root.children[0].id}` } })}>Canvas · {model.layoutDefinition.label}</button>
     },
 }))
 
@@ -141,6 +141,37 @@ describe('LayoutDesignerWorkspace', () => {
 
         expect(Number(structureSeparator.getAttribute('aria-valuenow'))).toBeLessThan(300)
         expect(Number(inspectorSeparator.getAttribute('aria-valuenow'))).toBeLessThan(340)
+    })
+
+    it('collapses and restores the structure and inspector panels', () => {
+        render(<Harness />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Collapse layout structure panel' }))
+        expect(screen.queryByRole('heading', { name: 'Layouts' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Expand layout structure panel' })).toHaveAttribute('aria-expanded', 'false')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Collapse layout inspector' }))
+        expect(screen.queryByRole('heading', { name: 'container' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Expand layout inspector' })).toHaveAttribute('aria-expanded', 'false')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Expand layout structure panel' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Expand layout inspector' }))
+        expect(screen.getByRole('heading', { name: 'Layouts' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'container' })).toBeInTheDocument()
+    })
+
+    it('sets responsive node colours with a visual picker while preserving text values', () => {
+        render(<Harness />)
+
+        const canvas = screen.getByRole('button', { name: 'Canvas · Main layout' })
+        expect(canvas).toHaveAttribute('data-root-md-background', '')
+        fireEvent.change(screen.getByLabelText('Pick background color'), { target: { value: '#22c55e' } })
+
+        expect(screen.getByLabelText('background color value')).toHaveValue('#22c55e')
+        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-md-background', '#22c55e')
+
+        fireEvent.change(screen.getByLabelText('background color value'), { target: { value: 'token:surface' } })
+        expect(screen.getByLabelText('background color value')).toHaveValue('token:surface')
     })
 
     it('uses theme breakpoints for the canvas and provides fit and manual zoom', () => {
