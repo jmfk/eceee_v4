@@ -173,7 +173,7 @@ const TableWidget = memo(({
             <div className={`table-widget ${responsive ? 'overflow-x-auto' : ''}`}>
                 <table className={`border-collapse ${table_width === 'full' ? 'w-full' : 'w-auto'} ${show_borders ? 'border border-gray-300' : ''} ${css_class}`}>
                     {caption && (
-                        <caption className="text-sm font-medium text-gray-700 mb-2">{caption}</caption>
+                        <caption className="table-caption text-sm font-medium text-gray-700 mb-2">{caption}</caption>
                     )}
                     <tbody>
                         {rows.map((row, rowIndex) => (

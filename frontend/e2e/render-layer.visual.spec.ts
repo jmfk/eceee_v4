@@ -52,6 +52,7 @@ for (const viewport of viewports) {
     await expect(page.locator('.content-card-header').first()).toHaveCSS('margin', '0px')
     await expect(page.locator('.form-description').first()).toHaveCSS('margin', '0px')
     await expect(page.locator('.news-excerpt').first()).toHaveCSS('margin', '0px')
+    await expect(page.locator('.table-caption').first()).toHaveCSS('text-align', 'left')
     await expect(page).toHaveScreenshot(`render-editor-${viewport.name}.png`, { fullPage: true, animations: 'disabled' })
 
     await openRender(page, designerModel)
