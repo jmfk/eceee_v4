@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { createElement, useEffect, useMemo, useRef, useState } from 'react'
 import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Braces, Copy, Maximize2, Minus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { validateLayoutDefinition } from '../../rendering/themeLayoutRenderer'
+import { themeBreakpointDefinition } from '../theme/breakpointConfig'
 
 const nodeTypes = ['container', 'section', 'grid', 'row', 'column', 'semantic', 'slot']
 const styleFields = ['display', 'width', 'max_width', 'min_height', 'grid_template_columns', 'grid_column', 'flex_direction', 'flex_wrap', 'flex_grow', 'order', 'gap', 'padding', 'margin', 'align_items', 'justify_content', 'background_color', 'color', 'border', 'border_radius']
 const externallyEditableNodeTypes = new Set(['container', 'semantic', 'slot'])
+const defaultPresentationColors = { container: '#3b82f6', semantic: '#f59e0b', slot: '#f43f5e' }
 const defaultStructureWidth = 300
 const minStructureWidth = 220
 const maxStructureWidth = 520
@@ -586,7 +588,13 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
                         <button type="button" onClick={() => addNode('section', 'after')} disabled={disabled || !selected?.parent} className="rounded px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-35">Add after</button>
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600">Theme breakpoint<select aria-label="Theme breakpoint" value={activeBreakpoint} onChange={(event) => { setActiveBreakpoint(event.target.value); setZoomMode('fit') }} className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-800">{breakpointEntries.map(([key, minimum]) => <option key={key} value={key}>{key.toUpperCase()} · {minimum}px+</option>)}</select></label>
+                        <div role="group" aria-label="Theme breakpoint" className="flex items-center rounded-md border border-gray-300 p-0.5">
+                            {breakpointEntries.map(([key, minimum]) => {
+                                const definition = themeBreakpointDefinition(key)
+                                const label = key === 'xs' ? 'Base' : definition?.label || key.toUpperCase()
+                                return <button type="button" key={key} onClick={() => { setActiveBreakpoint(key); setZoomMode('fit') }} aria-label={`${label} breakpoint at ${minimum}px`} aria-pressed={activeBreakpoint === key} title={`${label} · ${minimum}px`} className={`inline-flex h-7 min-w-7 items-center justify-center rounded p-1 text-xs font-semibold ${activeBreakpoint === key ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-100'}`}>{key === 'xs' ? 'B' : definition?.icon ? createElement(definition.icon, { className: 'h-4 w-4' }) : key.toUpperCase()}</button>
+                            })}
+                        </div>
                         <span className="text-[11px] tabular-nums text-gray-500">{canvasWidth}px canvas</span>
                         <div className="flex items-center rounded border border-gray-300" aria-label="Canvas zoom controls">
                             <button type="button" onClick={() => changeZoom(-0.1)} disabled={canvasZoom <= 0.25} aria-label="Zoom out canvas" title="Zoom out" className="inline-flex h-7 w-7 items-center justify-center rounded-l text-gray-600 hover:bg-gray-100 disabled:opacity-35"><Minus className="h-3.5 w-3.5" /></button>
@@ -643,6 +651,15 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
                     <div className="flex items-center justify-between"><span className="rounded bg-gray-100 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-gray-500">{selected.node.type}</span><span className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Editing {activeBreakpoint.toUpperCase()}</span></div>
                     {externallyEditableNodeTypes.has(selected.node.type) && <div className="mt-3 space-y-3">
                         <label className="block text-xs font-medium text-gray-700">Element name<input value={selected.node.label || ''} maxLength="100" onChange={(event) => updateNode((node) => ({ ...node, label: event.target.value }))} placeholder="Descriptive name in the Designer" className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm" /></label>
+                        <div>
+                            <span className="block text-xs font-medium text-gray-700">Presentation color</span>
+                            <div className="mt-1 flex items-center gap-2">
+                                <input type="color" aria-label="Presentation color" value={selected.node.presentation_color || defaultPresentationColors[selected.node.type]} onChange={(event) => updateNode((node) => ({ ...node, presentation_color: event.target.value }))} className="h-9 w-11 shrink-0 cursor-pointer rounded border border-gray-300 bg-white p-1" />
+                                <code className="min-w-0 flex-1 truncate rounded bg-gray-50 px-2 py-2 text-xs text-gray-600">{selected.node.presentation_color || 'Type default'}</code>
+                                <button type="button" onClick={() => updateNode((node) => { const next = { ...node }; delete next.presentation_color; return next })} disabled={!selected.node.presentation_color} className="rounded border border-gray-300 px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40">Use default</button>
+                            </div>
+                            <p className="mt-1 text-[11px] leading-4 text-gray-500">Only changes this block’s tint in the Layout Editor canvas.</p>
+                        </div>
                     </div>}
                     {selected.node.type === 'semantic' && <label className="mt-3 block text-xs font-medium text-gray-700">Semantic element<select value={selected.node.tag || 'div'} onChange={(event) => updateNode((node) => ({ ...node, tag: event.target.value }))} className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm">{['div', 'header', 'nav', 'main', 'aside', 'section', 'footer'].map((tag) => <option key={tag}>{tag}</option>)}</select></label>}
                     {selected.node.type === 'slot' && <div className="mt-3 space-y-3">

@@ -78,6 +78,26 @@ describe('theme layout rendering', () => {
         expect(css).toContain('calc(100vw * 112 / 1280)')
     })
 
+    it('applies presentation colours only in the layout editor canvas', () => {
+        const presented = structuredClone(layout)
+        presented.root.presentation_color = '#14b8a6'
+        const baseModel: RenderPageModel = {
+            layout: presented.key,
+            layoutDefinition: presented,
+            slots: { main: [] },
+            context: { preview: true },
+        }
+
+        const publicRender = render(<PageRenderer model={baseModel} />)
+        expect(publicRender.container.querySelector('main')).not.toHaveAttribute('data-layout-presentation-color')
+        publicRender.unmount()
+
+        const canvasRender = render(<PageRenderer model={{ ...baseModel, designer: { catalog: {}, texts: {}, assets: [], layoutCanvas: true } }} />)
+        const root = canvasRender.container.querySelector('main')
+        expect(root).toHaveAttribute('data-layout-presentation-color', '#14b8a6')
+        expect(root).toHaveStyle({ '--layout-presentation-color': '#14b8a6' })
+    })
+
     it('rejects a slot that is not declared', () => {
         const invalid = structuredClone(layout)
         invalid.root.children[0].slot_key = 'missing'
@@ -112,12 +132,14 @@ describe('theme layout rendering', () => {
         camel.root.children[0].slotKey = camel.root.children[0].slot_key
         delete camel.root.children[0].slot_key
         camel.root.styles.base.maxWidth = '70rem'
+        camel.root.presentationColor = '#14b8a6'
 
         const normalized = normalizeLayoutDefinition(camel)
 
         expect(normalized?.root.class_names).toEqual(['test-layout'])
         expect(normalized?.root.children[0].slot_key).toBe('main')
         expect(normalized?.root.styles?.base.max_width).toBe('70rem')
+        expect(normalized?.root.presentation_color).toBe('#14b8a6')
         expect(validateLayoutDefinition(normalized)).toBe(true)
     })
 })
