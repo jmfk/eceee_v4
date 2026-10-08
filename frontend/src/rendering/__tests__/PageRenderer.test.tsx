@@ -125,13 +125,17 @@ describe('PageRenderer', () => {
             widgets: {
                 header: [{ id: 'header', type: 'easy_widgets.HeaderWidget', config: {} }],
                 navbar: [{ id: 'navbar', type: 'easy_widgets.NavbarWidget', config: { menuItems: [{ linkData: { type: 'internal', label: 'Published', resolvedUrl: '/published/', isPublished: true } }, { linkData: { type: 'internal', label: 'Draft', resolvedUrl: '/draft/', isPublished: false } }] } }],
-                hero: [{ id: 'hero', type: 'easy_widgets.HeroWidget', config: { header: 'Hero', image: { imgproxyBaseUrl: 'https://example.com/hero.jpg' } } }],
+                hero: [{ id: 'hero', type: 'easy_widgets.HeroWidget', config: { beforeText: 'Before', header: 'Hero', afterText: 'After', image: { imgproxyBaseUrl: 'https://example.com/hero.jpg' } } }],
                 sidebar: [{ id: 'empty-nav', type: 'easy_widgets.NavigationWidget', config: { menuItems: [] } }],
             },
         })
         const { container } = render(<PageRenderer model={model} />)
         expect(container.querySelector('.header-widget.widget-type-header')).toBeTruthy()
         expect(container.querySelector('.hero-widget')).toHaveStyle({ backgroundImage: "url('https://example.com/hero.jpg')" })
+        expect(container.querySelector('.hero-content > .hero-header')).toHaveTextContent('Hero')
+        expect(container.querySelector('.hero-content > .hero-before-text')).toMatchObject({ tagName: 'P' })
+        expect(container.querySelector('.hero-content > .hero-after-text')).toMatchObject({ tagName: 'P' })
+        expect(container.querySelector('.hero-header')?.parentElement).toHaveClass('hero-content')
         expect(screen.getByText('Published')).toBeInTheDocument()
         expect(screen.queryByText('Draft')).toBeNull()
         expect(screen.queryByText(/Site title|No navigation items|Footer content/)).toBeNull()

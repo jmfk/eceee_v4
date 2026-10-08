@@ -190,6 +190,7 @@ const HeroWidget = ({
                     onChange: handleHeaderChange,
                     placeholder: 'Enter hero header...',
                     element: 'h1',
+                    className: 'hero-header',
                     pageId: context?.pageId,
                     siteRootId: context?.siteRootId,
                     namespace: context?.namespace
@@ -204,7 +205,8 @@ const HeroWidget = ({
                     mode: 'text-only',
                     onChange: handleBeforeTextChange,
                     placeholder: 'Enter text before header...',
-                    element: 'h5',
+                    element: 'p',
+                    className: 'hero-before-text before-text',
                     pageId: context?.pageId,
                     siteRootId: context?.siteRootId,
                     namespace: context?.namespace
@@ -219,7 +221,8 @@ const HeroWidget = ({
                     mode: 'text-only',
                     onChange: handleAfterTextChange,
                     placeholder: 'Enter text after header...',
-                    element: 'h6',
+                    element: 'p',
+                    className: 'hero-after-text after-text',
                     pageId: context?.pageId,
                     siteRootId: context?.siteRootId,
                     namespace: context?.namespace
@@ -310,9 +313,9 @@ const HeroWidget = ({
                     <Layers className="w-4 h-4 text-gray-600" />
                 </button>
                 <div className="hero-content">
-                    <div className="before-text" ref={beforeTextContainerRef} />
+                    <div ref={beforeTextContainerRef} />
                     <div ref={headerContainerRef} />
-                    <div className="after-text" ref={afterTextContainerRef} />
+                    <div ref={afterTextContainerRef} />
                 </div>
                 {/* Media Insert Modal */}
                 {showImageModal && (
@@ -349,15 +352,15 @@ const HeroWidget = ({
         <div className="hero-widget widget-type-easy-widgets-herowidget" style={heroStyle}>
             <div className="hero-content">
                 {beforeText && (
-                    <h5 className="before-text">
+                    <p className="hero-before-text before-text">
                         {beforeText}
-                    </h5>
+                    </p>
                 )}
-                {header && <div><h1>{header}</h1></div>}
+                {header && <h1 className="hero-header">{header}</h1>}
                 {afterText && (
-                    <h6 className="after-text">
+                    <p className="hero-after-text after-text">
                         {afterText}
-                    </h6>
+                    </p>
                 )}
             </div>
         </div>

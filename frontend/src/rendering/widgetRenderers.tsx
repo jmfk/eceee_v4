@@ -52,7 +52,7 @@ const HeaderRender: WidgetRenderComponent = ({ widget }) => (
 )
 
 const FooterRender: WidgetRenderComponent = ({ widget, renderWidgets }) => (
-    <footer className="footer-widget widget-type-easy-widgets-footerwidget" style={{
+    <footer className="footer-widget widget-type-easy-widgets-footerwidget" data-slot="content" style={{
         backgroundColor: value(widget.config, 'backgroundColor', 'background_color') || undefined,
         backgroundImage: imageUrl(value(widget.config, 'backgroundImage', 'background_image')) ? `url('${imageUrl(value(widget.config, 'backgroundImage', 'background_image'))}')` : undefined,
         backgroundSize: value(widget.config, 'backgroundSize', 'background_size') || undefined,
@@ -75,9 +75,9 @@ const HeroRender: WidgetRenderComponent = ({ widget }) => {
         backgroundImage: background2x ? `image-set(url('${background}') 1x, url('${background2x}') 2x)` : background ? `url('${background}')` : undefined,
     } as React.CSSProperties}>
         <div className="hero-content">
-            {value(widget.config, 'beforeText', 'before_text') && <h5 className="before-text"><TextWithBreaks>{value(widget.config, 'beforeText', 'before_text')}</TextWithBreaks></h5>}
-            <div><h1>{value(widget.config, 'header', 'title', 'headline') || ''}</h1></div>
-            {value(widget.config, 'afterText', 'after_text') && <h6 className="after-text"><TextWithBreaks>{value(widget.config, 'afterText', 'after_text')}</TextWithBreaks></h6>}
+            {value(widget.config, 'beforeText', 'before_text') && <p className="hero-before-text before-text"><TextWithBreaks>{value(widget.config, 'beforeText', 'before_text')}</TextWithBreaks></p>}
+            <h1 className="hero-header">{value(widget.config, 'header', 'title', 'headline') || ''}</h1>
+            {value(widget.config, 'afterText', 'after_text') && <p className="hero-after-text after-text"><TextWithBreaks>{value(widget.config, 'afterText', 'after_text')}</TextWithBreaks></p>}
         </div>
     </div>
 }
@@ -562,13 +562,13 @@ const SectionRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
     }, [accordion, collapsible, widget.id])
     if (!content.length) return null
     const variants = value(widget.config, 'variantClasses') ? ` ${value(widget.config, 'variantClasses')}` : ''
-    if (!collapsible) return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} className={`section-content-only-widget${variants}${bordered ? ' border-enabled' : ''}`}>{renderWidgets(content)}</div></div>
+    if (!collapsible) return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} data-slot="content" className={`section-content-only-widget${variants}${bordered ? ' border-enabled' : ''}`}>{renderWidgets(content)}</div></div>
     const toggleExpanded = () => setExpanded((current) => {
         if (!current && accordion) window.dispatchEvent(new CustomEvent('eceee-section-expand', { detail: widget.id }))
         return !current
     })
     return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} data-accordion-mode={accordion || undefined} className={`section-widget${variants}${bordered ? ' border-enabled' : ''}${expanded ? '' : ' section-collapsed'}`}>
-        <div className="slot-section-content">
+        <div className="slot-section-content" data-slot="content">
             {renderWidgets(content.slice(0, 1))}
             {expanded && <div className="section-remaining-content">{renderWidgets(content.slice(1))}</div>}
             <button type="button" className={expanded ? 'section-banner contract-banner' : 'section-banner expand-banner'} onClick={toggleExpanded}>{expanded ? value(widget.config, 'contractText', 'contract_text') || 'Show less' : value(widget.config, 'expandText', 'expand_text') || 'Expand to read more'}</button>

@@ -13,6 +13,7 @@ vi.mock('../SimpleTextEditorRenderer', () => ({
         this.options = { ...options }
         this.editorElement = document.createElement(options.element || 'div')
         this.editorElement.contentEditable = 'true'
+        this.editorElement.className = options.className || ''
         this.editorElement.innerHTML = options.content || ''
         this.render = vi.fn(() => {
             container.innerHTML = ''
@@ -268,6 +269,23 @@ describe('canonical widget update ownership', () => {
             header: 'Updated hero'
         }))
         expect(publishUpdateMock).not.toHaveBeenCalled()
+    })
+
+    it('HeroWidget uses matching semantic text elements and Designer classes in editor mode', () => {
+        const { container } = render(
+            <HeroWidget
+                mode="editor"
+                widgetId="hero-1"
+                slotName="main"
+                config={{ header: 'Hero title', beforeText: 'Before', afterText: 'After' }}
+                onConfigChange={vi.fn()}
+                context={{ pageId: '101' }}
+            />
+        )
+
+        expect(container.querySelector('.hero-content > div > h1.hero-header')).toHaveTextContent('Hero title')
+        expect(container.querySelector('.hero-content > div > p.hero-before-text.before-text')).toHaveTextContent('Before')
+        expect(container.querySelector('.hero-content > div > p.hero-after-text.after-text')).toHaveTextContent('After')
     })
 
     it('HeroWidget hydrates external UDC updates without echoing user edits', async () => {

@@ -173,6 +173,33 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(navigation["slots"], ["sidebar"])
         self.assertEqual(navigation["parts"][0]["part"], "nav-container")
 
+    def test_workspace_exposes_all_declared_widget_parts_before_they_are_styled(self):
+        groups = self.theme.design_groups
+        groups["groups"].append(
+            {
+                "name": "Hero",
+                "widgetTypes": ["easy_widgets.HeroWidget"],
+                "layoutProperties": {},
+                "elements": {},
+            }
+        )
+        self.theme.design_groups = groups
+        self.theme.save(update_fields=["design_groups"])
+        self.authenticate(self.designer)
+
+        workspace = self.client.get(self.workspace_url).data
+        hero = next(
+            group
+            for group in workspace["catalog"]["designGroups"]
+            if group["widgetTypes"] == ["easy_widgets.HeroWidget"]
+        )
+
+        self.assertEqual(
+            {part["part"] for part in hero["parts"]},
+            {"hero-widget", "hero-content", "hero-header", "hero-before-text", "hero-after-text"},
+        )
+        self.assertTrue(all(part["breakpoints"] == [] for part in hero["parts"]))
+
     def test_assignment_does_not_grant_access_to_tenant_content(self):
         page = WebPage.objects.create(
             title="Private draft",

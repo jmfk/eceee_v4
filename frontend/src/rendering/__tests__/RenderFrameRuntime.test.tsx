@@ -279,6 +279,103 @@ describe('RenderFrameRuntime designer overlay', () => {
         postMessage.mockRestore()
     })
 
+    it('scopes repeated design targets to the requested DOM instance inside one widget', async () => {
+        const repeatedWorkspace = structuredClone(workspace)
+        repeatedWorkspace.catalog.designGroups[0].elements = [{ id: 'paragraph', element: 'p', label: 'Paragraph' }]
+        const sourceModel = createPageRenderModel({
+            layout: 'main_layout',
+            widgets: {
+                main: [{
+                    id: 'content-1',
+                    type: 'easy_widgets.ContentWidget',
+                    config: { content: '<p>First paragraph</p><p>Second paragraph</p>' },
+                }],
+            },
+        })
+        render(<RenderFrameRuntime />)
+        const renderModel = createDesignerRenderModel({
+            workspace: repeatedWorkspace,
+            viewId: 'page-main',
+            sourceModel,
+            contentEditable: false,
+        })
+        sendModel(renderModel)
+
+        const firstParagraph = await screen.findByText('First paragraph')
+        const secondParagraph = await screen.findByText('Second paragraph')
+        await waitFor(() => expect(secondParagraph).toHaveAttribute('data-designer-instance'))
+        const secondInstanceId = secondParagraph.getAttribute('data-designer-instance') || ''
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-render-host', action: 'selectTarget',
+                targetId: 'paragraph', widgetId: 'content-1', targetInstanceId: secondInstanceId,
+            },
+            source: window.parent,
+        }))
+
+        expect(secondParagraph).toHaveClass('designer-selected')
+        expect(firstParagraph).not.toHaveClass('designer-selected')
+
+        sendModel({ ...renderModel })
+        await waitFor(() => {
+            expect(screen.getByText('Second paragraph')).toHaveClass('designer-selected')
+            expect(screen.getByText('First paragraph')).not.toHaveClass('designer-selected')
+        })
+    })
+
+    it('selects the nearest slot, widget, and element while preserving their nested paths', async () => {
+        const postMessage = vi.spyOn(window, 'postMessage')
+        const sourceModel = createPageRenderModel({
+            layout: 'main_layout',
+            widgets: {
+                main: [{
+                    id: 'columns-1',
+                    type: 'easy_widgets.TwoColumnsWidget',
+                    config: {
+                        slots: {
+                            left: [{ id: 'headline-1', type: 'easy_widgets.HeadlineWidget', config: { content: 'Nested heading', level: 3 } }],
+                            right: [],
+                        },
+                    },
+                }],
+            },
+        })
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace, viewId: 'page-main', sourceModel, contentEditable: true }))
+
+        const heading = await screen.findByRole('heading', { name: 'Nested heading' })
+        const nestedWidget = heading.closest('[data-widget-id="headline-1"]') as HTMLElement
+        const columnsWidget = heading.closest('[data-widget-id="columns-1"]') as HTMLElement
+        const nestedSlot = heading.closest('[data-slot="left"]') as HTMLElement
+        const layoutSlot = heading.closest('[data-slot-name="main"]') as HTMLElement
+        const selectedElement = heading.querySelector('[data-designer-kind="element"]') as HTMLElement
+        await waitFor(() => expect(nestedSlot).toHaveAttribute('data-designer-target', 'slot:columns-1:left'))
+        expect(selectedElement).toBeInTheDocument()
+
+        fireEvent.click(selectedElement)
+
+        expect(layoutSlot).not.toHaveClass('designer-selected-slot')
+        expect(nestedSlot).toHaveClass('designer-selected-slot')
+        expect(columnsWidget).not.toHaveClass('designer-selected-widget')
+        expect(nestedWidget).toHaveClass('designer-selected-widget')
+        expect(selectedElement).toHaveClass('designer-selected-element')
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            selectionPaths: {
+                slot: [
+                    expect.objectContaining({ id: 'layout:main_layout:slot:main', kind: 'layoutSlot' }),
+                    expect.objectContaining({ id: 'slot:columns-1:left', kind: 'slot' }),
+                ],
+                widget: [
+                    expect.objectContaining({ id: 'widget:columns-1', kind: 'widget' }),
+                    expect.objectContaining({ id: 'widget:headline-1', kind: 'widget' }),
+                ],
+                element: [expect.objectContaining({ kind: 'element' })],
+            },
+        }), '*')
+        postMessage.mockRestore()
+    })
+
     it('applies a design group only to widgets in the configured layout slots', async () => {
         const slottedWorkspace = structuredClone(workspace)
         slottedWorkspace.catalog.layouts[0].slots = [
