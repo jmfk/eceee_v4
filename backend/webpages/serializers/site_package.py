@@ -109,15 +109,32 @@ class SitePackageExportCreateSerializer(serializers.Serializer):
 
 class SitePackageImportCreateSerializer(serializers.Serializer):
     site_zip = serializers.FileField()
-    preservePublicationStatus = serializers.BooleanField(
-        source="preserve_publication_status", default=True, write_only=True
-    )
+    preserve_publication_status = serializers.BooleanField(required=False, write_only=True)
+    preservePublicationStatus = serializers.BooleanField(required=False, write_only=True)
     mode = serializers.ChoiceField(choices=("prompt", "clone", "update"), default="prompt")
     existingRootId = serializers.IntegerField(
         source="existing_root_id", required=False, allow_null=True, write_only=True
     )
 
     def validate(self, attrs):
+        has_snake_value = "preserve_publication_status" in self.initial_data
+        has_camel_value = "preservePublicationStatus" in self.initial_data
+        snake_value = (
+            attrs.get("preserve_publication_status", serializers.empty) if has_snake_value else serializers.empty
+        )
+        camel_value = (
+            attrs.pop("preservePublicationStatus", serializers.empty) if has_camel_value else serializers.empty
+        )
+        attrs.pop("preservePublicationStatus", None)
+        if snake_value is not serializers.empty and camel_value is not serializers.empty and snake_value != camel_value:
+            raise serializers.ValidationError(
+                {"preservePublicationStatus": "Conflicting publication-status values were provided."}
+            )
+        attrs["preserve_publication_status"] = (
+            camel_value
+            if camel_value is not serializers.empty
+            else snake_value if snake_value is not serializers.empty else True
+        )
         if attrs["mode"] == "update" and not attrs.get("existing_root_id"):
             raise serializers.ValidationError({"existingRootId": "Choose the existing site to update."})
         return attrs

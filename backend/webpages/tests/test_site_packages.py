@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import os
+import tempfile
 import uuid
 import zipfile
 from datetime import datetime, timedelta
@@ -13,6 +14,7 @@ from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.test import TestCase
 from django.utils import timezone
+from django.utils.text import slugify
 from rest_framework.test import APITestCase
 
 from content.models import Namespace
@@ -36,6 +38,7 @@ from webpages.services.site_package import (
     _remap_structured_references,
     build_site_package_export_filename,
     build_theme_transfer_package,
+    inspect_site_package_upload,
     restore_theme_transfer_package,
 )
 from webpages.tasks import import_remote_site_package
@@ -89,7 +92,7 @@ class SitePackageServiceTests(TestCase):
             file_path="site-package/hero.jpg",
             file_size=9,
             content_type="image/jpeg",
-            file_hash="hash-hero",
+            file_hash=hashlib.sha256(b"hero-data").hexdigest(),
             file_type="image",
             namespace=self.namespace,
             tenant=self.tenant,
@@ -422,21 +425,25 @@ class SitePackageServiceTests(TestCase):
             return job
 
         update_job = import_update()
-        self.assertEqual(local_root.versions.count(), initial_count + 1)
+        self.assertEqual(local_root.versions.count(), initial_count + 2)
         imported_draft = local_root.versions.order_by("-version_number").first()
+        theme_update = local_root.versions.get(version_number=2)
         self.assertIsNone(imported_draft.effective_date)
         self.assertEqual(imported_draft.page_data["heading"], "Remote draft")
         self.assertEqual(
             imported_draft.page_data["featuredLink"]["currentVersionId"],
-            local_root.versions.get(version_number=1).id,
+            theme_update.id,
         )
         self.assertNotEqual(imported_draft.theme_id, original_local_theme_id)
         self.assertEqual(local_root.versions.get(version_number=1).theme_id, original_local_theme_id)
         self.assertTrue(WebPage.objects.filter(pk=local_only.pk).exists())
         self.assertIn("local_page_preserved", {item["code"] for item in update_job.progress["warnings"]})
 
+        self.assertEqual(theme_update.page_data["heading"], "Published")
+        self.assertEqual(theme_update.theme_id, imported_draft.theme_id)
+
         import_update()
-        self.assertEqual(local_root.versions.count(), initial_count + 1)
+        self.assertEqual(local_root.versions.count(), initial_count + 2)
         binding.refresh_from_db()
         self.assertEqual(binding.local_root_id, local_root.id)
 
@@ -722,28 +729,35 @@ class SitePackageServiceTests(TestCase):
             imported_root = SitePackageImporter(import_job, storage=storage).import_package(package)
 
         self.assertEqual(imported_root.title, "Root (clone)")
-        revived_media = MediaFile.objects.get(file_hash="hash-hero")
+        revived_media = MediaFile.objects.get(file_hash=self.media.file_hash)
         self.assertFalse(revived_media.is_deleted)
-        self.assertEqual(MediaFile.objects.with_deleted().filter(file_hash="hash-hero").count(), 1)
+        self.assertEqual(MediaFile.objects.with_deleted().filter(file_hash=self.media.file_hash).count(), 1)
 
-    def test_zip_update_keeps_the_existing_root_and_adds_imported_versions(self):
+    def test_zip_update_keeps_the_existing_root_without_duplicating_identical_versions(self):
+        self.theme.image.name = "theme_images/source/preview.png"
+        self.theme.site_icon.name = "theme_images/source/favicon.png"
+        self.theme.save(update_fields=["image", "site_icon", "updated_at"])
         PageVersion.objects.create(
             page=self.root,
             version_number=1,
             page_data={"heading": "Package heading"},
             widgets={},
+            theme=self.theme,
             created_by=self.user,
         )
         export_job = SitePackageJob.objects.create(
             kind=SitePackageJob.KIND_EXPORT,
             root_page=self.root,
             created_by=self.user,
-            options={"include_media": False, "include_themes": False},
+            options={"include_media": False, "include_themes": True},
         )
+        storage = MemoryStorage()
+        storage.files[self.theme.image.name] = b"preview"
+        storage.files[self.theme.site_icon.name] = b"favicon"
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
-            SitePackageExporter(export_job, storage=MemoryStorage()).write_package(
-                package, self.root, include_media=False, include_themes=False
+            SitePackageExporter(export_job, storage=storage).write_package(
+                package, self.root, include_media=False, include_themes=True
             )
 
         import_job = SitePackageJob.objects.create(
@@ -758,11 +772,870 @@ class SitePackageServiceTests(TestCase):
         )
         buffer.seek(0)
         with zipfile.ZipFile(buffer, "r") as package:
-            updated_root = SitePackageImporter(import_job, storage=MemoryStorage()).import_package(package)
+            updated_root = SitePackageImporter(import_job, storage=storage).import_package(package)
 
         self.assertEqual(updated_root.id, self.root.id)
-        self.assertEqual(updated_root.versions.count(), 2)
+        self.assertEqual(updated_root.versions.count(), 1)
+        self.assertEqual(PageTheme.objects.filter(tenant=self.tenant).count(), 1)
         self.assertEqual(import_job.progress["binding"]["local_root_id"], self.root.id)
+
+    def test_zip_update_creates_a_version_when_only_the_theme_changes(self):
+        source_version = PageVersion.objects.create(
+            page=self.root,
+            version_number=1,
+            effective_date=timezone.now() - timedelta(hours=1),
+            page_data={"heading": "Same content"},
+            widgets={},
+            theme=self.theme,
+            created_by=self.user,
+        )
+        storage = MemoryStorage()
+
+        def package_bytes():
+            export_job = SitePackageJob.objects.create(
+                kind=SitePackageJob.KIND_EXPORT,
+                root_page=self.root,
+                created_by=self.user,
+                options={"include_media": False, "include_themes": True},
+            )
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+                SitePackageExporter(export_job, storage=storage).write_package(
+                    package, self.root, include_media=False, include_themes=True
+                )
+            return buffer.getvalue()
+
+        first_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "mode": "create",
+                "source_root_key": str(self.root.stable_key),
+            },
+        )
+        with zipfile.ZipFile(io.BytesIO(package_bytes()), "r") as package:
+            imported_root = SitePackageImporter(first_job, storage=storage).import_package(package)
+        first_job.status = SitePackageJob.STATUS_COMPLETED
+        first_job.imported_root_page = imported_root
+        first_job.save(update_fields=["status", "imported_root_page", "updated_at"])
+        original_theme_id = imported_root.versions.get().theme_id
+
+        replacement_expiry = timezone.now() + timedelta(days=1)
+        source_version.expiry_date = replacement_expiry
+        source_version.save(update_fields=["expiry_date", "updated_at"])
+        self.theme.colors = {"brand": "#123456"}
+        self.theme.save(update_fields=["colors", "updated_at"])
+        update_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "mode": "update",
+                "local_root_id": imported_root.id,
+                "source_root_key": str(self.root.stable_key),
+                "source_binding_job_id": str(first_job.id),
+            },
+        )
+        with zipfile.ZipFile(io.BytesIO(package_bytes()), "r") as package:
+            SitePackageImporter(update_job, storage=storage).import_package(package)
+
+        self.assertEqual(imported_root.versions.count(), 2)
+        original_version = imported_root.versions.order_by("version_number").first()
+        latest = imported_root.versions.order_by("-version_number").first()
+        original_version.refresh_from_db()
+        self.assertLessEqual(original_version.expiry_date, timezone.now())
+        self.assertNotEqual(latest.theme_id, original_theme_id)
+        self.assertEqual(latest.theme.colors, {"brand": "#123456"})
+        self.assertIsNone(imported_root.get_current_published_version(now=replacement_expiry + timedelta(seconds=1)))
+
+    def test_zip_update_imports_a_revert_to_previously_seen_content(self):
+        stable_key = str(self.root.stable_key)
+
+        def package_bytes(heading):
+            version_data = {
+                "source_id": 501,
+                "version_number": 1,
+                "page_data": {"heading": heading},
+                "widgets": {},
+            }
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+                package.writestr(
+                    "manifest.json",
+                    json.dumps({"package_version": "2.0", "source": {"root_stable_key": stable_key}}),
+                )
+                package.writestr(
+                    "pages.json",
+                    json.dumps(
+                        {
+                            "pages": [
+                                {
+                                    "source_id": 101,
+                                    "stable_key": stable_key,
+                                    "parent_source_id": None,
+                                    "title": "Revert site",
+                                    "slug": "revert-site",
+                                    "versions": [version_data],
+                                }
+                            ]
+                        }
+                    ),
+                )
+            return buffer.getvalue()
+
+        previous_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id), "mode": "create", "source_root_key": stable_key},
+        )
+        with zipfile.ZipFile(io.BytesIO(package_bytes("A")), "r") as package:
+            imported_root = SitePackageImporter(previous_job, storage=MemoryStorage()).import_package(package)
+        previous_job.status = SitePackageJob.STATUS_COMPLETED
+        previous_job.imported_root_page = imported_root
+        previous_job.save(update_fields=["status", "imported_root_page", "updated_at"])
+
+        for heading in ("B", "A"):
+            update_job = SitePackageJob.objects.create(
+                kind=SitePackageJob.KIND_IMPORT,
+                created_by=self.user,
+                options={
+                    "tenant_id": str(self.tenant.id),
+                    "mode": "update",
+                    "local_root_id": imported_root.id,
+                    "source_root_key": stable_key,
+                    "source_binding_job_id": str(previous_job.id),
+                },
+            )
+            with zipfile.ZipFile(io.BytesIO(package_bytes(heading)), "r") as package:
+                SitePackageImporter(update_job, storage=MemoryStorage()).import_package(package)
+            update_job.status = SitePackageJob.STATUS_COMPLETED
+            update_job.imported_root_page = imported_root
+            update_job.save(update_fields=["status", "imported_root_page", "updated_at"])
+            previous_job = update_job
+
+        self.assertEqual(imported_root.versions.count(), 3)
+        self.assertEqual(
+            list(imported_root.versions.order_by("version_number").values_list("page_data__heading", flat=True)),
+            ["A", "B", "A"],
+        )
+
+    def test_zip_update_preserves_imported_publication_status(self):
+        effective_date = timezone.now() - timedelta(hours=1)
+        page_stable_key = str(self.root.stable_key)
+        version_data = {
+            "source_id": 501,
+            "version_number": 1,
+            "version_title": "Published import",
+            "page_data": {"heading": "Updated"},
+            "widgets": {},
+            "effective_date": effective_date.isoformat(),
+            "expiry_date": None,
+        }
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr(
+                "manifest.json",
+                json.dumps(
+                    {
+                        "package_version": "2.0",
+                        "source": {"root_stable_key": page_stable_key},
+                    }
+                ),
+            )
+            package.writestr(
+                "pages.json",
+                json.dumps(
+                    {
+                        "pages": [
+                            {
+                                "source_id": 101,
+                                "stable_key": page_stable_key,
+                                "parent_source_id": None,
+                                "title": self.root.title,
+                                "slug": self.root.slug,
+                                "versions": [version_data],
+                            }
+                        ]
+                    }
+                ),
+            )
+
+        import_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "mode": "update",
+                "local_root_id": self.root.id,
+                "source_root_key": page_stable_key,
+                "preserve_publication_status": True,
+            },
+        )
+        buffer.seek(0)
+        with zipfile.ZipFile(buffer, "r") as package:
+            SitePackageImporter(import_job, storage=MemoryStorage()).import_package(package)
+
+        imported_version = self.root.versions.get()
+        self.root.refresh_from_db()
+        self.assertEqual(imported_version.effective_date, effective_date)
+        self.assertEqual(self.root.current_published_version_id, imported_version.id)
+
+    def test_zip_update_reconciles_publication_only_changes(self):
+        stable_key = str(self.root.stable_key)
+
+        def package_bytes(effective_date=None, expiry_date=None):
+            version_data = {
+                "source_id": 501,
+                "version_number": 1,
+                "version_title": "Publication sync",
+                "page_data": {"heading": "Unchanged"},
+                "widgets": {},
+                "effective_date": effective_date.isoformat() if effective_date else None,
+                "expiry_date": expiry_date.isoformat() if expiry_date else None,
+            }
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+                package.writestr(
+                    "manifest.json",
+                    json.dumps({"package_version": "2.0", "source": {"root_stable_key": stable_key}}),
+                )
+                package.writestr(
+                    "pages.json",
+                    json.dumps(
+                        {
+                            "pages": [
+                                {
+                                    "source_id": 101,
+                                    "stable_key": stable_key,
+                                    "parent_source_id": None,
+                                    "title": self.root.title,
+                                    "slug": self.root.slug,
+                                    "versions": [version_data],
+                                }
+                            ]
+                        }
+                    ),
+                )
+            return buffer.getvalue()
+
+        first_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id), "mode": "create", "source_root_key": stable_key},
+        )
+        with zipfile.ZipFile(io.BytesIO(package_bytes()), "r") as package:
+            imported_root = SitePackageImporter(first_job, storage=MemoryStorage()).import_package(package)
+        first_job.status = SitePackageJob.STATUS_COMPLETED
+        first_job.imported_root_page = imported_root
+        first_job.save(update_fields=["status", "imported_root_page", "updated_at"])
+
+        effective_date = timezone.now() - timedelta(hours=1)
+        publish_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "mode": "update",
+                "local_root_id": imported_root.id,
+                "source_root_key": stable_key,
+                "source_binding_job_id": str(first_job.id),
+                "preserve_publication_status": True,
+            },
+        )
+        with zipfile.ZipFile(io.BytesIO(package_bytes(effective_date=effective_date)), "r") as package:
+            SitePackageImporter(publish_job, storage=MemoryStorage()).import_package(package)
+
+        published_version = imported_root.versions.get()
+        imported_root.refresh_from_db()
+        self.assertEqual(published_version.effective_date, effective_date)
+        self.assertEqual(imported_root.current_published_version_id, published_version.id)
+
+        publish_job.status = SitePackageJob.STATUS_COMPLETED
+        publish_job.save(update_fields=["status", "updated_at"])
+        expiry_date = timezone.now() + timedelta(days=1)
+        expiry_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "mode": "update",
+                "local_root_id": imported_root.id,
+                "source_root_key": stable_key,
+                "source_binding_job_id": str(publish_job.id),
+                "preserve_publication_status": True,
+            },
+        )
+        with zipfile.ZipFile(
+            io.BytesIO(package_bytes(effective_date=effective_date, expiry_date=expiry_date)), "r"
+        ) as package:
+            SitePackageImporter(expiry_job, storage=MemoryStorage()).import_package(package)
+
+        imported_root.refresh_from_db()
+        published_version.refresh_from_db()
+        self.assertEqual(imported_root.versions.count(), 1)
+        self.assertEqual(published_version.expiry_date, expiry_date)
+        self.assertIsNone(imported_root.get_current_published_version(now=expiry_date + timedelta(seconds=1)))
+
+    def test_zip_update_expires_the_prior_publication_for_a_new_source_version(self):
+        stable_key = str(self.root.stable_key)
+
+        def package_bytes(source_version_id, heading, effective_date, expiry_date=None):
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+                package.writestr(
+                    "manifest.json",
+                    json.dumps({"package_version": "2.0", "source": {"root_stable_key": stable_key}}),
+                )
+                package.writestr(
+                    "pages.json",
+                    json.dumps(
+                        {
+                            "pages": [
+                                {
+                                    "source_id": 101,
+                                    "stable_key": stable_key,
+                                    "parent_source_id": None,
+                                    "title": "Publication replacement",
+                                    "slug": "publication-replacement",
+                                    "versions": [
+                                        {
+                                            "source_id": source_version_id,
+                                            "source_page_id": 101,
+                                            "version_number": source_version_id,
+                                            "page_data": {"heading": heading},
+                                            "widgets": {},
+                                            "effective_date": effective_date.isoformat(),
+                                            "expiry_date": expiry_date.isoformat() if expiry_date else None,
+                                        }
+                                    ],
+                                }
+                            ]
+                        }
+                    ),
+                )
+            return buffer.getvalue()
+
+        first_effective = timezone.now() - timedelta(days=2)
+        first_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "mode": "create",
+                "source_root_key": stable_key,
+                "preserve_publication_status": True,
+            },
+        )
+        with zipfile.ZipFile(io.BytesIO(package_bytes(501, "First", first_effective)), "r") as package:
+            imported_root = SitePackageImporter(first_job, storage=MemoryStorage()).import_package(package)
+        first_job.status = SitePackageJob.STATUS_COMPLETED
+        first_job.imported_root_page = imported_root
+        first_job.save(update_fields=["status", "imported_root_page", "updated_at"])
+        first_version = imported_root.versions.get()
+
+        replacement_effective = timezone.now() - timedelta(hours=1)
+        replacement_expiry = timezone.now() + timedelta(days=1)
+        update_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "mode": "update",
+                "local_root_id": imported_root.id,
+                "source_root_key": stable_key,
+                "source_binding_job_id": str(first_job.id),
+                "preserve_publication_status": True,
+            },
+        )
+        with zipfile.ZipFile(
+            io.BytesIO(package_bytes(502, "Replacement", replacement_effective, replacement_expiry)), "r"
+        ) as package:
+            SitePackageImporter(update_job, storage=MemoryStorage()).import_package(package)
+
+        first_version.refresh_from_db()
+        self.assertLessEqual(first_version.expiry_date, timezone.now())
+        self.assertEqual(imported_root.versions.count(), 2)
+        self.assertIsNone(imported_root.get_current_published_version(now=replacement_expiry + timedelta(seconds=1)))
+
+    def test_repeated_v1_update_reuses_the_existing_child_tree(self):
+        package_bytes = io.BytesIO()
+        with zipfile.ZipFile(package_bytes, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr("manifest.json", json.dumps({"package_version": "1.0"}))
+            package.writestr(
+                "pages.json",
+                json.dumps(
+                    {
+                        "pages": [
+                            {
+                                "source_id": 101,
+                                "parent_source_id": None,
+                                "title": "Legacy root",
+                                "slug": "legacy-root",
+                                "versions": [],
+                            },
+                            {
+                                "source_id": 102,
+                                "parent_source_id": 101,
+                                "title": "Legacy child",
+                                "slug": "legacy-child",
+                                "versions": [],
+                            },
+                        ]
+                    }
+                ),
+            )
+        raw_package = package_bytes.getvalue()
+        package_hash = inspect_site_package_upload(ContentFile(raw_package, name="legacy.zip"))["package_hash"]
+        first_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "mode": "create",
+                "source_root_key": "",
+                "source_package_hash": package_hash,
+            },
+        )
+        with zipfile.ZipFile(io.BytesIO(raw_package), "r") as package:
+            imported_root = SitePackageImporter(first_job, storage=MemoryStorage()).import_package(package)
+        first_job.status = SitePackageJob.STATUS_COMPLETED
+        first_job.imported_root_page = imported_root
+        first_job.save(update_fields=["status", "imported_root_page", "updated_at"])
+
+        update_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "mode": "update",
+                "local_root_id": imported_root.id,
+                "source_root_key": "",
+                "source_package_hash": package_hash,
+                "source_binding_job_id": str(first_job.id),
+            },
+        )
+        with zipfile.ZipFile(io.BytesIO(raw_package), "r") as package:
+            SitePackageImporter(update_job, storage=MemoryStorage()).import_package(package)
+
+        self.assertEqual(imported_root.children.filter(is_deleted=False).count(), 1)
+
+    def test_zip_update_recreates_deleted_child_versions_and_remaps_links(self):
+        root_key = str(self.root.stable_key)
+        child_key = str(self.child.stable_key)
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr(
+                "manifest.json",
+                json.dumps({"package_version": "2.0", "source": {"root_stable_key": root_key}}),
+            )
+            package.writestr(
+                "pages.json",
+                json.dumps(
+                    {
+                        "pages": [
+                            {
+                                "source_id": 101,
+                                "stable_key": root_key,
+                                "parent_source_id": None,
+                                "title": "Imported root",
+                                "slug": "imported-root",
+                                "versions": [
+                                    {
+                                        "source_id": 501,
+                                        "source_page_id": 101,
+                                        "version_number": 1,
+                                        "page_data": {"pageId": 102},
+                                        "widgets": {},
+                                    }
+                                ],
+                            },
+                            {
+                                "source_id": 102,
+                                "stable_key": child_key,
+                                "parent_source_id": 101,
+                                "title": "Imported child",
+                                "slug": "imported-child",
+                                "versions": [
+                                    {
+                                        "source_id": 502,
+                                        "source_page_id": 102,
+                                        "version_number": 1,
+                                        "page_data": {"heading": "Child"},
+                                        "widgets": {},
+                                    }
+                                ],
+                            },
+                        ]
+                    }
+                ),
+            )
+        raw_package = buffer.getvalue()
+        first_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id), "mode": "create", "source_root_key": root_key},
+        )
+        with zipfile.ZipFile(io.BytesIO(raw_package), "r") as package:
+            imported_root = SitePackageImporter(first_job, storage=MemoryStorage()).import_package(package)
+        first_job.status = SitePackageJob.STATUS_COMPLETED
+        first_job.imported_root_page = imported_root
+        first_job.save(update_fields=["status", "imported_root_page", "updated_at"])
+        deleted_child = imported_root.children.get(is_deleted=False)
+        deleted_child.soft_delete(self.user)
+
+        update_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "mode": "update",
+                "local_root_id": imported_root.id,
+                "source_root_key": root_key,
+                "source_binding_job_id": str(first_job.id),
+            },
+        )
+        with zipfile.ZipFile(io.BytesIO(raw_package), "r") as package:
+            SitePackageImporter(update_job, storage=MemoryStorage()).import_package(package)
+
+        recreated_child = imported_root.children.get(is_deleted=False)
+        self.assertNotEqual(recreated_child.id, deleted_child.id)
+        self.assertEqual(recreated_child.versions.count(), 1)
+        self.assertEqual(imported_root.versions.count(), 2)
+        self.assertEqual(
+            imported_root.versions.order_by("-version_number").first().page_data["pageId"],
+            recreated_child.id,
+        )
+
+    def test_zip_update_uses_the_latest_persisted_binding(self):
+        stable_key = str(self.root.stable_key)
+        PageVersion.objects.create(
+            page=self.root,
+            version_number=1,
+            page_data={"heading": "Already imported"},
+            widgets={},
+            created_by=self.user,
+        )
+        version_data = {
+            "source_id": 501,
+            "version_number": 1,
+            "page_data": {"heading": "Already imported"},
+            "widgets": {},
+            "content_fingerprint": "latest-fingerprint",
+        }
+        old_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            status=SitePackageJob.STATUS_COMPLETED,
+            imported_root_page=self.root,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id), "source_root_key": stable_key},
+            progress={
+                "binding": {
+                    "page_map": {stable_key: self.root.id},
+                    "version_fingerprints": {stable_key: []},
+                }
+            },
+        )
+        SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            status=SitePackageJob.STATUS_RUNNING,
+            imported_root_page=self.root,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id), "source_root_key": stable_key},
+            progress={
+                "binding": {
+                    "page_map": {stable_key: self.root.id},
+                    "version_fingerprints": {stable_key: ["latest-fingerprint"]},
+                }
+            },
+        )
+        update_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "mode": "update",
+                "local_root_id": self.root.id,
+                "source_root_key": stable_key,
+                "source_binding_job_id": str(old_job.id),
+            },
+        )
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr(
+                "manifest.json",
+                json.dumps({"package_version": "2.0", "source": {"root_stable_key": stable_key}}),
+            )
+            package.writestr(
+                "pages.json",
+                json.dumps(
+                    {
+                        "pages": [
+                            {
+                                "source_id": 101,
+                                "stable_key": stable_key,
+                                "parent_source_id": None,
+                                "title": self.root.title,
+                                "slug": self.root.slug,
+                                "versions": [version_data],
+                            }
+                        ]
+                    }
+                ),
+            )
+        buffer.seek(0)
+        with zipfile.ZipFile(buffer, "r") as package:
+            SitePackageImporter(update_job, storage=MemoryStorage()).import_package(package)
+
+        self.assertEqual(self.root.versions.count(), 1)
+
+    def test_missing_package_bytes_do_not_revive_soft_deleted_media(self):
+        self.media.is_deleted = True
+        self.media.deleted_at = timezone.now()
+        self.media.deleted_by = self.user
+        self.media.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr("manifest.json", json.dumps({"package_version": "2.0"}))
+            package.writestr(
+                "pages.json",
+                json.dumps(
+                    {
+                        "pages": [
+                            {
+                                "source_id": 101,
+                                "parent_source_id": None,
+                                "title": "Media import",
+                                "slug": "media-import",
+                                "versions": [],
+                            }
+                        ]
+                    }
+                ),
+            )
+            package.writestr(
+                "media/manifest.json",
+                json.dumps(
+                    {
+                        "files": [
+                            {
+                                "source_id": str(self.media.id),
+                                "file_hash": self.media.file_hash,
+                                "original_filename": self.media.original_filename,
+                            }
+                        ]
+                    }
+                ),
+            )
+        import_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id), "mode": "create"},
+        )
+        buffer.seek(0)
+        with zipfile.ZipFile(buffer, "r") as package:
+            SitePackageImporter(import_job, storage=MemoryStorage()).import_package(package)
+
+        self.media.refresh_from_db()
+        self.assertTrue(self.media.is_deleted)
+
+    def test_media_members_are_spooled_instead_of_loaded_as_bytes(self):
+        class StreamingAssertionStorage(MemoryStorage):
+            received_spooled_file = False
+
+            def _save(self, name, content):
+                self.received_spooled_file = isinstance(getattr(content, "file", None), tempfile.SpooledTemporaryFile)
+                return super()._save(name, content)
+
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr("manifest.json", json.dumps({"package_version": "2.0"}))
+            package.writestr(
+                "pages.json",
+                json.dumps(
+                    {
+                        "pages": [
+                            {
+                                "source_id": 101,
+                                "parent_source_id": None,
+                                "title": "Media stream",
+                                "slug": "media-stream",
+                                "versions": [],
+                            }
+                        ]
+                    }
+                ),
+            )
+            package.writestr(
+                "media/manifest.json",
+                json.dumps(
+                    {
+                        "files": [
+                            {
+                                "source_id": "new-media",
+                                "file_hash": hashlib.sha256(b"x" * 1024).hexdigest(),
+                                "original_filename": "streamed.bin",
+                                "file_size": 1024,
+                            }
+                        ]
+                    }
+                ),
+            )
+            package.writestr("media/files/new-media/streamed.bin", b"x" * 1024)
+        storage = StreamingAssertionStorage()
+        import_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id), "mode": "create"},
+        )
+        buffer.seek(0)
+        with zipfile.ZipFile(buffer, "r") as package:
+            SitePackageImporter(import_job, storage=storage).import_package(package)
+
+        self.assertTrue(storage.received_spooled_file)
+
+    def test_media_hash_mismatch_does_not_revive_or_overwrite_a_deleted_file(self):
+        self.media.is_deleted = True
+        self.media.deleted_at = timezone.now()
+        self.media.deleted_by = self.user
+        self.media.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"original"
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr("manifest.json", json.dumps({"package_version": "2.0"}))
+            package.writestr(
+                "pages.json",
+                json.dumps(
+                    {
+                        "pages": [
+                            {
+                                "source_id": 101,
+                                "parent_source_id": None,
+                                "title": "Media import",
+                                "slug": "media-import",
+                                "versions": [],
+                            }
+                        ]
+                    }
+                ),
+            )
+            package.writestr(
+                "media/manifest.json",
+                json.dumps(
+                    {
+                        "files": [
+                            {
+                                "source_id": str(self.media.id),
+                                "file_hash": self.media.file_hash,
+                                "original_filename": self.media.original_filename,
+                            }
+                        ]
+                    }
+                ),
+            )
+            package.writestr(f"media/files/{self.media.id}/hero.jpg", b"tampered")
+        import_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id), "mode": "create"},
+        )
+
+        buffer.seek(0)
+        with zipfile.ZipFile(buffer, "r") as package:
+            with self.assertRaisesMessage(ValueError, "SHA-256"):
+                SitePackageImporter(import_job, storage=storage).import_package(package)
+
+        self.media.refresh_from_db()
+        self.assertTrue(self.media.is_deleted)
+        self.assertEqual(storage.files[self.media.file_path], b"original")
+
+    def test_zip_update_replaces_a_version_when_referenced_media_changes(self):
+        stable_key = str(self.root.stable_key)
+        media_source_id = str(uuid.uuid4())
+
+        def package_bytes(content):
+            file_hash = hashlib.sha256(content).hexdigest()
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+                package.writestr(
+                    "manifest.json",
+                    json.dumps({"package_version": "2.0", "source": {"root_stable_key": stable_key}}),
+                )
+                package.writestr(
+                    "pages.json",
+                    json.dumps(
+                        {
+                            "pages": [
+                                {
+                                    "source_id": 101,
+                                    "stable_key": stable_key,
+                                    "parent_source_id": None,
+                                    "title": "Media dependency",
+                                    "slug": "media-dependency",
+                                    "versions": [
+                                        {
+                                            "source_id": 501,
+                                            "version_number": 1,
+                                            "page_data": {"imageId": media_source_id},
+                                            "widgets": {},
+                                        }
+                                    ],
+                                }
+                            ]
+                        }
+                    ),
+                )
+                package.writestr(
+                    "media/manifest.json",
+                    json.dumps(
+                        {
+                            "files": [
+                                {
+                                    "source_id": media_source_id,
+                                    "file_hash": file_hash,
+                                    "original_filename": "dependency.bin",
+                                }
+                            ]
+                        }
+                    ),
+                )
+                package.writestr(f"media/files/{media_source_id}/dependency.bin", content)
+            return buffer.getvalue(), file_hash
+
+        first_package, first_hash = package_bytes(b"first")
+        first_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id), "mode": "create", "source_root_key": stable_key},
+        )
+        with zipfile.ZipFile(io.BytesIO(first_package), "r") as package:
+            imported_root = SitePackageImporter(first_job, storage=MemoryStorage()).import_package(package)
+        first_job.status = SitePackageJob.STATUS_COMPLETED
+        first_job.imported_root_page = imported_root
+        first_job.save(update_fields=["status", "imported_root_page", "updated_at"])
+
+        second_package, second_hash = package_bytes(b"second")
+        update_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "mode": "update",
+                "local_root_id": imported_root.id,
+                "source_root_key": stable_key,
+                "source_binding_job_id": str(first_job.id),
+            },
+        )
+        with zipfile.ZipFile(io.BytesIO(second_package), "r") as package:
+            SitePackageImporter(update_job, storage=MemoryStorage()).import_package(package)
+
+        self.assertEqual(imported_root.versions.count(), 2)
+        first_media_id = imported_root.versions.get(version_number=1).page_data["imageId"]
+        latest_media_id = imported_root.versions.get(version_number=2).page_data["imageId"]
+        self.assertNotEqual(first_media_id, latest_media_id)
+        self.assertEqual(MediaFile.objects.get(id=first_media_id).file_hash, first_hash)
+        self.assertEqual(MediaFile.objects.get(id=latest_media_id).file_hash, second_hash)
 
     def test_import_remaps_exported_page_and_version_ids_inside_json(self):
         child_version = PageVersion.objects.create(
@@ -1011,6 +1884,32 @@ class SitePackageAPITests(APITestCase):
             )
         return ContentFile(buffer.getvalue(), name="site.zip")
 
+    def legacy_site_package_bytes(self, *, source_id=101, title="Legacy Site", children=()):
+        pages = [
+            {
+                "source_id": source_id,
+                "parent_source_id": None,
+                "title": title,
+                "slug": slugify(title),
+                "versions": [],
+            }
+        ]
+        pages.extend(
+            {
+                "source_id": child_id,
+                "parent_source_id": source_id,
+                "title": child_title,
+                "slug": slugify(child_title),
+                "versions": [],
+            }
+            for child_id, child_title in children
+        )
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr("manifest.json", json.dumps({"package_version": "1.0", "kind": "site-root-tree"}))
+            package.writestr("pages.json", json.dumps({"pages": pages}))
+        return buffer.getvalue()
+
     def test_export_filename_uses_hostname_with_export_datetime_and_random_suffix(self):
         export_datetime = datetime(2026, 5, 24, 13, 14, 15, tzinfo=datetime_timezone.utc)
         filename = build_site_package_export_filename(
@@ -1043,7 +1942,7 @@ class SitePackageAPITests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.status_code, 202, response.data)
         job = SitePackageJob.objects.get(id=response.data["id"])
         self.assertEqual(job.root_page, self.root)
         self.assertTrue(job.options["include_media"])
@@ -1151,13 +2050,173 @@ class SitePackageAPITests(APITestCase):
             format="multipart",
         )
 
-        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.status_code, 202, response.data)
         job = SitePackageJob.objects.get(id=response.data["id"])
         self.assertEqual(job.kind, SitePackageJob.KIND_IMPORT)
         self.assertEqual(job.options["mode"], "create")
         self.assertTrue(job.options["source_root_key"])
         self.assertIn(str(job.id), job.object_key)
         delay.assert_called_once_with(str(job.id))
+
+    @patch("webpages.views.site_package_views.import_site_package.delay")
+    @patch("webpages.views.site_package_views.S3MediaStorage")
+    def test_import_accepts_the_legacy_snake_case_publication_option(self, storage_class, delay):
+        storage_class.return_value = MemoryStorage()
+
+        response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {"site_zip": self.site_package_upload(), "preserve_publication_status": "false"},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 202)
+        job = SitePackageJob.objects.get(id=response.data["id"])
+        self.assertFalse(job.options["preserve_publication_status"])
+        delay.assert_called_once_with(str(job.id))
+
+    @patch("webpages.views.site_package_views.import_site_package.delay")
+    @patch("webpages.views.site_package_views.S3MediaStorage")
+    def test_import_rejects_conflicting_publication_options(self, storage_class, delay):
+        storage_class.return_value = MemoryStorage()
+
+        response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {
+                "site_zip": self.site_package_upload(),
+                "preserve_publication_status": "false",
+                "preservePublicationStatus": "true",
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        delay.assert_not_called()
+
+    @patch("webpages.services.site_package.SITE_PACKAGE_MAX_IDENTITY_FILE_SIZE", 128)
+    @patch("webpages.views.site_package_views.import_site_package.delay")
+    @patch("webpages.views.site_package_views.S3MediaStorage")
+    def test_import_rejects_oversized_identity_documents(self, storage_class, delay):
+        storage_class.return_value = MemoryStorage()
+        upload = self.site_package_upload(title="X" * 256)
+
+        response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {"site_zip": upload},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        delay.assert_not_called()
+
+    @patch("webpages.views.site_package_views.import_site_package.delay")
+    @patch("webpages.views.site_package_views.S3MediaStorage")
+    def test_import_rejects_an_invalid_root_stable_key(self, storage_class, delay):
+        storage_class.return_value = MemoryStorage()
+
+        response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {"site_zip": self.site_package_upload(stable_key="not-a-uuid")},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(SitePackageJob.objects.filter(kind=SitePackageJob.KIND_IMPORT).exists())
+        delay.assert_not_called()
+
+    @patch("webpages.views.site_package_views.import_site_package.delay")
+    @patch("webpages.views.site_package_views.S3MediaStorage")
+    def test_import_rejects_inconsistent_or_reordered_roots(self, storage_class, delay):
+        storage_class.return_value = MemoryStorage()
+        root_key = uuid.uuid4()
+        child_key = uuid.uuid4()
+
+        def upload(pages, manifest_key=root_key):
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+                package.writestr(
+                    "manifest.json",
+                    json.dumps(
+                        {
+                            "package_version": "2.0",
+                            "source": {"root_stable_key": str(manifest_key)},
+                        }
+                    ),
+                )
+                package.writestr("pages.json", json.dumps({"pages": pages}))
+            return ContentFile(buffer.getvalue(), name="invalid-root.zip")
+
+        root = {
+            "source_id": 1,
+            "stable_key": str(root_key),
+            "parent_source_id": None,
+            "title": "Root",
+            "slug": "root",
+            "versions": [],
+        }
+        child = {
+            "source_id": 2,
+            "stable_key": str(child_key),
+            "parent_source_id": 1,
+            "title": "Child",
+            "slug": "child",
+            "versions": [],
+        }
+
+        reordered_response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {"site_zip": upload([child, root])},
+            format="multipart",
+        )
+        mismatched_root = {**root, "stable_key": str(uuid.uuid4())}
+        mismatched_response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {"site_zip": upload([mismatched_root, child])},
+            format="multipart",
+        )
+        duplicate_child_key = uuid.uuid4()
+        duplicate_lineage_response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {
+                "site_zip": upload(
+                    [
+                        root,
+                        {**child, "stable_key": str(duplicate_child_key)},
+                        {
+                            **child,
+                            "source_id": 3,
+                            "stable_key": str(duplicate_child_key),
+                            "slug": "second-child",
+                        },
+                    ]
+                )
+            },
+            format="multipart",
+        )
+        mixed_id_response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {"site_zip": upload([root, {**child, "parent_source_id": "1"}])},
+            format="multipart",
+        )
+        zero_id_response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {
+                "site_zip": upload(
+                    [
+                        {**root, "source_id": 0},
+                        {**child, "parent_source_id": 0},
+                    ]
+                )
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(reordered_response.status_code, 400)
+        self.assertEqual(mismatched_response.status_code, 400)
+        self.assertEqual(duplicate_lineage_response.status_code, 400)
+        self.assertEqual(mixed_id_response.status_code, 400)
+        self.assertEqual(zero_id_response.status_code, 400)
+        self.assertFalse(SitePackageJob.objects.filter(kind=SitePackageJob.KIND_IMPORT).exists())
+        delay.assert_not_called()
 
     @patch("webpages.views.site_package_views.import_site_package.delay")
     @patch("webpages.views.site_package_views.S3MediaStorage")
@@ -1175,6 +2234,142 @@ class SitePackageAPITests(APITestCase):
         self.assertEqual(response.data["existingSites"][0]["id"], self.root.id)
         self.assertFalse(SitePackageJob.objects.filter(kind=SitePackageJob.KIND_IMPORT).exists())
         delay.assert_not_called()
+
+    @patch("webpages.views.site_package_views.import_site_package.delay")
+    @patch("webpages.views.site_package_views.S3MediaStorage")
+    def test_import_does_not_match_a_different_stable_site_with_the_same_source_id(self, storage_class, delay):
+        storage_class.return_value = MemoryStorage()
+        previous_root = WebPage.objects.create(
+            title="Previous import",
+            slug="previous-import",
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        previous_key = uuid.uuid4()
+        SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            status=SitePackageJob.STATUS_COMPLETED,
+            imported_root_page=previous_root,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id), "source_root_key": str(previous_key)},
+            progress={"object_maps": {"pages": {"900": previous_root.id}}},
+        )
+
+        response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {"site_zip": self.site_package_upload(stable_key=uuid.uuid4(), source_id=900)},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 202)
+        delay.assert_called_once()
+
+    @patch("webpages.views.site_package_views.import_site_package.delay")
+    @patch("webpages.views.site_package_views.S3MediaStorage")
+    def test_import_rejects_a_duplicate_while_the_same_source_is_pending(self, storage_class, delay):
+        storage_class.return_value = MemoryStorage()
+        stable_key = uuid.uuid4()
+        SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            status=SitePackageJob.STATUS_PENDING,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id), "source_root_key": str(stable_key)},
+        )
+
+        response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {"site_zip": self.site_package_upload(stable_key=stable_key)},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["code"], "site_import_in_progress")
+        delay.assert_not_called()
+
+    @patch("webpages.views.site_package_views.import_site_package.delay")
+    @patch("webpages.views.site_package_views.S3MediaStorage")
+    def test_expired_pending_import_does_not_block_a_retry(self, storage_class, delay):
+        storage_class.return_value = MemoryStorage()
+        stable_key = uuid.uuid4()
+        SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            status=SitePackageJob.STATUS_PENDING,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id), "source_root_key": str(stable_key)},
+            expires_at=timezone.now() - timedelta(minutes=1),
+        )
+
+        response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {"site_zip": self.site_package_upload(stable_key=stable_key)},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 202, response.data)
+        delay.assert_called_once()
+
+    @patch("webpages.views.site_package_views.import_site_package.delay", side_effect=RuntimeError("queue unavailable"))
+    @patch("webpages.views.site_package_views.S3MediaStorage")
+    def test_import_marks_the_job_failed_when_queue_dispatch_fails(self, storage_class, delay):
+        storage_class.return_value = MemoryStorage()
+
+        with self.assertRaises(RuntimeError):
+            self.client.post(
+                "/api/v1/webpages/site-packages/imports/",
+                {"site_zip": self.site_package_upload()},
+                format="multipart",
+            )
+
+        job = SitePackageJob.objects.get(kind=SitePackageJob.KIND_IMPORT)
+        self.assertEqual(job.status, SitePackageJob.STATUS_FAILED)
+        self.assertEqual(job.errors, ["queue unavailable"])
+        delay.assert_called_once_with(str(job.id))
+
+    @patch("webpages.views.site_package_views.import_site_package.delay")
+    @patch("webpages.views.site_package_views.S3MediaStorage")
+    def test_legacy_packages_only_match_the_same_package_bytes(self, storage_class, delay):
+        storage_class.return_value = MemoryStorage()
+        first_bytes = self.legacy_site_package_bytes(source_id=101, title="First legacy site")
+        first_hash = inspect_site_package_upload(ContentFile(first_bytes, name="first.zip"))["package_hash"]
+        previous_root = WebPage.objects.create(
+            title="First legacy site",
+            slug="first-legacy-site",
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            status=SitePackageJob.STATUS_COMPLETED,
+            imported_root_page=previous_root,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "source_root_key": "",
+                "source_package_hash": first_hash,
+            },
+            progress={"object_maps": {"pages": {"101": previous_root.id}}},
+        )
+
+        unrelated_response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {
+                "site_zip": ContentFile(
+                    self.legacy_site_package_bytes(source_id=101, title="Other site"), name="other.zip"
+                )
+            },
+            format="multipart",
+        )
+        repeated_response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {"site_zip": ContentFile(first_bytes, name="first.zip")},
+            format="multipart",
+        )
+
+        self.assertEqual(unrelated_response.status_code, 202)
+        self.assertEqual(repeated_response.status_code, 409)
+        self.assertEqual(repeated_response.data["code"], "site_already_exists")
 
     @patch("webpages.views.site_package_views.import_site_package.delay")
     @patch("webpages.views.site_package_views.S3MediaStorage")

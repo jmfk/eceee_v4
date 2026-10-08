@@ -13,10 +13,11 @@ import secrets
 import tempfile
 import uuid
 import zipfile
+import zlib
 from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional, Set
 
-from django.core.files.base import ContentFile
+from django.core.files.base import ContentFile, File
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -39,6 +40,9 @@ SUPPORTED_PACKAGE_VERSIONS = {"1.0", PACKAGE_VERSION}
 THEME_TRANSFER_MAX_FILES = 250
 THEME_TRANSFER_MAX_FILE_SIZE = 25 * 1024 * 1024
 THEME_TRANSFER_MAX_TOTAL_SIZE = 100 * 1024 * 1024
+SITE_PACKAGE_MAX_FILES = 20_000
+SITE_PACKAGE_MAX_TOTAL_SIZE = 2 * 1024 * 1024 * 1024
+SITE_PACKAGE_MAX_IDENTITY_FILE_SIZE = 64 * 1024 * 1024
 UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 URL_RE = re.compile(r"https?://[^\s\"'<>\\)]+", re.IGNORECASE)
 HTML_IMAGE_SRC_RE = re.compile(r"<img[^>]+src=[\"']([^\"']+)[\"']", re.IGNORECASE)
@@ -176,6 +180,39 @@ def _version_fingerprint(payload: Dict[str, Any]) -> str:
     }
     fingerprint_payload = {key: value for key, value in payload.items() if key not in lineage_fields}
     return _payload_fingerprint(fingerprint_payload)
+
+
+def _version_sync_fingerprint(
+    payload: Dict[str, Any],
+    theme_fingerprints: Dict[str, str],
+    media_metadata: Optional[Dict[str, Dict[str, Any]]] = None,
+    page_mappings: Optional[Dict[str, int]] = None,
+) -> str:
+    theme_source_id = payload.get("theme_source_id")
+    serialized_payload = json.dumps(payload, sort_keys=True, default=_json_default)
+    media_dependencies = {}
+    for source_id, metadata in (media_metadata or {}).items():
+        references = (
+            str(source_id),
+            metadata.get("file_path"),
+            metadata.get("file_url"),
+            f"/media/{source_id}/",
+        )
+        if any(reference and str(reference) in serialized_payload for reference in references):
+            media_dependencies[str(source_id)] = metadata.get("file_hash", "")
+    page_dependencies = {
+        str(source_id): destination_id
+        for source_id, destination_id in (page_mappings or {}).items()
+        if str(source_id) in serialized_payload
+    }
+    return _payload_fingerprint(
+        {
+            "content": _version_fingerprint(payload),
+            "theme": theme_fingerprints.get(str(theme_source_id), "") if theme_source_id is not None else "",
+            "media": media_dependencies,
+            "pages": page_dependencies,
+        }
+    )
 
 
 def _safe_export_filename_part(value: str) -> str:
@@ -650,28 +687,150 @@ def _unique_clone_title(tenant, title: str) -> str:
     return candidate
 
 
+def _validate_site_package_members(package: zipfile.ZipFile):
+    members = [item for item in package.infolist() if not item.is_dir()]
+    if len(members) > SITE_PACKAGE_MAX_FILES or sum(item.file_size for item in members) > SITE_PACKAGE_MAX_TOTAL_SIZE:
+        raise ValueError("The selected site package exceeds safety limits.")
+    for member in members:
+        if member.filename.startswith("themes/assets/") and member.file_size > THEME_TRANSFER_MAX_FILE_SIZE:
+            raise ValueError("A theme asset exceeds the site package safety limit.")
+        if member.filename.endswith(".json") and member.file_size > SITE_PACKAGE_MAX_IDENTITY_FILE_SIZE:
+            raise ValueError(f"{member.filename} exceeds the site package inspection limit.")
+    return members
+
+
+def _validate_site_package_documents(manifest: Dict[str, Any], pages_document: Dict[str, Any]):
+    if not isinstance(manifest, dict) or not isinstance(pages_document, dict):
+        raise ValueError("The selected file is not a valid site package ZIP.")
+    pages = pages_document.get("pages", [])
+    if (
+        manifest.get("package_version") not in SUPPORTED_PACKAGE_VERSIONS
+        or not isinstance(pages, list)
+        or not pages
+        or not all(isinstance(item, dict) for item in pages)
+    ):
+        raise ValueError("The selected file is not a supported site package.")
+
+    roots = [item for item in pages if item.get("parent_source_id") is None]
+    if len(roots) != 1 or roots[0] is not pages[0] or roots[0].get("source_id") is None:
+        raise ValueError("The site package must contain one root page listed first.")
+
+    seen_source_ids = set()
+    seen_lineage_keys = set()
+    for page in pages:
+        source_id = page.get("source_id")
+        parent_source_id = page.get("parent_source_id")
+        if isinstance(source_id, bool) or not isinstance(source_id, int) or source_id <= 0:
+            raise ValueError("The site package contains invalid page identifiers.")
+        if parent_source_id is not None and (
+            isinstance(parent_source_id, bool) or not isinstance(parent_source_id, int) or parent_source_id <= 0
+        ):
+            raise ValueError("The site package contains invalid page identifiers.")
+        if source_id in seen_source_ids:
+            raise ValueError("The site package contains invalid page identifiers.")
+        if parent_source_id is not None and parent_source_id not in seen_source_ids:
+            raise ValueError("Site package pages must be listed after their parent page.")
+        seen_source_ids.add(source_id)
+
+        stable_key = page.get("stable_key")
+        if stable_key:
+            try:
+                lineage_key = str(uuid.UUID(str(stable_key)))
+            except (AttributeError, TypeError, ValueError) as exc:
+                raise ValueError("The site package contains an invalid page stable key.") from exc
+        else:
+            lineage_key = str(source_id)
+        if lineage_key in seen_lineage_keys:
+            raise ValueError("The site package contains duplicate page lineage keys.")
+        seen_lineage_keys.add(lineage_key)
+
+    source = manifest.get("source") or {}
+    if not isinstance(source, dict):
+        raise ValueError("The selected file is not a supported site package.")
+
+    def normalized_stable_key(value):
+        if not value:
+            return ""
+        try:
+            return str(uuid.UUID(str(value)))
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise ValueError("The site package contains an invalid root stable key.") from exc
+
+    manifest_root_key = normalized_stable_key(source.get("root_stable_key"))
+    page_root_key = normalized_stable_key(roots[0].get("stable_key"))
+    if manifest_root_key and page_root_key and manifest_root_key != page_root_key:
+        raise ValueError("The site package root stable keys do not match.")
+    return pages, roots[0], source, manifest_root_key or page_root_key
+
+
 def inspect_site_package_upload(upload) -> Dict[str, Any]:
     """Read the source identity without consuming the uploaded ZIP stream."""
     position = upload.tell()
     try:
+        upload.seek(0)
         with zipfile.ZipFile(upload, "r") as package:
-            manifest = json.loads(package.read("manifest.json").decode("utf-8"))
-            pages = json.loads(package.read("pages.json").decode("utf-8")).get("pages", [])
-    except (KeyError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
+            _validate_site_package_members(package)
+            identity_members = {}
+            for name in ("manifest.json", "pages.json"):
+                member = package.getinfo(name)
+                if member.file_size > SITE_PACKAGE_MAX_IDENTITY_FILE_SIZE:
+                    raise ValueError(f"{name} exceeds the site package inspection limit.")
+                identity_members[name] = json.loads(package.read(member).decode("utf-8"))
+            manifest = identity_members["manifest.json"]
+            pages_document = identity_members["pages.json"]
+    except json.JSONDecodeError as exc:
+        raise ValueError("The selected file is not a valid site package ZIP.") from exc
+    except ValueError:
+        raise
+    except (
+        AttributeError,
+        EOFError,
+        KeyError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        UnicodeDecodeError,
+        zipfile.BadZipFile,
+        zlib.error,
+    ) as exc:
         raise ValueError("The selected file is not a valid site package ZIP.") from exc
     finally:
         upload.seek(position)
 
-    if manifest.get("package_version") not in SUPPORTED_PACKAGE_VERSIONS or not pages:
-        raise ValueError("The selected file is not a supported site package.")
-    root = next((item for item in pages if item.get("parent_source_id") is None), pages[0])
-    source = manifest.get("source") or {}
+    pages, root, source, stable_key = _validate_site_package_documents(manifest, pages_document)
+    package_hash = _payload_fingerprint({"manifest": manifest, "pages": pages_document})
     return {
-        "stable_key": str(source.get("root_stable_key") or root.get("stable_key") or ""),
+        "stable_key": stable_key,
         "source_id": str(root.get("source_id")),
+        "package_hash": package_hash,
         "title": source.get("root_title") or root.get("title") or "Imported site",
         "slug": source.get("root_slug") or root.get("slug") or "imported-site",
     }
+
+
+def _job_matches_site_package_identity(job: SitePackageJob, identity: Dict[str, Any]) -> bool:
+    options = job.options or {}
+    stable_key = identity.get("stable_key")
+    if stable_key:
+        return options.get("source_root_key") == stable_key
+    package_hash = identity.get("package_hash")
+    return bool(
+        package_hash and not options.get("source_root_key") and options.get("source_package_hash") == package_hash
+    )
+
+
+def find_site_package_import_in_progress(tenant, identity: Dict[str, Any]) -> Optional[SitePackageJob]:
+    now = timezone.now()
+    jobs = (
+        SitePackageJob.objects.filter(
+            kind=SitePackageJob.KIND_IMPORT,
+            status__in=(SitePackageJob.STATUS_PENDING, SitePackageJob.STATUS_RUNNING),
+            options__tenant_id=str(tenant.id),
+        )
+        .filter(models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now))
+        .order_by("-created_at")
+    )
+    return next((job for job in jobs if _job_matches_site_package_identity(job, identity)), None)
 
 
 def find_site_package_conflicts(tenant, identity: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -697,15 +856,22 @@ def find_site_package_conflicts(tenant, identity: Dict[str, Any]) -> List[Dict[s
             imported_root_page__is_deleted=False,
         )
         .select_related("imported_root_page")
+        .only(
+            "id",
+            "options",
+            "imported_root_page_id",
+            "imported_root_page__id",
+            "imported_root_page__title",
+            "imported_root_page__slug",
+        )
         .order_by("-updated_at")
     )
-    source_id = identity.get("source_id")
+    if stable_key:
+        jobs = jobs.filter(options__source_root_key=stable_key)
+    elif identity.get("package_hash"):
+        jobs = jobs.filter(options__source_package_hash=identity["package_hash"])
     for job in jobs:
-        options = job.options or {}
-        object_map = (job.progress or {}).get("object_maps", {}).get("pages", {})
-        same_source = bool(stable_key and options.get("source_root_key") == stable_key)
-        same_legacy_source = bool(source_id and str(object_map.get(str(source_id))) == str(job.imported_root_page_id))
-        if same_source or same_legacy_source:
+        if _job_matches_site_package_identity(job, identity):
             matches.setdefault(
                 job.imported_root_page_id,
                 {"root": job.imported_root_page, "binding_job_id": str(job.id)},
@@ -969,7 +1135,7 @@ class SitePackageExporter:
         for theme in themes:
             theme_data = _serialize_theme(theme)
             assets = []
-            for path in _theme_asset_paths(theme):
+            for path in sorted(_theme_asset_paths(theme)):
                 file_obj = None
                 try:
                     file_obj = storage._open(path, "rb")
@@ -1022,6 +1188,7 @@ class SitePackageImporter:
         self.job = job
         self.storage = storage or S3MediaStorage()
         self.theme_stable_map = {}
+        self.theme_source_fingerprints = {}
         self.media_source_metadata = {}
 
     def run(self):
@@ -1057,9 +1224,10 @@ class SitePackageImporter:
 
     @transaction.atomic
     def import_package(self, package: zipfile.ZipFile) -> WebPage:
+        _validate_site_package_members(package)
         manifest = json.loads(package.read("manifest.json").decode("utf-8"))
-        if manifest.get("package_version") not in SUPPORTED_PACKAGE_VERSIONS:
-            raise ValueError("Unsupported site package version")
+        pages_document = json.loads(package.read("pages.json").decode("utf-8"))
+        _validate_site_package_documents(manifest, pages_document)
         options = self.job.options or {}
         if options.get("source") == "remote":
             package_root_key = manifest.get("source", {}).get("root_stable_key")
@@ -1222,24 +1390,34 @@ class SitePackageImporter:
         options = self.job.options or {}
         connection_id = options.get("connection_id")
         remote_root_key = options.get("remote_site_key") or manifest.get("source", {}).get("root_stable_key")
-        if not remote_root_key:
-            return
         page_stable_map = {
-            str(data.get("stable_key")): page_map[data["source_id"]].id
+            str(data.get("stable_key") or data["source_id"]): page_map[data["source_id"]].id
             for data in pages_payload
-            if data.get("stable_key") and data["source_id"] in page_map
+            if data["source_id"] in page_map
         }
         fingerprints = {}
         for page_data in pages_payload:
-            key = str(page_data.get("stable_key") or "")
+            key = str(page_data.get("stable_key") or page_data.get("source_id") or "")
             if key:
-                fingerprints[key] = [_version_fingerprint(item) for item in page_data.get("versions", [])]
+                fingerprints[key] = {
+                    str(item["source_id"]): _version_sync_fingerprint(
+                        item,
+                        self.theme_source_fingerprints,
+                        self.media_source_metadata,
+                        {str(source_id): page.id for source_id, page in page_map.items()},
+                    )
+                    for item in page_data.get("versions", [])
+                }
         root_data = next((item for item in pages_payload if item.get("parent_source_id") is None), pages_payload[0])
         if not connection_id:
+            source_identity = remote_root_key or options.get("source_package_hash")
+            if not source_identity:
+                return
             self.job.progress = {
                 **(self.job.progress or {}),
                 "binding": {
-                    "source_root_key": str(remote_root_key),
+                    "source_root_key": str(remote_root_key or ""),
+                    "source_package_hash": options.get("source_package_hash", ""),
                     "local_root_id": page_map[root_data["source_id"]].id,
                     "page_map": page_stable_map,
                     "theme_map": self.theme_stable_map,
@@ -1247,6 +1425,8 @@ class SitePackageImporter:
                     "version_fingerprints": fingerprints,
                 },
             }
+            return
+        if not remote_root_key:
             return
         binding = RemoteSiteBinding.objects.create(
             tenant=self._destination_tenant(),
@@ -1274,7 +1454,7 @@ class SitePackageImporter:
 
         page_map = {}
         next_page_binding = dict(binding.page_map or {})
-        remote_keys = {str(item.get("stable_key")) for item in pages_payload if item.get("stable_key")}
+        remote_keys = {str(item.get("stable_key") or item["source_id"]) for item in pages_payload}
         for stale_key in sorted(set(next_page_binding) - remote_keys):
             warnings.append({"code": "remote_page_missing", "remotePageKey": stale_key})
         bound_page_ids = {int(page_id) for page_id in next_page_binding.values()}
@@ -1354,15 +1534,95 @@ class SitePackageImporter:
         next_fingerprints = dict(binding.version_fingerprints or {})
         next_version_binding = dict(binding.version_map or {})
         new_versions = []
+        publication_dates = {}
+        preserve_publication = options.get("preserve_publication_status", True)
 
         for page_data in pages_payload:
             page = page_map[page_data["source_id"]]
             stable_key = str(page_data.get("stable_key") or page_data["source_id"])
-            known = set(next_fingerprints.get(stable_key, []))
+            stored_fingerprints = next_fingerprints.get(stable_key, {})
+            current_fingerprints = dict(stored_fingerprints) if isinstance(stored_fingerprints, dict) else {}
+            legacy_fingerprints = set(stored_fingerprints) if isinstance(stored_fingerprints, list) else set()
             for version_data in page_data.get("versions", []):
-                fingerprint = _version_fingerprint(version_data)
-                if fingerprint in known:
-                    continue
+                source_version_key = str(version_data["source_id"])
+                fingerprint = _version_sync_fingerprint(
+                    version_data,
+                    self.theme_source_fingerprints,
+                    self.media_source_metadata,
+                    page_reference_map,
+                )
+                bound_version = PageVersion.objects.filter(
+                    id=next_version_binding.get(source_version_key),
+                    page=page,
+                ).first()
+                mapped_theme = theme_map.get(version_data.get("theme_source_id"))
+                content_unchanged = bool(
+                    bound_version
+                    and current_fingerprints.get(source_version_key) == fingerprint
+                    and bound_version.theme_id == (mapped_theme.id if mapped_theme else None)
+                )
+                if source_version_key not in current_fingerprints and legacy_fingerprints and bound_version:
+                    content_unchanged = bool(
+                        _version_fingerprint(version_data) in legacy_fingerprints
+                        and bound_version.theme_id == (mapped_theme.id if mapped_theme else None)
+                    )
+                elif source_version_key not in current_fingerprints and legacy_fingerprints and mapped_theme is None:
+                    content_unchanged = _version_fingerprint(version_data) in legacy_fingerprints
+                desired_effective_date = (
+                    self._parse_datetime(version_data.get("effective_date")) if preserve_publication else None
+                )
+                desired_expiry_date = (
+                    self._parse_datetime(version_data.get("expiry_date")) if preserve_publication else None
+                )
+                if content_unchanged:
+                    publication_changed = bool(
+                        preserve_publication
+                        and bound_version
+                        and (
+                            bound_version.effective_date != desired_effective_date
+                            or bound_version.expiry_date != desired_expiry_date
+                        )
+                    )
+                    if not publication_changed:
+                        current_fingerprints[source_version_key] = fingerprint
+                        continue
+                    now = timezone.now()
+                    if bound_version.effective_date is None or bound_version.effective_date > now:
+                        bound_version.effective_date = desired_effective_date
+                        bound_version.expiry_date = desired_expiry_date
+                        bound_version.save(update_fields=["effective_date", "expiry_date", "updated_at"])
+                        current_fingerprints[source_version_key] = fingerprint
+                        continue
+                    if bound_version.effective_date == desired_effective_date:
+                        bound_version.expiry_date = desired_expiry_date
+                        bound_version.save(update_fields=["expiry_date", "updated_at"])
+                        current_fingerprints[source_version_key] = fingerprint
+                        continue
+                    replacement_cutoff = (
+                        desired_effective_date if desired_effective_date and desired_effective_date > now else now
+                    )
+                    if bound_version.expiry_date:
+                        replacement_cutoff = min(bound_version.expiry_date, replacement_cutoff)
+                    bound_version.expiry_date = replacement_cutoff
+                    bound_version.save(update_fields=["expiry_date", "updated_at"])
+                elif preserve_publication and bound_version and bound_version.effective_date is not None:
+                    now = timezone.now()
+                    replacement_cutoff = (
+                        desired_effective_date if desired_effective_date and desired_effective_date > now else now
+                    )
+                    if bound_version.expiry_date:
+                        replacement_cutoff = min(bound_version.expiry_date, replacement_cutoff)
+                    bound_version.expiry_date = replacement_cutoff
+                    bound_version.save(update_fields=["expiry_date", "updated_at"])
+                elif preserve_publication and desired_effective_date is not None:
+                    now = timezone.now()
+                    replacement_cutoff = desired_effective_date if desired_effective_date > now else now
+                    superseded_version = page.get_current_published_version(now=replacement_cutoff)
+                    if superseded_version:
+                        if superseded_version.expiry_date:
+                            replacement_cutoff = min(superseded_version.expiry_date, replacement_cutoff)
+                        superseded_version.expiry_date = replacement_cutoff
+                        superseded_version.save(update_fields=["expiry_date", "updated_at"])
                 latest_number = page.versions.aggregate(maximum=models.Max("version_number"))["maximum"] or 0
                 version = PageVersion.objects.create(
                     page=page,
@@ -1389,9 +1649,13 @@ class SitePackageImporter:
                 )
                 self._restore_page_tags(version, version_data)
                 new_versions.append(version)
-                next_version_binding[str(version_data["source_id"])] = version.id
-                known.add(fingerprint)
-            next_fingerprints[stable_key] = sorted(known)
+                publication_dates[version.id] = (
+                    desired_effective_date,
+                    desired_expiry_date,
+                )
+                next_version_binding[source_version_key] = version.id
+                current_fingerprints[source_version_key] = fingerprint
+            next_fingerprints[stable_key] = current_fingerprints
 
         for version in new_versions:
             version.page_data = _remap_structured_references(
@@ -1409,11 +1673,16 @@ class SitePackageImporter:
                 media_map=media_reference_map,
             )
             version.save(update_fields=["page_data", "widgets", "updated_at"])
+            effective_date, expiry_date = publication_dates[version.id]
+            if effective_date or expiry_date:
+                version.effective_date = effective_date
+                version.expiry_date = expiry_date
+                version.save(update_fields=["effective_date", "expiry_date", "updated_at"])
 
         binding.page_map = next_page_binding
         binding.version_map = next_version_binding
         binding.version_fingerprints = next_fingerprints
-        binding.last_remote_exported_at = parse_datetime(manifest.get("exported_at"))
+        binding.last_remote_exported_at = self._parse_datetime(manifest.get("exported_at"))
         binding.last_synced_at = timezone.now()
         binding.save()
         progress = {
@@ -1425,6 +1694,7 @@ class SitePackageImporter:
         if isinstance(binding, _StoredSitePackageBinding):
             progress["binding"] = {
                 "source_root_key": str(options.get("source_root_key") or ""),
+                "source_package_hash": options.get("source_package_hash", ""),
                 "local_root_id": binding.local_root_id,
                 "page_map": binding.page_map,
                 "theme_map": binding.theme_map,
@@ -1434,6 +1704,8 @@ class SitePackageImporter:
         else:
             progress["binding_id"] = str(binding.id)
         self.job.progress = progress
+        self.job.imported_root_page = binding.local_root
+        self.job.save(update_fields=["progress", "imported_root_page", "updated_at"])
         return binding.local_root
 
     def _resolve_update_binding(self, tenant, pages_payload):
@@ -1468,9 +1740,25 @@ class SitePackageImporter:
         if local_root is None:
             raise ValueError("The selected existing site is no longer available.")
 
-        previous = None
+        identity = {
+            "stable_key": options.get("source_root_key"),
+            "package_hash": options.get("source_package_hash"),
+        }
+        previous = next(
+            (
+                candidate
+                for candidate in SitePackageJob.objects.filter(
+                    kind=SitePackageJob.KIND_IMPORT,
+                    imported_root_page=local_root,
+                )
+                .exclude(id=self.job.id)
+                .order_by("-updated_at")[:25]
+                if (candidate.progress or {}).get("binding") and _job_matches_site_package_identity(candidate, identity)
+            ),
+            None,
+        )
         binding_job_id = options.get("source_binding_job_id")
-        if binding_job_id:
+        if previous is None and binding_job_id:
             previous = SitePackageJob.objects.filter(
                 id=binding_job_id,
                 imported_root_page=local_root,
@@ -1487,8 +1775,22 @@ class SitePackageImporter:
             legacy_map = (previous.progress or {}).get("object_maps", {}).get("pages", {}) if previous else {}
             for data in pages_payload:
                 local_id = legacy_map.get(str(data.get("source_id")))
-                if local_id and data.get("stable_key"):
-                    binding.page_map[str(data["stable_key"])] = local_id
+                if local_id:
+                    binding.page_map[str(data.get("stable_key") or data["source_id"])] = local_id
+            for data in pages_payload:
+                key = str(data.get("stable_key") or data["source_id"])
+                local_id = binding.page_map.get(key)
+                if not local_id:
+                    continue
+                local_versions = list(PageVersion.objects.filter(page_id=local_id).order_by("version_number"))
+                fingerprints_by_id = {
+                    _version_fingerprint(_serialize_version(version)): version.id for version in local_versions
+                }
+                binding.version_fingerprints[key] = sorted(fingerprints_by_id)
+                for version_data in data.get("versions", []):
+                    local_version_id = fingerprints_by_id.get(_version_fingerprint(version_data))
+                    if local_version_id:
+                        binding.version_map[str(version_data["source_id"])] = local_version_id
         return binding
 
     def _parse_datetime(self, value):
@@ -1521,12 +1823,14 @@ class SitePackageImporter:
         theme_files = [name for name in package.namelist() if name.startswith("themes/") and name.endswith(".json")]
         for theme_file in theme_files:
             data = json.loads(package.read(theme_file).decode("utf-8"))
+            fingerprint = data.get("content_fingerprint") or _payload_fingerprint(data)
             theme = self._create_theme(package, data)
             theme_map[data["source_id"]] = theme
+            self.theme_source_fingerprints[str(data["source_id"])] = fingerprint
             if data.get("stable_key"):
                 self.theme_stable_map[str(data["stable_key"])] = {
                     "id": theme.id,
-                    "fingerprint": data.get("content_fingerprint") or _payload_fingerprint(data),
+                    "fingerprint": fingerprint,
                 }
         return theme_map
 
@@ -1564,12 +1868,43 @@ class SitePackageImporter:
             data = json.loads(package.read(theme_file).decode("utf-8"))
             stable_key = str(data.get("stable_key") or data["source_id"])
             fingerprint = data.get("content_fingerprint") or _payload_fingerprint(data)
+            self.theme_source_fingerprints[str(data["source_id"])] = fingerprint
             stored = next_binding_map.get(stable_key) or {}
             if isinstance(stored, int):
                 stored = {"id": stored}
             theme = None
             if stored.get("fingerprint") == fingerprint:
                 theme = PageTheme.objects.filter(id=stored.get("id"), tenant=self._destination_tenant()).first()
+            if theme is None and data.get("stable_key"):
+                existing_theme = PageTheme.objects.filter(
+                    tenant=self._destination_tenant(),
+                    stable_key=data["stable_key"],
+                ).first()
+                if existing_theme:
+                    existing_metadata = _serialize_theme(existing_theme)
+                    existing_metadata.pop("content_fingerprint", None)
+                    existing_assets = []
+                    for path in sorted(_theme_asset_paths(existing_theme)):
+                        file_obj = None
+                        try:
+                            file_obj = self.storage._open(path, "rb")
+                            digest = hashlib.sha256()
+                            while True:
+                                chunk = file_obj.read(1024 * 1024)
+                                if not chunk:
+                                    break
+                                digest.update(chunk)
+                            existing_assets.append({"path": path, "sha256": digest.hexdigest()})
+                        except Exception:
+                            continue
+                        finally:
+                            if file_obj:
+                                file_obj.close()
+                    existing_fingerprint = _payload_fingerprint(
+                        {"metadata": existing_metadata, "assets": existing_assets}
+                    )
+                    if existing_fingerprint == fingerprint:
+                        theme = existing_theme
             if theme is None:
                 theme = self._create_theme(package, data)
             next_binding_map[stable_key] = {"id": theme.id, "fingerprint": fingerprint}
@@ -1666,12 +2001,23 @@ class SitePackageImporter:
             if existing:
                 if existing.is_deleted:
                     file_member = self._find_media_file_member(package, data["source_id"])
-                    if file_member:
-                        self.storage._save(existing.file_path, ContentFile(package.read(file_member)))
+                    if not file_member:
+                        continue
+                    verified_file = self._verified_media_file(package, file_member, data["file_hash"])
+                    try:
+                        restored_path = self.storage._save(
+                            existing.file_path,
+                            verified_file,
+                        )
+                    finally:
+                        verified_file.close()
+                    if restored_path != existing.file_path:
+                        existing.file_path = restored_path
+                        existing.file_url = self.storage.url(restored_path)
                     existing.is_deleted = False
                     existing.deleted_at = None
                     existing.deleted_by = None
-                    existing.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+                    existing.save(update_fields=["file_path", "file_url", "is_deleted", "deleted_at", "deleted_by"])
                 media_map[data["source_id"]] = existing
                 self._restore_media_relations(existing, data, namespace)
                 continue
@@ -1679,11 +2025,14 @@ class SitePackageImporter:
             file_member = self._find_media_file_member(package, data["source_id"])
             if not file_member:
                 continue
-            content = package.read(file_member)
             extension = os.path.splitext(data.get("original_filename", ""))[1]
             destination_id = uuid.uuid4()
             new_path = f"{namespace.slug}/site-packages/{destination_id}{extension}"
-            self.storage._save(new_path, ContentFile(content))
+            verified_file = self._verified_media_file(package, file_member, data["file_hash"])
+            try:
+                self.storage._save(new_path, verified_file)
+            finally:
+                verified_file.close()
             media = MediaFile.objects.create(
                 id=destination_id,
                 title=data.get("title") or data.get("original_filename", "Imported media"),
@@ -1692,7 +2041,7 @@ class SitePackageImporter:
                 original_filename=data.get("original_filename", os.path.basename(new_path)),
                 file_path=new_path,
                 file_url=self.storage.url(new_path),
-                file_size=data.get("file_size") or len(content),
+                file_size=data.get("file_size") or package.getinfo(file_member).file_size,
                 content_type=data.get("content_type")
                 or mimetypes.guess_type(new_path)[0]
                 or "application/octet-stream",
@@ -1715,6 +2064,25 @@ class SitePackageImporter:
             media_map[data["source_id"]] = media
             self._restore_media_relations(media, data, namespace)
         return media_map
+
+    def _verified_media_file(self, package, file_member, expected_hash):
+        content = tempfile.SpooledTemporaryFile(max_size=25 * 1024 * 1024)
+        digest = hashlib.sha256()
+        try:
+            with package.open(file_member, "r") as source_file:
+                while True:
+                    chunk = source_file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    digest.update(chunk)
+                    content.write(chunk)
+            if digest.hexdigest() != expected_hash:
+                raise ValueError("A packaged media file does not match its SHA-256 hash.")
+            content.seek(0)
+            return File(content, name=os.path.basename(file_member))
+        except Exception:
+            content.close()
+            raise
 
     def _restore_media_relations(self, media: MediaFile, data: Dict[str, Any], namespace: Namespace):
         legacy_tags = [self._get_or_create_media_tag(item, namespace) for item in data.get("tags", [])]
