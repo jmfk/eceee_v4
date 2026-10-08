@@ -69,10 +69,9 @@ describe('direct render URL', () => {
     })
 
     it('loads the exact published version selected by the Designer', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => '' }))
         clientApi.get
             .mockResolvedValueOnce({ data: { id: 42, cachedRootHostnames: ['conference.example'] } })
-            .mockResolvedValueOnce({ data: { id: 9, codeLayout: 'main_layout', widgets: {}, effectiveTheme: { id: 5, updatedAt: '2026-09-27T10:00:00Z' } } })
+            .mockResolvedValueOnce({ data: { id: 9, codeLayout: 'main_layout', widgets: {}, effectiveTheme: { id: 5, colors: { brand: '#123456' } } } })
             .mockResolvedValueOnce({ data: { slots: {} } })
 
         const model = await loadResolvedRenderModel({
@@ -84,7 +83,7 @@ describe('direct render URL', () => {
         })
 
         expect(clientApi.get.mock.calls[1][0]).toContain('/pages/42/versions/9/')
-        expect(fetch).toHaveBeenCalledWith('/api/v1/webpages/themes/5/styles.css?v=1790503200000', expect.any(Object))
+        expect(model.themeCss).toContain('--brand: #123456')
         expect(model.context).toMatchObject({ tenantId: 'theme-tenant', siteId: 12, pageId: 42, versionId: 9 })
     })
 

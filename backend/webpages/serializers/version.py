@@ -236,8 +236,12 @@ class PageVersionSerializer(serializers.ModelSerializer):
         """Resolve inheritance for this version, independent of the live version."""
         if obj.theme:
             return obj.theme
-        if obj.page.parent_id:
-            return obj.page.parent.get_effective_theme()
+        current = obj.page.parent
+        while current:
+            parent_version = current.get_latest_version()
+            if parent_version and parent_version.theme:
+                return parent_version.theme
+            current = current.parent
         return PageTheme.get_default_theme(tenant=obj.page.tenant)
 
     def get_theme_inheritance_info(self, obj):
@@ -252,7 +256,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
         # Find which parent it came from
         current = obj.page.parent
         while current:
-            current_version = current.get_current_published_version()
+            current_version = current.get_latest_version()
             if current_version and current_version.theme:
                 return {
                     "source": "inherited",

@@ -6,7 +6,8 @@ import PreviewSizeManager from './PreviewSizeManager';
 import { resolvePagePreviewModel } from './resolvePagePreviewModel';
 import RenderFrame from '../rendering/RenderFrame';
 import { createPageRenderModel } from '../rendering/adapters';
-import { googleFontsStylesheetUrl, themeStylesheetUrl } from '../rendering/primitives';
+import { googleFontsStylesheetUrl } from '../rendering/primitives';
+import { buildThemeCSS } from '../utils/editorThemeCSS';
 import type { RenderPageModel } from '../rendering/types';
 
 interface PreviewSize {
@@ -54,7 +55,6 @@ const PagePreview: React.FC<PagePreviewProps> = ({
     const [isManaging, setIsManaging] = useState(false);
     const [iframeKey, setIframeKey] = useState(0);
     const [refreshGeneration, setRefreshGeneration] = useState(0);
-    const [themeCss, setThemeCss] = useState('');
     const [resolvedModel, setResolvedModel] = useState<RenderPageModel | null>(null);
 
     // Fetch preview sizes from backend
@@ -108,21 +108,15 @@ const PagePreview: React.FC<PagePreviewProps> = ({
     const effectiveTheme = pageVersionData?.effectiveTheme
         || (typeof pageVersionData?.theme === 'object' ? pageVersionData.theme : null)
         || webpageData?.effectiveTheme;
-    const themeId = effectiveTheme?.id
-        || pageVersionData?.theme?.id
-        || pageVersionData?.theme
-        || webpageData?.effectiveTheme?.id;
-    const themeUpdatedAt = effectiveTheme?.updatedAt || effectiveTheme?.updated_at;
-
-    useEffect(() => {
-        if (!themeId) { setThemeCss(''); return; }
-        const controller = new AbortController();
-        fetch(themeStylesheetUrl(themeId, effectiveTheme), { credentials: 'same-origin', signal: controller.signal })
-            .then((response) => response.ok ? response.text() : '')
-            .then(setThemeCss)
-            .catch((error) => { if (error.name !== 'AbortError') setThemeCss(''); });
-        return () => controller.abort();
-    }, [themeId, themeUpdatedAt]);
+    const themeCss = useMemo(() => buildThemeCSS({
+        theme: effectiveTheme,
+        pageCssVariables: webpageData?.pageCssVariables ?? webpageData?.page_css_variables
+            ?? pageVersionData?.pageCssVariables ?? pageVersionData?.page_css_variables,
+        pageCustomCss: webpageData?.pageCustomCss ?? webpageData?.page_custom_css
+            ?? pageVersionData?.pageCustomCss ?? pageVersionData?.page_custom_css,
+        enableCssInjection: webpageData?.enableCssInjection ?? webpageData?.enable_css_injection
+            ?? pageVersionData?.enableCssInjection ?? pageVersionData?.enable_css_injection ?? true,
+    }), [effectiveTheme, webpageData, pageVersionData]);
 
     const layoutName = layoutData?.layout?.name || layoutData?.name || pageVersionData?.codeLayout || 'main_layout';
     const renderModel = useMemo(() => createPageRenderModel({

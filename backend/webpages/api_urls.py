@@ -57,7 +57,6 @@ from .views.designer_theme_views import (
     DesignerThemePreviewObjectView,
     DesignerThemePreviewPageView,
     DesignerThemePreviewSiteView,
-    DesignerThemePreviewView,
     DesignerThemePublishView,
     DesignerThemeRestoreView,
     DesignerThemeUndoView,
@@ -190,7 +189,6 @@ urlpatterns = [
         DesignerThemeWorkspaceView.as_view(),
         name="designer-theme-workspace",
     ),
-    path("designer/themes/<int:theme_id>/preview/", DesignerThemePreviewView.as_view(), name="designer-theme-preview"),
     path(
         "designer/themes/<int:theme_id>/preview-content/",
         DesignerThemePreviewContentView.as_view(),

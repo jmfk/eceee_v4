@@ -29,6 +29,11 @@ const previewViews = [
 
 const workspace = {
     id: 7, name: 'Editorial', description: 'Theme for editorial sites', syncVersion: 4, liveSyncVersion: 4, draftVersion: 2, hasDraftChanges: false,
+    themeConfig: {
+        colors: { brand: '#000000' },
+        fonts: { googleFonts: [{ family: 'Roboto', variants: ['400'] }] },
+        designGroups: { groups: [{ name: 'Article', widgetTypes: ['easy_widgets.ContentWidget'], elements: { h1: {} }, layoutProperties: { 'content-widget': { md: {} } } }] },
+    },
     colors: [{ name: 'brand', value: '#123456', usage: ['Article / h1'] }],
     fonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap', usage: ['Article / h1'] }],
     typography: [{ targetId: 'group:0:element:h1', groupIndex: 0, groupName: 'Article', element: 'h1', values: { fontFamily: 'Inter', fontSize: '32px' } }],
@@ -156,7 +161,6 @@ describe('DesignerThemeWorkspacePage', () => {
         vi.clearAllMocks()
         mocks.workspace.mockResolvedValue(structuredClone(workspace))
         document.documentElement.lang = 'en'
-        mocks.preview.mockResolvedValue({ css: '.designer-preview{color:#123456}', fontUrl: 'https://fonts.googleapis.com/css2?family=Inter' })
         mocks.save.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 3, hasDraftChanges: true })
         mocks.publish.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4 })
         mocks.undo.mockResolvedValue({ ...structuredClone(workspace), liveSyncVersion: 5, draftVersion: 4, canUndo: false })
@@ -1460,7 +1464,7 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         await selectHeading()
         fireEvent.change(screen.getByDisplayValue('32px'), { target: { value: '40px' } })
-        await waitFor(() => expect(mocks.preview).toHaveBeenLastCalledWith('7', expect.objectContaining({ typography: expect.any(Array) })), { timeout: 1500 })
+        expect(mocks.preview).not.toHaveBeenCalled()
         fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
         await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
         expect(Object.keys(mocks.save.mock.calls[0][1]).sort()).toEqual(['colors', 'description', 'draftVersion', 'fonts', 'name', 'spacing', 'typography'])

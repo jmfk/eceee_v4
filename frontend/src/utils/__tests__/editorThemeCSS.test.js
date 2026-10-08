@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PUBLIC_RENDER_CSS } from '../../rendering/publicRenderCss'
-import { buildEditorThemeCSS, compileEditorCSS } from '../editorThemeCSS'
+import { buildDesignerTheme, buildEditorThemeCSS, buildThemeCSS, compileEditorCSS } from '../editorThemeCSS'
 
 const testDir = dirname(fileURLToPath(import.meta.url))
 const frontendRoot = resolve(testDir, '../../..')
@@ -207,5 +207,55 @@ describe('buildEditorThemeCSS', () => {
         expect(result).toContain('.slot-main > .widget-type-easy-widgets-contentwidget h1')
         expect(result).toContain('.slot-sidebar > .widget-type-easy-widgets-bannerwidget h2')
         expect(result).toContain('.widget-type-easy-widgets-legacywidget p')
+    })
+})
+
+describe('shared TypeScript theme CSS', () => {
+    it('builds an unscoped stylesheet for iframe and standalone rendering', () => {
+        const result = buildThemeCSS({ theme: { colors: { brand: '#123456' }, customCss: 'body { color: var(--brand); }' } })
+
+        expect(result).toContain(':root {\n  --brand: #123456;')
+        expect(result).toContain('body { color: var(--brand); }')
+        expect(result).not.toContain('@scope')
+    })
+
+    it('applies unsaved Designer values to the full theme configuration', () => {
+        const theme = buildDesignerTheme({
+            themeConfig: {
+                colors: { brand: '#000000' },
+                fonts: { googleFonts: [{ family: 'Roboto' }] },
+                designGroups: { groups: [{ elements: { h1: { fontSize: '20px' } }, layoutProperties: { main: { md: { padding: '8px' } } } }] },
+            },
+            colors: [{ name: 'brand', value: '#123456' }],
+            fonts: [{ family: 'Inter', variants: ['400'], display: 'swap', usage: [] }],
+            typography: [{ groupIndex: 0, element: 'h1', values: { fontSize: '40px' } }],
+            spacing: [{ scope: 'layout', groupIndex: 0, part: 'main', breakpoint: 'md', values: { padding: '24px' } }],
+            breakpoints: { md: 800 },
+        })
+
+        expect(theme.colors.brand).toBe('#123456')
+        expect(theme.fonts.googleFonts).toEqual([{ family: 'Inter', variants: ['400'], display: 'swap' }])
+        expect(theme.designGroups.groups[0].elements.h1.fontSize).toBe('40px')
+        expect(theme.designGroups.groups[0].layoutProperties.main.md.padding).toBe('24px')
+        expect(theme.breakpoints.md).toBe(800)
+    })
+
+    it('preserves the theme image density without backend image rendering', () => {
+        const result = buildThemeCSS({
+            theme: {
+                designGroups: {
+                    groups: [{
+                        widgetTypes: ['easy_widgets.HeaderWidget'],
+                        layoutProperties: {
+                            'header-widget': {
+                                xs: { backgroundImage: { url: 'https://images.test/header.png', dpr: 2 } },
+                            },
+                        },
+                    }],
+                },
+            },
+        })
+
+        expect(result).toContain("background-image: image-set(url('https://images.test/header.png') 2x)")
     })
 })

@@ -5,7 +5,8 @@ import { buildPathVariablesContext } from '../utils/pathParser'
 import { transformInheritanceData } from '../utils/widgetMerging'
 import { resolvePagePreviewModel } from '../components/resolvePagePreviewModel'
 import { createPageRenderModel } from './adapters'
-import { googleFontsStylesheetUrl, themeStylesheetUrl } from './primitives'
+import { buildThemeCSS } from '../utils/editorThemeCSS'
+import { googleFontsStylesheetUrl } from './primitives'
 import type { RenderPageModel } from './types'
 
 export interface DirectRenderLocation {
@@ -83,21 +84,18 @@ export const loadResolvedRenderModel = async (resolved: ResolvedRenderLocation):
     ])
     const page = pageResponse.data
     const version = versionResponse.data
-    const themeId = version?.effectiveTheme?.id
-        || version?.theme?.id
-        || version?.theme
-        || page?.effectiveTheme?.id
     const theme = version?.effectiveTheme
         || (typeof version?.theme === 'object' ? version.theme : null)
         || page?.effectiveTheme
-    let themeCss = ''
-    if (themeId) {
-        const response = await fetch(themeStylesheetUrl(themeId, theme), {
-            credentials: 'same-origin',
-            headers: { 'X-Tenant-ID': tenantId },
-        })
-        if (response.ok) themeCss = await response.text()
-    }
+    const themeCss = buildThemeCSS({
+        theme,
+        pageCssVariables: page?.pageCssVariables ?? page?.page_css_variables
+            ?? version?.pageCssVariables ?? version?.page_css_variables,
+        pageCustomCss: page?.pageCustomCss ?? page?.page_custom_css
+            ?? version?.pageCustomCss ?? version?.page_custom_css,
+        enableCssInjection: page?.enableCssInjection ?? page?.enable_css_injection
+            ?? version?.enableCssInjection ?? version?.enable_css_injection ?? true,
+    })
     return buildResolvedRenderModel({
         resolved,
         page,

@@ -28,12 +28,10 @@ from webpages.models import (
     ThemeVersion,
     WebPage,
 )
-from webpages.services import ThemeCSSGenerator
 from webpages.services.designer_export import designer_export_filename, designer_export_object_key
 from webpages.services.designer_theme import (
     MAX_IMAGE_PIXELS,
     DesignerDraftConflict,
-    apply_designer_patch,
     build_draft_workspace,
     delete_designer_preview_view,
     designer_preview_layout,
@@ -49,7 +47,6 @@ from webpages.services.designer_theme import (
     replace_designer_preview_image,
     save_designer_draft,
     save_designer_preview_texts,
-    theme_from_designer_draft,
     undo_designer_publish,
     user_can_design_theme,
 )
@@ -698,25 +695,6 @@ class DesignerThemeWorkspaceView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
         return Response(_draft_workspace(request, theme, draft))
-
-
-class DesignerThemePreviewView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [DesignerJSONParser]
-
-    def post(self, request, theme_id):
-        theme = _theme(request, theme_id)
-        stored_draft = get_or_create_designer_draft(theme, request.user)
-        preview_theme = theme_from_designer_draft(theme, stored_draft)
-        patch = {key: value for key, value in request.data.items() if key != "draft_version"}
-        apply_designer_patch(preview_theme, patch, validate_version=False)
-        css = ThemeCSSGenerator().generate_complete_css(preview_theme)
-        return Response(
-            {
-                "css": css,
-                "fontUrl": preview_theme.get_google_fonts_url(),
-            }
-        )
 
 
 class DesignerThemePublishView(APIView):

@@ -35,7 +35,7 @@ export const useThemeData = ({ pageId = null, enabled = true } = {}) => {
         return version?.effectiveTheme || (version?.theme ? state.themes[version.theme] : null)
     }, [udcContext])
 
-    const theme = pageData?.effectiveTheme || udcTheme
+    const theme = udcTheme || pageData?.effectiveTheme
     return {
         theme,
         currentTheme: theme,
