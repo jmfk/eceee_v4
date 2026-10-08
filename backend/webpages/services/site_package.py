@@ -639,6 +639,107 @@ def _unique_page_slug(parent: Optional[WebPage], tenant, slug: str) -> str:
     return candidate
 
 
+def _unique_clone_title(tenant, title: str) -> str:
+    base = (title or "Imported site").strip()
+    candidate = f"{base} (clone)"
+    counter = 2
+    roots = WebPage.objects.filter(tenant=tenant, parent__isnull=True, is_deleted=False)
+    while roots.filter(title=candidate).exists():
+        candidate = f"{base} (clone {counter})"
+        counter += 1
+    return candidate
+
+
+def inspect_site_package_upload(upload) -> Dict[str, Any]:
+    """Read the source identity without consuming the uploaded ZIP stream."""
+    position = upload.tell()
+    try:
+        with zipfile.ZipFile(upload, "r") as package:
+            manifest = json.loads(package.read("manifest.json").decode("utf-8"))
+            pages = json.loads(package.read("pages.json").decode("utf-8")).get("pages", [])
+    except (KeyError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
+        raise ValueError("The selected file is not a valid site package ZIP.") from exc
+    finally:
+        upload.seek(position)
+
+    if manifest.get("package_version") not in SUPPORTED_PACKAGE_VERSIONS or not pages:
+        raise ValueError("The selected file is not a supported site package.")
+    root = next((item for item in pages if item.get("parent_source_id") is None), pages[0])
+    source = manifest.get("source") or {}
+    return {
+        "stable_key": str(source.get("root_stable_key") or root.get("stable_key") or ""),
+        "source_id": str(root.get("source_id")),
+        "title": source.get("root_title") or root.get("title") or "Imported site",
+        "slug": source.get("root_slug") or root.get("slug") or "imported-site",
+    }
+
+
+def find_site_package_conflicts(tenant, identity: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Return active roots that represent the same source site."""
+    matches = {}
+    stable_key = identity.get("stable_key")
+    if stable_key:
+        for root in WebPage.objects.filter(
+            tenant=tenant,
+            stable_key=stable_key,
+            parent__isnull=True,
+            is_deleted=False,
+        ):
+            matches[root.id] = {"root": root, "binding_job_id": None}
+
+    jobs = (
+        SitePackageJob.objects.filter(
+            kind=SitePackageJob.KIND_IMPORT,
+            status=SitePackageJob.STATUS_COMPLETED,
+            options__tenant_id=str(tenant.id),
+            imported_root_page__tenant=tenant,
+            imported_root_page__parent__isnull=True,
+            imported_root_page__is_deleted=False,
+        )
+        .select_related("imported_root_page")
+        .order_by("-updated_at")
+    )
+    source_id = identity.get("source_id")
+    for job in jobs:
+        options = job.options or {}
+        object_map = (job.progress or {}).get("object_maps", {}).get("pages", {})
+        same_source = bool(stable_key and options.get("source_root_key") == stable_key)
+        same_legacy_source = bool(source_id and str(object_map.get(str(source_id))) == str(job.imported_root_page_id))
+        if same_source or same_legacy_source:
+            matches.setdefault(
+                job.imported_root_page_id,
+                {"root": job.imported_root_page, "binding_job_id": str(job.id)},
+            )
+
+    return [
+        {
+            "id": item["root"].id,
+            "title": item["root"].title,
+            "slug": item["root"].slug,
+            "binding_job_id": item["binding_job_id"],
+        }
+        for item in matches.values()
+    ]
+
+
+class _StoredSitePackageBinding:
+    """Binding-shaped state persisted in a ZIP import job's progress JSON."""
+
+    def __init__(self, local_root, state=None):
+        state = state or {}
+        self.local_root = local_root
+        self.local_root_id = local_root.id
+        self.page_map = dict(state.get("page_map") or {})
+        self.theme_map = dict(state.get("theme_map") or {})
+        self.version_map = dict(state.get("version_map") or {})
+        self.version_fingerprints = dict(state.get("version_fingerprints") or {})
+        self.last_remote_exported_at = None
+        self.last_synced_at = None
+
+    def save(self):
+        return None
+
+
 class SitePackageExporter:
     """Builds site ZIP packages for a root page tree."""
 
@@ -983,10 +1084,13 @@ class SitePackageImporter:
             source_id = page_data["source_id"]
             parent_source_id = page_data["parent_source_id"]
             parent = page_map.get(parent_source_id) if parent_source_id else None
+            title = page_data.get("title", "")
+            if parent is None and options.get("mode") == "clone":
+                title = _unique_clone_title(tenant, title)
             page = WebPage.objects.create(
                 parent=parent,
                 sort_order=page_data.get("sort_order", 0),
-                title=page_data.get("title", ""),
+                title=title,
                 description=page_data.get("description", ""),
                 slug=_unique_page_slug(parent, tenant, page_data.get("slug")),
                 hostnames=[] if not parent else page_data.get("hostnames", []),
@@ -1118,7 +1222,7 @@ class SitePackageImporter:
         options = self.job.options or {}
         connection_id = options.get("connection_id")
         remote_root_key = options.get("remote_site_key") or manifest.get("source", {}).get("root_stable_key")
-        if not connection_id or not remote_root_key:
+        if not remote_root_key:
             return
         page_stable_map = {
             str(data.get("stable_key")): page_map[data["source_id"]].id
@@ -1131,6 +1235,19 @@ class SitePackageImporter:
             if key:
                 fingerprints[key] = [_version_fingerprint(item) for item in page_data.get("versions", [])]
         root_data = next((item for item in pages_payload if item.get("parent_source_id") is None), pages_payload[0])
+        if not connection_id:
+            self.job.progress = {
+                **(self.job.progress or {}),
+                "binding": {
+                    "source_root_key": str(remote_root_key),
+                    "local_root_id": page_map[root_data["source_id"]].id,
+                    "page_map": page_stable_map,
+                    "theme_map": self.theme_stable_map,
+                    "version_map": {str(source_id): version.id for source_id, version in version_map.items()},
+                    "version_fingerprints": fingerprints,
+                },
+            }
+            return
         binding = RemoteSiteBinding.objects.create(
             tenant=self._destination_tenant(),
             connection_id=connection_id,
@@ -1148,22 +1265,8 @@ class SitePackageImporter:
     def _update_package(self, package: zipfile.ZipFile, manifest: Dict[str, Any]) -> WebPage:
         options = self.job.options or {}
         tenant = self._destination_tenant()
-        binding = (
-            RemoteSiteBinding.objects.select_for_update()
-            .filter(
-                tenant=tenant,
-                connection_id=options.get("connection_id"),
-                remote_root_key=options.get("remote_site_key"),
-                local_root_id=options.get("local_root_id"),
-                local_root__is_deleted=False,
-                local_root__parent__isnull=True,
-            )
-            .first()
-        )
-        if binding is None:
-            raise ValueError("The selected local site is not linked to this remote site.")
-
         pages_payload = json.loads(package.read("pages.json").decode("utf-8"))["pages"]
+        binding = self._resolve_update_binding(tenant, pages_payload)
         theme_map = self._import_themes_for_update(package, binding)
         media_map = self._import_media(package)
         replacements = self._build_replacements(media_map)
@@ -1313,14 +1416,80 @@ class SitePackageImporter:
         binding.last_remote_exported_at = parse_datetime(manifest.get("exported_at"))
         binding.last_synced_at = timezone.now()
         binding.save()
-        self.job.progress = {
+        progress = {
             **(self.job.progress or {}),
-            "binding_id": str(binding.id),
             "warnings": warnings,
             "updated_pages": len(page_map),
             "created_versions": len(new_versions),
         }
+        if isinstance(binding, _StoredSitePackageBinding):
+            progress["binding"] = {
+                "source_root_key": str(options.get("source_root_key") or ""),
+                "local_root_id": binding.local_root_id,
+                "page_map": binding.page_map,
+                "theme_map": binding.theme_map,
+                "version_map": binding.version_map,
+                "version_fingerprints": binding.version_fingerprints,
+            }
+        else:
+            progress["binding_id"] = str(binding.id)
+        self.job.progress = progress
         return binding.local_root
+
+    def _resolve_update_binding(self, tenant, pages_payload):
+        options = self.job.options or {}
+        if options.get("source") == "remote":
+            binding = (
+                RemoteSiteBinding.objects.select_for_update()
+                .filter(
+                    tenant=tenant,
+                    connection_id=options.get("connection_id"),
+                    remote_root_key=options.get("remote_site_key"),
+                    local_root_id=options.get("local_root_id"),
+                    local_root__is_deleted=False,
+                    local_root__parent__isnull=True,
+                )
+                .first()
+            )
+            if binding is None:
+                raise ValueError("The selected local site is not linked to this remote site.")
+            return binding
+
+        local_root = (
+            WebPage.objects.select_for_update()
+            .filter(
+                id=options.get("local_root_id"),
+                tenant=tenant,
+                parent__isnull=True,
+                is_deleted=False,
+            )
+            .first()
+        )
+        if local_root is None:
+            raise ValueError("The selected existing site is no longer available.")
+
+        previous = None
+        binding_job_id = options.get("source_binding_job_id")
+        if binding_job_id:
+            previous = SitePackageJob.objects.filter(
+                id=binding_job_id,
+                imported_root_page=local_root,
+                status=SitePackageJob.STATUS_COMPLETED,
+            ).first()
+        state = (previous.progress or {}).get("binding", {}) if previous else {}
+        binding = _StoredSitePackageBinding(local_root, state)
+        if not binding.page_map:
+            queue = [local_root]
+            while queue:
+                page = queue.pop(0)
+                queue.extend(page.children.filter(is_deleted=False))
+                binding.page_map[str(page.stable_key)] = page.id
+            legacy_map = (previous.progress or {}).get("object_maps", {}).get("pages", {}) if previous else {}
+            for data in pages_payload:
+                local_id = legacy_map.get(str(data.get("source_id")))
+                if local_id and data.get("stable_key"):
+                    binding.page_map[str(data["stable_key"])] = local_id
+        return binding
 
     def _parse_datetime(self, value):
         if not value:
@@ -1472,20 +1641,37 @@ class SitePackageImporter:
         media_map = {}
         for data in manifest.get("files", []):
             self.media_source_metadata[str(data["source_id"])] = data
-            existing = MediaFile.objects.filter(file_hash=data["file_hash"], tenant=namespace.tenant).first()
+            existing = (
+                MediaFile.objects.with_deleted().filter(file_hash=data["file_hash"], tenant=namespace.tenant).first()
+            )
             destination_hash = data["file_hash"]
             if (
                 existing is None
-                and MediaFile.objects.filter(file_hash=destination_hash).exclude(tenant=namespace.tenant).exists()
+                and MediaFile.objects.with_deleted()
+                .filter(file_hash=destination_hash)
+                .exclude(tenant=namespace.tenant)
+                .exists()
             ):
                 destination_hash = hashlib.sha256(
                     f"{data['file_hash']}:{namespace.tenant_id}".encode("utf-8")
                 ).hexdigest()
-                existing = MediaFile.objects.filter(
-                    file_hash=destination_hash,
-                    tenant=namespace.tenant,
-                ).first()
+                existing = (
+                    MediaFile.objects.with_deleted()
+                    .filter(
+                        file_hash=destination_hash,
+                        tenant=namespace.tenant,
+                    )
+                    .first()
+                )
             if existing:
+                if existing.is_deleted:
+                    file_member = self._find_media_file_member(package, data["source_id"])
+                    if file_member:
+                        self.storage._save(existing.file_path, ContentFile(package.read(file_member)))
+                    existing.is_deleted = False
+                    existing.deleted_at = None
+                    existing.deleted_by = None
+                    existing.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
                 media_map[data["source_id"]] = existing
                 self._restore_media_relations(existing, data, namespace)
                 continue

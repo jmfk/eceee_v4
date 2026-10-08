@@ -875,11 +875,21 @@ const TreePageManager = () => {
         }
     }, [addNotification, pollSitePackageJob, showError, upsertSitePackageJob])
 
-    const handleImportRootPackage = useCallback(async ({ file, preservePublicationStatus }) => {
+    const handleImportRootPackage = useCallback(async ({
+        file,
+        preservePublicationStatus,
+        mode = 'prompt',
+        existingRootId = null
+    }) => {
         addNotification(`Uploading "${file.name}"...`, 'info', 'site-import')
 
         try {
-            const job = await sitePackagesApi.createImport({ file, preservePublicationStatus })
+            const job = await sitePackagesApi.createImport({
+                file,
+                preservePublicationStatus,
+                mode,
+                existingRootId
+            })
             setShowSitePackageImportModal(false)
             upsertSitePackageJob({
                 ...job,
@@ -901,7 +911,12 @@ const TreePageManager = () => {
                     queryClient.removeQueries({ queryKey: ['pages'] })
                     queryClient.removeQueries({ queryKey: ['page-children'] })
                     await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
-                    addNotification('Site package imported as a new root', 'success', 'site-import')
+                    const message = mode === 'update'
+                        ? 'Existing site updated from package'
+                        : mode === 'clone'
+                            ? 'Site package imported as a cloned root'
+                            : 'Site package imported as a new root'
+                    addNotification(message, 'success', 'site-import')
                 }
             }).catch((error) => {
                 console.error('Failed to import root site package:', error)
@@ -915,6 +930,11 @@ const TreePageManager = () => {
                 addNotification(`Import failed: ${error.message}`, 'error', 'site-import')
             })
         } catch (error) {
+            const conflict = error.originalError?.response?.data
+            if (error.originalError?.response?.status === 409 && conflict?.code === 'site_already_exists') {
+                error.siteImportConflict = conflict
+                throw error
+            }
             console.error('Failed to start root site package import:', error)
             showError(error, 'error')
             addNotification('Failed to start site import', 'error', 'site-import')
@@ -1975,6 +1995,8 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
     const [loadingConnections, setLoadingConnections] = useState(false)
     const [loadingRemotes, setLoadingRemotes] = useState(false)
     const [hasLoadedRemoteSites, setHasLoadedRemoteSites] = useState(false)
+    const [zipConflict, setZipConflict] = useState(null)
+    const [existingRootId, setExistingRootId] = useState('')
 
     useEffect(() => {
         if (isOpen) {
@@ -1988,6 +2010,8 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
             setRemoteSites([])
             setLoadingConnections(true)
             setHasLoadedRemoteSites(false)
+            setZipConflict(null)
+            setExistingRootId('')
             designerThemesApi.remoteConnections()
                 .then((result) => {
                     const items = result.results || []
@@ -2001,8 +2025,7 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
 
     if (!isOpen) return null
 
-    const handleSubmit = async (event) => {
-        event.preventDefault()
+    const startZipImport = async (mode = 'prompt') => {
         if (!file) {
             setError('Choose a ZIP file to import.')
             return
@@ -2011,11 +2034,29 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
         setIsImporting(true)
         setError('')
         try {
-            await onImport({ file, preservePublicationStatus })
+            await onImport({
+                file,
+                preservePublicationStatus,
+                mode,
+                existingRootId: mode === 'update' ? Number(existingRootId) : null,
+            })
         } catch (importError) {
+            if (importError.siteImportConflict) {
+                const conflict = importError.siteImportConflict
+                setZipConflict(conflict)
+                setExistingRootId(String(conflict.existingSites?.[0]?.id || ''))
+                setError('')
+                setIsImporting(false)
+                return
+            }
             setError(importError.message || 'Failed to start import.')
             setIsImporting(false)
         }
+    }
+
+    const handleSubmit = async (event) => {
+        event.preventDefault()
+        await startZipImport('prompt')
     }
 
     const loadRemoteSites = async () => {
@@ -2170,7 +2211,11 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                             <input
                                 type="file"
                                 accept=".zip,application/zip,application/x-zip-compressed"
-                                onChange={(event) => setFile(event.target.files?.[0] || null)}
+                                onChange={(event) => {
+                                    setFile(event.target.files?.[0] || null)
+                                    setZipConflict(null)
+                                    setExistingRootId('')
+                                }}
                                 disabled={isImporting}
                                 className="block w-full text-sm text-gray-700 file:mr-3 file:px-3 file:py-2 file:border-0 file:rounded file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
                             />
@@ -2186,6 +2231,32 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                             />
                             <span>Preserve publication status</span>
                         </label>
+                        {zipConflict && (
+                            <div className="space-y-3 rounded border border-amber-200 bg-amber-50 p-4">
+                                <div>
+                                    <p className="font-medium text-amber-950">This site already exists</p>
+                                    <p className="mt-1 text-sm text-amber-900">{zipConflict.message}</p>
+                                </div>
+                                {zipConflict.existingSites?.length > 1 && (
+                                    <label className="block text-sm font-medium text-amber-950">
+                                        Existing site to update
+                                        <select
+                                            value={existingRootId}
+                                            onChange={(event) => setExistingRootId(event.target.value)}
+                                            disabled={isImporting}
+                                            className="mt-1 w-full rounded border border-amber-300 bg-white px-3 py-2 font-normal text-gray-900"
+                                        >
+                                            {zipConflict.existingSites.map((site) => (
+                                                <option key={site.id} value={site.id}>{site.title}</option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                )}
+                                <p className="text-xs text-amber-800">
+                                    Updating keeps the existing site root. A clone creates a separate root named with “(clone)”.
+                                </p>
+                            </div>
+                        )}
                         </form>}
                     </div>
 
@@ -2198,7 +2269,26 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                         >
                             Cancel
                         </button>
-                        {source === 'zip' && <button
+                        {source === 'zip' && zipConflict && <>
+                            <button
+                                type="button"
+                                onClick={() => startZipImport('clone')}
+                                disabled={isImporting}
+                                className="inline-flex items-center gap-2 rounded border border-blue-300 bg-white px-4 py-2 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                            >
+                                Create new clone
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => startZipImport('update')}
+                                disabled={isImporting || !existingRootId}
+                                className="inline-flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                {isImporting && <Loader2 className="h-4 w-4 animate-spin" />}
+                                Import over existing site
+                            </button>
+                        </>}
+                        {source === 'zip' && !zipConflict && <button
                             type="submit"
                             form="site-package-zip-form"
                             disabled={isImporting || !file}

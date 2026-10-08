@@ -252,6 +252,101 @@ describe('TreePageManager', () => {
         expect(await screen.findByText('No remote connections are configured. Add one in Designer themes first.')).toBeInTheDocument()
     })
 
+    it('asks whether an existing ZIP site should be updated or cloned', async () => {
+        api.post.mockRejectedValueOnce({
+            response: {
+                status: 409,
+                data: {
+                    code: 'site_already_exists',
+                    message: '“Summer Study” already exists. Choose how to import it.',
+                    existingSites: [{ id: 17, title: 'Summer Study', slug: 'summer-study' }],
+                },
+            },
+        })
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        fireEvent.click(screen.getByTestId('import-site-package-button'))
+        fireEvent.click(screen.getByRole('tab', { name: 'ZIP file' }))
+        fireEvent.change(screen.getByLabelText('Site package ZIP'), {
+            target: { files: [new File(['zip'], 'summer-study.zip', { type: 'application/zip' })] },
+        })
+        fireEvent.click(screen.getByRole('button', { name: 'Import Root' }))
+
+        expect(await screen.findByText('This site already exists')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Import over existing site' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Create new clone' })).toBeInTheDocument()
+    })
+
+    it('resubmits a conflicting ZIP import with the selected update mode', async () => {
+        api.post
+            .mockRejectedValueOnce({
+                response: {
+                    status: 409,
+                    data: {
+                        code: 'site_already_exists',
+                        message: '“Summer Study” already exists. Choose how to import it.',
+                        existingSites: [{ id: 17, title: 'Summer Study', slug: 'summer-study' }],
+                    },
+                },
+            })
+            .mockResolvedValueOnce({ data: { id: 'job-zip-update', kind: 'import', status: 'pending' } })
+        api.get.mockImplementation((url) => {
+            if (String(url).includes('/site-packages/imports/job-zip-update/')) {
+                return Promise.resolve({ data: { id: 'job-zip-update', kind: 'import', status: 'completed', progress: {} } })
+            }
+            return Promise.resolve({ data: [] })
+        })
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        fireEvent.click(screen.getByTestId('import-site-package-button'))
+        fireEvent.click(screen.getByRole('tab', { name: 'ZIP file' }))
+        fireEvent.change(screen.getByLabelText('Site package ZIP'), {
+            target: { files: [new File(['zip'], 'summer-study.zip', { type: 'application/zip' })] },
+        })
+        fireEvent.click(screen.getByRole('button', { name: 'Import Root' }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Import over existing site' }))
+
+        await waitFor(() => expect(api.post).toHaveBeenCalledTimes(2))
+        const updateForm = api.post.mock.calls[1][1]
+        expect(updateForm.get('mode')).toBe('update')
+        expect(updateForm.get('existingRootId')).toBe('17')
+    })
+
+    it('resubmits a conflicting ZIP import as a clone', async () => {
+        api.post
+            .mockRejectedValueOnce({
+                response: {
+                    status: 409,
+                    data: {
+                        code: 'site_already_exists',
+                        message: '“Summer Study” already exists. Choose how to import it.',
+                        existingSites: [{ id: 17, title: 'Summer Study', slug: 'summer-study' }],
+                    },
+                },
+            })
+            .mockResolvedValueOnce({ data: { id: 'job-zip-clone', kind: 'import', status: 'pending' } })
+        api.get.mockImplementation((url) => {
+            if (String(url).includes('/site-packages/imports/job-zip-clone/')) {
+                return Promise.resolve({ data: { id: 'job-zip-clone', kind: 'import', status: 'completed', progress: {} } })
+            }
+            return Promise.resolve({ data: [] })
+        })
+        renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        fireEvent.click(screen.getByTestId('import-site-package-button'))
+        fireEvent.click(screen.getByRole('tab', { name: 'ZIP file' }))
+        fireEvent.change(screen.getByLabelText('Site package ZIP'), {
+            target: { files: [new File(['zip'], 'summer-study.zip', { type: 'application/zip' })] },
+        })
+        fireEvent.click(screen.getByRole('button', { name: 'Import Root' }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Create new clone' }))
+
+        await waitFor(() => expect(api.post).toHaveBeenCalledTimes(2))
+        const cloneForm = api.post.mock.calls[1][1]
+        expect(cloneForm.get('mode')).toBe('clone')
+        expect(cloneForm.has('existingRootId')).toBe(false)
+    })
+
     it('lists remote sites and only offers updates for linked local copies', async () => {
         remoteMocks.remoteConnections.mockResolvedValueOnce({
             results: [{ id: 'connection-1', name: 'Production', isDefault: true }],
