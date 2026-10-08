@@ -232,6 +232,7 @@ class FormsWidget(BaseWidget):
 
     .forms-widget .form-description {
         color: var(--form-description-color, #6b7280);
+        margin-top: 0;
         margin-bottom: var(--form-description-margin, 2rem);
         text-align: var(--form-description-align, center);
         line-height: var(--form-description-line-height, 1.6);

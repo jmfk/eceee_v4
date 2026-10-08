@@ -290,6 +290,7 @@ class TopNewsPlugWidget(BaseWidget):
     }
 
     .top-news-plug-widget .news-excerpt {
+        margin: 0;
         color: #4b5563;
         line-height: 1.6;
         font-size: 0.9375rem;

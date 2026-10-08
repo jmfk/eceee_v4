@@ -134,6 +134,9 @@ class NewsListWidget(BaseWidget):
     }
 
     widget_css = """
+    .news-list-widget .news-excerpt {
+        margin: 0;
+    }
     """
 
     css_scope = "widget"
