@@ -2,13 +2,13 @@
 Content Card widget implementation.
 """
 
-from typing import Type, Optional, List, Literal
-from pydantic import BaseModel, Field, ConfigDict
+import logging
+from typing import Literal, Optional, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -108,9 +108,7 @@ class ContentCardWidget(BaseWidget):
     """Content card widget with flexible header, text, and image layouts"""
 
     name = "Content Card"
-    description = (
-        "Flexible content card with header, text, and configurable image layouts"
-    )
+    description = "Flexible content card with header, text, and configurable image layouts"
     template_name = "easy_widgets/widgets/content_card.html"
 
     layout_parts = {
@@ -198,7 +196,7 @@ class ContentCardWidget(BaseWidget):
         font-weight: 400;
     }
     .content-card-body {
-        display: flex;  
+        display: flex;
         flex: 1;
         min-height: 0;
         height: 170px;
@@ -206,7 +204,7 @@ class ContentCardWidget(BaseWidget):
         gap: 30px;
     }
     .content-card-text {
-        flex: 1; 
+        flex: 1;
         padding: 0px 0px 0px 30px;
         font-size: 16px;
         font-family: 'Source Sans 3', sans-serif;
@@ -218,22 +216,22 @@ class ContentCardWidget(BaseWidget):
         display: flex;
         align-items: top;
         justify-content: right;
-        padding: 0px 30px 30px 0px;        
+        padding: 0px 30px 30px 0px;
     }
-    
+
     /* Individual image styling - square (default) */
     .content-card-image {
         width: 140px;
         height: 140px;
         object-fit: cover;
     }
-    
+
     /* Rectangle image styling */
     .content-card-body.image-size-rectangle .content-card-image {
         width: 280px;
         height: 140px;
     }
-     
+
     /* Responsive behavior */
     @media (max-width: 768px) {
         .content-card-body {
@@ -260,8 +258,8 @@ class ContentCardWidget(BaseWidget):
             Tuple of (html, css) - always renders using template
         """
         from webpages.utils.mustache_renderer import (
-            render_mustache,
             prepare_component_context,
+            render_mustache,
         )
 
         style_name = config.get("component_style", "default")
@@ -295,9 +293,7 @@ class ContentCardWidget(BaseWidget):
 
         # Add content card specific context
         context["header"] = config.get("header", "")
-        context["imageSize"] = config.get("image_size") or config.get(
-            "imageSize", "square"
-        )
+        context["imageSize"] = config.get("image_size") or config.get("imageSize", "square")
 
         # Add image URL
         context["image1"] = config.get("image1") or config.get("image_1")
@@ -330,17 +326,19 @@ class ContentCardWidget(BaseWidget):
 
         # Resolve link objects in content HTML (similar to ContentWidget)
         request = context.get("request") if context else None
-        
+
         header_html = config.get("header", "")
         if header_html:
             from webpages.services.link_resolver import resolve_links_in_html
+
             template_config["header"] = resolve_links_in_html(header_html, request)
 
         content_html = config.get("content", "")
         if content_html:
             from bs4 import BeautifulSoup
+
             from webpages.services.link_resolver import resolve_links_in_html
-            
+
             soup = BeautifulSoup(content_html, "html.parser")
             content_str = str(soup)
             resolved_content = resolve_links_in_html(content_str, request)
