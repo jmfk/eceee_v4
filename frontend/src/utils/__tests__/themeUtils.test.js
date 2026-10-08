@@ -43,4 +43,26 @@ describe('generateDesignGroupsCSS', () => {
         expect(css).toContain('.slot-main > .widget-type-easy-widgets-contentwidget p')
         expect(css).not.toContain('easy-widgets-bannerwidget')
     })
+
+    it('resolves palette colors in layout properties', () => {
+        const css = generateDesignGroupsCSS({
+            groups: [{
+                widgetTypes: ['easy_widgets.NavigationWidget'],
+                layoutProperties: {
+                    'nav-container': {
+                        xs: {
+                            backgroundColor: 'orange5',
+                            color: 'black',
+                        },
+                    },
+                },
+            }],
+        }, {
+            orange5: '#ab7a1a',
+            black: '#000000',
+        })
+
+        expect(css).toContain('background-color: var(--orange5);')
+        expect(css).toContain('color: var(--black);')
+    })
 })

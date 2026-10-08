@@ -178,6 +178,8 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "component_styles",
             "designer_preview",
             "image_styles",
+            "gallery_styles",
+            "carousel_styles",
             "table_templates",
             "breakpoints",
             # Legacy fields (deprecated)

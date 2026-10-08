@@ -359,7 +359,12 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                         }
 
                         const cssProp = camelToKebab(prop);
-                        cssRules.push(`  ${cssProp}: ${value};`);
+                        const colorProperties = ['color', 'background-color', 'border-color', 'border-left-color',
+                            'border-right-color', 'border-top-color', 'border-bottom-color'];
+                        const resolvedValue = colorProperties.includes(cssProp) && colors[value]
+                            ? `var(--${value})`
+                            : value;
+                        cssRules.push(`  ${cssProp}: ${resolvedValue};`);
                     }
 
                     // Only generate CSS rule if there are actual CSS properties

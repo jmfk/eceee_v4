@@ -7,6 +7,19 @@ from webpages.serializers.theme import PageThemeSerializer
 
 
 class PageThemeImageResolutionTests(SimpleTestCase):
+    def test_serializer_includes_gallery_and_carousel_styles(self):
+        theme = PageTheme(
+            id=3,
+            name="Theme styles",
+            gallery_styles={"partner-logos": {"css": ".partner-logos { gap: 1rem; }"}},
+            carousel_styles={"hero": {"css": ".hero { min-height: 20rem; }"}},
+        )
+
+        data = PageThemeSerializer(theme).data
+
+        self.assertEqual(data["gallery_styles"], theme.gallery_styles)
+        self.assertEqual(data["carousel_styles"], theme.carousel_styles)
+
     def test_resolves_stale_cloned_theme_library_url_to_current_theme(self):
         theme = PageTheme(id=3, name="Clone")
         stale_url = "https://example.com/eceee-v4-media/theme_images/2/library/header.png"
