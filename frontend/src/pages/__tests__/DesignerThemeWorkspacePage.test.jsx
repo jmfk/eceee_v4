@@ -709,7 +709,7 @@ describe('DesignerThemeWorkspacePage', () => {
                 },
                 source: iframe.contentWindow,
             }))
-            expect(screen.getByText('Selected layout slot')).toBeInTheDocument()
+            expect(screen.getByText('Selected slot')).toBeInTheDocument()
         })
         expect(screen.getByRole('heading', { name: 'Hero' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Collapse Hero settings' })).toBeInTheDocument()
@@ -1057,6 +1057,93 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(pathItems[0].querySelector('[aria-current="page"]')).toBeNull()
         expect(pathItems[1]).toHaveTextContent('Inner content')
         expect(pathItems[1].querySelector('[aria-current="page"]')).toBeInTheDocument()
+    })
+
+    it('keeps repeated targets inside one widget as separate selectable DOM instances', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget:content-1', targetInstanceId: 'node:root', kind: 'widget',
+                label: 'Content widget', widgetId: 'content-1',
+                descendants: [
+                    {
+                        id: 'paragraph', instanceId: 'node:first', kind: 'element', label: 'Paragraph',
+                        displayLabel: 'Paragraph: “First paragraph”', widgetId: 'content-1',
+                        parentId: 'widget:content-1', parentInstanceId: 'node:root', parentWidgetId: 'content-1',
+                    },
+                    {
+                        id: 'paragraph', instanceId: 'node:second', kind: 'element', label: 'Paragraph',
+                        displayLabel: 'Paragraph: “Second paragraph”', widgetId: 'content-1',
+                        parentId: 'widget:content-1', parentInstanceId: 'node:root', parentWidgetId: 'content-1',
+                    },
+                ],
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(await screen.findByRole('treeitem', { name: 'Paragraph: “First paragraph”' })).toBeInTheDocument()
+        expect(screen.getByRole('treeitem', { name: 'Paragraph: “Second paragraph”' })).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Edit Paragraph: “Second paragraph”' }))
+        expect(postMessage).toHaveBeenCalledWith({
+            source: 'eceee-render-host', action: 'selectTarget', targetId: 'paragraph',
+            targetInstanceId: 'node:second', widgetId: 'content-1',
+        }, '*')
+    })
+
+    it('shows separate slot, widget, and element breadcrumb trails for a nested selection', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: {
+                    source: 'eceee-designer-preview', action: 'select',
+                    targetId: 'heading', kind: 'element', label: 'Heading', widgetId: 'headline-1',
+                    selectionPaths: {
+                        slot: [
+                            { id: 'layout:main_layout:slot:main', kind: 'layoutSlot', label: 'Main content' },
+                            { id: 'slot:columns-1:left', kind: 'slot', label: 'Left slot', widgetId: 'columns-1' },
+                        ],
+                        widget: [
+                            { id: 'widget:columns-1', kind: 'widget', label: 'Two columns widget', widgetId: 'columns-1' },
+                            { id: 'widget:headline-1', kind: 'widget', label: 'Headline widget', widgetId: 'headline-1' },
+                        ],
+                        element: [
+                            { id: 'article', kind: 'group', label: 'Article', widgetId: 'headline-1' },
+                            { id: 'heading', kind: 'element', label: 'Heading', widgetId: 'headline-1' },
+                        ],
+                    },
+                },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByRole('navigation', { name: 'Slot path' })).toBeInTheDocument()
+        })
+
+        const slotPath = screen.getByRole('navigation', { name: 'Slot path' })
+        const widgetPath = screen.getByRole('navigation', { name: 'Widget path' })
+        const elementPath = screen.getByRole('navigation', { name: 'Element path' })
+        expect(within(slotPath).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Main content', 'Left slot'])
+        expect(within(widgetPath).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Two columns widget', 'Headline widget'])
+        expect(within(elementPath).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Article', 'Heading'])
+        expect(slotPath).toHaveClass('border-yellow-400')
+        expect(widgetPath).toHaveClass('border-green-500')
+        expect(elementPath).toHaveClass('border-blue-500')
+        expect(within(slotPath).getByRole('button', { name: 'Left slot' })).toHaveAttribute('aria-current', 'page')
+        expect(within(widgetPath).getByRole('button', { name: 'Headline widget' })).toHaveAttribute('aria-current', 'page')
+        expect(within(elementPath).getByText('Heading')).toHaveAttribute('aria-current', 'page')
+
+        fireEvent.click(within(widgetPath).getByRole('button', { name: 'Headline widget' }))
+        expect(postMessage).toHaveBeenCalledWith({
+            source: 'eceee-render-host', action: 'selectTarget', targetId: 'widget:headline-1', widgetId: 'headline-1',
+        }, '*')
     })
 
     it('clears the preview target when the content source changes', async () => {

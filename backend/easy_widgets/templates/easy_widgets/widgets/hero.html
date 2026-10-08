@@ -3,14 +3,13 @@
 <div class="hero-widget widget-type-{{ widget_type.css_class_name }} cms-content" style="{{ hero_style }}{% if config.background_image_url_2x %} background-image: image-set(url('{{ config.background_image_url }}') 1x, url('{{ config.background_image_url_2x }}') 2x);{% elif config.background_image_url %} background-image: url('{{ config.background_image_url }}');{% endif %}">
     <div class="hero-content">
         {% if config.before_text %}
-            <h5 class="before-text">{{ config.before_text|linebreaksbr }}</h5>
+            <p class="hero-before-text before-text">{{ config.before_text|linebreaksbr }}</p>
         {% endif %}
-        
-        <div><h1>{{ config.header }}</h1></div>
+
+        <h1 class="hero-header">{{ config.header }}</h1>
         
         {% if config.after_text %}
-            <h6 class="after-text">{{ config.after_text|linebreaksbr }}</h6>
+            <p class="hero-after-text after-text">{{ config.after_text|linebreaksbr }}</p>
         {% endif %}
     </div>
 </div>
-

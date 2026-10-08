@@ -153,7 +153,7 @@ class HeroWidget(BaseWidget):
             ],
         },
         "hero-before-text": {
-            "label": "Before text (h5)",
+            "label": "Before text",
             "selector": ".hero-before-text",
             "properties": [
                 "fontFamily",
@@ -165,7 +165,7 @@ class HeroWidget(BaseWidget):
             ],
         },
         "hero-after-text": {
-            "label": "After text (h6)",
+            "label": "After text",
             "selector": ".hero-after-text",
             "properties": [
                 "fontFamily",

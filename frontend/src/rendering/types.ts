@@ -91,6 +91,7 @@ export interface RenderFrameMessage {
     action: 'render' | 'selectTarget' | 'clearTarget' | 'highlightTarget' | 'readTargetStyles' | 'updateText' | 'formatText'
     model?: RenderPageModel
     targetId?: string
+    targetInstanceId?: string
     widgetId?: string
     text?: string
     command?: string

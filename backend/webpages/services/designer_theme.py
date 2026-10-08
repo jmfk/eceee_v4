@@ -292,7 +292,15 @@ def build_designer_catalog(theme, assets, include_reference_previews=True):
             }
             for element in (group.get("elements") or {})
         ]
-        part_map = {}
+        part_map = {
+            part: {
+                "id": f"group:{group_index}:part:{part}",
+                "part": part,
+                "label": config.get("label") or _humanize_identifier(part),
+                "breakpoints": [],
+            }
+            for part, config in widget_parts.items()
+        }
         for part, breakpoint, _values in _iter_layout_properties(group):
             entry = part_map.setdefault(
                 part,

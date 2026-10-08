@@ -40,7 +40,39 @@ const breakpointLabel = (breakpoint) => {
 }
 
 const hasThemeValue = (value) => value !== undefined && value !== null && value !== ''
-const targetFocusKey = (target) => `${target?.widgetId || ''}:${target?.id || ''}`
+const targetFocusKey = (target) => `${target?.widgetId || ''}:${target?.id || ''}:${target?.instanceId || ''}`
+const targetSelectionKind = (target) => target?.kind === 'layoutSlot' || target?.kind === 'slot'
+    ? 'slot'
+    : target?.kind === 'widget'
+        ? 'widget'
+        : 'element'
+
+const selectionTones = {
+    slot: {
+        header: 'bg-yellow-50 hover:bg-yellow-100',
+        border: 'border-yellow-200',
+        label: 'text-yellow-800',
+        path: 'border-yellow-400 bg-yellow-50/70',
+        current: 'text-yellow-900',
+        focus: 'focus-visible:ring-yellow-500',
+    },
+    widget: {
+        header: 'bg-green-50 hover:bg-green-100',
+        border: 'border-green-200',
+        label: 'text-green-800',
+        path: 'border-green-500 bg-green-50/70',
+        current: 'text-green-900',
+        focus: 'focus-visible:ring-green-500',
+    },
+    element: {
+        header: 'bg-blue-50 hover:bg-blue-100',
+        border: 'border-blue-200',
+        label: 'text-blue-700',
+        path: 'border-blue-500 bg-blue-50/70',
+        current: 'text-blue-900',
+        focus: 'focus-visible:ring-blue-500',
+    },
+}
 
 const fitPaneWidths = (workspaceWidth, sidebarWidth, inspectorWidth, sidebarCollapsed, inspectorCollapsed) => {
     if (workspaceWidth < desktopPaneBreakpoint) return { sidebarWidth, inspectorWidth }
@@ -87,6 +119,27 @@ const matchesContentOption = (option, query) => [
 const TruncatedNavigationText = ({ value, className = '' }) => {
     const text = String(value || '')
     return <span title={text} className={`block min-w-0 truncate ${className}`}>{text}</span>
+}
+
+const SelectionPath = ({ kind, label, targets, selectedTarget, onSelect }) => {
+    if (!targets.length) return null
+    const tone = selectionTones[kind]
+    return <nav aria-label={`${label} path`} className={`border-l-4 px-2 py-1.5 ${tone.path}`}>
+        <p className={`text-[10px] font-semibold uppercase tracking-wide ${tone.label}`}>{label}</p>
+        <ol className="mt-0.5 flex min-w-0 flex-wrap items-center gap-y-1 text-sm text-gray-600">
+            {targets.map((target, index) => {
+                const isCurrent = index === targets.length - 1
+                const isActiveEditor = targetFocusKey(target) === targetFocusKey(selectedTarget)
+                const targetLabel = target.displayLabel || target.label
+                return <li key={`${kind}:${targetFocusKey(target)}`} className="flex min-w-0 items-center">
+                    {index > 0 && <ChevronRight aria-hidden="true" className="mx-1 h-3.5 w-3.5 shrink-0 text-gray-400" />}
+                    {isActiveEditor
+                        ? <span aria-current={isCurrent ? 'page' : undefined} className={`max-w-48 truncate font-semibold ${tone.current}`} title={targetLabel}>{targetLabel}</span>
+                        : <button type="button" aria-current={isCurrent ? 'page' : undefined} onClick={() => onSelect(target)} className={`min-h-6 max-w-48 truncate rounded px-1 py-0.5 text-left text-gray-600 hover:bg-white hover:text-gray-950 focus-visible:outline-none focus-visible:ring-2 ${tone.focus}`} title={`Select ${targetLabel}`}>{targetLabel}</button>}
+                </li>
+            })}
+        </ol>
+    </nav>
 }
 
 const contentGroups = (options, sourceMode) => ['page', 'object'].map((kind) => {
@@ -636,11 +689,13 @@ const SemanticThemeWorkspace = ({
             function normalizeTarget(option) {
                 return {
                     id: option.id,
+                    instanceId: option.instanceId || '',
                     kind: option.kind,
                     label: option.label,
                     displayLabel: option.displayLabel || option.label,
                     parentId: option.parentId || '',
                     parentWidgetId: option.parentWidgetId || '',
+                    parentInstanceId: option.parentInstanceId || '',
                     depth: Number.isFinite(option.depth) ? option.depth : 0,
                     widgetType: option.widgetType || '',
                     widgetId: option.widgetId || '',
@@ -656,6 +711,12 @@ const SemanticThemeWorkspace = ({
                     path: Array.isArray(option.path) ? option.path.map(normalizeTarget) : [],
                 }
             }
+            const normalizedSelectionPaths = Object.fromEntries(['slot', 'widget', 'element'].map((kind) => [
+                kind,
+                Array.isArray(event.data.selectionPaths?.[kind])
+                    ? event.data.selectionPaths[kind].filter((option) => option?.id && option?.label).map(normalizeTarget)
+                    : [],
+            ]))
             const alternatives = Array.isArray(event.data.alternatives)
                 ? event.data.alternatives.filter((option) => option?.id && option?.label).map(normalizeTarget)
                 : []
@@ -667,6 +728,7 @@ const SemanticThemeWorkspace = ({
                 : []
             const target = {
                 id: event.data.targetId,
+                instanceId: event.data.targetInstanceId || '',
                 kind: event.data.kind,
                 label: event.data.label,
                 widgetType: event.data.widgetType || '',
@@ -685,6 +747,7 @@ const SemanticThemeWorkspace = ({
                     : [],
                 ancestors,
                 descendants,
+                selectionPaths: normalizedSelectionPaths,
             }
             if (pendingInspectorSelectionRef.current === targetFocusKey(target)) pendingInspectorSelectionRef.current = null
             const currentRoot = inspectorRootRef.current
@@ -920,6 +983,7 @@ const SemanticThemeWorkspace = ({
             source: 'eceee-render-host',
             action: 'selectTarget',
             targetId: target.id,
+            ...(target.instanceId ? { targetInstanceId: target.instanceId } : {}),
             ...(target.widgetId ? { widgetId: target.widgetId } : {}),
         }, '*')
     }
@@ -932,6 +996,7 @@ const SemanticThemeWorkspace = ({
             action: 'highlightTarget',
             targetId: target.id,
             active,
+            ...(target.instanceId ? { targetInstanceId: target.instanceId } : {}),
             ...(target.widgetId ? { widgetId: target.widgetId } : {}),
         }, '*')
     }
@@ -962,6 +1027,8 @@ const SemanticThemeWorkspace = ({
         setSelectedTarget((current) => ({ ...current, text }))
         iframeRef.current?.contentWindow?.postMessage({
             source: 'eceee-render-host', action: 'updateText', targetId: selectedTarget.id, text,
+            ...(selectedTarget.instanceId ? { targetInstanceId: selectedTarget.instanceId } : {}),
+            ...(selectedTarget.widgetId ? { widgetId: selectedTarget.widgetId } : {}),
         }, '*')
     }
 
@@ -969,6 +1036,8 @@ const SemanticThemeWorkspace = ({
         if (!selectedTarget?.richText) return
         iframeRef.current?.contentWindow?.postMessage({
             source: 'eceee-render-host', action: 'formatText', targetId: selectedTarget.id, command, value,
+            ...(selectedTarget.instanceId ? { targetInstanceId: selectedTarget.instanceId } : {}),
+            ...(selectedTarget.widgetId ? { widgetId: selectedTarget.widgetId } : {}),
         }, '*')
     }
 
@@ -1228,6 +1297,7 @@ const SemanticThemeWorkspace = ({
         const parent = target.parentId !== target.id && childTargets.find((candidate) => (
             candidate.id === target.parentId
             && (!target.parentWidgetId || candidate.widgetId === target.parentWidgetId)
+            && (!target.parentInstanceId || candidate.instanceId === target.parentInstanceId)
         ))
         const parentKey = parent ? targetFocusKey(parent) : targetFocusKey(inspectorRoot)
         targetsByParent.set(parentKey, [...(targetsByParent.get(parentKey) || []), target])
@@ -1245,11 +1315,19 @@ const SemanticThemeWorkspace = ({
         .filter((alternative) => !assetsByTargetId.has(alternative.id))
     const selectedPathIndex = elementPathCandidates.findIndex((alternative) => targetFocusKey(alternative) === targetFocusKey(selectedTarget))
     const elementPath = selectedPathIndex >= 0 ? elementPathCandidates.slice(0, selectedPathIndex + 1) : elementPathCandidates
+    const selectionPaths = selectedTarget?.selectionPaths && Object.values(selectedTarget.selectionPaths).some((path) => path.length)
+        ? selectedTarget.selectionPaths
+        : elementPath.reduce((paths, target) => {
+            paths[targetSelectionKind(target)].push(target)
+            return paths
+        }, { slot: [], widget: [], element: [] })
     const targetAssetAlternatives = targetAlternatives.filter((alternative) => assetsByTargetId.has(alternative.id))
     const richTextToolClass = 'inline-flex h-8 min-w-8 items-center justify-center rounded border border-gray-300 bg-white px-2 text-xs text-gray-700 hover:bg-gray-50'
-    const selectedTargetTypeLabel = selectedTarget?.kind === 'layoutSlot'
-        ? 'Selected layout slot'
-        : selectedTarget?.kind === 'widget'
+    const selectedTargetKind = targetSelectionKind(selectedTarget)
+    const selectedTargetTone = selectionTones[selectedTargetKind]
+    const selectedTargetTypeLabel = selectedTargetKind === 'slot'
+        ? 'Selected slot'
+        : selectedTargetKind === 'widget'
             ? 'Selected widget'
             : 'Selected element'
     const selectedTargetLabel = selectedTarget?.displayLabel || selectedTarget?.label
@@ -1262,16 +1340,21 @@ const SemanticThemeWorkspace = ({
                 aria-controls="selected-element-editor"
                 aria-label={`${selectionExpanded ? 'Collapse' : 'Expand'} ${selectedTargetLabel} settings`}
                 onClick={() => setSelectionExpanded((current) => !current)}
-                className="flex w-full shrink-0 items-center gap-2 bg-blue-50 px-3 py-2 text-left hover:bg-blue-100"
+                className={`flex w-full shrink-0 items-center gap-2 px-3 py-2 text-left ${selectedTargetTone.header}`}
             >
                 <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{selectedTargetTypeLabel}</p>
+                    <p className={`text-xs font-semibold uppercase tracking-wide ${selectedTargetTone.label}`}>{selectedTargetTypeLabel}</p>
                     <h2 className="truncate text-base font-semibold text-gray-900">{selectedTargetLabel}</h2>
                 </div>
-                <ChevronDown className={`h-4 w-4 shrink-0 text-blue-700 transition-transform ${selectionExpanded ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${selectedTargetTone.label} ${selectionExpanded ? 'rotate-180' : ''}`} />
             </button>
             {selectionExpanded && (
-                <div id="selected-element-editor" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden border-t border-blue-200 p-2">
+                <div id="selected-element-editor" className={`flex min-h-0 flex-1 flex-col gap-3 overflow-hidden border-t p-2 ${selectedTargetTone.border}`}>
+                    <section aria-label="Selection context" className="shrink-0 space-y-1.5">
+                        <SelectionPath kind="slot" label="Slot" targets={selectionPaths.slot} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
+                        <SelectionPath kind="widget" label="Widget" targets={selectionPaths.widget} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
+                        <SelectionPath kind="element" label="Element" targets={selectionPaths.element} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
+                    </section>
                     {(() => {
                         const fields = <>
                     {contentMode === 'demo' && selectedTarget.kind === 'element' && selectedTarget.editable && <section className="space-y-2">
@@ -1289,20 +1372,7 @@ const SemanticThemeWorkspace = ({
                         </div> : <textarea aria-label="Example text" value={selectedTarget.text || ''} onChange={(event) => updateSelectedExampleText(event.target.value)} rows={3} className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900" />}
                         <button type="button" onClick={persistSelectedExampleText} disabled={disabled} className="rounded bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">Save example text</button>
                     </section>}
-                    {(elementPathCandidates.length > 1 || targetAssetAlternatives.length > 0) && <section className="space-y-2">
-                        {elementPathCandidates.length > 1 && <nav aria-label="Element path">
-                            <ol className="flex min-w-0 flex-wrap items-center gap-y-1 text-sm text-gray-600">
-                                {elementPath.map((alternative, index) => {
-                                    const isCurrent = targetFocusKey(alternative) === targetFocusKey(selectedTarget)
-                                    return <li key={targetFocusKey(alternative)} className="flex min-w-0 items-center">
-                                        {index > 0 && <ChevronRight aria-hidden="true" className="mx-1 h-3.5 w-3.5 shrink-0 text-gray-400" />}
-                                        {isCurrent
-                                            ? <span aria-current="page" className="max-w-48 truncate font-semibold text-blue-800" title={alternative.label}>{alternative.label}</span>
-                                            : <button type="button" onClick={() => chooseTargetAlternative(alternative)} className="max-w-48 truncate rounded px-1 py-0.5 text-left text-gray-600 hover:bg-gray-100 hover:text-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" title={`Select ${alternative.label}`}>{alternative.label}</button>}
-                                    </li>
-                                })}
-                            </ol>
-                        </nav>}
+                    {targetAssetAlternatives.length > 0 && <section className="space-y-2">
                         {targetAssetAlternatives.length > 0 && <div className="space-y-1.5"><p className="text-xs text-gray-500">Images can be uploaded or replaced directly.</p><div className="grid gap-1">{targetAssetAlternatives.map(renderTargetAssetAlternative)}</div></div>}
                     </section>}
                     {targetTypography.map(({ row, index }) => {

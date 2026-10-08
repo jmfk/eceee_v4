@@ -22,7 +22,7 @@ const editableTextLabel = (node: HTMLElement) => {
 }
 
 const FRAME_CSS = `${PUBLIC_RENDER_CSS}
-.designer-preview [data-designer-target]{cursor:pointer}[data-designer-target].designer-selected{outline:3px solid #2563eb!important;outline-offset:-3px!important}[data-designer-target].designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:0 0 0 3px rgba(245,158,11,.2)!important}[data-designer-target].designer-selected.designer-highlighted{outline:3px solid #2563eb!important;outline-offset:-3px!important;box-shadow:0 0 0 4px #f59e0b!important}.designer-guides .designer-hovered:not(.designer-selected):not(.designer-highlighted){outline:2px dotted #2563eb!important;outline-offset:-2px!important}
+.designer-preview [data-designer-target]{cursor:pointer}[data-designer-target].designer-selected-slot{outline:3px solid #eab308!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget{box-shadow:inset 0 0 0 3px #16a34a!important}[data-designer-target].designer-selected-element{outline:3px solid #2563eb!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget.designer-selected-element{box-shadow:inset 0 0 0 3px #16a34a,0 0 0 3px #2563eb!important}[data-designer-target].designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:0 0 0 3px rgba(245,158,11,.2)!important}[data-designer-target].designer-selected.designer-highlighted{outline-offset:-3px!important}.designer-guides .designer-hovered:not(.designer-selected):not(.designer-highlighted){outline:2px dotted #2563eb!important;outline-offset:-2px!important}
 .designer-context-menu{position:fixed!important;z-index:2147483647!important;min-width:180px!important;max-width:260px!important;padding:6px!important;border:1px solid #d1d5db!important;border-radius:8px!important;background:#fff!important;box-shadow:0 10px 24px rgba(15,23,42,.2)!important;color:#111827!important;font:500 13px/1.35 system-ui,sans-serif!important}.designer-context-menu-title{overflow:hidden!important;padding:5px 8px 7px!important;color:#6b7280!important;font-size:11px!important;font-weight:600!important;text-overflow:ellipsis!important;white-space:nowrap!important}.designer-context-menu button{display:block!important;width:100%!important;padding:7px 8px!important;border:0!important;border-radius:5px!important;background:transparent!important;color:#111827!important;font:inherit!important;text-align:left!important;cursor:pointer!important}.designer-context-menu button:hover,.designer-context-menu button:focus-visible{background:#eff6ff!important;color:#1d4ed8!important;outline:none!important}
 .designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483644!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483645!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483645!important;transform:translate(-50%,-50%);padding:2px 3px!important;border:0!important;border-radius:3px!important;background:#fff!important;font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;box-shadow:0 0 0 1px rgba(255,255,255,.9)!important}.designer-spacing-value[data-editable="true"]{pointer-events:auto!important;cursor:pointer!important;box-shadow:0 0 0 1px currentColor!important}.designer-spacing-value[data-editable="true"]:hover,.designer-spacing-value[data-editable="true"]:focus-visible{outline:2px solid #2563eb!important;outline-offset:1px!important}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}.designer-spacing-editor{position:fixed!important;z-index:2147483647!important;display:flex!important;gap:4px!important;padding:5px!important;border:1px solid #93c5fd!important;border-radius:6px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.22)!important}.designer-spacing-editor input{width:72px!important;padding:5px 6px!important;border:1px solid #d1d5db!important;border-radius:4px!important;font:500 12px/1.2 system-ui,sans-serif!important}.designer-spacing-editor button{padding:5px 7px!important;border:0!important;border-radius:4px!important;background:#2563eb!important;color:#fff!important;font:600 12px/1.2 system-ui,sans-serif!important;cursor:pointer!important}
 `
@@ -40,8 +40,22 @@ const nodeTargets = (node: HTMLElement) => {
     try { return JSON.parse(node.dataset.designerTargets || '[]') } catch { return [] }
 }
 
-const findTargetNode = (root: ParentNode, targetId: string, widgetId = '') => [...root.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => (
+const designerInstanceId = (node: HTMLElement) => {
+    if (node.dataset.designerInstance) return node.dataset.designerInstance
+    const path: number[] = []
+    let current: HTMLElement | null = node
+    while (current?.parentElement) {
+        path.unshift([...current.parentElement.children].indexOf(current))
+        current = current.parentElement
+    }
+    const instanceId = `node:${path.join('.')}`
+    node.dataset.designerInstance = instanceId
+    return instanceId
+}
+
+const findTargetNode = (root: ParentNode, targetId: string, widgetId = '', instanceId = '') => [...root.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => (
     (!widgetId || node.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId === widgetId)
+    && (!instanceId || designerInstanceId(node) === instanceId)
     && nodeTargets(node).some((target: any) => target.id === targetId)
 ))
 
@@ -72,12 +86,13 @@ const descendantTargets = (node: HTMLElement) => {
         const widgetNode = descendant.closest<HTMLElement>('[data-widget-id]')
         const widgetType = widgetNode?.dataset.widgetType || ''
         const widgetId = widgetNode?.dataset.widgetId || ''
-        const instanceKey = `${widgetId}:${primary?.id || ''}`
+        const instanceKey = `${widgetId}:${primary?.id || ''}:${primary?.instanceId || ''}`
         if (!primary?.id || seen.has(instanceKey)) return null
         seen.add(instanceKey)
         const parentNode = descendant.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
         const parentId = parentNode && (parentNode === node || node.contains(parentNode)) ? nodeTargets(parentNode)[0]?.id || '' : ''
         const parentWidgetId = parentNode?.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''
+        const parentInstanceId = parentNode ? designerInstanceId(parentNode) : ''
         let depth = 1
         let ancestor = parentNode
         while (ancestor && ancestor !== node) {
@@ -90,6 +105,7 @@ const descendantTargets = (node: HTMLElement) => {
             displayLabel: descendantDisplayLabel(descendant, primary),
             parentId,
             parentWidgetId,
+            parentInstanceId,
             depth,
             widgetType,
             widgetId,
@@ -118,7 +134,7 @@ const targetPath = (node: HTMLElement, preferredTarget?: any) => {
         const target = first && preferredTarget ? preferredTarget : nodeTargets(current)[0]
         const widgetNode = current.closest<HTMLElement>('[data-widget-id]')
         const widgetId = target?.widgetId || widgetNode?.dataset.widgetId || ''
-        const key = `${widgetId}:${target?.id || ''}`
+        const key = `${widgetId}:${target?.id || ''}:${target?.instanceId || ''}`
         if (target?.id && !seen.has(key)) {
             seen.add(key)
             path.unshift({
@@ -131,6 +147,59 @@ const targetPath = (node: HTMLElement, preferredTarget?: any) => {
         current = current.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
     }
     return path
+}
+
+const selectionKind = (target: any): 'slot' | 'widget' | 'element' => target?.kind === 'layoutSlot' || target?.kind === 'slot'
+    ? 'slot'
+    : target?.kind === 'widget'
+        ? 'widget'
+        : 'element'
+
+const selectionPaths = (node: HTMLElement, preferredTarget?: any) => {
+    const paths: Record<'slot' | 'widget' | 'element', any[]> = { slot: [], widget: [], element: [] }
+    const selectionRank = { slot: 0, widget: 1, element: 2 }
+    const preferredKind = selectionKind(preferredTarget)
+    const seen = new Set<string>()
+    let current: HTMLElement | null = node
+    let first = true
+    while (current) {
+        const targets = nodeTargets(current)
+        const candidates = first && preferredTarget
+            ? [preferredTarget, ...targets.filter((target: any) => target.id !== preferredTarget.id)]
+            : targets
+        ;(['slot', 'widget', 'element'] as const).forEach((kind) => {
+            if (first && preferredTarget && selectionRank[kind] > selectionRank[preferredKind]) return
+            const target = candidates.find((candidate: any) => selectionKind(candidate) === kind)
+            const widgetNode = current?.closest<HTMLElement>('[data-widget-id]')
+            const widgetId = target?.widgetId || widgetNode?.dataset.widgetId || ''
+            const key = `${kind}:${widgetId}:${target?.id || ''}:${target?.instanceId || ''}`
+            if (!target?.id || seen.has(key)) return
+            seen.add(key)
+            paths[kind].unshift({
+                ...target,
+                widgetType: target.widgetType || widgetNode?.dataset.widgetType || '',
+                widgetId,
+            })
+        })
+        first = false
+        current = current.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
+    }
+    return paths
+}
+
+const clearSelectionClasses = (root: ParentNode) => root.querySelectorAll('.designer-selected,.designer-selected-slot,.designer-selected-widget,.designer-selected-element')
+    .forEach((selected) => selected.classList.remove('designer-selected', 'designer-selected-slot', 'designer-selected-widget', 'designer-selected-element'))
+
+const applySelectionClasses = (root: ParentNode, node: HTMLElement, preferredTarget?: any) => {
+    clearSelectionClasses(root)
+    node.classList.add('designer-selected')
+    const paths = selectionPaths(node, preferredTarget)
+    ;(['slot', 'widget', 'element'] as const).forEach((kind) => {
+        const target = paths[kind].at(-1)
+        if (!target) return
+        findTargetNode(root, target.id, target.widgetId, target.instanceId)?.classList.add(`designer-selected-${kind}`)
+    })
+    return paths
 }
 
 const ancestorTargets = (node: HTMLElement, designer: NonNullable<RenderPageModel['designer']>) => {
@@ -170,6 +239,7 @@ const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['design
         sourceOccurrence: primary.sourceOccurrence ?? 0,
         sourcePath: primary.sourcePath || [],
         sourceMatchIndex: primary.sourceMatchIndex ?? 0,
+        targetInstanceId: primary.instanceId || designerInstanceId(node),
         computedStyles: computedThemeValues(node),
         alternatives: targets.map((target: any) => ({
             ...target,
@@ -180,6 +250,7 @@ const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['design
             computedStyles: computedThemeValues(node),
         })),
         path: targetPath(node, primary),
+        selectionPaths: selectionPaths(node, primary),
         ancestors: designer ? ancestorTargets(node, designer) : [],
         descendants: descendantTargets(node),
         ...extra,
@@ -189,9 +260,10 @@ const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['design
 const registerTarget = (node: HTMLElement, target: any, primary = false) => {
     let targets: any[] = []
     try { targets = JSON.parse(node.dataset.designerTargets || '[]') } catch { targets = [] }
+    const instanceTarget = { ...target, instanceId: target.instanceId || designerInstanceId(node) }
     if (!targets.some((candidate) => candidate.id === target.id)) {
-        if (primary) targets.unshift(target)
-        else targets.push(target)
+        if (primary) targets.unshift(instanceTarget)
+        else targets.push(instanceTarget)
     }
     node.dataset.designerTargets = JSON.stringify(targets)
     node.dataset.designerTarget = targets[0].id
@@ -202,8 +274,10 @@ const registerTarget = (node: HTMLElement, target: any, primary = false) => {
 type DesignerFocusState = {
     selectedTargetId: string
     selectedWidgetId: string
+    selectedInstanceId: string
     highlightedTargetId: string
     highlightedWidgetId: string
+    highlightedInstanceId: string
 }
 
 const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusState: DesignerFocusState) => {
@@ -435,8 +509,16 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     const layouts = designer.catalog?.layouts || []
     const layout = layouts.find((candidate: any) => candidate.key === model.layout)
 
-    ;(layout?.slots || []).forEach((slot: any) => {
-        root.querySelectorAll<HTMLElement>(`.slot-${slot.name}`).forEach((node) => registerTarget(node, { id: `layout:${model.layout}:slot:${slot.name}`, kind: 'layoutSlot', label: slot.label, editable: false }))
+    root.querySelectorAll<HTMLElement>('[data-slot-name]').forEach((node) => {
+        const slotName = node.dataset.slotName || ''
+        if (!slotName) return
+        const slot = (layout?.slots || []).find((candidate: any) => candidate.name === slotName)
+        registerTarget(node, {
+            id: `layout:${model.layout}:slot:${slotName}`,
+            kind: 'layoutSlot',
+            label: slot?.label || slotName.replace(/[-_]+/g, ' ').replace(/^./, (character) => character.toUpperCase()),
+            editable: false,
+        })
     })
 
     const widgetRoots = [...root.querySelectorAll<HTMLElement>('[data-widget-id][data-widget-type]')]
@@ -452,6 +534,21 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             widgetType,
             editable: false,
         })
+    })
+
+    root.querySelectorAll<HTMLElement>('[data-slot]').forEach((node) => {
+        const slotName = node.dataset.slot || ''
+        const owner = node.parentElement?.closest<HTMLElement>('[data-widget-id]')
+        const ownerWidgetId = owner?.dataset.widgetId || ''
+        if (!slotName || !ownerWidgetId) return
+        registerTarget(node, {
+            id: `slot:${ownerWidgetId}:${slotName}`,
+            kind: 'slot',
+            label: `${slotName.replace(/[-_]+/g, ' ').replace(/^./, (character) => character.toUpperCase())} slot`,
+            widgetId: ownerWidgetId,
+            widgetType: owner?.dataset.widgetType || '',
+            editable: false,
+        }, true)
     })
 
     groups.forEach((group: any) => {
@@ -574,20 +671,20 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     }
 
     const restoredSelection = focusState.selectedTargetId
-        ? findTargetNode(root, focusState.selectedTargetId, focusState.selectedWidgetId)
+        ? findTargetNode(root, focusState.selectedTargetId, focusState.selectedWidgetId, focusState.selectedInstanceId)
         : null
     const restoredHighlight = focusState.highlightedTargetId
-        ? findTargetNode(root, focusState.highlightedTargetId, focusState.highlightedWidgetId)
+        ? findTargetNode(root, focusState.highlightedTargetId, focusState.highlightedWidgetId, focusState.highlightedInstanceId)
         : null
     if (restoredSelection) {
-        restoredSelection.classList.add('designer-selected')
+        applySelectionClasses(root, restoredSelection)
         selectedNode = restoredSelection
         showSpacing(restoredSelection)
     }
     restoredHighlight?.classList.add('designer-highlighted')
 
     root.querySelectorAll<HTMLElement>('[data-designer-target]').forEach((node) => {
-        const click = (event: Event) => { if (!node.isContentEditable) event.preventDefault(); event.stopPropagation(); root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected')); root.querySelectorAll('.designer-highlighted').forEach((highlighted) => highlighted.classList.remove('designer-highlighted')); node.classList.add('designer-selected'); selectedNode = node; focusState.selectedTargetId = nodeTargets(node)[0]?.id || ''; focusState.selectedWidgetId = node.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''; focusState.highlightedTargetId = ''; focusState.highlightedWidgetId = ''; showSpacing(node); postDesignerEvent(node, designer) }
+        const click = (event: Event) => { if (!node.isContentEditable) event.preventDefault(); event.stopPropagation(); applySelectionClasses(root, node); root.querySelectorAll('.designer-highlighted').forEach((highlighted) => highlighted.classList.remove('designer-highlighted')); selectedNode = node; focusState.selectedTargetId = nodeTargets(node)[0]?.id || ''; focusState.selectedWidgetId = node.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''; focusState.selectedInstanceId = designerInstanceId(node); focusState.highlightedTargetId = ''; focusState.highlightedWidgetId = ''; focusState.highlightedInstanceId = ''; showSpacing(node); postDesignerEvent(node, designer) }
         let primaryTarget: any = null
         try { primaryTarget = JSON.parse(node.dataset.designerTargets || '[]')[0] } catch { primaryTarget = null }
         const activateEditing = (event?: Event) => {
@@ -633,14 +730,16 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         event.preventDefault()
         event.stopPropagation()
         closeContextMenu()
-        root.querySelectorAll('.designer-selected').forEach((selected) => selected.classList.remove('designer-selected'))
+        clearSelectionClasses(root)
         root.querySelectorAll('.designer-highlighted').forEach((highlighted) => highlighted.classList.remove('designer-highlighted'))
-        eventNode.classList.add('designer-selected')
+        applySelectionClasses(root, eventNode, primary)
         selectedNode = eventNode
         focusState.selectedTargetId = primary.id
         focusState.selectedWidgetId = eventNode.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''
+        focusState.selectedInstanceId = designerInstanceId(eventNode)
         focusState.highlightedTargetId = ''
         focusState.highlightedWidgetId = ''
+        focusState.highlightedInstanceId = ''
         showSpacing(eventNode)
         postDesignerEvent(eventNode, designer, 'select', primary)
 
@@ -784,7 +883,7 @@ export const RenderFrameRuntime = () => {
     const [model, setModel] = useState<RenderPageModel | null>(null)
     const modelRef = useRef<RenderPageModel | null>(null)
     const rootRef = useRef<HTMLDivElement>(null)
-    const focusStateRef = useRef<DesignerFocusState>({ selectedTargetId: '', selectedWidgetId: '', highlightedTargetId: '', highlightedWidgetId: '' })
+    const focusStateRef = useRef<DesignerFocusState>({ selectedTargetId: '', selectedWidgetId: '', selectedInstanceId: '', highlightedTargetId: '', highlightedWidgetId: '', highlightedInstanceId: '' })
 
     useEffect(() => {
         const receive = (event: MessageEvent<RenderFrameMessage>) => {
@@ -797,54 +896,56 @@ export const RenderFrameRuntime = () => {
             if (event.data.action === 'selectTarget' && event.data.targetId) {
                 focusStateRef.current.selectedTargetId = event.data.targetId
                 focusStateRef.current.selectedWidgetId = event.data.widgetId || ''
+                focusStateRef.current.selectedInstanceId = event.data.targetInstanceId || ''
                 focusStateRef.current.highlightedTargetId = ''
                 focusStateRef.current.highlightedWidgetId = ''
-                document.querySelectorAll('.designer-selected').forEach((node) => node.classList.remove('designer-selected'))
+                focusStateRef.current.highlightedInstanceId = ''
+                clearSelectionClasses(document)
                 document.querySelectorAll('.designer-highlighted').forEach((node) => node.classList.remove('designer-highlighted'))
-                const match = findTargetNode(document, event.data.targetId, event.data.widgetId)
-                match?.classList.add('designer-selected')
-                match?.dispatchEvent(new CustomEvent('designerselect', { bubbles: true }))
+                const match = findTargetNode(document, event.data.targetId, event.data.widgetId, event.data.targetInstanceId)
                 const preferredTarget = match ? nodeTargets(match).find((target: any) => target.id === event.data.targetId) : null
+                if (match) applySelectionClasses(document, match, preferredTarget)
+                match?.dispatchEvent(new CustomEvent('designerselect', { bubbles: true }))
                 if (match && preferredTarget) postDesignerEvent(match, modelRef.current?.designer, 'select', preferredTarget)
                 match?.scrollIntoView?.({ block: 'nearest' })
             }
             if (event.data.action === 'clearTarget') {
                 focusStateRef.current.selectedTargetId = ''
                 focusStateRef.current.selectedWidgetId = ''
+                focusStateRef.current.selectedInstanceId = ''
                 focusStateRef.current.highlightedTargetId = ''
                 focusStateRef.current.highlightedWidgetId = ''
-                document.querySelectorAll('.designer-selected,.designer-highlighted').forEach((node) => node.classList.remove('designer-selected', 'designer-highlighted'))
+                focusStateRef.current.highlightedInstanceId = ''
+                clearSelectionClasses(document)
+                document.querySelectorAll('.designer-highlighted').forEach((node) => node.classList.remove('designer-highlighted'))
                 rootRef.current?.dispatchEvent(new CustomEvent('designerclear'))
             }
             if (event.data.action === 'highlightTarget') {
                 focusStateRef.current.highlightedTargetId = event.data.active && event.data.targetId ? event.data.targetId : ''
                 focusStateRef.current.highlightedWidgetId = event.data.active ? event.data.widgetId || '' : ''
+                focusStateRef.current.highlightedInstanceId = event.data.active ? event.data.targetInstanceId || '' : ''
                 document.querySelectorAll('.designer-highlighted').forEach((node) => node.classList.remove('designer-highlighted'))
                 if (event.data.active && event.data.targetId) {
-                    const match = findTargetNode(document, event.data.targetId, event.data.widgetId)
+                    const match = findTargetNode(document, event.data.targetId, event.data.widgetId, event.data.targetInstanceId)
                     match?.classList.add('designer-highlighted')
                     match?.scrollIntoView?.({ block: 'nearest' })
                 }
             }
             if (event.data.action === 'readTargetStyles' && event.data.targetId) {
-                const match = [...document.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => {
-                    try { return JSON.parse(node.dataset.designerTargets || '[]').some((target: any) => target.id === event.data.targetId) } catch { return false }
-                })
+                const match = findTargetNode(document, event.data.targetId, event.data.widgetId, event.data.targetInstanceId)
                 if (match) window.parent.postMessage({
                     source: 'eceee-designer-preview', action: 'targetStyles', targetId: event.data.targetId,
                     computedStyles: computedThemeValues(match),
                 }, '*')
             }
             if (event.data.action === 'updateText' && event.data.targetId && typeof event.data.text === 'string') {
-                const match = [...document.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => {
-                    try { return JSON.parse(node.dataset.designerTargets || '[]')[0]?.id === event.data.targetId } catch { return false }
-                })
+                const match = findTargetNode(document, event.data.targetId, event.data.widgetId, event.data.targetInstanceId)
                 const richText = match ? nodeTargets(match)[0]?.richText : false
                 if (match && richText && match.innerHTML !== event.data.text) match.innerHTML = DOMPurify.sanitize(event.data.text)
                 if (match && !richText && match.textContent !== event.data.text) match.textContent = event.data.text
             }
             if (event.data.action === 'formatText' && event.data.targetId && event.data.command) {
-                const match = [...document.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => nodeTargets(node)[0]?.id === event.data.targetId)
+                const match = findTargetNode(document, event.data.targetId, event.data.widgetId, event.data.targetInstanceId)
                 if (!match || !nodeTargets(match)[0]?.richText) return
                 match.contentEditable = 'true'
                 match.focus()

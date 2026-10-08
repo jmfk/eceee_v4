@@ -145,6 +145,7 @@ export class SimpleTextEditorRenderer {
             onChange: null,
             placeholder: '',
             element: 'div', // HTML element type: 'div', 'h1', 'h2', 'h5', 'h6'
+            className: '', // Stable presentation/design classes for the editable element
             allowedButtons: ['bold', 'italic', 'link', 'format', 'list', 'code', 'quote', 'image'], // Which toolbar buttons to show
             allowedFormats: null, // Restrict allowed paragraph formats (e.g., ['<p>', '<h2>', '<h3>'])
             ...options
@@ -202,7 +203,9 @@ export class SimpleTextEditorRenderer {
     createEditor() {
         this.editorElement = document.createElement(this.options.element)
         this.editorElement.contentEditable = true
-        this.editorElement.className = 'simple-text-editor outline-none'
+        this.editorElement.className = ['simple-text-editor', 'outline-none', this.options.className]
+            .filter(Boolean)
+            .join(' ')
 
         // Add placeholder attribute if provided
         if (this.options.placeholder) {
@@ -683,6 +686,14 @@ export class SimpleTextEditorRenderer {
         if (newOptions.element !== undefined) {
             this.options.element = newOptions.element
         }
+        if (newOptions.className !== undefined) {
+            this.options.className = newOptions.className
+            if (this.editorElement) {
+                this.editorElement.className = ['simple-text-editor', 'outline-none', newOptions.className]
+                    .filter(Boolean)
+                    .join(' ')
+            }
+        }
         if (newOptions.placeholder !== undefined) {
             this.options.placeholder = newOptions.placeholder
             if (this.editorElement) {
@@ -746,4 +757,3 @@ export class SimpleTextEditorRenderer {
 }
 
 export default SimpleTextEditorRenderer
-
