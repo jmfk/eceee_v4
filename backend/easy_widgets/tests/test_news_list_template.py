@@ -46,6 +46,7 @@ class NewsListTemplateTests(SimpleTestCase):
         )
 
         self.assertIn("Rendered object", html)
+        self.assertIn('<p class="news-excerpt">', html)
         self.assertIn("Prepared excerpt", html)
         self.assertIn('href="/objects/rendered-object/"', html)
 

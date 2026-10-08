@@ -5,9 +5,9 @@
         <header class="form-header">
             <h2 class="form-title">{{ config.title }}</h2>
             {% if config.description %}
-                <div class="form-description">
-                    {{ config.description|linebreaks }}
-                </div>
+                <p class="form-description">
+                    {{ config.description|linebreaksbr }}
+                </p>
             {% endif %}
         </header>
     {% endif %}

@@ -11,6 +11,7 @@ class TableWidgetRenderTests(SimpleTestCase):
             {
                 "showBorders": True,
                 "tableWidth": "full",
+                "caption": "Canonical table",
                 "columnWidths": ["60%", "40%"],
                 "rows": [{"cells": [{"content": "Name"}, {"content": "Value"}]}],
             }
@@ -22,6 +23,8 @@ class TableWidgetRenderTests(SimpleTestCase):
         )
 
         self.assertIn('class="w-full border"', html)
+        self.assertIn('<caption class="table-caption text-sm text-gray-600 mb-2">Canonical table</caption>', html)
+        self.assertLess(html.index("<caption"), html.index("<colgroup>"))
         self.assertIn("<colgroup>", html)
         self.assertIn('style="width: 60%;"', html)
 

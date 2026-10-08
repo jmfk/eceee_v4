@@ -103,6 +103,7 @@ import BannerWidget from '../BannerWidget'
 import HeroWidget from '../HeroWidget'
 import ContentCardWidget from '../ContentCardWidget'
 import BioWidget from '../BioWidget'
+import HeaderWidget from '../HeaderWidget'
 
 const latestRenderer = () => rendererInstances[rendererInstances.length - 1]
 const rendererAt = index => rendererInstances[index]
@@ -132,6 +133,12 @@ describe('canonical widget update ownership', () => {
         externalChangeCallbacks = []
         publishUpdateMock = vi.fn()
         vi.clearAllMocks()
+    })
+
+    it('HeaderWidget uses the same semantic root as public rendering', () => {
+        const { container } = render(<HeaderWidget />)
+
+        expect(container.querySelector('.header-widget')).toMatchObject({ tagName: 'HEADER' })
     })
 
     it('HeadlineWidget emits one parent update and does not publish directly for user edits', async () => {
@@ -343,6 +350,22 @@ describe('canonical widget update ownership', () => {
             content: '<p>Updated body</p>'
         }))
         expect(publishUpdateMock).not.toHaveBeenCalled()
+    })
+
+    it('ContentCardWidget exposes its card header as a heading in editor mode', () => {
+        const { container } = render(
+            <ContentCardWidget
+                mode="editor"
+                widgetId="card-1"
+                slotName="main"
+                config={{ header: 'Card heading', content: '<p>Card body</p>' }}
+                onConfigChange={vi.fn()}
+                context={{ pageId: '101' }}
+            />
+        )
+
+        expect(container.querySelector('.content-card-header')).toMatchObject({ tagName: 'H2', textContent: 'Card heading' })
+        expect(container.querySelector('.content-card-header')?.parentElement?.style.display).toBe('contents')
     })
 
     it('ContentCardWidget hydrates external UDC updates without echoing user edits', async () => {

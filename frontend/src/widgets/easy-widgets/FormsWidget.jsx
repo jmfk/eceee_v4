@@ -253,12 +253,12 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
         return (
             <div className="forms-widget-editor p-4">
                 <div className="forms-widget bg-white border border-gray-200 rounded-lg p-6 max-w-2xl mx-auto">
-                    <div className="form-header mb-6">
-                        <div className="form-title text-2xl font-semibold text-gray-900 text-center">{title}</div>
+                    <header className="form-header mb-6">
+                        <h2 className="form-title text-2xl font-semibold text-gray-900 text-center">{title}</h2>
                         {description && (
-                            <div className="form-description text-gray-600 text-center mt-2">{description}</div>
+                            <p className="form-description text-gray-600 text-center mt-2">{description}</p>
                         )}
-                    </div>
+                    </header>
 
                     {fields.length > 0 ? (
                         <form onSubmit={handleSubmit} className="widget-form space-y-6">
@@ -353,12 +353,12 @@ const FormsWidget = ({ config = {}, mode = 'preview' }) => {
 
     return (
         <div className="forms-widget bg-white border border-gray-200 rounded-lg p-6 max-w-2xl mx-auto">
-            <div className="form-header mb-6">
-                <div className="form-title text-2xl font-semibold text-gray-900 text-center">{title}</div>
+            <header className="form-header mb-6">
+                <h2 className="form-title text-2xl font-semibold text-gray-900 text-center">{title}</h2>
                 {description && (
-                    <div className="form-description text-gray-600 text-center mt-2">{description}</div>
+                    <p className="form-description text-gray-600 text-center mt-2">{description}</p>
                 )}
-            </div>
+            </header>
 
             {fields.length > 0 ? (
                 <form onSubmit={handleSubmit} className="widget-form space-y-6">
