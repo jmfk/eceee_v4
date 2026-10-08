@@ -13,6 +13,20 @@ SPEC.loader.exec_module(configure_orbstack)
 
 
 class DotenvHelpersTests(unittest.TestCase):
+    def test_local_compose_services_use_project_scoped_container_names(self):
+        for compose_file in ("docker-compose.dev.yml", "docker-compose.infra.yml"):
+            with self.subTest(compose_file=compose_file):
+                content = (configure_orbstack.ROOT / compose_file).read_text(
+                    encoding="utf-8"
+                )
+                self.assertNotIn("container_name:", content)
+
+        dev_compose = (configure_orbstack.ROOT / "docker-compose.dev.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("http://eceee-v4-imgproxy:8080", dev_compose)
+        self.assertIn("http://imgproxy:8080", dev_compose)
+
     def test_checkout_redis_namespace_is_unique_and_acl_compatible(self):
         self.assertEqual(
             configure_orbstack.checkout_redis_namespace(Path("/tmp/eceee_v4_2")),

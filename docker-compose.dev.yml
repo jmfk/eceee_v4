@@ -7,7 +7,6 @@ services:
       args:
         REQUIREMENTS_FILE: dev.txt
     image: ${BACKEND_IMAGE:-eceee-v4-backend}:latest
-    container_name: ${BACKEND_CONTAINER_NAME:-eceee-v4-backend}
     restart: "no"
     environment:
       - DEBUG=1
@@ -30,7 +29,7 @@ services:
       - AWS_S3_USE_SSL=False
       - REDIS_URL=${REDIS_URL:?Run make configure-local-infra}
       - ECEEE_REDIS_NAMESPACE=${ECEEE_REDIS_NAMESPACE:-eceee_v4}
-      - IMGPROXY_URL=${IMGPROXY_URL:-http://eceee-v4-imgproxy:8080}
+      - IMGPROXY_URL=${IMGPROXY_URL:-http://imgproxy:8080}
       - IMGPROXY_PUBLIC_URL=http://localhost:${ECEEE_IMGPROXY_PORT:-10106}
       - IMGPROXY_KEY=${IMGPROXY_KEY:?Run make configure-local-infra}
       - IMGPROXY_SALT=${IMGPROXY_SALT:?Run make configure-local-infra}
@@ -70,7 +69,6 @@ services:
       dockerfile: Dockerfile
       target: development
     image: ${FRONTEND_IMAGE:-eceee-v4-frontend}:latest
-    container_name: ${FRONTEND_CONTAINER_NAME:-eceee-v4-frontend}
     restart: "no"
     environment:
       - REACT_APP_API_URL=http://localhost:${BACKEND_PORT:-10101}/api
@@ -119,7 +117,6 @@ services:
       args:
         REQUIREMENTS_FILE: dev.txt
     image: ${BACKEND_IMAGE:-eceee-v4-backend}:latest
-    container_name: ${CELERY_WORKER_CONTAINER_NAME:-eceee-v4-celery-worker}
     restart: "no"
     environment:
       - DEBUG=1
@@ -140,7 +137,7 @@ services:
       - AWS_S3_USE_SSL=False
       - REDIS_URL=${REDIS_URL:?Run make configure-local-infra}
       - ECEEE_REDIS_NAMESPACE=${ECEEE_REDIS_NAMESPACE:-eceee_v4}
-      - IMGPROXY_URL=${IMGPROXY_URL:-http://eceee-v4-imgproxy:8080}
+      - IMGPROXY_URL=${IMGPROXY_URL:-http://imgproxy:8080}
       - IMGPROXY_PUBLIC_URL=http://localhost:${ECEEE_IMGPROXY_PORT:-10106}
       - IMGPROXY_KEY=${IMGPROXY_KEY:?Run make configure-local-infra}
       - IMGPROXY_SALT=${IMGPROXY_SALT:?Run make configure-local-infra}
@@ -171,7 +168,6 @@ services:
       context: ./theme-sync
       dockerfile: Dockerfile
     image: ${THEME_SYNC_IMAGE:-eceee-v4-theme-sync}:latest
-    container_name: ${THEME_SYNC_CONTAINER_NAME:-eceee-v4-theme-sync}
     restart: "no"
     networks:
       - default

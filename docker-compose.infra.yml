@@ -4,7 +4,6 @@ services:
   imgproxy:
     image: darthsim/imgproxy:latest
     platform: linux/arm64
-    container_name: eceee-v4-imgproxy
     restart: "no"
     environment:
       IMGPROXY_ALLOW_UNSAFE_URL: true
