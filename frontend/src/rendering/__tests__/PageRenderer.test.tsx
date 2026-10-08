@@ -63,8 +63,11 @@ describe('PageRenderer', () => {
         const { container } = render(<PageRenderer model={model} />)
         const sections = container.querySelectorAll('.section-widget')
         expect(sections[0]).toHaveClass('border-enabled', 'section-collapsed')
-        fireEvent.click(screen.getAllByRole('button', { name: 'Expand to read more' })[0])
+        const firstControl = screen.getAllByRole('button', { name: 'Expand to read more' })[0]
+        expect(firstControl).toHaveAttribute('aria-expanded', 'false')
+        fireEvent.click(firstControl)
         expect(sections[0]).not.toHaveClass('section-collapsed')
+        expect(screen.getAllByRole('button', { name: 'Show less' })[0]).toHaveAttribute('aria-expanded', 'true')
         fireEvent.click(screen.getAllByRole('button', { name: 'Expand to read more' })[0])
         expect(sections[0]).toHaveClass('section-collapsed')
         expect(sections[1]).not.toHaveClass('section-collapsed')
@@ -648,6 +651,21 @@ describe('PageRenderer', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Next slide' }))
         expect(track).toHaveStyle({ transform: 'translateX(-100%)' })
         expect(screen.getByRole('button', { name: 'Go to slide 2' })).toHaveAttribute('aria-current', 'true')
+    })
+
+    it('associates image captions with semantic figures', () => {
+        const model = createPageRenderModel({
+            widgets: { main: [{ id: 'image', type: 'easy_widgets.ImageWidget', config: {
+                image: { src: '/image.jpg', altText: 'Semantic image' },
+                caption: 'Semantic image caption',
+            } }] },
+        })
+
+        const { container } = render(<PageRenderer model={model} />)
+
+        const caption = screen.getByText('Semantic image caption')
+        expect(caption.tagName).toBe('FIGCAPTION')
+        expect(caption.closest('figure')).toBe(container.querySelector('.image-container'))
     })
 
     it('renders responsive image sources supplied by the publisher model', () => {

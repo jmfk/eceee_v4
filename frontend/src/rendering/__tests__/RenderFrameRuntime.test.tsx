@@ -74,6 +74,30 @@ describe('RenderFrameRuntime navigation', () => {
 })
 
 describe('RenderFrameRuntime designer overlay', () => {
+    it('exposes image captions as editable Designer targets', async () => {
+        const postMessage = vi.spyOn(window, 'postMessage')
+        const sourceModel = createPageRenderModel({
+            widgets: { main: [{
+                id: 'captioned-image',
+                type: 'easy_widgets.ImageWidget',
+                config: { image: { src: '/image.jpg', altText: 'Example' }, caption: 'Editable caption' },
+            }] },
+        })
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace, sourceModel, contentEditable: true }))
+
+        const caption = await screen.findByText('Editable caption')
+        await waitFor(() => expect(caption).toHaveAttribute('data-designer-target'))
+        fireEvent.click(caption)
+
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview',
+            action: 'select',
+            label: 'Image caption',
+        }), '*')
+        postMessage.mockRestore()
+    })
+
     it('binds read-only catalog targets to rendered DOM while keeping editor chrome out', async () => {
         render(<RenderFrameRuntime />)
         sendModel(createDesignerRenderModel({ workspace, viewId: 'page-main', themeCss: '.content-widget{color:rgb(1,2,3)}' }))

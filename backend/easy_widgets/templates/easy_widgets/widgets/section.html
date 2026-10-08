@@ -35,12 +35,12 @@ Section Widget Template
             </div>
             
             {# Expand/Contract banners #}
-            <div class="section-banner expand-banner" onclick="toggleSection(this)">
+            <button type="button" class="section-banner expand-banner" aria-expanded="{% if config.start_expanded %}true{% else %}false{% endif %}" onclick="toggleSection(this)">
                 <span>{{ config.expand_text|default:'Expand to read more' }}</span>
-            </div>
-            <div class="section-banner contract-banner" onclick="toggleSection(this)">
+            </button>
+            <button type="button" class="section-banner contract-banner" aria-expanded="{% if config.start_expanded %}true{% else %}false{% endif %}" onclick="toggleSection(this)">
                 <span>{{ config.contract_text|default:'Show less' }}</span>
-            </div>
+            </button>
         </div>
     </div>
 {% else %}
@@ -55,6 +55,13 @@ Section Widget Template
 {% if config.enable_collapse %}
 <script>
 (function() {
+    function syncSectionControls(sectionWidget) {
+        const isExpanded = !sectionWidget.classList.contains('section-collapsed');
+        sectionWidget.querySelectorAll('.section-banner').forEach(control => {
+            control.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        });
+    }
+
     window.toggleSection = function(element) {
         const sectionWidget = element.closest('.section-widget');
         const isCollapsed = sectionWidget.classList.contains('section-collapsed');
@@ -65,6 +72,7 @@ Section Widget Template
             allSections.forEach(section => {
                 if (section !== sectionWidget && !section.classList.contains('section-collapsed')) {
                     section.classList.add('section-collapsed');
+                    syncSectionControls(section);
                 }
             });
         }
@@ -77,6 +85,7 @@ Section Widget Template
             // Scroll to top of section when collapsing
             sectionWidget.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+        syncSectionControls(sectionWidget);
     };
 })();
 </script>
