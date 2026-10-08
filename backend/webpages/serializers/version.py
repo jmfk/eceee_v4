@@ -236,9 +236,12 @@ class PageVersionSerializer(serializers.ModelSerializer):
         """Resolve inheritance for this version, independent of the live version."""
         if obj.theme:
             return obj.theme
+        include_parent_drafts = not obj.is_published()
         current = obj.page.parent
         while current:
-            parent_version = current.get_latest_version()
+            parent_version = (
+                current.get_latest_version() if include_parent_drafts else current.get_current_published_version()
+            )
             if parent_version and parent_version.theme:
                 return parent_version.theme
             current = current.parent
@@ -254,9 +257,12 @@ class PageVersionSerializer(serializers.ModelSerializer):
             return {"source": "none", "inherited_from": None}
 
         # Find which parent it came from
+        include_parent_drafts = not obj.is_published()
         current = obj.page.parent
         while current:
-            current_version = current.get_latest_version()
+            current_version = (
+                current.get_latest_version() if include_parent_drafts else current.get_current_published_version()
+            )
             if current_version and current_version.theme:
                 return {
                     "source": "inherited",

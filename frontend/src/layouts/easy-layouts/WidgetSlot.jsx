@@ -304,7 +304,7 @@ const WidgetSlot = ({
 
         try {
             return (
-                <div key={uniqueKey}>
+                <React.Fragment key={uniqueKey}>
                     <PageWidgetFactory
                         widget={widget}
                         slotName={name}
@@ -362,7 +362,7 @@ const WidgetSlot = ({
                         buildWidgetPath={buildWidgetPath}
                         parseWidgetPath={parseWidgetPath}
                     />
-                </div>
+                </React.Fragment>
             );
         } catch (error) {
             return (

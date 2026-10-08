@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.utils import timezone
 
 from core.models import Tenant
 from webpages.models import PageTheme, WebPage
@@ -84,3 +85,29 @@ class ThemeInheritanceSerializationTest(TestCase):
 
         self.assertEqual(data["effective_theme"]["id"], draft_theme.id)
         self.assertEqual(data["theme_inheritance_info"]["inherited_from"]["theme_id"], draft_theme.id)
+
+    def test_published_child_does_not_inherit_theme_from_parent_draft(self):
+        live_theme = PageTheme.objects.create(name="Live theme", tenant=self.tenant, created_by=self.user)
+        draft_theme = PageTheme.objects.create(name="Draft theme", tenant=self.tenant, created_by=self.user)
+
+        live_parent = self.parent.create_version(self.user, "Parent live")
+        live_parent.theme = live_theme
+        live_parent.effective_date = timezone.now()
+        live_parent.save(update_fields=["theme", "effective_date"])
+        self.parent.current_published_version = live_parent
+        self.parent.save(update_fields=["current_published_version"])
+
+        draft_parent = self.parent.create_version(self.user, "Parent draft")
+        draft_parent.theme = draft_theme
+        draft_parent.save(update_fields=["theme"])
+
+        published_child = self.child.create_version(self.user, "Child live")
+        published_child.effective_date = timezone.now()
+        published_child.save(update_fields=["effective_date"])
+        self.child.current_published_version = published_child
+        self.child.save(update_fields=["current_published_version"])
+
+        data = PageVersionSerializer(published_child).data
+
+        self.assertEqual(data["effective_theme"]["id"], live_theme.id)
+        self.assertEqual(data["theme_inheritance_info"]["inherited_from"]["theme_id"], live_theme.id)

@@ -205,7 +205,7 @@ const ThreeColumnsWidget = ({
         const fullWidgetPath = [...widgetPath, slotName, widget.id];
 
         return (
-            <div key={uniqueKey} className="widget-wrapper">
+            <div key={uniqueKey} className="three-col-widget-wrapper">
                 <PageWidgetFactory
                     widget={widget}
                     slotName={slotName}
@@ -431,10 +431,10 @@ const ThreeColumnsWidget = ({
     // Default rendering helper function
     function renderDefaultThreeColumns() {
         const layoutStyle = config.layoutStyle || config.layout_style || '2:2:2'
-        const gridClasses = getGridClasses(layoutStyle)
+        const ratioClass = `three-col-ratio-${layoutStyle.replace(/:/g, '-')}`
 
         return (
-            <div className={`grid grid-cols-1 ${gridClasses} gap-4 w-full mb-4`}>
+            <div className={`three-columns-widget widget-type-easy-widgets-threecolumnswidget ${ratioClass}`}>
                 <div className="three-col-slot left" data-slot="left">
                     {slotsData.left && slotsData.left.length > 0 ? (
                         slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
