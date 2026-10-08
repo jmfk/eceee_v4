@@ -892,7 +892,7 @@ describe('DesignerThemeWorkspacePage', () => {
             data: { source: 'eceee-designer-preview', targetId: 'group:0:part:content-widget', kind: 'part', label: 'Content' },
             source: iframe.contentWindow,
         }))
-        expect(screen.getByText(/defined at Base \(Mobile\)/i)).toBeInTheDocument()
+        expect(await screen.findByText(/defined at Base \(Mobile\)/i)).toBeInTheDocument()
         expect(screen.getByDisplayValue('12px')).toBeDisabled()
 
         fireEvent.click(screen.getByRole('button', { name: 'Theme images' }))
