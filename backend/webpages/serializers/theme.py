@@ -14,6 +14,7 @@ from rest_framework import serializers
 from file_manager.imgproxy import imgproxy_service
 
 from ..models import PageTheme, PreviewSize
+from ..theme_layouts import validate_layout_compatibility, validate_theme_layouts
 from .base import UserSerializer
 
 
@@ -177,6 +178,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "design_groups",
             "component_styles",
             "designer_preview",
+            "layouts",
             "image_styles",
             "gallery_styles",
             "carousel_styles",
@@ -385,6 +387,17 @@ class PageThemeSerializer(serializers.ModelSerializer):
                     )
 
         return value
+
+    def validate_layouts(self, value):
+        try:
+            validate_theme_layouts(value)
+            return validate_layout_compatibility(self.instance, value) if self.instance else value
+        except Exception as exc:
+            from django.core.exceptions import ValidationError as DjangoValidationError
+
+            if isinstance(exc, DjangoValidationError):
+                raise serializers.ValidationError(exc.messages) from exc
+            raise
 
     def validate_table_templates(self, value):
         """Validate table templates configuration"""

@@ -223,7 +223,7 @@ const ImageWidget = ({
                 quality: 85,
                 format: 'webp',
             })
-            return [sourceUrl, url && url !== sourceUrl ? url : '']
+            return [sourceUrl, url || '']
         })).then(entries => {
             if (!cancelled) setProcessedImageUrls(Object.fromEntries(entries))
         })

@@ -51,7 +51,15 @@ export const buildResolvedRenderModel = async ({
         ? page.hostnames
         : page?.cachedRootHostnames || page?.cached_root_hostnames || []
     const model = createPageRenderModel({
-        layout: version?.codeLayout || page?.effectiveLayout?.name || 'main_layout',
+        layout: version?.layoutKey || version?.codeLayout || page?.effectiveLayout?.name || 'main_layout',
+        layoutDefinition: (() => {
+            const theme = version?.effectiveTheme || page?.effectiveTheme
+            const key = version?.layoutKey || version?.codeLayout || page?.effectiveLayout?.name
+                || theme?.layouts?.default_layout_key || theme?.layouts?.defaultLayoutKey || 'main_layout'
+            return theme?.layouts?.items?.find((candidate: any) => candidate.key === key) || null
+        })(),
+        layoutDefinitionRequired: Boolean((version?.effectiveTheme || page?.effectiveTheme)?.layouts),
+        layoutBreakpoints: version?.effectiveTheme?.breakpoints || page?.effectiveTheme?.breakpoints,
         widgets: version?.widgets || {},
         inheritedWidgets: inheritance.inheritedWidgets,
         slotInheritanceRules: inheritance.slotInheritanceRules,

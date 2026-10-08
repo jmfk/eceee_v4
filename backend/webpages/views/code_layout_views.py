@@ -123,9 +123,10 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         return response
 
     def list(self, request):
-        """Get all registered code-based layouts"""
+        """Get active layouts from a requested/default theme, with registry compatibility fallback."""
         from ..layout_autodiscovery import autodiscover_layouts, get_layout_summary
         from ..layout_registry import layout_registry
+        from ..models import PageTheme
 
         # Ensure layouts are discovered
         autodiscover_layouts()
@@ -136,9 +137,55 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         # Log metrics
         self._log_metrics(request, "list")
 
-        # Get layouts
-        layouts = layout_registry.list_layouts(active_only=active_only)
-        layout_data = [layout.to_dict() for layout in layouts]
+        theme = None
+        tenant = getattr(request, "tenant", None)
+        theme_id = request.query_params.get("theme_id")
+        source = request.query_params.get("source", "effective")
+        if source not in {"effective", "code"}:
+            return self._create_formatted_response(
+                {"error": "source must be 'effective' or 'code'"}, request, status.HTTP_400_BAD_REQUEST
+            )
+        if source == "code":
+            theme = None
+        elif tenant and theme_id:
+            theme = PageTheme.objects.filter(tenant=tenant, id=theme_id).first()
+        elif tenant:
+            theme = PageTheme.get_default_theme(tenant=tenant)
+
+        theme_items = (theme.layouts or {}).get("items", []) if theme else []
+        if source != "code" and theme_items:
+            layout_data = [
+                {
+                    "name": item.get("key"),
+                    "description": item.get("description", ""),
+                    "slot_configuration": {
+                        "slots": [
+                            {"name": key, "title": config.get("label", key), **config}
+                            for key, config in (item.get("slots") or {}).items()
+                        ]
+                    },
+                    "is_active": item.get("status", "active") == "active",
+                    "type": "theme",
+                }
+                for item in theme_items
+                if not active_only or item.get("status", "active") == "active"
+            ]
+        else:
+            layouts = layout_registry.list_layouts(active_only=active_only)
+            layout_data = [layout.to_dict() for layout in layouts]
+            legacy_error_names = {"error_403", "error_404", "error_500", "error_503"}
+            legacy_error = next((item for item in layout_data if item.get("name") in legacy_error_names), None)
+            has_shared_error = any(item.get("name") == "error_layout" for item in layout_data)
+            layout_data = [item for item in layout_data if item.get("name") not in legacy_error_names]
+            if legacy_error and not has_shared_error:
+                layout_data.append(
+                    {
+                        **legacy_error,
+                        "name": "error_layout",
+                        "description": "Shared layout for site-owned 403, 404, 500, and 503 pages",
+                    }
+                )
+                layout_data.sort(key=lambda item: item.get("name", ""))
 
         # Use serializer for consistent formatting
         serializer_context = {

@@ -106,6 +106,7 @@ class PageVersionWorkflowService:
         "meta_title",
         "meta_description",
         "code_layout",
+        "layout_key",
         "page_data",
         "widgets",
         "theme",

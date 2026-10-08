@@ -1,325 +1,115 @@
-import React, { useState, useMemo } from 'react'
-import {
-    Grid3X3,
-    Search,
-    X,
-    Eye
-} from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { ArrowRight, Code2, Database, Eye, Grid3X3, Loader2, Plus, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
-// API
+import { layoutWorkspacesApi } from '../api/layoutWorkspaces'
 import { layoutsApi } from '../api/layouts'
+import { themesApi } from '../api/themes'
 import ContextualHelpLink from './help/ContextualHelpLink'
 
-const LayoutEditor = ({
-    onSelect,
-    selectedLayout = null,
-    showPreview = true,
-    className = "",
-    mode = "view" // "view" | "select"
-}) => {
-    const [searchTerm, setSearchTerm] = useState('')
-    const [selectedLayoutForPreview, setSelectedLayoutForPreview] = useState(null)
+const uuid = () => crypto.randomUUID()
 
-    // Fetch code layouts
-    const { data: codeLayoutsData, isLoading } = useQuery({
-        queryKey: ['code-layouts'],
-        queryFn: () => layoutsApi.codeLayouts.list(),
-        staleTime: 5 * 60 * 1000, // 5 minutes
+const convertedLayout = (layout) => {
+    const key = layout.name
+    const slots = layout.slotConfiguration?.slots || []
+    const slotDefinitions = Object.fromEntries(slots.map((slot, index) => [slot.name, {
+        label: slot.title || slot.name.replaceAll('_', ' '),
+        description: slot.description || 'Converted from the code-layout registry.',
+        order: slot.order ?? (index + 1) * 10,
+        max_widgets: slot.maxWidgets ?? slot.max_widgets ?? null,
+        required: Boolean(slot.required),
+        allows_inheritance: Boolean(slot.allowsInheritance ?? slot.allows_inheritance),
+        allow_merge: Boolean(slot.allowMerge ?? slot.allow_merge),
+        collapse_behavior: slot.collapseBehavior ?? slot.collapse_behavior ?? 'never',
+        default_widgets: slot.defaultWidgets ?? slot.default_widgets ?? [],
+        ...(slot.allowedWidgetTypes || slot.allowed_widget_types ? { allowed_widget_types: slot.allowedWidgetTypes || slot.allowed_widget_types } : {}),
+        ...(slot.disallowedWidgetTypes || slot.disallowed_widget_types ? { disallowed_widget_types: slot.disallowedWidgetTypes || slot.disallowed_widget_types } : {}),
+        ...(slot.inheritableTypes || slot.inheritable_types ? { inheritable_types: slot.inheritableTypes || slot.inheritable_types } : {}),
+        ...(slot.dimensions ? { dimensions: slot.dimensions } : {}),
+    }]))
+    const safeSlots = Object.keys(slotDefinitions).length ? slotDefinitions : {
+        main: { label: 'Main', description: 'Primary content', order: 10, max_widgets: null, required: true, collapse_behavior: 'never', default_widgets: [] },
+    }
+    return {
+        id: uuid(), key,
+        label: layout.name.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
+        description: layout.description || 'Converted from the legacy code-layout registry.', status: 'active',
+        root: {
+            id: uuid(), type: 'semantic', tag: 'main',
+            children: Object.keys(safeSlots).map((slotKey) => ({ id: uuid(), type: 'slot', slot_key: slotKey, children: [], styles: {}, class_names: ['layout-slot', `slot-${slotKey.replaceAll('_', '-')}`] })),
+            styles: { base: { width: '100%', display: 'flex', flex_direction: 'column' } },
+            class_names: ['converted-code-layout', `layout-${key.replaceAll('_', '-')}`],
+        },
+        slots: safeSlots,
+    }
+}
+
+const LayoutEditor = ({ className = '', themeId = null }) => {
+    const navigate = useNavigate()
+    const [previewLayout, setPreviewLayout] = useState(null)
+    const [showConvert, setShowConvert] = useState(false)
+    const [error, setError] = useState('')
+    const themeQuery = useQuery({
+        queryKey: ['layout-overview', themeId || 'default-theme'],
+        queryFn: async () => themeId ? await themesApi.get(themeId) : await themesApi.getDefault(),
+    })
+    const codeQuery = useQuery({ queryKey: ['layout-overview', 'code-layouts'], queryFn: () => layoutsApi.codeLayouts.list(true, 'code') })
+    const theme = themeQuery.data
+    const layouts = useMemo(() => theme?.layouts?.items || [], [theme])
+    const codeLayouts = codeQuery.data?.results || []
+    const convertedKeys = useMemo(() => new Set(layouts.map((layout) => layout.key)), [layouts])
+
+    const openDesigner = (layoutKey = '') => {
+        if (!theme?.id) return
+        const params = new URLSearchParams({ workspace: 'layouts' })
+        if (layoutKey) params.set('layout', layoutKey)
+        navigate(`/settings/themes/${theme.id}/layouts/editor?${params}`)
+    }
+
+    const convertMutation = useMutation({
+        mutationFn: async (codeLayout) => {
+            const workspace = await layoutWorkspacesApi.workspace(theme.id)
+            if (workspace.layouts.items.some((layout) => layout.key === codeLayout.name)) return codeLayout.name
+            const layout = convertedLayout(codeLayout)
+            await layoutWorkspacesApi.save(theme.id, workspace.draftVersion, { ...workspace.layouts, items: [...workspace.layouts.items, layout] })
+            return layout.key
+        },
+        onSuccess: (layoutKey) => openDesigner(layoutKey),
+        onError: (conversionError) => setError(conversionError.message || 'The code layout could not be converted.'),
     })
 
-    // Combine and format layouts
-    const layouts = useMemo(() => {
-        const allLayouts = []
+    if (themeQuery.isLoading || codeQuery.isLoading) return <div className={`flex h-64 items-center justify-center ${className}`}><Loader2 className="h-8 w-8 animate-spin text-blue-600" /><span className="ml-2 text-gray-600">Loading layouts…</span></div>
 
-        // Add code layouts
-        if (codeLayoutsData?.results) {
-            const codeLayouts = codeLayoutsData.results.map(layout => ({
-                ...layout,
-                type: 'code',
-                displayName: layout.name,
-                source: 'Code-based'
-            }))
-            allLayouts.push(...codeLayouts)
-        }
-
-        return allLayouts
-    }, [codeLayoutsData])
-
-    // Filter layouts based on search
-    const filteredLayouts = useMemo(() => {
-        if (!searchTerm.trim()) return layouts
-
-        const term = searchTerm.toLowerCase()
-        return layouts.filter(layout =>
-            layout.name.toLowerCase().includes(term) ||
-            layout.description?.toLowerCase().includes(term) ||
-            layout.source.toLowerCase().includes(term)
-        )
-    }, [layouts, searchTerm])
-
-    const handleLayoutSelect = (layout) => {
-        if (mode === "select" && onSelect) {
-            onSelect(layout)
-        } else {
-            setSelectedLayoutForPreview(layout)
-        }
-    }
-
-    const closePreview = () => {
-        setSelectedLayoutForPreview(null)
-    }
-
-    if (isLoading) {
-        return (
-            <div className={`layout-editor ${className}`}>
-                <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <span className="ml-2 text-gray-600">Loading layouts...</span>
+    return <div className={`layout-overview bg-white ${className}`}>
+        <header className="border-b border-gray-200 p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div><div className="flex items-center text-xl font-semibold text-gray-900" role="heading" aria-level="2"><Grid3X3 className="mr-2 h-6 w-6 text-blue-600" />Layouts<ContextualHelpLink topicId="settings-layouts" label="Open Layout help" className="ml-2" /></div><p className="mt-1 text-sm text-gray-600">Theme-owned React layouts available to pages using <span className="font-medium">{theme?.name || 'the default theme'}</span>.</p></div>
+                <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => setShowConvert(true)} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"><Code2 className="h-4 w-4" />Convert Code Layout</button>
+                    <button type="button" onClick={() => navigate(`/settings/themes/${theme.id}/layouts/editor?action=create`)} disabled={!theme?.id} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40"><Plus className="h-4 w-4" />Create Layout</button>
                 </div>
             </div>
-        )
-    }
-
-    return (
-        <div className={`layout-overview bg-white ${className}`}>
-            {/* Header */}
-            <div className="border-b border-gray-200 p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="text-xl font-semibold text-gray-900 flex items-center" role="heading" aria-level="2">
-                            <Grid3X3 className="h-6 w-6 mr-2 text-blue-600" />
-                            Layout Overview
-                            <ContextualHelpLink topicId="settings-layouts" label="Open Layout help" className="ml-2" />
-                        </div>
-                        <div className="mt-1 text-sm text-gray-600">
-                            Available page layout templates defined in the system
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Layouts Grid */}
-            <div className="p-6">
-                {filteredLayouts.length === 0 ? (
-                    <div className="text-center py-8">
-                        <Grid3X3 className="mx-auto h-12 w-12 text-gray-400" />
-                        <div className="mt-2 text-sm font-medium text-gray-900" role="heading" aria-level="3">No layouts found</div>
-                        <div className="mt-1 text-sm text-gray-500">
-                            No layouts have been defined.
-                        </div>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredLayouts.map((layout) => (
-                            <LayoutCard
-                                key={layout.name}
-                                layout={layout}
-                                isSelected={selectedLayout?.name === layout.name}
-                                onSelect={() => handleLayoutSelect(layout)}
-                                onPreview={showPreview ? () => setSelectedLayoutForPreview(layout) : null}
-                                mode={mode}
-                            />
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* Layout Preview Modal */}
-            {selectedLayoutForPreview && showPreview && (
-                <LayoutPreviewModal
-                    layout={selectedLayoutForPreview}
-                    onClose={closePreview}
-                />
-            )}
-        </div>
-    )
+        </header>
+        {error && <div role="alert" className="border-b border-red-200 bg-red-50 px-6 py-3 text-sm text-red-800">{error}</div>}
+        {themeQuery.isError && <div role="alert" className="m-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">The default theme and its layouts could not be loaded.</div>}
+        <section className="p-6" aria-label="Theme layouts">
+            {layouts.length === 0 ? <div className="py-8 text-center"><Grid3X3 className="mx-auto h-12 w-12 text-gray-400" /><h3 className="mt-2 text-sm font-medium text-gray-900">No theme layouts found</h3><p className="mt-1 text-sm text-gray-500">Create a layout to start defining page structure.</p></div> : <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">{layouts.map((layout) => <LayoutCard key={layout.id || layout.key} layout={layout} isDefault={layout.key === theme.layouts.default_layout_key} onEdit={() => openDesigner(layout.key)} onPreview={() => setPreviewLayout(layout)} />)}</div>}
+        </section>
+        {showConvert && <ConvertDialog layouts={codeLayouts} convertedKeys={convertedKeys} converting={convertMutation.isPending} onConvert={(layout) => convertMutation.mutate(layout)} onClose={() => setShowConvert(false)} />}
+        {previewLayout && <LayoutPreviewModal layout={previewLayout} onClose={() => setPreviewLayout(null)} />}
+    </div>
 }
 
-// Layout Card Component
-const LayoutCard = ({ layout, isSelected, onSelect, onPreview, mode }) => {
-    const slotCount = layout.slotConfiguration?.slots?.length || 0
-    const layoutTestId = (layout.name || 'layout')
-        .toString()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '') || 'layout'
+const LayoutCard = ({ layout, isDefault, onEdit, onPreview }) => <article data-testid={`layout-card-${layout.key}`} className="rounded-lg border border-gray-200 p-4 transition-shadow hover:shadow-md">
+    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-semibold text-gray-900">{layout.label || layout.key}</h3><p className="mt-1 flex items-center gap-1.5 text-xs text-blue-700"><Database className="h-3.5 w-3.5" />Theme Layout</p></div><button type="button" onClick={onPreview} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label={`Preview ${layout.label || layout.key}`}><Eye className="h-4 w-4" /></button></div>
+    <p className="mt-3 min-h-10 text-sm text-gray-600">{layout.description || 'No description.'}</p>
+    <dl className="mt-3 space-y-2 text-xs"><div className="flex justify-between text-gray-500"><dt>Key</dt><dd className="font-mono text-gray-700">{layout.key}</dd></div><div className="flex justify-between text-gray-500"><dt>Slots</dt><dd className="font-medium text-gray-700">{Object.keys(layout.slots || {}).length}</dd></div><div className="flex justify-between text-gray-500"><dt>Status</dt><dd className="flex items-center gap-2">{isDefault && <span className="rounded-full bg-blue-50 px-2 py-1 font-medium text-blue-700">Default</span>}<span className={`rounded-full px-2 py-1 font-medium ${layout.status === 'archived' ? 'bg-gray-100 text-gray-700' : 'bg-green-100 text-green-800'}`}>{layout.status === 'archived' ? 'Archived' : 'Active'}</span></dd></div></dl>
+    <button type="button" onClick={onEdit} className="mt-4 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Edit layout<ArrowRight className="h-4 w-4" /></button>
+</article>
 
-    return (
-        <div
-            data-testid={`layout-card-${layoutTestId}`}
-            className={`layout-card border rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md ${isSelected
-                ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                : 'border-gray-200 hover:border-gray-300'
-                }`}
-            onClick={onSelect}
-        >
-            {/* Header */}
-            <div className="flex items-start justify-between mb-3">
-                <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate" role="heading" aria-level="4">
-                        {layout.displayName || layout.name}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                        📝 Code Layout
-                    </div>
-                </div>
-                {onPreview && (
-                    <button
-                        data-testid={`layout-preview-${layoutTestId}`}
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            onPreview()
-                        }}
-                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                        title="Preview layout"
-                    >
-                        <Eye className="h-4 w-4" />
-                    </button>
-                )}
-            </div>
+const ConvertDialog = ({ layouts, convertedKeys, converting, onConvert, onClose }) => <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="convert-layout-title"><div className="w-full max-w-xl rounded-lg bg-white shadow-xl"><div className="flex items-start justify-between border-b border-gray-200 p-5"><div><h2 id="convert-layout-title" className="text-lg font-semibold text-gray-900">Convert Code Layout</h2><p className="mt-1 text-sm text-gray-600">Create an editable theme layout in the current Designer draft.</p></div><button type="button" onClick={onClose} aria-label="Close convert dialog" className="rounded p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700"><X className="h-5 w-5" /></button></div><div className="max-h-[60vh] space-y-2 overflow-y-auto p-5">{layouts.map((layout) => { const converted = convertedKeys.has(layout.name); return <div key={layout.name} className="flex items-center justify-between gap-4 rounded-md border border-gray-200 p-3"><div><p className="font-medium text-gray-900">{layout.name}</p><p className="mt-0.5 text-xs text-gray-500">{layout.slotConfiguration?.slots?.length || 0} slots</p></div><button type="button" disabled={converted || converting} onClick={() => onConvert(layout)} className="min-w-24 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:bg-gray-50 disabled:text-gray-400">{converted ? 'Converted' : converting ? 'Converting…' : 'Convert'}</button></div> })}{layouts.length === 0 && <p className="py-6 text-center text-sm text-gray-500">No registered code layouts were found.</p>}</div></div></div>
 
-            {/* Description */}
-            {layout.description && (
-                <div className="text-sm text-gray-600 mb-3 line-clamp-2">
-                    {layout.description}
-                </div>
-            )}
+const LayoutPreviewModal = ({ layout, onClose }) => <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="layout-preview-title"><div className="w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl"><div className="flex items-start justify-between border-b border-gray-200 p-5"><div><h2 id="layout-preview-title" className="text-lg font-semibold text-gray-900">{layout.label || layout.key}</h2><p className="mt-1 text-sm text-gray-600">Theme Layout · {layout.key}</p></div><button type="button" onClick={onClose} aria-label="Close layout preview" className="rounded p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700"><X className="h-5 w-5" /></button></div><div className="max-h-[65vh] overflow-y-auto p-5"><p className="text-sm text-gray-600">{layout.description || 'No description.'}</p><h3 className="mt-5 text-sm font-semibold text-gray-900">Slots ({Object.keys(layout.slots || {}).length})</h3><div className="mt-2 space-y-2">{Object.entries(layout.slots || {}).map(([key, slot]) => <div key={key} className="rounded-md bg-gray-50 p-3"><div className="flex justify-between gap-3"><span className="text-sm font-medium text-gray-900">{slot.label || key}</span><span className="font-mono text-xs text-gray-500">{key}</span></div>{slot.description && <p className="mt-1 text-xs text-gray-600">{slot.description}</p>}</div>)}</div></div></div></div>
 
-            {/* Metadata */}
-            <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Slots</span>
-                    <span className="font-medium">{slotCount}</span>
-                </div>
-
-                {layout.template_name && (
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>Template</span>
-                        <span className="font-mono truncate max-w-32" title={layout.template_name}>
-                            {layout.template_name}
-                        </span>
-                    </div>
-                )}
-
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Status</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${layout.isActive
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                        }`}>
-                        {layout.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                </div>
-            </div>
-
-            {/* Selection indicator */}
-            {mode === "select" && isSelected && (
-                <div className="mt-3 flex items-center text-blue-600 text-sm font-medium">
-                    <div className="w-2 h-2 bg-blue-600 rounded-full mr-2"></div>
-                    Selected
-                </div>
-            )}
-        </div>
-    )
-}
-
-// Layout Preview Modal
-const LayoutPreviewModal = ({ layout, onClose }) => {
-    return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <div>
-                        <div className="text-lg font-semibold text-gray-900" role="heading" aria-level="3">
-                            {layout.name}
-                        </div>
-                        <div className="text-sm text-gray-600 mt-1">
-                            📝 Code Layout Preview
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                        <X className="h-5 w-5" />
-                    </button>
-                </div>
-
-                {/* Content */}
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                    {/* Basic Info */}
-                    <div className="mb-6">
-                        <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="4">Layout Information</div>
-                        <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Name:</span>
-                                <span className="font-medium">{layout.name}</span>
-                            </div>
-                            {layout.description && (
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-600">Description:</span>
-                                    <span className="font-medium text-right max-w-xs">{layout.description}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Type:</span>
-                                <span className="font-medium">Code-based</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Status:</span>
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${layout.isActive
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-gray-100 text-gray-800'
-                                    }`}>
-                                    {layout.isActive ? 'Active' : 'Inactive'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Slots Configuration */}
-                    {layout.slotConfiguration?.slots && layout.slotConfiguration.slots.length > 0 && (
-                        <div>
-                            <div className="text-sm font-medium text-gray-900 mb-2" role="heading" aria-level="4">
-                                Widget Slots ({layout.slotConfiguration.slots.length})
-                            </div>
-                            <div className="space-y-3">
-                                {layout.slotConfiguration.slots.map((slot, index) => (
-                                    <div key={index} className="bg-gray-50 rounded-lg p-3">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="font-medium text-sm text-gray-900">
-                                                {slot.title || slot.name}
-                                            </span>
-                                            <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded">
-                                                {slot.name}
-                                            </span>
-                                        </div>
-                                        {slot.description && (
-                                            <div className="text-xs text-gray-600 mb-2">
-                                                {slot.description}
-                                            </div>
-                                        )}
-                                        <div className="flex items-center justify-between text-xs text-gray-500">
-                                            <span>
-                                                Max widgets: {slot.max_widgets || 'Unlimited'}
-                                            </span>
-                                            {slot.css_classes && (
-                                                <span className="font-mono">
-                                                    {slot.css_classes}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    )
-}
-
-export default LayoutEditor 
+export default LayoutEditor

@@ -117,6 +117,51 @@ class DesignerThemeApiTests(TestCase):
         self.authenticate(self.other)
         self.assertEqual(self.client.get(self.workspace_url).status_code, 403)
 
+    def test_layout_workspace_rejects_non_layout_fields(self):
+        self.authenticate(self.designer)
+        url = f"/api/v1/webpages/layout-editor/themes/{self.theme.id}/workspace/"
+        workspace = self.client.get(url).data
+
+        response = self.client.patch(
+            url,
+            {"draftVersion": workspace["draftVersion"], "name": "Must not change here"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.name, "Editorial")
+
+    def test_layout_publish_does_not_publish_other_designer_changes(self):
+        self.authenticate(self.designer)
+        layout_url = f"/api/v1/webpages/layout-editor/themes/{self.theme.id}/workspace/"
+        workspace = self.client.get(layout_url).data
+        changed_layouts = workspace["layouts"]
+        changed_layouts["items"][0]["description"] = "Published layout description"
+        saved = self.client.patch(
+            layout_url,
+            {"draftVersion": workspace["draftVersion"], "layouts": changed_layouts},
+            format="json",
+        ).data
+        designer_saved = self.client.patch(
+            self.workspace_url,
+            {"draftVersion": saved["draftVersion"], "description": "Unpublished theme description"},
+            format="json",
+        ).data
+
+        response = self.client.post(
+            f"/api/v1/webpages/layout-editor/themes/{self.theme.id}/publish/",
+            {"draftVersion": designer_saved["draftVersion"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.description, "Theme for editorial sites")
+        self.assertEqual(self.theme.layouts["items"][0]["description"], "Published layout description")
+        self.assertTrue(response.data["hasOtherDraftChanges"])
+        self.assertFalse(response.data["hasLayoutDraftChanges"])
+
     def test_workspace_exposes_semantic_catalog_without_selectors(self):
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data

@@ -16,6 +16,12 @@ const spacingLabels = {
     padding: 'Inner spacing', paddingTop: 'Inner top', paddingRight: 'Inner right', paddingBottom: 'Inner bottom', paddingLeft: 'Inner left',
 }
 
+const layoutParameterFields = new Set([
+    'display', 'width', 'max_width', 'min_height', 'grid_template_columns', 'grid_column',
+    'flex_direction', 'flex_wrap', 'flex_grow', 'order', 'gap', 'padding', 'margin',
+    'align_items', 'justify_content', 'background_color', 'color', 'border', 'border_radius',
+])
+
 const defaultSidebarWidth = 360
 const minSidebarWidth = 280
 const maxSidebarWidth = 640
@@ -106,6 +112,16 @@ const humanize = (value) => String(value || '')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/[-_]+/g, ' ')
     .replace(/^./, (character) => character.toUpperCase())
+
+const findLayoutNodeById = (node, nodeId) => {
+    if (!node || !nodeId) return null
+    if (node.id === nodeId) return node
+    for (const child of node.children || []) {
+        const found = findLayoutNodeById(child, nodeId)
+        if (found) return found
+    }
+    return null
+}
 
 const matchesContentOption = (option, query) => [
     option.label,
@@ -707,6 +723,8 @@ const SemanticThemeWorkspace = ({
                     sourcePath: Array.isArray(option.sourcePath) ? option.sourcePath : [],
                     sourceMatchIndex: option.sourceMatchIndex ?? 0,
                     computedStyles: option.computedStyles || {},
+                    layoutNodeId: option.layoutNodeId || '',
+                    editableParameters: Array.isArray(option.editableParameters) ? option.editableParameters : [],
                     alternatives: Array.isArray(option.alternatives) ? option.alternatives.map(normalizeTarget) : [],
                     path: Array.isArray(option.path) ? option.path.map(normalizeTarget) : [],
                 }
@@ -741,6 +759,8 @@ const SemanticThemeWorkspace = ({
                 sourcePath: Array.isArray(event.data.sourcePath) ? event.data.sourcePath : [],
                 sourceMatchIndex: event.data.sourceMatchIndex ?? 0,
                 computedStyles: event.data.computedStyles || {},
+                layoutNodeId: event.data.layoutNodeId || '',
+                editableParameters: Array.isArray(event.data.editableParameters) ? event.data.editableParameters : [],
                 alternatives,
                 path: Array.isArray(event.data.path)
                     ? event.data.path.filter((option) => option?.id && option?.label).map(normalizeTarget)
@@ -960,6 +980,27 @@ const SemanticThemeWorkspace = ({
         return () => window.clearTimeout(timer)
     }, [addedThemeValues, preview.css, workspace])
     const relevantColors = (selectedGroup?.colorNames || []).map((name) => ({ name, index: workspace.colors.findIndex((color) => color.name === name) })).filter(({ index }) => index >= 0)
+    const selectedLayoutNode = selectedTarget?.layoutNodeId
+        ? (workspace.layouts?.items || []).map((layout) => findLayoutNodeById(layout.root, selectedTarget.layoutNodeId)).find(Boolean)
+        : null
+    const selectedLayoutParameters = [...new Set(selectedTarget?.editableParameters || selectedLayoutNode?.editable_parameters || [])]
+        .filter((field) => layoutParameterFields.has(field))
+    const layoutParameterBreakpoint = mapBreakpointName(viewport) === 'xs' ? 'base' : mapBreakpointName(viewport)
+    const updateSelectedLayoutParameter = (field, value) => updateWorkspace((next) => {
+        const mutate = (node) => {
+            if (node.id === selectedTarget?.layoutNodeId) {
+                node.styles ||= {}
+                node.styles[layoutParameterBreakpoint] ||= {}
+                if (value) node.styles[layoutParameterBreakpoint][field] = value
+                else delete node.styles[layoutParameterBreakpoint][field]
+                if (!Object.keys(node.styles[layoutParameterBreakpoint]).length) delete node.styles[layoutParameterBreakpoint]
+                return true
+            }
+            return (node.children || []).some(mutate)
+        }
+        ;(next.layouts?.items || []).some((layout) => mutate(layout.root))
+        return next
+    })
     const selectTargetFromInspector = (target, { replaceInspectorRoot = false } = {}) => {
         const asset = assetsByTargetId.get(target.id)
         if (asset) setSelectedImageAspectKey(imageAspectKey(asset))
@@ -1405,9 +1446,13 @@ const SemanticThemeWorkspace = ({
                             </section>
                         )
                     })}
+                    {selectedLayoutNode && selectedLayoutParameters.length > 0 && <section className="space-y-3 border-t border-gray-200 pt-3">
+                        <div><h3 className="text-sm font-medium text-gray-900">Layout parameters</h3><p className="mt-0.5 text-xs text-gray-500">Exposed by the layout for {breakpointLabel(layoutParameterBreakpoint)}. Blank values inherit from a smaller breakpoint.</p></div>
+                        <div className="space-y-2">{selectedLayoutParameters.map((field) => <label key={field} className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,1.2fr)] items-center gap-2 text-xs text-gray-700"><span>{humanize(field)}</span><input aria-label={`${selectedLayoutNode.label || selectedTargetLabel} ${humanize(field)}`} value={selectedLayoutNode.styles?.[layoutParameterBreakpoint]?.[field] ?? ''} onChange={(event) => updateSelectedLayoutParameter(field, event.target.value)} placeholder="Inherited" className="min-w-0 rounded border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>)}</div>
+                    </section>}
                     {addableThemeValues.length > 0 && <section className="border-t border-gray-200 pt-4"><label htmlFor="add-theme-value" className="text-xs font-semibold uppercase tracking-wide text-gray-500">Add theme value</label><select id="add-theme-value" value="" onChange={(event) => addThemeValue(event.target.value)} className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"><option value="">Choose a value…</option>{addableThemeValues.map((value) => <option key={propertyKey(value.kind, value.index, value.field)} value={propertyKey(value.kind, value.index, value.field)}>{value.label}</option>)}</select></section>}
                     {relevantColors.length > 0 && <section className="space-y-3 border-t border-gray-200 pt-4"><h3 className="font-medium text-gray-900">Colors used here</h3><p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global values.</strong> Colors are the same at every breakpoint.</p>{relevantColors.map(({ name, index }) => <label key={name} className="flex items-center gap-3"><input type="color" value={/^#[0-9a-f]{6}$/i.test(workspace.colors[index].value) ? workspace.colors[index].value : '#000000'} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="h-10 w-12 rounded border border-gray-300" /><span className="min-w-0 flex-1 text-sm font-medium">{name}</span><input aria-label={`${name} value`} value={workspace.colors[index].value} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="w-28 rounded-md border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>)}</section>}
-                    {!targetTypography.length && !targetSpacing.length && !relevantColors.length && selectedTarget.kind !== 'element' && selectedTarget.kind !== 'asset' && <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500">Choose a more specific text or image inside this area to edit its details.</p>}
+                    {!targetTypography.length && !targetSpacing.length && !relevantColors.length && !selectedLayoutParameters.length && selectedTarget.kind !== 'element' && selectedTarget.kind !== 'asset' && <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500">Choose a more specific text or image inside this area to edit its details.</p>}
                         </>
                         return <>
                             {targetFocusKey(selectedTarget) === targetFocusKey(inspectorRoot) && <div key={`root-${selectionFocusVersion}`} className={`designer-inspector-focus space-y-3 ${childTargets.length > 0 ? 'shrink-0' : 'min-h-0 flex-1 overflow-y-auto'}`}>{fields}</div>}

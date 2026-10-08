@@ -60,15 +60,65 @@ export interface DesignerRenderOptions {
     previewImageReferences?: DesignerPreviewImageReference[]
     contentEditable?: boolean
     guidesEnabled?: boolean
+    layoutCanvas?: boolean
 }
 
 export interface RenderPageModel {
     layout: 'main_layout' | 'landing_page' | string
+    layoutDefinition?: ThemeLayoutDefinition | null
+    layoutDefinitionRequired?: boolean
+    layoutBreakpoints?: Record<string, number>
     slots: Record<string, RenderWidgetModel[]>
     context: RenderContext
     themeCss?: string
     fontUrl?: string
     designer?: DesignerRenderOptions
+}
+
+export type ThemeLayoutNodeType = 'container' | 'section' | 'grid' | 'row' | 'column' | 'semantic' | 'slot'
+
+export interface ThemeLayoutNode {
+    id: string
+    type: ThemeLayoutNodeType
+    label?: string
+    children: ThemeLayoutNode[]
+    styles?: Record<string, Record<string, string | number>>
+    class_names?: string[]
+    tag?: 'div' | 'header' | 'nav' | 'main' | 'aside' | 'section' | 'footer'
+    slot_key?: string
+    editable_parameters?: string[]
+}
+
+export interface ThemeLayoutSlot {
+    label?: string
+    description?: string
+    order?: number
+    required?: boolean
+    max_widgets?: number | null
+    allowed_widget_types?: string[]
+    disallowed_widget_types?: string[]
+    allows_inheritance?: boolean
+    allow_merge?: boolean
+    inheritable_types?: string[]
+    collapse_behavior?: 'never' | 'any' | 'all'
+    dimensions?: Record<string, { width?: number | null, height?: number | null }>
+    default_widgets?: unknown[]
+}
+
+export interface ThemeLayoutDefinition {
+    id: string
+    key: string
+    label: string
+    description?: string
+    status: 'active' | 'archived'
+    root: ThemeLayoutNode
+    slots: Record<string, ThemeLayoutSlot>
+}
+
+export interface ThemeLayoutDocument {
+    schema_version: 1
+    default_layout_key: string
+    items: ThemeLayoutDefinition[]
 }
 
 export interface WidgetRenderProps {

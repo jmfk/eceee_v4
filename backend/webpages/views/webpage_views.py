@@ -169,6 +169,10 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         # Normalize sort orders for the parent group
         page = serializer.instance
+        if page.parent_id is None:
+            from ..services.error_pages import ensure_site_error_pages
+
+            ensure_site_error_pages(page, self.request.user)
         WebPage.normalize_sort_orders(page.parent_id, tenant_id=page.tenant_id)
 
     def retrieve(self, request, pk=None):

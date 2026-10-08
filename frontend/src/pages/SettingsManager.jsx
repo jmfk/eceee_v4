@@ -30,7 +30,6 @@ import { layoutsApi } from '../api/layouts'
 import { useNotificationContext } from '../components/NotificationManager'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
-import LayoutEditor from '../components/LayoutEditor'
 import ThemeEditor from '../components/ThemeEditor'
 import StatusBar from '../components/StatusBar'
 
@@ -67,7 +66,6 @@ const SettingsManager = () => {
         if (path === '/settings/namespaces') return 'namespaces'
         if (path.startsWith('/settings/data-connections')) return 'data-connections'
         if (path.startsWith('/settings/content-migration')) return 'content-migration'
-        if (path.startsWith('/settings/layouts')) return 'layouts'
         return 'dashboard' // default for /settings or fallback
     }
 
@@ -75,7 +73,6 @@ const SettingsManager = () => {
 
     // Set document title based on active tab
     const tabTitles = {
-        'layouts': 'Settings - Layout Overview',
         'themes': 'Settings - Themes',
         'widgets': 'Settings - Widgets',
         'value-lists': 'Settings - Value Lists',
@@ -396,8 +393,6 @@ const SettingsManager = () => {
         switch (activeTab) {
             case 'dashboard':
                 return <SettingsDashboard />
-            case 'layouts':
-                return <LayoutEditor />
             case 'themes':
                 return <ThemeEditor onSave={handleThemeEditorCallback} />
             case 'widgets':

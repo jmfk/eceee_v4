@@ -2,7 +2,8 @@
 Error layouts for the CMS.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
+
 from webpages.layout_registry import BaseLayout, register_layout
 
 
@@ -35,6 +36,15 @@ class BaseErrorLayout(BaseLayout):
                 },
             ]
         }
+
+
+@register_layout
+class ErrorLayout(BaseErrorLayout):
+    """Compatibility wrapper while Django layout rendering is being retired."""
+
+    name = "error_layout"
+    description = "Shared layout for site-owned HTTP error pages"
+    template_name = "webpages/page_detail.html"
 
 
 @register_layout

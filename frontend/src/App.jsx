@@ -7,7 +7,7 @@
  * as published by MongoDB, Inc. See the LICENSE file for details.
  */
 
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster, toast } from 'react-hot-toast'
 import { X } from 'lucide-react'
@@ -53,6 +53,7 @@ import SessionExpiredOverlay from './components/SessionExpiredOverlay'
 import AppVersionReloadGuard from './components/AppVersionReloadGuard'
 import DesignerThemesPage from './pages/DesignerThemesPage'
 import DesignerThemeWorkspacePage from './pages/DesignerThemeWorkspacePage'
+import LayoutWorkspacePage from './pages/LayoutWorkspacePage'
 import DesignerRoute from './components/DesignerRoute'
 
 // Create a client for React Query
@@ -65,6 +66,12 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+const LegacyLayoutWorkspaceRedirect = () => {
+  const { themeId } = useParams()
+  const location = useLocation()
+  return <Navigate to={`/settings/themes/${themeId}/layouts/editor${location.search}`} replace />
+}
 
 // Initialize global context menu config
 if (typeof window !== 'undefined' && !window.__contextMenuConfig) {
@@ -300,11 +307,10 @@ export const AppRoutes = () => {
         } />
         {/* Redirect old tags route to new top-level route */}
         <Route path="/settings/tags" element={<Navigate to="/tags" replace />} />
-        <Route path="/settings/layouts" element={
+        <Route path="/settings/layouts" element={<Navigate to="/settings/themes" replace />} />
+        <Route path="/settings/layouts/:themeId" element={
           <PrivateRoute>
-            <SettingsLayout>
-              <SettingsManager />
-            </SettingsLayout>
+            <LegacyLayoutWorkspaceRedirect />
           </PrivateRoute>
         } />
         <Route path="/settings/themes" element={
@@ -318,6 +324,13 @@ export const AppRoutes = () => {
           <PrivateRoute>
             <SettingsLayout>
               <SettingsManager />
+            </SettingsLayout>
+          </PrivateRoute>
+        } />
+        <Route path="/settings/themes/:themeId/layouts/editor" element={
+          <PrivateRoute>
+            <SettingsLayout statusContent="Settings - Layout Editor">
+              <LayoutWorkspacePage />
             </SettingsLayout>
           </PrivateRoute>
         } />

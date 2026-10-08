@@ -4,6 +4,7 @@ PageTheme Model
 Theme configurations for page styling including colors, fonts, and CSS.
 """
 
+import copy
 import uuid
 
 from django.contrib.auth.models import User
@@ -11,6 +12,7 @@ from django.core.files.base import ContentFile
 from django.db import models
 
 from file_manager.storage import system_storage
+from webpages.theme_layouts import default_theme_layouts, validate_theme_layouts
 
 
 class PageTheme(models.Model):
@@ -64,6 +66,11 @@ class PageTheme(models.Model):
             "Designer preview views and demo content. Views may represent pages or objects and "
             "reference a registered layout while keeping their demo text and images separate from live content."
         ),
+    )
+    layouts = models.JSONField(
+        default=default_theme_layouts,
+        blank=True,
+        help_text="Versioned, validated React layout definitions owned by this theme",
     )
     image_styles = models.JSONField(
         default=dict,
@@ -428,6 +435,7 @@ class PageTheme(models.Model):
             "design_groups": self.design_groups,
             "component_styles": self.component_styles,
             "designer_preview": self.designer_preview,
+            "layouts": self.layouts,
             "image_styles": self.image_styles,
             "gallery_styles": self.gallery_styles,  # Deprecated
             "carousel_styles": self.carousel_styles,  # Deprecated
@@ -447,6 +455,7 @@ class PageTheme(models.Model):
 
     def save(self, *args, **kwargs):
         """Override save to ensure only one default theme exists, increment sync version, and invalidate CSS cache"""
+        validate_theme_layouts(self.layouts)
         if self.is_default:
             # A default is unique within its tenant, not across the whole installation.
             PageTheme.objects.filter(tenant_id=self.tenant_id, is_default=True).exclude(id=self.id).update(
@@ -2605,6 +2614,7 @@ class PageTheme(models.Model):
             design_groups=self.design_groups.copy() if self.design_groups else {},
             component_styles=(self.component_styles.copy() if self.component_styles else {}),
             designer_preview=(self.designer_preview.copy() if self.designer_preview else {}),
+            layouts=copy.deepcopy(self.layouts) if self.layouts else default_theme_layouts(),
             image_styles=self.image_styles.copy() if self.image_styles else {},
             gallery_styles=self.gallery_styles.copy() if self.gallery_styles else {},
             carousel_styles=self.carousel_styles.copy() if self.carousel_styles else {},

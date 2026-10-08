@@ -10,6 +10,7 @@ Schema serializers for the Web Page Publishing System
 """
 
 from rest_framework import serializers
+
 from ..models import PageDataSchema
 from .base import UserSerializer
 
@@ -18,9 +19,8 @@ class PageDataSchemaSerializer(serializers.ModelSerializer):
     """Serializer for page data JSON Schemas (system and layout scopes)."""
 
     created_by = UserSerializer(read_only=True)
-    layout_name = serializers.CharField(
-        max_length=255, required=False, allow_blank=True, allow_null=True
-    )
+    layout_name = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+    layoutKey = serializers.CharField(source="layout_key", max_length=64, required=False, allow_blank=True)
 
     def to_internal_value(self, data):
         # Ensure layout_name is present for field validation
@@ -44,6 +44,7 @@ class PageDataSchemaSerializer(serializers.ModelSerializer):
             "description",
             "scope",
             "layout_name",
+            "layoutKey",
             "schema",
             "is_active",
             "created_at",
@@ -59,16 +60,17 @@ class PageDataSchemaSerializer(serializers.ModelSerializer):
         if scope == PageDataSchema.SCOPE_SYSTEM:
             # For system schemas, clear layout_name and name fields (like model.clean())
             data["layout_name"] = ""
+            data["layout_key"] = ""
             data["name"] = ""
         elif scope == PageDataSchema.SCOPE_LAYOUT:
             # For layout schemas, layout_name is required
-            layout_name = data.get(
-                "layout_name", getattr(self.instance, "layout_name", "")
+            layout_key = data.get("layout_key") or data.get(
+                "layout_name", getattr(self.instance, "layout_key", "") or getattr(self.instance, "layout_name", "")
             )
-            if not layout_name:
-                raise serializers.ValidationError(
-                    {"layout_name": "Layout name is required for layout scope"}
-                )
+            if not layout_key:
+                raise serializers.ValidationError({"layoutKey": "Layout key is required for layout scope"})
+            data["layout_key"] = layout_key
+            data["layout_name"] = layout_key
         else:
             # Default layout_name to empty string if not provided
             if "layout_name" not in data:
@@ -76,7 +78,7 @@ class PageDataSchemaSerializer(serializers.ModelSerializer):
 
         # Validate JSON Schema correctness using jsonschema library
         try:
-            from jsonschema import Draft202012Validator, Draft7Validator
+            from jsonschema import Draft7Validator, Draft202012Validator
 
             schema = data.get("schema", getattr(self.instance, "schema", {}))
             # Try latest first, fall back to draft-07
@@ -85,9 +87,6 @@ class PageDataSchemaSerializer(serializers.ModelSerializer):
             except Exception:
                 Draft7Validator.check_schema(schema)
         except Exception as e:
-            raise serializers.ValidationError(
-                {"schema": f"Invalid JSON Schema: {str(e)}"}
-            )
+            raise serializers.ValidationError({"schema": f"Invalid JSON Schema: {str(e)}"})
 
         return data
-

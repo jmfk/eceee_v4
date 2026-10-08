@@ -34,6 +34,11 @@ class PageVersion(models.Model):
         blank=True,
         help_text="Name of code-based layout class. Leave blank to inherit from parent",
     )
+    layout_key = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text="Portable layout key in the effective theme. Leave blank to inherit from parent.",
+    )
 
     # Snapshot of page data at this version
     page_data = models.JSONField(blank=True, default=dict, help_text="Serialized page data (excluding widgets)")
@@ -120,6 +125,7 @@ class PageVersion(models.Model):
         "meta_title",
         "meta_description",
         "code_layout",
+        "layout_key",
         "page_data",
         "widgets",
         "theme_id",
@@ -212,6 +218,25 @@ class PageVersion(models.Model):
 
     def save(self, *args, **kwargs):
         """Protect published snapshots and update their media references."""
+        update_fields = kwargs.get("update_fields")
+        if update_fields and "layout_key" in update_fields and "code_layout" not in update_fields:
+            self.code_layout = self.layout_key
+            kwargs["update_fields"] = [*update_fields, "code_layout"]
+        elif update_fields and "code_layout" in update_fields and "layout_key" not in update_fields:
+            self.layout_key = self.code_layout
+            kwargs["update_fields"] = [*update_fields, "layout_key"]
+        elif self.pk and self.layout_key != self.code_layout:
+            persisted = type(self).objects.filter(pk=self.pk).values("layout_key", "code_layout").first()
+            legacy_changed = persisted is not None and self.code_layout != persisted["code_layout"]
+            key_changed = persisted is not None and self.layout_key != persisted["layout_key"]
+            if legacy_changed and not key_changed:
+                self.layout_key = self.code_layout
+            else:
+                self.code_layout = self.layout_key
+        elif not self.pk:
+            effective_key = self.layout_key or self.code_layout
+            self.layout_key = effective_key
+            self.code_layout = effective_key
         self._assert_published_snapshot_immutable(kwargs.get("update_fields"))
         # First do the actual save
         super().save(*args, **kwargs)

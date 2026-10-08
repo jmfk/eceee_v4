@@ -34,6 +34,11 @@ export async function getImgproxyUrl(sourceUrl, options = {}) {
         console.warn('getImgproxyUrl: No source URL provided');
         return '';
     }
+    // Inline images are already self-contained and cannot be fetched by the
+    // separate imgproxy container as an object-storage URL.
+    if (/^data:image\/(?:png|gif|jpe?g|webp|svg\+xml)[;,]/i.test(sourceUrl)) {
+        return sourceUrl;
+    }
 
     // Generate cache key
     const cacheKey = JSON.stringify({ sourceUrl, ...options });
@@ -385,4 +390,3 @@ export default {
     preloadImgproxyUrls,
     clearImgproxyCache,
 };
-

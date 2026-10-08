@@ -161,4 +161,23 @@ describe('ImageWidget', () => {
             format: 'webp',
         })
     })
+
+    it('renders safe inline images when imgproxy returns the source unchanged', async () => {
+        const inlineSvg = 'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22/%3E'
+        imgproxyApi.getUrl.mockResolvedValue(inlineSvg)
+
+        render(
+            <ImageWidget
+                mode="editor"
+                widgetId="image-1"
+                slotName="main"
+                config={{
+                    displayType: 'gallery',
+                    mediaItems: [{ type: 'image', url: inlineSvg, altText: 'Error page illustration' }],
+                }}
+            />
+        )
+
+        expect(await screen.findByRole('img', { name: 'Error page illustration' })).toHaveAttribute('src', inlineSvg)
+    })
 })

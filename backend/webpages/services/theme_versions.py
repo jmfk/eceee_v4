@@ -16,6 +16,7 @@ SNAPSHOT_FIELDS = (
     "design_groups",
     "component_styles",
     "designer_preview",
+    "layouts",
     "image_styles",
     "gallery_styles",
     "carousel_styles",

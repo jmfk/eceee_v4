@@ -289,10 +289,23 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         return serialized_inheritance_info
 
     def get_available_code_layouts(self, obj):
-        """Get list of available code layouts"""
-        from ..layout_registry import layout_registry
-
-        return [layout.to_dict() for layout in layout_registry.list_layouts(active_only=True)]
+        """List active layouts from the page's effective theme."""
+        theme = obj.get_effective_theme()
+        if theme and isinstance(theme.layouts, dict):
+            return [
+                {
+                    "name": item.get("key"),
+                    "description": item.get("description", ""),
+                    "slots": [
+                        {"name": key, "title": value.get("label", key), **value}
+                        for key, value in (item.get("slots") or {}).items()
+                    ],
+                    "type": "theme",
+                }
+                for item in theme.layouts.get("items", [])
+                if item.get("status", "active") == "active"
+            ]
+        return []
 
     def get_children_count(self, obj):
         return obj.children.filter(is_deleted=False).count()
@@ -316,10 +329,11 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
     def get_code_layout(self, obj):
         """Get code layout from published version"""
         if hasattr(obj, "_published_versions_list") and obj._published_versions_list:
-            return obj._published_versions_list[0].code_layout or ""
+            version = obj._published_versions_list[0]
+            return version.layout_key or version.code_layout or ""
         published_version = obj.get_current_published_version()
         if published_version:
-            return published_version.code_layout or ""
+            return published_version.layout_key or published_version.code_layout or ""
         return ""
 
     def get_publication_status(self, obj):
@@ -694,7 +708,7 @@ class WebPageListSerializer(serializers.ModelSerializer):
 
     def get_code_layout(self, obj):
         published_version = self._published_version(obj)
-        return published_version.code_layout if published_version and published_version.code_layout else ""
+        return (published_version.layout_key or published_version.code_layout) if published_version else ""
 
     def get_published_version_id(self, obj):
         published_version = self._published_version(obj)

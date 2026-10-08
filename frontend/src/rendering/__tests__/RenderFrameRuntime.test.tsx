@@ -74,6 +74,43 @@ describe('RenderFrameRuntime navigation', () => {
 })
 
 describe('RenderFrameRuntime designer overlay', () => {
+    it('adds labels, live dimensions, and layout-canvas chrome to theme layout nodes', async () => {
+        const renderModel = createPageRenderModel({
+            layout: 'main_layout',
+            layoutDefinitionRequired: true,
+            layoutDefinition: {
+                id: '8ac4db5a-492f-4977-bf00-d21b8d72f08e',
+                key: 'main_layout',
+                label: 'Main layout',
+                description: '',
+                status: 'active',
+                slots: { main: { label: 'Main content' } },
+                root: {
+                    id: '2d1ee676-3624-4ec8-aaf4-8874bea037f4',
+                    type: 'container',
+                    children: [{
+                        id: '114eff0f-f86f-4a10-8df5-27925804fc73',
+                        type: 'slot',
+                        slot_key: 'main',
+                        children: [],
+                        styles: {},
+                    }],
+                    styles: { base: { width: '100%' } },
+                },
+            },
+        })
+        renderModel.designer = { catalog: {}, texts: {}, assets: [], guidesEnabled: true, layoutCanvas: true }
+
+        const { container } = render(<RenderFrameRuntime />)
+        sendModel(renderModel)
+
+        const preview = await waitFor(() => container.querySelector('.layout-designer-preview'))
+        const slot = container.querySelector<HTMLElement>('[data-layout-node-type="slot"]')
+        expect(preview).toBeInTheDocument()
+        expect(slot).toHaveAttribute('data-layout-node-label', 'Main content')
+        await waitFor(() => expect(slot?.dataset.layoutNodeSize).toMatch(/^\d+ × \d+$/))
+    })
+
     it('keeps saved positional text IDs stable when semantic targets are added', async () => {
         const sourceModel = createPageRenderModel({
             widgets: { main: [

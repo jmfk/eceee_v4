@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
     LayoutDashboard,
-    Grid3X3,
     Palette,
     Settings as Cog,
     Calendar,
@@ -18,14 +17,12 @@ import {
     ChevronRight
 } from 'lucide-react'
 import { themesApi } from '../api'
-import { objectTypesApi } from '../api/objectStorage'
-import { layoutsApi } from '../api/layouts'
-import { valueListsApi } from '../api/valueLists'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function SettingsSidebar() {
     const location = useLocation()
     const { user } = useAuth()
+    const [isCollapsed, setIsCollapsed] = useState(false)
     const [expandedSections, setExpandedSections] = useState({
         themes: true,
         system: true,
@@ -137,7 +134,6 @@ export default function SettingsSidebar() {
             icon: Palette,
             items: [
                 { id: 'themes-overview', label: 'All Themes', icon: Palette, href: '/settings/themes' },
-                { id: 'layouts-overview', label: 'Layout Overview', icon: Grid3X3, href: '/settings/layouts' },
                 ...themes.map(theme => ({
                     id: `theme-${theme.id}`,
                     label: theme.name,
@@ -170,15 +166,26 @@ export default function SettingsSidebar() {
     ]
 
     return (
-        <aside className="w-64 bg-white border-r border-gray-200 h-full flex flex-col overflow-y-auto py-6">
-            <div className="px-4 mb-6">
-                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Settings</h2>
+        <aside className={`${isCollapsed ? 'w-14' : 'w-64'} h-full shrink-0 border-r border-gray-200 bg-white transition-[width] duration-200 ease-out flex flex-col`}>
+            <div className={`flex h-16 shrink-0 items-center ${isCollapsed ? 'justify-center px-2' : 'justify-between px-4'}`}>
+                {!isCollapsed && <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Settings</h2>}
+                <button
+                    type="button"
+                    onClick={() => setIsCollapsed((collapsed) => !collapsed)}
+                    aria-label={isCollapsed ? 'Expand settings menu' : 'Collapse settings menu'}
+                    aria-expanded={!isCollapsed}
+                    aria-controls="settings-navigation"
+                    title={isCollapsed ? 'Expand settings menu' : 'Collapse settings menu'}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                >
+                    {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronRight className="h-4 w-4 rotate-180" />}
+                </button>
             </div>
-            <nav className="flex-1 px-2 space-y-1">
-                {navigation.map(section => (
-                    <NavItem key={section.id} item={section} />
-                ))}
-            </nav>
+            {!isCollapsed && <nav id="settings-navigation" aria-label="Settings" className="flex-1 overflow-y-auto px-2 pb-6 space-y-1">
+                    {navigation.map(section => (
+                        <NavItem key={section.id} item={section} />
+                    ))}
+                </nav>}
         </aside>
     )
 }

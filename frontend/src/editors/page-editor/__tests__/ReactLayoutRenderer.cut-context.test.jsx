@@ -207,6 +207,43 @@ describe('ReactLayoutRenderer cut source context', () => {
         })).toBe(true)
     })
 
+    it('renders a theme-owned database layout that has no legacy registry component', () => {
+        renderRenderer({
+            layoutName: 'error_layout',
+            widgets: { message: [] },
+            pageVersionData: {
+                versionId: 'version-b',
+                effectiveTheme: {
+                    layouts: {
+                        items: [{
+                            id: '24f44670-e925-4fc7-b1e8-a0534ea10b50',
+                            key: 'error_layout',
+                            label: 'Error Page',
+                            status: 'active',
+                            root: {
+                                id: '218c4f3d-ac65-4c23-a8a8-75be302584fd',
+                                type: 'semantic',
+                                tag: 'main',
+                                children: [{
+                                    id: 'a14ea8b5-9410-41da-b509-3a27f1637536',
+                                    type: 'slot',
+                                    slot_key: 'message',
+                                    children: [],
+                                    styles: {},
+                                }],
+                                styles: {},
+                            },
+                            slots: { message: { label: 'Error Message', required: true } },
+                        }],
+                    },
+                },
+            },
+        })
+
+        expect(screen.getByTestId('page-editor-slot-message')).toBeInTheDocument()
+        expect(screen.queryByText('Layout Not Found')).not.toBeInTheDocument()
+    })
+
     it('deletes cut widgets from the source version when page id matches but version differs', async () => {
         const onWidgetChange = vi.fn()
 
