@@ -1170,6 +1170,7 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
         "id": theme.id,
         "name": theme.name,
         "description": theme.description,
+        "themeConfig": PageThemeSerializer(theme).data,
         "syncVersion": theme.sync_version,
         "colors": colors,
         "fonts": fonts,

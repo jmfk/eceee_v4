@@ -64,3 +64,23 @@ class ThemeInheritanceSerializationTest(TestCase):
             data["theme_inheritance_info"]["inherited_from"]["theme_id"],
             parent_theme.id,
         )
+
+    def test_child_draft_inherits_theme_from_latest_parent_draft(self):
+        live_theme = PageTheme.objects.create(name="Live theme", tenant=self.tenant, created_by=self.user)
+        draft_theme = PageTheme.objects.create(name="Draft theme", tenant=self.tenant, created_by=self.user)
+
+        live_parent = self.parent.create_version(self.user, "Parent live")
+        live_parent.theme = live_theme
+        live_parent.save(update_fields=["theme"])
+        self.parent.current_published_version = live_parent
+        self.parent.save(update_fields=["current_published_version"])
+
+        draft_parent = self.parent.create_version(self.user, "Parent draft")
+        draft_parent.theme = draft_theme
+        draft_parent.save(update_fields=["theme"])
+        child_draft = self.child.create_version(self.user, "Child draft")
+
+        data = PageVersionSerializer(child_draft).data
+
+        self.assertEqual(data["effective_theme"]["id"], draft_theme.id)
+        self.assertEqual(data["theme_inheritance_info"]["inherited_from"]["theme_id"], draft_theme.id)

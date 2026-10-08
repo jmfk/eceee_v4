@@ -204,19 +204,15 @@ const variablesCSS = variables => {
     return declarations.length ? `:root {\n${declarations.join('\n')}\n}` : ''
 }
 
-export const buildEditorThemeCSS = ({
+export const buildThemeCSS = ({
     theme,
     pageCssVariables,
     pageCustomCss,
     enableCssInjection = true,
-    scopeId,
 }) => {
-    if (!scopeId) return ''
-
     const colors = theme?.colors || theme?.cssVariables || {}
     const designGroups = theme?.designGroups || theme?.typography
-    const fontUrl = googleFontsStylesheetUrl(theme?.fonts)
-    const rawCSS = [
+    return [
         PUBLIC_RENDER_CSS,
         EDITOR_WIDGET_BASE_CSS,
         generateColorsCSS(colors),
@@ -230,6 +226,19 @@ export const buildEditorThemeCSS = ({
         enableCssInjection ? variablesCSS(pageCssVariables) : '',
         enableCssInjection ? pageCustomCss || '' : '',
     ].filter(Boolean).join('\n\n')
+}
+
+export const buildEditorThemeCSS = ({
+    theme,
+    pageCssVariables,
+    pageCustomCss,
+    enableCssInjection = true,
+    scopeId,
+}) => {
+    if (!scopeId) return ''
+
+    const fontUrl = googleFontsStylesheetUrl(theme?.fonts)
+    const rawCSS = buildThemeCSS({ theme, pageCssVariables, pageCustomCss, enableCssInjection })
 
     const rootSelector = `.eceee-theme-scope[data-eceee-theme-scope="${scopeId}"]`
     const compiled = compileEditorCSS(rawCSS, {
@@ -237,4 +246,43 @@ export const buildEditorThemeCSS = ({
         namespace: `eceee-${scopeId.replace(/[^a-zA-Z0-9_-]/g, '-')}-`,
     })
     return fontUrl ? `@import url("${fontUrl}");\n\n${compiled}` : compiled
+}
+
+export const buildDesignerTheme = workspace => {
+    if (!workspace?.themeConfig) return null
+
+    const theme = structuredClone(workspace.themeConfig)
+    theme.colors = Object.fromEntries((workspace.colors || []).map(({ name, value }) => [name, value]))
+
+    const fonts = theme.fonts || {}
+    const googleFonts = (workspace.fonts || []).map(({ family, variants, display }) => ({ family, variants, display }))
+    theme.fonts = { ...fonts, googleFonts }
+
+    const designGroups = theme.designGroups || theme.design_groups || { groups: [] }
+    const groups = designGroups.groups || []
+    for (const row of workspace.typography || []) {
+        const group = groups[row.groupIndex]
+        if (!group) continue
+        group.elements ||= {}
+        group.elements[row.element] = { ...(group.elements[row.element] || {}), ...row.values }
+    }
+    for (const row of workspace.spacing || []) {
+        const group = groups[row.groupIndex]
+        if (!group) continue
+        if (row.scope === 'layout') {
+            const layoutProperties = group.layoutProperties || group.layout_properties || {}
+            layoutProperties[row.part] ||= {}
+            layoutProperties[row.part][row.breakpoint] = {
+                ...(layoutProperties[row.part][row.breakpoint] || {}),
+                ...row.values,
+            }
+            group.layoutProperties = layoutProperties
+        } else {
+            group.elements ||= {}
+            group.elements[row.element] = { ...(group.elements[row.element] || {}), ...row.values }
+        }
+    }
+    theme.designGroups = { ...designGroups, groups }
+    theme.breakpoints = workspace.breakpoints || theme.breakpoints
+    return theme
 }

@@ -20,7 +20,6 @@ export const designerThemesApi = {
     pullRemoteTheme: async (connectionId, stableKey) => unwrap(await api.post(`${base}/themes/remote/pull/`, { connectionId, stableKey })),
     pushRemoteTheme: async (connectionId, themeId) => unwrap(await api.post(`${base}/themes/remote/push/`, { connectionId, themeId })),
     workspace: async (themeId) => unwrap(await api.get(`${base}/themes/${themeId}/workspace/`)),
-    preview: async (themeId, patch) => unwrap(await api.post(`${base}/themes/${themeId}/preview/`, patch)),
     savePreviewContent: async (themeId, viewId, texts, draftVersion) => unwrap(await api.patch(`${base}/themes/${themeId}/preview-content/`, { viewId, texts, draftVersion })),
     importPreviewSource: async (themeId, sourceKind, sourceId, draftVersion) => unwrap(await api.post(`${base}/themes/${themeId}/preview-content/import/`, { sourceKind, sourceId, draftVersion })),
     deletePreviewContent: async (themeId, viewId, draftVersion) => unwrap(await api.delete(`${base}/themes/${themeId}/preview-content/`, { data: { viewId, draftVersion } })),

@@ -9,6 +9,8 @@ import { THEME_BREAKPOINTS } from '../components/theme/breakpointConfig'
 import StatusBar from '../components/StatusBar'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { buildResolvedRenderModel } from '../rendering/directRender'
+import { googleFontsStylesheetUrl } from '../rendering/primitives'
+import { buildDesignerTheme, buildThemeCSS } from '../utils/editorThemeCSS'
 
 const DesignerThemeWorkspacePage = () => {
     const { themeId } = useParams()
@@ -16,7 +18,6 @@ const DesignerThemeWorkspacePage = () => {
     const [workspace, setWorkspace] = useState(null)
     const [viewport, setViewport] = useState('xl')
     const [mobilePane, setMobilePane] = useState('edit')
-    const [preview, setPreview] = useState({ css: '', fontUrl: '' })
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [publishing, setPublishing] = useState(false)
@@ -26,7 +27,6 @@ const DesignerThemeWorkspacePage = () => {
     const [exporting, setExporting] = useState(false)
     const [exportProgress, setExportProgress] = useState(null)
     const [placeholderDrafts, setPlaceholderDrafts] = useState({})
-    const previewRequestRef = useRef(0)
     const pendingPreviewTextsRef = useRef({})
     const [hasPendingPreviewTexts, setHasPendingPreviewTexts] = useState(false)
     const [previewTextResetVersion, setPreviewTextResetVersion] = useState(0)
@@ -44,13 +44,13 @@ const DesignerThemeWorkspacePage = () => {
         typography: workspace.typography.map((row) => ({ groupIndex: row.groupIndex, element: row.element, values: row.values })),
         spacing: workspace.spacing.map((row) => ({ scope: row.scope, groupIndex: row.groupIndex, element: row.element, part: row.part, breakpoint: row.breakpoint, values: row.values })),
     }) : null, [workspace])
-    const previewPayload = useMemo(() => payload ? ({
-        draftVersion: payload.draftVersion,
-        colors: payload.colors,
-        fonts: payload.fonts,
-        typography: payload.typography,
-        spacing: payload.spacing,
-    }) : null, [payload])
+    const preview = useMemo(() => {
+        const theme = buildDesignerTheme(workspace)
+        return {
+            css: theme ? buildThemeCSS({ theme }) : '',
+            fontUrl: googleFontsStylesheetUrl(theme?.fonts),
+        }
+    }, [workspace])
 
     const loadWorkspace = useCallback(async () => {
         setLoading(true)
@@ -70,22 +70,6 @@ const DesignerThemeWorkspacePage = () => {
     }, [themeId])
 
     useEffect(() => { loadWorkspace() }, [loadWorkspace])
-
-    useEffect(() => {
-        if (!previewPayload) return undefined
-        const requestId = previewRequestRef.current + 1
-        previewRequestRef.current = requestId
-        const timer = window.setTimeout(async () => {
-            try {
-                const result = await designerThemesApi.preview(themeId, previewPayload)
-                if (requestId !== previewRequestRef.current) return
-                setPreview({ css: result.css || '', fontUrl: result.fontUrl || '' })
-            } catch (err) {
-                addNotification({ type: 'error', message: err.message || 'Preview could not be updated' })
-            }
-        }, 350)
-        return () => window.clearTimeout(timer)
-    }, [previewPayload, themeId, addNotification])
 
     const updateWorkspace = (updater) => {
         setWorkspace((current) => updater(structuredClone(current)))

@@ -138,6 +138,11 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(workspace["catalog"]["previewViews"], [])
         self.assertEqual(workspace["contentObjects"], [])
         self.assertEqual(workspace["name"], "Editorial")
+        self.assertEqual(workspace["themeConfig"]["colors"], self.theme.colors)
+        self.assertEqual(
+            workspace["themeConfig"]["design_groups"]["groups"][0]["elements"],
+            self.theme.design_groups["groups"][0]["elements"],
+        )
         self.assertEqual(workspace["description"], "Theme for editorial sites")
         self.assertEqual(
             {asset["assetKey"] for asset in workspace["assets"] if asset["kind"] in {"preview", "site-icon"}},
@@ -989,8 +994,8 @@ class DesignerThemeApiTests(TestCase):
             format="json",
         )
         self.assertEqual(unsupported.status_code, 400)
-        unsafe = self.client.post(
-            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview/",
+        unsafe = self.client.patch(
+            self.workspace_url,
             {
                 "draftVersion": workspace["draftVersion"],
                 "colors": {"brandColor": "red; background:url(https://example.test)"},
@@ -998,20 +1003,6 @@ class DesignerThemeApiTests(TestCase):
             format="json",
         )
         self.assertEqual(unsafe.status_code, 400)
-
-    def test_preview_does_not_save(self):
-        self.authenticate(self.designer)
-        workspace = self.client.get(self.workspace_url).data
-        response = self.client.post(
-            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview/",
-            {"draftVersion": workspace["draftVersion"], "colors": {"brandColor": "#ffffff"}},
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200, response.data)
-        self.assertIn("css", response.data)
-        self.assertNotIn("content", response.data)
-        self.theme.refresh_from_db()
-        self.assertEqual(self.theme.colors["brandColor"], "#123456")
 
     @patch("webpages.services.designer_theme._field_dimensions", return_value=(64, 64))
     @patch("webpages.services.designer_theme.system_storage.url", return_value="https://storage.test/identity.png")
