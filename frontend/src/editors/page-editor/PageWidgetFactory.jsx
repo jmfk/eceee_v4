@@ -747,7 +747,7 @@ class WidgetErrorBoundary extends Component {
 
             if (mode === 'editor' || mode === 'edit') {
                 return (
-                    <div className="widget-error-placeholder p-6 border-2 border-dashed border-red-300 bg-red-50 rounded-lg text-center">
+                    <div className="eceee-editor-ui widget-error-placeholder p-6 border-2 border-dashed border-red-300 bg-red-50 rounded-lg text-center">
                         <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-2" />
                         <div className="text-red-900 font-semibold mb-1">Rendering Error: {displayName}</div>
                         <div className="text-red-600 text-xs mb-4 font-mono overflow-hidden text-ellipsis whitespace-nowrap">
@@ -798,7 +798,7 @@ const WidgetEmptyStateHandler = ({ children, widgetType, mode, onOpenEditor }) =
 
         return (
             <div
-                className="widget-empty-placeholder p-8 border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                className="eceee-editor-ui widget-empty-placeholder p-8 border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all group"
                 onClick={onOpenEditor}
             >
                 <Icon className="w-10 h-10 text-gray-400 mx-auto mb-2 group-hover:text-blue-500 transition-colors" />
