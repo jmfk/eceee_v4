@@ -74,6 +74,7 @@ import { usePageWebSocket } from '../hooks/usePageWebSocket'
 import { logValidationSync } from '../utils/stateVerification'
 import { buildPathVariablesContext, getDefaultSimulatedPath } from '../utils/pathParser'
 import { detectPageConflicts, applyConflictResolutions } from '../utils/conflictResolution'
+import { deriveTodoItemsFromError } from '../utils/pageEditorValidationErrors'
 import ConflictResolutionModal from './ConflictResolutionModal'
 
 // Helpers: error parsing and merging for To-Do items
@@ -88,73 +89,6 @@ function mergeTodoItems(existing, incoming) {
         }
     })
     return Array.from(byId.values())
-}
-
-function hashString(str) {
-    let h = 0
-    const s = String(str || '')
-    for (let i = 0; i < s.length; i++) {
-        h = ((h << 5) - h) + s.charCodeAt(i)
-        h |= 0
-    }
-    return Math.abs(h).toString(36)
-}
-
-function mapFieldToTarget(field) {
-    if (!field) return { type: 'data' }
-    const settingsFields = new Set(['title', 'slug', 'codeLayout'])
-    const metadataFields = new Set(['metaTitle', 'metaDescription', 'hostnames'])
-    if (settingsFields.has(field)) return { type: 'settings' }
-    if (metadataFields.has(field)) return { type: 'metadata' }
-    return { type: 'data' }
-}
-
-function deriveTodoItemsFromError(errorString) {
-    const items = []
-    const s = String(errorString || '')
-
-    // Common jsonschema error patterns
-    const requiredMatch = s.match(/'(.*?)' is a required property/)
-    if (requiredMatch) {
-        const field = requiredMatch[1]
-        const target = mapFieldToTarget(field)
-        items.push({
-            id: `required:${field}`,
-            title: `Missing required field: ${field}`,
-            detail: s,
-            hint: `Provide a valid value for '${field}'.`,
-            target,
-            checked: false
-        })
-    }
-
-    const typeMatch = s.match(/'(.*?)' is not of type '(.*?)'/)
-    if (typeMatch) {
-        const field = typeMatch[1]
-        const expected = typeMatch[2]
-        const target = mapFieldToTarget(field)
-        items.push({
-            id: `type:${field}`,
-            title: `Field '${field}' must be of type ${expected}`,
-            detail: s,
-            hint: `Change the value of '${field}' to a ${expected}.`,
-            target,
-            checked: false
-        })
-    }
-
-    // Fallback single item if nothing matched
-    if (items.length === 0) {
-        items.push({
-            id: `error:${hashString(s)}`,
-            title: 'Validation error',
-            detail: s,
-            hint: 'Review the error and update the related fields.',
-            target: { type: 'data', path: null },
-            checked: false
-        })
-    }
-    return items
 }
 
 function formatWorkflowState(state) {
