@@ -654,6 +654,13 @@ def validate_theme_layouts(document):
     return document
 
 
+def _widget_type_matches(widget_type, patterns):
+    return any(
+        pattern == "*" or widget_type == pattern or (pattern.endswith(".*") and widget_type.startswith(pattern[:-1]))
+        for pattern in patterns
+    )
+
+
 def validate_layout_widgets(theme, layout_key, widgets):
     """Enforce persisted slot limits and widget allow/deny policies."""
     if not theme or not layout_key or not isinstance(widgets, dict):
@@ -664,14 +671,6 @@ def validate_layout_widgets(theme, layout_key, widgets):
     )
     if not layout:
         return widgets
-
-    def matches(widget_type, patterns):
-        return any(
-            pattern == "*"
-            or widget_type == pattern
-            or (pattern.endswith(".*") and widget_type.startswith(pattern[:-1]))
-            for pattern in patterns
-        )
 
     errors = []
     slots = layout.get("slots", {})
@@ -695,9 +694,9 @@ def validate_layout_widgets(theme, layout_key, widgets):
             if not isinstance(widget_type, str) or not widget_type.strip():
                 errors.append(f"Every widget in slot '{slot_key}' must have a type.")
                 continue
-            if allowed and not matches(widget_type, allowed):
+            if allowed and not _widget_type_matches(widget_type, allowed):
                 errors.append(f"Widget type '{widget_type}' is not allowed in slot '{slot_key}'.")
-            elif disallowed and matches(widget_type, disallowed):
+            elif disallowed and _widget_type_matches(widget_type, disallowed):
                 errors.append(f"Widget type '{widget_type}' is not allowed in slot '{slot_key}'.")
     if errors:
         raise ValidationError(errors)
@@ -711,7 +710,11 @@ def theme_layout_usage(theme):
     from webpages.models import PageDataSchema, PageVersion
 
     usage = {}
-    default_theme = type(theme).get_default_theme(tenant=theme.tenant)
+    # Usage checks run while building read-only Designer workspaces. Resolving the
+    # fallback theme must therefore mirror get_default_theme() without letting that
+    # helper assign/create a default and advance the live theme's sync version.
+    active_themes = type(theme).objects.filter(tenant=theme.tenant, is_active=True)
+    default_theme = active_themes.filter(is_default=True).first() or active_themes.first()
     versions = PageVersion.objects.filter(page__tenant=theme.tenant).filter(Q(theme=theme) | Q(theme__isnull=True))
     for version in versions.only("page_id", "layout_key", "code_layout", "widgets"):
         effective_theme = version.theme
@@ -740,20 +743,34 @@ def theme_layout_usage(theme):
             key = (effective_theme.layouts or {}).get("default_layout_key")
         if not key:
             continue
-        entry = usage.setdefault(key, {"page_ids": set(), "version_count": 0, "schema_count": 0, "slots": {}})
+        entry = usage.setdefault(
+            key,
+            {"page_ids": set(), "version_count": 0, "schema_count": 0, "slots": {}, "slot_details": {}},
+        )
         entry["page_ids"].add(version.page_id)
         entry["version_count"] += 1
         if isinstance(version.widgets, dict):
             for slot_key, widgets in version.widgets.items():
                 if widgets:
                     entry["slots"][slot_key] = entry["slots"].get(slot_key, 0) + 1
+                    if isinstance(widgets, list):
+                        details = entry["slot_details"].setdefault(
+                            slot_key, {"max_widget_count": 0, "widget_types": set()}
+                        )
+                        details["max_widget_count"] = max(details["max_widget_count"], len(widgets))
+                        details["widget_types"].update(
+                            widget.get("type")
+                            for widget in widgets
+                            if isinstance(widget, dict) and isinstance(widget.get("type"), str)
+                        )
     schemas = PageDataSchema.objects.filter(scope=PageDataSchema.SCOPE_LAYOUT, is_active=True)
     for schema in schemas.only("layout_key", "layout_name"):
         key = schema.layout_key or schema.layout_name
         if key:
-            usage.setdefault(key, {"page_ids": set(), "version_count": 0, "schema_count": 0, "slots": {}})[
-                "schema_count"
-            ] += 1
+            usage.setdefault(
+                key,
+                {"page_ids": set(), "version_count": 0, "schema_count": 0, "slots": {}, "slot_details": {}},
+            )["schema_count"] += 1
     return {
         key: {
             "page_count": len(value["page_ids"]),
@@ -761,6 +778,13 @@ def theme_layout_usage(theme):
             "version_count": value["version_count"],
             "schema_count": value["schema_count"],
             "slots": value["slots"],
+            "slot_details": {
+                slot_key: {
+                    "max_widget_count": details["max_widget_count"],
+                    "widget_types": sorted(details["widget_types"]),
+                }
+                for slot_key, details in value["slot_details"].items()
+            },
         }
         for key, value in usage.items()
     }
@@ -797,6 +821,29 @@ def validate_layout_compatibility(theme, updated_document):
                 errors.append(
                     f"Slot '{old_key}.{slot_key}' contains content in {slot_count} versions and cannot be removed."
                 )
+        for slot_key, policy in (current.get("slots") or {}).items():
+            details = counts.get("slot_details", {}).get(slot_key)
+            if not details:
+                continue
+            maximum = policy.get("max_widgets")
+            if maximum is not None and details["max_widget_count"] > maximum:
+                errors.append(
+                    f"Slot '{old_key}.{slot_key}' already contains up to {details['max_widget_count']} widgets "
+                    f"and cannot be limited to {maximum}."
+                )
+            allowed = policy.get("allowed_widget_types")
+            disallowed = policy.get("disallowed_widget_types") or []
+            for widget_type in details["widget_types"]:
+                if allowed and not _widget_type_matches(widget_type, allowed):
+                    errors.append(
+                        f"Slot '{old_key}.{slot_key}' already contains widget type '{widget_type}', "
+                        "which the new policy disallows."
+                    )
+                elif disallowed and _widget_type_matches(widget_type, disallowed):
+                    errors.append(
+                        f"Slot '{old_key}.{slot_key}' already contains widget type '{widget_type}', "
+                        "which the new policy disallows."
+                    )
     if errors:
         raise ValidationError(errors)
     return updated_document

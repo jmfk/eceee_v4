@@ -6,6 +6,7 @@ to inherited widget data across the page hierarchy.
 """
 
 import time
+from types import SimpleNamespace
 from typing import Dict, List, Optional, Set
 
 from django.db.models import Q
@@ -21,7 +22,7 @@ from .inheritance_types import (
     WidgetInheritanceBehavior,
 )
 from .layout_registry import layout_registry
-from .models import PageVersion, WebPage
+from .models import PageTheme, PageVersion, WebPage
 
 
 class InheritanceTreeBuilder:
@@ -35,6 +36,7 @@ class InheritanceTreeBuilder:
     def __init__(self):
         self._generation_start_time = None
         self._target_version = None
+        self._target_page = None
         self._as_of = None
 
     def build_tree(
@@ -57,6 +59,7 @@ class InheritanceTreeBuilder:
         """
         self._generation_start_time = time.time()
         self._target_version = target_version
+        self._target_page = page
         self._as_of = as_of
 
         try:
@@ -100,13 +103,59 @@ class InheritanceTreeBuilder:
 
     def _layout_for_page(self, page: WebPage, depth: int):
         version = self._version_for_page(page, depth)
-        if version and version.code_layout:
-            layout = layout_registry.get_layout(version.code_layout)
+        layout_key = (version.layout_key or version.code_layout) if version else ""
+        if layout_key:
+            layout = self._theme_layout(layout_key)
+            if layout:
+                return layout
+            layout = layout_registry.get_layout(layout_key)
             if layout:
                 return layout
         if page.parent:
             return self._layout_for_page(page.parent, depth + 1)
+        theme = self._effective_theme()
+        default_key = (theme.layouts or {}).get("default_layout_key") if theme else ""
+        if default_key:
+            return self._theme_layout(default_key)
         return None
+
+    def _effective_theme(self):
+        current = self._target_page
+        depth = 0
+        while current:
+            version = self._version_for_page(current, depth)
+            if version and version.theme_id:
+                return version.theme
+            current = current.parent
+            depth += 1
+        if not self._target_page:
+            return None
+        active = PageTheme.objects.filter(tenant=self._target_page.tenant, is_active=True)
+        return active.filter(is_default=True).first() or active.first()
+
+    def _theme_layout(self, layout_key):
+        theme = self._effective_theme()
+        definition = (
+            next(
+                (item for item in (theme.layouts or {}).get("items", []) if item.get("key") == layout_key),
+                None,
+            )
+            if theme
+            else None
+        )
+        if not definition:
+            return None
+        slots = [
+            {"name": key, "title": policy.get("label", key.replace("_", " ").title()), **policy}
+            for key, policy in (definition.get("slots") or {}).items()
+        ]
+        return SimpleNamespace(name=layout_key, slot_configuration={"slots": slots})
+
+    def effective_slot_configuration(self):
+        if not self._target_page:
+            return {"slots": []}
+        layout = self._layout_for_page(self._target_page, 0)
+        return layout.slot_configuration if layout else {"slots": []}
 
     def _check_circular_references(self, page: WebPage, visited: Set[int]) -> None:
         """Check for circular parent references"""

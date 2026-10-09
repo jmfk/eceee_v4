@@ -400,7 +400,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                     "generation_time_ms": stats.generation_time_ms,
                 },
                 # Legacy compatibility - convert tree back to slot format
-                "legacy": self._convert_tree_to_legacy_format(tree, helpers),
+                "legacy": self._convert_tree_to_legacy_format(tree, helpers, builder.effective_slot_configuration()),
             }
 
             return Response(response_data)
@@ -562,7 +562,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
             "parent": self._serialize_tree_node(node.parent) if node.parent else None,
         }
 
-    def _convert_tree_to_legacy_format(self, tree, helpers):
+    def _convert_tree_to_legacy_format(self, tree, helpers, slot_configuration=None):
         """Convert tree back to legacy slot-based format (snake_case auto-converted)"""
         legacy_data = {
             "page_id": tree.page_id,
@@ -587,9 +587,21 @@ class WebPageViewSet(viewsets.ModelViewSet):
             all_slots.update(current.slots.keys())
             current = current.parent
 
+        slot_policies = {
+            slot.get("name"): slot for slot in (slot_configuration or {}).get("slots", []) if slot.get("name")
+        }
+
         # Convert each slot to legacy format
         for slot_name in all_slots:
+            policy = slot_policies.get(slot_name, {})
+            allows_inheritance = policy.get("allows_inheritance", True)
+            allow_merge = policy.get("allow_merge", True)
+            inheritable_types = policy.get("inheritable_types", [])
             inherited_widgets = helpers.get_inherited_widgets(slot_name)
+            if not allows_inheritance:
+                inherited_widgets = []
+            elif inheritable_types:
+                inherited_widgets = [widget for widget in inherited_widgets if widget.type in inheritable_types]
 
             legacy_data["slots"][slot_name] = {
                 "has_inherited_widgets": len(inherited_widgets) > 0,
@@ -612,9 +624,11 @@ class WebPageViewSet(viewsets.ModelViewSet):
                     }
                     for widget in inherited_widgets
                 ],
-                "inheritance_allowed": True,
-                "merge_mode": True,
-                "inheritable_types": [],
+                "inheritance_allowed": allows_inheritance,
+                "allow_merge": allow_merge,
+                "merge_mode": allows_inheritance and allow_merge,
+                "inheritable_types": inheritable_types,
+                "collapse_behavior": policy.get("collapse_behavior", "any"),
             }
 
         return legacy_data

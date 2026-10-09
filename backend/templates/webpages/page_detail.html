@@ -88,7 +88,7 @@
                     <div class="layout-slot" data-slot-name="{{ slot.name }}">
                         {% if slot.name in widgets_by_slot %}
                             {% for widget_data in widgets_by_slot|lookup:slot.name %}
-                                {% include "webpages/widgets/widget_wrapper.html" with widget=widget_data.widget config=widget_data.widget.configuration inherited_from=widget_data.inherited_from is_override=widget_data.is_override slot_name=slot.name %}
+                                {{ widget_data.html|safe }}
                             {% endfor %}
                         {% endif %}
                     </div>
@@ -100,7 +100,7 @@
                 <div class="layout-slot" data-slot-name="main">
                     {% if "main" in widgets_by_slot %}
                         {% for widget_data in widgets_by_slot.main %}
-                            {% include "webpages/widgets/widget_wrapper.html" with widget=widget_data.widget config=widget_data.widget.configuration inherited_from=widget_data.inherited_from is_override=widget_data.is_override slot_name="main" %}
+                            {{ widget_data.html|safe }}
                         {% endfor %}
                     {% else %}
                         <p>No content available for this page.</p>
@@ -145,4 +145,4 @@
             });
         });
     </script>
-{% endblock %} 
+{% endblock %}

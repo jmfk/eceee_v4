@@ -20,7 +20,7 @@ class PageDataSchemaSerializer(serializers.ModelSerializer):
 
     created_by = UserSerializer(read_only=True)
     layout_name = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
-    layoutKey = serializers.CharField(source="layout_key", max_length=64, required=False, allow_blank=True)
+    layout_key = serializers.CharField(max_length=64, required=False, allow_blank=True)
 
     def to_internal_value(self, data):
         # Ensure layout_name is present for field validation
@@ -44,7 +44,7 @@ class PageDataSchemaSerializer(serializers.ModelSerializer):
             "description",
             "scope",
             "layout_name",
-            "layoutKey",
+            "layout_key",
             "schema",
             "is_active",
             "created_at",
