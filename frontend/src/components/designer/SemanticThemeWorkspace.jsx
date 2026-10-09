@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileText, Focus, Image as ImageIcon, Italic, Link2, List, ListOrdered, Loader2, Search, Settings2, Trash2 } from 'lucide-react'
+import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileText, Focus, Image as ImageIcon, Italic, KeyRound, Link2, List, ListOrdered, Loader2, RotateCcw, Search, Settings2, Trash2 } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel, designerPreviewImageReferences } from '../../rendering/adapters'
 import { getBreakpoints, mapBreakpointName } from '../../utils/themeUtils'
 import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
 import { themeBreakpointDefinition } from '../theme/breakpointConfig'
+import { inheritedLayoutStyle } from './layoutStyleInheritance'
 const typographyLabels = {
     fontFamily: 'Font family', fontSize: 'Size', fontWeight: 'Weight', fontStyle: 'Style',
     lineHeight: 'Line height', letterSpacing: 'Letter spacing',
@@ -21,6 +22,7 @@ const layoutParameterFields = new Set([
     'flex_direction', 'flex_wrap', 'flex_grow', 'order', 'gap', 'padding', 'margin',
     'align_items', 'justify_content', 'background_color', 'color', 'border', 'border_radius',
 ])
+const gridStyleFields = ['grid_template_columns', 'gap', 'padding', 'margin', 'align_items', 'justify_content']
 
 const defaultSidebarWidth = 360
 const minSidebarWidth = 280
@@ -985,6 +987,10 @@ const SemanticThemeWorkspace = ({
         : null
     const selectedLayoutParameters = [...new Set(selectedTarget?.editableParameters || selectedLayoutNode?.editable_parameters || [])]
         .filter((field) => layoutParameterFields.has(field))
+        .sort((left, right) => selectedLayoutNode?.type === 'grid'
+            ? (gridStyleFields.indexOf(left) === -1 ? gridStyleFields.length : gridStyleFields.indexOf(left))
+                - (gridStyleFields.indexOf(right) === -1 ? gridStyleFields.length : gridStyleFields.indexOf(right))
+            : 0)
     const layoutParameterBreakpoint = mapBreakpointName(viewport) === 'xs' ? 'base' : mapBreakpointName(viewport)
     const updateSelectedLayoutParameter = (field, value) => updateWorkspace((next) => {
         const mutate = (node) => {
@@ -1447,8 +1453,26 @@ const SemanticThemeWorkspace = ({
                         )
                     })}
                     {selectedLayoutNode && selectedLayoutParameters.length > 0 && <section className="space-y-3 border-t border-gray-200 pt-3">
-                        <div><h3 className="text-sm font-medium text-gray-900">Layout parameters</h3><p className="mt-0.5 text-xs text-gray-500">Exposed by the layout for {breakpointLabel(layoutParameterBreakpoint)}. Blank values inherit from a smaller breakpoint.</p></div>
-                        <div className="space-y-2">{selectedLayoutParameters.map((field) => <label key={field} className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,1.2fr)] items-center gap-2 text-xs text-gray-700"><span>{humanize(field)}</span><input aria-label={`${selectedLayoutNode.label || selectedTargetLabel} ${humanize(field)}`} value={selectedLayoutNode.styles?.[layoutParameterBreakpoint]?.[field] ?? ''} onChange={(event) => updateSelectedLayoutParameter(field, event.target.value)} placeholder="Inherited" className="min-w-0 rounded border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>)}</div>
+                        <div><h3 className="text-sm font-medium text-gray-900">Layout parameters</h3><p className="mt-0.5 text-xs text-gray-500">Exposed by the layout for {breakpointLabel(layoutParameterBreakpoint)}.</p></div>
+                        <div className="space-y-2">{selectedLayoutParameters.map((field) => {
+                            const activeStyles = selectedLayoutNode.styles?.[layoutParameterBreakpoint] || {}
+                            const hasOverride = Object.hasOwn(activeStyles, field)
+                            const inherited = hasOverride ? null : inheritedLayoutStyle(selectedLayoutNode, field, layoutParameterBreakpoint, workspace.breakpoints)
+                            const displayedValue = hasOverride ? activeStyles[field] : inherited?.value || ''
+                            const inheritedLabel = inherited ? breakpointLabel(inherited.breakpoint) : ''
+                            const hasOverrideControl = Boolean(inherited || (hasOverride && layoutParameterBreakpoint !== 'base'))
+                            return <label key={field} className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,1.2fr)] items-start gap-2 text-xs text-gray-700">
+                                <span className="pt-1.5">{humanize(field)}</span>
+                                <span className="min-w-0">
+                                    <span className="flex min-w-0">
+                                        <input aria-label={`${selectedLayoutNode.label || selectedTargetLabel} ${humanize(field)}`} value={displayedValue} disabled={Boolean(inherited)} onChange={(event) => updateSelectedLayoutParameter(field, event.target.value)} className={`min-w-0 flex-1 border border-gray-300 px-2 py-1.5 font-mono text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 ${hasOverrideControl ? 'rounded-l' : 'rounded'}`} />
+                                        {inherited && <button type="button" onClick={() => updateSelectedLayoutParameter(field, inherited.value)} aria-label={`Override ${humanize(field)} at ${breakpointLabel(layoutParameterBreakpoint)}`} title="Create override" className="inline-flex h-[30px] w-8 shrink-0 items-center justify-center rounded-r border border-l-0 border-gray-300 bg-white text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><KeyRound className="h-3.5 w-3.5" /></button>}
+                                        {!inherited && hasOverride && layoutParameterBreakpoint !== 'base' && <button type="button" onClick={() => updateSelectedLayoutParameter(field, '')} aria-label={`Reset ${humanize(field)} override`} title="Reset override" className="inline-flex h-[30px] w-8 shrink-0 items-center justify-center rounded-r border border-l-0 border-gray-300 bg-white text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><RotateCcw className="h-3.5 w-3.5" /></button>}
+                                    </span>
+                                    {inherited && <span className="mt-1 block text-[10px] text-gray-500">Inherited from {inheritedLabel}</span>}
+                                </span>
+                            </label>
+                        })}</div>
                     </section>}
                     {addableThemeValues.length > 0 && <section className="border-t border-gray-200 pt-4"><label htmlFor="add-theme-value" className="text-xs font-semibold uppercase tracking-wide text-gray-500">Add theme value</label><select id="add-theme-value" value="" onChange={(event) => addThemeValue(event.target.value)} className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"><option value="">Choose a value…</option>{addableThemeValues.map((value) => <option key={propertyKey(value.kind, value.index, value.field)} value={propertyKey(value.kind, value.index, value.field)}>{value.label}</option>)}</select></section>}
                     {relevantColors.length > 0 && <section className="space-y-3 border-t border-gray-200 pt-4"><h3 className="font-medium text-gray-900">Colors used here</h3><p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global values.</strong> Colors are the same at every breakpoint.</p>{relevantColors.map(({ name, index }) => <label key={name} className="flex items-center gap-3"><input type="color" value={/^#[0-9a-f]{6}$/i.test(workspace.colors[index].value) ? workspace.colors[index].value : '#000000'} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="h-10 w-12 rounded border border-gray-300" /><span className="min-w-0 flex-1 text-sm font-medium">{name}</span><input aria-label={`${name} value`} value={workspace.colors[index].value} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="w-28 rounded-md border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>)}</section>}

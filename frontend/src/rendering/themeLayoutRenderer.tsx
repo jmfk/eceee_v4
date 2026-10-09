@@ -85,13 +85,13 @@ export const validateLayoutDefinition = (layout: unknown): layout is ThemeLayout
         if (node.type === 'semantic' && !semanticTags.has(node.tag || 'div')) return false
         if (node.label !== undefined && (typeof node.label !== 'string' || node.label.length > 100)) return false
         if (node.presentation_color !== undefined && (
-            !['container', 'semantic', 'slot'].includes(node.type)
+            !['container', 'grid', 'semantic', 'slot'].includes(node.type)
             || !presentationColorPattern.test(node.presentation_color)
         )) return false
         if (node.editable_parameters !== undefined && (
             !Array.isArray(node.editable_parameters)
             || node.editable_parameters.some((property) => !propertyMap[property])
-            || (node.editable_parameters.length > 0 && !['container', 'semantic', 'slot'].includes(node.type))
+            || (node.editable_parameters.length > 0 && !['container', 'grid', 'semantic', 'slot'].includes(node.type))
         )) return false
         if (Object.entries(node.styles || {}).some(([breakpoint, values]) => (
             !allowedBreakpoints.has(breakpoint)

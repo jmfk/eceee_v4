@@ -36,6 +36,17 @@ class ThemeLayoutValidationTests(SimpleTestCase):
             {"main_layout", "landing_page", "error_layout"},
         )
 
+    def test_default_page_layouts_use_descriptive_structure_and_plain_footer_wrappers(self):
+        layouts = {layout["key"]: layout for layout in default_theme_layouts()["items"]}
+
+        for key in ("main_layout", "landing_page"):
+            root = layouts[key]["root"]
+            self.assertEqual(root["label"], "Viewport background")
+            self.assertEqual(root["children"][0]["label"], "Page surface")
+            footer = next(node for node in root["children"][0]["children"] if "Footer wrapper" == node.get("label"))
+            self.assertEqual(footer["type"], "container")
+            self.assertNotIn("tag", footer)
+
     def test_every_declared_slot_must_have_exactly_one_leaf(self):
         document = default_theme_layouts()
         document["items"][0]["slots"]["orphan"] = {"label": "Orphan"}
@@ -82,12 +93,20 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         with self.assertRaisesMessage(ValidationError, "unsupported editable parameter"):
             validate_theme_layouts(document)
 
-    def test_structural_nodes_cannot_expose_designer_parameters(self):
+    def test_grid_nodes_can_expose_designer_parameters(self):
         document = deepcopy(default_theme_layouts())
         grid = next(node for node in document["items"][0]["root"]["children"][0]["children"] if node["type"] == "grid")
         grid["editable_parameters"] = ["gap"]
 
-        with self.assertRaisesMessage(ValidationError, "only container, semantic, and slot"):
+        self.assertIs(validate_theme_layouts(document), document)
+
+    def test_non_editable_structural_nodes_cannot_expose_designer_parameters(self):
+        document = deepcopy(default_theme_layouts())
+        grid = next(node for node in document["items"][0]["root"]["children"][0]["children"] if node["type"] == "grid")
+        grid["type"] = "row"
+        grid["editable_parameters"] = ["gap"]
+
+        with self.assertRaisesMessage(ValidationError, "only container, grid, semantic, and slot"):
             validate_theme_layouts(document)
 
     def test_validates_editor_only_presentation_colours(self):
