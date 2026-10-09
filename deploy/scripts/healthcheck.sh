@@ -60,10 +60,15 @@ while [ "$SECONDS" -lt "$deadline" ]; do
         publisher_timeout_ms=$(((remaining < 5 ? remaining : 5) * 1000))
         PUBLISHER_STATUS=$(docker_compose exec -T publisher node -e "fetch('http://127.0.0.1:3000/api/health',{signal:AbortSignal.timeout(${publisher_timeout_ms})}).then(async r=>{process.stdout.write(String(r.status)); if(!r.ok)process.exit(1)}).catch(()=>{process.stdout.write('000');process.exit(1)})" 2>/dev/null || true)
         if [ "$PUBLISHER_PUBLIC_ROUTE_CHECK" -eq 1 ]; then
-            PUBLISHER_ROUTES_STATUS="200:nextjs"
+            publisher_routes_complete=1
+            publisher_routes_checked=0
             for publisher_host in $PUBLISHER_PUBLIC_HOSTS; do
                 remaining=$((deadline - SECONDS))
-                [ "$remaining" -gt 0 ] || break
+                if [ "$remaining" -le 0 ]; then
+                    PUBLISHER_ROUTES_STATUS="$publisher_host:000:timeout"
+                    publisher_routes_complete=0
+                    break
+                fi
                 route_timeout=$((remaining < 5 ? remaining : 5))
                 route_headers=$(docker_compose exec -T backend curl --silent --show-error --max-time "$route_timeout" --dump-header - --output /dev/null "https://$publisher_host/" 2>/dev/null || true)
                 normalized_headers=$(printf '%s' "$route_headers" | tr -d '\r' | tr '[:upper:]' '[:lower:]')
@@ -71,9 +76,14 @@ while [ "$SECONDS" -lt "$deadline" ]; do
                 route_renderer=$(printf '%s\n' "$normalized_headers" | awk '$1 == "x-eceee-renderer:" { value=$2 } END { print value }')
                 if [ "$route_status" != "200" ] || [ "$route_renderer" != "nextjs" ]; then
                     PUBLISHER_ROUTES_STATUS="$publisher_host:${route_status:-000}:${route_renderer:-missing}"
+                    publisher_routes_complete=0
                     break
                 fi
+                publisher_routes_checked=$((publisher_routes_checked + 1))
             done
+            if [ "$publisher_routes_complete" -eq 1 ] && [ "$publisher_routes_checked" -gt 0 ]; then
+                PUBLISHER_ROUTES_STATUS="200:nextjs"
+            fi
         fi
     fi
     if [ "$BACKEND_STATUS" = "200" ] \
