@@ -759,8 +759,8 @@ describe('DesignerThemeWorkspacePage', () => {
             source: iframe.contentWindow,
         }))
 
-        expect(screen.getByRole('treeitem', { name: 'Paragraph: “First copy”' })).toBeInTheDocument()
-        const secondParagraph = screen.getByRole('button', { name: 'Edit Paragraph: “Second copy”' })
+        expect(await screen.findByRole('treeitem', { name: 'Paragraph: “First copy”' })).toBeInTheDocument()
+        const secondParagraph = await screen.findByRole('button', { name: 'Edit Paragraph: “Second copy”' })
         fireEvent.click(secondParagraph)
 
         expect(screen.getByRole('button', { name: 'Edit Paragraph: “Second copy”' })).toHaveAttribute('aria-pressed', 'true')
