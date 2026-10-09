@@ -3,7 +3,7 @@ import { createDesignerRenderModel, createPageRenderModel } from '../../renderin
 import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
 
 const objectApi = vi.hoisted(() => ({ search: vi.fn(), get: vi.fn(), getNewsList: vi.fn() }))
-const clientApi = vi.hoisted(() => ({ get: vi.fn() }))
+const clientApi = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
 const imgproxyApi = vi.hoisted(() => ({ getBatch: vi.fn() }))
 const mediaApi = vi.hoisted(() => ({ getFiles: vi.fn() }))
 vi.mock('../../api/objectStorage', () => ({ objectInstancesApi: objectApi }))
@@ -111,7 +111,7 @@ describe('page preview model resolution', () => {
     })
 
     it('resolves links before handing the model to the renderer', async () => {
-        clientApi.get.mockResolvedValue({ data: { id: 69, path: '/panels/', title: 'Panels', isPublished: true, siteId: 85 } })
+        clientApi.post.mockResolvedValue({ data: { results: [{ id: 69, path: '/panels/', title: 'Panels', isPublished: true, siteId: 85 }] } })
         const model = createPageRenderModel({
             widgets: {
                 navbar: [{ id: 'nav', type: 'easy_widgets.NavbarWidget', config: { menuItems: [{ linkData: { type: 'internal', pageId: 69, label: 'Panels' } }] } }],
@@ -121,6 +121,12 @@ describe('page preview model resolution', () => {
 
         const resolved = await resolvePagePreviewModel(model)
 
+        expect(clientApi.post).toHaveBeenCalledOnce()
+        expect(clientApi.post).toHaveBeenCalledWith(
+            expect.stringContaining('/pages/lookup/'),
+            { ids: ['69'], currentSiteId: model.context.siteId },
+            undefined,
+        )
         expect(resolved.slots.navbar[0].config.menuItems[0].linkData).toMatchObject({ resolvedUrl: '/panels/', siteId: 85 })
         expect(resolved.slots.main[0].config.content).toContain('href="/panels/"')
     })

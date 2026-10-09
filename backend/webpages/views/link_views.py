@@ -4,14 +4,13 @@ Link resolution API views.
 Provides endpoints for resolving link objects to URLs and getting link display info.
 """
 
-from rest_framework import status, permissions
+from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from ..services.link_resolver import (
-    resolve_link,
     get_link_display_info,
-    is_link_object,
+    resolve_link,
 )
 
 
@@ -130,13 +129,49 @@ def link_display_info(request):
     return Response({"results": results}, status=status.HTTP_200_OK)
 
 
-@api_view(["GET"])
+def _page_lookup_data(page, roots_by_id, current_site_id=None):
+    root_id = page.cached_root_id or (page.id if page.parent_id is None else None)
+    root = roots_by_id.get(root_id)
+    site_page = root if root and root.hostnames else None
+    response_data = {
+        "id": page.id,
+        "title": page.title,
+        "path": page.get_absolute_url(),
+        "slug": page.slug,
+        "is_published": page.is_currently_published,
+        "parent_id": page.parent_id,
+        "site_id": site_page.id if site_page else None,
+    }
+    if site_page and current_site_id and str(site_page.id) != str(current_site_id):
+        response_data["site"] = {
+            "id": site_page.id,
+            "title": site_page.title,
+            "slug": site_page.slug,
+        }
+    return response_data
+
+
+def _lookup_pages(page_ids, tenant):
+    from ..models import WebPage
+
+    pages = list(WebPage.objects.filter(id__in=page_ids, tenant=tenant, is_deleted=False).order_by("id"))
+    root_ids = {page.cached_root_id or page.id for page in pages if page.cached_root_id or page.parent_id is None}
+    roots_by_id = WebPage.objects.filter(
+        id__in=root_ids,
+        tenant=tenant,
+        is_deleted=False,
+    ).in_bulk()
+    return pages, roots_by_id
+
+
+@api_view(["GET", "POST"])
 @permission_classes([permissions.IsAuthenticated])
 def page_lookup(request):
     """
     Quick page info lookup by ID.
 
     GET /api/pages/lookup/?id=123
+    POST /api/pages/lookup/ {"ids": [123, 456], "currentSiteId": 123}
 
     Returns:
     {
@@ -148,71 +183,72 @@ def page_lookup(request):
         "siteTitle": "Main Site"  // if different from current site context
     }
     """
-    from ..models import WebPage
+    tenant = getattr(request, "tenant", None)
+    if tenant is None:
+        return Response(
+            {"error": "Tenant is required. Provide X-Tenant-ID header."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if request.method == "POST":
+        page_ids = request.data.get("ids", [])
+        current_site_id = request.data.get("current_site_id")
+        if not isinstance(page_ids, list):
+            return Response(
+                {"error": "ids must be an array"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(page_ids) > 500:
+            return Response(
+                {"error": "ids must contain at most 500 page IDs"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        unique_ids = []
+        seen_ids = set()
+        for page_id in page_ids:
+            if (
+                isinstance(page_id, bool)
+                or not isinstance(page_id, (int, str))
+                or not str(page_id).isdigit()
+                or int(page_id) <= 0
+            ):
+                return Response(
+                    {"error": "ids must contain only positive integer page IDs"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            numeric_page_id = int(page_id)
+            if numeric_page_id not in seen_ids:
+                seen_ids.add(numeric_page_id)
+                unique_ids.append(numeric_page_id)
+        pages, roots_by_id = _lookup_pages(unique_ids, tenant)
+        pages_by_id = {page.id: page for page in pages}
+        results = [
+            _page_lookup_data(pages_by_id[page_id], roots_by_id, current_site_id)
+            for page_id in unique_ids
+            if page_id in pages_by_id
+        ]
+        return Response({"results": results}, status=status.HTTP_200_OK)
 
     page_id = request.query_params.get("id")
     current_site_id = request.query_params.get("currentSiteId")
-
     if not page_id:
         return Response(
             {"error": "id parameter is required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
-
     try:
-        page = WebPage.objects.get(id=page_id, is_deleted=False)
-
-        # Build path by traversing parents
-        # A page is a "site" if it has hostnames (ArrayField - check with bool)
-        slugs = []
-        current = page
-        site_page = None
-
-        while current:
-            # Check if this page is a site (has hostnames)
-            if current.hostnames:
-                site_page = current
-                break
-            if current.slug:
-                slugs.append(current.slug)
-
-            # Fetch parent if exists
-            if current.parent_id:
-                current = WebPage.objects.get(id=current.parent_id, is_deleted=False)
-            else:
-                current = None
-
-        # Reverse slugs to build path (we collected from leaf to root)
-        slugs.reverse()
-        calculated_path = "/" + "/".join(slugs) + "/" if slugs else "/"
-
-        # Determine if we need to show site info
-        site_info = None
-        if site_page:
-            # If currentSiteId provided and different from this page's site, include site info
-            if current_site_id and str(site_page.id) != str(current_site_id):
-                site_info = {
-                    "id": site_page.id,
-                    "title": site_page.title,
-                    "slug": site_page.slug,
-                }
-
-        response_data = {
-            "id": page.id,
-            "title": page.title,
-            "path": calculated_path,
-            "slug": page.slug,
-            "isPublished": page.is_currently_published,
-            "parentId": page.parent_id,
-            "siteId": site_page.id if site_page else None,
-        }
-
-        if site_info:
-            response_data["site"] = site_info
-
-        return Response(response_data, status=status.HTTP_200_OK)
-    except WebPage.DoesNotExist:
+        numeric_page_id = int(page_id)
+        if numeric_page_id <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
         return Response(
-            {"error": "Page not found"},
-            status=status.HTTP_404_NOT_FOUND,
+            {"error": "id must be a positive integer"},
+            status=status.HTTP_400_BAD_REQUEST,
         )
+    pages, roots_by_id = _lookup_pages([numeric_page_id], tenant)
+    if not pages:
+        return Response({"error": "Page not found"}, status=status.HTTP_404_NOT_FOUND)
+    return Response(
+        _page_lookup_data(pages[0], roots_by_id, current_site_id),
+        status=status.HTTP_200_OK,
+    )
