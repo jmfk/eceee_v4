@@ -42,29 +42,35 @@ try {
 
       const standalone = await browser.newPage({ viewport })
       await standalone.addInitScript(() => {
-        window.addEventListener('message', (event) => {
-          if (event.data?.source === 'eceee-render-host' && event.data?.action === 'render') {
-            window.__legacyNewsMigrationModel = event.data.model
-          }
+        window.__ECEEE_CAPTURE_RENDER_MODEL__ = true
+        window.addEventListener('eceee-standalone-render-ready', (event) => {
+          window.__legacyNewsMigrationModel = event.detail?.model
         })
       })
       await standalone.goto(`${reactBase}/_render/${siteId}/migration-preview/news/${slug}`, { waitUntil: 'networkidle' })
-      const frameElement = standalone.locator('iframe[title="Saved page preview"]')
-      await frameElement.waitFor()
-      const frame = standalone.frames().find((candidate) => candidate.url().includes('/__render-frame'))
-      if (!frame) throw new Error(`Standalone render frame did not load for ${slug}`)
-      await frame.locator('[data-widget-type="news-detail"]').waitFor()
+      await standalone.locator('[data-widget-type="news-detail"]').waitFor()
       await standalone.screenshot({
         path: path.join(outputRoot, 'standalone-react', viewport.name, `${slug}.png`),
         fullPage: true,
         animations: 'disabled',
       })
-      const model = await frame.evaluate(() => window.__legacyNewsMigrationModel)
+      const model = await standalone.evaluate(() => window.__legacyNewsMigrationModel)
       if (!model) throw new Error(`Could not capture the render model for ${slug}`)
-      await frame.locator('body').screenshot({
+
+      const editor = await browser.newPage({ viewport })
+      await editor.goto(`${reactBase}/__render-frame`)
+      await editor.evaluate((renderModel) => {
+        window.dispatchEvent(new MessageEvent('message', {
+          source: window,
+          data: { source: 'eceee-render-host', action: 'render', model: renderModel },
+        }))
+      }, model)
+      await editor.locator('[data-widget-type="news-detail"]').waitFor()
+      await editor.locator('body').screenshot({
         path: path.join(outputRoot, 'editor-preview', viewport.name, `${slug}.png`),
         animations: 'disabled',
       })
+      await editor.close()
       await standalone.close()
 
       const designer = await browser.newPage({ viewport })

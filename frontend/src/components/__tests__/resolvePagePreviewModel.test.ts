@@ -124,11 +124,44 @@ describe('page preview model resolution', () => {
         expect(clientApi.post).toHaveBeenCalledOnce()
         expect(clientApi.post).toHaveBeenCalledWith(
             expect.stringContaining('/pages/lookup/'),
-            { ids: ['69'], currentSiteId: model.context.siteId },
+            { ids: [69], currentSiteId: model.context.siteId },
             undefined,
         )
         expect(resolved.slots.navbar[0].config.menuItems[0].linkData).toMatchObject({ resolvedUrl: '/panels/', siteId: 85 })
         expect(resolved.slots.main[0].config.content).toContain('href="/panels/"')
+    })
+
+    it('isolates malformed page IDs and resolves oversized link sets in bounded batches', async () => {
+        clientApi.post.mockImplementation(async (_url, request) => ({
+            data: {
+                results: request.ids.map((id: number) => ({
+                    id,
+                    path: `/page-${id}/`,
+                    title: `Page ${id}`,
+                    isPublished: true,
+                })),
+            },
+        }))
+        const menuItems = [
+            ...Array.from({ length: 501 }, (_item, index) => ({
+                linkData: { type: 'internal', pageId: index + 1, label: `Page ${index + 1}` },
+            })),
+            { linkData: { type: 'internal', pageId: '²', label: 'Malformed' } },
+        ]
+        const model = createPageRenderModel({
+            widgets: {
+                navbar: [{ id: 'nav', type: 'easy_widgets.NavbarWidget', config: { menuItems } }],
+            },
+        })
+
+        const resolved = await resolvePagePreviewModel(model)
+
+        expect(clientApi.post).toHaveBeenCalledTimes(2)
+        expect(clientApi.post.mock.calls[0][1].ids).toHaveLength(500)
+        expect(clientApi.post.mock.calls[1][1].ids).toHaveLength(1)
+        expect(resolved.slots.navbar[0].config.menuItems[0].linkData.resolvedUrl).toBe('/page-1/')
+        expect(resolved.slots.navbar[0].config.menuItems[500].linkData.resolvedUrl).toBe('/page-501/')
+        expect(resolved.slots.navbar[0].config.menuItems[501].linkData.resolvedUrl).toBe('#')
     })
 
     it('prepares image variants before handing the model to the renderer', async () => {
