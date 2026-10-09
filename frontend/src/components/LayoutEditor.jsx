@@ -71,14 +71,27 @@ const updatedConvertedLayout = (existingLayout, codeLayout) => {
         if ('disallowed_widget_types' in definition) delete refreshed.allowed_widget_types
         return [slotKey, refreshed]
     }))
+    const newSlotNodes = newSlotKeys.map(slotNode)
+    const updatedRoot = newSlotNodes.length === 0
+        ? existingLayout.root
+        : existingLayout.root?.type === 'slot'
+            ? {
+                id: uuid(),
+                type: 'container',
+                label: 'Layout container',
+                children: [existingLayout.root, ...newSlotNodes],
+                styles: { base: { width: '100%' } },
+                class_names: ['converted-code-layout-slots'],
+            }
+            : {
+                ...existingLayout.root,
+                children: [...(existingLayout.root?.children || []), ...newSlotNodes],
+            }
 
     return {
         ...existingLayout,
         slots: { ...existingSlots, ...refreshedSlots },
-        root: newSlotKeys.length === 0 ? existingLayout.root : {
-            ...existingLayout.root,
-            children: [...(existingLayout.root?.children || []), ...newSlotKeys.map(slotNode)],
-        },
+        root: updatedRoot,
     }
 }
 

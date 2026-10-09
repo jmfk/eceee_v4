@@ -1461,17 +1461,18 @@ const SemanticThemeWorkspace = ({
                             const displayedValue = hasOverride ? activeStyles[field] : inherited?.value || ''
                             const inheritedLabel = inherited ? breakpointLabel(inherited.breakpoint) : ''
                             const hasOverrideControl = Boolean(inherited || (hasOverride && layoutParameterBreakpoint !== 'base'))
-                            return <label key={field} className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,1.2fr)] items-start gap-2 text-xs text-gray-700">
-                                <span className="pt-1.5">{humanize(field)}</span>
+                            const inputId = `layout-parameter-${selectedLayoutNode.id}-${layoutParameterBreakpoint}-${field}`
+                            return <div key={field} className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,1.2fr)] items-start gap-2 text-xs text-gray-700">
+                                <label htmlFor={inputId} className="pt-1.5">{humanize(field)}</label>
                                 <span className="min-w-0">
                                     <span className="flex min-w-0">
-                                        <input aria-label={`${selectedLayoutNode.label || selectedTargetLabel} ${humanize(field)}`} value={displayedValue} disabled={Boolean(inherited)} onChange={(event) => updateSelectedLayoutParameter(field, event.target.value)} className={`min-w-0 flex-1 border border-gray-300 px-2 py-1.5 font-mono text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 ${hasOverrideControl ? 'rounded-l' : 'rounded'}`} />
+                                        <input id={inputId} aria-label={`${selectedLayoutNode.label || selectedTargetLabel} ${humanize(field)}`} value={displayedValue} disabled={Boolean(inherited)} onChange={(event) => updateSelectedLayoutParameter(field, event.target.value)} className={`min-w-0 flex-1 border border-gray-300 px-2 py-1.5 font-mono text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 ${hasOverrideControl ? 'rounded-l' : 'rounded'}`} />
                                         {inherited && <button type="button" onClick={() => updateSelectedLayoutParameter(field, inherited.value)} aria-label={`Override ${humanize(field)} at ${breakpointLabel(layoutParameterBreakpoint)}`} title="Create override" className="inline-flex h-[30px] w-8 shrink-0 items-center justify-center rounded-r border border-l-0 border-gray-300 bg-white text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><KeyRound className="h-3.5 w-3.5" /></button>}
                                         {!inherited && hasOverride && layoutParameterBreakpoint !== 'base' && <button type="button" onClick={() => updateSelectedLayoutParameter(field, '')} aria-label={`Reset ${humanize(field)} override`} title="Reset override" className="inline-flex h-[30px] w-8 shrink-0 items-center justify-center rounded-r border border-l-0 border-gray-300 bg-white text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><RotateCcw className="h-3.5 w-3.5" /></button>}
                                     </span>
                                     {inherited && <span className="mt-1 block text-[10px] text-gray-500">Inherited from {inheritedLabel}</span>}
                                 </span>
-                            </label>
+                            </div>
                         })}</div>
                     </section>}
                     {addableThemeValues.length > 0 && <section className="border-t border-gray-200 pt-4"><label htmlFor="add-theme-value" className="text-xs font-semibold uppercase tracking-wide text-gray-500">Add theme value</label><select id="add-theme-value" value="" onChange={(event) => addThemeValue(event.target.value)} className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"><option value="">Choose a value…</option>{addableThemeValues.map((value) => <option key={propertyKey(value.kind, value.index, value.field)} value={propertyKey(value.kind, value.index, value.field)}>{value.label}</option>)}</select></section>}
