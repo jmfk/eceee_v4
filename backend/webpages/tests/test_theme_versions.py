@@ -341,6 +341,7 @@ class ThemeVersionApiTests(TestCase):
         )
 
         self.assertEqual(created.status_code, 201, created.data)
+        self.assertEqual(created["Cache-Control"], "private, no-store")
         self.assertTrue(created.data["secret"].startswith("eceee_theme_"))
         self.assertCountEqual(created.data["capabilities"], ["theme.transfer", "site.transfer"])
         access_key = ThemeRemoteAccessKey.objects.get(id=created.data["id"])
@@ -364,6 +365,16 @@ class ThemeVersionApiTests(TestCase):
             is_active=False,
         )
 
+        missing_capabilities = self.client.post(
+            f"/api/v1/webpages/remote-sites/access-keys/{access_key.id}/rotate/",
+            {},
+            format="json",
+        )
+        self.assertEqual(missing_capabilities.status_code, 400, missing_capabilities.data)
+        access_key.refresh_from_db()
+        self.assertEqual(access_key.key_hash, key_hash)
+        self.assertFalse(access_key.is_active)
+
         rotated = self.client.post(
             f"/api/v1/webpages/remote-sites/access-keys/{access_key.id}/rotate/",
             {"capabilities": ["site.transfer"]},
@@ -371,6 +382,7 @@ class ThemeVersionApiTests(TestCase):
         )
 
         self.assertEqual(rotated.status_code, 200, rotated.data)
+        self.assertEqual(rotated["Cache-Control"], "private, no-store")
         self.assertNotEqual(rotated.data["secret"], raw_key)
         access_key.refresh_from_db()
         self.assertTrue(access_key.is_active)

@@ -44,6 +44,7 @@ describe('RemoteSitesSettings', () => {
             configurable: true,
             value: { writeText: vi.fn(() => Promise.resolve()) },
         })
+        window.confirm = vi.fn(() => true)
     })
 
     it('unifies outgoing connections and incoming access keys', async () => {
@@ -108,10 +109,46 @@ describe('RemoteSitesSettings', () => {
         await screen.findByText('Local development')
 
         fireEvent.click(screen.getByRole('button', { name: 'Rotate' }))
+        expect(window.confirm).toHaveBeenCalledWith('Rotate “Local development”? The current key will stop working immediately.')
         await waitFor(() => expect(mocks.rotateRemoteAccessKey).toHaveBeenCalledWith('key-1', accessKey.capabilities))
         expect(await screen.findByText('eceee_theme_rotated-value')).toBeInTheDocument()
 
         fireEvent.click(screen.getByRole('button', { name: 'Revoke' }))
+        expect(window.confirm).toHaveBeenCalledWith('Revoke “Local development”? Remote connections using it will stop working.')
         await waitFor(() => expect(mocks.revokeRemoteAccessKey).toHaveBeenCalledWith('key-1'))
+    })
+
+    it('does not rotate or revoke a key when confirmation is cancelled', async () => {
+        window.confirm.mockReturnValue(false)
+        renderWithStateProviders(<RemoteSitesSettings />)
+        await screen.findByText('Local development')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Rotate' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Revoke' }))
+
+        expect(mocks.rotateRemoteAccessKey).not.toHaveBeenCalled()
+        expect(mocks.revokeRemoteAccessKey).not.toHaveBeenCalled()
+    })
+
+    it('keeps a newly issued secret visible when refreshing the lists fails', async () => {
+        mocks.createRemoteAccessKey.mockResolvedValue({
+            id: 'key-2',
+            name: 'Migration host',
+            secret: 'eceee_theme_one-time-value',
+            capabilities: ['theme.transfer'],
+        })
+        mocks.remoteConnections
+            .mockResolvedValueOnce({ results: [connection], canManage: true })
+            .mockRejectedValueOnce(new Error('refresh failed'))
+        renderWithStateProviders(<RemoteSitesSettings />)
+        await screen.findByText('Local development')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Create access key' }))
+        fireEvent.change(screen.getByLabelText('Key name'), { target: { value: 'Migration host' } })
+        fireEvent.click(screen.getAllByRole('button', { name: 'Create access key' })[1])
+
+        expect(await screen.findByText('eceee_theme_one-time-value')).toBeInTheDocument()
+        expect(screen.getByRole('alert')).toHaveTextContent('The access key was created, but the settings list could not be refreshed.')
+        expect(screen.queryByText('The access key could not be created.')).not.toBeInTheDocument()
     })
 })

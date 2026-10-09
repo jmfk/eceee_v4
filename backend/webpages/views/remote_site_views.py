@@ -52,11 +52,16 @@ class RemoteAccessKeyRotateSerializer(serializers.Serializer):
     capabilities = serializers.ListField(
         child=serializers.ChoiceField(choices=REMOTE_CAPABILITIES),
         allow_empty=False,
-        required=False,
     )
 
     def validate_capabilities(self, value):
         return sorted(set(value))
+
+
+def _issued_key_response(access_key, raw_key, *, response_status=status.HTTP_200_OK):
+    response = Response(_key_data(access_key, secret=raw_key), status=response_status)
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 class RemoteAccessKeysView(APIView):
@@ -90,7 +95,7 @@ class RemoteAccessKeysView(APIView):
             capabilities=data["capabilities"],
             created_by=request.user,
         )
-        return Response(_key_data(access_key, secret=raw_key), status=status.HTTP_201_CREATED)
+        return _issued_key_response(access_key, raw_key, response_status=status.HTTP_201_CREATED)
 
 
 class RemoteAccessKeyRotateView(APIView):
@@ -109,14 +114,14 @@ class RemoteAccessKeyRotateView(APIView):
         raw_key, key_hash, key_prefix = generate_access_key()
         access_key.key_hash = key_hash
         access_key.key_prefix = key_prefix
-        access_key.capabilities = serializer.validated_data.get("capabilities", access_key.capabilities)
+        access_key.capabilities = serializer.validated_data["capabilities"]
         access_key.is_active = True
         access_key.last_used_at = None
         access_key.created_by = request.user
         access_key.save(
             update_fields=["key_hash", "key_prefix", "capabilities", "is_active", "last_used_at", "created_by"]
         )
-        return Response(_key_data(access_key, secret=raw_key))
+        return _issued_key_response(access_key, raw_key)
 
 
 class RemoteAccessKeyRevokeView(APIView):

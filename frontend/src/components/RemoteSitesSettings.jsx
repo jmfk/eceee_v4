@@ -34,6 +34,14 @@ export default function RemoteSitesSettings() {
         setSyncEnabled(keyResult.syncEnabled !== false)
     }
 
+    const refreshAfterMutation = async (successMessage) => {
+        try {
+            await load()
+        } catch {
+            setError(`${successMessage} Reload this page to refresh the list.`)
+        }
+    }
+
     useEffect(() => {
         load()
             .catch((loadError) => setError(loadError.message || 'Remote site settings could not be loaded.'))
@@ -52,7 +60,7 @@ export default function RemoteSitesSettings() {
             setConnectionForm(emptyConnection)
             setEditingConnectionId(null)
             setShowConnectionForm(false)
-            await load()
+            await refreshAfterMutation('The connection was saved, but the settings list could not be refreshed.')
         } catch (saveError) {
             setError(saveError.message || 'The remote connection could not be saved.')
         } finally {
@@ -79,7 +87,7 @@ export default function RemoteSitesSettings() {
         try {
             await designerThemesApi.deleteRemoteConnection(connectionId)
             setConfirmingConnectionId(null)
-            await load()
+            await refreshAfterMutation('The connection was removed, but the settings list could not be refreshed.')
         } catch (removeError) {
             setError(removeError.message || 'The remote connection could not be removed.')
         } finally {
@@ -103,7 +111,7 @@ export default function RemoteSitesSettings() {
             setKeyName('')
             setKeyCapabilities(defaultCapabilities)
             setShowKeyForm(false)
-            await load()
+            await refreshAfterMutation('The access key was created, but the settings list could not be refreshed.')
         } catch (keyError) {
             setError(keyError.message || 'The access key could not be created.')
         } finally {
@@ -112,13 +120,14 @@ export default function RemoteSitesSettings() {
     }
 
     const rotateKey = async (accessKey) => {
+        if (!window.confirm(`Rotate “${accessKey.name}”? The current key will stop working immediately.`)) return
         setBusy(`rotate-${accessKey.id}`)
         setError('')
         try {
             const result = await designerThemesApi.rotateRemoteAccessKey(accessKey.id, accessKey.capabilities)
             setIssuedSecret({ name: result.name, secret: result.secret })
             setCopied(false)
-            await load()
+            await refreshAfterMutation('The access key was rotated, but the settings list could not be refreshed.')
         } catch (rotateError) {
             setError(rotateError.message || 'The access key could not be rotated.')
         } finally {
@@ -127,11 +136,13 @@ export default function RemoteSitesSettings() {
     }
 
     const revokeKey = async (accessKeyId) => {
+        const accessKey = accessKeys.find((item) => item.id === accessKeyId)
+        if (!accessKey || !window.confirm(`Revoke “${accessKey.name}”? Remote connections using it will stop working.`)) return
         setBusy(`revoke-${accessKeyId}`)
         setError('')
         try {
             await designerThemesApi.revokeRemoteAccessKey(accessKeyId)
-            await load()
+            await refreshAfterMutation('The access key was revoked, but the settings list could not be refreshed.')
         } catch (revokeError) {
             setError(revokeError.message || 'The access key could not be revoked.')
         } finally {

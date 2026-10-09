@@ -73,8 +73,8 @@ Remote-site connections are configured inside Designer while inbound access keys
 
 ## Completion Evidence
 
-- Backend: 22 focused `ThemeVersionApiTests` passed against PostgreSQL, including authorization, capability validation, hash-only persistence, one-time creation/rotation responses, and revocation.
-- Frontend: 32 focused Vitest tests passed across Remote Sites settings, Designer themes, Settings routing, and sidebar navigation.
+- Backend: 23 focused `ThemeVersionApiTests` passed against PostgreSQL, including authorization, capability validation, hash-only persistence, one-time creation/rotation responses, and revocation.
+- Frontend: 35 focused Vitest tests passed across Remote Sites settings, Designer themes, Settings routing, and sidebar navigation.
 - Quality: focused ESLint passed; Black, isort, and Flake8 passed for changed backend files; Vite production build passed with existing chunk warnings.
 - Governance: `validate_specs.py` passed.
 - Visual verification: confirmed the unified page and access-key form in the running local application at `/settings/remote-sites`.
