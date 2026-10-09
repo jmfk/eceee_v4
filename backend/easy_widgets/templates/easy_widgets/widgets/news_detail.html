@@ -55,7 +55,7 @@
     {% if config.render_object_widgets and rendered_widgets %}
         <div class="news-object-widgets">
             {% for slot_name, widgets in rendered_widgets.items %}
-                <div class="news-widget-slot news-widget-slot-{{ slot_name }}" data-slot="{{ slot_name }}">
+                <div class="news-widget-slot news-widget-slot-{{ slot_name }}" data-slot="{{ slot_name }}" data-widget-slot="{{ slot_name }}" data-owner-widget-type="easy_widgets.NewsDetailWidget">
                     {% for widget_html in widgets %}
                         {{ widget_html|sanitize_html }}
                     {% endfor %}

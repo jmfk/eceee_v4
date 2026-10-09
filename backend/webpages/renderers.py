@@ -6,6 +6,8 @@ from copy import copy
 
 from django.db.models import Q
 from django.template.loader import get_template
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 
 from .inheritance_helpers import InheritanceTreeHelpers
 from .inheritance_tree import InheritanceTreeBuilder
@@ -22,6 +24,16 @@ class WebPageRenderer:
     def __init__(self, request=None):
         self.request = request
         self._rendered_css = set()  # Track rendered CSS to avoid duplicates
+
+    def _wrap_widget_html(self, widget_data, widget_type, widget_html):
+        """Keep public widget markup aligned with the React render boundary."""
+        return format_html(
+            '<div class="widget-item widget-type-{}" data-widget-type="{}" data-widget-id="{}">{}</div>',
+            widget_type.css_class_name,
+            widget_type.type,
+            widget_data.get("id", "unknown"),
+            mark_safe(widget_html),
+        )
 
     def _is_mustache_wrapper_template(self, template_name):
         """
@@ -343,8 +355,8 @@ class WebPageRenderer:
             if custom_style_css:
                 # Process CSS to handle breakpoint dictionaries
                 processed_css = self._process_component_css(custom_style_css, enhanced_context.get("theme"))
-                return f"<style>{processed_css}</style>\n{custom_style_html}"
-            return custom_style_html
+                custom_style_html = f"<style>{processed_css}</style>\n{custom_style_html}"
+            return self._wrap_widget_html(widget_data, widget_type, custom_style_html)
 
         # Check for Mustache-only widgets (no Django template or wrapper template)
         if hasattr(widget_type, "mustache_template_name") and widget_type.mustache_template_name:
@@ -366,7 +378,7 @@ class WebPageRenderer:
                         processed_css = self._process_component_css(custom_style_css, enhanced_context.get("theme"))
                         widget_html = f"<style>{processed_css}</style>\n{widget_html}"
 
-                    return widget_html
+                    return self._wrap_widget_html(widget_data, widget_type, widget_html)
                 except Exception as e:
                     logger.error(f"Error rendering Mustache template for {widget_type.name}: {e}")
                     return f"<!-- Error rendering Mustache widget: {e} -->"
@@ -421,7 +433,7 @@ class WebPageRenderer:
                 # Process CSS to handle breakpoint dictionaries
                 processed_css = self._process_component_css(custom_style_css, enhanced_context.get("theme"))
                 widget_html = f"<style>{processed_css}</style>\n{widget_html}"
-            return widget_html
+            return self._wrap_widget_html(widget_data, widget_type, widget_html)
         except Exception as e:
             return f"<!-- Error rendering widget: {e} -->"
 

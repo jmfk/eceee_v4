@@ -110,4 +110,37 @@ describe('generateDesignGroupsCSS', () => {
         expect(css).toContain('@media (min-width: 900px)')
         expect(css).toContain('padding: 3rem;')
     })
+
+    it('renders responsive structural spacing for layout, widget, and nested widget-slot targets', () => {
+        const css = generateDesignGroupsCSS({
+            groups: [],
+            structuralSpacing: [
+                { scope: 'layoutSlot', layout: 'main_layout', slot: 'main', breakpoint: 'xs', values: { paddingLeft: '1rem' } },
+                { scope: 'widget', widgetType: 'easy_widgets.ContentWidget', breakpoint: 'md', values: { marginBottom: '2rem' } },
+                { scope: 'widgetSlot', widgetType: 'easy_widgets.TwoColumnsWidget', slot: 'left', breakpoint: '900', values: { padding: '24px' } },
+                { scope: 'widgetPart', widgetType: 'easy_widgets.HeroWidget', part: 'hero-content', breakpoint: 'xl', values: { paddingTop: '32px' } },
+            ],
+        })
+
+        expect(css).toContain('[data-render-layout="main_layout"] .layout-slot[data-slot-name="main"]')
+        expect(css).toContain('padding-left: 1rem;')
+        expect(css).toContain('@media (min-width: 768px)')
+        expect(css).toContain('[data-widget-id][data-widget-type="easy_widgets.ContentWidget"]')
+        expect(css).toContain('@media (min-width: 900px)')
+        expect(css).toContain('[data-widget-slot="left"][data-owner-widget-type="easy_widgets.TwoColumnsWidget"]')
+        expect(css).toContain('[data-widget-id][data-widget-type="easy_widgets.HeroWidget"] .hero-content')
+        expect(css).toContain('padding-top: 32px;')
+    })
+
+    it('emits structural spacing in mobile-first order regardless of edit order', () => {
+        const css = generateDesignGroupsCSS({
+            groups: [],
+            structuralSpacing: [
+                { scope: 'layoutSlot', layout: 'main_layout', slot: 'main', breakpoint: 'xl', values: { paddingLeft: '4rem' } },
+                { scope: 'layoutSlot', layout: 'main_layout', slot: 'main', breakpoint: 'xs', values: { paddingLeft: '1rem' } },
+            ],
+        })
+
+        expect(css.indexOf('padding-left: 1rem;')).toBeLessThan(css.indexOf('padding-left: 4rem;'))
+    })
 })

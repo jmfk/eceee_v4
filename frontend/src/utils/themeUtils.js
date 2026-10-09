@@ -69,14 +69,14 @@ function normalizeForCSS(value) {
 export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', widgetType = null, slot = null, frontendScoped = false, breakpoints = null) {
     // Use provided breakpoints or defaults
     const bps = breakpoints || DEFAULT_BREAKPOINTS;
-    if (!designGroups || !designGroups.groups) {
+    if (!designGroups) {
         return '';
     }
 
     const cssParts = [];
 
     // Find applicable groups
-    const applicableGroups = designGroups.groups.filter(group => {
+    const applicableGroups = (designGroups.groups || []).filter(group => {
         const groupWidgetType = group.widgetType || group.widget_type;
         const groupSlot = group.slot;
 
@@ -378,6 +378,49 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                     }
                 }
             }
+        }
+    }
+
+    const structuralSpacing = designGroups.structuralSpacing || designGroups.structural_spacing || [];
+    const orderedStructuralSpacing = structuralSpacing.map((row, index) => ({ row, index })).sort((left, right) => {
+        const width = ({ row }) => {
+            const breakpoint = mapBreakpointName(row.breakpoint || 'xs');
+            if (breakpoint === 'xs') return 0;
+            if (/^\d+$/.test(breakpoint)) return Number(breakpoint);
+            return Number(bps[breakpoint] ?? Number.POSITIVE_INFINITY);
+        };
+        return width(left) - width(right) || left.index - right.index;
+    }).map(({ row }) => row);
+    const escapeAttribute = value => String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const escapeClassIdentifier = value => String(value || '').replace(/[^A-Za-z0-9_-]/g, character => `\\${character}`);
+    for (const row of orderedStructuralSpacing) {
+        const values = row.values || {};
+        const declarations = Object.entries(values)
+            .filter(([, value]) => value !== undefined && value !== null && value !== '')
+            .map(([property, value]) => `  ${camelToKebab(property)}: ${value};`);
+        if (!declarations.length) continue;
+
+        const rowWidgetType = row.widgetType || row.widget_type;
+        let selector = '';
+        if (row.scope === 'layoutSlot' && row.layout && row.slot) {
+            selector = `[data-render-layout="${escapeAttribute(row.layout)}"] .layout-slot[data-slot-name="${escapeAttribute(row.slot)}"]`;
+        } else if (row.scope === 'widget' && rowWidgetType) {
+            selector = `[data-widget-id][data-widget-type="${escapeAttribute(rowWidgetType)}"]`;
+        } else if (row.scope === 'widgetSlot' && rowWidgetType && row.slot) {
+            selector = `[data-widget-slot="${escapeAttribute(row.slot)}"][data-owner-widget-type="${escapeAttribute(rowWidgetType)}"]`;
+        } else if (row.scope === 'widgetPart' && rowWidgetType && row.part) {
+            selector = `[data-widget-id][data-widget-type="${escapeAttribute(rowWidgetType)}"] .${escapeClassIdentifier(row.part)}`;
+        }
+        if (!selector) continue;
+        if (scope) selector = `${scope} ${selector}`.trim();
+        if (frontendScoped) selector = `.cms-content ${selector}`.trim();
+
+        const breakpoint = mapBreakpointName(row.breakpoint || 'xs');
+        const rule = `${selector} {\n${declarations.join('\n')}\n}`;
+        if (breakpoint === 'xs') cssParts.push(rule);
+        else {
+            const bpPx = /^\d+$/.test(breakpoint) ? Number(breakpoint) : bps[breakpoint];
+            if (bpPx !== undefined) cssParts.push(`@media (min-width: ${bpPx}px) {\n  ${selector} {\n${declarations.map(line => `  ${line}`).join('\n')}\n  }\n}`);
         }
     }
 

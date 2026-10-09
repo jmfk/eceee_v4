@@ -115,6 +115,10 @@ const workspace = {
             slots: [{ name: 'hero', label: 'Hero' }, { name: 'main', label: 'Main content' }], parts: [], layoutCss: '.main-layout{display:block}',
             previewTemplate: '<div class="main-layout"><div class="slot-hero">__DESIGNER_SLOT_hero__</div><main class="slot-main">__DESIGNER_SLOT_main__</main></div>',
         }],
+        widgetSlots: [{
+            widgetType: 'easy_widgets.TwoColumnsWidget', label: 'Two Columns',
+            slots: [{ name: 'left', label: 'Left Column' }, { name: 'right', label: 'Right Column' }],
+        }],
         previewViews,
     },
     constraints: {
@@ -125,35 +129,32 @@ const workspace = {
 }
 
 const selectHeading = async () => {
-    await waitFor(() => {
-        const iframe = screen.getByTitle('Live theme preview')
-        fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:h1', kind: 'element', label: 'Heading 1', text: 'A heading with a realistic length' },
-            source: iframe.contentWindow,
-        }))
-        expect(screen.getByRole('heading', { name: 'Heading 1' })).toBeInTheDocument()
-    })
+    const iframe = await screen.findByTitle('Live theme preview')
+    fireEvent(window, new MessageEvent('message', {
+        data: { source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:h1', kind: 'element', label: 'Heading 1', text: 'A heading with a realistic length' },
+        source: iframe.contentWindow,
+    }))
+    expect(await screen.findByRole('heading', { name: 'Heading 1' })).toBeInTheDocument()
 }
 
 const readyPreview = async () => {
     const iframe = await screen.findByTitle('Live theme preview')
     const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
-    await waitFor(() => {
-        fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-render-frame', action: 'ready' },
-            source: iframe.contentWindow,
-        }))
-        expect(postMessage).toHaveBeenCalledWith(
-            expect.objectContaining({ source: 'eceee-render-host', action: 'render' }),
-            '*',
-        )
-    })
+    fireEvent(window, new MessageEvent('message', {
+        data: { source: 'eceee-render-frame', action: 'ready' },
+        source: iframe.contentWindow,
+    }))
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'eceee-render-host', action: 'render' }),
+        '*',
+    ))
 
     return { iframe, postMessage }
 }
 
 describe('DesignerThemeWorkspacePage', () => {
     afterEach(() => {
+        vi.restoreAllMocks()
         vi.unstubAllGlobals()
     })
 
@@ -248,19 +249,28 @@ describe('DesignerThemeWorkspacePage', () => {
             }],
         }
         mocks.workspace.mockResolvedValue(layoutWorkspace)
+        mocks.save.mockImplementation(async (_themeId, payload) => ({
+            ...structuredClone(layoutWorkspace),
+            layouts: structuredClone(payload.layouts),
+            draftVersion: 3,
+            hasDraftChanges: true,
+        }))
 
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         const iframe = await screen.findByTitle('Live theme preview')
-        fireEvent(window, new MessageEvent('message', {
-            data: {
-                source: 'eceee-designer-preview', action: 'select',
-                targetId: 'layout-node:2d1ee676-3624-4ec8-aaf4-8874bea037f4',
-                kind: 'element', label: 'Content grid',
-                layoutNodeId: '2d1ee676-3624-4ec8-aaf4-8874bea037f4',
-                editableParameters: ['background_color', 'gap', 'grid_template_columns'],
-            },
-            source: iframe.contentWindow,
-        }))
+        await waitFor(() => {
+            fireEvent(window, new MessageEvent('message', {
+                data: {
+                    source: 'eceee-designer-preview', action: 'select',
+                    targetId: 'layout-node:2d1ee676-3624-4ec8-aaf4-8874bea037f4',
+                    kind: 'element', label: 'Content grid',
+                    layoutNodeId: '2d1ee676-3624-4ec8-aaf4-8874bea037f4',
+                    editableParameters: ['background_color', 'gap', 'grid_template_columns'],
+                },
+                source: iframe.contentWindow,
+            }))
+            expect(screen.getByRole('heading', { name: 'Content grid' })).toBeInTheDocument()
+        })
 
         const gap = await screen.findByLabelText('Content grid Gap')
         const columns = screen.getByLabelText('Content grid Grid template columns')
@@ -276,6 +286,17 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(gap).toBeEnabled()
         fireEvent.change(gap, { target: { value: '36px' } })
         expect(gap).toHaveValue('36px')
+        expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled()
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalledWith('7', expect.objectContaining({
+            layouts: expect.objectContaining({
+                items: [expect.objectContaining({
+                    root: expect.objectContaining({
+                        styles: expect.objectContaining({ xl: expect.objectContaining({ gap: '36px' }) }),
+                    }),
+                })],
+            }),
+        })))
         fireEvent.click(screen.getByRole('button', { name: 'Reset Gap override' }))
         expect(gap).toBeDisabled()
         expect(gap).toHaveValue('30px')
@@ -649,9 +670,10 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ source: 'eceee-render-host', action: 'formatText', targetId: 'content:0', command: 'createLink', value: 'https://example.com/article' }), '*')
         expect(screen.getByText('Elements inside')).toBeInTheDocument()
         const elementHierarchy = screen.getByRole('tree', { name: 'Element hierarchy' })
-        expect(elementHierarchy).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto')
-        expect(elementHierarchy.closest('section')).toHaveClass('min-h-0', 'flex-1', 'flex-col')
-        expect(document.getElementById('selected-element-editor')).toHaveClass('min-h-0', 'flex-1', 'overflow-hidden')
+        expect(elementHierarchy).toHaveClass('overflow-x-hidden')
+        expect(elementHierarchy).not.toHaveClass('overflow-y-auto')
+        expect(elementHierarchy.closest('section')).toHaveClass('shrink-0', 'flex-col')
+        expect(document.getElementById('selected-element-editor')).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto', 'overscroll-contain')
         expect(screen.getByRole('button', { name: 'Edit Paragraph: “More copy”' })).toHaveAttribute('aria-expanded', 'false')
         expect(screen.getByRole('treeitem', { name: /Paragraph: “More copy”/ })).toHaveAttribute('aria-level', '2')
         const highlightButton = screen.getByRole('button', { name: 'Highlight Heading 1: “Editable copy”' })
@@ -672,12 +694,12 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-pressed', 'true')
         expect(screen.getByRole('button', { name: 'Highlight Heading 1: “Editable copy”' })).toHaveAttribute('aria-pressed', 'false')
         expect(screen.getByRole('region', { name: 'Heading 1 settings' })).toHaveClass('designer-inspector-focus')
-        expect(postMessage).toHaveBeenCalledWith({
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-render-host',
             action: 'selectTarget',
             targetId: 'group:0:element:h1',
             widgetId: 'content-1',
-        }, '*')
+        }), '*')
         fireEvent.click(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' }))
         expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-expanded', 'false')
         expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-pressed', 'true')
@@ -721,8 +743,7 @@ describe('DesignerThemeWorkspacePage', () => {
     it('keeps repeated element targets separate for each widget instance', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
-        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+        const { iframe, postMessage } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -742,14 +763,19 @@ describe('DesignerThemeWorkspacePage', () => {
         const secondParagraph = screen.getByRole('button', { name: 'Edit Paragraph: “Second copy”' })
         fireEvent.click(secondParagraph)
 
-        expect(secondParagraph).toHaveAttribute('aria-pressed', 'true')
-        expect(postMessage).toHaveBeenCalledWith({
+        expect(screen.getByRole('button', { name: 'Edit Paragraph: “Second copy”' })).toHaveAttribute('aria-pressed', 'true')
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-render-host', action: 'selectTarget',
             targetId: 'paragraph', widgetId: 'second',
-        }, '*')
+            selectionLevel: 'element',
+        }), '*')
     })
 
     it('identifies layout slots separately from selected elements', async () => {
+        const layoutSlotWorkspace = structuredClone(workspace)
+        layoutSlotWorkspace.constraints.editableSpacingProperties.push('paddingTop')
+        layoutSlotWorkspace.catalog.layouts[0].slots.find((slot) => slot.name === 'hero').editableSpacingProperties = ['paddingTop']
+        mocks.workspace.mockResolvedValue(layoutSlotWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
@@ -759,6 +785,7 @@ describe('DesignerThemeWorkspacePage', () => {
                 data: {
                     source: 'eceee-designer-preview', action: 'select', targetId: 'layout:main_layout:slot:hero',
                     kind: 'layoutSlot', label: 'Hero', editable: false,
+                    computedStyles: { paddingTop: '12px' },
                     descendants: [{
                         id: 'group:0:element:h1', kind: 'element', label: 'Heading 1',
                         displayLabel: 'Heading 1: “Example headline”', parentId: 'layout:main_layout:slot:hero',
@@ -770,7 +797,16 @@ describe('DesignerThemeWorkspacePage', () => {
             expect(screen.getByText('Selected slot')).toBeInTheDocument()
         })
         expect(screen.getByRole('heading', { name: 'Hero' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Collapse Hero settings' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Collapse selected slot Hero' })).toBeInTheDocument()
+        fireEvent.change(await screen.findByLabelText('slot Padding top'), { target: { value: '20px' } })
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        expect(mocks.save.mock.calls[0][1].spacing).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                scope: 'layoutSlot', layout: 'main_layout', slot: 'hero',
+                breakpoint: 'xl', values: { paddingTop: '20px' },
+            }),
+        ]))
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -782,7 +818,27 @@ describe('DesignerThemeWorkspacePage', () => {
 
         expect(screen.getByText('Selected element')).toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Heading 1' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Collapse Heading 1 settings' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Collapse selected element Heading 1' })).toBeInTheDocument()
+    })
+
+    it('keeps layout slots informative when the layout exposes no editable spacing', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'layout:main_layout:slot:main', styleTargetId: 'layout:main_layout:slot:main',
+                kind: 'layoutSlot', label: 'Main Content', computedStyles: { paddingTop: '30px' },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(await screen.findByRole('heading', { name: 'Main Content' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /selected slot Main Content/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: '+ Add spacing' })).not.toBeInTheDocument()
+        expect(screen.queryByLabelText('slot Padding top')).not.toBeInTheDocument()
     })
 
     it('identifies widget selections separately from slots and elements', async () => {
@@ -802,7 +858,216 @@ describe('DesignerThemeWorkspacePage', () => {
             expect(screen.getByText('Selected widget')).toBeInTheDocument()
         })
         expect(screen.getByRole('heading', { name: 'Banner widget' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Collapse Banner widget settings' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /selected widget Banner widget/i })).not.toBeInTheDocument()
+    })
+
+    it('creates responsive spacing for a selected nested widget slot', async () => {
+        const widgetSlotWorkspace = structuredClone(workspace)
+        widgetSlotWorkspace.constraints.editableSpacingProperties.push('paddingTop')
+        widgetSlotWorkspace.catalog.widgetSlots[0].slots[0].editableSpacingProperties = ['paddingTop']
+        mocks.workspace.mockResolvedValue(widgetSlotWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'slot:columns-1:left', styleTargetId: 'widget-slot:easy_widgets.TwoColumnsWidget:left',
+                kind: 'slot', label: 'Left slot', widgetId: 'columns-1', widgetType: 'easy_widgets.TwoColumnsWidget',
+                computedStyles: { marginBottom: '0px', padding: '0px' },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(screen.queryByRole('button', { name: '+ Add spacing' })).not.toBeInTheDocument()
+        fireEvent.change(await screen.findByLabelText('slot Padding top'), { target: { value: '24px' } })
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        expect(mocks.save.mock.calls[0][1].spacing).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                scope: 'widgetSlot', widgetType: 'easy_widgets.TwoColumnsWidget', slot: 'left',
+                breakpoint: 'xl', values: expect.objectContaining({ paddingTop: '24px' }),
+            }),
+        ]))
+    })
+
+    it('creates the first responsive spacing rule for a layout slot from inline editing', async () => {
+        const layoutSlotWorkspace = structuredClone(workspace)
+        layoutSlotWorkspace.catalog.layouts[0].slots.find((slot) => slot.name === 'main').editableSpacingProperties = ['padding']
+        mocks.workspace.mockResolvedValue(layoutSlotWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'layout:main_layout:slot:main', styleTargetId: 'layout:main_layout:slot:main',
+                kind: 'layoutSlot', label: 'Main content', computedStyles: { padding: '0px' },
+            },
+            source: iframe.contentWindow,
+        }))
+        expect(await screen.findByLabelText('slot Inner spacing')).toHaveValue('0px')
+        expect(screen.queryByRole('button', { name: '+ Add spacing' })).not.toBeInTheDocument()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'spacingChange',
+                targetIds: ['layout:main_layout:slot:main'], property: 'padding', value: '28px',
+            },
+            source: iframe.contentWindow,
+        }))
+        await waitFor(() => expect(screen.getByRole('button', { name: /save draft/i })).toBeEnabled())
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        expect(mocks.save.mock.calls[0][1].spacing).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                scope: 'layoutSlot', layout: 'main_layout', slot: 'main',
+                breakpoint: 'xl', values: expect.objectContaining({ padding: '28px' }),
+            }),
+        ]))
+    })
+
+    it('shows only meaningful computed spacing controls for a selected widget', async () => {
+        const compactSpacingWorkspace = structuredClone(workspace)
+        compactSpacingWorkspace.constraints.editableSpacingProperties = [
+            'margin', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
+            'padding', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+        ]
+        compactSpacingWorkspace.spacing = [{
+            targetId: 'group:0:part:content-widget', scope: 'layout', groupIndex: 0, groupName: 'Article',
+            part: 'content-widget', breakpoint: 'md',
+            values: { marginRight: '40px', marginLeft: '40px', padding: '30px' },
+        }]
+        mocks.workspace.mockResolvedValue(compactSpacingWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'group:0:part:content-widget',
+                kind: 'part', label: 'Content widget', widgetId: 'content-1', widgetType: 'easy_widgets.ContentWidget',
+                computedStyles: {
+                    margin: '0px 40px', marginTop: '0px', marginRight: '40px', marginBottom: '0px', marginLeft: '40px',
+                    padding: '30px', paddingTop: '30px', paddingRight: '30px', paddingBottom: '30px', paddingLeft: '30px',
+                },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(await screen.findByLabelText('widget Margin right')).toHaveValue('40px')
+        expect(screen.getByLabelText('widget Margin left')).toHaveValue('40px')
+        expect(screen.getByLabelText('widget Padding top')).toHaveValue('30px')
+        expect(screen.getByLabelText('widget Padding right')).toHaveValue('30px')
+        expect(screen.getByLabelText('widget Padding bottom')).toHaveValue('30px')
+        expect(screen.getByLabelText('widget Padding left')).toHaveValue('30px')
+        expect(screen.getByLabelText('widget Padding top').parentElement).toHaveClass('col-start-2', 'row-start-1')
+        expect(screen.getByLabelText('widget Padding right').parentElement).toHaveClass('col-start-3', 'row-start-2')
+        expect(screen.getByLabelText('widget Padding bottom').parentElement).toHaveClass('col-start-2', 'row-start-3')
+        expect(screen.getByLabelText('widget Padding left').parentElement).toHaveClass('col-start-1', 'row-start-2')
+        expect(screen.getByLabelText('widget Margin right').parentElement).toHaveClass('col-start-3', 'row-start-2')
+        expect(screen.getByLabelText('widget Margin left').parentElement).toHaveClass('col-start-1', 'row-start-2')
+        expect(screen.queryByLabelText('widget Outer spacing')).not.toBeInTheDocument()
+        expect(screen.queryByLabelText('widget Inner spacing')).not.toBeInTheDocument()
+        expect(screen.queryByLabelText('widget Margin top')).not.toBeInTheDocument()
+        expect(screen.queryByLabelText('widget Margin bottom')).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Show all margin and padding sides' })).not.toBeInTheDocument()
+    })
+
+    it.each([
+        {
+            widgetName: 'Two Columns', widgetType: 'easy_widgets.TwoColumnsWidget',
+            part: 'two-columns-widget', label: 'Two Columns container',
+        },
+        {
+            widgetName: 'Three Columns', widgetType: 'easy_widgets.ThreeColumnsWidget',
+            part: 'three-columns-widget', label: 'Three Columns container',
+        },
+    ])('creates the first $widgetName gap override at the widget level', async ({ widgetName, widgetType, part, label }) => {
+        const columnWorkspace = structuredClone(workspace)
+        columnWorkspace.constraints.editableSpacingProperties.push('gap')
+        columnWorkspace.catalog.designGroups[0].parts = [{
+            id: `group:0:part:${part}`, part, label,
+            editableSpacingProperties: ['gap'],
+        }]
+        columnWorkspace.spacing = columnWorkspace.spacing.filter((row) => row.targetId !== `group:0:part:${part}`)
+        mocks.workspace.mockResolvedValue(columnWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget:columns-1', styleTargetId: `widget-type:${widgetType}`,
+                kind: 'widget', label: `${widgetName} widget`,
+                widgetId: 'columns-1', widgetType, computedStyles: { paddingLeft: '100px' },
+                configurationSpacingTargets: [{
+                    id: `group:0:part:${part}`, styleTargetId: `group:0:part:${part}`,
+                    kind: 'part', label, widgetId: 'columns-1', widgetType,
+                    computedStyles: { gap: '30px' },
+                }],
+                selectionPaths: {
+                    slot: [],
+                    widget: [{
+                        id: 'widget:columns-1', styleTargetId: `widget-type:${widgetType}`,
+                        kind: 'widget', label: `${widgetName} widget`, widgetId: 'columns-1', widgetType,
+                        computedStyles: { paddingLeft: '100px' },
+                        configurationSpacingTargets: [{
+                            id: `group:0:part:${part}`, styleTargetId: `group:0:part:${part}`,
+                            kind: 'part', label, widgetId: 'columns-1', widgetType,
+                            computedStyles: { gap: '30px' },
+                        }],
+                    }],
+                    element: [],
+                },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(await screen.findByLabelText('widget Column gap')).toHaveValue('30px')
+        fireEvent.change(screen.getByLabelText('widget Column gap'), { target: { value: '36px' } })
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        expect(mocks.save.mock.calls[0][1].spacing).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                scope: 'layout', groupIndex: 0, part, breakpoint: 'xl', values: { gap: '36px' },
+            }),
+        ]))
+    })
+
+    it('shows spacing from the selected instance when semantic targets are reused', async () => {
+        const reusedTargetWorkspace = structuredClone(workspace)
+        reusedTargetWorkspace.constraints.editableSpacingProperties = [
+            'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
+            'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+        ]
+        reusedTargetWorkspace.spacing[0].values.marginTop = '16px'
+        mocks.workspace.mockResolvedValue(reusedTargetWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'group:0:element:h1', kind: 'element', label: 'Hero heading', widgetId: 'hero-1',
+                computedStyles: { marginTop: '16px', marginBottom: '16px' },
+                alternatives: [{
+                    id: 'group:0:element:h1', kind: 'element', label: 'Another heading', widgetId: 'content-1',
+                    computedStyles: { marginTop: '24px', marginBottom: '18px' },
+                }],
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(await screen.findByLabelText('element Margin top')).toHaveValue('16px')
+        expect(screen.getByLabelText('element Margin bottom')).toHaveValue('16px')
     })
 
     it('applies a clicked preview spacing label to the nearest target and active breakpoint', async () => {
@@ -834,6 +1099,183 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(mocks.save.mock.calls[0][1].spacing[1].values.padding).toBe('8px')
         expect(mocks.save.mock.calls[0][1].spacing[2].values.padding).toBe('24px')
         expect(mocks.save.mock.calls[0][1].spacing[3]).toEqual(expect.objectContaining({ breakpoint: 'xl', values: { padding: '32px' } }))
+    })
+
+    it('ignores inline spacing changes for widget parts not exposed by the theme', async () => {
+        const widgetPartWorkspace = structuredClone(workspace)
+        widgetPartWorkspace.spacing = widgetPartWorkspace.spacing.filter((row) => !row.targetId.startsWith('widget-part:'))
+        widgetPartWorkspace.constraints.editableSpacingProperties.push('paddingTop')
+        mocks.workspace.mockResolvedValue(widgetPartWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const { iframe, postMessage } = await readyPreview()
+        postMessage.mockRestore()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'spacingChange',
+                targetIds: ['widget-part:easy_widgets.HeroWidget:hero-content', 'group:0:element:h1'],
+                property: 'paddingTop', value: '34px', viewportWidth: 1280,
+            },
+            source: iframe.contentWindow,
+        }))
+        expect(screen.getByRole('button', { name: /save draft/i })).toBeDisabled()
+        expect(mocks.save).not.toHaveBeenCalled()
+    })
+
+    it('creates first widget-slot spacing from the inline preview editor', async () => {
+        const widgetSlotWorkspace = structuredClone(workspace)
+        widgetSlotWorkspace.spacing = widgetSlotWorkspace.spacing.filter((row) => row.scope !== 'widgetSlot')
+        widgetSlotWorkspace.constraints.editableSpacingProperties.push('paddingTop')
+        widgetSlotWorkspace.catalog.widgetSlots[0].slots[0].editableSpacingProperties = ['paddingTop']
+        mocks.workspace.mockResolvedValue(widgetSlotWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const { iframe, postMessage } = await readyPreview()
+        postMessage.mockRestore()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'spacingChange',
+                targetId: 'widget-slot:easy_widgets.TwoColumnsWidget:left',
+                targetIds: ['slot:columns-1:left', 'widget-slot:easy_widgets.TwoColumnsWidget:left'],
+                property: 'paddingTop', value: '28px', viewportWidth: 1280,
+            },
+            source: iframe.contentWindow,
+        }))
+        await waitFor(() => expect(screen.getByRole('button', { name: /save draft/i })).toBeEnabled())
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        expect(mocks.save.mock.calls[0][1].spacing).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                scope: 'widgetSlot', widgetType: 'easy_widgets.TwoColumnsWidget', slot: 'left',
+                breakpoint: 'xl', values: { paddingTop: '28px' },
+            }),
+        ]))
+    })
+
+    it('does not offer widget-part spacing that the theme does not expose', async () => {
+        const widgetPartWorkspace = structuredClone(workspace)
+        widgetPartWorkspace.spacing = widgetPartWorkspace.spacing.filter((row) => !row.targetId.startsWith('widget-part:'))
+        widgetPartWorkspace.constraints.editableSpacingProperties.push('paddingTop')
+        mocks.workspace.mockResolvedValue(widgetPartWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget-part:easy_widgets.HeroWidget:hero-content',
+                styleTargetId: 'widget-part:easy_widgets.HeroWidget:hero-content',
+                kind: 'element', label: 'Hero content', widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
+                computedStyles: { paddingTop: '17px' },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(screen.queryByLabelText('Padding top')).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: '+ Add spacing' })).not.toBeInTheDocument()
+    })
+
+    it('keeps an inline element spacing change on the exact element instead of its widget-part ancestor', async () => {
+        const exactTargetWorkspace = structuredClone(workspace)
+        exactTargetWorkspace.constraints.editableSpacingProperties.push('paddingTop')
+        mocks.workspace.mockResolvedValue(exactTargetWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const { iframe, postMessage } = await readyPreview()
+        postMessage.mockRestore()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'spacingChange',
+                targetId: 'group:0:element:h1',
+                targetIds: ['group:0:element:h1', 'widget-part:easy_widgets.ContentWidget:content-widget'],
+                property: 'marginBottom', value: '20px', viewportWidth: 1280,
+            },
+            source: iframe.contentWindow,
+        }))
+        await waitFor(() => expect(screen.getByRole('button', { name: /save draft/i })).toBeEnabled())
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        const savedSpacing = mocks.save.mock.calls[0][1].spacing
+        expect(savedSpacing.find((row) => row.scope === 'element' && row.groupIndex === 0 && row.element === 'h1').values.marginBottom).toBe('20px')
+        expect(savedSpacing.some((row) => row.scope === 'widgetPart' && row.widgetType === 'easy_widgets.ContentWidget')).toBe(false)
+    })
+
+    it('creates an active-breakpoint override when inherited structural spacing is edited', async () => {
+        const inheritedWorkspace = structuredClone(workspace)
+        inheritedWorkspace.constraints.editableSpacingProperties.push('paddingTop')
+        inheritedWorkspace.spacing.push({
+            targetId: 'widget-type:easy_widgets.HeroWidget', scope: 'widget',
+            widgetType: 'easy_widgets.HeroWidget', values: { paddingTop: '8px' },
+        })
+        inheritedWorkspace.spacing.push({
+            targetId: 'widget-type:easy_widgets.HeroWidget', scope: 'widget',
+            widgetType: 'easy_widgets.HeroWidget', breakpoint: 'md', values: { paddingTop: '24px' },
+        })
+        mocks.workspace.mockResolvedValue(inheritedWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget:hero-1', styleTargetId: 'widget-type:easy_widgets.HeroWidget',
+                kind: 'widget', label: 'Hero widget', widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
+                computedStyles: { paddingTop: '24px' },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        fireEvent.change(await screen.findByLabelText('widget Padding top'), { target: { value: '32px' } })
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        const savedSpacing = mocks.save.mock.calls[0][1].spacing
+        expect(savedSpacing.find((row) => row.scope === 'widget' && row.widgetType === 'easy_widgets.HeroWidget' && !row.breakpoint).values.paddingTop).toBe('8px')
+        expect(savedSpacing.find((row) => row.scope === 'widget' && row.widgetType === 'easy_widgets.HeroWidget' && row.breakpoint === 'md').values.paddingTop).toBe('24px')
+        expect(savedSpacing.find((row) => row.scope === 'widget' && row.widgetType === 'easy_widgets.HeroWidget' && row.breakpoint === 'xl').values.paddingTop).toBe('32px')
+    })
+
+    it('edits an inherited responsive shorthand instead of a hidden global direction', async () => {
+        const inheritedWorkspace = structuredClone(workspace)
+        inheritedWorkspace.constraints.editableSpacingProperties.push('paddingLeft')
+        inheritedWorkspace.spacing.push({
+            targetId: 'widget-type:easy_widgets.HeroWidget', scope: 'widget',
+            widgetType: 'easy_widgets.HeroWidget', values: { paddingLeft: '40px' },
+        }, {
+            targetId: 'widget-type:easy_widgets.HeroWidget', scope: 'widget',
+            widgetType: 'easy_widgets.HeroWidget', breakpoint: 'md', values: { padding: '24px' },
+        })
+        mocks.workspace.mockResolvedValue(inheritedWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget:hero-1', styleTargetId: 'widget-type:easy_widgets.HeroWidget',
+                kind: 'widget', label: 'Hero widget', widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
+                computedStyles: { paddingLeft: '24px' },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(await screen.findByLabelText('widget Padding left')).toHaveValue('24px')
+        fireEvent.change(screen.getByLabelText('widget Padding left'), { target: { value: '32px' } })
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        const savedSpacing = mocks.save.mock.calls[0][1].spacing
+        expect(savedSpacing.find((row) => row.widgetType === 'easy_widgets.HeroWidget' && !row.breakpoint).values.paddingLeft).toBe('40px')
+        expect(savedSpacing.find((row) => row.widgetType === 'easy_widgets.HeroWidget' && row.breakpoint === 'md').values.padding).toBe('24px')
+        expect(savedSpacing.find((row) => row.widgetType === 'easy_widgets.HeroWidget' && row.breakpoint === 'xl').values.paddingLeft).toBe('32px')
     })
 
     it('edits the canonical breakpoint when legacy and canonical rows share a width', async () => {
@@ -878,53 +1320,43 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
 
         const iframe = screen.getByTitle('Live theme preview')
-        await waitFor(() => {
-            fireEvent(window, new MessageEvent('message', {
-                data: { source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:part:content-widget', kind: 'part', label: 'Content' },
-                source: iframe.contentWindow,
-            }))
-            expect(screen.getByDisplayValue('10px')).toBeInTheDocument()
-        })
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'group:0:part:content-widget', kind: 'part', label: 'Content',
+                computedStyles: { paddingLeft: '10px' },
+            },
+            source: iframe.contentWindow,
+        }))
+        expect(await screen.findByDisplayValue('10px')).toBeInTheDocument()
         expect(screen.queryByDisplayValue('40px')).not.toBeInTheDocument()
     })
 
-    it('uses the theme breakpoints as the global preview and inspector selector', async () => {
+    it('uses every theme level, including Base, as a global preview selector', async () => {
         const responsiveWorkspace = structuredClone(workspace)
         responsiveWorkspace.breakpoints = { xs: 0, sm: 600, md: 820, lg: 1100, xl: 1440 }
-        responsiveWorkspace.spacing = [
-            responsiveWorkspace.spacing[0],
-            { ...responsiveWorkspace.spacing[1], breakpoint: 'sm', values: { padding: '12px' } },
-            { ...responsiveWorkspace.spacing[1], breakpoint: 'md', values: { padding: '24px' } },
-            { ...responsiveWorkspace.spacing[1], breakpoint: 'lg', values: { padding: '36px' } },
-            { ...responsiveWorkspace.spacing[1], breakpoint: 'xl', values: { marginBottom: '0px', padding: '48px' } },
-        ]
         mocks.workspace.mockResolvedValue(responsiveWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
 
         expect(screen.getByRole('button', { name: 'Small (Mobile) preview at 600px' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Base (Mobile) preview at 375px' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Medium (Tablet) preview at 820px' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Large (Desktop) preview at 1100px' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Extra Large preview at 1440px' })).toHaveAttribute('aria-pressed', 'true')
         expect(screen.getByTitle('Live theme preview')).toHaveStyle({ width: '1440px' })
 
-        const iframe = screen.getByTitle('Live theme preview')
-        fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:part:content-widget', kind: 'part', label: 'Content' },
-            source: iframe.contentWindow,
-        }))
-        expect(screen.getByRole('heading', { name: 'Spacing · Content · Extra Large' })).toBeInTheDocument()
-        expect(screen.getByText(/Defined at Extra Large/)).toBeInTheDocument()
-        expect(screen.getByDisplayValue('48px')).toBeInTheDocument()
-        expect(screen.queryByDisplayValue('0px')).not.toBeInTheDocument()
-        expect(screen.queryByDisplayValue('12px')).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Base (Mobile) preview at 375px' }))
+
+        expect(screen.getByTitle('Live theme preview')).toHaveStyle({ width: '375px' })
+        expect(screen.getByText('Base (Mobile) · 375px')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Base (Mobile) preview at 375px' })).toHaveAttribute('aria-pressed', 'true')
 
         fireEvent.click(screen.getByRole('button', { name: 'Small (Mobile) preview at 600px' }))
 
         expect(screen.getByTitle('Live theme preview')).toHaveStyle({ width: '600px' })
-        expect(screen.getByRole('heading', { name: 'Spacing · Content · Small (Mobile)' })).toBeInTheDocument()
-        expect(screen.getByDisplayValue('12px')).toBeInTheDocument()
-        expect(screen.queryByDisplayValue('48px')).not.toBeInTheDocument()
+        expect(screen.getByText('Small (Mobile) · 600px')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Small (Mobile) preview at 600px' })).toHaveAttribute('aria-pressed', 'true')
     })
 
     it('keeps legacy breakpoint spacing and images available at their canonical levels', async () => {
@@ -955,6 +1387,7 @@ describe('DesignerThemeWorkspacePage', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Theme images' }))
         fireEvent.click(screen.getByRole('button', { name: /Select image aspect Article/ }))
+        fireEvent.click(screen.getByRole('button', { name: 'Change to Base (Mobile)' }))
         expect(screen.getByRole('button', { name: 'Replace Article hero mobile source at Base (Mobile)' })).toBeInTheDocument()
     })
 
@@ -993,20 +1426,18 @@ describe('DesignerThemeWorkspacePage', () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
-        await waitFor(() => {
-            fireEvent(window, new MessageEvent('message', {
-                data: {
-                    source: 'eceee-designer-preview', action: 'select', targetId: 'content:99', kind: 'element', label: 'Heading 1 text', text: 'Heading', editable: true,
-                    computedStyles: { fontSize: '18px', padding: '10px' },
-                    ancestors: [{
-                        id: 'group:0:element:h1', kind: 'element', label: 'Heading 1', editable: false,
-                        computedStyles: { fontSize: '18px', fontWeight: '700', lineHeight: '1.2', padding: '10px' },
-                    }],
-                },
-                source: iframe.contentWindow,
-            }))
-            expect(screen.getByLabelText('Inner spacing')).toHaveValue('10px')
-        })
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select', targetId: 'content:99', kind: 'element', label: 'Heading 1 text', text: 'Heading', editable: true,
+                computedStyles: { fontSize: '18px', padding: '10px' },
+                ancestors: [{
+                    id: 'group:0:element:h1', kind: 'element', label: 'Heading 1', editable: false,
+                    computedStyles: { fontSize: '18px', fontWeight: '700', lineHeight: '1.2', padding: '10px' },
+                }],
+            },
+            source: iframe.contentWindow,
+        }))
+        expect(await screen.findByLabelText('Inner spacing')).toHaveValue('10px')
         expect(screen.getByLabelText('Weight')).toHaveValue('700')
         expect(screen.getByLabelText('Line height')).toHaveValue('1.2')
         expect(screen.getAllByText('Theme default').length).toBeGreaterThan(0)
@@ -1046,9 +1477,8 @@ describe('DesignerThemeWorkspacePage', () => {
     it('shows the nested element path as a clickable breadcrumb', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        await waitFor(() => {
-            const iframe = screen.getByTitle('Live theme preview')
-            fireEvent(window, new MessageEvent('message', {
+        const { iframe, postMessage } = await readyPreview()
+        fireEvent(window, new MessageEvent('message', {
                 data: {
                     source: 'eceee-designer-preview',
                     targetId: 'group:0:element:a',
@@ -1068,53 +1498,21 @@ describe('DesignerThemeWorkspacePage', () => {
                     ],
                 },
                 source: iframe.contentWindow,
-            }))
-            expect(screen.getByRole('navigation', { name: 'Element path' })).toBeInTheDocument()
-        })
+        }))
+        await screen.findByRole('navigation', { name: 'Element path' })
 
         const elementPath = screen.getByRole('navigation', { name: 'Element path' })
         expect(within(elementPath).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Bullet list', 'List item', 'Link'])
         expect(within(elementPath).getByText('Link')).toHaveAttribute('aria-current', 'page')
         expect(within(elementPath).getByRole('button', { name: 'List item' })).toBeInTheDocument()
-        const iframe = screen.getByTitle('Live theme preview')
-        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
         fireEvent.click(within(elementPath).getByRole('button', { name: 'Bullet list' }))
         expect(screen.getByRole('heading', { name: 'Bullet list' })).toBeInTheDocument()
-        expect(within(screen.getByRole('navigation', { name: 'Element path' })).getByText('Bullet list')).toHaveAttribute('aria-current', 'page')
         expect(screen.queryByLabelText('Preview text')).not.toBeInTheDocument()
-        expect(postMessage).toHaveBeenCalledWith({
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-render-host',
             action: 'selectTarget',
             targetId: 'group:0:element:ul',
-        }, '*')
-    })
-
-    it('keeps repeated breadcrumb targets scoped to their widget instance', async () => {
-        renderWithStateProviders(<DesignerThemeWorkspacePage />)
-        await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
-
-        await waitFor(() => {
-            fireEvent(window, new MessageEvent('message', {
-                data: {
-                    source: 'eceee-designer-preview', action: 'select',
-                    targetId: 'shared-group', kind: 'group', label: 'Inner content', widgetId: 'inner',
-                    path: [
-                        { id: 'shared-group', kind: 'group', label: 'Outer content', widgetId: 'outer' },
-                        { id: 'shared-group', kind: 'group', label: 'Inner content', widgetId: 'inner' },
-                    ],
-                },
-                source: iframe.contentWindow,
-            }))
-            expect(screen.getByRole('navigation', { name: 'Element path' })).toBeInTheDocument()
-        })
-
-        const pathItems = within(screen.getByRole('navigation', { name: 'Element path' })).getAllByRole('listitem')
-        expect(pathItems).toHaveLength(2)
-        expect(pathItems[0]).toHaveTextContent('Outer content')
-        expect(pathItems[0].querySelector('[aria-current="page"]')).toBeNull()
-        expect(pathItems[1]).toHaveTextContent('Inner content')
-        expect(pathItems[1].querySelector('[aria-current="page"]')).toBeInTheDocument()
+        }), '*')
     })
 
     it('keeps repeated targets inside one widget as separate selectable DOM instances', async () => {
@@ -1148,60 +1546,105 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('treeitem', { name: 'Paragraph: “Second paragraph”' })).toBeInTheDocument()
 
         fireEvent.click(screen.getByRole('button', { name: 'Edit Paragraph: “Second paragraph”' }))
-        expect(postMessage).toHaveBeenCalledWith({
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-render-host', action: 'selectTarget', targetId: 'paragraph',
             targetInstanceId: 'node:second', widgetId: 'content-1',
-        }, '*')
+        }), '*')
     })
 
-    it('shows separate slot, widget, and element breadcrumb trails for a nested selection', async () => {
+    it('shows one navigable widget and slot trail while preserving the original selection', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const iframe = screen.getByTitle('Live theme preview')
         const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
 
-        await waitFor(() => {
-            fireEvent(window, new MessageEvent('message', {
+        fireEvent(window, new MessageEvent('message', {
                 data: {
                     source: 'eceee-designer-preview', action: 'select',
-                    targetId: 'heading', kind: 'element', label: 'Heading', widgetId: 'headline-1',
+                    targetId: 'group:0:element:h1', kind: 'element', label: 'Heading', widgetId: 'headline-1',
+                    path: [
+                        { id: 'layout:main_layout:slot:main', kind: 'layoutSlot', label: 'Main content' },
+                        { id: 'widget:columns-1', kind: 'widget', label: 'Two columns widget', widgetId: 'columns-1' },
+                        {
+                            id: 'slot:columns-1:left', styleTargetId: 'widget-slot:easy_widgets.TwoColumnsWidget:left',
+                            kind: 'slot', label: 'Left slot', widgetId: 'columns-1', widgetType: 'easy_widgets.TwoColumnsWidget',
+                        },
+                        { id: 'widget:headline-1', kind: 'widget', label: 'Headline widget', widgetId: 'headline-1' },
+                        { id: 'group:0:element:h1', kind: 'element', label: 'Heading', widgetId: 'headline-1' },
+                    ],
                     selectionPaths: {
                         slot: [
                             { id: 'layout:main_layout:slot:main', kind: 'layoutSlot', label: 'Main content' },
-                            { id: 'slot:columns-1:left', kind: 'slot', label: 'Left slot', widgetId: 'columns-1' },
+                            {
+                                id: 'slot:columns-1:left', styleTargetId: 'widget-slot:easy_widgets.TwoColumnsWidget:left',
+                                kind: 'slot', label: 'Left slot', widgetId: 'columns-1', widgetType: 'easy_widgets.TwoColumnsWidget',
+                            },
                         ],
                         widget: [
                             { id: 'widget:columns-1', kind: 'widget', label: 'Two columns widget', widgetId: 'columns-1' },
-                            { id: 'widget:headline-1', kind: 'widget', label: 'Headline widget', widgetId: 'headline-1' },
+                            {
+                                id: 'widget:headline-1', kind: 'widget', label: 'Headline widget', widgetId: 'headline-1',
+                                widgetType: 'easy_widgets.ContentWidget',
+                            },
                         ],
                         element: [
                             { id: 'article', kind: 'group', label: 'Article', widgetId: 'headline-1' },
-                            { id: 'heading', kind: 'element', label: 'Heading', widgetId: 'headline-1' },
+                            { id: 'group:0:element:h1', kind: 'element', label: 'Heading', widgetId: 'headline-1' },
                         ],
                     },
                 },
                 source: iframe.contentWindow,
-            }))
-            expect(screen.getByRole('navigation', { name: 'Slot path' })).toBeInTheDocument()
-        })
+        }))
+        await screen.findByRole('navigation', { name: 'Widget and slot path' })
 
-        const slotPath = screen.getByRole('navigation', { name: 'Slot path' })
-        const widgetPath = screen.getByRole('navigation', { name: 'Widget path' })
-        const elementPath = screen.getByRole('navigation', { name: 'Element path' })
-        expect(within(slotPath).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Main content', 'Left slot'])
-        expect(within(widgetPath).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Two columns widget', 'Headline widget'])
-        expect(within(elementPath).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Article', 'Heading'])
-        expect(slotPath).toHaveClass('border-yellow-400')
-        expect(widgetPath).toHaveClass('border-green-500')
-        expect(elementPath).toHaveClass('border-blue-500')
-        expect(within(slotPath).getByRole('button', { name: 'Left slot' })).toHaveAttribute('aria-current', 'page')
-        expect(within(widgetPath).getByRole('button', { name: 'Headline widget' })).toHaveAttribute('aria-current', 'page')
-        expect(within(elementPath).getByText('Heading')).toHaveAttribute('aria-current', 'page')
+        const trail = screen.getByRole('navigation', { name: 'Widget and slot path' })
+        expect(within(trail).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+            'Main content', 'Two columns widget', 'Left slot', 'Headline widget',
+        ])
+        expect(within(trail).getByRole('button', { name: 'Headline widget' })).toHaveAttribute('aria-current', 'page')
+        expect(screen.getByRole('heading', { name: 'Left slot' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Headline widget' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Heading' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Collapse selected slot Left slot' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Collapse selected widget Headline widget' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Collapse selected element Heading' })).toHaveAttribute('aria-expanded', 'true')
+        fireEvent.click(within(trail).getByRole('button', { name: 'Two columns widget' }))
+        expect(within(trail).getByRole('button', { name: 'Headline widget' })).toHaveAttribute('aria-current', 'page')
+        expect(within(trail).getByRole('button', { name: 'Two columns widget' })).toHaveAttribute('aria-pressed', 'true')
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-render-host', action: 'selectTarget', targetId: 'widget:columns-1',
+            selectionLevel: 'widget',
+            selectedTargets: expect.arrayContaining([
+                expect.objectContaining({ targetId: 'slot:columns-1:left', selectionLevel: 'slot' }),
+                expect.objectContaining({ targetId: 'widget:columns-1', selectionLevel: 'widget' }),
+                expect.objectContaining({ targetId: 'group:0:element:h1', selectionLevel: 'element' }),
+            ]),
+        }), '*')
 
-        fireEvent.click(within(widgetPath).getByRole('button', { name: 'Headline widget' }))
-        expect(postMessage).toHaveBeenCalledWith({
-            source: 'eceee-render-host', action: 'selectTarget', targetId: 'widget:headline-1', widgetId: 'headline-1',
-        }, '*')
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget:navbar-1', kind: 'widget', label: 'Navbar widget container', widgetId: 'navbar-1',
+                selectionPaths: {
+                    slot: [
+                        { id: 'layout:main_layout:slot:navigation', kind: 'layoutSlot', label: 'Navigation Bar' },
+                    ],
+                    widget: [
+                        { id: 'widget:navbar-1', kind: 'widget', label: 'Navbar widget container', widgetId: 'navbar-1' },
+                    ],
+                    element: [],
+                },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(screen.getByRole('heading', { name: 'Navigation Bar' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Navbar widget container' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Collapse selected element Heading' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Expand selected element Heading' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Expand selected slot Navigation Bar' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Collapse selected slot Navigation Bar' })).not.toBeInTheDocument()
+        expect(screen.queryByText('Layout placement only. This slot does not provide editable spacing.')).not.toBeInTheDocument()
     })
 
     it('clears the preview target when the content source changes', async () => {
@@ -1244,15 +1687,24 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.workspace.mockResolvedValue(duplicatedWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
-        await waitFor(() => {
-            fireEvent(window, new MessageEvent('message', {
+        const { iframe, postMessage } = await readyPreview()
+        postMessage.mockRestore()
+        fireEvent(window, new MessageEvent('message', {
                 data: {
                     source: 'eceee-designer-preview',
                     action: 'select',
                     targetId: 'group:0:part:content-widget',
                     kind: 'part',
                     label: 'Content widget container',
+                    widgetId: 'content-1',
+                    selectionPaths: {
+                        slot: [],
+                        widget: [
+                            { id: 'widget:content-1', kind: 'widget', label: 'Content widget', widgetId: 'content-1' },
+                            { id: 'group:0:part:content-widget', kind: 'part', label: 'Content widget container', widgetId: 'content-1' },
+                        ],
+                        element: [],
+                    },
                     alternatives: [
                         { id: 'group:0:part:content-widget', kind: 'part', label: 'Content widget container' },
                         { id: 'group:1:part:content-widget', kind: 'part', label: 'Content widget container' },
@@ -1260,46 +1712,65 @@ describe('DesignerThemeWorkspacePage', () => {
                     ],
                 },
                 source: iframe.contentWindow,
-            }))
-            expect(screen.getByRole('heading', { name: 'Content widget container' })).toBeInTheDocument()
-        })
+        }))
+        await screen.findByRole('heading', { name: 'Content area' })
 
         expect(screen.queryByRole('heading', { name: 'Choose what to edit' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Content widget container' })).not.toBeInTheDocument()
-        expect(screen.getAllByRole('heading', { name: 'Spacing · Content widget container · Extra Large' })).toHaveLength(1)
+        expect(screen.queryByRole('navigation', { name: 'Widget ancestors path' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Content widget' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: '+ Add spacing' })).not.toBeInTheDocument()
     })
 
-    it('shows theme properties without mixing image replacement into element editing', async () => {
+    it('shows theme colors in the selected level without opening the image library', async () => {
         const propertyWorkspace = structuredClone(workspace)
         propertyWorkspace.spacing[1].values.marginBottom = '16px'
         mocks.workspace.mockResolvedValue(propertyWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        await waitFor(() => {
-            const iframe = screen.getByTitle('Live theme preview')
-            fireEvent(window, new MessageEvent('message', {
+        const iframe = screen.getByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
                 data: { source: 'eceee-designer-preview', targetId: 'group:0', kind: 'group', label: 'Article' },
                 source: iframe.contentWindow,
-            }))
-            expect(screen.getByRole('heading', { name: 'Typography · Heading 1' })).toBeInTheDocument()
-        })
+        }))
+        await screen.findByRole('heading', { name: 'Article' })
 
         expect(screen.queryByRole('heading', { name: 'Theme images' })).not.toBeInTheDocument()
-        expect(screen.getByRole('heading', { name: 'Typography · Heading 1' })).toBeInTheDocument()
-        expect(screen.getByRole('heading', { name: 'Spacing · Content · Extra Large' })).toBeInTheDocument()
-        expect(screen.getByText(/Inherited at Extra Large/)).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Override Inner spacing at Extra Large' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Edit source at Medium (Tablet)' })).toBeInTheDocument()
-        expect(screen.getByDisplayValue('24px')).toBeDisabled()
-        fireEvent.click(screen.getByRole('button', { name: 'Override Inner spacing at Extra Large' }))
-        expect(screen.getByText(/Defined at Extra Large/)).toBeInTheDocument()
-        expect(screen.getByText(/This value is defined at Medium \(Tablet\)/)).toBeInTheDocument()
-        expect(screen.getByDisplayValue('24px')).toBeEnabled()
+        expect(screen.getByLabelText('brand value')).toBeInTheDocument()
+        fireEvent.change(screen.getByLabelText('brand value'), { target: { value: '#abcdef' } })
         fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
         await waitFor(() => expect(mocks.save).toHaveBeenCalled())
-        const override = mocks.save.mock.calls[0][1].spacing.find((row) => row.breakpoint === 'xl')
-        expect(override.values).toEqual({ padding: '24px' })
-        expect(screen.getByLabelText('brand value')).toBeInTheDocument()
+        expect(mocks.save.mock.calls[0][1].colors).toEqual(expect.objectContaining({ brand: '#abcdef' }))
+    })
+
+    it('shows widget images and colors at the selected widget level', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget:hero-1', kind: 'widget', label: 'Hero widget',
+                widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
+                alternatives: [
+                    { id: 'widget:hero-1', kind: 'widget', label: 'Hero widget', widgetId: 'hero-1' },
+                    { id: 'group:0', kind: 'group', label: 'Article', widgetId: 'hero-1' },
+                    { id: 'asset:design:0:hero:md:background', kind: 'asset', label: 'Article hero', widgetId: 'hero-1' },
+                ],
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(await screen.findByRole('button', { name: 'Change to Medium (Tablet)' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Upload Article hero source at Medium (Tablet)' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Add Article hero image here for Extra Large' })).toHaveTextContent('Add image here')
+        expect(screen.getByLabelText('brand value')).toHaveValue('#123456')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Change to Medium (Tablet)' }))
+        expect(screen.getByRole('button', { name: 'Medium (Tablet) preview at 768px' })).toHaveAttribute('aria-pressed', 'true')
+        expect(await screen.findByRole('button', { name: 'Upload Article hero source at Medium (Tablet)' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Add Article hero image here for Extra Large' })).not.toBeInTheDocument()
     })
 
     it('keeps the preview visible while editing images in the right inspector', async () => {
@@ -1313,15 +1784,15 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByTitle('Live theme preview')).toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: /Select image aspect Article/ }))
 
-        expect(screen.getByRole('button', { name: 'Upload Article hero source at Medium (Tablet)' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Create Extra Large override for Article hero' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Change to Medium (Tablet)' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Upload Article hero source at Medium (Tablet)' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Replace Article hero mobile source at Small (Mobile)' })).not.toBeInTheDocument()
         expect(screen.getByText('Used for theme sizes: MD, LG and XL.')).toBeInTheDocument()
         expect(screen.getByText('Shown from 768 px wide and up.')).toBeInTheDocument()
         expect(screen.queryByText('Used for theme size: SM.')).not.toBeInTheDocument()
         expect(screen.queryByText('Shown from 640 px to 767 px wide.')).not.toBeInTheDocument()
 
-        expect(screen.getByRole('button', { name: 'Create Article hero source placeholder at Medium (Tablet)' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Create Article hero source placeholder at Medium (Tablet)' })).not.toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: 'Create Extra Large placeholder override for Article hero' }))
         await waitFor(() => expect(mocks.createPlaceholder).toHaveBeenCalledWith('7', {
             assetKey: 'design:0:hero:md:background',
@@ -1340,6 +1811,12 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByText('All sizes')).toBeInTheDocument()
         expect(screen.getByText('Used for all theme sizes: XS, SM, MD, LG and XL.')).toBeInTheDocument()
         expect(screen.getByText('Shown at every screen width.')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Change to Base (Mobile)' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Replace Callout background source at Base (Mobile)' })).not.toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Change to Base (Mobile)' }))
+        expect(screen.getByRole('button', { name: 'Base (Mobile) preview at 375px' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByRole('button', { name: 'Replace Callout background source at Base (Mobile)' })).toBeInTheDocument()
 
         fireEvent.click(screen.getByRole('button', { name: 'Select image aspect imported-example.jpg' }))
         expect(screen.getByText('1200 × 630 px · 24 KB')).toBeInTheDocument()
@@ -1376,9 +1853,8 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         fireEvent.click(screen.getByRole('button', { name: 'Small (Mobile) preview at 640px' }))
 
-        await waitFor(() => {
-            const iframe = screen.getByTitle('Live theme preview')
-            fireEvent(window, new MessageEvent('message', {
+        const iframe = screen.getByTitle('Live theme preview')
+        fireEvent(window, new MessageEvent('message', {
                 data: {
                     source: 'eceee-designer-preview',
                     targetId: 'asset:design:0:hero:sm:background',
@@ -1392,9 +1868,8 @@ describe('DesignerThemeWorkspacePage', () => {
                     ],
                 },
                 source: iframe.contentWindow,
-            }))
-            expect(screen.getByRole('heading', { name: 'Article hero mobile' })).toBeInTheDocument()
-        })
+        }))
+        await screen.findByRole('heading', { name: 'Article hero mobile' })
 
         expect(screen.getByTitle('Live theme preview')).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Theme images' })).toHaveClass('text-gray-700')
@@ -1435,13 +1910,11 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         const { iframe, postMessage } = await readyPreview()
         postMessage.mockClear()
-        await waitFor(() => {
-            fireEvent(window, new MessageEvent('message', {
+        fireEvent(window, new MessageEvent('message', {
                 data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'A revised example heading', editable: true },
                 source: iframe.contentWindow,
-            }))
-            expect(screen.getByLabelText('Example text')).toHaveValue('A revised example heading')
-        })
+        }))
+        await waitFor(() => expect(screen.getByLabelText('Example text')).toHaveValue('A revised example heading'))
         expect(postMessage).not.toHaveBeenCalled()
         fireEvent.change(screen.getByLabelText('Example text'), { target: { value: 'Inspector heading' } })
         expect(postMessage).toHaveBeenCalledWith({
@@ -1464,13 +1937,11 @@ describe('DesignerThemeWorkspacePage', () => {
         const { iframe, postMessage } = await readyPreview()
         postMessage.mockRestore()
 
-        await waitFor(() => {
-            fireEvent(window, new MessageEvent('message', {
+        fireEvent(window, new MessageEvent('message', {
                 data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'Pending heading', editable: true },
                 source: iframe.contentWindow,
-            }))
-            expect(screen.getByText('Unsaved local draft changes')).toBeInTheDocument()
-        })
+        }))
+        await screen.findByText('Unsaved local draft changes')
         expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled()
         expect(screen.getByRole('button', { name: 'Discard draft' })).toBeEnabled()
         expect(screen.getByRole('button', { name: 'Publish changes' })).toBeEnabled()
@@ -1513,13 +1984,11 @@ describe('DesignerThemeWorkspacePage', () => {
         const { iframe, postMessage } = await readyPreview()
         postMessage.mockRestore()
 
-        await waitFor(() => {
-            fireEvent(window, new MessageEvent('message', {
+        fireEvent(window, new MessageEvent('message', {
                 data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'Discard me', editable: true },
                 source: iframe.contentWindow,
-            }))
-            expect(screen.getByLabelText('Example text')).toHaveValue('Discard me')
-        })
+        }))
+        await waitFor(() => expect(screen.getByLabelText('Example text')).toHaveValue('Discard me'))
 
         fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }))
         await waitFor(() => expect(mocks.discard).toHaveBeenCalledWith('7', 2))
@@ -1534,13 +2003,11 @@ describe('DesignerThemeWorkspacePage', () => {
         await selectHeading()
         fireEvent.change(screen.getByDisplayValue('32px'), { target: { value: '40px' } })
         const iframe = screen.getByTitle('Live theme preview')
-        await waitFor(() => {
-            fireEvent(window, new MessageEvent('message', {
+        fireEvent(window, new MessageEvent('message', {
                 data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'One write only', editable: true },
                 source: iframe.contentWindow,
-            }))
-            expect(screen.getByLabelText('Example text')).toHaveValue('One write only')
-        })
+        }))
+        await waitFor(() => expect(screen.getByLabelText('Example text')).toHaveValue('One write only'))
 
         fireEvent.click(screen.getByRole('button', { name: 'Save example text' }))
 
@@ -1627,18 +2094,27 @@ describe('DesignerThemeWorkspacePage', () => {
 
     it('persists pending theme values before replacing a theme asset', async () => {
         mocks.replaceAsset.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 4, hasDraftChanges: true })
-        const { container } = renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        await selectHeading()
-        fireEvent.change(screen.getByDisplayValue('32px'), { target: { value: '40px' } })
         const iframe = screen.getByTitle('Live theme preview')
         fireEvent(window, new MessageEvent('message', {
-            data: { source: 'eceee-designer-preview', targetId: 'asset:design:0:hero:md:background', kind: 'asset', label: 'Article hero' },
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget:hero-1', kind: 'widget', label: 'Hero widget',
+                widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
+                alternatives: [
+                    { id: 'widget:hero-1', kind: 'widget', label: 'Hero widget', widgetId: 'hero-1' },
+                    { id: 'group:0', kind: 'group', label: 'Article', widgetId: 'hero-1' },
+                    { id: 'asset:design:0:hero:md:background', kind: 'asset', label: 'Article hero', widgetId: 'hero-1' },
+                ],
+            },
             source: iframe.contentWindow,
         }))
+        fireEvent.change(await screen.findByLabelText('brand value'), { target: { value: '#abcdef' } })
+        fireEvent.click(await screen.findByRole('button', { name: 'Change to Medium (Tablet)' }))
         await screen.findByRole('button', { name: 'Upload Article hero source at Medium (Tablet)' })
         const upload = new File(['image'], 'hero.png', { type: 'image/png' })
-        fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [upload] } })
+        fireEvent.change(screen.getByLabelText('New source image for Article hero at Medium (Tablet)'), { target: { files: [upload] } })
         await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
         await waitFor(() => expect(mocks.replaceAsset).toHaveBeenCalledWith('7', 'design:0:hero:md:background', upload, 3))
     })

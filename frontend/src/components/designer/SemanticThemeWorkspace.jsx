@@ -5,7 +5,7 @@ import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel, designerPreviewImageReferences } from '../../rendering/adapters'
 import { getBreakpoints, mapBreakpointName } from '../../utils/themeUtils'
 import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
-import { themeBreakpointDefinition } from '../theme/breakpointConfig'
+import { designerPreviewWidth, themeBreakpointDefinition } from '../theme/breakpointConfig'
 import { inheritedLayoutStyle } from './layoutStyleInheritance'
 const typographyLabels = {
     fontFamily: 'Font family', fontSize: 'Size', fontWeight: 'Weight', fontStyle: 'Style',
@@ -13,9 +13,15 @@ const typographyLabels = {
 }
 
 const spacingLabels = {
-    margin: 'Outer spacing', marginTop: 'Space above', marginRight: 'Space right', marginBottom: 'Space below', marginLeft: 'Space left',
-    padding: 'Inner spacing', paddingTop: 'Inner top', paddingRight: 'Inner right', paddingBottom: 'Inner bottom', paddingLeft: 'Inner left',
+    gap: 'Column gap',
+    margin: 'Outer spacing', marginTop: 'Margin top', marginRight: 'Margin right', marginBottom: 'Margin bottom', marginLeft: 'Margin left',
+    padding: 'Inner spacing', paddingTop: 'Padding top', paddingRight: 'Padding right', paddingBottom: 'Padding bottom', paddingLeft: 'Padding left',
 }
+const directionalSpacingFields = [
+    'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
+    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+]
+const visibleSpacingFields = [...directionalSpacingFields, 'gap']
 
 const layoutParameterFields = new Set([
     'display', 'width', 'max_width', 'min_height', 'grid_template_columns', 'grid_column',
@@ -48,12 +54,25 @@ const breakpointLabel = (breakpoint) => {
 }
 
 const hasThemeValue = (value) => value !== undefined && value !== null && value !== ''
+const friendlyTargetLabel = (label) => label === 'Content widget container' ? 'Content area' : label
 const targetFocusKey = (target) => `${target?.widgetId || ''}:${target?.id || ''}:${target?.instanceId || ''}`
 const targetSelectionKind = (target) => target?.kind === 'layoutSlot' || target?.kind === 'slot'
     ? 'slot'
-    : target?.kind === 'widget'
+    : ['widget', 'part', 'group'].includes(target?.kind)
         ? 'widget'
         : 'element'
+
+const widgetSlotTrail = (path = []) => path.reduce((trail, target) => {
+    const kind = targetSelectionKind(target)
+    if (kind === 'element') return trail
+    const item = { ...target, selectionLevel: kind }
+    const previous = trail.at(-1)
+    if (kind === 'widget' && previous?.selectionLevel === 'widget' && previous.widgetId && previous.widgetId === item.widgetId) {
+        return [...trail.slice(0, -1), item]
+    }
+    if (trail.some((candidate) => targetFocusKey(candidate) === targetFocusKey(item))) return trail
+    return [...trail, item]
+}, [])
 
 const selectionTones = {
     slot: {
@@ -160,6 +179,33 @@ const SelectionPath = ({ kind, label, targets, selectedTarget, onSelect }) => {
     </nav>
 }
 
+const WidgetSlotTrail = ({ targets, originKey, selectedTarget, onSelect }) => {
+    if (!targets.length) return null
+    return <nav aria-label="Widget and slot path" className="shrink-0 border-b border-gray-200 bg-gray-50 px-3 py-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Widget → slot path</p>
+        <ol className="mt-1 flex min-w-0 flex-wrap items-center gap-y-1 text-xs">
+            {targets.map((target, index) => {
+                const tone = selectionTones[target.selectionLevel]
+                const key = targetFocusKey(target)
+                const isOrigin = key === originKey
+                const isActive = key === targetFocusKey(selectedTarget)
+                const label = target.displayLabel || target.label
+                return <li key={`trail:${key}`} className="flex min-w-0 items-center">
+                    {index > 0 && <ChevronRight aria-hidden="true" className="mx-1 h-3.5 w-3.5 shrink-0 text-gray-400" />}
+                    <button
+                        type="button"
+                        aria-current={isOrigin ? 'page' : undefined}
+                        aria-pressed={isActive}
+                        onClick={() => onSelect(target)}
+                        title={`${isOrigin ? 'Original selection: ' : 'Select '}${label}`}
+                        className={`min-h-6 max-w-44 truncate rounded border-l-2 px-1.5 py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 ${tone.border} ${tone.focus} ${isActive ? tone.header : 'bg-white text-gray-700 hover:bg-gray-100'} ${isOrigin ? 'font-semibold ring-1 ring-inset ring-gray-400' : ''}`}
+                    >{label}</button>
+                </li>
+            })}
+        </ol>
+    </nav>
+}
+
 const contentGroups = (options, sourceMode) => ['page', 'object'].map((kind) => {
     const kindOptions = options.filter((option) => option.kind === kind)
     const subgroupKey = sourceMode === 'content'
@@ -191,6 +237,39 @@ const spacingRowIndexForChange = (rows, targetIds, breakpoints, viewportWidth) =
         .sort((left, right) => right.width - left.width
             || breakpointPrecedence(right.row.breakpoint) - breakpointPrecedence(left.row.breakpoint))[0]
     return active?.index ?? candidates[0].index
+}
+
+const structuralTargetForChange = (targetIds) => targetIds.map((targetId) => {
+    let match = targetId.match(/^layout:(.+):slot:([^:]+)$/)
+    if (match) return { targetId, scope: 'layoutSlot', layout: match[1], slot: match[2] }
+    match = targetId.match(/^group:(\d+):part:(.+)$/)
+    if (match) return { targetId, scope: 'layout', groupIndex: Number(match[1]), part: match[2] }
+    match = targetId.match(/^widget-type:(.+)$/)
+    if (match) return { targetId, scope: 'widget', widgetType: match[1] }
+    match = targetId.match(/^widget-slot:([^:]+):([^:]+)$/)
+    if (match) return { targetId, scope: 'widgetSlot', widgetType: match[1], slot: match[2] }
+    match = targetId.match(/^widget-part:([^:]+):([^:]+)$/)
+    return match ? { targetId, scope: 'widgetPart', widgetType: match[1], part: match[2] } : null
+}).find(Boolean)
+
+const editableStructuralSpacingProperties = (catalog, target) => {
+    if (target?.scope === 'layoutSlot') return catalog.layouts
+        ?.find((layout) => layout.key === target.layout)
+        ?.slots?.find((slot) => slot.name === target.slot)
+        ?.editableSpacingProperties || []
+    if (target?.scope === 'widgetSlot') return catalog.widgetSlots
+        ?.find((widget) => widget.widgetType === target.widgetType)
+        ?.slots?.find((slot) => slot.name === target.slot)
+        ?.editableSpacingProperties || []
+    if (target?.scope === 'layout') return catalog.designGroups
+        ?.find((group) => group.groupIndex === target.groupIndex)
+        ?.parts?.find((part) => part.part === target.part)
+        ?.editableSpacingProperties || []
+    if (target?.scope === 'widgetPart') return catalog.widgetParts
+        ?.find((widget) => widget.widgetType === target.widgetType)
+        ?.parts?.find((part) => part.part === target.part)
+        ?.editableSpacingProperties || []
+    return []
 }
 
 const ContentSourceBrowser = ({ sourceMode, options, value, onChange, onDelete, disabled, loading }) => {
@@ -393,29 +472,79 @@ const effectiveSpacingEntries = (entries, activeBreakpoint, breakpoints, fields)
         current.fields.push(field)
         grouped.set(entry.index, current)
     })
+    const structuralByTarget = new Map()
+    entries.filter((entry) => ['layout', 'layoutSlot', 'widget', 'widgetSlot', 'widgetPart'].includes(entry.row.scope)).forEach((entry) => {
+        const width = breakpointWidth(entry.breakpoint, configuredBreakpoints)
+        if (!Number.isFinite(width) || width > activeWidth) return
+        const current = structuralByTarget.get(entry.row.targetId)
+        const currentWidth = breakpointWidth(current?.breakpoint, configuredBreakpoints)
+        if (!current || width > currentWidth || width === currentWidth
+            && breakpointPrecedence(entry.breakpoint) > breakpointPrecedence(current.breakpoint)) {
+            structuralByTarget.set(entry.row.targetId, entry)
+        }
+    })
+    structuralByTarget.forEach((entry) => {
+        if (!grouped.has(entry.index)) grouped.set(entry.index, { ...entry, fields })
+    })
     return [...globalEntries, ...grouped.values()]
 }
 
 const isZeroCssValue = (value) => /^0(?:\.0+)?(?:px|rem|em|%|vh|vw)?$/i.test(String(value || '').trim())
 
-const ValueFields = ({ idPrefix, values, defaults, fields, labels, onChange, onRemove, onOverride, overrideLabel, disabled = false }) => (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-2">
-        {fields.map((field) => (
-            <div key={field} className="min-w-0">
+const spacingEntryForField = (entries, field) => (
+    entries.find((entry) => entry.row.breakpoint && entry.fields?.includes(field))
+    || entries.find((entry) => entry.row.breakpoint && entry.fields?.includes(
+        field.startsWith('margin') && field !== 'margin' ? 'margin'
+            : field.startsWith('padding') && field !== 'padding' ? 'padding'
+                : '',
+    ))
+    || entries.find((entry) => entry.fields?.includes(field))
+    || entries[0]
+)
+
+const directionalFieldPosition = {
+    Top: 'col-start-2 row-start-1',
+    Left: 'col-start-1 row-start-2',
+    Right: 'col-start-3 row-start-2',
+    Bottom: 'col-start-2 row-start-3',
+}
+
+const FieldLayout = ({ fields, renderField }) => {
+    const directionalGroups = ['margin', 'padding'].map((prefix) => fields.filter((field) => (
+        field.startsWith(prefix) && directionalFieldPosition[field.slice(prefix.length)]
+    ))).filter((group) => group.length)
+    const groupedFields = new Set(directionalGroups.flat())
+    const regularFields = fields.filter((field) => !groupedFields.has(field))
+
+    return <div className="space-y-3">
+        {regularFields.length > 0 && <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-2">
+            {regularFields.map((field) => renderField(field, ''))}
+        </div>}
+        {directionalGroups.map((group) => (
+            <div key={group[0].replace(/(Top|Right|Bottom|Left)$/, '')} className="grid grid-cols-3 grid-rows-3 gap-2" aria-label={`${group[0].startsWith('margin') ? 'Margin' : 'Padding'} sides`}>
+                {group.map((field) => renderField(field, directionalFieldPosition[field.match(/(Top|Right|Bottom|Left)$/)[1]]))}
+            </div>
+        ))}
+    </div>
+}
+
+const ValueFields = ({ idPrefix, values, defaults, fields, labels, onChange, onRemove, onOverride, overrideLabel, disabled = false }) => {
+    const renderField = (field, className = '') => (
+        <div key={field} className={`min-w-0 ${className}`} data-spacing-side={field.match(/(Top|Right|Bottom|Left)$/)?.[1]?.toLowerCase()}>
                 <div className="flex items-center justify-between gap-2">
                     <label htmlFor={`${idPrefix}-${field}`} className="text-xs font-medium text-gray-700">{labels[field] || field}</label>
-                    <button type="button" aria-label={`Remove ${labels[field] || field}`} onClick={() => onRemove(field)} disabled={disabled} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>
+                    {onRemove && <button type="button" aria-label={`Remove ${labels[field] || field}`} onClick={() => onRemove(field)} disabled={disabled} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>}
                 </div>
                 <input id={`${idPrefix}-${field}`} value={values[field] || defaults?.[field] || ''} onChange={(event) => onChange(field, event.target.value)} disabled={disabled} className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500" placeholder="Theme default" />
                 {onOverride && <button type="button" onClick={() => onOverride(field)} className="mt-1 w-full rounded border border-blue-300 bg-white px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50">Override {labels[field] || field} at {overrideLabel}</button>}
                 {!values[field] && defaults?.[field] && <p className="mt-0.5 text-[10px] text-gray-500">Theme default</p>}
             </div>
-        ))}
-    </div>
-)
+    )
+    return <FieldLayout fields={fields} renderField={renderField} />
+}
 
 const SemanticThemeWorkspace = ({
-    workspace, preview, viewport, updateWorkspace, replaceAsset, createPlaceholder,
+    workspace, preview, viewport, onViewportChange, updateWorkspace, replaceAsset, createPlaceholder,
     placeholderDrafts, setPlaceholderDrafts,
     loadPageContent, loadObjectContent, importPreviewSource, deletePreviewContent,
     savePreviewText, replacePreviewImage, pendingPreviewTextsRef, onPendingPreviewTextsChange,
@@ -434,6 +563,10 @@ const SemanticThemeWorkspace = ({
         || '',
     )
     const [selectedTarget, setSelectedTarget] = useState(null)
+    const [levelSelections, setLevelSelections] = useState({ slot: null, widget: null, element: null })
+    const [selectionTrail, setSelectionTrail] = useState([])
+    const [selectionTrailOriginKey, setSelectionTrailOriginKey] = useState('')
+    const [expandedSelectionLevels, setExpandedSelectionLevels] = useState(() => new Set(['slot', 'widget', 'element']))
     const [inspectorRoot, setInspectorRoot] = useState(null)
     const [openTargetId, setOpenTargetId] = useState('')
     const [highlightedTargetId, setHighlightedTargetId] = useState('')
@@ -590,6 +723,9 @@ const SemanticThemeWorkspace = ({
         pendingInspectorSelectionRef.current = null
         inspectorRootRef.current = null
         setInspectorRoot(null)
+        setLevelSelections({ slot: null, widget: null, element: null })
+        setSelectionTrail([])
+        setSelectionTrailOriginKey('')
         setOpenTargetId('')
         setHighlightedTargetId('')
         iframeRef.current?.contentWindow?.postMessage({
@@ -677,9 +813,11 @@ const SemanticThemeWorkspace = ({
             }
             if (event.data.action === 'spacingChange') {
                 const targetIds = Array.isArray(event.data.targetIds) ? event.data.targetIds : []
+                const exactTargetIds = event.data.targetId ? [event.data.targetId] : targetIds
+                const structuralTarget = structuralTargetForChange(exactTargetIds)
                 const index = spacingRowIndexForChange(
                     workspace.spacing,
-                    targetIds,
+                    structuralTarget ? [structuralTarget.targetId] : exactTargetIds,
                     workspace.breakpoints,
                     workspace.breakpoints?.[viewport],
                 )
@@ -701,16 +839,28 @@ const SemanticThemeWorkspace = ({
                         }
                         return next
                     })
+                } else if (structuralTarget
+                    && editableStructuralSpacingProperties(workspace.catalog, structuralTarget).includes(property)
+                    && workspace.constraints.editableSpacingProperties.includes(property)) {
+                    updateWorkspace((next) => {
+                        next.spacing.push({
+                            ...structuralTarget,
+                            breakpoint: viewport,
+                            values: { [property]: event.data.value },
+                        })
+                        return next
+                    })
                 }
                 return
             }
             function normalizeTarget(option) {
                 return {
                     id: option.id,
+                    styleTargetId: option.styleTargetId || '',
                     instanceId: option.instanceId || '',
                     kind: option.kind,
                     label: option.label,
-                    displayLabel: option.displayLabel || option.label,
+                    displayLabel: friendlyTargetLabel(option.displayLabel || option.label),
                     parentId: option.parentId || '',
                     parentWidgetId: option.parentWidgetId || '',
                     parentInstanceId: option.parentInstanceId || '',
@@ -725,6 +875,9 @@ const SemanticThemeWorkspace = ({
                     sourcePath: Array.isArray(option.sourcePath) ? option.sourcePath : [],
                     sourceMatchIndex: option.sourceMatchIndex ?? 0,
                     computedStyles: option.computedStyles || {},
+                    configurationSpacingTargets: Array.isArray(option.configurationSpacingTargets)
+                        ? option.configurationSpacingTargets.map(normalizeTarget)
+                        : [],
                     layoutNodeId: option.layoutNodeId || '',
                     editableParameters: Array.isArray(option.editableParameters) ? option.editableParameters : [],
                     alternatives: Array.isArray(option.alternatives) ? option.alternatives.map(normalizeTarget) : [],
@@ -748,9 +901,11 @@ const SemanticThemeWorkspace = ({
                 : []
             const target = {
                 id: event.data.targetId,
+                styleTargetId: event.data.styleTargetId || '',
                 instanceId: event.data.targetInstanceId || '',
                 kind: event.data.kind,
                 label: event.data.label,
+                displayLabel: friendlyTargetLabel(event.data.displayLabel || event.data.label),
                 widgetType: event.data.widgetType || '',
                 widgetId: event.data.widgetId || '',
                 text: event.data.text || '',
@@ -761,6 +916,9 @@ const SemanticThemeWorkspace = ({
                 sourcePath: Array.isArray(event.data.sourcePath) ? event.data.sourcePath : [],
                 sourceMatchIndex: event.data.sourceMatchIndex ?? 0,
                 computedStyles: event.data.computedStyles || {},
+                configurationSpacingTargets: Array.isArray(event.data.configurationSpacingTargets)
+                    ? event.data.configurationSpacingTargets.filter((option) => option?.id && option?.label).map(normalizeTarget)
+                    : [],
                 layoutNodeId: event.data.layoutNodeId || '',
                 editableParameters: Array.isArray(event.data.editableParameters) ? event.data.editableParameters : [],
                 alternatives,
@@ -771,7 +929,33 @@ const SemanticThemeWorkspace = ({
                 descendants,
                 selectionPaths: normalizedSelectionPaths,
             }
-            if (pendingInspectorSelectionRef.current === targetFocusKey(target)) pendingInspectorSelectionRef.current = null
+            const requestedSelectionLevel = ['slot', 'widget', 'element'].includes(event.data.selectionLevel)
+                ? event.data.selectionLevel
+                : null
+            const inspectorNavigation = pendingInspectorSelectionRef.current === targetFocusKey(target)
+            if (!inspectorNavigation && event.data.action !== 'contentChange') {
+                const trail = widgetSlotTrail(target.path)
+                setSelectionTrail(trail)
+                setSelectionTrailOriginKey(trail.length ? targetFocusKey(trail.at(-1)) : '')
+            }
+            setLevelSelections((current) => {
+                const next = requestedSelectionLevel
+                    ? { ...current }
+                    : { slot: null, widget: null, element: null }
+                ;(['slot', 'widget', 'element']).forEach((kind) => {
+                    if (requestedSelectionLevel && requestedSelectionLevel !== kind) return
+                    const path = normalizedSelectionPaths[kind]
+                    const fallback = targetSelectionKind(target) === kind ? target : null
+                    const selected = path.at(-1) || fallback
+                    if (selected) next[kind] = {
+                        ...selected,
+                        path: path.length ? path : selected.path || [],
+                        selectionPaths: normalizedSelectionPaths,
+                    }
+                })
+                return next
+            })
+            if (inspectorNavigation) pendingInspectorSelectionRef.current = null
             const currentRoot = inspectorRootRef.current
             const targetBelongsToCurrentRoot = currentRoot && (
                 targetFocusKey(currentRoot) === targetFocusKey(target)
@@ -783,7 +967,14 @@ const SemanticThemeWorkspace = ({
                     : {
                         ...currentRoot,
                         descendants: currentRoot.descendants.map((descendant) => targetFocusKey(descendant) === targetFocusKey(target)
-                            ? { ...descendant, ...target, descendants: descendant.descendants || [] }
+                            ? {
+                                ...descendant,
+                                ...target,
+                                displayLabel: event.data.displayLabel
+                                    ? target.displayLabel
+                                    : descendant.displayLabel || target.displayLabel,
+                                descendants: descendant.descendants || [],
+                            }
                             : descendant),
                     }
                 inspectorRootRef.current = updatedRoot
@@ -799,9 +990,22 @@ const SemanticThemeWorkspace = ({
             }
             setThemeDefaults((current) => ({
                 ...current,
+                ...Object.fromEntries(alternatives.flatMap((alternative) => [
+                    [alternative.id, alternative.computedStyles],
+                    ...(alternative.styleTargetId ? [[alternative.styleTargetId, alternative.computedStyles]] : []),
+                ])),
+                ...Object.fromEntries(ancestors.flatMap((ancestor) => [
+                    [ancestor.id, ancestor.computedStyles],
+                    ...(ancestor.styleTargetId ? [[ancestor.styleTargetId, ancestor.computedStyles]] : []),
+                ])),
+                ...Object.fromEntries(Object.values(normalizedSelectionPaths).flat().flatMap((pathTarget) => [
+                    [pathTarget.id, pathTarget.computedStyles],
+                    ...(pathTarget.styleTargetId ? [[pathTarget.styleTargetId, pathTarget.computedStyles]] : []),
+                ])),
+                // Reused semantic target IDs can occur several times on a page. The clicked
+                // instance must win over another matching heading/widget collected as context.
                 [target.id]: target.computedStyles,
-                ...Object.fromEntries(alternatives.map((alternative) => [alternative.id, alternative.computedStyles])),
-                ...Object.fromEntries(ancestors.map((ancestor) => [ancestor.id, ancestor.computedStyles])),
+                ...(target.styleTargetId ? { [target.styleTargetId]: target.computedStyles } : {}),
             }))
             setAddedThemeValues(new Set())
             if (event.data.action === 'contextAction' || event.data.action === 'editText') {
@@ -843,7 +1047,7 @@ const SemanticThemeWorkspace = ({
         }
         window.addEventListener('message', receive)
         return () => window.removeEventListener('message', receive)
-    }, [contentMode, onPendingPreviewTextsChange, pendingPreviewTextsRef, replaceAsset, replacePreviewImage, updateWorkspace, viewId, viewport, workspace.assets, workspace.breakpoints, workspace.constraints.editableSpacingProperties, workspace.spacing])
+    }, [contentMode, onPendingPreviewTextsChange, pendingPreviewTextsRef, replaceAsset, replacePreviewImage, updateWorkspace, viewId, viewport, workspace.assets, workspace.breakpoints, workspace.catalog, workspace.constraints.editableSpacingProperties, workspace.spacing])
 
     const selectedView = previewContent.views.find((view) => view.id === viewId) || previewContent.views[0] || null
     const selectedViewImages = useMemo(() => designerPreviewImageReferences(selectedView), [selectedView])
@@ -916,13 +1120,17 @@ const SemanticThemeWorkspace = ({
     }, [contentMode, previewModel, selectedViewImages])
 
     const configuredBreakpoints = getBreakpoints(workspace)
-    const previewCanvasWidth = Number(configuredBreakpoints[viewport]) || 1280
+    const previewCanvasWidth = designerPreviewWidth(viewport, configuredBreakpoints)
     const previewScale = Math.min(1, previewFrameWidth / previewCanvasWidth)
     const previewOffset = Math.max(0, (previewFrameWidth - previewCanvasWidth * previewScale) / 2)
 
     const selectedTargetIds = [...new Set([
         selectedTarget?.id,
+        selectedTarget?.styleTargetId,
         ...(selectedTarget?.ancestors || []).map((target) => target.id),
+        ...(selectedTarget?.ancestors || []).map((target) => target.styleTargetId),
+        ...(selectedTarget?.alternatives || []).map((target) => target.id),
+        ...(selectedTarget?.alternatives || []).map((target) => target.styleTargetId),
     ].filter(Boolean))]
     const selectedGroupIndex = Number(selectedTargetIds.map((id) => id.match(/^group:(\d+)/)?.[1]).find((value) => value !== undefined))
     const selectedGroup = Number.isInteger(selectedGroupIndex)
@@ -944,13 +1152,34 @@ const SemanticThemeWorkspace = ({
         workspace.breakpoints,
         workspace.constraints.editableSpacingProperties,
     )
+    const editableTargetSpacing = targetSpacing
     const propertyKey = (kind, index, field) => `${kind}:${index}:${field}`
+    const structuralSpacingFields = (row, fields) => {
+        const defaults = themeDefaults[row.targetId] || {}
+        const selected = new Set()
+        ;[
+            ['margin', ['marginTop', 'marginRight', 'marginBottom', 'marginLeft']],
+            ['padding', ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']],
+        ].forEach(([shorthand, directions]) => {
+            const availableDirections = directions.filter((field) => fields.includes(field))
+            if (!availableDirections.length) {
+                if (fields.includes(shorthand)) selected.add(shorthand)
+                return
+            }
+            availableDirections.filter((field) => (
+                hasThemeValue(row.values[field]) || !isZeroCssValue(defaults[field])
+            )).forEach((field) => selected.add(field))
+        })
+        return [...directionalSpacingFields, 'margin', 'padding'].filter((field) => fields.includes(field) && selected.has(field))
+    }
     const activeFields = (kind, index, row, fields) => selectedTarget
-        ? fields.filter((field) => !isZeroCssValue(row.values[field] || themeDefaults[row.targetId]?.[field]))
+            ? ['layoutSlot', 'widget', 'widgetSlot', 'widgetPart'].includes(row.scope)
+            ? structuralSpacingFields(row, fields)
+            : fields.filter((field) => !isZeroCssValue(row.values[field] || themeDefaults[row.targetId]?.[field]))
         : fields.filter((field) => row.values[field] || addedThemeValues.has(propertyKey(kind, index, field)))
-    const sectionLabel = (kind, row, breakpoint = row.breakpoint) => kind === 'typography'
+    const sectionLabel = (kind, row) => kind === 'typography'
         ? `Typography${row.element ? ` · ${selectedGroup?.elements?.find((element) => element.element === row.element)?.label || row.element}` : ''}`
-        : `Spacing${row.part ? ` · ${selectedGroup?.parts?.find((part) => part.part === row.part)?.label || row.part}` : ''}${breakpoint ? ` · ${breakpointLabel(breakpoint)}` : ''}`
+        : `Spacing${row.part ? ` · ${selectedGroup?.parts?.find((part) => part.part === row.part)?.label || row.part}` : ''}`
     const createSpacingOverride = (row, field) => updateWorkspace((next) => {
         const existing = next.spacing.find((candidate) => (
             candidate.targetId === row.targetId && candidate.breakpoint === viewport
@@ -961,6 +1190,187 @@ const SemanticThemeWorkspace = ({
         else next.spacing.push({ ...row, breakpoint: viewport, values: { [field]: value } })
         return next
     })
+    const updateStructuralSpacing = (row, field, value) => {
+        updateWorkspace((next) => {
+            const targetBreakpoint = row.breakpoint || viewport
+            let entry = next.spacing.find((candidate) => (
+                candidate.targetId === row.targetId && candidate.breakpoint === targetBreakpoint
+            ))
+            if (!entry) {
+                entry = { ...row, breakpoint: targetBreakpoint, values: {} }
+                next.spacing.push(entry)
+            }
+            const shorthand = field.startsWith('margin') ? 'margin' : field.startsWith('padding') ? 'padding' : ''
+            if (shorthand && field !== shorthand && hasThemeValue(entry.values[shorthand])) {
+                const directions = shorthand === 'margin'
+                    ? ['marginTop', 'marginRight', 'marginBottom', 'marginLeft']
+                    : ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']
+                directions.forEach((direction) => {
+                    if (!hasThemeValue(entry.values[direction])) entry.values[direction] = themeDefaults[row.targetId]?.[direction] || '0px'
+                })
+                delete entry.values[shorthand]
+            }
+            entry.values[field] = value
+            return next
+        })
+    }
+    const structuralSpacingTargetFor = (target) => {
+        const groupPartMatch = [target?.styleTargetId, target?.id]
+            .map((targetId) => targetId?.match(/^group:(\d+):part:(.+)$/))
+            .find(Boolean)
+        if (groupPartMatch) return {
+            targetId: target.styleTargetId || target.id,
+            scope: 'layout',
+            groupIndex: Number(groupPartMatch[1]),
+            groupName: workspace.catalog.designGroups.find((group) => group.groupIndex === Number(groupPartMatch[1]))?.label || '',
+            part: groupPartMatch[2],
+        }
+        const widgetPartId = [target?.styleTargetId, target?.id]
+            .find((targetId) => targetId?.startsWith('widget-part:'))
+        if (widgetPartId && target?.widgetType) return {
+            targetId: widgetPartId,
+            scope: 'widgetPart', widgetType: target.widgetType, part: widgetPartId.split(':').at(-1),
+        }
+        if (target?.kind === 'layoutSlot') {
+            const match = target.id.match(/^layout:(.+):slot:([^:]+)$/)
+            return match ? {
+                targetId: target.styleTargetId || target.id,
+                scope: 'layoutSlot', layout: match[1], slot: match[2],
+            } : null
+        }
+        if (target?.kind === 'widget' && target.widgetType) return {
+            targetId: target.styleTargetId || `widget-type:${target.widgetType}`,
+            scope: 'widget', widgetType: target.widgetType,
+        }
+        if (target?.kind === 'slot' && target.widgetType) {
+            const slot = target.styleTargetId?.split(':').at(-1) || target.id.split(':').at(-1)
+            return slot ? {
+                targetId: target.styleTargetId || `widget-slot:${target.widgetType}:${slot}`,
+                scope: 'widgetSlot', widgetType: target.widgetType, slot,
+            } : null
+        }
+        return null
+    }
+    const editableSpacingFieldsForTarget = (target, structural) => {
+        if (structural) {
+            const declared = editableStructuralSpacingProperties(workspace.catalog, structural)
+                .filter((field) => workspace.constraints.editableSpacingProperties.includes(field))
+            if (structural.scope !== 'widget' || declared.length) return declared
+        }
+        if (target?.kind !== 'layoutSlot' && target?.kind !== 'slot') return workspace.constraints.editableSpacingProperties
+        const layoutMatch = target.id.match(/^layout:(.+):slot:([^:]+)$/)
+        const slotName = target.styleTargetId?.split(':').at(-1) || target.id.split(':').at(-1)
+        return editableStructuralSpacingProperties(workspace.catalog, target.kind === 'layoutSlot'
+            ? { scope: 'layoutSlot', layout: layoutMatch?.[1], slot: layoutMatch?.[2] }
+            : { scope: 'widgetSlot', widgetType: target.widgetType, slot: slotName })
+            .filter((field) => workspace.constraints.editableSpacingProperties.includes(field))
+    }
+    const spacingForLevelTarget = (target) => {
+        if (!target) return { computed: {}, fields: [], entries: [], structural: null }
+        const configurationTargets = target.configurationSpacingTargets || []
+        const targetIds = [...new Set([
+            target.id,
+            target.styleTargetId,
+            ...configurationTargets.flatMap((configurationTarget) => [configurationTarget.id, configurationTarget.styleTargetId]),
+        ].filter(Boolean))]
+        const structural = structuralSpacingTargetFor(target)
+        const configurationStructuralTargets = configurationTargets
+            .map((configurationTarget) => ({
+                target: configurationTarget,
+                structural: structuralSpacingTargetFor(configurationTarget),
+            }))
+            .filter(({ structural: configurationStructural }) => configurationStructural)
+        const editableFields = [...new Set([
+            ...editableSpacingFieldsForTarget(target, structural),
+            ...configurationStructuralTargets.flatMap(({ target: configurationTarget, structural: configurationStructural }) => (
+                editableSpacingFieldsForTarget(configurationTarget, configurationStructural)
+            )),
+        ])]
+        const computed = {
+            ...(target.computedStyles || {}),
+            ...(themeDefaults[target.id] || {}),
+            ...(target.styleTargetId ? themeDefaults[target.styleTargetId] || {} : {}),
+            ...Object.assign({}, ...configurationTargets.map((configurationTarget) => ({
+                ...(configurationTarget.computedStyles || {}),
+                ...(themeDefaults[configurationTarget.id] || {}),
+                ...(configurationTarget.styleTargetId ? themeDefaults[configurationTarget.styleTargetId] || {} : {}),
+            }))),
+        }
+        if (['layoutSlot', 'slot'].includes(target.kind) && !editableFields.length) {
+            return { computed, fields: [], entries: [], structural }
+        }
+        const matching = workspace.spacing
+            .map((row, index) => ({ row, index, breakpoint: row.breakpoint }))
+            .filter(({ row }) => targetIds.includes(row.targetId))
+        const entries = effectiveSpacingEntries(
+            matching,
+            viewport,
+            workspace.breakpoints,
+            editableFields,
+        )
+        if (!entries.length && structural && editableFields.length) entries.push({
+            row: { ...structural, breakpoint: viewport, values: {} },
+            index: -1,
+            fields: editableFields,
+        })
+        configurationStructuralTargets.reverse().forEach(({ target: configurationTarget, structural: configurationStructural }) => {
+            const fields = editableSpacingFieldsForTarget(configurationTarget, configurationStructural)
+            if (!fields.length || entries.some((entry) => entry.row.targetId === configurationStructural.targetId)) return
+            entries.unshift({
+                row: { ...configurationStructural, breakpoint: viewport, values: {} },
+                index: -1,
+                fields,
+            })
+        })
+        const visibleFieldsForTarget = ['layoutSlot', 'slot'].includes(target.kind)
+            ? [...directionalSpacingFields, 'margin', 'padding'].filter((field) => editableFields.includes(field))
+            : visibleSpacingFields
+        const fields = visibleFieldsForTarget.filter((field) => {
+            if (['layoutSlot', 'slot'].includes(target.kind)) return true
+            const shorthand = field.startsWith('margin') ? 'margin' : field.startsWith('padding') ? 'padding' : field
+            const explicitlyConfigured = entries.some((entry) => (
+                hasThemeValue(entry.row.values[field]) || hasThemeValue(entry.row.values[shorthand])
+                || entry.index < 0 && entry.fields?.includes(field)
+            ))
+            if (!explicitlyConfigured) return false
+            const value = Number.parseFloat(computed[field])
+            return Number.isFinite(value)
+        })
+        return { computed, fields, entries, structural }
+    }
+    const updateLevelSpacing = (target, field, value) => {
+        setThemeDefaults((current) => ({
+            ...current,
+            [target.id]: { ...(current[target.id] || target.computedStyles || {}), [field]: value },
+            ...(target.styleTargetId ? {
+                [target.styleTargetId]: { ...(current[target.styleTargetId] || target.computedStyles || {}), [field]: value },
+            } : {}),
+        }))
+        const { entries } = spacingForLevelTarget(target)
+        const entry = spacingEntryForField(entries, field)
+        const configured = getBreakpoints(workspace)
+        const inherited = entry?.row.breakpoint
+            && breakpointWidth(entry.row.breakpoint, configured) !== breakpointWidth(viewport, configured)
+        if (entry && ['layout', 'layoutSlot', 'widget', 'widgetSlot', 'widgetPart'].includes(entry.row.scope)) {
+            updateStructuralSpacing(inherited ? { ...entry.row, breakpoint: viewport } : entry.row, field, value)
+            return
+        }
+        if (entry?.index >= 0) {
+            updateWorkspace((next) => {
+                if (!inherited) next.spacing[entry.index].values[field] = value
+                else {
+                    let override = next.spacing.find((candidate) => candidate.targetId === entry.row.targetId && candidate.breakpoint === viewport)
+                    if (!override) {
+                        override = { ...entry.row, breakpoint: viewport, values: {} }
+                        next.spacing.push(override)
+                    }
+                    override.values[field] = value
+                }
+                return next
+            })
+            return
+        }
+    }
     const addableThemeValues = selectedTarget ? [] : [
         ...targetTypography.flatMap(({ row, index }) => workspace.constraints.editableTypographyProperties
             .filter((field) => !row.values[field] && !addedThemeValues.has(propertyKey('typography', index, field)))
@@ -1007,7 +1417,7 @@ const SemanticThemeWorkspace = ({
         ;(next.layouts?.items || []).some((layout) => mutate(layout.root))
         return next
     })
-    const selectTargetFromInspector = (target, { replaceInspectorRoot = false } = {}) => {
+    const selectTargetFromInspector = (target, { replaceInspectorRoot = false, selectionLevel = targetSelectionKind(target) } = {}) => {
         const asset = assetsByTargetId.get(target.id)
         if (asset) setSelectedImageAspectKey(imageAspectKey(asset))
         const normalizedTarget = {
@@ -1022,6 +1432,8 @@ const SemanticThemeWorkspace = ({
         }
         pendingInspectorSelectionRef.current = targetFocusKey(target)
         setSelectedTarget(normalizedTarget)
+        const nextLevelSelections = { ...levelSelections, [selectionLevel]: normalizedTarget }
+        setLevelSelections(nextLevelSelections)
         setHighlightedTargetId('')
         setSelectionExpanded(true)
         setOpenTargetId(replaceInspectorRoot || targetFocusKey(target) === targetFocusKey(inspectorRootRef.current) ? '' : targetFocusKey(target))
@@ -1030,6 +1442,13 @@ const SemanticThemeWorkspace = ({
             source: 'eceee-render-host',
             action: 'selectTarget',
             targetId: target.id,
+            selectionLevel,
+            selectedTargets: Object.entries(nextLevelSelections).flatMap(([kind, selected]) => selected ? [{
+                targetId: selected.id,
+                selectionLevel: kind,
+                ...(selected.instanceId ? { targetInstanceId: selected.instanceId } : {}),
+                ...(selected.widgetId ? { widgetId: selected.widgetId } : {}),
+            }] : []),
             ...(target.instanceId ? { targetInstanceId: target.instanceId } : {}),
             ...(target.widgetId ? { widgetId: target.widgetId } : {}),
         }, '*')
@@ -1054,15 +1473,20 @@ const SemanticThemeWorkspace = ({
         }
         selectTargetFromInspector(target)
     }
-    const chooseTargetAlternative = (alternative) => {
-        const currentPath = selectedTarget?.path || []
+    const chooseTargetAlternative = (alternative, selectionLevel = targetSelectionKind(alternative)) => {
+        const currentLevelTarget = levelSelections[selectionLevel]
+        const currentPath = currentLevelTarget?.path || []
         const pathIndex = currentPath.findIndex((target) => targetFocusKey(target) === targetFocusKey(alternative))
         selectTargetFromInspector({
             ...alternative,
-            alternatives: selectedTarget?.alternatives || [alternative],
+            alternatives: currentLevelTarget?.alternatives || [alternative],
             path: pathIndex >= 0 ? currentPath : alternative.path || [],
-        }, { replaceInspectorRoot: true })
+        }, { replaceInspectorRoot: true, selectionLevel })
     }
+    const chooseTrailTarget = (target) => selectTargetFromInspector({
+        ...target,
+        path: selectionTrail,
+    }, { selectionLevel: target.selectionLevel || targetSelectionKind(target) })
 
     const updateSelectedExampleText = (text) => {
         if (!selectedView || !selectedTarget) return
@@ -1202,12 +1626,13 @@ const SemanticThemeWorkspace = ({
     }, [assetsByTargetId, imageAspects, selectedTarget, viewport, workspace.breakpoints])
     const imageBreakpointState = (asset) => {
         const activeLabel = breakpointLabel(viewport)
-        if (!asset.breakpoint) return { activeLabel, sourceLabel: 'All breakpoints', isInherited: false, isGlobal: true }
+        if (!asset.breakpoint) return { activeLabel, sourceLabel: 'All breakpoints', sourceBreakpoint: null, isInherited: false, isGlobal: true }
         const sourceLabel = breakpointLabel(asset.breakpoint)
         const configuredBreakpoints = getBreakpoints(workspace)
         return {
             activeLabel,
             sourceLabel,
+            sourceBreakpoint: asset.breakpoint,
             isInherited: breakpointWidth(asset.breakpoint, configuredBreakpoints) !== breakpointWidth(viewport, configuredBreakpoints),
             isGlobal: false,
         }
@@ -1225,16 +1650,15 @@ const SemanticThemeWorkspace = ({
                         <div className="flex items-start justify-between gap-2"><div className="min-w-0"><h4 className="truncate text-sm font-medium text-gray-900">{asset.displayName}</h4><p className="truncate text-xs text-gray-500">{asset.filename || 'No file yet'}</p></div>{usage && <span className="shrink-0 rounded bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{usage.badge}</span>}</div>
                         {asset.url ? <img src={asset.url} alt="" className="h-32 w-full rounded-md border border-gray-200 bg-gray-50 object-contain" /> : <div className="flex h-32 items-center justify-center rounded-md border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-500">Placeholder image</div>}
                         {breakpointState.isInherited
-                            ? <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950" role="status"><p><strong>Inherited at {breakpointState.activeLabel}.</strong> This image is defined at {breakpointState.sourceLabel}.</p><p className="mt-1">Replace the source to change every size that inherits it, or create an override only from {breakpointState.activeLabel}.</p></div>
+                            ? <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950" role="status"><p><strong>Inherited from {breakpointState.sourceLabel}.</strong> <button type="button" onClick={() => onViewportChange(breakpointState.sourceBreakpoint)} className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">Change to {breakpointState.sourceLabel}</button> to replace it, or create a separate image here for {breakpointState.activeLabel}.</p></div>
                             : <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>{breakpointState.isGlobal ? 'Global image.' : `Defined at ${breakpointState.activeLabel}.`}</strong> {breakpointState.isGlobal ? 'It is used at every breakpoint without a responsive image.' : 'Larger breakpoints inherit it unless they define their own image.'}</p>}
                         {usage && <div className="rounded-md bg-gray-50 px-3 py-2"><p className="text-sm font-medium text-gray-800">{usage.summary}</p><p className="mt-0.5 text-xs text-gray-600">{usage.range}</p></div>}
                         <p className="text-xs text-gray-600">{asset.width || asset.requiredWidth || asset.recommendedWidth || '?'} × {asset.height || asset.requiredHeight || '?'} px{asset.kind === 'library' ? asset.size ? ` · ${Math.ceil(asset.size / 1024)} KB` : '' : ` · ${asset.dpr || 2}x`}</p>
-                        {asset.kind === 'design-group' && !asset.url && <div className="grid gap-2"><input aria-label={`${asset.displayName} placeholder name`} value={placeholderDrafts[asset.assetKey]?.displayName ?? asset.displayName} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], displayName: event.target.value } }))} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /><div className="grid grid-cols-2 gap-2"><input aria-label={`${asset.displayName} placeholder width`} type="number" min="16" max="8000" value={placeholderDrafts[asset.assetKey]?.width ?? asset.requiredWidth ?? ''} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], width: event.target.value } }))} placeholder="Width px" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /><input aria-label={`${asset.displayName} placeholder height`} type="number" min="16" max="8000" value={placeholderDrafts[asset.assetKey]?.height ?? asset.requiredHeight ?? ''} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], height: event.target.value } }))} placeholder="Height px" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></div><button type="button" aria-label={`Create ${asset.displayName} source placeholder at ${breakpointState.sourceLabel}`} onClick={() => createPlaceholder(asset)} className={`rounded-md px-3 py-2 text-sm font-medium ${breakpointState.isInherited ? 'border border-amber-400 bg-white text-amber-950 hover:bg-amber-50' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>Create source placeholder at {breakpointState.sourceLabel}</button>{breakpointState.isInherited && <button type="button" aria-label={`Create ${breakpointState.activeLabel} placeholder override for ${asset.displayName}`} onClick={() => createPlaceholder(asset, viewport)} className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Create {breakpointState.activeLabel} placeholder override</button>}</div>}
+                        {asset.kind === 'design-group' && !asset.url && <div className="grid gap-2"><input aria-label={`${asset.displayName} placeholder name`} value={placeholderDrafts[asset.assetKey]?.displayName ?? asset.displayName} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], displayName: event.target.value } }))} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /><div className="grid grid-cols-2 gap-2"><input aria-label={`${asset.displayName} placeholder width`} type="number" min="16" max="8000" value={placeholderDrafts[asset.assetKey]?.width ?? asset.requiredWidth ?? ''} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], width: event.target.value } }))} placeholder="Width px" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /><input aria-label={`${asset.displayName} placeholder height`} type="number" min="16" max="8000" value={placeholderDrafts[asset.assetKey]?.height ?? asset.requiredHeight ?? ''} onChange={(event) => setPlaceholderDrafts((current) => ({ ...current, [asset.assetKey]: { ...current[asset.assetKey], height: event.target.value } }))} placeholder="Height px" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></div>{!breakpointState.isInherited && <button type="button" aria-label={`Create ${asset.displayName} source placeholder at ${breakpointState.sourceLabel}`} onClick={() => createPlaceholder(asset)} className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Create source placeholder at {breakpointState.sourceLabel}</button>}{breakpointState.isInherited && <button type="button" aria-label={`Create ${breakpointState.activeLabel} placeholder override for ${asset.displayName}`} onClick={() => createPlaceholder(asset, viewport)} className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Create {breakpointState.activeLabel} placeholder override</button>}</div>}
                         {asset.replaceable === false
                             ? <p className="text-xs text-gray-500">Stored in the theme image library. Select an element that uses it to replace that occurrence.</p>
                             : <div className="grid gap-2">
-                                <input ref={(node) => { uploadRefs.current[asset.assetKey] = node }} aria-label={`New source image for ${asset.displayName} at ${breakpointState.sourceLabel}`} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" />
-                                <button type="button" aria-label={`${asset.url ? 'Replace' : 'Upload'} ${asset.displayName} source at ${breakpointState.sourceLabel}`} onClick={() => uploadRefs.current[asset.assetKey]?.click()} className={`w-full rounded-md px-3 py-2 text-sm font-medium ${breakpointState.isInherited ? 'border border-amber-400 bg-white text-amber-950 hover:bg-amber-50' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{asset.url ? 'Replace' : 'Upload'} source at {breakpointState.sourceLabel}</button>
+                                {!breakpointState.isInherited && <><input ref={(node) => { uploadRefs.current[asset.assetKey] = node }} aria-label={`New source image for ${asset.displayName} at ${breakpointState.sourceLabel}`} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" /><button type="button" aria-label={`${asset.url ? 'Replace' : 'Upload'} ${asset.displayName} source at ${breakpointState.sourceLabel}`} onClick={() => uploadRefs.current[asset.assetKey]?.click()} className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">{asset.url ? 'Replace' : 'Upload'} source at {breakpointState.sourceLabel}</button></>}
                                 {breakpointState.isInherited && <><input ref={(node) => { uploadRefs.current[`override:${asset.assetKey}:${viewport}`] = node }} aria-label={`New ${breakpointState.activeLabel} image override for ${asset.displayName}`} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0], viewport)} className="sr-only" /><button type="button" aria-label={`Create ${breakpointState.activeLabel} override for ${asset.displayName}`} onClick={() => uploadRefs.current[`override:${asset.assetKey}:${viewport}`]?.click()} className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Create {breakpointState.activeLabel} override</button></>}
                             </div>}
                     </article>
@@ -1290,11 +1714,10 @@ const SemanticThemeWorkspace = ({
                         </span>
                     </button>
                 </div>
-                {breakpointState.isInherited && <p className="rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-950"><strong>Inherited from {breakpointState.sourceLabel}.</strong> Choose where the change belongs.</p>}
+                {breakpointState.isInherited && <p className="rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-950"><strong>Inherited from {breakpointState.sourceLabel}.</strong> <button type="button" onClick={() => onViewportChange(breakpointState.sourceBreakpoint)} className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">Change to {breakpointState.sourceLabel}</button> to replace it, or create a separate image here for {breakpointState.activeLabel}.</p>}
                 <div className="grid gap-1.5">
-                    <input ref={(node) => { uploadRefs.current[`inline:${asset.assetKey}`] = node }} aria-label={`New source image for ${asset.displayName} at ${breakpointState.sourceLabel}`} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" />
-                    <button type="button" aria-label={`${asset.url ? 'Replace' : 'Upload'} ${asset.displayName} source at ${breakpointState.sourceLabel}`} onClick={() => uploadRefs.current[`inline:${asset.assetKey}`]?.click()} className="rounded-md border border-blue-600 bg-white px-2 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50">{asset.url ? 'Replace' : 'Upload'} source at {breakpointState.sourceLabel}</button>
-                    {breakpointState.isInherited && <><input ref={(node) => { uploadRefs.current[`inline-override:${asset.assetKey}:${viewport}`] = node }} aria-label={`New ${breakpointState.activeLabel} image override for ${asset.displayName}`} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0], viewport)} className="sr-only" /><button type="button" aria-label={`Create ${breakpointState.activeLabel} override for ${asset.displayName}`} onClick={() => uploadRefs.current[`inline-override:${asset.assetKey}:${viewport}`]?.click()} className="rounded-md bg-blue-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-blue-700">Create {breakpointState.activeLabel} override</button></>}
+                    {!breakpointState.isInherited && <><input ref={(node) => { uploadRefs.current[`inline:${asset.assetKey}`] = node }} aria-label={`New source image for ${asset.displayName} at ${breakpointState.sourceLabel}`} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0])} className="sr-only" /><button type="button" aria-label={`${asset.url ? 'Replace' : 'Upload'} ${asset.displayName} source at ${breakpointState.sourceLabel}`} onClick={() => uploadRefs.current[`inline:${asset.assetKey}`]?.click()} className="rounded-md border border-blue-600 bg-white px-2 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50">{asset.url ? 'Replace' : 'Upload'} at {breakpointState.sourceLabel}</button></>}
+                    {breakpointState.isInherited && <><input ref={(node) => { uploadRefs.current[`inline-override:${asset.assetKey}:${viewport}`] = node }} aria-label={`New ${breakpointState.activeLabel} image override for ${asset.displayName}`} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => replaceAsset(asset, event.target.files?.[0], viewport)} className="sr-only" /><button type="button" aria-label={`Add ${asset.displayName} image here for ${breakpointState.activeLabel}`} onClick={() => uploadRefs.current[`inline-override:${asset.assetKey}:${viewport}`]?.click()} className="rounded-md bg-blue-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-blue-700">Add image here</button></>}
                 </div>
             </article>
         )
@@ -1378,6 +1801,130 @@ const SemanticThemeWorkspace = ({
             ? 'Selected widget'
             : 'Selected element'
     const selectedTargetLabel = selectedTarget?.displayLabel || selectedTarget?.label
+    const selectionChildTree = childTargets.length > 0 && (
+        <section className="flex shrink-0 flex-col border-t border-gray-200 px-3 py-3">
+            <h3 className="mb-2 shrink-0 text-sm font-medium text-gray-900">Elements inside</h3>
+            <div className="overflow-x-hidden border-y border-gray-200" role="tree" aria-label="Element hierarchy">
+                {(() => {
+                    const renderTargetTree = (parentKey, level = 1) => (childTargetsByParent.get(parentKey) || []).map((child) => {
+                        const childKey = targetFocusKey(child)
+                        const isSelected = targetFocusKey(selectedTarget) === childKey
+                        const isHighlighted = highlightedTargetId === childKey
+                        const childLabel = child.displayLabel || child.label
+                        const nestedTargets = childTargetsByParent.get(childKey) || []
+                        return <div key={childKey} role="treeitem" aria-label={childLabel} aria-level={level} aria-selected={isSelected} className="min-w-0 border-b border-gray-200 last:border-b-0">
+                            <div className={`flex min-w-0 items-stretch ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
+                                <button
+                                    type="button"
+                                    aria-pressed={isSelected}
+                                    aria-label={`Edit ${childLabel}`}
+                                    onClick={() => selectTargetFromInspector(child)}
+                                    className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-sm transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${isSelected ? 'font-medium text-blue-800' : 'text-gray-800 hover:bg-gray-50 hover:text-gray-950'}`}
+                                >
+                                    <span className="min-w-0 flex-1 truncate" title={childLabel}>{childLabel}</span>
+                                    {isSelected && <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-blue-700">Selected</span>}
+                                </button>
+                                <button
+                                    type="button"
+                                    aria-label={`${isHighlighted ? 'Stop highlighting' : 'Highlight'} ${childLabel}`}
+                                    aria-pressed={isHighlighted}
+                                    title={`${isHighlighted ? 'Stop highlighting' : 'Highlight'} in preview`}
+                                    onClick={() => toggleTargetHighlight(child)}
+                                    className={`my-1.5 mr-1.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${isHighlighted ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 bg-white text-gray-500 hover:border-amber-400 hover:text-amber-700'}`}
+                                >
+                                    <Focus className="h-4 w-4" />
+                                </button>
+                            </div>
+                            {nestedTargets.length > 0 && <div role="group" className="ml-4 border-l border-gray-300 pl-2">{renderTargetTree(childKey, level + 1)}</div>}
+                        </div>
+                    })
+                    return renderTargetTree(targetFocusKey(inspectorRoot))
+                })()}
+            </div>
+        </section>
+    )
+
+    const requiresSelectedEditor = selectedLayoutParameters.length > 0
+        || (selectedTarget?.kind === 'part' && !Object.keys(selectedTarget.computedStyles || {}).length)
+        || (contentMode === 'demo' && [selectedTarget, inspectorRoot]
+            .some((target) => target?.kind === 'element' && target.editable
+                && (target.richText || target.text)))
+    const selectionSpacingPanels = !requiresSelectedEditor
+        && Object.entries(levelSelections).some(([, target]) => target) && (
+        <section aria-label="Selected spacing levels" className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-white">
+            <WidgetSlotTrail
+                targets={selectionTrail}
+                originKey={selectionTrailOriginKey}
+                selectedTarget={selectedTarget}
+                onSelect={chooseTrailTarget}
+            />
+            {(['slot', 'widget', 'element']).map((kind) => {
+                const target = levelSelections[kind]
+                if (!target) return null
+                const tone = selectionTones[kind]
+                const expanded = expandedSelectionLevels.has(kind)
+                const panelId = `selected-${kind}-spacing`
+                const label = target.displayLabel || target.label
+                const { computed, fields, entries } = spacingForLevelTarget(target)
+                const hasEditableSpacing = fields.length > 0
+                const isActiveTargetPanel = targetFocusKey(target) === targetFocusKey(selectedTarget)
+                const levelAssets = isActiveTargetPanel ? targetAssetAlternatives : []
+                const levelColors = isActiveTargetPanel ? relevantColors : []
+                const hasEditableProperties = hasEditableSpacing || levelAssets.length > 0 || levelColors.length > 0
+                const headerContent = <>
+                    <div className="min-w-0 flex-1">
+                        <p className={`text-[10px] font-semibold uppercase tracking-wide ${tone.label}`}>Selected {kind}</p>
+                        <h2 className="truncate text-sm font-semibold text-gray-900">{label}</h2>
+                    </div>
+                    {hasEditableProperties && <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${tone.label} ${expanded ? 'rotate-180' : ''}`} />}
+                </>
+                return <section key={kind} className={`shrink-0 border-b ${tone.border}`}>
+                    {hasEditableProperties ? <button
+                            type="button"
+                            aria-expanded={expanded}
+                            aria-controls={panelId}
+                            aria-label={`${expanded ? 'Collapse' : 'Expand'} selected ${kind} ${label}`}
+                            onClick={() => setExpandedSelectionLevels((current) => {
+                                const next = new Set(current)
+                                if (next.has(kind)) next.delete(kind)
+                                else next.add(kind)
+                                return next
+                            })}
+                            className={`flex w-full items-center gap-2 px-3 py-2 text-left ${tone.header}`}
+                        >{headerContent}</button>
+                        : <div className={`flex w-full items-center gap-2 px-3 py-2 text-left ${tone.header}`}>{headerContent}</div>}
+                    {hasEditableProperties && expanded && <div id={panelId} className="space-y-3 px-3 py-3">
+                        {hasEditableSpacing && fields.length > 0 && <FieldLayout fields={fields} renderField={(field, className) => {
+                                const entry = spacingEntryForField(entries, field)
+                                const value = entry?.row.values[field] || computed[field] || ''
+                                return <label key={field} className={`block min-w-0 text-xs font-medium text-gray-700 ${className}`} data-spacing-side={field.match(/(Top|Right|Bottom|Left)$/)?.[1]?.toLowerCase()}>
+                                    {spacingLabels[field]}
+                                    <input
+                                        aria-label={`${kind} ${spacingLabels[field]}`}
+                                        value={value}
+                                        onChange={(event) => updateLevelSpacing(target, field, event.target.value)}
+                                        disabled={disabled || !entry}
+                                        className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50"
+                                    />
+                                </label>
+                            }} />}
+                        {levelAssets.length > 0 && <section className="space-y-2 border-t border-gray-200 pt-3">
+                            <div className="grid gap-1">{levelAssets.map(renderTargetAssetAlternative)}</div>
+                        </section>}
+                        {levelColors.length > 0 && <section className="space-y-3 border-t border-gray-200 pt-3">
+                            <h3 className="text-sm font-medium text-gray-900">Colors used here</h3>
+                            {levelColors.map(({ name, index }) => <label key={name} className="flex items-center gap-3">
+                                <input type="color" value={/^#[0-9a-f]{6}$/i.test(workspace.colors[index].value) ? workspace.colors[index].value : '#000000'} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="h-9 w-11 rounded border border-gray-300" />
+                                <span className="min-w-0 flex-1 text-sm font-medium">{name}</span>
+                                <input aria-label={`${name} value`} value={workspace.colors[index].value} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="w-28 rounded-md border border-gray-300 px-2 py-1.5 font-mono text-xs" />
+                            </label>)}
+                        </section>}
+                    </div>}
+                </section>
+            })}
+            {selectionChildTree}
+        </section>
+    )
 
     const selectedEditor = selectedTarget && (
         <section className="flex min-h-0 flex-1 flex-col border-b border-gray-200 bg-white">
@@ -1396,7 +1943,7 @@ const SemanticThemeWorkspace = ({
                 <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${selectedTargetTone.label} ${selectionExpanded ? 'rotate-180' : ''}`} />
             </button>
             {selectionExpanded && (
-                <div id="selected-element-editor" className={`flex min-h-0 flex-1 flex-col gap-3 overflow-hidden border-t p-2 ${selectedTargetTone.border}`}>
+                <div id="selected-element-editor" className={`flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto overscroll-contain border-t p-2 ${selectedTargetTone.border}`}>
                     <section aria-label="Selection context" className="shrink-0 space-y-1.5">
                         <SelectionPath kind="slot" label="Slot" targets={selectionPaths.slot} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
                         <SelectionPath kind="widget" label="Widget" targets={selectionPaths.widget} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
@@ -1426,7 +1973,7 @@ const SemanticThemeWorkspace = ({
                         const fields = activeFields('typography', index, row, workspace.constraints.editableTypographyProperties)
                         return fields.length > 0 && <section key={`type-${index}`} className="space-y-2 border-t border-gray-200 pt-3"><h3 className="text-sm font-medium text-gray-900">{sectionLabel('typography', row)}</h3><p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global value.</strong> Typography is the same at every breakpoint.</p><ValueFields idPrefix={`typography-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={typographyLabels} onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)} /></section>
                     })}
-                    {targetSpacing.map(({ row, index, fields: effectiveFields = workspace.constraints.editableSpacingProperties }) => {
+                    {editableTargetSpacing.map(({ row, index, fields: effectiveFields = workspace.constraints.editableSpacingProperties }) => {
                         const fields = activeFields('spacing', index, row, effectiveFields)
                         const configuredBreakpoints = getBreakpoints(workspace)
                         const isInherited = Boolean(row.breakpoint && breakpointWidth(row.breakpoint, configuredBreakpoints) !== breakpointWidth(viewport, configuredBreakpoints))
@@ -1447,8 +1994,10 @@ const SemanticThemeWorkspace = ({
                                     </div>
                                     : <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Defined at {activeLabel}.</strong> Changes start here and are inherited by larger breakpoints without their own value.</p>)
                                     : <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global value.</strong> This spacing is the same at every breakpoint.</p>}
-                                <p className="text-xs text-gray-500">Margin and padding can also be changed by clicking their labels in the preview. On an inherited level, that creates an override here.</p>
-                                <ValueFields idPrefix={`spacing-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={spacingLabels} disabled={!canEditSource} onOverride={isInherited && !canEditSource ? (field) => createSpacingOverride(row, field) : null} overrideLabel={activeLabel} onChange={(field, value) => updateWorkspace((next) => { next.spacing[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('spacing', index, row, field, spacingLabels[field] || field)} />
+                                <p className="text-xs text-gray-500">Spacing and column gaps can also be changed by clicking their labels in the preview. On an inherited level, that creates an override here.</p>
+                                {fields.length > 0
+                                    ? <ValueFields idPrefix={`spacing-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={spacingLabels} disabled={!canEditSource} onOverride={isInherited && !canEditSource ? (field) => createSpacingOverride(row, field) : null} overrideLabel={activeLabel} onChange={(field, value) => ['layoutSlot', 'widget', 'widgetSlot', 'widgetPart'].includes(row.scope) ? updateStructuralSpacing(row, field, value) : updateWorkspace((next) => { next.spacing[index].values[field] = value; return next })} onRemove={index < 0 ? null : (field) => removeThemeValue('spacing', index, row, field, spacingLabels[field] || field)} />
+                                    : <p className="rounded-md border border-dashed border-gray-300 p-3 text-xs text-gray-500">This target has no visible spacing at {activeLabel}.</p>}
                             </section>
                         )
                     })}
@@ -1477,13 +2026,13 @@ const SemanticThemeWorkspace = ({
                     </section>}
                     {addableThemeValues.length > 0 && <section className="border-t border-gray-200 pt-4"><label htmlFor="add-theme-value" className="text-xs font-semibold uppercase tracking-wide text-gray-500">Add theme value</label><select id="add-theme-value" value="" onChange={(event) => addThemeValue(event.target.value)} className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"><option value="">Choose a value…</option>{addableThemeValues.map((value) => <option key={propertyKey(value.kind, value.index, value.field)} value={propertyKey(value.kind, value.index, value.field)}>{value.label}</option>)}</select></section>}
                     {relevantColors.length > 0 && <section className="space-y-3 border-t border-gray-200 pt-4"><h3 className="font-medium text-gray-900">Colors used here</h3><p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global values.</strong> Colors are the same at every breakpoint.</p>{relevantColors.map(({ name, index }) => <label key={name} className="flex items-center gap-3"><input type="color" value={/^#[0-9a-f]{6}$/i.test(workspace.colors[index].value) ? workspace.colors[index].value : '#000000'} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="h-10 w-12 rounded border border-gray-300" /><span className="min-w-0 flex-1 text-sm font-medium">{name}</span><input aria-label={`${name} value`} value={workspace.colors[index].value} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="w-28 rounded-md border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>)}</section>}
-                    {!targetTypography.length && !targetSpacing.length && !relevantColors.length && !selectedLayoutParameters.length && selectedTarget.kind !== 'element' && selectedTarget.kind !== 'asset' && <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500">Choose a more specific text or image inside this area to edit its details.</p>}
+                    {!targetTypography.length && !editableTargetSpacing.length && !relevantColors.length && !selectedLayoutParameters.length && selectedTarget.kind !== 'element' && selectedTarget.kind !== 'asset' && <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500">Choose a more specific text or image inside this area to edit its details.</p>}
                         </>
                         return <>
-                            {targetFocusKey(selectedTarget) === targetFocusKey(inspectorRoot) && <div key={`root-${selectionFocusVersion}`} className={`designer-inspector-focus space-y-3 ${childTargets.length > 0 ? 'shrink-0' : 'min-h-0 flex-1 overflow-y-auto'}`}>{fields}</div>}
-                            {childTargets.length > 0 && <section className="flex min-h-0 flex-1 flex-col border-t border-gray-200 pt-3">
+                            {targetFocusKey(selectedTarget) === targetFocusKey(inspectorRoot) && <div key={`root-${selectionFocusVersion}`} className="designer-inspector-focus shrink-0 space-y-3">{fields}</div>}
+                            {childTargets.length > 0 && <section className="flex shrink-0 flex-col border-t border-gray-200 pt-3">
                                 <h3 className="mb-2 shrink-0 text-sm font-medium text-gray-900">Elements inside</h3>
-                                <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain border-y border-gray-200" role="tree" aria-label="Element hierarchy">
+                                <div className="overflow-x-hidden border-y border-gray-200" role="tree" aria-label="Element hierarchy">
                                     {(() => {
                                         const renderTargetTree = (parentKey, level = 1) => (childTargetsByParent.get(parentKey) || []).map((child) => {
                                         const childKey = targetFocusKey(child)
@@ -1656,7 +2205,7 @@ const SemanticThemeWorkspace = ({
                         ? themeDetailsEditor
                         : workspaceView === 'images'
                             ? <div className="space-y-6">{imageAspectNavigation}{themeImageEditor}</div>
-                            : <div className="flex min-h-0 flex-1 flex-col gap-3">{selectedEditor || <div className="flex min-h-32 items-center justify-center border border-dashed border-gray-300 p-3 text-center text-sm text-gray-500">Select an element in the preview to edit its text, images, typography, spacing, and colors.</div>}{exampleImageEditor}</div>}
+                            : <div className="flex min-h-0 flex-1 flex-col gap-3">{selectionSpacingPanels || selectedEditor || <div className="flex min-h-32 items-center justify-center border border-dashed border-gray-300 p-3 text-center text-sm text-gray-500">Select something in the preview to inspect its margin and padding.</div>}{exampleImageEditor}</div>}
                 </fieldset>
             </section>
         </main>

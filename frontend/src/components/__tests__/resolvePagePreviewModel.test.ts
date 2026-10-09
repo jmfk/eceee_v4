@@ -244,6 +244,38 @@ describe('page preview model resolution', () => {
         })
     })
 
+    it('resolves dynamic navigation and images nested in a sidebar section', async () => {
+        clientApi.get.mockResolvedValue({ data: [{
+            page: { id: 17, title: '2024 Side events', path: '/2024-side-events/' },
+            currentVersion: { id: 71 },
+            sortOrder: 2,
+        }] })
+        const model = createPageRenderModel({
+            widgets: { sidebar: [{
+                id: 'section', type: 'easy_widgets.SectionWidget', config: { slots: { content: [
+                    { id: 'navigation', type: 'easy_widgets.NavigationWidget', config: { includeSubpages: true } },
+                    { id: 'image', type: 'easy_widgets.ImageWidget', config: { image: { sourceUrl: '/sidebar.jpg' } } },
+                ] } },
+            }] },
+            context: { tenantId: 'tenant-b', pageId: 9 },
+        })
+
+        const resolved = await resolvePagePreviewModel(model)
+        const [navigation, image] = resolved.slots.sidebar[0].config.slots.content
+
+        expect(clientApi.get).toHaveBeenCalledWith(
+            '/api/v1/webpages/pages/9/children/',
+            { headers: { 'X-Tenant-ID': 'tenant-b' }, params: { include_unpublished: false } },
+        )
+        expect(navigation.config.dynamicItems).toEqual([expect.objectContaining({
+            label: '2024 Side events', url: '/2024-side-events/', isActive: true, isPublished: true,
+        })])
+        expect(image.config.mediaItems[0]).toMatchObject({
+            url: '/sidebar.jpg',
+            src: '/imgproxy/resize:fit:896:0//sidebar.jpg',
+        })
+    })
+
     it('signs more than 50 image requests in supported batches', async () => {
         const mediaItems = Array.from({ length: 51 }, (_, index) => ({
             id: `image-${index}`,

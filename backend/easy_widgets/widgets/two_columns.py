@@ -2,8 +2,9 @@
 Simple two-column widget implementation.
 """
 
-from typing import Type, Optional, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Literal, Optional, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
@@ -61,6 +62,7 @@ class TwoColumnsWidget(BaseWidget):
                 "lineHeight",
                 "gap",
             ],
+            "designer_editable_spacing_properties": ["gap"],
         },
     }
 
@@ -74,48 +76,48 @@ class TwoColumnsWidget(BaseWidget):
     .two-columns-widget:last-child {
         margin-bottom: 0;
     }
-    
+
     .two-columns-widget.two-col-ratio-5-1 {
         grid-template-columns: 5fr 1fr;
     }
-    
+
     .two-columns-widget.two-col-ratio-4-2 {
         grid-template-columns: 2fr 1fr;
     }
-    
+
     .two-columns-widget.two-col-ratio-3-3 {
         grid-template-columns: 1fr 1fr;
     }
-    
+
     .two-columns-widget.two-col-ratio-2-4 {
         grid-template-columns: 1fr 2fr;
     }
-    
+
     .two-columns-widget.two-col-ratio-1-5 {
         grid-template-columns: 1fr 5fr;
     }
-    
+
     .two-col-slot {
         position: relative;
         height: 100%;
     }
-    
+
     .two-col-slot.left {
         grid-area: 1 / 1;
     }
-    
+
     .two-col-slot.right {
         grid-area: 1 / 2;
     }
-    
+
     .two-col-widget-wrapper {
         margin-bottom: 30px;
     }
-    
+
     .two-col-widget-wrapper:last-child {
         margin-bottom: 0;
     }
-    
+
     .two-col-empty-slot {
         color: #9ca3af;
         font-style: italic;
@@ -125,18 +127,18 @@ class TwoColumnsWidget(BaseWidget):
         background-color: #f9fafb;
         height: 100%;
     }
-    
+
     /* Responsive design */
     @media (max-width: 768px) {
         .two-columns-widget {
             grid-template-columns: 1fr;
             grid-template-rows: auto auto;
         }
-        
+
         .two-col-slot.left {
             grid-area: 1 / 1;
         }
-        
+
         .two-col-slot.right {
             grid-area: 2 / 1;
         }
@@ -186,11 +188,9 @@ class TwoColumnsWidget(BaseWidget):
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import (
-            render_mustache,
-            prepare_component_context,
-        )
         from django.template.loader import render_to_string
+
+        from webpages.utils.mustache_renderer import prepare_component_context, render_mustache
 
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
@@ -221,9 +221,7 @@ class TwoColumnsWidget(BaseWidget):
             anchor="",
             style_vars=style.get("variables", {}),
             config=prepared_config,  # Pass processed config for granular control
-            slots=prepared_config.get(
-                "rendered_slots"
-            ),  # Pass slot data for custom rendering
+            slots=prepared_config.get("rendered_slots"),  # Pass slot data for custom rendering
         )
 
         # Render with style template
@@ -251,33 +249,22 @@ class TwoColumnsWidget(BaseWidget):
                     try:
                         # Filter out hidden widgets (check both config.isVisible and config.is_visible)
                         widget_config = widget_data.get("config", {})
-                        is_visible = widget_config.get(
-                            "isVisible", widget_config.get("is_visible", True)
-                        )
+                        is_visible = widget_config.get("isVisible", widget_config.get("is_visible", True))
                         if not is_visible:
                             continue  # Skip hidden widgets
 
                         # Filter out inactive widgets (check both config.isActive and config.is_active)
-                        is_active = widget_config.get(
-                            "isActive", widget_config.get("is_active", True)
-                        )
+                        is_active = widget_config.get("isActive", widget_config.get("is_active", True))
                         if not is_active:
                             continue  # Skip inactive widgets
 
                         # Add sort_order if missing (use array index to preserve order)
-                        if (
-                            "sort_order" not in widget_data
-                            and "order" not in widget_data
-                        ):
+                        if "sort_order" not in widget_data and "order" not in widget_data:
                             widget_data = {**widget_data, "sort_order": index}
 
-                        widget_html = context["renderer"].render_widget_json(
-                            widget_data, context
-                        )
-                        rendered_widgets.append(
-                            {"html": widget_html, "widget_data": widget_data}
-                        )
-                    except Exception as e:
+                        widget_html = context["renderer"].render_widget_json(widget_data, context)
+                        rendered_widgets.append({"html": widget_html, "widget_data": widget_data})
+                    except Exception:
                         # Log error and continue
                         continue
                 rendered_slots[slot_name] = rendered_widgets
@@ -288,8 +275,6 @@ class TwoColumnsWidget(BaseWidget):
                 for slot_name, widgets in slots_data.items()
             }
 
-        template_config.update(
-            {"slots_data": slots_data, "rendered_slots": rendered_slots}
-        )
+        template_config.update({"slots_data": slots_data, "rendered_slots": rendered_slots})
 
         return template_config

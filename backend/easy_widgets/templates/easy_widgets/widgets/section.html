@@ -19,7 +19,7 @@ Section Widget Template
          {% if config.anchor %}
             <a name="{{ config.anchor }}" class="section-anchor"></a>      
          {% endif %}
-        <div class="slot-section-content">
+        <div class="slot-section-content" data-slot="content" data-widget-slot="content" data-owner-widget-type="easy_widgets.SectionWidget">
             {# First widget - always visible #}
             {% if config.rendered_slots.content %}
                 {{ config.rendered_slots.content.0.html|safe }}
@@ -45,7 +45,7 @@ Section Widget Template
     </div>
 {% else %}
     {# Non-collapsible: just render content directly with anchor #}
-    <div {% if config.anchor %}id="{{ config.anchor }}"{% endif %} class="section-content-only-widget {% if config.show_border %} border-enabled{% endif %}">
+    <div {% if config.anchor %}id="{{ config.anchor }}"{% endif %} class="section-content-only-widget {% if config.show_border %} border-enabled{% endif %}" data-slot="content" data-widget-slot="content" data-owner-widget-type="easy_widgets.SectionWidget">
         {% for widget in config.rendered_slots.content %}
             {{ widget.html|safe }}
         {% endfor %}

@@ -4,7 +4,8 @@ export const imageSourceUrl = source => {
     if (typeof source === 'string') return source
     if (!source || typeof source !== 'object') return ''
 
-    return source.sourceUrl || source.source_url
+    return source.src || source.srcUrl || source.src_url
+        || source.sourceUrl || source.source_url
         || source.imgproxyBaseUrl || source.imgproxy_base_url
         || source.fileUrl || source.file_url
         || source.url

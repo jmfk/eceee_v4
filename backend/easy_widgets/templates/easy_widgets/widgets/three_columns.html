@@ -1,7 +1,7 @@
 {% load security_filters %}
 
 <div class="three-columns-widget widget-type-{{ widget_type.css_class_name }} {{ config.ratio_class }}" data-widget-type="three-columns">
-    <div class="three-col-slot left" data-slot="left">
+    <div class="three-col-slot left" data-slot="left" data-widget-slot="left" data-owner-widget-type="easy_widgets.ThreeColumnsWidget">
         {% if config.rendered_slots.left %}
             {% for widget in config.rendered_slots.left %}
                 <div class="three-col-widget-wrapper">
@@ -13,7 +13,7 @@
         {% endif %}
     </div>
 
-    <div class="three-col-slot center" data-slot="center">
+    <div class="three-col-slot center" data-slot="center" data-widget-slot="center" data-owner-widget-type="easy_widgets.ThreeColumnsWidget">
         {% if config.rendered_slots.center %}
             {% for widget in config.rendered_slots.center %}
                 <div class="three-col-widget-wrapper">
@@ -25,7 +25,7 @@
         {% endif %}
     </div>
 
-    <div class="three-col-slot right" data-slot="right">
+    <div class="three-col-slot right" data-slot="right" data-widget-slot="right" data-owner-widget-type="easy_widgets.ThreeColumnsWidget">
         {% if config.rendered_slots.right %}
             {% for widget in config.rendered_slots.right %}
                 <div class="three-col-widget-wrapper">

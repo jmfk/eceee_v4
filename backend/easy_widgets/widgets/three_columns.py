@@ -2,8 +2,9 @@
 Simple three-column widget implementation.
 """
 
-from typing import Type, Optional, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Literal, Optional, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
@@ -41,9 +42,7 @@ class ThreeColumnsWidget(BaseWidget):
 
     app_label = "easy_widgets"
     name = "Three Columns"
-    description = (
-        "Simple three-column layout with left, center, and right slots for widgets"
-    )
+    description = "Simple three-column layout with left, center, and right slots for widgets"
     template_name = "easy_widgets/widgets/three_columns.html"
 
     layout_parts = {
@@ -63,6 +62,7 @@ class ThreeColumnsWidget(BaseWidget):
                 "lineHeight",
                 "gap",
             ],
+            "designer_editable_spacing_properties": ["gap"],
         },
         "three-col-widget-wrapper": {
             "label": "Three Columns Wrappercontainer",
@@ -87,50 +87,50 @@ class ThreeColumnsWidget(BaseWidget):
     .three-columns-widget:last-child {
         margin-bottom: 0;
     }
-    
-    
+
+
     .three-columns-widget.three-col-ratio-3-2-1 {
         grid-template-columns: 3fr 2fr 1fr;
     }
-    
+
     .three-columns-widget.three-col-ratio-2-2-2 {
         grid-template-columns: 1fr 1fr 1fr;
     }
-    
+
     .three-columns-widget.three-col-ratio-1-2-3 {
         grid-template-columns: 1fr 2fr 3fr;
     }
-    
+
     .three-columns-widget.three-col-ratio-1-4-1 {
         grid-template-columns: 1fr 4fr 1fr;
     }
-    
+
     .three-col-slot {
         position: relative;
         min-height: 140px;
         height: 100%;
     }
-    
+
     .three-col-slot.left {
         grid-area: 1 / 1;
     }
-    
+
     .three-col-slot.center {
         grid-area: 1 / 2;
     }
-    
+
     .three-col-slot.right {
         grid-area: 1 / 3;
     }
-    
+
     .three-col-widget-wrapper {
         margin-bottom: 30px;
     }
-    
+
     .three-col-widget-wrapper:last-child {
         margin-bottom: 0;
     }
-    
+
     .three-col-empty-slot {
         color: #9ca3af;
         font-style: italic;
@@ -140,41 +140,41 @@ class ThreeColumnsWidget(BaseWidget):
         background-color: #f9fafb;
         height: 100%;
     }
-    
+
     /* Responsive design */
     @media (max-width: 1024px) {
         .three-columns-widget {
             grid-template-columns: 1fr 1fr;
             grid-template-rows: auto auto;
         }
-        
+
         .three-col-slot.left {
             grid-area: 1 / 1;
         }
-        
+
         .three-col-slot.center {
             grid-area: 1 / 2;
         }
-        
+
         .three-col-slot.right {
             grid-area: 2 / 1 / 2 / 3;
         }
     }
-    
+
     @media (max-width: 768px) {
         .three-columns-widget {
             grid-template-columns: 1fr;
             grid-template-rows: auto auto auto;
         }
-        
+
         .three-col-slot.left {
             grid-area: 1 / 1;
         }
-        
+
         .three-col-slot.center {
             grid-area: 2 / 1;
         }
-        
+
         .three-col-slot.right {
             grid-area: 3 / 1;
         }
@@ -234,11 +234,9 @@ class ThreeColumnsWidget(BaseWidget):
         Returns:
             Tuple of (html, css) or None for default rendering
         """
-        from webpages.utils.mustache_renderer import (
-            render_mustache,
-            prepare_component_context,
-        )
         from django.template.loader import render_to_string
+
+        from webpages.utils.mustache_renderer import prepare_component_context, render_mustache
 
         style_name = config.get("component_style", "default")
         if not style_name or style_name == "default":
@@ -269,9 +267,7 @@ class ThreeColumnsWidget(BaseWidget):
             anchor="",
             style_vars=style.get("variables", {}),
             config=prepared_config,  # Pass processed config for granular control
-            slots=prepared_config.get(
-                "rendered_slots"
-            ),  # Pass slot data for custom rendering
+            slots=prepared_config.get("rendered_slots"),  # Pass slot data for custom rendering
         )
 
         # Render with style template
@@ -299,33 +295,22 @@ class ThreeColumnsWidget(BaseWidget):
                     try:
                         # Filter out hidden widgets (check both config.isVisible and config.is_visible)
                         widget_config = widget_data.get("config", {})
-                        is_visible = widget_config.get(
-                            "isVisible", widget_config.get("is_visible", True)
-                        )
+                        is_visible = widget_config.get("isVisible", widget_config.get("is_visible", True))
                         if not is_visible:
                             continue  # Skip hidden widgets
 
                         # Filter out inactive widgets (check both config.isActive and config.is_active)
-                        is_active = widget_config.get(
-                            "isActive", widget_config.get("is_active", True)
-                        )
+                        is_active = widget_config.get("isActive", widget_config.get("is_active", True))
                         if not is_active:
                             continue  # Skip inactive widgets
 
                         # Add sort_order if missing (use array index to preserve order)
-                        if (
-                            "sort_order" not in widget_data
-                            and "order" not in widget_data
-                        ):
+                        if "sort_order" not in widget_data and "order" not in widget_data:
                             widget_data = {**widget_data, "sort_order": index}
 
-                        widget_html = context["renderer"].render_widget_json(
-                            widget_data, context
-                        )
-                        rendered_widgets.append(
-                            {"html": widget_html, "widget_data": widget_data}
-                        )
-                    except Exception as e:
+                        widget_html = context["renderer"].render_widget_json(widget_data, context)
+                        rendered_widgets.append({"html": widget_html, "widget_data": widget_data})
+                    except Exception:
                         # Log error and continue
                         continue
                 rendered_slots[slot_name] = rendered_widgets
@@ -336,8 +321,6 @@ class ThreeColumnsWidget(BaseWidget):
                 for slot_name, widgets in slots_data.items()
             }
 
-        template_config.update(
-            {"slots_data": slots_data, "rendered_slots": rendered_slots}
-        )
+        template_config.update({"slots_data": slots_data, "rendered_slots": rendered_slots})
 
         return template_config

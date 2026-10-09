@@ -4,6 +4,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from bs4 import BeautifulSoup
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError
@@ -14,6 +15,9 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
 from core.models import Tenant
+from easy_widgets.widgets.content import ContentWidget
+from easy_widgets.widgets.navbar import NavbarWidget
+from easy_widgets.widgets.section import SectionWidget
 from webpages.models import (
     PageTheme,
     PageVersion,
@@ -22,14 +26,249 @@ from webpages.models import (
     ThemeDesignerRevision,
     WebPage,
 )
+from webpages.renderers import WebPageRenderer
 from webpages.services.designer_export import ThemeDesignerExporter, cleanup_expired_designer_exports
 from webpages.services.designer_theme import (
     _safe_reference_preview_html,
+    apply_designer_patch,
     collect_designer_assets,
     generate_placeholder_png,
     validate_image_upload,
 )
 from webpages.views.designer_theme_views import DesignerExportThrottle, DesignerThemeExportView
+
+
+class DesignerStructuralSpacingTests(SimpleTestCase):
+    def test_structural_spacing_is_validated_and_emitted_as_responsive_css(self):
+        theme = PageTheme(
+            name="Structural theme",
+            design_groups={"groups": []},
+            breakpoints={"xs": 0, "sm": 640, "md": 768, "lg": 1024, "xl": 1280},
+        )
+
+        apply_designer_patch(
+            theme,
+            {
+                "spacing": [
+                    {
+                        "scope": "layoutSlot",
+                        "layout": "main_layout",
+                        "slot": "main",
+                        "breakpoint": "xl",
+                        "values": {"paddingLeft": "64px"},
+                    },
+                    {
+                        "scope": "layoutSlot",
+                        "layout": "main_layout",
+                        "slot": "main",
+                        "breakpoint": "xs",
+                        "values": {"paddingLeft": "16px"},
+                    },
+                    {
+                        "scope": "widget",
+                        "widget_type": "easy_widgets.ContentWidget",
+                        "breakpoint": "md",
+                        "values": {"marginBottom": "2rem"},
+                    },
+                    {
+                        "scope": "widgetSlot",
+                        "widget_type": "easy_widgets.TwoColumnsWidget",
+                        "slot": "left",
+                        "breakpoint": "xl",
+                        "values": {"padding": "24px"},
+                    },
+                    {
+                        "scope": "widgetPart",
+                        "widget_type": "easy_widgets.HeroWidget",
+                        "part": "hero-content",
+                        "breakpoint": "xl",
+                        "values": {"paddingTop": "32px"},
+                    },
+                    {
+                        "scope": "widgetPart",
+                        "widget_type": "easy_widgets.TwoColumnsWidget",
+                        "part": "two-columns-widget",
+                        "breakpoint": "xl",
+                        "values": {"gap": "36px"},
+                    },
+                ]
+            },
+            validate_version=False,
+        )
+
+        css = theme.generate_css()
+        self.assertIn('[data-render-layout="main_layout"] .layout-slot[data-slot-name="main"]', css)
+        self.assertIn("padding-left: 16px", css)
+        self.assertIn("@media (min-width: 768px)", css)
+        self.assertIn('[data-widget-id][data-widget-type="easy_widgets.ContentWidget"]', css)
+        self.assertIn('[data-widget-slot="left"][data-owner-widget-type="easy_widgets.TwoColumnsWidget"]', css)
+        self.assertIn('[data-widget-id][data-widget-type="easy_widgets.HeroWidget"] .hero-content', css)
+        self.assertIn("padding-top: 32px", css)
+        self.assertIn('[data-widget-id][data-widget-type="easy_widgets.TwoColumnsWidget"] .two-columns-widget', css)
+        self.assertIn("gap: 36px", css)
+        self.assertLess(css.index("padding-left: 16px"), css.index("padding-left: 64px"))
+
+    def test_structural_spacing_canonicalizes_breakpoint_and_widget_aliases(self):
+        theme = PageTheme(name="Structural aliases", design_groups={"groups": []})
+
+        apply_designer_patch(
+            theme,
+            {
+                "spacing": [
+                    {
+                        "scope": "widget",
+                        "widget_type": "EASY_WIDGETS.CONTENTWIDGET",
+                        "breakpoint": "mobile",
+                        "values": {"paddingLeft": "16px"},
+                    }
+                ]
+            },
+            validate_version=False,
+        )
+
+        self.assertEqual(
+            theme.design_groups["structuralSpacing"][0],
+            {
+                "scope": "widget",
+                "widgetType": "easy_widgets.ContentWidget",
+                "breakpoint": "xs",
+                "values": {"paddingLeft": "16px"},
+            },
+        )
+
+    def test_structural_spacing_rejects_equivalent_breakpoint_aliases(self):
+        theme = PageTheme(name="Structural aliases", design_groups={"groups": []})
+        repeated_target = {
+            "scope": "layoutSlot",
+            "layout": "main_layout",
+            "slot": "main",
+            "values": {"paddingLeft": "16px"},
+        }
+
+        with self.assertRaisesMessage(ValidationError, "duplicated at this breakpoint"):
+            apply_designer_patch(
+                theme,
+                {
+                    "spacing": [
+                        {**repeated_target, "breakpoint": "mobile"},
+                        {**repeated_target, "breakpoint": "xs"},
+                    ]
+                },
+                validate_version=False,
+            )
+
+    def test_public_widget_markup_matches_structural_spacing_selector(self):
+        renderer = WebPageRenderer()
+        widget_type = ContentWidget()
+        widget_data = {
+            "id": "content-1",
+            "type": widget_type.type,
+            "config": {"content": "<p>Public content</p>"},
+        }
+
+        with patch(
+            "webpages.widget_registry.widget_type_registry.get_widget_type_flexible",
+            return_value=widget_type,
+        ):
+            html = renderer.render_widget_json(widget_data, {})
+
+        wrapper = BeautifulSoup(html, "html.parser").select_one(
+            '[data-widget-id="content-1"][data-widget-type="easy_widgets.ContentWidget"]'
+        )
+        self.assertIsNotNone(wrapper)
+        self.assertIn("Public content", wrapper.get_text())
+
+    def test_mustache_widget_has_one_canonical_public_wrapper(self):
+        renderer = WebPageRenderer()
+        widget_type = NavbarWidget()
+
+        with patch(
+            "webpages.widget_registry.widget_type_registry.get_widget_type_flexible",
+            return_value=widget_type,
+        ):
+            html = renderer.render_widget_json(
+                {"id": "navbar-1", "type": widget_type.type, "config": {}},
+                {},
+            )
+
+        soup = BeautifulSoup(html, "html.parser")
+        wrappers = soup.select('[data-widget-id="navbar-1"][data-widget-type="easy_widgets.NavbarWidget"]')
+        self.assertEqual(len(wrappers), 1)
+        self.assertIsNotNone(wrappers[0].select_one(".navbar-widget"))
+
+    def test_component_style_widget_has_one_canonical_public_wrapper(self):
+        renderer = WebPageRenderer()
+        widget_type = ContentWidget()
+        theme = SimpleNamespace(
+            component_styles={
+                "feature": {
+                    "template": '<article class="feature">{{{content}}}</article>',
+                    "css": ".feature { padding: 1rem; }",
+                }
+            }
+        )
+
+        with patch(
+            "webpages.widget_registry.widget_type_registry.get_widget_type_flexible",
+            return_value=widget_type,
+        ):
+            html = renderer.render_widget_json(
+                {
+                    "id": "styled-1",
+                    "type": widget_type.type,
+                    "config": {"component_style": "feature", "content": "Styled content"},
+                },
+                {"theme": theme},
+            )
+
+        soup = BeautifulSoup(html, "html.parser")
+        wrappers = soup.select('[data-widget-id="styled-1"][data-widget-type="easy_widgets.ContentWidget"]')
+        self.assertEqual(len(wrappers), 1)
+        self.assertEqual(wrappers[0].select_one("article.feature").get_text(), "Styled content")
+
+    def test_nested_widget_preserves_one_wrapper_and_slot_hierarchy_per_widget(self):
+        renderer = WebPageRenderer()
+        section_type = SectionWidget()
+        content_type = ContentWidget()
+
+        def resolve_widget_type(type_name):
+            return {
+                section_type.type: section_type,
+                content_type.type: content_type,
+            }.get(type_name)
+
+        with patch(
+            "webpages.widget_registry.widget_type_registry.get_widget_type_flexible",
+            side_effect=resolve_widget_type,
+        ):
+            html = renderer.render_widget_json(
+                {
+                    "id": "section-1",
+                    "type": section_type.type,
+                    "config": {
+                        "slots": {
+                            "content": [
+                                {
+                                    "id": "nested-content-1",
+                                    "type": content_type.type,
+                                    "config": {"content": "Nested content"},
+                                }
+                            ]
+                        }
+                    },
+                },
+                {"renderer": renderer},
+            )
+
+        soup = BeautifulSoup(html, "html.parser")
+        outer = soup.select('[data-widget-id="section-1"][data-widget-type="easy_widgets.SectionWidget"]')
+        child = soup.select('[data-widget-id="nested-content-1"][data-widget-type="easy_widgets.ContentWidget"]')
+        self.assertEqual(len(outer), 1)
+        self.assertEqual(len(child), 1)
+        self.assertIsNotNone(child[0].find_parent(attrs={"data-widget-id": "section-1"}))
+        self.assertEqual(
+            child[0].find_parent(attrs={"data-widget-slot": "content"})["data-owner-widget-type"], section_type.type
+        )
 
 
 class DesignerThemeApiTests(TestCase):
@@ -171,10 +410,41 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(group["elements"][0]["id"], "group:0:element:h1")
         self.assertEqual(group["parts"][0]["label"], "Hero")
         self.assertEqual(group["assetKeys"], ["design:0:hero:md:background"])
+        hero_parts = next(
+            widget
+            for widget in workspace["catalog"]["widgetParts"]
+            if widget["widgetType"] == "easy_widgets.HeroWidget"
+        )
+        self.assertIn("hero-content", {part["part"] for part in hero_parts["parts"]})
+        banner_parts = next(
+            widget
+            for widget in workspace["catalog"]["widgetParts"]
+            if widget["widgetType"] == "easy_widgets.BannerWidget"
+        )
+        banner_content = next(part for part in banner_parts["parts"] if part["part"] == "banner-text")
+        self.assertEqual(banner_content["designerLevel"], "element")
         self.assertNotIn("selector", str(workspace["catalog"]).lower())
         self.assertEqual(workspace["catalog"]["componentStyles"][0]["label"], "Feature card")
         self.assertTrue(workspace["catalog"]["layouts"])
         main_layout = next(layout for layout in workspace["catalog"]["layouts"] if layout["key"] == "main_layout")
+        main_slot = next(slot for slot in main_layout["slots"] if slot["name"] == "main")
+        self.assertEqual(main_slot["editableSpacingProperties"], ["gap"])
+        two_columns = next(
+            widget
+            for widget in workspace["catalog"]["widgetSlots"]
+            if widget["widgetType"] == "easy_widgets.TwoColumnsWidget"
+        )
+        left_slot = next(slot for slot in two_columns["slots"] if slot["name"] == "left")
+        self.assertEqual(left_slot["editableSpacingProperties"], [])
+        for widget_type, part_name in (
+            ("easy_widgets.TwoColumnsWidget", "two-columns-widget"),
+            ("easy_widgets.ThreeColumnsWidget", "three-columns-widget"),
+        ):
+            column_parts = next(
+                widget for widget in workspace["catalog"]["widgetParts"] if widget["widgetType"] == widget_type
+            )
+            column_part = next(part for part in column_parts["parts"] if part["part"] == part_name)
+            self.assertEqual(column_part["editableSpacingProperties"], ["gap"])
         self.assertIn('class="main-layout-container"', main_layout["previewTemplate"])
         self.assertIn("__DESIGNER_SLOT_main__", main_layout["previewTemplate"])
         self.assertTrue(main_layout["layoutCss"])
@@ -860,6 +1130,82 @@ class DesignerThemeApiTests(TestCase):
         layout = self.theme.designer_draft.snapshot["design_groups"]["groups"][0]["layoutProperties"]["hero"]
         self.assertEqual(layout["md"]["padding"], "24px")
         self.assertEqual(layout["xl"]["padding"], "48px")
+
+    def test_workspace_persists_semantic_structural_spacing(self):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+
+        response = self.client.patch(
+            self.workspace_url,
+            {
+                "draftVersion": workspace["draftVersion"],
+                "spacing": [
+                    {
+                        "scope": "layoutSlot",
+                        "layout": "main_layout",
+                        "slot": "main",
+                        "breakpoint": "xs",
+                        "values": {"paddingLeft": "16px"},
+                    },
+                    {
+                        "scope": "widget",
+                        "widgetType": "easy_widgets.ContentWidget",
+                        "breakpoint": "md",
+                        "values": {"marginBottom": "2rem"},
+                    },
+                    {
+                        "scope": "widgetSlot",
+                        "widgetType": "easy_widgets.TwoColumnsWidget",
+                        "slot": "left",
+                        "breakpoint": "xl",
+                        "values": {"padding": "24px"},
+                    },
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        stored = self.theme.designer_draft.snapshot["design_groups"]["structuralSpacing"]
+        self.assertEqual([row["scope"] for row in stored], ["layoutSlot", "widget", "widgetSlot"])
+        self.assertEqual(stored[2]["widgetType"], "easy_widgets.TwoColumnsWidget")
+        target_ids = {row["targetId"] for row in response.data["spacing"]}
+        self.assertIn("layout:main_layout:slot:main", target_ids)
+        self.assertIn("widget-type:easy_widgets.ContentWidget", target_ids)
+        self.assertIn("widget-slot:easy_widgets.TwoColumnsWidget:left", target_ids)
+        from webpages.services.designer_theme import theme_from_designer_draft
+
+        css = theme_from_designer_draft(self.theme, self.theme.designer_draft).generate_css()
+        self.assertIn('[data-render-layout="main_layout"] .layout-slot[data-slot-name="main"]', css)
+        self.assertIn('[data-widget-id][data-widget-type="easy_widgets.ContentWidget"]', css)
+        self.assertIn(
+            '[data-widget-slot="left"][data-owner-widget-type="easy_widgets.TwoColumnsWidget"]',
+            css,
+        )
+
+    def test_workspace_rejects_structural_spacing_for_unknown_widget_slot(self):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+
+        response = self.client.patch(
+            self.workspace_url,
+            {
+                "draftVersion": workspace["draftVersion"],
+                "spacing": [
+                    {
+                        "scope": "widgetSlot",
+                        "widgetType": "easy_widgets.TwoColumnsWidget",
+                        "slot": "missing",
+                        "breakpoint": "xl",
+                        "values": {"padding": "24px"},
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("Structural widget slot no longer exists", str(response.data))
 
     def test_publish_reports_a_conflict_for_a_concurrent_name_collision(self):
         self.authenticate(self.designer)

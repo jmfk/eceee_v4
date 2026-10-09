@@ -52,7 +52,7 @@ const HeaderRender: WidgetRenderComponent = ({ widget }) => (
 )
 
 const FooterRender: WidgetRenderComponent = ({ widget, renderWidgets }) => (
-    <footer className="footer-widget widget-type-easy-widgets-footerwidget" data-slot="content" style={{
+    <footer className="footer-widget widget-type-easy-widgets-footerwidget" data-slot="content" data-widget-slot="content" data-owner-widget-type={widget.type} style={{
         backgroundColor: value(widget.config, 'backgroundColor', 'background_color') || undefined,
         backgroundImage: imageUrl(value(widget.config, 'backgroundImage', 'background_image')) ? `url('${imageUrl(value(widget.config, 'backgroundImage', 'background_image'))}')` : undefined,
         backgroundSize: value(widget.config, 'backgroundSize', 'background_size') || undefined,
@@ -133,7 +133,7 @@ const MediaView = ({ item, className }: { item: any, className: string }) => {
             <source src={source} type={item.mimeType || item.mime_type || 'video/mp4'} />
         </video>
     }
-    return item?.src
+    return imageUrl(item)
         ? <ImageView source={item} alt={item?.altText || item?.alt_text || item?.title || ''} className={className} />
         : null
 }
@@ -184,7 +184,7 @@ const ImageRender: WidgetRenderComponent = ({ widget }) => {
         </div>
     }
     const source = items[0] || value(config, 'imageUrl', 'image_url', 'image', 'src', 'url')
-    if (!source?.src) return null
+    if (!imageUrl(source)) return null
     const alt = source && typeof source === 'object'
         ? source.altText || source.alt_text || source.alt || source.title || value(config, 'altText', 'alt_text', 'alt') || ''
         : value(config, 'altText', 'alt_text', 'alt') || ''
@@ -391,7 +391,7 @@ const NavbarRender: WidgetRenderComponent = ({ widget, context }) => {
         </div>}
         {mobile && <div className="navbar-mobile-menu" hidden={!open}>{items.map((item, index) => <div key={index}>{renderLink(item)}</div>)}{secondaryItems.map((item, index) => <div key={`secondary-${index}`}>{renderLink(item, true)}</div>)}</div>}
         {!mobile && <div className="navbar-desktop-menu">
-            <ul className="navbar-menu-list">{items.map((item, index) => <li className="navbar-menu-item" key={index}>{renderLink(item)}</li>)}</ul>
+            <ul className="navbar-menu-list navbar-primary-menu">{items.map((item, index) => <li className="navbar-menu-item" key={index}>{renderLink(item)}</li>)}</ul>
             {secondaryItems.length > 0 && <ul className="navbar-menu-list navbar-secondary-menu">{secondaryItems.map((item, index) => <li className="navbar-menu-item" key={index} style={{ backgroundColor: item.backgroundColor || item.background_color || undefined, color: item.textColor || item.text_color || undefined }}>{renderLink(item, true)}</li>)}</ul>}
         </div>}
     </nav>
@@ -541,7 +541,7 @@ const ColumnRender = ({ widget, renderWidgets, count }: WidgetRenderProps & { co
     const ratio = value(widget.config, 'ratioClass', 'ratio_class')
         || (layoutStyle ? `${count === 2 ? 'two' : 'three'}-col-ratio-${layoutStyle.replaceAll(':', '-')}` : '')
     return <div className={`${base} widget-type-easy-widgets-${count === 2 ? 'twocolumnswidget' : 'threecolumnswidget'} ${ratio}`} data-widget-type={count === 2 ? 'two-columns' : 'three-columns'}>
-        {names.map((name) => <div key={name} className={`${slotBase}-slot ${name}`} data-slot={name}>{asArray<RenderWidgetModel>(slots[name]).map((nested, index) => <div className={`${slotBase}-widget-wrapper`} key={nested.id || index}>{renderWidgets([nested])}</div>)}</div>)}
+        {names.map((name) => <div key={name} className={`${slotBase}-slot ${name}`} data-slot={name} data-widget-slot={name} data-owner-widget-type={widget.type}>{asArray<RenderWidgetModel>(slots[name]).map((nested, index) => <div className={`${slotBase}-widget-wrapper`} key={nested.id || index}>{renderWidgets([nested])}</div>)}</div>)}
     </div>
 }
 
@@ -564,13 +564,13 @@ const SectionRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
     }, [accordion, collapsible, widget.id])
     if (!content.length) return null
     const variants = value(widget.config, 'variantClasses') ? ` ${value(widget.config, 'variantClasses')}` : ''
-    if (!collapsible) return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} data-slot="content" className={`section-content-only-widget${variants}${bordered ? ' border-enabled' : ''}`}>{renderWidgets(content)}</div></div>
+    if (!collapsible) return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} data-slot="content" data-widget-slot="content" data-owner-widget-type={widget.type} className={`section-content-only-widget${variants}${bordered ? ' border-enabled' : ''}`}>{renderWidgets(content)}</div></div>
     const toggleExpanded = () => setExpanded((current) => {
         if (!current && accordion) window.dispatchEvent(new CustomEvent('eceee-section-expand', { detail: widget.id }))
         return !current
     })
     return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} data-accordion-mode={accordion || undefined} className={`section-widget${variants}${bordered ? ' border-enabled' : ''}${expanded ? '' : ' section-collapsed'}`}>
-        <div className="slot-section-content" data-slot="content">
+        <div className="slot-section-content" data-slot="content" data-widget-slot="content" data-owner-widget-type={widget.type}>
             {renderWidgets(content.slice(0, 1))}
             {expanded && <div className="section-remaining-content">{renderWidgets(content.slice(1))}</div>}
             <button type="button" className={expanded ? 'section-banner contract-banner' : 'section-banner expand-banner'} aria-expanded={expanded} onClick={toggleExpanded}>{expanded ? value(widget.config, 'contractText', 'contract_text') || 'Show less' : value(widget.config, 'expandText', 'expand_text') || 'Expand to read more'}</button>
@@ -680,7 +680,7 @@ const NewsDetailRender: WidgetRenderComponent = ({ widget, context, renderWidget
         {configEnabled(widget.config, true, 'showFeaturedImage', 'show_featured_image') && <div className="news-featured-image"><ImageView source={fields.image} alt={item.title || ''} /></div>}
         {summary && <p className="news-summary">{summary}</p>}
         {!hasStructuredWidgets && <SafeHtml className="news-content" html={data.content || data.body || data.text || item.content} />}
-        {hasStructuredWidgets && <div className="news-object-widgets">{Object.entries(slots).map(([slotName, widgets]) => <div className={`news-widget-slot news-widget-slot-${slotName}`} data-slot={slotName} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)}</div>}
+        {hasStructuredWidgets && <div className="news-object-widgets">{Object.entries(slots).map(([slotName, widgets]) => <div className={`news-widget-slot news-widget-slot-${slotName}`} data-slot={slotName} data-widget-slot={slotName} data-owner-widget-type={widget.type} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)}</div>}
         {externalUrl && <div className="news-external-source"><PreviewLink href={externalUrl} rel="noopener noreferrer">Read the original source</PreviewLink></div>}
     </article>
 }
@@ -721,7 +721,7 @@ const ObjectDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) =>
             {showHierarchy && ancestors.length > 0 && <div className="object-hierarchy"><h4>Location in hierarchy:</h4><div className="breadcrumb">{ancestors.map((ancestor, index) => <React.Fragment key={ancestor.id || index}><PreviewLink href={ancestor.path}>{ancestor.title}</PreviewLink><span>→</span></React.Fragment>)}<span>{item.title}</span></div></div>}
         </header>
         <div className="object-content">{showWidgets && hasWidgetSlots
-            ? Object.entries(slots).map(([slotName, widgets]) => <div className="widget-slot" data-slot={slotName} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)
+            ? Object.entries(slots).map(([slotName, widgets]) => <div className="widget-slot" data-slot={slotName} data-widget-slot={slotName} data-owner-widget-type={widget.type} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)
             : dataEntries.map(([fieldName, fieldValue]) => <div className="object-field" key={fieldName}><h4 className="field-label">{fieldName.replaceAll('_', ' ')}</h4><div className="field-value">{typeof fieldValue === 'object' ? JSON.stringify(fieldValue) : String(fieldValue)}</div></div>)}</div>
         {showHierarchy && children.length > 0 && <section className="object-children"><h3>Related Content</h3><div className="children-grid">{children.map((child, index) => {
             const childFields = newsFields(child)

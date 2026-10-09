@@ -148,6 +148,36 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
     allWidgets.forEach((widget) => { widget.config = resolveConfigLinks(widget.config, pageLookup) })
     allWidgets = collectWidgets(Object.values(next.slots).flat())
 
+    const dynamicNavigationWidgets = allWidgets.filter((widget) => (
+        widget.type === 'easy_widgets.NavigationWidget'
+        && (widget.config.includeSubpages === true || widget.config.include_subpages === true)
+    ))
+    if (dynamicNavigationWidgets.length && next.context.pageId) {
+        try {
+            const response: any = await api.get(
+                `/api/v1/webpages/pages/${next.context.pageId}/children/`,
+                { ...(tenantRequestConfig || {}), params: { include_unpublished: false } },
+            )
+            const children = response?.data || response || []
+            const dynamicItems = (Array.isArray(children) ? children : []).map((child: any, index: number) => {
+                const page = child.page || child
+                return {
+                    id: page.id,
+                    label: page.shortTitle || page.short_title || page.title || page.slug || '',
+                    url: page.path || page.cachedPath || page.cached_path || `/${page.slug || ''}`,
+                    isActive: true,
+                    isPublished: Boolean(child.currentVersion || child.current_version || page.isPublished || page.is_published),
+                    targetBlank: false,
+                    type: 'internal',
+                    order: child.sortOrder ?? child.sort_order ?? index,
+                }
+            }).sort((left: any, right: any) => left.order - right.order)
+            dynamicNavigationWidgets.forEach((widget) => { widget.config.dynamicItems = dynamicItems })
+        } catch {
+            dynamicNavigationWidgets.forEach((widget) => { widget.config.dynamicItems = [] })
+        }
+    }
+
     const imageRequests: Array<Record<string, any>> = []
     const imageAssignments: Array<(url: string) => void> = []
     const queueImage = (source: any, options: Record<string, any>, assign: (url: string) => void) => {

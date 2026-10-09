@@ -144,6 +144,13 @@ export interface RenderFrameMessage {
     targetId?: string
     targetInstanceId?: string
     widgetId?: string
+    selectionLevel?: 'slot' | 'widget' | 'element'
+    selectedTargets?: Array<{
+        targetId: string
+        targetInstanceId?: string
+        widgetId?: string
+        selectionLevel: 'slot' | 'widget' | 'element'
+    }>
     text?: string
     command?: string
     value?: string

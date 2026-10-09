@@ -41,6 +41,7 @@ TYPE_PROPERTIES = {
     "letterSpacing",
 }
 SPACING_PROPERTIES = {
+    "gap",
     "margin",
     "marginTop",
     "marginRight",
@@ -123,6 +124,20 @@ def _humanize_identifier(value):
     return value[:1].upper() + value[1:] if value else "Element"
 
 
+def _structural_spacing_target_id(item):
+    scope = item.get("scope")
+    widget_type = item.get("widgetType") or item.get("widget_type")
+    if scope == "layoutSlot":
+        return f"layout:{item.get('layout')}:slot:{item.get('slot')}"
+    if scope == "widget":
+        return f"widget-type:{widget_type}"
+    if scope == "widgetSlot":
+        return f"widget-slot:{widget_type}:{item.get('slot')}"
+    if scope == "widgetPart":
+        return f"widget-part:{widget_type}:{item.get('part')}"
+    return ""
+
+
 def _designer_group_label(group, widget):
     slots = group.get("slots") or ([group.get("slot")] if group.get("slot") else [])
     if widget:
@@ -186,9 +201,16 @@ def _normalized_layout_parts(source):
             config = {"label": config}
         elif not isinstance(config, dict):
             config = {}
+        semantic_part = str(part_name).endswith(("-image", "-header", "-text", "-caption", "-link"))
         normalized[part_name] = {
             "label": config.get("label") or _humanize_identifier(part_name),
             "properties": config.get("properties"),
+            "editableSpacingProperties": config.get("designerEditableSpacingProperties")
+            or config.get("designer_editable_spacing_properties")
+            or [],
+            "designerLevel": config.get("designerLevel")
+            or config.get("designer_level")
+            or ("element" if semantic_part else "widget"),
         }
     return normalized
 
@@ -300,6 +322,10 @@ def build_designer_catalog(theme, assets, include_reference_previews=True):
                 "part": part,
                 "label": config.get("label") or _humanize_identifier(part),
                 "breakpoints": [],
+                "designerLevel": config.get("designerLevel", "widget"),
+                "editableSpacingProperties": [
+                    prop for prop in (config.get("editableSpacingProperties") or []) if prop in SPACING_PROPERTIES
+                ],
             }
             for part, config in widget_parts.items()
         }
@@ -311,6 +337,12 @@ def build_designer_catalog(theme, assets, include_reference_previews=True):
                     "part": part,
                     "label": widget_parts.get(part, {}).get("label") or _humanize_identifier(part),
                     "breakpoints": [],
+                    "designerLevel": widget_parts.get(part, {}).get("designerLevel", "widget"),
+                    "editableSpacingProperties": [
+                        prop
+                        for prop in (widget_parts.get(part, {}).get("editableSpacingProperties") or [])
+                        if prop in SPACING_PROPERTIES
+                    ],
                 },
             )
             entry["breakpoints"].append(breakpoint)
@@ -344,11 +376,51 @@ def build_designer_catalog(theme, assets, include_reference_previews=True):
         if isinstance(style, dict)
     ]
 
+    widget_parts = [
+        {
+            "widgetType": widget.type,
+            "label": widget.name,
+            "parts": [
+                {
+                    "id": f"widget-part:{widget.type}:{part}",
+                    "part": part,
+                    "label": config.get("label") or _humanize_identifier(part),
+                    "designerLevel": config.get("designerLevel", "widget"),
+                    "editableSpacingProperties": [
+                        prop for prop in (config.get("editableSpacingProperties") or []) if prop in SPACING_PROPERTIES
+                    ],
+                }
+                for part, config in _normalized_layout_parts(getattr(widget, "layout_parts", {})).items()
+            ],
+        }
+        for widget in widget_type_registry.list_widget_types(active_only=True)
+        if getattr(widget, "layout_parts", None)
+    ]
+    widget_slots = [
+        {
+            "widgetType": widget.type,
+            "label": widget.name,
+            "slots": [
+                {
+                    "name": slot_name,
+                    "label": slot.get("title") or _humanize_identifier(slot_name),
+                    "editableSpacingProperties": [
+                        prop for prop in (slot.get("properties") or []) if prop in SPACING_PROPERTIES
+                    ],
+                }
+                for slot_name, slot in (widget.get_slot_definitions() or {}).items()
+            ],
+        }
+        for widget in widget_type_registry.list_widget_types(active_only=True)
+        if widget.get_slot_definitions()
+    ]
+
     autodiscover_layouts()
     layouts = []
     registered_layouts = layout_registry.list_layouts(active_only=True)
     for layout in registered_layouts:
         slots = sorted(layout.slot_configuration.get("slots", []), key=lambda slot: slot.get("order", 999))
+        layout_parts = _normalized_layout_parts(getattr(layout, "layout_parts", {}))
         layouts.append(
             {
                 "key": layout.name,
@@ -361,13 +433,18 @@ def build_designer_catalog(theme, assets, include_reference_previews=True):
                         "name": slot.get("name"),
                         "label": slot.get("title") or _humanize_identifier(slot.get("name")),
                         "description": slot.get("description", ""),
+                        "editableSpacingProperties": [
+                            prop
+                            for prop in (layout_parts.get(f"slot-{slot.get('name')}", {}).get("properties") or [])
+                            if prop in SPACING_PROPERTIES
+                        ],
                     }
                     for slot in slots
                     if slot.get("name")
                 ],
                 "parts": [
                     {"id": f"layout:{layout.name}:part:{name}", "part": name, **config}
-                    for name, config in _normalized_layout_parts(getattr(layout, "layout_parts", {})).items()
+                    for name, config in layout_parts.items()
                 ],
             }
         )
@@ -376,6 +453,8 @@ def build_designer_catalog(theme, assets, include_reference_previews=True):
         preview_views = _designer_reference_previews(theme, preview_views)
     return {
         "designGroups": groups,
+        "widgetParts": widget_parts,
+        "widgetSlots": widget_slots,
         "componentStyles": component_styles,
         "layouts": layouts,
         "previewViews": preview_views,
@@ -1161,6 +1240,22 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
                 }
             )
 
+    for item in (theme.design_groups or {}).get("structuralSpacing", []):
+        if not isinstance(item, dict) or not _structural_spacing_target_id(item):
+            continue
+        spacing.append(
+            {
+                "targetId": _structural_spacing_target_id(item),
+                "scope": item.get("scope"),
+                "layout": item.get("layout"),
+                "slot": item.get("slot"),
+                "part": item.get("part"),
+                "widgetType": item.get("widgetType") or item.get("widget_type"),
+                "breakpoint": item.get("breakpoint", "xs"),
+                "values": {key: _theme_property_value(item.get("values") or {}, key) for key in SPACING_PROPERTIES},
+            }
+        )
+
     colors = []
     for name, value in (theme.colors or {}).items():
         colors.append(
@@ -1356,9 +1451,83 @@ def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=Tr
                 value = incoming[key]
                 _set_theme_property(target, key, None if value in (None, "") else _safe_css_value(value, key))
 
+    structural_spacing = []
+    structural_spacing_keys = set()
     for item in spacing:
         if not isinstance(item, dict):
             raise ValidationError("Spacing entries must be objects.")
+        if item.get("scope") in {"layoutSlot", "widget", "widgetSlot", "widgetPart"}:
+            scope = item["scope"]
+            layout = str(item.get("layout") or "")
+            slot = str(item.get("slot") or "")
+            part = str(item.get("part") or "")
+            widget_type = str(item.get("widget_type") or item.get("widgetType") or "")
+            safe_identifier = re.compile(r"^[A-Za-z0-9_.-]{1,160}$")
+            if scope == "layoutSlot":
+                from webpages.layout_autodiscovery import autodiscover_layouts
+                from webpages.layout_registry import layout_registry
+
+                autodiscover_layouts()
+                registered_layout = layout_registry.get_layout(layout)
+                known_slots = {
+                    candidate.get("name")
+                    for candidate in (
+                        registered_layout.slot_configuration.get("slots", []) if registered_layout else []
+                    )
+                }
+                if (
+                    not safe_identifier.fullmatch(layout)
+                    or not safe_identifier.fullmatch(slot)
+                    or slot not in known_slots
+                ):
+                    raise ValidationError("Structural layout slot no longer exists.")
+            else:
+                from webpages.widget_registry import widget_type_registry
+
+                widget = widget_type_registry.get_widget_type_flexible(widget_type)
+                if widget is None or not safe_identifier.fullmatch(widget_type):
+                    raise ValidationError("Structural widget target no longer exists.")
+                widget_type = widget.type
+                if scope == "widgetSlot":
+                    known_slots = widget.get_slot_definitions() or {}
+                    if not safe_identifier.fullmatch(slot) or slot not in known_slots:
+                        raise ValidationError("Structural widget slot no longer exists.")
+                if scope == "widgetPart":
+                    known_parts = _normalized_layout_parts(getattr(widget, "layout_parts", {}))
+                    if not safe_identifier.fullmatch(part) or part not in known_parts:
+                        raise ValidationError("Structural widget part no longer exists.")
+            breakpoint = str(item.get("breakpoint") or "xs")
+            breakpoint = {"default": "xs", "mobile": "xs", "tablet": "md", "desktop": "sm"}.get(breakpoint, breakpoint)
+            if breakpoint.isdigit() and int(breakpoint) > 10000:
+                raise ValidationError("Structural spacing breakpoint is too large.")
+            if breakpoint not in theme.get_breakpoints() and not breakpoint.isdigit():
+                raise ValidationError("Unsupported structural spacing breakpoint.")
+            structural_key = (scope, layout, widget_type, slot, part, breakpoint)
+            if structural_key in structural_spacing_keys:
+                raise ValidationError("Structural spacing target is duplicated at this breakpoint.")
+            structural_spacing_keys.add(structural_key)
+            incoming = item.get("values", {})
+            if not isinstance(incoming, dict):
+                raise ValidationError("Spacing values must be an object.")
+            unknown = set(incoming) - SPACING_PROPERTIES
+            if unknown:
+                raise ValidationError(f"Unsupported spacing properties: {', '.join(sorted(unknown))}")
+            values = {}
+            for key in SPACING_PROPERTIES:
+                if key in incoming and incoming[key] not in (None, ""):
+                    values[key] = _safe_css_value(incoming[key], key)
+            structural_spacing.append(
+                {
+                    "scope": scope,
+                    **({"layout": layout} if scope == "layoutSlot" else {}),
+                    **({"widgetType": widget_type} if scope in {"widget", "widgetSlot", "widgetPart"} else {}),
+                    **({"slot": slot} if scope in {"layoutSlot", "widgetSlot"} else {}),
+                    **({"part": part} if scope == "widgetPart" else {}),
+                    "breakpoint": breakpoint,
+                    "values": values,
+                }
+            )
+            continue
         group_index = _integer(item.get("group_index", -1), "groupIndex")
         if group_index < 0 or group_index >= len(groups):
             raise ValidationError("Spacing target no longer exists.")
@@ -1389,6 +1558,8 @@ def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=Tr
             if key in incoming:
                 value = incoming[key]
                 _set_theme_property(target, key, None if value in (None, "") else _safe_css_value(value, key))
+    if "spacing" in payload:
+        design_groups["structuralSpacing"] = structural_spacing
     theme.design_groups = design_groups
     return theme
 

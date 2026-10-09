@@ -8,7 +8,7 @@ Footer Widget Template
 {% endcomment %}
 
 <div class="widget-type-{{widget_type.css_class_name}}">
-    <footer class="footer-widget"
+    <footer class="footer-widget" data-slot="content" data-widget-slot="content" data-owner-widget-type="easy_widgets.FooterWidget"
             style="{% if config.background_color %}background-color: {{ config.background_color }};{% endif %}{% if config.background_image %}background-image: url('{{ config.background_image }}'); background-size: cover; background-position: center;{% endif %}{% if config.text_color %}color: {{ config.text_color }};{% endif %}">
         {% if config.rendered_slots.content %}
             {% for widget in config.rendered_slots.content %}
