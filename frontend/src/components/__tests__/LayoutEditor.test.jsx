@@ -125,4 +125,36 @@ describe('LayoutEditor', () => {
         expect(updated.slots.message.required).toBe(true)
         expect(mocks.navigate).toHaveBeenCalledWith('/settings/themes/18/layouts/editor?workspace=layouts&layout=error_layout')
     })
+
+    it('wraps a slot root before adding newly registered slots', async () => {
+        const user = userEvent.setup()
+        const mainRoot = {
+            id: 'main-slot-root',
+            type: 'slot',
+            slot_key: 'main',
+            children: [],
+            styles: {},
+            class_names: ['layout-slot'],
+        }
+        mocks.listCode.mockResolvedValue({ results: [{
+            name: 'main_layout',
+            slotConfiguration: { slots: [{ name: 'main' }, { name: 'sidebar' }] },
+        }] })
+        mocks.workspace.mockResolvedValue({
+            draftVersion: 5,
+            layouts: { ...layouts, items: [{ ...layouts.items[0], root: mainRoot }, ...layouts.items.slice(1)] },
+        })
+        renderWithProviders(<LayoutEditor />)
+
+        await user.click(await screen.findByRole('button', { name: 'Convert Code Layout' }))
+        await user.click(screen.getByRole('button', { name: 'Update main_layout' }))
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce())
+        const updated = mocks.save.mock.calls[0][2].items.find((layout) => layout.key === 'main_layout')
+        expect(updated.root).toMatchObject({
+            type: 'container',
+            children: [mainRoot, { type: 'slot', slot_key: 'sidebar', children: [] }],
+        })
+        expect(updated.root.children[0]).toBe(mainRoot)
+    })
 })
