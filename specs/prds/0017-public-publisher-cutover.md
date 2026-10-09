@@ -62,6 +62,7 @@ The production stack already runs and validates the standalone Next publisher on
 
 - 2026-10-09: Implementation started on `codex/public-publisher-cutover`.
 - 2026-10-09: Production routing, renderer-marked live-route health checks, CI Caddy validation, and operator documentation were implemented locally. Production deployment remains separately gated.
+- 2026-10-09: The deployment health gate was made configuration-aware so rolling back to a Django-routing tag does not falsely require the Next.js marker, while a Next.js-routing release still fails when the publisher service or either live route is unavailable.
 
 ## Linked ADRs
 

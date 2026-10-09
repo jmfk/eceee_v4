@@ -9,6 +9,7 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 
 cp "$HEALTHCHECK_SCRIPT" "$TEST_DIR/healthcheck.sh"
 printf 'DOMAIN=example.com\n' > "$TEST_DIR/.env"
+printf 'header X-ECEEE-Renderer "nextjs"\n' > "$TEST_DIR/Caddyfile"
 
 cat > "$TEST_DIR/env.sh" <<'EOF'
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,10 +56,24 @@ HEALTHCHECK_TIMEOUT=2 HEALTHCHECK_INTERVAL=1 \
     bash "$TEST_DIR/healthcheck.sh" > "$SUCCESS_LOG"
 grep -Fq "backend: 200, publisher: 200, public routes: 200:nextjs" "$SUCCESS_LOG"
 
+if PUBLISHER_ENABLED=0 HEALTHCHECK_TIMEOUT=1 HEALTHCHECK_INTERVAL=1 \
+    bash "$TEST_DIR/healthcheck.sh" >/dev/null 2>&1; then
+    echo "healthcheck unexpectedly accepted publisher routes without a publisher service" >&2
+    exit 1
+fi
+
+printf '# Django public fallback\n' > "$TEST_DIR/Caddyfile"
+
 NO_PUBLISHER_LOG="$TEST_DIR/no-publisher.log"
 PUBLISHER_ENABLED=0 HEALTHCHECK_TIMEOUT=2 HEALTHCHECK_INTERVAL=1 \
     bash "$TEST_DIR/healthcheck.sh" > "$NO_PUBLISHER_LOG"
-grep -Fq "backend: 200, publisher: not-configured, public routes: not-configured" "$NO_PUBLISHER_LOG"
+grep -Fq "backend: 200, publisher: not-configured, public routes: not-required" "$NO_PUBLISHER_LOG"
+
+ROLLBACK_WITH_PUBLISHER_LOG="$TEST_DIR/rollback-with-publisher.log"
+TEST_INDUSTRY_STATUS=503 TEST_SUMMERSTUDY_RENDERER=django \
+    HEALTHCHECK_TIMEOUT=2 HEALTHCHECK_INTERVAL=1 \
+    bash "$TEST_DIR/healthcheck.sh" > "$ROLLBACK_WITH_PUBLISHER_LOG"
+grep -Fq "backend: 200, publisher: 200, public routes: not-required" "$ROLLBACK_WITH_PUBLISHER_LOG"
 
 if TEST_BACKEND_STATUS=503 HEALTHCHECK_TIMEOUT=1 HEALTHCHECK_INTERVAL=1 \
     bash "$TEST_DIR/healthcheck.sh" >/dev/null 2>&1; then
@@ -71,6 +86,8 @@ if TEST_PUBLISHER_STATUS=503 HEALTHCHECK_TIMEOUT=1 HEALTHCHECK_INTERVAL=1 \
     echo "healthcheck unexpectedly accepted an unhealthy publisher" >&2
     exit 1
 fi
+
+printf 'header X-ECEEE-Renderer "nextjs"\n' > "$TEST_DIR/Caddyfile"
 
 if TEST_INDUSTRY_STATUS=503 HEALTHCHECK_TIMEOUT=1 HEALTHCHECK_INTERVAL=1 \
     bash "$TEST_DIR/healthcheck.sh" >/dev/null 2>&1; then
