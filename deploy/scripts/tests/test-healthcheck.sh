@@ -23,7 +23,19 @@ docker_compose() {
         return 0
     fi
     if [ "$1" = "exec" ] && [ "$3" = "backend" ]; then
-        printf '%s' "${TEST_BACKEND_STATUS:-200}"
+        case "$*" in
+            *"https://summerstudy.example.com/"*)
+                printf 'HTTP/2 %s\r\nX-ECEEE-Renderer: %s\r\n\r\n' \
+                    "${TEST_SUMMERSTUDY_STATUS:-200}" "${TEST_SUMMERSTUDY_RENDERER:-nextjs}"
+                ;;
+            *"https://industry.example.com/"*)
+                printf 'HTTP/2 %s\r\nX-ECEEE-Renderer: %s\r\n\r\n' \
+                    "${TEST_INDUSTRY_STATUS:-200}" "${TEST_INDUSTRY_RENDERER:-nextjs}"
+                ;;
+            *)
+                printf '%s' "${TEST_BACKEND_STATUS:-200}"
+                ;;
+        esac
         return
     fi
     if [ "$1" = "exec" ] && [ "$3" = "publisher" ]; then
@@ -41,12 +53,12 @@ EOF
 SUCCESS_LOG="$TEST_DIR/success.log"
 HEALTHCHECK_TIMEOUT=2 HEALTHCHECK_INTERVAL=1 \
     bash "$TEST_DIR/healthcheck.sh" > "$SUCCESS_LOG"
-grep -Fq "backend: 200, publisher: 200" "$SUCCESS_LOG"
+grep -Fq "backend: 200, publisher: 200, public routes: 200:nextjs" "$SUCCESS_LOG"
 
 NO_PUBLISHER_LOG="$TEST_DIR/no-publisher.log"
 PUBLISHER_ENABLED=0 HEALTHCHECK_TIMEOUT=2 HEALTHCHECK_INTERVAL=1 \
     bash "$TEST_DIR/healthcheck.sh" > "$NO_PUBLISHER_LOG"
-grep -Fq "backend: 200, publisher: not-configured" "$NO_PUBLISHER_LOG"
+grep -Fq "backend: 200, publisher: not-configured, public routes: not-configured" "$NO_PUBLISHER_LOG"
 
 if TEST_BACKEND_STATUS=503 HEALTHCHECK_TIMEOUT=1 HEALTHCHECK_INTERVAL=1 \
     bash "$TEST_DIR/healthcheck.sh" >/dev/null 2>&1; then
@@ -57,6 +69,18 @@ fi
 if TEST_PUBLISHER_STATUS=503 HEALTHCHECK_TIMEOUT=1 HEALTHCHECK_INTERVAL=1 \
     bash "$TEST_DIR/healthcheck.sh" >/dev/null 2>&1; then
     echo "healthcheck unexpectedly accepted an unhealthy publisher" >&2
+    exit 1
+fi
+
+if TEST_INDUSTRY_STATUS=503 HEALTHCHECK_TIMEOUT=1 HEALTHCHECK_INTERVAL=1 \
+    bash "$TEST_DIR/healthcheck.sh" >/dev/null 2>&1; then
+    echo "healthcheck unexpectedly accepted an unhealthy public publisher route" >&2
+    exit 1
+fi
+
+if TEST_SUMMERSTUDY_RENDERER=django HEALTHCHECK_TIMEOUT=1 HEALTHCHECK_INTERVAL=1 \
+    bash "$TEST_DIR/healthcheck.sh" >/dev/null 2>&1; then
+    echo "healthcheck unexpectedly accepted a public route served by Django" >&2
     exit 1
 fi
 

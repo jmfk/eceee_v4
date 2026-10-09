@@ -83,17 +83,17 @@ Add these A records pointing to your VPS IP (match `DOMAIN` and `deploy/Caddyfil
 - `app.eceee.org`
 - `imgproxy.eceee.org`
 
-The parallel Publisher additionally needs A/AAAA records for these test hostnames pointing to the same VPS:
+The Next publisher serves the existing `summerstudy.eceee.org` and `industry.eceee.org` public routes. The parallel test routes additionally need A/AAAA records for these hostnames pointing to the same VPS:
 
 - `eceee-test.colliberty.com`
 - `summerstudy-test.colliberty.com`
 - `industry-test.colliberty.com`
 
-These hostnames are isolated from the existing public routes, which continue to use Django until their Caddy routes are deliberately changed. Caddy sends `X-Robots-Tag: noindex, nofollow, noarchive` on every test hostname to keep the mirrored pages out of search indexes.
+These hostnames remain isolated from the live public routes. Caddy sends `X-Robots-Tag: noindex, nofollow, noarchive` on every test hostname to keep the mirrored pages out of search indexes.
 
 Before deploying publisher direct-host lookup, identify the three intended **ECEEE v4** root pages in the CMS. On each root page, use Settings → Hostnames to add its corresponding `*-test.colliberty.com` hostname alongside its existing hostnames; do not replace the existing entries. The editor presents one hostname per list item and also accepts scoped wildcards such as `*.colliberty.com`; use exact test hostnames here to avoid assigning unrelated subdomains to one root. A scoped wildcard matches subdomains, not its base domain, and does not create DNS records or HTTPS/Caddy routes. Confirm the root is published and that the same hostname is not assigned to another root. Save, reload, and verify the hostname is still present. These are production data changes and must be performed or explicitly approved by the operator; deploying code alone does not create aliases. The `eceee-test` root must be identified from v4 data, not inferred from `eceee.org` or `www.eceee.org`.
 
-Hostname aliases are CMS content configuration and are deliberately not part of the deployment healthcheck. After configuring or changing an alias, verify the rendered page and form flow on that host separately. `make prod-deploy` only requires the backend and publisher services themselves to become healthy.
+Hostname aliases are CMS content configuration. After configuring or changing a test alias, verify the rendered page and form flow on that host separately. `make prod-deploy` requires the backend and publisher services to become healthy and verifies that both live public roots return publisher-marked HTTP 200 responses. Set `PUBLISHER_PUBLIC_HOSTS` only when validating an explicitly reviewed alternative host list.
 
 ### 6. First deploy
 
@@ -287,7 +287,7 @@ Edit `deploy/.env` on the server, then run `make prod-deploy` (the containers wi
 5. Run migrations
 6. `python manage.py collectstatic`, then provision convergent least-privilege publisher roles when configured
 7. `docker compose up -d --remove-orphans`
-8. Health check for up to 90s (backend, publisher liveness, direct rendered pages, and every public test-host HTTPS route through Caddy)
+8. Health check for up to 90s (backend, publisher liveness, and both live public publisher roots through Caddy)
 9. Log the deploy to `/opt/eceee/app/deploy.log`
 
 There is ~30-60s of downtime during step 7. That is acceptable for this deployment.
