@@ -196,6 +196,14 @@ jobs:
           docker logs --tail=50 eceee-publisher-ci >&2
           exit 1
 
+      - name: Validate production Caddy routing
+        run: |
+          docker run --rm \
+            -e DOMAIN=example.com \
+            -e EMAIL=ci@example.com \
+            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+
       - name: Test publisher deployment health gate
         run: |
           bash deploy/scripts/tests/test-healthcheck.sh

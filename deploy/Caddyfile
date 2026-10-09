@@ -20,12 +20,23 @@ eceee-test.colliberty.com, summerstudy-test.colliberty.com, industry-test.collib
     reverse_proxy publisher:3000
 }
 
-# Public Content Sites - Django backend serving public pages
+# Public Content Sites - Next publisher serving public pages. Django retains
+# the CMS/API and compatibility asset routes; it does not render page requests.
 summerstudy.{$DOMAIN}, industry.{$DOMAIN} {
     encode gzip
 
     handle /admin* {
         redir https://admin.{$DOMAIN}{uri} permanent
+    }
+
+    handle_path /imgproxy/* {
+        reverse_proxy imgproxy:8080
+    }
+
+    # Public forms are validated and stored by the publisher. This must remain
+    # before the broader Django API route below.
+    handle /api/forms/* {
+        reverse_proxy publisher:3000
     }
 
     handle /static/* {
@@ -41,7 +52,8 @@ summerstudy.{$DOMAIN}, industry.{$DOMAIN} {
     }
 
     handle /* {
-        reverse_proxy backend:8000
+        header X-ECEEE-Renderer "nextjs"
+        reverse_proxy publisher:3000
     }
 }
 
