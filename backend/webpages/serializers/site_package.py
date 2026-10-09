@@ -109,9 +109,20 @@ class SitePackageExportCreateSerializer(serializers.Serializer):
 
 class SitePackageImportCreateSerializer(serializers.Serializer):
     site_zip = serializers.FileField()
+    theme_zips = serializers.ListField(child=serializers.FileField(), required=False, default=list)
     preserve_publication_status = serializers.BooleanField(required=False, write_only=True)
     preservePublicationStatus = serializers.BooleanField(required=False, write_only=True)
-    mode = serializers.ChoiceField(choices=("prompt", "clone", "update"), default="prompt")
+    mode = serializers.ChoiceField(choices=("prompt", "clone", "update", "replace"), default="prompt")
+    include_site = serializers.BooleanField(default=True, required=False)
+    includeSite = serializers.BooleanField(source="include_site", required=False, write_only=True)
+    include_media = serializers.BooleanField(default=True, required=False)
+    includeMedia = serializers.BooleanField(source="include_media", required=False, write_only=True)
+    include_themes = serializers.BooleanField(default=True, required=False)
+    includeThemes = serializers.BooleanField(source="include_themes", required=False, write_only=True)
+    media_namespace_name = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    mediaNamespaceName = serializers.CharField(
+        source="media_namespace_name", required=False, allow_blank=True, max_length=100, write_only=True
+    )
     existingRootId = serializers.IntegerField(
         source="existing_root_id", required=False, allow_null=True, write_only=True
     )
@@ -135,9 +146,27 @@ class SitePackageImportCreateSerializer(serializers.Serializer):
             if camel_value is not serializers.empty
             else snake_value if snake_value is not serializers.empty else True
         )
-        if attrs["mode"] == "update" and not attrs.get("existing_root_id"):
+        for snake_name, camel_name in (
+            ("include_site", "includeSite"),
+            ("include_media", "includeMedia"),
+            ("include_themes", "includeThemes"),
+        ):
+            if snake_name not in self.initial_data and camel_name not in self.initial_data:
+                attrs[snake_name] = True
+        if not any(attrs.get(name, True) for name in ("include_site", "include_media", "include_themes")):
+            raise serializers.ValidationError("Select at least one part of the package to import.")
+        if (
+            attrs["mode"] in {"update", "replace"}
+            and attrs.get("include_site", True)
+            and not attrs.get("existing_root_id")
+        ):
             raise serializers.ValidationError({"existingRootId": "Choose the existing site to update."})
         return attrs
+
+
+class SitePackageAssessmentSerializer(serializers.Serializer):
+    site_zip = serializers.FileField()
+    theme_zips = serializers.ListField(child=serializers.FileField(), required=False, default=list)
 
 
 class RemoteSiteListSerializer(serializers.Serializer):
@@ -160,7 +189,17 @@ class RemoteSiteListSerializer(serializers.Serializer):
 class RemoteSiteImportCreateSerializer(RemoteSiteListSerializer):
     remote_site_key = serializers.UUIDField(required=False)
     remoteSiteKey = serializers.UUIDField(source="remote_site_key", required=False, write_only=True)
-    mode = serializers.ChoiceField(choices=("copy", "update"), default="copy")
+    mode = serializers.ChoiceField(choices=("clone", "update", "replace", "copy"), default="clone")
+    include_site = serializers.BooleanField(default=True, required=False)
+    includeSite = serializers.BooleanField(source="include_site", required=False, write_only=True)
+    include_media = serializers.BooleanField(default=True, required=False)
+    includeMedia = serializers.BooleanField(source="include_media", required=False, write_only=True)
+    include_themes = serializers.BooleanField(default=True, required=False)
+    includeThemes = serializers.BooleanField(source="include_themes", required=False, write_only=True)
+    media_namespace_name = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    mediaNamespaceName = serializers.CharField(
+        source="media_namespace_name", required=False, allow_blank=True, max_length=100, write_only=True
+    )
     local_root_id = serializers.IntegerField(required=False, allow_null=True)
     localRootId = serializers.IntegerField(source="local_root_id", required=False, allow_null=True, write_only=True)
 
@@ -168,7 +207,11 @@ class RemoteSiteImportCreateSerializer(RemoteSiteListSerializer):
         attrs = super().validate(attrs)
         if "remote_site_key" not in attrs:
             raise serializers.ValidationError({"remoteSiteKey": "This field is required."})
-        if attrs["mode"] == "update":
+        if attrs["mode"] == "copy":
+            attrs["mode"] = "clone"
+        if not any(attrs.get(name, True) for name in ("include_site", "include_media", "include_themes")):
+            raise serializers.ValidationError("Select at least one part of the remote site to import.")
+        if attrs["mode"] in {"update", "replace"} and attrs.get("include_site", True):
             local_root_id = attrs.get("local_root_id")
             if not local_root_id:
                 raise serializers.ValidationError({"localRootId": "Choose a linked local site."})

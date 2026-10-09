@@ -1534,6 +1534,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             metadata = {
                 "name": theme.name,
                 "source_theme_id": theme.id,
+                "stable_key": str(theme.stable_key),
                 "description": theme.description,
                 "created_at": theme.created_at.isoformat(),
                 "updated_at": theme.updated_at.isoformat(),

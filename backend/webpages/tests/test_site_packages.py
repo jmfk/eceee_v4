@@ -1013,6 +1013,87 @@ class SitePackageServiceTests(TestCase):
         self.assertEqual(PageTheme.objects.filter(tenant=self.tenant).count(), 1)
         self.assertEqual(import_job.progress["binding"]["local_root_id"], self.root.id)
 
+    def test_replace_removes_only_stale_bound_pages_and_preserves_local_content(self):
+        local_page = WebPage.objects.create(
+            title="Local notes",
+            slug="local-notes",
+            parent=self.child,
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        previous_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            status=SitePackageJob.STATUS_COMPLETED,
+            imported_root_page=self.root,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id), "source_root_key": str(self.root.stable_key)},
+            progress={
+                "binding": {
+                    "source_root_key": str(self.root.stable_key),
+                    "local_root_id": self.root.id,
+                    "page_map": {
+                        str(self.root.stable_key): self.root.id,
+                        str(self.child.stable_key): self.child.id,
+                    },
+                    "theme_map": {},
+                    "version_map": {},
+                    "version_fingerprints": {},
+                }
+            },
+        )
+        package_buffer = io.BytesIO()
+        with zipfile.ZipFile(package_buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr(
+                "manifest.json",
+                json.dumps(
+                    {
+                        "package_version": "2.0",
+                        "kind": "site-root-tree",
+                        "source": {"root_stable_key": str(self.root.stable_key)},
+                    }
+                ),
+            )
+            package.writestr(
+                "pages.json",
+                json.dumps(
+                    {
+                        "pages": [
+                            {
+                                "source_id": self.root.id,
+                                "stable_key": str(self.root.stable_key),
+                                "parent_source_id": None,
+                                "title": self.root.title,
+                                "slug": self.root.slug,
+                                "versions": [],
+                            }
+                        ]
+                    }
+                ),
+            )
+        replace_job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={
+                "tenant_id": str(self.tenant.id),
+                "mode": "replace",
+                "local_root_id": self.root.id,
+                "source_root_key": str(self.root.stable_key),
+                "source_binding_job_id": str(previous_job.id),
+            },
+        )
+
+        package_buffer.seek(0)
+        with zipfile.ZipFile(package_buffer, "r") as package:
+            SitePackageImporter(replace_job, storage=MemoryStorage()).import_package(package)
+
+        self.child.refresh_from_db()
+        local_page.refresh_from_db()
+        self.assertTrue(self.child.is_deleted)
+        self.assertFalse(local_page.is_deleted)
+        self.assertEqual(local_page.parent_id, self.root.id)
+        self.assertIn("bound_page_replaced", [warning["code"] for warning in replace_job.progress["warnings"]])
+
     def test_zip_update_creates_a_version_when_only_the_theme_changes(self):
         source_version = PageVersion.objects.create(
             page=self.root,
@@ -2081,8 +2162,25 @@ class SitePackageAPITests(APITestCase):
             last_modified_by=self.user,
         )
 
-    def site_package_upload(self, *, stable_key=None, source_id=900, title="Imported Site"):
+    def site_package_upload(
+        self,
+        *,
+        stable_key=None,
+        source_id=900,
+        title="Imported Site",
+        theme_source_id=None,
+        theme_stable_key=None,
+    ):
         stable_key = stable_key or uuid.uuid4()
+        dependencies = {}
+        if theme_source_id is not None:
+            dependencies["themes"] = [
+                {
+                    "source_id": theme_source_id,
+                    "stable_key": str(theme_stable_key or uuid.uuid4()),
+                    "name": "Conference",
+                }
+            ]
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
             package.writestr(
@@ -2096,6 +2194,7 @@ class SitePackageAPITests(APITestCase):
                             "root_title": title,
                             "root_slug": "imported-site",
                         },
+                        "dependencies": dependencies,
                     }
                 ),
             )
@@ -2110,13 +2209,78 @@ class SitePackageAPITests(APITestCase):
                                 "parent_source_id": None,
                                 "title": title,
                                 "slug": "imported-site",
-                                "versions": [],
+                                "versions": (
+                                    [
+                                        {
+                                            "source_id": source_id * 10,
+                                            "version_number": 1,
+                                            "theme_source_id": theme_source_id,
+                                            "page_data": {},
+                                            "widgets": {},
+                                        }
+                                    ]
+                                    if theme_source_id is not None
+                                    else []
+                                ),
                             }
                         ]
                     }
                 ),
             )
         return ContentFile(buffer.getvalue(), name="site.zip")
+
+    def test_assess_import_reports_existing_site_and_missing_related_theme(self):
+        response = self.client.post(
+            "/api/v1/webpages/site-packages/assess/",
+            {
+                "site_zip": self.site_package_upload(
+                    stable_key=self.root.stable_key,
+                    title=self.root.title,
+                    theme_source_id=88,
+                )
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["existingSites"][0]["id"], self.root.id)
+        self.assertEqual(response.data["assessment"]["counts"]["themes"], 1)
+        self.assertEqual(response.data["assessment"]["missingThemes"], 1)
+        self.assertEqual(response.data["assessment"]["themes"][0]["name"], "Conference")
+        self.assertEqual(response.data["assessment"]["themes"][0]["status"], "missing")
+
+    def test_assess_import_ignores_invalid_optional_theme_zip_with_warning(self):
+        response = self.client.post(
+            "/api/v1/webpages/site-packages/assess/",
+            {
+                "site_zip": self.site_package_upload(theme_source_id=88),
+                "theme_zips": ContentFile(b"not a zip", name="missing-theme.zip"),
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["assessment"]["missingThemes"], 1)
+        self.assertEqual(response.data["assessment"]["warnings"][0]["code"], "theme_package_invalid")
+
+    def test_assess_import_accepts_a_referenced_optional_theme_zip(self):
+        theme_buffer = io.BytesIO()
+        with zipfile.ZipFile(theme_buffer, "w", zipfile.ZIP_DEFLATED) as package:
+            package.writestr("metadata.json", json.dumps({"source_theme_id": 88, "name": "Conference"}))
+            package.writestr("theme.json", json.dumps({"name": "Conference", "layouts": {}}))
+
+        response = self.client.post(
+            "/api/v1/webpages/site-packages/assess/",
+            {
+                "site_zip": self.site_package_upload(theme_source_id=88),
+                "theme_zips": ContentFile(theme_buffer.getvalue(), name="conference.zip"),
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["assessment"]["missingThemes"], 0)
+        self.assertEqual(response.data["assessment"]["themes"][0]["status"], "supplied")
 
     def legacy_site_package_bytes(self, *, source_id=101, title="Legacy Site", children=()):
         pages = [
@@ -2325,6 +2489,42 @@ class SitePackageAPITests(APITestCase):
 
         self.assertEqual(response.status_code, 400)
         delay.assert_not_called()
+
+    @patch("webpages.views.site_package_views.import_site_package.delay")
+    @patch("webpages.views.site_package_views.S3MediaStorage")
+    def test_import_requires_at_least_one_selected_scope(self, storage_class, delay):
+        storage_class.return_value = MemoryStorage()
+
+        response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {
+                "site_zip": self.site_package_upload(),
+                "includeSite": "false",
+                "includeMedia": "false",
+                "includeThemes": "false",
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(SitePackageJob.objects.filter(kind=SitePackageJob.KIND_IMPORT).exists())
+        delay.assert_not_called()
+
+    @patch("webpages.views.site_package_views.import_site_package.delay")
+    @patch("webpages.views.site_package_views.S3MediaStorage")
+    def test_import_records_a_warning_when_an_optional_theme_zip_is_missing(self, storage_class, delay):
+        storage_class.return_value = MemoryStorage()
+
+        response = self.client.post(
+            "/api/v1/webpages/site-packages/imports/",
+            {"site_zip": self.site_package_upload(theme_source_id=88), "mode": "clone"},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 202, response.data)
+        job = SitePackageJob.objects.get(id=response.data["id"])
+        self.assertEqual(job.options["supplement_warnings"][0]["code"], "theme_package_missing")
+        delay.assert_called_once_with(str(job.id))
 
     @patch("webpages.services.site_package.SITE_PACKAGE_MAX_IDENTITY_FILE_SIZE", 128)
     @patch("webpages.views.site_package_views.import_site_package.delay")
@@ -2661,7 +2861,7 @@ class SitePackageAPITests(APITestCase):
         self.assertEqual(response.data[0]["kind"], SitePackageJob.KIND_IMPORT)
 
     @patch("webpages.views.site_package_views.import_remote_site_package.delay")
-    def test_start_remote_copy_job_uses_camel_case_contract(self, delay):
+    def test_start_remote_copy_alias_uses_canonical_clone_mode(self, delay):
         connection = ThemeRemoteConnection.objects.create(
             tenant=self.tenant,
             name="Remote source",
@@ -2684,7 +2884,7 @@ class SitePackageAPITests(APITestCase):
 
         self.assertEqual(response.status_code, 202)
         self.assertEqual(response.data["source"], "remote")
-        self.assertEqual(response.data["mode"], "copy")
+        self.assertEqual(response.data["mode"], "clone")
         self.assertEqual(response.data["remote_site_key"], str(self.root.stable_key))
         self.assertEqual(response.data["phase"], "queued")
         job = SitePackageJob.objects.get(id=response.data["id"])

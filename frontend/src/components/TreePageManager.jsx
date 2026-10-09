@@ -879,7 +879,12 @@ const TreePageManager = () => {
         file,
         preservePublicationStatus,
         mode = 'prompt',
-        existingRootId = null
+        existingRootId = null,
+        themeFiles = [],
+        includeSite = true,
+        includeMedia = true,
+        includeThemes = true,
+        mediaNamespaceName = ''
     }) => {
         addNotification(`Uploading "${file.name}"...`, 'info', 'site-import')
 
@@ -888,7 +893,12 @@ const TreePageManager = () => {
                 file,
                 preservePublicationStatus,
                 mode,
-                existingRootId
+                existingRootId,
+                themeFiles,
+                includeSite,
+                includeMedia,
+                includeThemes,
+                mediaNamespaceName
             })
             setShowSitePackageImportModal(false)
             upsertSitePackageJob({
@@ -913,6 +923,8 @@ const TreePageManager = () => {
                     await queryClient.refetchQueries({ queryKey: ['pages'], type: 'active' })
                     const message = mode === 'update'
                         ? 'Existing site updated from package'
+                        : mode === 'replace'
+                            ? 'Existing site replaced from package'
                         : mode === 'clone'
                             ? 'Site package imported as a cloned root'
                             : 'Site package imported as a new root'
@@ -942,10 +954,33 @@ const TreePageManager = () => {
         }
     }, [addNotification, pollSitePackageJob, queryClient, showError, upsertSitePackageJob])
 
-    const handleImportRemoteSite = useCallback(async ({ connectionId, remoteSiteKey, mode, localRootId, title }) => {
-        const actionLabel = mode === 'update' ? `Update ${title}` : `Download ${title}`
+    const handleImportRemoteSite = useCallback(async ({
+        connectionId,
+        remoteSiteKey,
+        mode,
+        localRootId,
+        title,
+        includeSite,
+        includeMedia,
+        includeThemes,
+        mediaNamespaceName
+    }) => {
+        const actionLabel = mode === 'update'
+            ? `Update ${title}`
+            : mode === 'replace'
+                ? `Replace ${title}`
+                : `Clone ${title}`
         try {
-            const job = await sitePackagesApi.createRemoteImport({ connectionId, remoteSiteKey, mode, localRootId })
+            const job = await sitePackagesApi.createRemoteImport({
+                connectionId,
+                remoteSiteKey,
+                mode,
+                localRootId,
+                includeSite,
+                includeMedia,
+                includeThemes,
+                mediaNamespaceName
+            })
             setShowSitePackageImportModal(false)
             upsertSitePackageJob({ ...job, label: actionLabel })
             pollSitePackageJob({
@@ -1983,6 +2018,15 @@ const SitePackageExportModal = ({ rootPage, onClose, onExport }) => {
     )
 }
 
+const formatImportAssessmentWarning = (warning) => {
+    const filename = warning.filename ? `“${warning.filename}”` : 'A dependency package'
+    if (warning.code === 'theme_package_invalid') return `${filename} could not be read and will be ignored.`
+    if (warning.code === 'theme_package_not_referenced') return `${filename} is not used by this site and will be ignored.`
+    if (warning.code === 'theme_package_already_included') return `${filename} is already included in the site package.`
+    if (warning.code === 'remote_assessment_unavailable') return 'The remote server did not provide theme and media details.'
+    return warning.message || 'One dependency could not be included.'
+}
+
 const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) => {
     const [source, setSource] = useState('remote')
     const [file, setFile] = useState(null)
@@ -1995,8 +2039,16 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
     const [loadingConnections, setLoadingConnections] = useState(false)
     const [loadingRemotes, setLoadingRemotes] = useState(false)
     const [hasLoadedRemoteSites, setHasLoadedRemoteSites] = useState(false)
-    const [zipConflict, setZipConflict] = useState(null)
     const [existingRootId, setExistingRootId] = useState('')
+    const [assessment, setAssessment] = useState(null)
+    const [selectedRemoteSite, setSelectedRemoteSite] = useState(null)
+    const [mode, setMode] = useState('clone')
+    const [includeSite, setIncludeSite] = useState(true)
+    const [includeMedia, setIncludeMedia] = useState(true)
+    const [includeThemes, setIncludeThemes] = useState(true)
+    const [themeFiles, setThemeFiles] = useState([])
+    const [separateMediaNamespace, setSeparateMediaNamespace] = useState(false)
+    const [mediaNamespaceName, setMediaNamespaceName] = useState('')
 
     useEffect(() => {
         if (isOpen) {
@@ -2010,8 +2062,16 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
             setRemoteSites([])
             setLoadingConnections(true)
             setHasLoadedRemoteSites(false)
-            setZipConflict(null)
             setExistingRootId('')
+            setAssessment(null)
+            setSelectedRemoteSite(null)
+            setMode('clone')
+            setIncludeSite(true)
+            setIncludeMedia(true)
+            setIncludeThemes(true)
+            setThemeFiles([])
+            setSeparateMediaNamespace(false)
+            setMediaNamespaceName('')
             designerThemesApi.remoteConnections()
                 .then((result) => {
                     const items = result.results || []
@@ -2025,7 +2085,28 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
 
     if (!isOpen) return null
 
-    const startZipImport = async (mode = 'prompt') => {
+    const assessZip = async (nextFile, nextThemeFiles = themeFiles) => {
+        if (!nextFile) {
+            setAssessment(null)
+            return
+        }
+        setIsImporting(true)
+        setError('')
+        try {
+            const result = await sitePackagesApi.assessImport({ file: nextFile, themeFiles: nextThemeFiles })
+            setAssessment(result)
+            const matches = result.existingSites || []
+            setExistingRootId(String(matches[0]?.id || ''))
+            if (!matches.length && mode !== 'clone') setMode('clone')
+        } catch (assessmentError) {
+            setAssessment(null)
+            setError(assessmentError.message || 'Could not assess this site package.')
+        } finally {
+            setIsImporting(false)
+        }
+    }
+
+    const startZipImport = async () => {
         if (!file) {
             setError('Choose a ZIP file to import.')
             return
@@ -2038,13 +2119,19 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                 file,
                 preservePublicationStatus,
                 mode,
-                existingRootId: mode === 'update' ? Number(existingRootId) : null,
+                existingRootId: ['update', 'replace'].includes(mode) && includeSite ? Number(existingRootId) : null,
+                themeFiles,
+                includeSite,
+                includeMedia,
+                includeThemes,
+                mediaNamespaceName: mode === 'clone' && includeMedia && separateMediaNamespace ? mediaNamespaceName : '',
             })
         } catch (importError) {
             if (importError.siteImportConflict) {
                 const conflict = importError.siteImportConflict
-                setZipConflict(conflict)
+                setAssessment((current) => ({ ...current, existingSites: conflict.existingSites || [] }))
                 setExistingRootId(String(conflict.existingSites?.[0]?.id || ''))
+                setMode('update')
                 setError('')
                 setIsImporting(false)
                 return
@@ -2056,13 +2143,15 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
 
     const handleSubmit = async (event) => {
         event.preventDefault()
-        await startZipImport('prompt')
+        await startZipImport()
     }
 
     const loadRemoteSites = async () => {
         if (!connectionId) return
         setLoadingRemotes(true)
         setHasLoadedRemoteSites(false)
+        setAssessment(null)
+        setSelectedRemoteSite(null)
         setError('')
         try {
             const result = await sitePackagesApi.listRemoteSites(connectionId)
@@ -2085,10 +2174,28 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                 mode,
                 localRootId,
                 title: site.title,
+                includeSite,
+                includeMedia,
+                includeThemes,
+                mediaNamespaceName: mode === 'clone' && includeMedia && separateMediaNamespace ? mediaNamespaceName : '',
             })
         } catch (importError) {
             setError(importError.message || 'Could not start the remote site import.')
             setIsImporting(false)
+        }
+    }
+
+    const startReviewedImport = async () => {
+        if (source === 'zip') {
+            await startZipImport()
+            return
+        }
+        if (selectedRemoteSite) {
+            await startRemoteImport(
+                selectedRemoteSite,
+                mode,
+                ['update', 'replace'].includes(mode) && includeSite ? Number(existingRootId) : null
+            )
         }
     }
 
@@ -2123,7 +2230,7 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                                     type="button"
                                     role="tab"
                                     aria-selected={source === value}
-                                    onClick={() => { setSource(value); setError('') }}
+                                    onClick={() => { setSource(value); setError(''); setAssessment(null); setSelectedRemoteSite(null) }}
                                     className={`pb-2 text-sm font-medium ${source === value ? 'border-b-2 border-blue-600 text-blue-700' : 'text-gray-600'}`}
                                 >
                                     {label}
@@ -2145,13 +2252,13 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                                     <Loader2 className="h-4 w-4 animate-spin" /> Loading remote connections
                                 </p>
                             ) : connections.length === 0 ? (
-                                <p className="text-sm text-gray-600">No remote connections are configured. Add one in Designer themes first.</p>
+                                <p className="text-sm text-gray-600">No remote connections are configured. Add one in Settings → Remote Sites first.</p>
                             ) : <div className="flex items-end gap-3">
                                 <label className="min-w-0 flex-1 text-sm font-medium text-gray-700">
                                     Remote connection
                                     <select
                                         value={connectionId}
-                                        onChange={(event) => { setConnectionId(event.target.value); setRemoteSites([]); setHasLoadedRemoteSites(false) }}
+                                        onChange={(event) => { setConnectionId(event.target.value); setRemoteSites([]); setHasLoadedRemoteSites(false); setAssessment(null); setSelectedRemoteSite(null) }}
                                         disabled={isImporting}
                                         className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal"
                                     >
@@ -2185,24 +2292,26 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => startRemoteImport(site, 'copy')}
+                                            onClick={() => {
+                                                const remoteAssessment = site.assessment || {
+                                                    counts: { pages: site.pageCount || 0, versions: 0, themes: 0, media: 0 },
+                                                    themes: [],
+                                                    missingThemes: 0,
+                                                    included: { site: true, themes: false, media: false },
+                                                    warnings: [{ code: 'remote_assessment_unavailable' }],
+                                                }
+                                                setSelectedRemoteSite(site)
+                                                setAssessment({ ...site, assessment: remoteAssessment, existingSites: site.localCopies || [] })
+                                                const firstCopy = site.localCopies?.[0]
+                                                setMode(firstCopy ? 'update' : 'clone')
+                                                setExistingRootId(String(firstCopy?.localRootId || ''))
+                                            }}
                                             disabled={isImporting}
-                                            className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:opacity-50"
+                                            className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
                                         >
-                                            Download as new site
+                                            Review import
                                         </button>
                                     </div>
-                                    {site.localCopies?.length > 0 && <div className="mt-3 flex flex-wrap gap-2">
-                                        {site.localCopies.map((copy) => <button
-                                            key={copy.bindingId}
-                                            type="button"
-                                            onClick={() => startRemoteImport(site, 'update', copy.localRootId)}
-                                            disabled={isImporting}
-                                            className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800 disabled:opacity-50"
-                                        >
-                                            Update {copy.title}
-                                        </button>)}
-                                    </div>}
                                 </div>)}
                             </div>}
                         </> : <form id="site-package-zip-form" onSubmit={handleSubmit} className="space-y-4">
@@ -2212,14 +2321,33 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                                 type="file"
                                 accept=".zip,application/zip,application/x-zip-compressed"
                                 onChange={(event) => {
-                                    setFile(event.target.files?.[0] || null)
-                                    setZipConflict(null)
+                                    const nextFile = event.target.files?.[0] || null
+                                    setFile(nextFile)
                                     setExistingRootId('')
+                                    setThemeFiles([])
+                                    assessZip(nextFile, [])
                                 }}
                                 disabled={isImporting}
                                 className="block w-full text-sm text-gray-700 file:mr-3 file:px-3 file:py-2 file:border-0 file:rounded file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
                             />
                         </label>
+
+                        {(assessment?.assessment?.missingThemes > 0 || themeFiles.length > 0) && <label className="block">
+                            <span className="block text-sm font-medium text-gray-700 mb-1">Optional theme ZIP files</span>
+                            <input
+                                type="file"
+                                multiple
+                                accept=".zip,application/zip,application/x-zip-compressed"
+                                onChange={(event) => {
+                                    const nextFiles = Array.from(event.target.files || [])
+                                    setThemeFiles(nextFiles)
+                                    assessZip(file, nextFiles)
+                                }}
+                                disabled={isImporting}
+                                className="block w-full text-sm text-gray-700 file:mr-3 file:px-3 file:py-2 file:border-0 file:rounded file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
+                            />
+                            <span className="mt-1 block text-xs text-gray-500">Missing theme ZIPs can be skipped. The import will continue with warnings.</span>
+                        </label>}
 
                         <label className="flex items-center gap-2 text-sm text-gray-700">
                             <input
@@ -2231,33 +2359,81 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                             />
                             <span>Preserve publication status</span>
                         </label>
-                        {zipConflict && (
-                            <div className="space-y-3 rounded border border-amber-200 bg-amber-50 p-4">
-                                <div>
-                                    <p className="font-medium text-amber-950">This site already exists</p>
-                                    <p className="mt-1 text-sm text-amber-900">{zipConflict.message}</p>
-                                </div>
-                                {zipConflict.existingSites?.length > 1 && (
-                                    <label className="block text-sm font-medium text-amber-950">
-                                        Existing site to update
-                                        <select
-                                            value={existingRootId}
-                                            onChange={(event) => setExistingRootId(event.target.value)}
-                                            disabled={isImporting}
-                                            className="mt-1 w-full rounded border border-amber-300 bg-white px-3 py-2 font-normal text-gray-900"
-                                        >
-                                            {zipConflict.existingSites.map((site) => (
-                                                <option key={site.id} value={site.id}>{site.title}</option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                )}
-                                <p className="text-xs text-amber-800">
-                                    Updating keeps the existing site root. A clone creates a separate root named with “(clone)”.
-                                </p>
-                            </div>
-                        )}
                         </form>}
+
+                        {assessment?.assessment && <section className="border-t border-gray-200 pt-6" aria-labelledby="import-assessment-heading">
+                            <div className="flex flex-wrap items-start justify-between gap-4">
+                                <div>
+                                    <h3 id="import-assessment-heading" className="text-lg font-semibold text-gray-900">Review import</h3>
+                                    <p className="mt-1 text-sm text-gray-600">
+                                        {assessment.title || assessment.assessment.title || 'Site package'} · {assessment.assessment.counts.pages} pages · {assessment.assessment.counts.themes} themes · {assessment.assessment.counts.media} media files
+                                    </p>
+                                </div>
+                                {assessment.assessment.missingThemes > 0 && <p className="text-sm text-amber-700">{assessment.assessment.missingThemes} theme package(s) missing. They will be skipped.</p>}
+                            </div>
+
+                            {assessment.assessment.themes.length > 0 && <div className="mt-5">
+                                <p className="text-sm font-medium text-gray-800">Related themes</p>
+                                <ul className="mt-2 divide-y divide-gray-200 text-sm">
+                                    {assessment.assessment.themes.map((theme) => <li key={theme.sourceId} className="flex items-center justify-between gap-4 py-2">
+                                        <span className="text-gray-800">{theme.name}</span>
+                                        <span className={theme.status === 'missing' ? 'text-amber-700' : 'text-gray-500'}>{theme.status}</span>
+                                    </li>)}
+                                </ul>
+                            </div>}
+
+                            {assessment.assessment.warnings?.length > 0 && <ul className="mt-4 space-y-1 text-sm text-amber-700">
+                                {assessment.assessment.warnings.map((warning, index) => (
+                                    <li key={`${warning.code || 'warning'}-${warning.filename || index}`}>
+                                        {formatImportAssessmentWarning(warning)}
+                                    </li>
+                                ))}
+                            </ul>}
+
+                            <fieldset className="mt-6">
+                                <legend className="text-sm font-medium text-gray-800">Include</legend>
+                                <div className="mt-2 flex flex-wrap gap-x-6 gap-y-3">
+                                    {[
+                                        ['Site', includeSite, setIncludeSite],
+                                        ['Media', includeMedia, setIncludeMedia],
+                                        ['Themes', includeThemes, setIncludeThemes],
+                                    ].map(([label, checked, setter]) => <label key={label} className="flex min-h-10 items-center gap-2 text-sm text-gray-700">
+                                        <input type="checkbox" checked={checked} onChange={(event) => setter(event.target.checked)} disabled={isImporting} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                        {label}
+                                    </label>)}
+                                </div>
+                            </fieldset>
+
+                            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                                <label className="text-sm font-medium text-gray-700">
+                                    Import mode
+                                    <select value={mode} onChange={(event) => setMode(event.target.value)} disabled={isImporting} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal">
+                                        <option value="update" disabled={!assessment.existingSites?.length}>Update · add and update changed material</option>
+                                        <option value="clone">Clone · create an independent copy</option>
+                                        <option value="replace" disabled={!assessment.existingSites?.length}>Replace · match the imported site</option>
+                                    </select>
+                                </label>
+                                {['update', 'replace'].includes(mode) && includeSite && <label className="text-sm font-medium text-gray-700">
+                                    Existing site
+                                    <select value={existingRootId} onChange={(event) => setExistingRootId(event.target.value)} disabled={isImporting} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal">
+                                        {(assessment.existingSites || []).map((site) => <option key={site.id || site.bindingId} value={site.id || site.localRootId}>{site.title}</option>)}
+                                    </select>
+                                </label>}
+                            </div>
+
+                            {mode === 'clone' && includeMedia && <div className="mt-5">
+                                <label className="flex min-h-10 items-center gap-2 text-sm text-gray-700">
+                                    <input type="checkbox" checked={separateMediaNamespace} onChange={(event) => setSeparateMediaNamespace(event.target.checked)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    Put cloned media in a separate namespace
+                                </label>
+                                {separateMediaNamespace && <label className="mt-2 block text-sm font-medium text-gray-700">
+                                    Namespace name
+                                    <input value={mediaNamespaceName} onChange={(event) => setMediaNamespaceName(event.target.value)} placeholder={`${assessment.title || 'Imported site'} media`} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" />
+                                </label>}
+                            </div>}
+
+                            {mode === 'replace' && <p className="mt-5 border-l-4 border-amber-500 bg-amber-50 px-4 py-3 text-sm text-amber-900">Replace removes stale pages previously bound to this imported site. Unrelated workspace content is preserved.</p>}
+                        </section>}
                     </div>
 
                     <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
@@ -2269,33 +2445,14 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                         >
                             Cancel
                         </button>
-                        {source === 'zip' && zipConflict && <>
-                            <button
-                                type="button"
-                                onClick={() => startZipImport('clone')}
-                                disabled={isImporting}
-                                className="inline-flex items-center gap-2 rounded border border-blue-300 bg-white px-4 py-2 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                            >
-                                Create new clone
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => startZipImport('update')}
-                                disabled={isImporting || !existingRootId}
-                                className="inline-flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-                            >
-                                {isImporting && <Loader2 className="h-4 w-4 animate-spin" />}
-                                Import over existing site
-                            </button>
-                        </>}
-                        {source === 'zip' && !zipConflict && <button
-                            type="submit"
-                            form="site-package-zip-form"
-                            disabled={isImporting || !file}
+                        {assessment?.assessment && <button
+                            type="button"
+                            onClick={startReviewedImport}
+                            disabled={isImporting || (!includeSite && !includeMedia && !includeThemes) || (['update', 'replace'].includes(mode) && includeSite && !existingRootId) || (mode === 'clone' && includeMedia && separateMediaNamespace && !mediaNamespaceName.trim())}
                             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                         >
                             {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                            {isImporting ? 'Uploading...' : 'Import Root'}
+                            {isImporting ? 'Starting import…' : 'Start import'}
                         </button>}
                     </div>
                 </div>

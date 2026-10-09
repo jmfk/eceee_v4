@@ -31,16 +31,35 @@ export const sitePackagesApi = {
         return api.get(endpoints.sitePackages.imports)
     }, 'sitePackages.listImports'),
 
+    assessImport: wrapApiCall(async ({ file, themeFiles = [] }) => {
+        const formData = new FormData()
+        formData.append('site_zip', file)
+        themeFiles.forEach((themeFile) => formData.append('theme_zips', themeFile))
+        return api.post(endpoints.sitePackages.assess, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+    }, 'sitePackages.assessImport'),
+
     createImport: wrapApiCall(async ({
         file,
         preservePublicationStatus = true,
         mode = 'prompt',
-        existingRootId = null
+        existingRootId = null,
+        themeFiles = [],
+        includeSite = true,
+        includeMedia = true,
+        includeThemes = true,
+        mediaNamespaceName = ''
     }) => {
         const formData = new FormData()
         formData.append('site_zip', file)
         formData.append('preservePublicationStatus', preservePublicationStatus ? 'true' : 'false')
         formData.append('mode', mode)
+        formData.append('includeSite', includeSite ? 'true' : 'false')
+        formData.append('includeMedia', includeMedia ? 'true' : 'false')
+        formData.append('includeThemes', includeThemes ? 'true' : 'false')
+        if (mediaNamespaceName) formData.append('mediaNamespaceName', mediaNamespaceName)
+        themeFiles.forEach((themeFile) => formData.append('theme_zips', themeFile))
         if (existingRootId !== null) formData.append('existingRootId', String(existingRootId))
         return api.post(endpoints.sitePackages.imports, formData, {
             headers: {
@@ -57,12 +76,25 @@ export const sitePackagesApi = {
         return api.post(endpoints.sitePackages.remoteSites, { connectionId })
     }, 'sitePackages.listRemoteSites'),
 
-    createRemoteImport: wrapApiCall(async ({ connectionId, remoteSiteKey, mode, localRootId = null }) => {
+    createRemoteImport: wrapApiCall(async ({
+        connectionId,
+        remoteSiteKey,
+        mode,
+        localRootId = null,
+        includeSite = true,
+        includeMedia = true,
+        includeThemes = true,
+        mediaNamespaceName = ''
+    }) => {
         return api.post(endpoints.sitePackages.remoteImports, {
             connectionId,
             remoteSiteKey,
             mode,
-            localRootId
+            localRootId,
+            includeSite,
+            includeMedia,
+            includeThemes,
+            mediaNamespaceName
         })
     }, 'sitePackages.createRemoteImport')
 }
