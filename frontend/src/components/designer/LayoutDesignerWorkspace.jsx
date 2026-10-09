@@ -1,14 +1,16 @@
 import { createElement, useEffect, useMemo, useRef, useState } from 'react'
-import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Braces, Copy, Maximize2, Minus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
+import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Braces, Copy, KeyRound, Maximize2, Minus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Redo2, RotateCcw, Trash2, Undo2 } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { validateLayoutDefinition } from '../../rendering/themeLayoutRenderer'
 import { themeBreakpointDefinition } from '../theme/breakpointConfig'
+import { inheritedLayoutStyle } from './layoutStyleInheritance'
 
 const nodeTypes = ['container', 'section', 'grid', 'row', 'column', 'semantic', 'slot']
 const styleFields = ['display', 'width', 'max_width', 'min_height', 'grid_template_columns', 'grid_column', 'flex_direction', 'flex_wrap', 'flex_grow', 'order', 'gap', 'padding', 'margin', 'align_items', 'justify_content', 'background_color', 'color', 'border', 'border_radius']
-const externallyEditableNodeTypes = new Set(['container', 'semantic', 'slot'])
-const defaultPresentationColors = { container: '#3b82f6', semantic: '#f59e0b', slot: '#f43f5e' }
+const gridStyleFields = ['grid_template_columns', 'gap', 'padding', 'margin', 'align_items', 'justify_content']
+const externallyEditableNodeTypes = new Set(['container', 'grid', 'semantic', 'slot'])
+const defaultPresentationColors = { container: '#3b82f6', grid: '#a855f7', semantic: '#f59e0b', slot: '#f43f5e' }
 const defaultStructureWidth = 300
 const minStructureWidth = 220
 const maxStructureWidth = 520
@@ -72,10 +74,21 @@ const documentError = (document) => {
     return invalid ? `Layout “${invalid.label || invalid.key || 'Untitled'}” has an invalid tree or slot definition.` : ''
 }
 
+const nodeDisplayName = (node) => {
+    if (!node) return 'Inspector'
+    const label = String(node.label || '').trim()
+    if (node.type === 'slot') return label || `Slot · ${node.slot_key}`
+    if (node.type === 'semantic') {
+        const tag = String(node.tag || 'div').toLowerCase()
+        return label ? `${label} <${tag}>` : `${tag.charAt(0).toUpperCase()}${tag.slice(1)}`
+    }
+    return label || `${node.type.charAt(0).toUpperCase()}${node.type.slice(1)}`
+}
+
 const TreeNode = ({ node, selectedId, onSelect, onDragStart, onDrop, disabled = false, depth = 0 }) => (
     <li>
         <button type="button" draggable={!disabled} disabled={disabled} onDragStart={(event) => { if (!disabled) onDragStart(event, node.id) }} onDragOver={(event) => { if (!disabled && node.type !== 'slot') event.preventDefault() }} onDrop={(event) => { if (!disabled) onDrop(event, node.id) }} onClick={() => onSelect(node.id)} aria-current={selectedId === node.id ? 'true' : undefined} className={`flex min-h-8 w-full items-center gap-2 rounded px-2 py-1 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 ${selectedId === node.id ? 'bg-blue-50 font-medium text-blue-800' : 'text-gray-700 hover:bg-gray-100'}`} style={{ paddingLeft: `${8 + depth * 14}px` }}>
-            <span className="truncate">{node.label || (node.type === 'slot' ? `Slot · ${node.slot_key}` : node.type)}</span>
+            <span className="truncate">{nodeDisplayName(node)}</span>
         </button>
         {node.children.length > 0 && <ul>{node.children.map((child) => <TreeNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} onDragStart={onDragStart} onDrop={onDrop} disabled={disabled} depth={depth + 1} />)}</ul>}
     </li>
@@ -118,6 +131,12 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
     const selected = selectedLayout ? findNode(selectedLayout.root, selectedNodeId) : null
     const usage = workspace.layoutUsage?.[selectedLayout?.key] || { pageCount: 0, pageIds: [], versionCount: 0, schemaCount: 0, slots: {} }
     const activeStyleBreakpoint = activeBreakpoint === 'xs' ? 'base' : activeBreakpoint
+    const styleFieldGroups = selected?.node.type === 'grid'
+        ? [
+            { label: 'Grid layout', fields: gridStyleFields },
+            { label: 'Other styles', fields: styleFields.filter((field) => !gridStyleFields.includes(field)) },
+        ]
+        : [{ label: 'Responsive styles', fields: styleFields }]
     const canvasWidth = breakpointCanvasWidth(breakpointEntries, activeBreakpoint)
     const fitZoom = canvasViewportSize.width ? Math.min(1, Math.max(0.25, (canvasViewportSize.width - 24) / canvasWidth)) : 1
     const canvasZoom = zoomMode === 'fit' ? fitZoom : manualZoom
@@ -290,6 +309,21 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
     }
 
     const updateNode = (updater) => updateLayout((layout) => ({ ...layout, root: mapNode(layout.root, selectedNodeId, updater) }))
+
+    const setStyleOverride = (field, value) => updateNode((node) => {
+        const styles = clone(node.styles || {})
+        styles[activeStyleBreakpoint] = { ...(styles[activeStyleBreakpoint] || {}), [field]: value }
+        return { ...node, styles }
+    })
+
+    const resetStyleOverride = (field) => updateNode((node) => {
+        const styles = clone(node.styles || {})
+        if (styles[activeStyleBreakpoint]) {
+            delete styles[activeStyleBreakpoint][field]
+            if (!Object.keys(styles[activeStyleBreakpoint]).length) delete styles[activeStyleBreakpoint]
+        }
+        return { ...node, styles }
+    })
 
     const addLayout = () => {
         const count = layouts.items.length + 1
@@ -640,7 +674,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
             </div>
             <aside className={`min-h-0 overflow-y-auto border-l border-gray-200 bg-white xl:col-start-5 xl:border-l-0 ${inspectorCollapsed ? 'overflow-hidden p-1.5' : 'p-4'}`}>
                 <div className={`flex items-center ${inspectorCollapsed ? 'justify-center' : 'justify-between gap-2'}`}>
-                    {!inspectorCollapsed && <h2 className="truncate text-sm font-semibold text-gray-900">{inspectingLayout ? 'Layout inspector' : selected?.node.label || (selected?.node.type === 'slot' ? `Slot · ${selected.node.slot_key}` : selected?.node.type || 'Inspector')}</h2>}
+                    {!inspectorCollapsed && <h2 className="truncate text-sm font-semibold text-gray-900">{inspectingLayout ? 'Layout inspector' : nodeDisplayName(selected?.node)}</h2>}
                     <button type="button" onClick={() => setInspectorCollapsed((current) => !current)} className={iconButton} aria-label={inspectorCollapsed ? 'Expand layout inspector' : 'Collapse layout inspector'} aria-expanded={!inspectorCollapsed} title={inspectorCollapsed ? 'Expand layout inspector' : 'Collapse layout inspector'}>{inspectorCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}</button>
                 </div>
                 {!inspectorCollapsed && <fieldset disabled={disabled} className="contents">
@@ -684,24 +718,38 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
                         <details className="rounded border border-gray-200 bg-gray-50 p-2"><summary className="cursor-pointer text-xs font-medium text-gray-700">Default widgets (read-only)</summary><pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[11px] text-gray-600">{JSON.stringify(selectedLayout.slots[selected.node.slot_key]?.default_widgets || [], null, 2)}</pre></details>
                         <p className="text-xs text-gray-500">{usage.slots?.[selected.node.slot_key] || 0} versions contain widgets in this slot.</p>
                     </div>}
-                    <div className="mt-4 space-y-2">
-                        <div>
-                            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Responsive styles</h4>
-                            {externallyEditableNodeTypes.has(selected.node.type) && <p className="mt-1 text-[11px] leading-4 text-gray-500">Check the box beside a field to expose it in the Theme Designer.</p>}
-                        </div>
-                        {styleFields.map((field) => {
+                    <div className="mt-4 space-y-4">
+                        {styleFieldGroups.map((group, groupIndex) => <section key={group.label} className="space-y-2">
+                            <div>
+                                <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{group.label}</h4>
+                                {groupIndex === 0 && externallyEditableNodeTypes.has(selected.node.type) && <p className="mt-1 text-[11px] leading-4 text-gray-500">Use the checkbox to expose a property in the Theme Designer.</p>}
+                            </div>
+                            {group.fields.map((field) => {
                             const fieldLabel = field.replaceAll('_', ' ')
-                            return <div key={field} className="grid grid-cols-[1fr_1.2fr] items-center gap-2 text-xs text-gray-600">
-                                <label htmlFor={`layout-style-${selected.node.id}-${activeStyleBreakpoint}-${field}`} className="capitalize">{fieldLabel}</label>
-                                <div className="flex min-w-0">
-                                    {['background_color', 'color'].includes(field) && <input type="color" aria-label={`Pick ${fieldLabel}`} value={colorPickerValue(selected.node.styles?.[activeStyleBreakpoint]?.[field], field === 'color' ? '#111827' : '#ffffff')} onChange={(event) => updateNode((node) => { const styles = clone(node.styles || {}); styles[activeStyleBreakpoint] = { ...(styles[activeStyleBreakpoint] || {}), [field]: event.target.value }; return { ...node, styles } })} className="h-[30px] w-9 shrink-0 cursor-pointer rounded-l border border-r-0 border-gray-300 bg-white p-1" />}
-                                    <input id={`layout-style-${selected.node.id}-${activeStyleBreakpoint}-${field}`} aria-label={`${fieldLabel} value`} value={selected.node.styles?.[activeStyleBreakpoint]?.[field] ?? ''} onChange={(event) => updateNode((node) => { const styles = clone(node.styles || {}); styles[activeStyleBreakpoint] = { ...(styles[activeStyleBreakpoint] || {}) }; if (event.target.value) styles[activeStyleBreakpoint][field] = event.target.value; else delete styles[activeStyleBreakpoint][field]; return { ...node, styles } })} className={`min-w-0 flex-1 border border-gray-300 px-2 py-1.5 text-xs ${['background_color', 'color'].includes(field) ? externallyEditableNodeTypes.has(selected.node.type) ? '' : 'rounded-r' : externallyEditableNodeTypes.has(selected.node.type) ? 'rounded-l' : 'rounded'}`} />
+                            const currentStyles = selected.node.styles?.[activeStyleBreakpoint] || {}
+                            const hasOverride = Object.hasOwn(currentStyles, field)
+                            const inherited = hasOverride ? null : inheritedLayoutStyle(selected.node, field, activeBreakpoint, workspace.breakpoints)
+                            const displayedValue = hasOverride ? currentStyles[field] : inherited?.value || ''
+                            const inheritedLabel = inherited?.breakpoint === 'base' ? 'Base' : themeBreakpointDefinition(inherited?.breakpoint)?.label || inherited?.breakpoint?.toUpperCase()
+                            const canReset = activeStyleBreakpoint !== 'base' && hasOverride
+                            const hasTrailingControl = Boolean(inherited || canReset || externallyEditableNodeTypes.has(selected.node.type))
+                            return <div key={field} className="grid grid-cols-[1fr_1.2fr] items-start gap-2 text-xs text-gray-600">
+                                <label htmlFor={`layout-style-${selected.node.id}-${activeStyleBreakpoint}-${field}`} className="pt-1.5 capitalize">{fieldLabel}</label>
+                                <div className="min-w-0">
+                                    <div className="flex min-w-0">
+                                    {['background_color', 'color'].includes(field) && <input type="color" aria-label={`Pick ${fieldLabel}`} value={colorPickerValue(displayedValue, field === 'color' ? '#111827' : '#ffffff')} disabled={Boolean(inherited)} onChange={(event) => setStyleOverride(field, event.target.value)} className="h-[30px] w-9 shrink-0 cursor-pointer rounded-l border border-r-0 border-gray-300 bg-white p-1 disabled:cursor-not-allowed disabled:bg-gray-100" />}
+                                    <input id={`layout-style-${selected.node.id}-${activeStyleBreakpoint}-${field}`} aria-label={`${fieldLabel} value`} value={displayedValue} disabled={Boolean(inherited)} onChange={(event) => event.target.value ? setStyleOverride(field, event.target.value) : resetStyleOverride(field)} className={`min-w-0 flex-1 border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 ${['background_color', 'color'].includes(field) ? hasTrailingControl ? '' : 'rounded-r' : hasTrailingControl ? 'rounded-l' : 'rounded'}`} />
+                                    {inherited && <button type="button" onClick={() => setStyleOverride(field, inherited.value)} aria-label={`Override ${fieldLabel} at ${activeBreakpoint === 'xs' ? 'Base' : themeBreakpointDefinition(activeBreakpoint)?.label || activeBreakpoint.toUpperCase()}`} title={`Create ${activeBreakpoint.toUpperCase()} override`} className="inline-flex h-[30px] w-8 shrink-0 items-center justify-center border-y border-r border-gray-300 bg-white text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><KeyRound className="h-3.5 w-3.5" /></button>}
+                                    {canReset && <button type="button" onClick={() => resetStyleOverride(field)} aria-label={`Reset ${fieldLabel} override`} title="Reset override" className="inline-flex h-[30px] w-8 shrink-0 items-center justify-center border-y border-r border-gray-300 bg-white text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><RotateCcw className="h-3.5 w-3.5" /></button>}
                                     {externallyEditableNodeTypes.has(selected.node.type) && <label title={`Expose ${fieldLabel} in the Theme Designer`} className="inline-flex w-9 shrink-0 cursor-pointer items-center justify-center rounded-r border border-l-0 border-gray-300 bg-gray-50 hover:bg-gray-100">
                                         <input type="checkbox" aria-label={`Expose ${fieldLabel} in Theme Designer`} checked={(selected.node.editable_parameters || []).includes(field)} onChange={(event) => updateNode((node) => { const parameters = new Set(node.editable_parameters || []); if (event.target.checked) parameters.add(field); else parameters.delete(field); return { ...node, editable_parameters: [...parameters] } })} />
                                     </label>}
+                                    </div>
+                                    {inherited && <p className="mt-1 text-[10px] text-gray-500">Inherited from {inheritedLabel}</p>}
                                 </div>
                             </div>
-                        })}
+                            })}
+                        </section>)}
                     </div>
                 </div>}
                 </fieldset>}

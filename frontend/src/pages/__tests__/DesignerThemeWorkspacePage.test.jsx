@@ -223,7 +223,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByTitle('Live theme preview')).not.toHaveAttribute('srcdoc')
     })
 
-    it('edits layout parameters explicitly exposed by a named layout element', async () => {
+    it('edits inherited parameters explicitly exposed by a grid layout element', async () => {
         const layoutWorkspace = structuredClone(workspace)
         layoutWorkspace.layouts = {
             schema_version: 1,
@@ -236,10 +236,10 @@ describe('DesignerThemeWorkspacePage', () => {
                 slots: { main: { label: 'Main content' } },
                 root: {
                     id: '2d1ee676-3624-4ec8-aaf4-8874bea037f4',
-                    type: 'container',
-                    label: 'Site frame',
-                    editable_parameters: ['width', 'background_color'],
-                    styles: { base: { width: '100%' } },
+                    type: 'grid',
+                    label: 'Content grid',
+                    editable_parameters: ['background_color', 'gap', 'grid_template_columns'],
+                    styles: { base: { gap: '30px' }, lg: { grid_template_columns: 'repeat(3, minmax(0, 1fr))' } },
                     children: [{
                         id: '114eff0f-f86f-4a10-8df5-27925804fc73',
                         type: 'slot', slot_key: 'main', children: [], styles: {},
@@ -255,21 +255,30 @@ describe('DesignerThemeWorkspacePage', () => {
             data: {
                 source: 'eceee-designer-preview', action: 'select',
                 targetId: 'layout-node:2d1ee676-3624-4ec8-aaf4-8874bea037f4',
-                kind: 'element', label: 'Site frame',
+                kind: 'element', label: 'Content grid',
                 layoutNodeId: '2d1ee676-3624-4ec8-aaf4-8874bea037f4',
-                editableParameters: ['width', 'background_color'],
+                editableParameters: ['background_color', 'gap', 'grid_template_columns'],
             },
             source: iframe.contentWindow,
         }))
 
-        const width = await screen.findByLabelText('Site frame Width')
-        const background = screen.getByLabelText('Site frame Background color')
-        expect(width).toHaveValue('')
-        expect(width).toHaveAttribute('placeholder', 'Inherited')
-        expect(background).toHaveAttribute('placeholder', 'Inherited')
+        const gap = await screen.findByLabelText('Content grid Gap')
+        const columns = screen.getByLabelText('Content grid Grid template columns')
+        const background = screen.getByLabelText('Content grid Background color')
+        expect(gap).toBeDisabled()
+        expect(gap).toHaveValue('30px')
+        expect(columns).toBeDisabled()
+        expect(columns).toHaveValue('repeat(3, minmax(0, 1fr))')
+        expect(background).toBeEnabled()
+        expect(background).toHaveValue('')
 
-        fireEvent.change(width, { target: { value: '90%' } })
-        expect(width).toHaveValue('90%')
+        fireEvent.click(screen.getByRole('button', { name: 'Override Gap at Extra Large' }))
+        expect(gap).toBeEnabled()
+        fireEvent.change(gap, { target: { value: '36px' } })
+        expect(gap).toHaveValue('36px')
+        fireEvent.click(screen.getByRole('button', { name: 'Reset Gap override' }))
+        expect(gap).toBeDisabled()
+        expect(gap).toHaveValue('30px')
     })
 
     it('resizes both side panes with dragging and keyboard controls', async () => {

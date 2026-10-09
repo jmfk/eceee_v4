@@ -34,7 +34,7 @@ STYLE_PROPERTIES = {
     "border",
     "border_radius",
 }
-EXTERNALLY_EDITABLE_NODE_TYPES = {"container", "semantic", "slot"}
+EXTERNALLY_EDITABLE_NODE_TYPES = {"container", "grid", "semantic", "slot"}
 COLLAPSE_BEHAVIORS = {"never", "any", "all"}
 MAX_LAYOUTS = 50
 MAX_NODES = 250
@@ -172,6 +172,7 @@ def _main_layout():
         "main/main",
         "semantic",
         tag="main",
+        label="Main content",
         class_names=["main-layout-main"],
         styles={
             "base": {"width": "100%", "max_width": "650px", "margin": "0 auto"},
@@ -183,6 +184,7 @@ def _main_layout():
         "main/aside",
         "semantic",
         tag="aside",
+        label="Sidebar",
         class_names=["main-layout-aside"],
         styles={
             "base": {"display": "grid", "grid_template_columns": "1fr", "gap": "30px", "min_height": "310px"},
@@ -194,6 +196,7 @@ def _main_layout():
     grid = _node(
         "main/grid",
         "grid",
+        label="Content grid",
         class_names=["main-layout-grid"],
         styles={
             "base": {
@@ -213,8 +216,8 @@ def _main_layout():
     )
     footer = _node(
         "main/footer",
-        "semantic",
-        tag="footer",
+        "container",
+        label="Footer wrapper",
         class_names=["main-layout-footer"],
         styles={"base": {"min_height": "310px", "display": "flex", "flex_direction": "column"}},
         children=[_slot_node("main", "footer")],
@@ -222,6 +225,7 @@ def _main_layout():
     wrapper = _node(
         "main/wrapper",
         "container",
+        label="Page surface",
         class_names=["main-layout-wrapper"],
         styles={
             "base": {
@@ -245,6 +249,7 @@ def _main_layout():
         "root": _node(
             "main/root",
             "container",
+            label="Viewport background",
             class_names=["main-layout-container"],
             styles={
                 "base": {
@@ -281,14 +286,15 @@ def _landing_layout():
         "landing/main",
         "semantic",
         tag="main",
+        label="Main content",
         class_names=["landing-page-main"],
         styles={"base": {"padding": "30px", "min_height": "310px", "background_color": "#ffffff"}},
         children=[_slot_node("landing", "landing_page", ["layout-slot", "slot-landing-page", "slot-landingPage"])],
     )
     footer = _node(
         "landing/footer",
-        "semantic",
-        tag="footer",
+        "container",
+        label="Footer wrapper",
         class_names=["landing-page-footer"],
         styles={"base": {"min_height": "310px", "display": "flex", "flex_direction": "column"}},
         children=[_slot_node("landing", "footer")],
@@ -296,6 +302,7 @@ def _landing_layout():
     wrapper = _node(
         "landing/wrapper",
         "container",
+        label="Page surface",
         class_names=["landing-page-wrapper"],
         styles={
             "base": {
@@ -325,6 +332,7 @@ def _landing_layout():
         "root": _node(
             "landing/root",
             "container",
+            label="Viewport background",
             class_names=["landing-page-container"],
             styles={
                 "base": {
@@ -425,6 +433,7 @@ def _error_layout():
             "error/root",
             "semantic",
             tag="main",
+            label="Error page",
             class_names=["error-layout-container"],
             styles={
                 "base": {
@@ -601,7 +610,7 @@ def validate_theme_layouts(document):
                 _validate_string_list(editable_parameters, f"{path}.root node editable_parameters")
                 if node_type not in EXTERNALLY_EDITABLE_NODE_TYPES:
                     raise ValidationError(
-                        f"{path}.root only container, semantic, and slot nodes can expose editable parameters."
+                        f"{path}.root only container, grid, semantic, and slot nodes can expose editable parameters."
                     )
                 if any(parameter not in STYLE_PROPERTIES for parameter in editable_parameters):
                     raise ValidationError(f"{path}.root node exposes an unsupported editable parameter.")
