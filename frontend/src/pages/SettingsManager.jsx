@@ -39,6 +39,7 @@ import BulkPublishingOperations from '../components/BulkPublishingOperations'
 import NamespaceManager from '../components/NamespaceManager'
 import ObjectTypeManager from '../components/ObjectTypeManager'
 import DataConnectionsManager from '../components/DataConnectionsManager'
+import RemoteSitesSettings from '../components/RemoteSitesSettings'
 import MigrationManager from '../components/contentMigration/MigrationManager'
 import ContextualHelpLink from '../components/help/ContextualHelpLink'
 import WidgetManager from '../components/WidgetManager'
@@ -64,6 +65,7 @@ const SettingsManager = () => {
         if (path === '/settings/versions') return 'versions'
         if (path === '/settings/publishing') return 'publishing'
         if (path === '/settings/namespaces') return 'namespaces'
+        if (path === '/settings/remote-sites') return 'remote-sites'
         if (path.startsWith('/settings/data-connections')) return 'data-connections'
         if (path.startsWith('/settings/content-migration')) return 'content-migration'
         return 'dashboard' // default for /settings or fallback
@@ -80,6 +82,7 @@ const SettingsManager = () => {
         'versions': 'Settings - Versions',
         'publishing': 'Settings - Publishing',
         'namespaces': 'Settings - Namespaces',
+        'remote-sites': 'Settings - Remote Sites',
         'data-connections': 'Settings - Data Connections',
         'content-migration': 'Settings - Content Migration'
     }
@@ -409,6 +412,8 @@ const SettingsManager = () => {
                 return renderPublishingWorkflow()
             case 'namespaces':
                 return renderNamespaceManagement()
+            case 'remote-sites':
+                return <RemoteSitesSettings />
             case 'data-connections':
                 return <DataConnectionsManager />
             case 'content-migration':

@@ -22,6 +22,7 @@ const SettingsLayout = ({ children, statusContent }) => {
         if (path.includes('/versions')) return 'Settings - Versions'
         if (path.includes('/publishing')) return 'Settings - Publishing'
         if (path.includes('/namespaces')) return 'Settings - Namespaces'
+        if (path.includes('/remote-sites')) return 'Settings - Remote Sites'
         if (path.includes('/data-connections')) return 'Settings - Data Connections'
         if (path.includes('/schemas/system')) return 'System Schema'
         if (path.includes('/schemas/layout')) return 'Layout Schemas'

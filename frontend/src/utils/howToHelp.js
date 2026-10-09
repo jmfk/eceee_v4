@@ -128,6 +128,7 @@ const SETTINGS_HELP_TOPICS = {
     versions: 'settings',
     publishing: 'settings-publishing',
     namespaces: 'settings-data',
+    'remote-sites': 'settings',
     'data-connections': 'settings-data',
     'content-migration': 'settings-data'
 }

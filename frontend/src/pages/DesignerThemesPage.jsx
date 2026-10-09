@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, GitCompareArrows, History, Palette, Plus, RefreshCw, Settings, Trash2 } from 'lucide-react'
+import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, GitCompareArrows, History, Palette, RefreshCw } from 'lucide-react'
 import DesignerNavbar from '../components/DesignerNavbar'
 import StatusBar from '../components/StatusBar'
 import { designerThemesApi } from '../api/designerThemes'
@@ -22,9 +22,6 @@ const DesignerThemesPage = () => {
     const [editingVersionId, setEditingVersionId] = useState(null)
     const [versionNameDraft, setVersionNameDraft] = useState('')
     const [remoteOpen, setRemoteOpen] = useState(false)
-    const [connectionForm, setConnectionForm] = useState({ name: '', baseUrl: '', remoteWorkspace: '', accessKey: '', isDefault: false })
-    const [editingConnectionId, setEditingConnectionId] = useState(null)
-    const [showConnectionForm, setShowConnectionForm] = useState(false)
     const [remoteThemes, setRemoteThemes] = useState([])
     const [loading, setLoading] = useState(true)
     const [busy, setBusy] = useState('')
@@ -140,47 +137,17 @@ const DesignerThemesPage = () => {
         finally { setBusy('') }
     }
 
-    const saveConnection = async () => {
-        setBusy('save-connection')
-        setError('')
-        try {
-            if (editingConnectionId) await designerThemesApi.updateRemoteConnection(editingConnectionId, connectionForm)
-            else await designerThemesApi.createRemoteConnection(connectionForm)
-            setConnectionForm({ name: '', baseUrl: '', remoteWorkspace: '', accessKey: '', isDefault: false })
-            setEditingConnectionId(null)
-            setShowConnectionForm(false)
-            await loadThemes()
-        } catch (err) { setError(err.message || 'Unable to save the remote site.') }
-        finally { setBusy('') }
-    }
-
-    const editConnection = (connection) => {
-        setConnectionForm({ name: connection.name, baseUrl: connection.baseUrl, remoteWorkspace: connection.remoteWorkspace, accessKey: '', isDefault: connection.isDefault })
-        setEditingConnectionId(connection.id)
-        setShowConnectionForm(true)
-    }
-
-    const removeConnection = async (connection) => {
-        if (!window.confirm(`Remove the saved remote site “${connection.name}”?`)) return
-        setBusy(`delete-${connection.id}`)
-        try { await designerThemesApi.deleteRemoteConnection(connection.id); setRemoteThemes([]); setSelectedConnectionId(''); await loadThemes() }
-        catch (err) { setError(err.message || 'Unable to remove the remote site.') }
-        finally { setBusy('') }
-    }
-
     return <div className="fixed inset-0 flex flex-col bg-gray-50">
         <DesignerNavbar />
         <main className="flex-1 overflow-y-auto"><div className="mx-auto max-w-6xl px-6 py-10">
             <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
                 <div><h1 className="text-2xl font-bold text-gray-900">Designer themes</h1><p className="mt-1 text-sm text-gray-600">Compare designs, inspect version history, or open a theme for editing.</p></div>
-                {(connections.length > 0 || canManageRemotes) && <button type="button" onClick={() => setRemoteOpen((value) => !value)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"><RefreshCw className="h-4 w-4" />Remote sites</button>}
+                {(connections.length > 0 || canManageRemotes) && <button type="button" onClick={() => setRemoteOpen((value) => !value)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"><RefreshCw className="h-4 w-4" />Remote themes</button>}
             </div>
             {error && <div role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">{error}</div>}
-            {remoteOpen && <section className="mb-6 rounded-lg border border-gray-200 bg-white p-5" aria-label="Remote sites panel">
-                <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold text-gray-900">Remote sites</h2><p className="mt-1 text-sm text-gray-600">Choose a saved connection. Access keys remain protected on the server.</p></div>{canManageRemotes && <button type="button" onClick={() => { setEditingConnectionId(null); setConnectionForm({ name: '', baseUrl: '', remoteWorkspace: '', accessKey: '', isDefault: false }); setShowConnectionForm((value) => !value) }} className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm"><Plus className="h-4 w-4" />Add remote site</button>}</div>
-                {showConnectionForm && <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-4"><div className="grid gap-3 md:grid-cols-2"><label className="text-sm text-gray-700">Name<input aria-label="Connection name" value={connectionForm.name} onChange={(event) => setConnectionForm({ ...connectionForm, name: event.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /></label><label className="text-sm text-gray-700">Site URL<input aria-label="Site URL" value={connectionForm.baseUrl} onChange={(event) => setConnectionForm({ ...connectionForm, baseUrl: event.target.value })} placeholder="https://example.org" className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /></label><label className="text-sm text-gray-700">Remote workspace<input aria-label="Remote workspace" value={connectionForm.remoteWorkspace} onChange={(event) => setConnectionForm({ ...connectionForm, remoteWorkspace: event.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /></label><label className="text-sm text-gray-700">Access key{editingConnectionId && ' (leave blank to keep current)'}<input aria-label="Access key" type="password" autoComplete="new-password" value={connectionForm.accessKey} onChange={(event) => setConnectionForm({ ...connectionForm, accessKey: event.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /></label></div><label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={connectionForm.isDefault} onChange={(event) => setConnectionForm({ ...connectionForm, isDefault: event.target.checked })} />Use as default</label><div className="mt-4 flex gap-2"><button type="button" disabled={!connectionForm.name || !connectionForm.baseUrl || !connectionForm.remoteWorkspace || (!editingConnectionId && !connectionForm.accessKey) || busy === 'save-connection'} onClick={saveConnection} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Save connection</button><button type="button" onClick={() => setShowConnectionForm(false)} className="rounded-md border border-gray-300 px-4 py-2 text-sm">Cancel</button></div></div>}
+            {remoteOpen && <section className="mb-6 rounded-lg border border-gray-200 bg-white p-5" aria-label="Remote themes panel">
+                <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold text-gray-900">Remote themes</h2><p className="mt-1 text-sm text-gray-600">Choose an administrator-configured connection to transfer theme versions.</p></div>{canManageRemotes && <Link to="/settings/remote-sites" className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700">Manage connections</Link>}</div>
                 {connections.length > 0 ? <div className="mt-4 flex flex-wrap items-end gap-3"><label className="min-w-72 flex-1 text-sm text-gray-700">Remote site<select aria-label="Remote site" value={selectedConnectionId} onChange={(event) => { setSelectedConnectionId(event.target.value); setRemoteThemes([]) }} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2">{connections.map((item) => <option key={item.id} value={item.id}>{item.name}{item.isDefault ? ' · Default' : ''}</option>)}</select></label><button type="button" disabled={!selectedConnectionId || busy === 'remote-list'} onClick={connectRemote} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Refresh themes</button></div> : <p className="mt-4 text-sm text-gray-600">No remote sites have been configured for this workspace.</p>}
-                {canManageRemotes && connections.length > 0 && <div className="mt-4 divide-y divide-gray-200 border-y border-gray-200">{connections.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 py-3 text-sm"><div><span className="font-medium text-gray-900">{item.name}</span>{item.isDefault && <span className="ml-2 text-xs text-gray-500">Default</span>}<p className="text-xs text-gray-500">{item.baseUrl} · {item.remoteWorkspace}</p></div><div className="flex gap-2"><button type="button" onClick={() => editConnection(item)} className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1"><Settings className="h-3.5 w-3.5" />Edit</button><button type="button" onClick={() => removeConnection(item)} className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1"><Trash2 className="h-3.5 w-3.5" />Remove</button></div></div>)}</div>}
                 {remoteThemes.length > 0 && <div className="mt-5 divide-y divide-gray-200 border-t border-gray-200">{remoteThemes.map((theme) => <div key={theme.stableKey || theme.name} className="flex items-center justify-between gap-4 py-3"><div><p className="font-medium text-gray-900">{theme.name}</p><p className="text-xs text-gray-500">Remote version {theme.syncVersion}</p></div><button type="button" onClick={() => pull(theme.stableKey)} disabled={busy === `pull-${theme.stableKey}`} className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm"><ArrowDownToLine className="h-4 w-4" />Download as version</button></div>)}</div>}
             </section>}
             {selected.length === 2 && <section className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">

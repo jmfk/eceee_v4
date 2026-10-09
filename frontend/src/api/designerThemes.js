@@ -2,6 +2,7 @@ import { api } from './client.js'
 import { processResponse } from './utils.js'
 
 const base = '/api/v1/webpages/designer'
+const remoteSitesBase = '/api/v1/webpages/remote-sites'
 
 const unwrap = async (promise) => processResponse(await promise)
 
@@ -16,6 +17,10 @@ export const designerThemesApi = {
     createRemoteConnection: async (connection) => unwrap(await api.post(`${base}/remote-connections/`, connection)),
     updateRemoteConnection: async (connectionId, connection) => unwrap(await api.patch(`${base}/remote-connections/${connectionId}/`, connection)),
     deleteRemoteConnection: async (connectionId) => unwrap(await api.delete(`${base}/remote-connections/${connectionId}/`)),
+    remoteAccessKeys: async () => unwrap(await api.get(`${remoteSitesBase}/access-keys/`)),
+    createRemoteAccessKey: async (accessKey) => unwrap(await api.post(`${remoteSitesBase}/access-keys/`, accessKey)),
+    rotateRemoteAccessKey: async (accessKeyId, capabilities) => unwrap(await api.post(`${remoteSitesBase}/access-keys/${accessKeyId}/rotate/`, { capabilities })),
+    revokeRemoteAccessKey: async (accessKeyId) => unwrap(await api.post(`${remoteSitesBase}/access-keys/${accessKeyId}/revoke/`)),
     remoteThemes: async (connectionId) => unwrap(await api.post(`${base}/themes/remote/`, { connectionId })),
     pullRemoteTheme: async (connectionId, stableKey) => unwrap(await api.post(`${base}/themes/remote/pull/`, { connectionId, stableKey })),
     pushRemoteTheme: async (connectionId, themeId) => unwrap(await api.post(`${base}/themes/remote/push/`, { connectionId, themeId })),

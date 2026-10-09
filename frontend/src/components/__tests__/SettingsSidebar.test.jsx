@@ -19,7 +19,7 @@ vi.mock('react-router-dom', async () => {
 })
 
 vi.mock('../../contexts/AuthContext', () => ({
-    useAuth: () => ({ user: { username: 'editor', isSuperuser: false } }),
+    useAuth: () => ({ user: { username: 'editor', hasTenantAdminAccess: true, isSuperuser: false } }),
 }))
 
 vi.mock('../../api', () => ({
@@ -70,5 +70,11 @@ describe('SettingsSidebar', () => {
 
         expect(screen.queryByRole('link', { name: 'Layout Overview' })).not.toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'All Themes' })).toHaveAttribute('href', '/settings/themes')
+    })
+
+    it('links to unified remote site settings', () => {
+        renderSidebar()
+
+        expect(screen.getByRole('link', { name: 'Remote Sites' })).toHaveAttribute('href', '/settings/remote-sites')
     })
 })

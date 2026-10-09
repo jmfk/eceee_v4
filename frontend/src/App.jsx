@@ -426,6 +426,13 @@ export const AppRoutes = () => {
             </SettingsLayout>
           </PrivateRoute>
         } />
+        <Route path="/settings/remote-sites" element={
+          <PrivateRoute>
+            <SettingsLayout>
+              <SettingsManager />
+            </SettingsLayout>
+          </PrivateRoute>
+        } />
         <Route path="/settings/data-connections" element={
           <PrivateRoute>
             <SettingsLayout>

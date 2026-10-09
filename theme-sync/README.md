@@ -260,13 +260,15 @@ To enable in production:
 
 Designer can use several saved remote-site connections per workspace, with one connection marked as the default. Workspace administrators manage the connections; Designer users can select and use them but cannot read the stored access key.
 
-On the remote installation:
+On the remote installation, a workspace administrator can create the key in **Settings → Remote Sites → Access to this site**. Choose whether the connection may transfer themes, sites, or both, then copy the key when it is shown. The key cannot be displayed again.
+
+The production command remains available for automation and recovery:
 
 1. Enable the sync API with `THEME_SYNC_ENABLED=True`.
-2. Create or rotate a theme-only access key from the local repository. The command prints the key once:
+2. Create or rotate an access key from the local repository. The command prints the key once. Set `THEME_ACCESS_CAPABILITIES` to `theme`, `site`, or `both`:
 
    ```bash
-   make prod-theme-access-key \
+   THEME_ACCESS_CAPABILITIES=both make prod-theme-access-key \
      THEME_WORKSPACE=WORKSPACE_IDENTIFIER \
      THEME_ADMIN=ADMIN_USERNAME
    ```
@@ -279,10 +281,12 @@ On the remote installation:
    python manage.py setup_theme_remote_access \
      --workspace WORKSPACE_IDENTIFIER \
      --created-by ADMIN_USERNAME \
+     --capability theme.transfer \
+     --capability site.transfer \
      --name "Primary Designer connection"
    ```
 
-3. Copy the final output line directly into the local installation's **Designer themes → Remote sites → Add remote site** form. Do not save it in source control or chat.
+3. Copy the final output line directly into the connecting installation's **Settings → Remote Sites → Connections to other sites → Add connection** form. Do not save it in source control or chat.
 
 On the local installation, configure credential encryption before saving connections. Generate a Fernet key once and place it in the protected runtime environment as `THEME_REMOTE_CREDENTIAL_KEYS`. The first key encrypts new values; additional comma-separated keys allow key rotation and decrypt older values.
 

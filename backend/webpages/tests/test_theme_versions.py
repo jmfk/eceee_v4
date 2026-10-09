@@ -330,6 +330,76 @@ class ThemeVersionApiTests(TestCase):
         connection.refresh_from_db()
         self.assertTrue(connection.is_default)
 
+    def test_workspace_admin_manages_remote_access_keys_without_persisting_plaintext(self):
+        created = self.client.post(
+            "/api/v1/webpages/remote-sites/access-keys/",
+            {
+                "name": "Local development",
+                "capabilities": ["theme.transfer", "site.transfer", "site.transfer"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(created.status_code, 201, created.data)
+        self.assertTrue(created.data["secret"].startswith("eceee_theme_"))
+        self.assertCountEqual(created.data["capabilities"], ["theme.transfer", "site.transfer"])
+        access_key = ThemeRemoteAccessKey.objects.get(id=created.data["id"])
+        self.assertNotEqual(access_key.key_hash, created.data["secret"])
+
+        listed = self.client.get("/api/v1/webpages/remote-sites/access-keys/")
+
+        self.assertEqual(listed.status_code, 200, listed.data)
+        self.assertNotIn("secret", listed.data["results"][0])
+        self.assertNotIn("keyHash", listed.data["results"][0])
+
+    def test_remote_access_key_rotation_returns_one_new_secret_and_reactivates_key(self):
+        raw_key, key_hash, key_prefix = generate_access_key()
+        access_key = ThemeRemoteAccessKey.objects.create(
+            tenant=self.tenant,
+            name="Transfer key",
+            key_hash=key_hash,
+            key_prefix=key_prefix,
+            capabilities=["theme.transfer"],
+            created_by=self.user,
+            is_active=False,
+        )
+
+        rotated = self.client.post(
+            f"/api/v1/webpages/remote-sites/access-keys/{access_key.id}/rotate/",
+            {"capabilities": ["site.transfer"]},
+            format="json",
+        )
+
+        self.assertEqual(rotated.status_code, 200, rotated.data)
+        self.assertNotEqual(rotated.data["secret"], raw_key)
+        access_key.refresh_from_db()
+        self.assertTrue(access_key.is_active)
+        self.assertEqual(access_key.capabilities, ["site.transfer"])
+
+        revoked = self.client.post(f"/api/v1/webpages/remote-sites/access-keys/{access_key.id}/revoke/")
+        self.assertEqual(revoked.status_code, 200, revoked.data)
+        self.assertFalse(revoked.data["isActive"])
+        self.assertNotIn("secret", revoked.data)
+
+    def test_remote_access_keys_require_workspace_admin_and_a_capability(self):
+        no_capabilities = self.client.post(
+            "/api/v1/webpages/remote-sites/access-keys/",
+            {"name": "Invalid", "capabilities": []},
+            format="json",
+        )
+        self.assertEqual(no_capabilities.status_code, 400, no_capabilities.data)
+
+        designer = User.objects.create_user("remote-key-designer", password="test")
+        ThemeDesignerAssignment.objects.create(
+            tenant=self.tenant,
+            theme=self.left,
+            user=designer,
+            created_by=self.user,
+        )
+        self.client.force_authenticate(designer)
+        denied = self.client.get("/api/v1/webpages/remote-sites/access-keys/")
+        self.assertEqual(denied.status_code, 403, denied.data)
+
     @override_settings(THEME_SYNC_ENABLED=True)
     def test_scoped_remote_access_key_authenticates_only_for_its_workspace(self):
         raw_key, key_hash, key_prefix = generate_access_key()
