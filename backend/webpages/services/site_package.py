@@ -2284,30 +2284,37 @@ class SitePackageImporter:
         self._augment_destination_default_theme(references["unbound"])
         return theme_map
 
-    def _create_theme(self, package, data, layout_references=None):
+    def _create_theme(self, package, data, layout_references=None, *, preserve_stable_key=False):
         destination_tenant = self._destination_tenant()
         layouts = _with_compatibility_layouts(data.get("layouts"), layout_references)
+        create_values = {
+            "tenant": destination_tenant,
+            "name": _unique_theme_name(data.get("name", "Imported Theme")),
+            "description": data.get("description", ""),
+            "fonts": data.get("fonts", {}),
+            "colors": data.get("colors", {}),
+            "design_groups": data.get("design_groups", {}),
+            "component_styles": data.get("component_styles", {}),
+            "designer_preview": normalize_theme_preview_namespaces(
+                data.get("designer_preview", {}), destination_tenant
+            ),
+            "layouts": layouts,
+            "image_styles": data.get("image_styles", {}),
+            "gallery_styles": data.get("gallery_styles", {}),
+            "carousel_styles": data.get("carousel_styles", {}),
+            "table_templates": data.get("table_templates", {}),
+            "breakpoints": data.get("breakpoints", {}),
+            "css_variables": data.get("css_variables", {}),
+            "html_elements": data.get("html_elements", {}),
+            "custom_css": data.get("custom_css", ""),
+            "is_active": data.get("is_active", True),
+            "is_default": False,
+            "created_by": self.job.created_by,
+        }
+        if preserve_stable_key and data.get("stable_key"):
+            create_values["stable_key"] = data["stable_key"]
         theme = PageTheme.objects.create(
-            tenant=destination_tenant,
-            name=_unique_theme_name(data.get("name", "Imported Theme")),
-            description=data.get("description", ""),
-            fonts=data.get("fonts", {}),
-            colors=data.get("colors", {}),
-            design_groups=data.get("design_groups", {}),
-            component_styles=data.get("component_styles", {}),
-            designer_preview=normalize_theme_preview_namespaces(data.get("designer_preview", {}), destination_tenant),
-            layouts=layouts,
-            image_styles=data.get("image_styles", {}),
-            gallery_styles=data.get("gallery_styles", {}),
-            carousel_styles=data.get("carousel_styles", {}),
-            table_templates=data.get("table_templates", {}),
-            breakpoints=data.get("breakpoints", {}),
-            css_variables=data.get("css_variables", {}),
-            html_elements=data.get("html_elements", {}),
-            custom_css=data.get("custom_css", ""),
-            is_active=data.get("is_active", True),
-            is_default=False,
-            created_by=self.job.created_by,
+            **create_values,
         )
         self._restore_theme_assets(package, theme, data)
         return theme
@@ -2384,7 +2391,7 @@ class SitePackageImporter:
             theme = (
                 self._apply_theme_data(package, theme, data, observed)
                 if theme
-                else self._create_theme(package, data, observed)
+                else self._create_theme(package, data, observed, preserve_stable_key=True)
             )
             theme_map[data["source_id"]] = theme
         self._augment_destination_default_theme(references["unbound"])

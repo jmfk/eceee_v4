@@ -626,6 +626,13 @@ export async function mockCmsApi(page, {
           title: 'Remote Summer Study',
           hostnames: ['remote.example'],
           pageCount: 6,
+          assessment: {
+            counts: { pages: 6, versions: 8, themes: 1, media: 3 },
+            themes: [{ sourceId: '42', stableKey: '265bb925-df27-48a9-a148-b4cbb3d62e7f', name: 'Conference', status: 'remote' }],
+            missingThemes: 0,
+            included: { site: true, themes: true, media: true },
+            warnings: [],
+          },
           localCopies: editorState.remoteSiteCopied
             ? [{ bindingId: 'binding-1', localRootId: 301, title: 'Remote Summer Study' }]
             : [],
@@ -645,7 +652,7 @@ export async function mockCmsApi(page, {
       }, 202)
     }
 
-    if (/^\/api\/v1\/webpages\/site-packages\/imports\/remote-(copy|update)-job\/$/.test(url.pathname)) {
+    if (/^\/api\/v1\/webpages\/site-packages\/imports\/remote-(clone|update|replace)-job\/$/.test(url.pathname)) {
       return json(route, {
         id: `remote-${editorState.remoteImportMode}-job`,
         kind: 'import',
