@@ -261,6 +261,12 @@ class ErrorPageRenderingTests(TestCase):
         self.assertEqual(version.widgets["visual"][0]["type"], "easy_widgets.ImageWidget")
         self.assertEqual(version.widgets["message"][0]["type"], "easy_widgets.HeadlineWidget")
 
+        view = HostnamePageView()
+        view.request = self.factory.get("/missing/", HTTP_HOST="testsite.com")
+        response = view._render_error_page(version.page, 404)
+        self.assertContains(response, "404 — Page not found", status_code=404)
+        self.assertContains(response, "Return to the home page", status_code=404)
+
         repeated = ensure_site_error_pages(self.root_page, self.user)
         self.assertEqual([page.id for page in repeated], [page.id for page in pages])
 
@@ -373,10 +379,7 @@ class ErrorLayoutTests(TestCase):
         slots = layout.slot_configuration.get("slots", [])
         slot_names = [slot["name"] for slot in slots]
 
-        # Error layouts should have these slots
-        self.assertIn("branding", slot_names)
-        self.assertIn("error_message", slot_names)
-        self.assertIn("helpful_content", slot_names)
+        self.assertEqual(slot_names, ["visual", "message", "actions"])
 
     def test_error_layout_template_names(self):
         """Test that error layouts have correct template names"""

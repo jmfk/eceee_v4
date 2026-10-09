@@ -1,6 +1,6 @@
 import { compileThemeCss, fontImports, widgetVariantClasses } from './theme';
 import { responsiveImageSources, type ResponsiveImageOptions } from './imgproxy';
-import type { ThemeLayoutDefinition, ThemeLayoutDocument } from '../../frontend/src/rendering/types';
+import type { ThemeLayoutDefinition, ThemeLayoutDocument, ThemeLayoutSlot } from '../../frontend/src/rendering/types';
 
 export type DbId = string;
 
@@ -318,6 +318,7 @@ function mergeSlot(
   slot: string,
   chain: Array<{ page: Page; version: Version; depth: number }>,
   at: Date,
+  policy?: ThemeLayoutSlot,
 ): Widget[] {
   const candidates: Array<{ item: RawWidget; page: Page | null; depth: number; behavior: string }> = [];
   for (let index = chain.length - 1; index >= 0; index--) {
@@ -331,9 +332,31 @@ function mergeSlot(
       candidates.push({ item, page: depth ? owner.page : null, depth, behavior });
     }
   }
-  const closestOverride = candidates.filter(candidate => candidate.behavior === 'override_parent')
+  const local = candidates.filter(candidate => candidate.depth === 0);
+  if (policy?.allows_inheritance === false) {
+    return local.map(({ item, page, depth }, index) => normalizeWidget(item, `${slot}-${index}`, page, depth, at))
+      .filter((item): item is Widget => item !== null);
+  }
+
+  const inheritableTypes = policy?.inheritable_types || [];
+  const inherited = candidates.filter(candidate => candidate.depth > 0 && (
+    !inheritableTypes.length || inheritableTypes.includes(String(value(candidate.item, 'type', 'widget_type') || ''))
+  ));
+  if (policy?.allow_merge === false) {
+    const replacement = local.length
+      ? local
+      : inherited.filter(candidate => candidate.depth === Math.min(...inherited.map(item => item.depth)));
+    return replacement.map(({ item, page, depth }, index) => normalizeWidget(item, `${slot}-${index}`, page, depth, at))
+      .filter((item): item is Widget => item !== null);
+  }
+  if (inheritableTypes.length && local.some(candidate => inheritableTypes.includes(String(value(candidate.item, 'type', 'widget_type') || '')))) {
+    return local.map(({ item, page, depth }, index) => normalizeWidget(item, `${slot}-${index}`, page, depth, at))
+      .filter((item): item is Widget => item !== null);
+  }
+  const policyCandidates = [...local, ...inherited];
+  const closestOverride = policyCandidates.filter(candidate => candidate.behavior === 'override_parent')
     .reduce<number | null>((closest, candidate) => closest === null ? candidate.depth : Math.min(closest, candidate.depth), null);
-  const visible = closestOverride === null ? candidates : candidates.filter(candidate => candidate.depth <= closestOverride);
+  const visible = closestOverride === null ? policyCandidates : policyCandidates.filter(candidate => candidate.depth <= closestOverride);
   const before = visible.filter(candidate => candidate.behavior === 'insert_before_parent').sort((left, right) => left.depth - right.depth);
   const override = visible.filter(candidate => candidate.behavior === 'override_parent').sort((left, right) => left.depth - right.depth);
   const after = visible.filter(candidate => candidate.behavior === 'insert_after_parent').sort((left, right) => right.depth - left.depth);
@@ -840,7 +863,10 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
       ...Object.keys(layoutDefinition?.slots || {}),
       ...chain.flatMap(item => Object.keys(object(item.version.widgets))),
     ]);
-    let slots = Object.fromEntries([...slotNames].map(slot => [slot, mergeSlot(slot, chain, at)]));
+    let slots = Object.fromEntries([...slotNames].map(slot => [
+      slot,
+      mergeSlot(slot, chain, at, layoutDefinition?.slots?.[slot]),
+    ]));
 
     const matchedPath = '/' + segments.slice(0, consumedSegments).join('/');
     slots = await resolvePublishedData(slots, reader, root.tenant_id, at, matchedPath || '/', pathVariables || {});

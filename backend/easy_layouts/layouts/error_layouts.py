@@ -46,6 +46,16 @@ class ErrorLayout(BaseErrorLayout):
     description = "Shared layout for site-owned HTTP error pages"
     template_name = "webpages/page_detail.html"
 
+    @property
+    def slot_configuration(self) -> Dict[str, Any]:
+        return {
+            "slots": [
+                {"name": "visual", "title": "Visual", "max_widgets": 1},
+                {"name": "message", "title": "Message", "max_widgets": None},
+                {"name": "actions", "title": "Actions", "max_widgets": None},
+            ]
+        }
+
 
 @register_layout
 class Error404Layout(BaseErrorLayout):

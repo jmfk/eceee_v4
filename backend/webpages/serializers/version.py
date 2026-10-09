@@ -109,7 +109,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
     page_id = serializers.SerializerMethodField()
     effective_theme = serializers.SerializerMethodField()
     theme_inheritance_info = serializers.SerializerMethodField()
-    layoutKey = serializers.CharField(source="layout_key", required=False, allow_blank=True)
+    layout_key = serializers.CharField(required=False, allow_blank=True)
 
     page = serializers.PrimaryKeyRelatedField(read_only=True)
 
@@ -142,7 +142,7 @@ class PageVersionSerializer(serializers.ModelSerializer):
             "meta_title",
             "meta_description",
             "code_layout",
-            "layoutKey",
+            "layout_key",
             "page_data",
             "widgets",
             "tags",

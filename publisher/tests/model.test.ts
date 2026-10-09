@@ -118,6 +118,75 @@ describe('public resolution', () => {
     expect(model?.slots.sidebar[2].inheritedFrom).toEqual({ id: '2', title: 'News', depth: 1 });
   });
 
+  it('does not publish ancestor widgets when the theme slot disables inheritance', async () => {
+    const policyTheme: Theme = {
+      ...theme,
+      layouts: {
+        schema_version: 1,
+        default_layout_key: 'main_layout',
+        items: [{
+          id: '00000000-0000-4000-8000-000000000001',
+          key: 'main_layout',
+          label: 'Main',
+          status: 'active',
+          root: { id: '00000000-0000-4000-8000-000000000002', type: 'slot', slot_key: 'main', children: [] },
+          slots: { main: { allows_inheritance: false } },
+        }],
+      },
+    };
+    const policyReader: PageReader = {
+      ...reader,
+      theme: async () => policyTheme,
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        if (!selected) return null;
+        if (id === root.id) return version({ ...selected, widgets: { main: [{ id: 'ancestor-main', type: 'easy_widgets.ContentWidget', inheritanceLevel: -1, config: {} }] } });
+        if (id === article.id) return version({ ...selected, widgets: {} });
+        return selected;
+      },
+    };
+
+    const model = await buildPublishedPageModel({ withSnapshot: async read => read(policyReader) }, 'example.org', '/news/story', new Date('2026-06-01'));
+
+    expect(model?.slots.main).toEqual([]);
+  });
+
+  it('uses replacement and type policies for inherited public widgets', async () => {
+    const policyTheme: Theme = {
+      ...theme,
+      layouts: {
+        schema_version: 1,
+        default_layout_key: 'main_layout',
+        items: [{
+          id: '00000000-0000-4000-8000-000000000011',
+          key: 'main_layout',
+          label: 'Main',
+          status: 'active',
+          root: { id: '00000000-0000-4000-8000-000000000012', type: 'slot', slot_key: 'header', children: [] },
+          slots: { header: { allows_inheritance: true, allow_merge: false, inheritable_types: ['easy_widgets.HeaderWidget'] } },
+        }],
+      },
+    };
+    const policyReader: PageReader = {
+      ...reader,
+      theme: async () => policyTheme,
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        if (!selected) return null;
+        if (id === root.id) return version({ ...selected, widgets: { header: [
+          { id: 'allowed-parent', type: 'easy_widgets.HeaderWidget', inheritanceLevel: -1, config: {} },
+          { id: 'blocked-parent', type: 'easy_widgets.ContentWidget', inheritanceLevel: -1, config: {} },
+        ] } });
+        if (id === article.id) return version({ ...selected, widgets: { header: [{ id: 'local-header', type: 'easy_widgets.HeaderWidget', config: {} }] } });
+        return selected;
+      },
+    };
+
+    const model = await buildPublishedPageModel({ withSnapshot: async read => read(policyReader) }, 'example.org', '/news/story', new Date('2026-06-01'));
+
+    expect(model?.slots.header.map(widget => widget.id)).toEqual(['local-header']);
+  });
+
   it('filters scheduled, expired and non-inheritable widgets', async () => {
     const scheduledReader = {
       ...reader,

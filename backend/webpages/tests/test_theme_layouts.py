@@ -1,22 +1,25 @@
+import io
+import json
 from copy import deepcopy
 from importlib import import_module
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase
+from djangorestframework_camel_case.parser import CamelCaseJSONParser
 
 from core.models import Tenant
+from webpages.inheritance_tree import InheritanceTreeBuilder
 from webpages.models import PageTheme, WebPage
-from webpages.serializers import PageVersionSerializer
-
+from webpages.serializers import PageDataSchemaSerializer, PageVersionSerializer
 from webpages.theme_layouts import (
     default_theme_layouts,
     legacy_compatibility_layout,
     theme_layout_usage,
-    validate_layout_widgets,
     validate_layout_compatibility,
+    validate_layout_widgets,
     validate_theme_layouts,
 )
 
@@ -160,6 +163,46 @@ class ThemeLayoutValidationTests(SimpleTestCase):
 
 
 class ThemeLayoutUsageTests(TestCase):
+    def test_inheritance_tree_uses_custom_theme_layout_slot_policies(self):
+        user = User.objects.create_user("layout-tree-policy", password="test")
+        tenant = Tenant.objects.create(name="Layout tree policy", identifier="layout-tree-policy", created_by=user)
+        layouts = default_theme_layouts()
+        custom_layout = legacy_compatibility_layout("article_layout", {"body"})
+        custom_layout["slots"]["body"]["allows_inheritance"] = False
+        custom_layout["slots"]["body"]["allow_merge"] = False
+        layouts["items"].append(custom_layout)
+        theme = PageTheme.objects.create(
+            tenant=tenant, name="Policy theme", is_default=True, created_by=user, layouts=layouts
+        )
+        page = WebPage.objects.create(
+            tenant=tenant, title="Article", slug="article", created_by=user, last_modified_by=user
+        )
+        version = page.create_version(user, "Article draft")
+        version.theme = theme
+        version.layout_key = "article_layout"
+        version.save(update_fields=["theme", "layout_key"])
+        builder = InheritanceTreeBuilder()
+
+        builder.build_tree(page, target_version=version)
+
+        body = next(slot for slot in builder.effective_slot_configuration()["slots"] if slot["name"] == "body")
+        self.assertFalse(body["allows_inheritance"])
+        self.assertFalse(body["allow_merge"])
+
+    def test_usage_lookup_does_not_assign_or_version_a_default_theme(self):
+        user = User.objects.create_user("layout-usage-read-only", password="test")
+        tenant = Tenant.objects.create(
+            name="Layout usage read only", identifier="layout-usage-read-only", created_by=user
+        )
+        theme = PageTheme.objects.create(tenant=tenant, name="Only active theme", created_by=user)
+        original_sync_version = theme.sync_version
+
+        theme_layout_usage(theme)
+
+        theme.refresh_from_db()
+        self.assertFalse(theme.is_default)
+        self.assertEqual(theme.sync_version, original_sync_version)
+
     def test_inherited_versions_are_counted_only_for_their_effective_theme(self):
         user = User.objects.create_user("layout-usage", password="test")
         tenant = Tenant.objects.create(name="Layout usage", identifier="layout-usage", created_by=user)
@@ -214,7 +257,54 @@ class ThemeLayoutUsageTests(TestCase):
         version.widgets = {"visual": [{"type": "easy_widgets.ImageWidget", "config": {}}]}
         version.save(update_fields=["theme", "layout_key", "widgets"])
 
-        serializer = PageVersionSerializer(version, data={"layoutKey": "main_layout"}, partial=True)
+        payload = CamelCaseJSONParser().parse(io.BytesIO(json.dumps({"layoutKey": "main_layout"}).encode()))
+        serializer = PageVersionSerializer(version, data=payload, partial=True)
 
         self.assertFalse(serializer.is_valid())
         self.assertIn("widgets", serializer.errors)
+
+    def test_schema_serializer_accepts_layout_key_after_http_case_conversion(self):
+        payload = CamelCaseJSONParser().parse(
+            io.BytesIO(
+                json.dumps(
+                    {
+                        "scope": "layout",
+                        "layoutKey": "landing_page",
+                        "schema": {"type": "object", "properties": {}},
+                    }
+                ).encode()
+            )
+        )
+        serializer = PageDataSchemaSerializer(data=payload)
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertEqual(serializer.validated_data["layout_key"], "landing_page")
+
+    def test_layout_policy_cannot_invalidate_widgets_already_in_use(self):
+        user = User.objects.create_user("layout-policy-change", password="test")
+        tenant = Tenant.objects.create(name="Layout policy change", identifier="layout-policy-change", created_by=user)
+        theme = PageTheme.objects.create(tenant=tenant, name="Policy theme", is_default=True, created_by=user)
+        page = WebPage.objects.create(
+            tenant=tenant, title="Policy page", slug="policy-existing", created_by=user, last_modified_by=user
+        )
+        version = page.create_version(user, "Policy draft")
+        version.theme = theme
+        version.layout_key = "main_layout"
+        version.widgets = {
+            "main": [
+                {"type": "easy_widgets.ContentWidget", "config": {}},
+                {"type": "easy_widgets.ContentWidget", "config": {}},
+            ]
+        }
+        version.save(update_fields=["theme", "layout_key", "widgets"])
+
+        limited = deepcopy(theme.layouts)
+        limited["items"][0]["slots"]["main"]["max_widgets"] = 1
+        with self.assertRaisesMessage(ValidationError, "cannot be limited to 1"):
+            validate_layout_compatibility(theme, limited)
+
+        restricted = deepcopy(theme.layouts)
+        restricted["items"][0]["slots"]["main"]["allowed_widget_types"] = ["easy_widgets.HeadlineWidget"]
+        restricted["items"][0]["slots"]["main"].pop("disallowed_widget_types", None)
+        with self.assertRaisesMessage(ValidationError, "ContentWidget"):
+            validate_layout_compatibility(theme, restricted)
