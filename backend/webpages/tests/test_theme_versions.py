@@ -374,6 +374,10 @@ class ThemeVersionApiTests(TestCase):
             {
                 "name": "Local development",
                 "capabilities": ["theme.transfer", "site.transfer", "site.transfer"],
+            },
+            format="json",
+        )
+
         self.assertEqual(created.status_code, 201, created.data)
         self.assertEqual(created["Cache-Control"], "private, no-store")
         self.assertTrue(created.data["secret"].startswith("eceee_theme_"))

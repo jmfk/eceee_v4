@@ -256,9 +256,9 @@ To enable in production:
 3. Consider restricting access to sync endpoints via firewall/network policies
 4. Monitor sync activity and version conflicts
 
-## Saved Designer remote sites
+## Saved remote sites
 
-Designer can use several saved remote-site connections per workspace, with one connection marked as the default. Workspace administrators manage the connections; Designer users can select and use them but cannot read the stored access key.
+Each workspace can use several saved remote-site connections, with one connection marked as the default. Workspace administrators manage them under **Settings → Remote Sites**; Designer users can select and use them but cannot read the stored access key.
 
 On the remote installation, a workspace administrator can create the key in **Settings → Remote Sites → Access to this site**. Choose whether the connection may transfer themes, sites, or both, then copy the key when it is shown. The key cannot be displayed again.
 

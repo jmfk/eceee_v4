@@ -22,6 +22,7 @@ const connection = {
     name: 'Production',
     baseUrl: 'https://remote.example',
     remoteWorkspace: 'default',
+    credentialScheme: 'theme_key',
     isDefault: true,
 }
 
@@ -66,6 +67,7 @@ describe('RemoteSitesSettings', () => {
         fireEvent.change(screen.getByLabelText('Connection name'), { target: { value: 'Staging' } })
         fireEvent.change(screen.getByLabelText('Site URL'), { target: { value: 'https://staging.example' } })
         fireEvent.change(screen.getByLabelText('Remote workspace'), { target: { value: 'staging' } })
+        fireEvent.change(screen.getByLabelText('Credential type'), { target: { value: 'api_key' } })
         fireEvent.change(screen.getByLabelText('Access key'), { target: { value: 'write-only-value' } })
         fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
 
@@ -73,6 +75,7 @@ describe('RemoteSitesSettings', () => {
             name: 'Staging',
             remoteWorkspace: 'staging',
             accessKey: 'write-only-value',
+            credentialScheme: 'api_key',
         })))
     })
 

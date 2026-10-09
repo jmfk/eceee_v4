@@ -15,6 +15,7 @@ from object_storage.services.object_transfer import (
     _reference_field_names,
     _remap,
     collect_object_graph,
+    collect_type_definitions,
     type_definition_differs,
     type_is_compatible,
     validate_package,
@@ -193,6 +194,78 @@ class ObjectTransferHelperTests(SimpleTestCase):
         remote["allowed_child_types"] = ["child"]
         remote["browser_group"] = "other"
         self.assertFalse(type_is_compatible(local, remote))
+
+    def test_type_compatibility_normalizes_supported_slot_aliases(self):
+        local = SimpleNamespace(
+            hierarchy_level="both",
+            schema={"type": "object", "properties": {}},
+            slot_configuration={
+                "slots": [
+                    {
+                        "name": "body",
+                        "widgetControls": [{"widgetType": "content", "maxInstances": 2, "preCreate": True}],
+                        "allowedTypes": ["content"],
+                    }
+                ]
+            },
+            allowed_child_types=SimpleNamespace(values_list=lambda *_args, **_kwargs: []),
+            browser_group=None,
+        )
+        remote = {
+            "hierarchy_level": "both",
+            "schema": {"type": "object", "properties": {}},
+            "slot_configuration": {
+                "slots": [
+                    {
+                        "name": "body",
+                        "widget_controls": [{"widget_type": "content", "max_instances": 2, "pre_create": True}],
+                        "allowed_types": ["content"],
+                    }
+                ]
+            },
+            "allowed_child_types": [],
+            "browser_group": None,
+        }
+
+        self.assertTrue(type_is_compatible(local, remote))
+        self.assertFalse(type_definition_differs(local, remote))
+
+    def test_type_collection_does_not_follow_foreign_tenant_topology(self):
+        class Relation:
+            def __init__(self, values):
+                self.values = values
+
+            def all(self):
+                return self.values
+
+        own_namespace = SimpleNamespace(tenant_id=1)
+        foreign_namespace = SimpleNamespace(tenant_id=2)
+        own_child = SimpleNamespace(
+            id=2,
+            namespace_id=20,
+            namespace=own_namespace,
+            allowed_child_types=Relation([]),
+            browser_group_id=None,
+        )
+        foreign_child = SimpleNamespace(
+            id=3,
+            namespace_id=30,
+            namespace=foreign_namespace,
+            allowed_child_types=Relation([]),
+            browser_group_id=None,
+        )
+        root_type = SimpleNamespace(
+            id=1,
+            namespace_id=10,
+            namespace=own_namespace,
+            allowed_child_types=Relation([own_child, foreign_child]),
+            browser_group_id=3,
+            browser_group=foreign_child,
+        )
+
+        result = collect_type_definitions([SimpleNamespace(tenant_id=1, object_type=root_type)])
+
+        self.assertEqual(set(result), {1, 2})
 
     def test_package_requires_a_complete_checksum_manifest(self):
         payload = json.dumps({"types": [], "objects": [], "media": []}).encode()

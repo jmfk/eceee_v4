@@ -70,7 +70,7 @@ Editors can transfer themes and complete page packages between ECEEE installatio
 
 ## Completion Evidence
 
-- Django system checks and migration drift checks pass.
-- Five database-free backend helper/request tests pass; the package graph/round-trip tests are present but await the PostgreSQL test environment.
-- The focused Object Browser Vitest suite (5 tests), targeted ESLint, frontend production build, formatting, compile checks, diff checks, and repository spec validation pass.
-- Full PostgreSQL-backed acceptance remains pending because OrbStack was unavailable and the repository's registered host ports do not match its current local configuration.
+- Django system checks and migration drift checks pass, including a clean upgrade through webpages migration `0084` and object storage migration `0025`.
+- The full PostgreSQL-backed Django suite passes: 1,163 tests with 12 intentional skips.
+- The full Vitest suite passes: 1,454 tests across 141 files. Focused object import and remote-site settings tests also pass.
+- Backend and focused frontend lint, the frontend production build, diff checks, and repository spec validation pass.

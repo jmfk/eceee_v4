@@ -137,6 +137,15 @@ def collect_object_graph(tenant, root_ids):
 
 def collect_type_definitions(objects):
     """Collect object types plus the topology types they reference."""
+    tenant_ids = {obj.tenant_id for obj in objects}
+    tenant_id = next(iter(tenant_ids)) if len(tenant_ids) == 1 else None
+
+    def visible_topology_type(obj_type):
+        if tenant_id is None or not getattr(obj_type, "namespace_id", None):
+            return True
+        namespace_tenant_id = getattr(getattr(obj_type, "namespace", None), "tenant_id", None)
+        return namespace_tenant_id in {None, tenant_id}
+
     collected = {}
     queue = deque(obj.object_type for obj in objects)
     while queue:
@@ -144,8 +153,8 @@ def collect_type_definitions(objects):
         if obj_type.id in collected:
             continue
         collected[obj_type.id] = obj_type
-        queue.extend(obj_type.allowed_child_types.all())
-        if obj_type.browser_group_id:
+        queue.extend(item for item in obj_type.allowed_child_types.all() if visible_topology_type(item))
+        if obj_type.browser_group_id and visible_topology_type(obj_type.browser_group):
             queue.append(obj_type.browser_group)
     return collected
 
@@ -254,8 +263,10 @@ def type_is_compatible(local, remote):
         if local_definition is None or normalized_definition(local_definition) != normalized_definition(definition):
             return False
 
-    local_slot_configuration = local.slot_configuration or {}
-    remote_slot_configuration = remote.get("slot_configuration") or remote.get("slotConfiguration") or {}
+    local_slot_configuration = _normalize_slot_contract(local.slot_configuration or {})
+    remote_slot_configuration = _normalize_slot_contract(
+        remote.get("slot_configuration") or remote.get("slotConfiguration") or {}
+    )
     local_slot_constraints = {key: value for key, value in local_slot_configuration.items() if key != "slots"}
     remote_slot_constraints = {key: value for key, value in remote_slot_configuration.items() if key != "slots"}
     if local_slot_constraints != remote_slot_constraints:
@@ -283,9 +294,33 @@ def _local_allowed_child_type_names(obj_type):
     return set(relation.values_list("name", flat=True))
 
 
+_SLOT_KEY_ALIASES = {
+    "allowedTypes": "allowed_types",
+    "defaultConfig": "default_config",
+    "maxInstances": "max_instances",
+    "maxWidgets": "max_widgets",
+    "preCreate": "pre_create",
+    "widgetControls": "widget_controls",
+    "widgetType": "widget_type",
+}
+
+
+def _normalize_slot_contract(value):
+    if isinstance(value, list):
+        return [_normalize_slot_contract(item) for item in value]
+    if isinstance(value, dict):
+        return {_SLOT_KEY_ALIASES.get(key, key): _normalize_slot_contract(item) for key, item in value.items()}
+    return value
+
+
 def type_definition_differs(local, remote):
     """Compare the complete structural contract used by imported objects."""
-    if any(getattr(local, field) != remote.get(field) for field in ("schema", "slot_configuration", "hierarchy_level")):
+    if local.schema != remote.get("schema") or local.hierarchy_level != (
+        remote.get("hierarchy_level") or remote.get("hierarchyLevel")
+    ):
+        return True
+    remote_slots = remote.get("slot_configuration") or remote.get("slotConfiguration") or {}
+    if _normalize_slot_contract(local.slot_configuration or {}) != _normalize_slot_contract(remote_slots):
         return True
     remote_children = set(remote.get("allowed_child_types") or remote.get("allowedChildTypes") or [])
     remote_browser_group = remote.get("browser_group") or remote.get("browserGroup")
