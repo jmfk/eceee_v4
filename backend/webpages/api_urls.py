@@ -69,11 +69,7 @@ from .views.layout_workspace_views import LayoutDiscardView, LayoutPublishView, 
 from .views.page_debug_views import PageDebugExportView
 from .views.page_import_views import ImportSinglePageView, ImportStatusView, ImportTreeView
 from .views.path_pattern_views import PathPatternViewSet
-from .views.preview_views import (
-    PreviewSizeViewSet,
-    create_version_preview_grant,
-    render_version_preview,
-)
+from .views.preview_views import PreviewSizeViewSet, create_version_preview_grant, render_version_preview
 from .views.remote_site_views import RemoteAccessKeyRevokeView, RemoteAccessKeyRotateView, RemoteAccessKeysView
 from .views.simplified_layout_views import (
     simplified_layout_json,
@@ -88,6 +84,7 @@ from .views.site_package_views import (
     RemoteSiteSourceExportDownloadView,
     RemoteSiteSourceExportListView,
     RemoteSiteSourceListView,
+    SitePackageAssessmentView,
     SitePackageExportDetailView,
     SitePackageExportDownloadView,
     SitePackageExportListView,
@@ -414,6 +411,11 @@ urlpatterns = [
         "site-packages/exports/<uuid:job_id>/download/",
         SitePackageExportDownloadView.as_view(),
         name="site-package-export-download",
+    ),
+    path(
+        "site-packages/assess/",
+        SitePackageAssessmentView.as_view(),
+        name="site-package-assess",
     ),
     path(
         "site-packages/imports/",

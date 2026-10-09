@@ -19,18 +19,14 @@ from .base import UserSerializer
 from .layout import LayoutSerializer
 
 # Page serializers
-from .page import (
-    DeletedPageSerializer,
-    PageHierarchySerializer,
-    WebPageListSerializer,
-    WebPageSimpleSerializer,
-)
+from .page import DeletedPageSerializer, PageHierarchySerializer, WebPageListSerializer, WebPageSimpleSerializer
 
 # Schema serializers
 from .schema import PageDataSchemaSerializer
 from .site_package import (
     RemoteSiteImportCreateSerializer,
     RemoteSiteListSerializer,
+    SitePackageAssessmentSerializer,
     SitePackageExportCreateSerializer,
     SitePackageImportCreateSerializer,
     SitePackageJobSerializer,
@@ -74,6 +70,7 @@ __all__ = [
     # Schema
     "PageDataSchemaSerializer",
     "SitePackageExportCreateSerializer",
+    "SitePackageAssessmentSerializer",
     "SitePackageImportCreateSerializer",
     "SitePackageJobSerializer",
     "RemoteSiteListSerializer",

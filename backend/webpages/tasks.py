@@ -158,7 +158,11 @@ def import_remote_site_package(self, job_id):
                 connection,
                 "POST",
                 "exports/",
-                {"stableKey": options["remote_site_key"]},
+                {
+                    "stableKey": options["remote_site_key"],
+                    "includeMedia": options.get("include_media", True),
+                    "includeThemes": options.get("include_themes", True),
+                },
             )
             remote_job_id = str(remote_job["id"])
             job.progress = {**(job.progress or {}), "phase": "remote_export", "remote_job_id": remote_job_id}

@@ -19,6 +19,7 @@
 | ADR-0015 | [Revision-based optimistic page collaboration](active/0015-revision-based-page-collaboration.md) | accepted | PRD-0013 |
 | ADR-0016 | [Scoped machine API keys across the supported CMS API](active/0016-scoped-machine-api-keys.md) | accepted | PRD-0014 |
 | ADR-0017 | [Browser-managed scoped remote access keys](active/0017-browser-managed-remote-access-keys.md) | accepted | PRD-0015 |
+| ADR-0018 | [Assess imports and scope replacement to imported bindings](active/0018-assessed-import-plans.md) | accepted | PRD-0016 |
 
 ## Archived Decisions
 

@@ -65,6 +65,7 @@ export const endpoints = {
         exports: `${BASE_PATH}/webpages/site-packages/exports/`,
         exportDetail: (jobId) => `${BASE_PATH}/webpages/site-packages/exports/${jobId}/`,
         exportDownload: (jobId) => `${BASE_PATH}/webpages/site-packages/exports/${jobId}/download/`,
+        assess: `${BASE_PATH}/webpages/site-packages/assess/`,
         imports: `${BASE_PATH}/webpages/site-packages/imports/`,
         importDetail: (jobId) => `${BASE_PATH}/webpages/site-packages/imports/${jobId}/`,
         remoteSites: `${BASE_PATH}/webpages/site-packages/remote/sites/`,

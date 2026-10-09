@@ -11,6 +11,7 @@ import mimetypes
 import os
 import re
 import secrets
+import shutil
 import tempfile
 import uuid
 import zipfile
@@ -890,7 +891,7 @@ def _validate_site_package_documents(manifest: Dict[str, Any], pages_document: D
     return pages, roots[0], source, manifest_root_key or page_root_key
 
 
-def inspect_site_package_upload(upload) -> Dict[str, Any]:
+def inspect_site_package_upload(upload, tenant=None) -> Dict[str, Any]:
     """Read the source identity without consuming the uploaded ZIP stream."""
     position = upload.tell()
     try:
@@ -926,13 +927,197 @@ def inspect_site_package_upload(upload) -> Dict[str, Any]:
 
     pages, root, source, stable_key = _validate_site_package_documents(manifest, pages_document)
     package_hash = _payload_fingerprint({"manifest": manifest, "pages": pages_document})
+    referenced_theme_ids = sorted(
+        {
+            str(version.get("theme_source_id"))
+            for page in pages
+            for version in page.get("versions", [])
+            if version.get("theme_source_id") is not None
+        }
+    )
+    included_themes = {}
+    has_media_manifest = False
+    position = upload.tell()
+    try:
+        upload.seek(0)
+        with zipfile.ZipFile(upload, "r") as package:
+            has_media_manifest = "media/manifest.json" in package.namelist()
+            for name in package.namelist():
+                if not name.startswith("themes/") or not name.endswith(".json"):
+                    continue
+                try:
+                    data = json.loads(package.read(name).decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    continue
+                source_id = str(data.get("source_id") or name.rsplit("/", 1)[-1].removesuffix(".json"))
+                included_themes[source_id] = data
+    finally:
+        upload.seek(position)
+
+    declared_themes = {
+        str(item.get("source_id")): item
+        for item in (manifest.get("dependencies") or {}).get("themes", [])
+        if isinstance(item, dict) and item.get("source_id") is not None
+    }
+    theme_assessment = []
+    for source_id in referenced_theme_ids:
+        data = included_themes.get(source_id) or declared_themes.get(source_id) or {}
+        stable_key_value = data.get("stable_key")
+        local_theme = None
+        if stable_key_value and tenant is not None:
+            local_theme = (
+                PageTheme.objects.filter(tenant=tenant, stable_key=stable_key_value).only("id", "name").first()
+            )
+        status = "included" if source_id in included_themes else "missing"
+        if status == "missing" and local_theme is not None:
+            status = "local"
+        theme_assessment.append(
+            {
+                "sourceId": source_id,
+                "stableKey": str(stable_key_value or ""),
+                "name": data.get("name") or f"Theme {source_id}",
+                "status": status,
+                "localThemeId": local_theme.id if local_theme else None,
+                "localThemeName": local_theme.name if local_theme else None,
+            }
+        )
+
+    media_manifest = (manifest.get("dependencies") or {}).get("media") or {}
     return {
         "stable_key": stable_key,
         "source_id": str(root.get("source_id")),
         "package_hash": package_hash,
         "title": source.get("root_title") or root.get("title") or "Imported site",
         "slug": source.get("root_slug") or root.get("slug") or "imported-site",
+        "assessment": {
+            "counts": {
+                "pages": len(pages),
+                "versions": sum(len(page.get("versions", [])) for page in pages),
+                "themes": len(referenced_theme_ids),
+                "media": manifest.get("counts", {}).get("media", media_manifest.get("count", 0)),
+            },
+            "themes": theme_assessment,
+            "missingThemes": sum(1 for item in theme_assessment if item["status"] == "missing"),
+            "included": {
+                "site": True,
+                "themes": bool(included_themes),
+                "media": has_media_manifest,
+            },
+            "warnings": list(manifest.get("warnings") or []),
+        },
     }
+
+
+def supplement_site_package_upload(site_upload, theme_uploads):
+    """Return a site ZIP augmented with valid, referenced standalone theme ZIPs."""
+    if not theme_uploads:
+        site_upload.seek(0)
+        return site_upload, [], set()
+
+    output = tempfile.SpooledTemporaryFile(max_size=25 * 1024 * 1024)
+    warnings = []
+    supplied_ids = set()
+    site_upload.seek(0)
+    with zipfile.ZipFile(site_upload, "r") as source, zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as target:
+        _validate_site_package_members(source)
+        pages_document = json.loads(source.read("pages.json").decode("utf-8"))
+        referenced_ids = {
+            str(version.get("theme_source_id"))
+            for page in pages_document.get("pages", [])
+            for version in page.get("versions", [])
+            if version.get("theme_source_id") is not None
+        }
+        existing_names = set(source.namelist())
+        for member in source.infolist():
+            if member.is_dir():
+                continue
+            with source.open(member, "r") as source_member, target.open(member, "w") as target_member:
+                shutil.copyfileobj(source_member, target_member, length=1024 * 1024)
+
+        for upload in theme_uploads:
+            filename = getattr(upload, "name", "theme.zip")
+            try:
+                upload.seek(0)
+                with zipfile.ZipFile(upload, "r") as theme_package:
+                    members = [item for item in theme_package.infolist() if not item.is_dir()]
+                    if (
+                        len(members) > THEME_TRANSFER_MAX_FILES
+                        or any(item.file_size > THEME_TRANSFER_MAX_FILE_SIZE for item in members)
+                        or sum(item.file_size for item in members) > THEME_TRANSFER_MAX_TOTAL_SIZE
+                    ):
+                        raise ValueError("Theme package exceeds safety limits.")
+                    theme_data = json.loads(theme_package.read("theme.json").decode("utf-8"))
+                    metadata = (
+                        json.loads(theme_package.read("metadata.json").decode("utf-8"))
+                        if "metadata.json" in theme_package.namelist()
+                        else {}
+                    )
+                    source_id = str(theme_data.get("source_id") or metadata.get("source_theme_id") or "")
+                    if not source_id or source_id not in referenced_ids:
+                        warnings.append({"code": "theme_package_not_referenced", "filename": filename})
+                        continue
+                    destination_name = f"themes/{source_id}.json"
+                    if destination_name in existing_names:
+                        warnings.append({"code": "theme_package_already_included", "filename": filename})
+                        continue
+                    normalized = {
+                        **theme_data,
+                        "source_id": int(source_id) if source_id.isdigit() else source_id,
+                        "stable_key": theme_data.get("stable_key") or metadata.get("stable_key"),
+                        "name": theme_data.get("name") or metadata.get("name") or f"Theme {source_id}",
+                        "description": theme_data.get("description") or metadata.get("description", ""),
+                    }
+                    library_paths = {}
+                    for member in members:
+                        if member.filename.startswith(("library_images/", "design_group_images/")):
+                            basename = os.path.basename(member.filename)
+                            path = f"theme_images/{source_id}/library/{basename}"
+                            library_paths[basename] = path
+                            target.writestr(f"themes/assets/{source_id}/{path}", theme_package.read(member))
+                        elif member.filename.startswith("image/"):
+                            basename = os.path.basename(member.filename)
+                            path = f"theme_images/{source_id}/{basename}"
+                            normalized["image"] = path
+                            target.writestr(f"themes/assets/{source_id}/{path}", theme_package.read(member))
+                    if library_paths:
+                        normalized = _rewrite_theme_zip_library_references(normalized, library_paths)
+                    normalized["content_fingerprint"] = _payload_fingerprint(normalized)
+                    _write_json(target, destination_name, normalized)
+                    existing_names.add(destination_name)
+                    supplied_ids.add(source_id)
+            except (
+                EOFError,
+                KeyError,
+                OSError,
+                RuntimeError,
+                TypeError,
+                UnicodeDecodeError,
+                ValueError,
+                json.JSONDecodeError,
+                zipfile.BadZipFile,
+                zlib.error,
+            ):
+                warnings.append({"code": "theme_package_invalid", "filename": filename})
+            finally:
+                upload.seek(0)
+    site_upload.seek(0)
+    output.seek(0)
+    return output, warnings, supplied_ids
+
+
+def _rewrite_theme_zip_library_references(value, library_paths):
+    if isinstance(value, str):
+        for basename, path in library_paths.items():
+            if basename in value:
+                if value.startswith(("http://", "https://", "/")):
+                    return path
+                value = value.replace(basename, path)
+        return value
+    if isinstance(value, dict):
+        return {key: _rewrite_theme_zip_library_references(item, library_paths) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_rewrite_theme_zip_library_references(item, library_paths) for item in value]
+    return value
 
 
 def _job_matches_site_package_identity(job: SitePackageJob, identity: Dict[str, Any]) -> bool:
@@ -1090,10 +1275,15 @@ class SitePackageExporter:
                 page_payload["versions"].append(_serialize_version(version))
             pages_payload.append(page_payload)
 
-        themes = list(PageTheme.objects.filter(id__in=theme_ids).order_by("id")) if include_themes else []
-        media_ids = (
-            self._collect_media_ids(selected_versions, pages, root_page.tenant, themes) if include_media else set()
+        referenced_themes = list(PageTheme.objects.filter(id__in=theme_ids).order_by("id"))
+        themes = referenced_themes if include_themes else []
+        referenced_media_ids = self._collect_media_ids(
+            selected_versions,
+            pages,
+            root_page.tenant,
+            referenced_themes,
         )
+        media_ids = referenced_media_ids if include_media else set()
         media_files = list(
             MediaFile.objects.filter(id__in=media_ids, tenant=root_page.tenant)
             .prefetch_related(
@@ -1130,6 +1320,17 @@ class SitePackageExporter:
                 "versions": len(selected_versions),
                 "themes": len(themes),
                 "media": len(media_files),
+            },
+            "dependencies": {
+                "themes": [
+                    {
+                        "source_id": theme.id,
+                        "stable_key": str(theme.stable_key),
+                        "name": theme.name,
+                    }
+                    for theme in referenced_themes
+                ],
+                "media": {"count": len(referenced_media_ids)},
             },
             "object_maps": {
                 "pages": [page["source_id"] for page in pages_payload],
@@ -1317,6 +1518,7 @@ class SitePackageImporter:
         self.theme_stable_map = {}
         self.theme_source_fingerprints = {}
         self.media_source_metadata = {}
+        self._resolved_namespace = None
 
     def run(self):
         self.job.mark_running()
@@ -1333,7 +1535,7 @@ class SitePackageImporter:
             progress={**(self.job.progress or {}), "status": "completed"},
             expires_at=timezone.now() + timedelta(hours=24),
         )
-        return imported_root.id
+        return imported_root.id if imported_root else None
 
     def _download_package(self):
         file_obj = self.storage._open(self.job.object_key, "rb")
@@ -1393,7 +1595,29 @@ class SitePackageImporter:
             if not package_root_key or str(package_root_key) != str(options.get("remote_site_key")):
                 raise ValueError("The remote package does not match the selected site.")
 
-        if options.get("mode") == "update":
+        if not options.get("include_site", True):
+            tenant = self._destination_tenant()
+            self._lock_layout_tenant(tenant)
+            pages_payload = pages_document["pages"]
+            binding = None
+            if options.get("mode") in {"update", "replace"} and options.get("local_root_id"):
+                binding = self._resolve_update_binding(tenant, pages_payload)
+            if options.get("mode") == "clone":
+                self._import_themes(package, pages_payload)
+            elif binding is not None:
+                self._import_themes_for_update(package, binding, pages_payload)
+                binding.save()
+            else:
+                self._import_themes_by_stable_key(package, pages_payload)
+            self._import_media(package)
+            self.job.progress = {
+                **(self.job.progress or {}),
+                "warnings": [*(manifest.get("warnings") or []), *(options.get("supplement_warnings") or [])],
+            }
+            self.job.save(update_fields=["progress", "updated_at"])
+            return None
+
+        if options.get("mode") in {"update", "replace"}:
             return self._update_package(package, manifest)
 
         pages_payload = json.loads(package.read("pages.json").decode("utf-8"))["pages"]
@@ -1521,7 +1745,7 @@ class SitePackageImporter:
         self._create_remote_binding(manifest, pages_payload, page_map, version_map)
         self.job.progress = {
             **(self.job.progress or {}),
-            "warnings": manifest.get("warnings", []),
+            "warnings": [*(manifest.get("warnings") or []), *(options.get("supplement_warnings") or [])],
         }
         self.job.save(update_fields=["progress", "updated_at"])
         return imported_root
@@ -1623,8 +1847,29 @@ class SitePackageImporter:
         page_map = {}
         next_page_binding = dict(binding.page_map or {})
         remote_keys = {str(item.get("stable_key") or item["source_id"]) for item in pages_payload}
-        for stale_key in sorted(set(next_page_binding) - remote_keys):
-            warnings.append({"code": "remote_page_missing", "remotePageKey": stale_key})
+        stale_keys = sorted(set(next_page_binding) - remote_keys)
+        if options.get("mode") == "replace":
+            stale_ids = {int(next_page_binding[key]) for key in stale_keys}
+            stale_pages = list(WebPage.objects.filter(id__in=stale_ids, tenant=tenant, is_deleted=False))
+            stale_by_id = {page.id: page for page in stale_pages}
+
+            def stale_depth(page):
+                depth = 0
+                parent_id = page.parent_id
+                while parent_id in stale_by_id:
+                    depth += 1
+                    parent_id = stale_by_id[parent_id].parent_id
+                return depth
+
+            for page in sorted(stale_pages, key=stale_depth, reverse=True):
+                page.children.filter(is_deleted=False).exclude(id__in=stale_ids).update(parent=binding.local_root)
+                page.soft_delete(self.job.created_by, recursive=False)
+                warnings.append({"code": "bound_page_replaced", "localPageId": page.id, "title": page.title})
+            for stale_key in stale_keys:
+                next_page_binding.pop(stale_key, None)
+        else:
+            for stale_key in stale_keys:
+                warnings.append({"code": "remote_page_missing", "remotePageKey": stale_key})
         bound_page_ids = {int(page_id) for page_id in next_page_binding.values()}
         local_queue = [binding.local_root]
         while local_queue:
@@ -1990,11 +2235,37 @@ class SitePackageImporter:
         return Namespace.get_default().tenant
 
     def _destination_namespace(self):
+        if self._resolved_namespace is not None:
+            return self._resolved_namespace
         tenant = self._destination_tenant()
+        requested_name = str((self.job.options or {}).get("media_namespace_name") or "").strip()
+        if requested_name and (self.job.options or {}).get("mode") == "clone":
+            base_slug = slugify(requested_name) or "imported-media"
+            slug = base_slug
+            counter = 2
+            while Namespace.objects.filter(slug=slug).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            name = requested_name
+            counter = 2
+            while Namespace.objects.filter(name=name).exists():
+                name = f"{requested_name} {counter}"
+                counter += 1
+            self._resolved_namespace = Namespace.objects.create(
+                tenant=tenant,
+                name=name,
+                slug=slug,
+                is_default=False,
+                created_by=self.job.created_by,
+            )
+            return self._resolved_namespace
         namespace = Namespace.objects.filter(tenant=tenant, is_default=True).first()
-        return namespace or Namespace.get_default()
+        self._resolved_namespace = namespace or Namespace.get_default()
+        return self._resolved_namespace
 
     def _import_themes(self, package: zipfile.ZipFile, pages_payload=None) -> Dict[int, PageTheme]:
+        if not (self.job.options or {}).get("include_themes", True):
+            return self._resolve_existing_themes(package, pages_payload=pages_payload)
         theme_map = {}
         references = _package_layout_references(pages_payload)
         theme_files = [name for name in package.namelist() if name.startswith("themes/") and name.endswith(".json")]
@@ -2041,7 +2312,87 @@ class SitePackageImporter:
         self._restore_theme_assets(package, theme, data)
         return theme
 
+    def _apply_theme_data(self, package, theme, data, layout_references=None):
+        values = {
+            "name": data.get("name", theme.name),
+            "description": data.get("description", ""),
+            "fonts": data.get("fonts", {}),
+            "colors": data.get("colors", {}),
+            "design_groups": data.get("design_groups", {}),
+            "component_styles": data.get("component_styles", {}),
+            "designer_preview": normalize_theme_preview_namespaces(
+                data.get("designer_preview", {}), self._destination_tenant()
+            ),
+            "layouts": _with_compatibility_layouts(data.get("layouts"), layout_references),
+            "image_styles": data.get("image_styles", {}),
+            "gallery_styles": data.get("gallery_styles", {}),
+            "carousel_styles": data.get("carousel_styles", {}),
+            "table_templates": data.get("table_templates", {}),
+            "breakpoints": data.get("breakpoints", {}),
+            "css_variables": data.get("css_variables", {}),
+            "html_elements": data.get("html_elements", {}),
+            "custom_css": data.get("custom_css", ""),
+            "is_active": data.get("is_active", True),
+        }
+        for field_name, value in values.items():
+            setattr(theme, field_name, value)
+        theme.save(update_fields=[*values, "updated_at"])
+        self._restore_theme_assets(package, theme, data)
+        return theme
+
+    def _resolve_existing_themes(self, package, binding=None, pages_payload=None):
+        theme_map = {}
+        references = _package_layout_references(pages_payload)
+        binding_map = dict(getattr(binding, "theme_map", {}) or {})
+        for theme_file in [
+            name for name in package.namelist() if name.startswith("themes/") and name.endswith(".json")
+        ]:
+            data = json.loads(package.read(theme_file).decode("utf-8"))
+            stable_key = str(data.get("stable_key") or data["source_id"])
+            stored = binding_map.get(stable_key) or {}
+            if isinstance(stored, int):
+                stored = {"id": stored}
+            theme = PageTheme.objects.filter(
+                tenant=self._destination_tenant(),
+                id=stored.get("id"),
+            ).first()
+            if theme is None and data.get("stable_key"):
+                theme = PageTheme.objects.filter(
+                    tenant=self._destination_tenant(), stable_key=data["stable_key"]
+                ).first()
+            if theme:
+                theme_map[data["source_id"]] = theme
+                self.theme_source_fingerprints[str(data["source_id"])] = data.get("content_fingerprint", "")
+        self._augment_destination_default_theme(references["unbound"])
+        return theme_map
+
+    def _import_themes_by_stable_key(self, package, pages_payload=None):
+        if not (self.job.options or {}).get("include_themes", True):
+            return self._resolve_existing_themes(package, pages_payload=pages_payload)
+        theme_map = {}
+        references = _package_layout_references(pages_payload)
+        for theme_file in [
+            name for name in package.namelist() if name.startswith("themes/") and name.endswith(".json")
+        ]:
+            data = json.loads(package.read(theme_file).decode("utf-8"))
+            observed = references["by_theme"].get(str(data["source_id"]), {})
+            theme = None
+            if data.get("stable_key"):
+                theme = PageTheme.objects.filter(
+                    tenant=self._destination_tenant(), stable_key=data["stable_key"]
+                ).first()
+            theme = (
+                self._apply_theme_data(package, theme, data, observed)
+                if theme
+                else self._create_theme(package, data, observed)
+            )
+            theme_map[data["source_id"]] = theme
+        self._augment_destination_default_theme(references["unbound"])
+        return theme_map
+
     def _import_themes_for_update(self, package, binding, pages_payload=None):
+        if not (self.job.options or {}).get("include_themes", True):
+            return self._resolve_existing_themes(package, binding=binding, pages_payload=pages_payload)
         theme_map = {}
         references = _package_layout_references(pages_payload)
         next_binding_map = dict(binding.theme_map or {})
@@ -2088,6 +2439,8 @@ class SitePackageImporter:
                     )
                     if existing_fingerprint == fingerprint:
                         theme = existing_theme
+                    else:
+                        theme = self._apply_theme_data(package, existing_theme, data, observed)
             if theme is None:
                 theme = self._create_theme(package, data, observed)
             elif observed:
@@ -2167,6 +2520,8 @@ class SitePackageImporter:
         theme.save()
 
     def _import_media(self, package: zipfile.ZipFile) -> Dict[str, MediaFile]:
+        if not (self.job.options or {}).get("include_media", True):
+            return {}
         try:
             manifest = json.loads(package.read("media/manifest.json").decode("utf-8"))
         except KeyError:

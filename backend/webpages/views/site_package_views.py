@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+from django.core.files.base import File
 from django.db import transaction
 from django.db.models import Q
 from django.http import FileResponse
@@ -16,21 +17,24 @@ from core.machine_api_keys import MachineAPIKeyAuthentication
 from core.models import MachineAPIKey, Tenant
 from core.permissions import HasTenantAccess
 from file_manager.storage import S3MediaStorage
-from webpages.models import RemoteSiteBinding, SitePackageJob, ThemeRemoteAccessKey, WebPage
+from webpages.models import PageTheme, RemoteSiteBinding, SitePackageJob, ThemeRemoteAccessKey, WebPage
 from webpages.models.theme_remote import SITE_TRANSFER_CAPABILITY
 from webpages.serializers import (
     RemoteSiteImportCreateSerializer,
     RemoteSiteListSerializer,
+    SitePackageAssessmentSerializer,
     SitePackageExportCreateSerializer,
     SitePackageImportCreateSerializer,
     SitePackageJobSerializer,
 )
 from webpages.services.site_package import (
+    SitePackageExporter,
     build_site_package_export_object_key,
     find_site_package_conflicts,
     find_site_package_import_in_progress,
     get_site_package_download_filename,
     inspect_site_package_upload,
+    supplement_site_package_upload,
 )
 from webpages.services.theme_remote import RemoteThemeError, remote_site_request
 from webpages.services.theme_remote_credentials import (
@@ -157,7 +161,20 @@ class SitePackageImportListView(APIView):
         serializer.is_valid(raise_exception=True)
         tenant = getattr(request, "tenant", None)
         try:
-            identity = inspect_site_package_upload(serializer.validated_data["site_zip"])
+            staged_upload, supplement_warnings, supplied_theme_ids = supplement_site_package_upload(
+                serializer.validated_data["site_zip"],
+                serializer.validated_data.get("theme_zips", []),
+            )
+            identity = inspect_site_package_upload(staged_upload, tenant=tenant)
+            supplement_warnings.extend(
+                {
+                    "code": "theme_package_missing",
+                    "sourceThemeId": theme["sourceId"],
+                    "name": theme["name"],
+                }
+                for theme in identity["assessment"]["themes"]
+                if theme["status"] == "missing"
+            )
         except ValueError as exc:
             raise serializers.ValidationError({"siteZip": str(exc)}) from exc
 
@@ -175,7 +192,8 @@ class SitePackageImportListView(APIView):
                     status=status.HTTP_409_CONFLICT,
                 )
 
-            conflicts = find_site_package_conflicts(tenant, identity) if tenant else []
+            include_site = serializer.validated_data["include_site"]
+            conflicts = find_site_package_conflicts(tenant, identity) if tenant and include_site else []
             mode = serializer.validated_data["mode"]
             if conflicts and mode == "prompt":
                 return Response(
@@ -189,7 +207,7 @@ class SitePackageImportListView(APIView):
                     },
                     status=status.HTTP_409_CONFLICT,
                 )
-            if mode == "update":
+            if mode in {"update", "replace"} and include_site:
                 selected = next(
                     (item for item in conflicts if item["id"] == serializer.validated_data["existing_root_id"]),
                     None,
@@ -208,6 +226,12 @@ class SitePackageImportListView(APIView):
                 "source_root_key": identity["stable_key"],
                 "source_root_id": identity["source_id"],
                 "source_package_hash": identity["package_hash"],
+                "include_site": include_site,
+                "include_media": serializer.validated_data["include_media"],
+                "include_themes": serializer.validated_data["include_themes"],
+                "media_namespace_name": serializer.validated_data.get("media_namespace_name", ""),
+                "supplement_warnings": supplement_warnings,
+                "supplied_theme_ids": sorted(supplied_theme_ids),
             }
             if selected:
                 options["local_root_id"] = selected["id"]
@@ -227,12 +251,41 @@ class SitePackageImportListView(APIView):
             job.save(update_fields=["object_key", "updated_at"])
 
         try:
-            S3MediaStorage()._save(object_key, serializer.validated_data["site_zip"])
+            staged_upload.seek(0)
+            S3MediaStorage()._save(object_key, File(staged_upload, name=f"{job.id}.zip"))
             import_site_package.delay(str(job.id))
         except Exception as exc:
             job.mark_failed(exc)
             raise
         return Response(SitePackageJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
+
+
+class SitePackageAssessmentView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        serializer = SitePackageAssessmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            staged_upload, warnings, supplied_ids = supplement_site_package_upload(
+                serializer.validated_data["site_zip"], serializer.validated_data.get("theme_zips", [])
+            )
+            identity = inspect_site_package_upload(staged_upload, tenant=request.tenant)
+        except ValueError as exc:
+            raise serializers.ValidationError({"siteZip": str(exc)}) from exc
+        for theme in identity["assessment"]["themes"]:
+            if theme["sourceId"] in supplied_ids:
+                theme["status"] = "supplied"
+        identity["assessment"]["missingThemes"] = sum(
+            1 for item in identity["assessment"]["themes"] if item["status"] == "missing"
+        )
+        identity["assessment"]["warnings"].extend(warnings)
+        identity["existingSites"] = [
+            {"id": item["id"], "title": item["title"], "slug": item["slug"]}
+            for item in find_site_package_conflicts(request.tenant, identity)
+        ]
+        return Response(identity)
 
 
 class SitePackageImportDetailView(APIView):
@@ -248,19 +301,39 @@ class RemoteSiteSourceListView(RemoteSiteSourceMixin, APIView):
         roots = WebPage.objects.filter(tenant=request.tenant, parent__isnull=True, is_deleted=False).order_by("title")
         results = []
         for root in roots:
-            page_count = 0
-            queue = [root]
-            while queue:
-                page = queue.pop(0)
-                page_count += 1
-                queue.extend(page.children.filter(is_deleted=False).only("id"))
+            exporter = SitePackageExporter(job=None)
+            pages = exporter._collect_pages(root)
+            versions = [version for page in pages for version in exporter._select_versions(page)]
+            theme_ids = {version.theme_id for version in versions if version.theme_id}
+            themes = list(PageTheme.objects.filter(id__in=theme_ids, tenant=request.tenant).order_by("name"))
+            media_ids = exporter._collect_media_ids(versions, pages, request.tenant, themes)
             results.append(
                 {
                     "stableKey": str(root.stable_key),
                     "title": root.title,
                     "hostnames": root.hostnames or [],
                     "updatedAt": root.updated_at,
-                    "pageCount": page_count,
+                    "pageCount": len(pages),
+                    "assessment": {
+                        "counts": {
+                            "pages": len(pages),
+                            "versions": len(versions),
+                            "themes": len(themes),
+                            "media": len(media_ids),
+                        },
+                        "themes": [
+                            {
+                                "sourceId": str(theme.id),
+                                "stableKey": str(theme.stable_key),
+                                "name": theme.name,
+                                "status": "remote",
+                            }
+                            for theme in themes
+                        ],
+                        "missingThemes": 0,
+                        "included": {"site": True, "themes": True, "media": True},
+                        "warnings": [],
+                    },
                 }
             )
         return Response({"results": results})
@@ -285,8 +358,8 @@ class RemoteSiteSourceExportListView(RemoteSiteSourceMixin, APIView):
             created_by=request.user,
             object_key=build_site_package_export_object_key(root),
             options={
-                "include_media": True,
-                "include_themes": True,
+                "include_media": request.data.get("includeMedia", request.data.get("include_media", True)),
+                "include_themes": request.data.get("includeThemes", request.data.get("include_themes", True)),
                 "source": "remote",
                 **_remote_owner_options(request),
             },
@@ -360,7 +433,11 @@ class RemoteSiteImportView(APIView):
                 "connection_id": str(data["connection"].id),
                 "remote_site_key": str(data["remote_site_key"]),
                 "local_root_id": data.get("local_root_id"),
-                "preserve_publication_status": data["mode"] == "copy",
+                "preserve_publication_status": data["mode"] == "clone",
+                "include_site": data["include_site"],
+                "include_media": data["include_media"],
+                "include_themes": data["include_themes"],
+                "media_namespace_name": data.get("media_namespace_name", ""),
             },
             progress={"phase": "queued"},
             expires_at=timezone.now() + timedelta(hours=24),
