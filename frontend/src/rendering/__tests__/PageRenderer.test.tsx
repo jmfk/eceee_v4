@@ -559,6 +559,8 @@ describe('PageRenderer', () => {
 
         expect(detail).not.toHaveTextContent('Must stay hidden')
         expect(detail?.querySelector('[data-slot="main"]')).toBeInTheDocument()
+        expect(detail?.querySelector('[data-slot="main"]')).toHaveAttribute('data-widget-slot', 'main')
+        expect(detail?.querySelector('[data-slot="main"]')).toHaveAttribute('data-owner-widget-type', 'object_storage.ObjectDetailWidget')
     })
 
     it('uses Django compact date formatting in top-news and sidebar views', () => {
@@ -666,6 +668,26 @@ describe('PageRenderer', () => {
         const caption = screen.getByText('Semantic image caption')
         expect(caption.tagName).toBe('FIGCAPTION')
         expect(caption.closest('figure')).toBe(container.querySelector('.image-container'))
+    })
+
+    it('renders published image references when no responsive source was generated', () => {
+        const model = createPageRenderModel({ widgets: {
+            main: [{
+                id: 'image', type: 'easy_widgets.ImageWidget',
+                config: { image: { sourceUrl: '/published-image.jpg', title: 'Published image' } },
+            }],
+            sidebar: [{
+                id: 'banner', type: 'easy_widgets.BannerWidget', config: {
+                    bannerMode: 'text', textContent: 'Banner with image',
+                    image1: { sourceUrl: '/published-banner.jpg' },
+                },
+            }],
+        } })
+
+        render(<PageRenderer model={model} />)
+
+        expect(screen.getByRole('img', { name: 'Published image' })).toHaveAttribute('src', '/published-image.jpg')
+        expect(document.querySelector('.banner-image')).toHaveAttribute('src', '/published-banner.jpg')
     })
 
     it('renders responsive image sources supplied by the publisher model', () => {

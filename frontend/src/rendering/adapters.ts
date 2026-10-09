@@ -7,6 +7,17 @@ const previewImagePattern = /(?:https?:\/\/[^\s"'()<>]+|s3:\/\/[^\s"'()<>]+|\/(?
 const imageReferenceKey = /(?:background|file|image|media|poster|src|thumbnail|url)/i
 const nonImageReferenceKey = /(?:caption|description|href|label|link|summary|text|title)/i
 
+const spacingDirections: Record<string, string[]> = {
+    margin: ['marginTop', 'marginRight', 'marginBottom', 'marginLeft'],
+    padding: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'],
+}
+
+const configuredSpacingFields = (values: Record<string, any> = {}) => [...new Set(
+    Object.entries(values)
+        .filter(([, value]) => value !== '' && value !== null && value !== undefined)
+        .flatMap(([field]) => [field, ...(spacingDirections[field] || [])]),
+)]
+
 const isRenderedImageReference = (value: string, key: string, matchIndex: number) => {
     const before = value.slice(Math.max(0, matchIndex - 500), matchIndex)
     const openImageTag = before.toLowerCase().lastIndexOf('<img')
@@ -196,6 +207,39 @@ export const createDesignerRenderModel = ({
         slots.landingPage = slots.landing_page
     }
 
+    const structuralSlotSpacing = Object.fromEntries((workspace?.catalog?.layouts || []).flatMap((item: any) => (
+        (item.slots || []).map((slot: any) => [
+            `layout:${item.key}:slot:${slot.name}`,
+            slot.editableSpacingProperties || [],
+        ])
+    )).concat((workspace?.catalog?.widgetSlots || []).flatMap((item: any) => (
+        (item.slots || []).map((slot: any) => [
+            `widget-slot:${item.widgetType}:${slot.name}`,
+            slot.editableSpacingProperties || [],
+        ])
+    ))))
+    const structuralWidgetPartSpacing = Object.fromEntries([
+        ...(workspace?.catalog?.designGroups || []).flatMap((group: any) => (
+            (group.parts || []).flatMap((part: any) => part.editableSpacingProperties?.length
+                ? [[part.id, part.editableSpacingProperties]]
+                : [])
+        )),
+        ...(workspace?.catalog?.widgetParts || []).flatMap((widget: any) => (
+            (widget.parts || []).flatMap((part: any) => part.editableSpacingProperties?.length
+                ? [[part.id, part.editableSpacingProperties]]
+                : [])
+        )),
+    ])
+    const editableSpacingTargets = (workspace?.spacing || []).reduce((targets: Record<string, string[]>, row: any) => {
+        const fields = row.scope === 'layoutSlot'
+            ? structuralSlotSpacing[row.targetId] || []
+            : row.scope === 'widgetSlot'
+                ? structuralSlotSpacing[row.targetId] || []
+                : configuredSpacingFields(row.values)
+        if (fields.length) targets[row.targetId] = [...new Set([...(targets[row.targetId] || []), ...fields])]
+        return targets
+    }, { ...structuralSlotSpacing, ...structuralWidgetPartSpacing })
+
     return {
         layout,
         layoutDefinition,
@@ -223,11 +267,7 @@ export const createDesignerRenderModel = ({
                 targets[row.targetId] = [...new Set([...(targets[row.targetId] || []), ...fields])]
                 return targets
             }, {}),
-            editableSpacingTargets: (workspace?.spacing || []).reduce((targets: Record<string, string[]>, row: any) => {
-                const fields = workspace?.constraints?.editableSpacingProperties || Object.keys(row.values || {})
-                targets[row.targetId] = [...new Set([...(targets[row.targetId] || []), ...fields])]
-                return targets
-            }, {}),
+            editableSpacingTargets,
             previewImageReferences: sourceModel ? [] : imageReferenceCollection.references,
             contentEditable,
             guidesEnabled,

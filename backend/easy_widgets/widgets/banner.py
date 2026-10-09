@@ -2,13 +2,13 @@
 Banner widget implementation.
 """
 
-from typing import Type, Optional, List, Literal
-from pydantic import BaseModel, Field, ConfigDict
+import logging
+from typing import Literal, Optional, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +171,20 @@ class BannerWidget(BaseWidget):
                 "height",
             ],
         },
+        "banner-text": {
+            "label": "Banner content",
+            "selector": ".banner-text",
+            "properties": [
+                "margin",
+                "padding",
+                "fontFamily",
+                "fontSize",
+                "fontWeight",
+                "lineHeight",
+                "color",
+                "textAlign",
+            ],
+        },
     }
 
     widget_css = """
@@ -205,24 +219,24 @@ class BannerWidget(BaseWidget):
         background-repeat: no-repeat;
         z-index: 0;
     }
-    
+
     .banner-body {
-        display: flex;  
+        display: flex;
         flex: 1;
         min-height: 0;
         height: 140px;
         position: relative;
         z-index: 1;
     }
-    
+
     /* Text mode styles */
     .banner-body.mode-text {
         justify-content: flex-start;
         align-items: flex-start;
     }
-    
+
     .banner-body.mode-text .banner-text {
-        flex: 1; 
+        flex: 1;
         padding: 26px 30px 30px;
         font-size: 16px;
         font-family: 'Source Sans 3', sans-serif;
@@ -247,20 +261,20 @@ class BannerWidget(BaseWidget):
         overflow: hidden;
         margin-top: 0;
         margin-bottom: 0;
-    }    
+    }
     .banner-body.mode-text .banner-images {
         display: flex;
         align-items: top;
         justify-content: right;
-        padding: 0px; 
+        padding: 0px;
     }
-    
+
     /* Header mode styles */
     .banner-body.mode-header {
         justify-content: center;
         align-items: center;
     }
-    
+
     .banner-body.mode-header .banner-text {
         width: 100%;
         padding: 30px;
@@ -285,14 +299,14 @@ class BannerWidget(BaseWidget):
     .banner-widget.border-disabled {
         border: none;
     }
-    
+
     /* Rectangle image styling */
     .banner-body.image-size-rectangle .banner-image {
         width: 280px;
         height: 140px;
         border: 5px solid white;
     }
-    
+
     /* Responsive behavior */
     @media (max-width: 768px) {
         .banner-body.mode-text {
@@ -318,10 +332,7 @@ class BannerWidget(BaseWidget):
         Returns:
             Tuple of (html, css) - always renders using template
         """
-        from webpages.utils.mustache_renderer import (
-            render_mustache,
-            prepare_component_context,
-        )
+        from webpages.utils.mustache_renderer import prepare_component_context, render_mustache
 
         style_name = config.get("component_style", "default")
 
@@ -348,11 +359,7 @@ class BannerWidget(BaseWidget):
         banner_mode = config.get("banner_mode", "text")
 
         # Select content based on mode
-        content = (
-            config.get("header_content", "")
-            if banner_mode == "header"
-            else config.get("text_content", "")
-        )
+        content = config.get("header_content", "") if banner_mode == "header" else config.get("text_content", "")
 
         # Prepare context with all widget data
         context = prepare_component_context(
@@ -380,8 +387,8 @@ class BannerWidget(BaseWidget):
         """
         Prepare template context with snake_case field conversions and layout properties.
         """
-        from webpages.utils.color_utils import resolve_color_value
         from webpages.services.link_resolver import resolve_links_in_html
+        from webpages.utils.color_utils import resolve_color_value
 
         template_config = config.copy() if config else {}
         request = context.get("request") if context else None
@@ -390,7 +397,7 @@ class BannerWidget(BaseWidget):
         header_content = config.get("header_content", "")
         if header_content:
             template_config["header_content"] = resolve_links_in_html(header_content, request)
-        
+
         text_content = config.get("text_content", "")
         if text_content:
             template_config["text_content"] = resolve_links_in_html(text_content, request)
@@ -427,9 +434,7 @@ class BannerWidget(BaseWidget):
         background_image = config.get("background_image")
         if background_image and isinstance(background_image, dict):
             # Extract URL from MediaFile object
-            bg_url = background_image.get("imgproxy_base_url") or background_image.get(
-                "file_url"
-            )
+            bg_url = background_image.get("imgproxy_base_url") or background_image.get("file_url")
             template_config["background_image_url"] = bg_url
         else:
             template_config["background_image_url"] = None

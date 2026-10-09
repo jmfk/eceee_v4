@@ -492,7 +492,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {}, onConfigCha
             <div className="flex justify-between items-center h-full w-full">
                 {/* Primary menu (left-aligned) */}
                 <ul
-                    className="navbar-menu-list flex gap-6 m-0 p-0 pl-[20px] items-center"
+                    className="navbar-menu-list navbar-primary-menu flex gap-6 m-0 items-center"
                     style={{ listStyle: 'none' }}
                 >
                     {visibleItems.map((item, index) => (
@@ -558,7 +558,7 @@ const NavbarWidget = ({ config = {}, mode = 'preview', context = {}, onConfigCha
                 {/* Secondary menu (right-aligned) */}
                 {activeSecondaryMenuItems.length > 0 && showSecondaryMenu && (
                     <ul
-                        className="navbar-menu-list navbar-secondary-menu flex gap-1 m-0 p-0 pr-[20px] items-center ml-auto"
+                        className="navbar-menu-list navbar-secondary-menu flex gap-1 m-0 items-center ml-auto"
                         style={{ listStyle: 'none' }}
                     >
                         {activeSecondaryMenuItems.map((item, index) => {

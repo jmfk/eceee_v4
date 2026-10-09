@@ -1,7 +1,7 @@
 {% load security_filters %}
 
 <div class="two-columns-widget widget-type-{{ widget_type.css_class_name }} {{ config.ratio_class }}" data-widget-type="two-columns">
-    <div class="two-col-slot left" data-slot="left">
+    <div class="two-col-slot left" data-slot="left" data-widget-slot="left" data-owner-widget-type="easy_widgets.TwoColumnsWidget">
         {% if config.rendered_slots.left %}
             {% for widget in config.rendered_slots.left %}
                 <div class="two-col-widget-wrapper">
@@ -13,7 +13,7 @@
         {% endif %}
     </div>
 
-    <div class="two-col-slot right" data-slot="right">
+    <div class="two-col-slot right" data-slot="right" data-widget-slot="right" data-owner-widget-type="easy_widgets.TwoColumnsWidget">
         {% if config.rendered_slots.right %}
             {% for widget in config.rendered_slots.right %}
                 <div class="two-col-widget-wrapper">

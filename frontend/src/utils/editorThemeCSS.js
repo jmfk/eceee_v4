@@ -214,13 +214,20 @@ export const buildThemeCSS = ({
         ? theme.colors
         : theme?.cssVariables || {}
     const designGroups = theme?.designGroups || theme?.typography
+    const structuralSpacing = designGroups?.structuralSpacing || designGroups?.structural_spacing || []
+    const designCSS = designGroups?.groups?.length
+        ? generateDesignGroupsCSS(designGroups, colors, '', null, null, false, getBreakpoints(theme))
+        : [
+            legacyElementsCSS(theme?.htmlElements),
+            structuralSpacing.length
+                ? generateDesignGroupsCSS(designGroups, colors, '', null, null, false, getBreakpoints(theme))
+                : '',
+        ].filter(Boolean).join('\n\n')
     return [
         PUBLIC_RENDER_CSS,
         EDITOR_WIDGET_BASE_CSS,
         generateColorsCSS(colors),
-        designGroups?.groups?.length
-            ? generateDesignGroupsCSS(designGroups, colors, '', null, null, false, getBreakpoints(theme))
-            : legacyElementsCSS(theme?.htmlElements),
+        designCSS,
         styleCollectionCSS(theme?.componentStyles, theme),
         styleCollectionCSS(theme?.galleryStyles, theme),
         styleCollectionCSS(theme?.carouselStyles, theme),
@@ -269,6 +276,7 @@ export const buildDesignerTheme = workspace => {
         group.elements[row.element] = { ...(group.elements[row.element] || {}), ...row.values }
     }
     for (const row of workspace.spacing || []) {
+        if (['layoutSlot', 'widget', 'widgetSlot', 'widgetPart'].includes(row.scope)) continue
         const group = groups[row.groupIndex]
         if (!group) continue
         if (row.scope === 'layout') {
@@ -284,7 +292,12 @@ export const buildDesignerTheme = workspace => {
             group.elements[row.element] = { ...(group.elements[row.element] || {}), ...row.values }
         }
     }
-    theme.designGroups = { ...designGroups, groups }
+    const structuralSpacing = (workspace.spacing || [])
+        .filter(row => ['layoutSlot', 'widget', 'widgetSlot', 'widgetPart'].includes(row.scope))
+        .map(({ scope, layout, slot, part, widgetType, breakpoint, values }) => ({
+            scope, layout, slot, part, widgetType, breakpoint, values,
+        }))
+    theme.designGroups = { ...designGroups, groups, structuralSpacing }
     theme.breakpoints = workspace.breakpoints || theme.breakpoints
     return theme
 }

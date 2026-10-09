@@ -288,7 +288,7 @@ const TwoColumnsWidget = ({
 
         return (
             <div className={`grid grid-cols-1 ${gridClasses} gap-4 w-full mb-4`}>
-                <div className="two-col-slot left min-h-[50px]">
+                <div className="two-col-slot left min-h-[50px]" data-slot="left" data-widget-slot="left" data-owner-widget-type="easy_widgets.TwoColumnsWidget">
                     <SlotEditor
                         slotName="left"
                         slotLabel="Left Column"
@@ -325,7 +325,7 @@ const TwoColumnsWidget = ({
                         onPasteAtPosition={onPasteAtPosition}
                     />
                 </div>
-                <div className="two-col-slot right min-h-[50px]">
+                <div className="two-col-slot right min-h-[50px]" data-slot="right" data-widget-slot="right" data-owner-widget-type="easy_widgets.TwoColumnsWidget">
                     <SlotEditor
                         slotName="right"
                         slotLabel="Right Column"
@@ -428,14 +428,14 @@ const TwoColumnsWidget = ({
 
         return (
             <div className={`grid grid-cols-1 ${gridClasses} gap-4 w-full mb-4`}>
-                <div className="two-col-slot left min-h-[50px]">
+                <div className="two-col-slot left min-h-[50px]" data-slot="left" data-widget-slot="left" data-owner-widget-type="easy_widgets.TwoColumnsWidget">
                     {slotsData.left && slotsData.left.length > 0 ? (
                         slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
                     ) : (
                         <div className="p-4 text-center text-gray-400">Left column</div>
                     )}
                 </div>
-                <div className="two-col-slot right min-h-[50px]">
+                <div className="two-col-slot right min-h-[50px]" data-slot="right" data-widget-slot="right" data-owner-widget-type="easy_widgets.TwoColumnsWidget">
                     {slotsData.right && slotsData.right.length > 0 ? (
                         slotsData.right.map((widget, index) => renderWidget(widget, 'right', index))
                     ) : (

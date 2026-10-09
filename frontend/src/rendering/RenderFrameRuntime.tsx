@@ -9,6 +9,7 @@ const DESIGNER_STYLE_PROPERTIES: Record<string, string> = {
     lineHeight: 'line-height', letterSpacing: 'letter-spacing',
     margin: 'margin', marginTop: 'margin-top', marginRight: 'margin-right', marginBottom: 'margin-bottom', marginLeft: 'margin-left',
     padding: 'padding', paddingTop: 'padding-top', paddingRight: 'padding-right', paddingBottom: 'padding-bottom', paddingLeft: 'padding-left',
+    gap: 'gap',
 }
 
 const EDITABLE_TEXT_SELECTOR = 'a,blockquote,caption,code,em,figcaption,h1,h2,h3,h4,h5,h6,li,p,pre,span,strong'
@@ -28,7 +29,8 @@ const editableTextLabel = (node: HTMLElement) => {
 
 const DESIGNER_CSS = `.designer-preview [data-designer-target]{cursor:pointer}[data-designer-target].designer-selected-slot{outline:3px solid #eab308!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget{box-shadow:inset 0 0 0 3px #16a34a!important}[data-designer-target].designer-selected-element{outline:3px solid #2563eb!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget.designer-selected-element{box-shadow:inset 0 0 0 3px #16a34a,0 0 0 3px #2563eb!important}[data-designer-target].designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:0 0 0 3px rgba(245,158,11,.2)!important}[data-designer-target].designer-selected.designer-highlighted{outline-offset:-3px!important}[data-designer-target].designer-selected-slot.designer-highlighted{outline:3px solid #eab308!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget.designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:inset 0 0 0 3px #16a34a!important}[data-designer-target].designer-selected-element.designer-highlighted{outline:3px solid #2563eb!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget.designer-selected-element.designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:inset 0 0 0 3px #16a34a,0 0 0 3px #2563eb!important}.designer-guides .designer-hovered:not(.designer-selected):not(.designer-highlighted){outline:2px dotted #2563eb!important;outline-offset:-2px!important}
 .designer-context-menu{position:fixed!important;z-index:2147483647!important;min-width:180px!important;max-width:260px!important;padding:6px!important;border:1px solid #d1d5db!important;border-radius:8px!important;background:#fff!important;box-shadow:0 10px 24px rgba(15,23,42,.2)!important;color:#111827!important;font:500 13px/1.35 system-ui,sans-serif!important}.designer-context-menu-title{overflow:hidden!important;padding:5px 8px 7px!important;color:#6b7280!important;font-size:11px!important;font-weight:600!important;text-overflow:ellipsis!important;white-space:nowrap!important}.designer-context-menu button{display:block!important;width:100%!important;padding:7px 8px!important;border:0!important;border-radius:5px!important;background:transparent!important;color:#111827!important;font:inherit!important;text-align:left!important;cursor:pointer!important}.designer-context-menu button:hover,.designer-context-menu button:focus-visible{background:#eff6ff!important;color:#1d4ed8!important;outline:none!important}
-.designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483644!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483645!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483645!important;transform:translate(-50%,-50%);padding:2px 3px!important;border:0!important;border-radius:3px!important;background:#fff!important;font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;box-shadow:0 0 0 1px rgba(255,255,255,.9)!important}.designer-spacing-value[data-editable="true"]{pointer-events:auto!important;cursor:pointer!important;box-shadow:0 0 0 1px currentColor!important}.designer-spacing-value[data-editable="true"]:hover,.designer-spacing-value[data-editable="true"]:focus-visible{outline:2px solid #2563eb!important;outline-offset:1px!important}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}.designer-spacing-editor{position:fixed!important;z-index:2147483647!important;display:flex!important;gap:4px!important;padding:5px!important;border:1px solid #93c5fd!important;border-radius:6px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.22)!important}.designer-spacing-editor input{width:72px!important;padding:5px 6px!important;border:1px solid #d1d5db!important;border-radius:4px!important;font:500 12px/1.2 system-ui,sans-serif!important}.designer-spacing-editor button{padding:5px 7px!important;border:0!important;border-radius:4px!important;background:#2563eb!important;color:#fff!important;font:600 12px/1.2 system-ui,sans-serif!important;cursor:pointer!important}
+.designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483644!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483645!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483645!important;transform:translate(-50%,-50%);padding:2px 3px!important;border:0!important;border-radius:3px!important;background:#fff!important;font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;box-shadow:0 0 0 1px rgba(255,255,255,.9)!important}.designer-spacing-value[data-editable="true"]{pointer-events:auto!important;cursor:pointer!important;box-shadow:0 0 0 1px currentColor!important}.designer-spacing-value[data-editable="true"]:hover,.designer-spacing-value[data-editable="true"]:focus-visible{outline:2px solid #2563eb!important;outline-offset:1px!important}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}.designer-spacing-editor{position:fixed!important;z-index:2147483647!important;display:flex!important;gap:4px!important;padding:5px!important;border:1px solid #93c5fd!important;border-radius:6px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.22)!important}.designer-spacing-editor input{width:72px!important;padding:5px 6px!important;border:1px solid #d1d5db!important;border-radius:4px!important;font:500 12px/1.2 system-ui,sans-serif!important}.designer-spacing-editor button{min-width:28px!important;padding:5px 7px!important;border:0!important;border-radius:4px!important;background:#2563eb!important;color:#fff!important;font:600 12px/1.2 system-ui,sans-serif!important;cursor:pointer!important}.designer-spacing-editor .designer-spacing-step{background:#e5e7eb!important;color:#111827!important;font-size:16px!important}
+.designer-spacing-guide.designer-spacing-level-slot.designer-spacing-margin{background:rgba(234,179,8,.2)!important}.designer-spacing-guide.designer-spacing-level-slot.designer-spacing-padding{background:rgba(234,179,8,.32)!important}.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-margin{background:rgba(22,163,74,.18)!important}.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-padding,.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-gap{background:rgba(22,163,74,.3)!important}.designer-spacing-guide.designer-spacing-level-element.designer-spacing-margin{background:rgba(37,99,235,.18)!important}.designer-spacing-guide.designer-spacing-level-element.designer-spacing-padding{background:rgba(37,99,235,.3)!important}.designer-spacing-content.designer-spacing-level-slot,.designer-spacing-content.designer-spacing-level-widget,.designer-spacing-content.designer-spacing-level-element{box-sizing:border-box!important;border-style:solid!important;border-width:2px!important}.designer-spacing-content.designer-spacing-level-slot{border-color:#ca8a04!important}.designer-spacing-content.designer-spacing-level-widget{border-color:#16a34a!important}.designer-spacing-content.designer-spacing-level-element{border-color:#2563eb!important}.designer-column-slot-guide{box-sizing:border-box!important;border:2px solid #eab308!important;background:rgba(234,179,8,.06)!important}.designer-spacing-value.designer-spacing-level-slot{background:#fefce8!important;color:#854d0e!important}.designer-spacing-value.designer-spacing-level-widget{background:#f0fdf4!important;color:#166534!important}.designer-spacing-value.designer-spacing-level-element{background:#eff6ff!important;color:#1d4ed8!important}.designer-spacing-measure.designer-spacing-level-slot,.designer-spacing-measure.designer-spacing-level-slot::before,.designer-spacing-measure.designer-spacing-level-slot::after{background:#eab308!important;box-shadow:0 0 0 1px #854d0e!important}.designer-spacing-measure.designer-spacing-level-widget,.designer-spacing-measure.designer-spacing-level-widget::before,.designer-spacing-measure.designer-spacing-level-widget::after{background:#16a34a!important;box-shadow:0 0 0 1px #166534!important}.designer-spacing-measure.designer-spacing-level-element,.designer-spacing-measure.designer-spacing-level-element::before,.designer-spacing-measure.designer-spacing-level-element::after{background:#2563eb!important;box-shadow:0 0 0 1px #1d4ed8!important}
 .layout-designer-preview [data-layout-node-id]{position:relative!important;box-shadow:inset 0 0 0 1px rgba(30,64,175,.42)!important}.layout-designer-preview [data-layout-node-id]::before{content:attr(data-layout-node-type) " · " attr(data-layout-node-size)!important;display:none;position:absolute!important;z-index:20!important;top:3px!important;right:3px!important;max-width:calc(100% - 6px)!important;overflow:hidden!important;padding:2px 5px!important;border:1px solid rgba(255,255,255,.8)!important;border-radius:4px!important;background:rgba(15,23,42,.82)!important;color:#fff!important;font:600 10px/1.2 system-ui,sans-serif!important;text-overflow:ellipsis!important;text-transform:capitalize!important;white-space:nowrap!important;pointer-events:none!important}.layout-designer-preview [data-layout-node-type="slot"]::before,.layout-designer-preview [data-layout-node-id].designer-selected::before,.layout-designer-preview [data-layout-node-id].designer-highlighted::before,.layout-designer-preview [data-layout-node-id].designer-hovered::before{display:block}.layout-designer-preview [data-layout-node-type="container"]{background-color:rgba(59,130,246,.10)!important}.layout-designer-preview [data-layout-node-type="section"]{background-color:rgba(6,182,212,.12)!important}.layout-designer-preview [data-layout-node-type="grid"]{background-color:rgba(168,85,247,.12)!important}.layout-designer-preview [data-layout-node-type="row"]{background-color:rgba(99,102,241,.12)!important}.layout-designer-preview [data-layout-node-type="column"]{background-color:rgba(34,197,94,.12)!important}.layout-designer-preview [data-layout-node-type="semantic"]{background-color:rgba(245,158,11,.14)!important}.layout-designer-preview [data-layout-node-type="slot"]{min-height:40px;background-color:rgba(244,63,94,.13)!important;color:#881337!important;text-align:center!important}.layout-designer-preview [data-layout-node-type="slot"]::after{content:attr(data-layout-node-label)!important;position:absolute!important;z-index:10!important;inset:0!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:5px 9px!important;color:#881337!important;font:600 13px/1.25 system-ui,sans-serif!important;text-align:center!important;pointer-events:none!important}.layout-designer-preview [data-layout-presentation-color]{background-color:color-mix(in srgb,var(--layout-presentation-color) 16%,transparent)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--layout-presentation-color) 62%,transparent)!important}
 `
 
@@ -61,7 +63,7 @@ const designerInstanceId = (node: HTMLElement) => {
 const findTargetNode = (root: ParentNode, targetId: string, widgetId = '', instanceId = '') => [...root.querySelectorAll<HTMLElement>('[data-designer-target]')].find((node) => (
     (!widgetId || node.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId === widgetId)
     && (!instanceId || designerInstanceId(node) === instanceId)
-    && nodeTargets(node).some((target: any) => target.id === targetId)
+    && nodeTargets(node).some((target: any) => target.id === targetId || target.styleTargetId === targetId)
 ))
 
 const compactText = (node: HTMLElement) => (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim()
@@ -156,11 +158,36 @@ const targetPath = (node: HTMLElement, preferredTarget?: any) => {
 
 const selectionKind = (target: any): 'slot' | 'widget' | 'element' => target?.kind === 'layoutSlot' || target?.kind === 'slot'
     ? 'slot'
-    : target?.kind === 'widget'
+    : ['widget', 'part', 'group'].includes(target?.kind)
         ? 'widget'
         : 'element'
 
-const selectionPaths = (node: HTMLElement, preferredTarget?: any) => {
+const widgetSpacingConfigurationTargets = (
+    node: HTMLElement,
+    designer: RenderPageModel['designer'],
+    target?: any,
+) => {
+    if (!designer || target?.kind !== 'widget') return []
+    const widgetRoot = node.closest<HTMLElement>('[data-widget-id][data-widget-type]')
+    if (!widgetRoot) return []
+    const seen = new Set<string>()
+    return [...widgetRoot.querySelectorAll<HTMLElement>('[data-designer-target]')].flatMap((configurationNode) => (
+        nodeTargets(configurationNode).flatMap((candidate: any) => {
+            const targetId = candidate.styleTargetId || candidate.id
+            const editableFields = designer.editableSpacingTargets?.[targetId] || []
+            if (!targetId || !editableFields.length || selectionKind(candidate) !== 'widget' || seen.has(targetId)) return []
+            seen.add(targetId)
+            return [{
+                ...candidate,
+                widgetId: candidate.widgetId || widgetRoot.dataset.widgetId || '',
+                widgetType: candidate.widgetType || widgetRoot.dataset.widgetType || '',
+                computedStyles: computedThemeValues(configurationNode),
+            }]
+        })
+    ))
+}
+
+const selectionPaths = (node: HTMLElement, preferredTarget?: any, designer?: RenderPageModel['designer']) => {
     const paths: Record<'slot' | 'widget' | 'element', any[]> = { slot: [], widget: [], element: [] }
     const selectionRank = { slot: 0, widget: 1, element: 2 }
     const preferredKind = selectionKind(preferredTarget)
@@ -184,6 +211,10 @@ const selectionPaths = (node: HTMLElement, preferredTarget?: any) => {
                 ...target,
                 widgetType: target.widgetType || widgetNode?.dataset.widgetType || '',
                 widgetId,
+                computedStyles: computedThemeValues(current),
+                ...(target.kind === 'widget' ? {
+                    configurationSpacingTargets: widgetSpacingConfigurationTargets(current, designer, target),
+                } : {}),
             })
         })
         first = false
@@ -207,6 +238,15 @@ const applySelectionClasses = (root: ParentNode, node: HTMLElement, preferredTar
     return paths
 }
 
+const applyIndependentSelectionClasses = (root: ParentNode, selections: NonNullable<RenderFrameMessage['selectedTargets']>) => {
+    clearSelectionClasses(root)
+    selections.forEach((selection) => {
+        const node = findTargetNode(root, selection.targetId, selection.widgetId, selection.targetInstanceId)
+        if (!node) return
+        node.classList.add('designer-selected', `designer-selected-${selection.selectionLevel}`)
+    })
+}
+
 const ancestorTargets = (node: HTMLElement, designer: NonNullable<RenderPageModel['designer']>) => {
     const seen = new Set<string>()
     const ancestors: any[] = []
@@ -216,7 +256,7 @@ const ancestorTargets = (node: HTMLElement, designer: NonNullable<RenderPageMode
     while (ancestor) {
         nodeTargets(ancestor).forEach((target: any) => {
             const typographyTarget = Boolean(designer.editableTypographyTargets?.[target.id])
-            const spacingTarget = Boolean(designer.editableSpacingTargets?.[target.id])
+            const spacingTarget = Boolean(designer.editableSpacingTargets?.[target.styleTargetId || target.id])
             if (!target.id || seen.has(target.id) || (!typographyTarget || foundTypography) && (!spacingTarget || foundSpacing)) return
             seen.add(target.id)
             ancestors.push({ ...target, computedStyles: computedThemeValues(ancestor) })
@@ -236,7 +276,7 @@ const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['design
     const richText = Boolean(primary.richText || isRichTextNode(node))
     const widgetNode = node.closest<HTMLElement>('[data-widget-id]')
     window.parent.postMessage({
-        source: 'eceee-designer-preview', action, targetId: primary.id, kind: primary.kind,
+        source: 'eceee-designer-preview', action, targetId: primary.id, styleTargetId: primary.styleTargetId || '', kind: primary.kind,
         label: primary.label, text: editableValue(node, richText), editable: primary.editable, richText,
         layoutNodeId: primary.layoutNodeId || '',
         editableParameters: primary.editableParameters || [],
@@ -248,6 +288,9 @@ const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['design
         sourceMatchIndex: primary.sourceMatchIndex ?? 0,
         targetInstanceId: primary.instanceId || designerInstanceId(node),
         computedStyles: computedThemeValues(node),
+        ...(primary.kind === 'widget' ? {
+            configurationSpacingTargets: widgetSpacingConfigurationTargets(node, designer, primary),
+        } : {}),
         alternatives: targets.map((target: any) => ({
             ...target,
             widgetType: target.widgetType || widgetNode?.dataset.widgetType || '',
@@ -257,7 +300,7 @@ const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['design
             computedStyles: computedThemeValues(node),
         })),
         path: targetPath(node, primary),
-        selectionPaths: selectionPaths(node, primary),
+        selectionPaths: selectionPaths(node, primary, designer),
         ancestors: designer ? ancestorTargets(node, designer) : [],
         descendants: descendantTargets(node),
         ...extra,
@@ -282,6 +325,7 @@ type DesignerFocusState = {
     selectedTargetId: string
     selectedWidgetId: string
     selectedInstanceId: string
+    selectedTargets: NonNullable<RenderFrameMessage['selectedTargets']>
     highlightedTargetId: string
     highlightedWidgetId: string
     highlightedInstanceId: string
@@ -294,8 +338,9 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     let guides: HTMLElement[] = []
     let hoveredNode: HTMLElement | null = null
     let selectedNode: HTMLElement | null = null
+    let selectedNodes: Record<'slot' | 'widget' | 'element', HTMLElement | null> = { slot: null, widget: null, element: null }
     let contextMenu: HTMLElement | null = null
-    let spacingEditor: { element: HTMLFormElement, node: HTMLElement, property: string } | null = null
+    let spacingEditor: { element: HTMLFormElement, node: HTMLElement, property: string, restore: () => void } | null = null
     if (designer.layoutCanvas) {
         const layoutNodes = [...root.querySelectorAll<HTMLElement>('[data-layout-node-id]')]
         const updateNodeSize = (node: HTMLElement) => {
@@ -316,7 +361,11 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         })
     }
     const closeContextMenu = () => { contextMenu?.remove(); contextMenu = null }
-    const closeSpacingEditor = () => { spacingEditor?.element.remove(); spacingEditor = null }
+    const closeSpacingEditor = (restore = true) => {
+        if (restore) spacingEditor?.restore()
+        spacingEditor?.element.remove()
+        spacingEditor = null
+    }
     const positionSpacingEditor = (editor: HTMLFormElement, labelLeft: number, labelTop: number) => {
         const gap = 12
         const width = editor.offsetWidth || 164
@@ -334,11 +383,15 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         hoveredNode?.classList.remove('designer-hovered')
         hoveredNode = null
     }
-    const showSpacing = (node: HTMLElement) => {
-        removeGuides()
-        hoveredNode?.classList.remove('designer-hovered')
-        hoveredNode = node
-        node.classList.add('designer-hovered')
+    let showSelectedSpacing: () => void = () => undefined
+    let redrawSpacing: (node: HTMLElement) => void = () => undefined
+    const showSpacing = (node: HTMLElement, append = false, selectionLevel?: 'slot' | 'widget' | 'element') => {
+        if (!append) {
+            removeGuides()
+            hoveredNode?.classList.remove('designer-hovered')
+            hoveredNode = node
+            node.classList.add('designer-hovered')
+        }
         if (designer.guidesEnabled === false) return
         const rect = node.getBoundingClientRect()
         const style = getComputedStyle(node)
@@ -346,6 +399,12 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         const margin = { top: number('margin-top'), right: number('margin-right'), bottom: number('margin-bottom'), left: number('margin-left') }
         const padding = { top: number('padding-top'), right: number('padding-right'), bottom: number('padding-bottom'), left: number('padding-left') }
         const border = { top: number('border-top-width'), right: number('border-right-width'), bottom: number('border-bottom-width'), left: number('border-left-width') }
+        const columnGrid = node.matches('.two-columns-widget,.three-columns-widget')
+            ? node
+            : node.querySelector<HTMLElement>('.two-columns-widget,.three-columns-widget')
+        const levelClass = selectionLevel
+            ? ` designer-spacing-level-${selectionLevel}`
+            : columnGrid === node ? ' designer-spacing-level-widget' : ''
         const addGuide = (
             className: string,
             left: number,
@@ -353,12 +412,12 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             width: number,
             height: number,
             side?: string,
-            spacing?: 'margin' | 'padding',
+            spacing?: 'margin' | 'padding' | 'gap',
             value?: number,
         ) => {
             if (width <= 0 || height <= 0) return
             const guide = document.createElement('div')
-            guide.className = `designer-spacing-guide ${className}`
+            guide.className = `designer-spacing-guide ${className}${levelClass}`
             guide.setAttribute('aria-hidden', 'true')
             if (side) guide.dataset.side = side
             Object.assign(guide.style, { left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px` })
@@ -375,7 +434,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
 
             const measure = document.createElement('div')
             const horizontalMeasure = side === 'left' || side === 'right'
-            measure.className = `designer-spacing-measure designer-spacing-measure-${horizontalMeasure ? 'horizontal' : 'vertical'} designer-spacing-${spacing}-measure`
+            measure.className = `designer-spacing-measure designer-spacing-measure-${horizontalMeasure ? 'horizontal' : 'vertical'} designer-spacing-${spacing}-measure${levelClass}`
             measure.setAttribute('aria-hidden', 'true')
             if (side) measure.dataset.side = side
             Object.assign(measure.style, horizontalMeasure ? {
@@ -391,7 +450,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             guides.push(measure)
 
             const label = document.createElement('div')
-            label.className = `designer-spacing-value designer-spacing-${spacing}-value`
+            label.className = `designer-spacing-value designer-spacing-${spacing}-value${levelClass}`
             if (side) label.dataset.side = side
             label.textContent = `${value}px`
             const labelWidth = Math.max(20, label.textContent.length * 6)
@@ -419,43 +478,79 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                 left: `${labelLeft}px`,
                 top: `${labelTop}px`,
             })
-            const property = `${spacing}${side ? side[0].toUpperCase() + side.slice(1) : ''}`
+            const property = spacing === 'gap' ? 'gap' : `${spacing}${side ? side[0].toUpperCase() + side.slice(1) : ''}`
+            const spacingDescription = spacing === 'gap' ? 'column gap' : `${spacing} ${side}`
+            const editNode = spacing === 'gap' && columnGrid ? columnGrid : node
+            const directTargetIds = nodeTargets(editNode).flatMap((target: any) => [target.id, target.styleTargetId]).filter(Boolean)
             const targetIds: string[] = []
-            let targetNode: HTMLElement | null = node
+            let targetNode: HTMLElement | null = editNode
             while (targetNode && root.contains(targetNode)) {
                 nodeTargets(targetNode).forEach((target: any) => {
                     if (target.id && !targetIds.includes(target.id)) targetIds.push(target.id)
+                    if (target.styleTargetId && !targetIds.includes(target.styleTargetId)) targetIds.push(target.styleTargetId)
                 })
                 targetNode = targetNode.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
             }
-            const editable = targetIds.some((targetId) => designer.editableSpacingTargets?.[targetId]?.includes(property))
+            const editableTargetIds = directTargetIds.filter((targetId: string) => designer.editableSpacingTargets?.[targetId]?.includes(property))
+            const spacingTargetId = editableTargetIds[0] || ''
+            const editable = Boolean(spacingTargetId)
             label.setAttribute('aria-hidden', editable ? 'false' : 'true')
             if (editable) {
                 label.dataset.editable = 'true'
                 label.tabIndex = 0
                 label.setAttribute('role', 'button')
-                label.setAttribute('aria-label', `Edit ${spacing} ${side}`)
+                label.setAttribute('aria-label', `Edit ${spacingDescription}`)
                 const openEditor = (event: Event) => {
                     event.preventDefault()
                     event.stopPropagation()
                     closeSpacingEditor()
                     const editor = document.createElement('form')
                     editor.className = 'designer-spacing-editor'
-                    editor.setAttribute('aria-label', `Edit ${spacing} ${side}`)
+                    editor.setAttribute('aria-label', `Edit ${spacingDescription}`)
                     const input = document.createElement('input')
-                    input.setAttribute('aria-label', `${spacing} ${side} value`)
+                    input.setAttribute('aria-label', `${spacingDescription} value`)
                     input.value = `${value}px`
+                    const cssProperty = property.replace(/[A-Z]/g, (character) => `-${character.toLowerCase()}`)
+                    const originalInlineValue = editNode.style.getPropertyValue(cssProperty)
+                    const originalInlinePriority = editNode.style.getPropertyPriority(cssProperty)
+                    const restoreValue = () => {
+                        if (originalInlineValue) editNode.style.setProperty(cssProperty, originalInlineValue, originalInlinePriority)
+                        else editNode.style.removeProperty(cssProperty)
+                    }
+                    const previewValue = () => {
+                        editNode.style.setProperty(cssProperty, input.value.trim())
+                        redrawSpacing(node)
+                    }
+                    const decrease = document.createElement('button')
+                    decrease.type = 'button'
+                    decrease.className = 'designer-spacing-step'
+                    decrease.textContent = '−'
+                    decrease.setAttribute('aria-label', `Decrease ${spacingDescription}`)
+                    const increase = document.createElement('button')
+                    increase.type = 'button'
+                    increase.className = 'designer-spacing-step'
+                    increase.textContent = '+'
+                    increase.setAttribute('aria-label', `Increase ${spacingDescription}`)
                     const save = document.createElement('button')
                     save.type = 'submit'
                     save.textContent = 'Apply'
-                    editor.append(input, save)
-                    const applyValue = () => {
+                    editor.append(decrease, input, increase, save)
+                    const applyValue = (close = true) => {
                         if (!editor.isConnected) return
+                        previewValue()
                         window.parent.postMessage({
-                            source: 'eceee-designer-preview', action: 'spacingChange', targetIds, property,
+                            source: 'eceee-designer-preview', action: 'spacingChange', targetId: spacingTargetId, targetIds, property,
                             value: input.value.trim(), viewportWidth: window.innerWidth,
                         }, '*')
-                        closeSpacingEditor()
+                        if (close) closeSpacingEditor(false)
+                    }
+                    const adjustValue = (direction: number, step: number) => {
+                        const match = input.value.match(/^\s*(-?(?:\d+(?:\.\d*)?|\.\d+))\s*([a-z%]*)\s*$/i)
+                        if (!match) return
+                        const nextValue = Math.max(0, Math.round((Number(match[1]) + direction * step) * 1000) / 1000)
+                        input.value = `${nextValue}${match[2] || 'px'}`
+                        input.select()
+                        previewValue()
                     }
                     editor.addEventListener('submit', (submitEvent) => {
                         submitEvent.preventDefault()
@@ -470,7 +565,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                             keyEvent.preventDefault()
                             keyEvent.stopPropagation()
                             closeSpacingEditor()
-                            showSpacing(node)
+                            redrawSpacing(node)
                             return
                         }
                         if (keyEvent.key === 'Enter') {
@@ -479,17 +574,15 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                             return
                         }
                         if (keyEvent.key !== 'ArrowUp' && keyEvent.key !== 'ArrowDown') return
-                        const match = input.value.match(/^\s*(-?(?:\d+(?:\.\d*)?|\.\d+))\s*([a-z%]*)\s*$/i)
-                        if (!match) return
                         keyEvent.preventDefault()
                         const direction = keyEvent.key === 'ArrowUp' ? 1 : -1
-                        const step = keyEvent.shiftKey ? 10 : 1
-                        const nextValue = Math.round((Number(match[1]) + direction * step) * 1000) / 1000
-                        input.value = `${nextValue}${match[2] || 'px'}`
-                        input.select()
+                        adjustValue(direction, keyEvent.shiftKey ? 5 : 1)
                     })
+                    decrease.addEventListener('click', (clickEvent) => { clickEvent.preventDefault(); adjustValue(-1, 1) })
+                    increase.addEventListener('click', (clickEvent) => { clickEvent.preventDefault(); adjustValue(1, 1) })
+                    input.addEventListener('input', previewValue)
                     document.body.append(editor)
-                    spacingEditor = { element: editor, node, property }
+                    spacingEditor = { element: editor, node: editNode, property, restore: restoreValue }
                     positionSpacingEditor(editor, labelLeft, labelTop)
                     input.focus()
                     input.select()
@@ -501,7 +594,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             }
             document.body.append(label)
             guides.push(label)
-            if (spacingEditor?.node === node && spacingEditor.property === property) {
+            if (spacingEditor?.node === editNode && spacingEditor.property === property) {
                 positionSpacingEditor(spacingEditor.element, labelLeft, labelTop)
             }
         }
@@ -529,9 +622,105 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         addGuide('designer-spacing-padding', contentLeft + contentWidth, contentTop, Math.max(0, padding.right), contentHeight, 'right', 'padding', Math.max(0, padding.right))
         addGuide('designer-spacing-padding', innerLeft, contentTop + contentHeight, innerWidth, Math.max(0, padding.bottom), 'bottom', 'padding', Math.max(0, padding.bottom))
         addGuide('designer-spacing-padding', innerLeft, contentTop, Math.max(0, padding.left), contentHeight, 'left', 'padding', Math.max(0, padding.left))
-        addGuide('designer-spacing-content', contentLeft, contentTop, contentWidth, contentHeight)
+        const contentOutlineInset = selectionLevel === 'widget' ? 3 : selectionLevel === 'element' ? 1 : 0
+        addGuide(
+            'designer-spacing-content',
+            contentLeft + contentOutlineInset,
+            contentTop + contentOutlineInset,
+            Math.max(0, contentWidth - contentOutlineInset * 2),
+            Math.max(0, contentHeight - contentOutlineInset * 2),
+        )
+        if (columnGrid && (selectionLevel === 'widget' || columnGrid === node)) {
+            const slots = [...columnGrid.children]
+                .filter((child): child is HTMLElement => child instanceof HTMLElement && child.matches('[data-slot]'))
+            const slotRects = slots.map((slot) => slot.getBoundingClientRect())
+            slotRects.forEach((slotRect) => addGuide(
+                'designer-column-slot-guide',
+                slotRect.left,
+                slotRect.top,
+                slotRect.width,
+                slotRect.height,
+            ))
+            for (let index = 0; index < slotRects.length - 1; index += 1) {
+                const current = slotRects[index]
+                const next = slotRects[index + 1]
+                const horizontalGap = Math.max(0, next.left - current.right)
+                const verticalGap = Math.max(0, next.top - current.bottom)
+                if (horizontalGap > 0) {
+                    addGuide(
+                        'designer-spacing-gap',
+                        current.right,
+                        Math.max(current.top, next.top),
+                        horizontalGap,
+                        Math.max(0, Math.min(current.bottom, next.bottom) - Math.max(current.top, next.top)),
+                        'right',
+                        'gap',
+                        horizontalGap,
+                    )
+                } else if (verticalGap > 0) {
+                    addGuide(
+                        'designer-spacing-gap',
+                        Math.max(current.left, next.left),
+                        current.bottom,
+                        Math.max(0, Math.min(current.right, next.right) - Math.max(current.left, next.left)),
+                        verticalGap,
+                        'bottom',
+                        'gap',
+                        verticalGap,
+                    )
+                }
+            }
+        }
     }
+    const selectedNodeEntries = () => (Object.entries(selectedNodes) as Array<['slot' | 'widget' | 'element', HTMLElement | null]>)
+        .filter((entry): entry is ['slot' | 'widget' | 'element', HTMLElement] => Boolean(entry[1] && root.contains(entry[1])))
+    const selectedNodeList = () => [...new Set(selectedNodeEntries().map(([, node]) => node))]
+    showSelectedSpacing = () => {
+        const entries = selectedNodeEntries()
+        if (!entries.length) {
+            if (selectedNode && root.contains(selectedNode)) showSpacing(selectedNode)
+            return
+        }
+        removeGuides()
+        hoveredNode?.classList.remove('designer-hovered')
+        hoveredNode = selectedNode && root.contains(selectedNode) ? selectedNode : entries.at(-1)?.[1] || null
+        hoveredNode?.classList.add('designer-hovered')
+        const levelByNode = new Map<HTMLElement, 'slot' | 'widget' | 'element'>()
+        entries.forEach(([kind, node]) => levelByNode.set(node, kind))
+        levelByNode.forEach((kind, node) => showSpacing(node, true, kind))
+        if (selectedNode?.matches('.two-columns-widget,.three-columns-widget') && !levelByNode.has(selectedNode)) {
+            showSpacing(selectedNode, true, 'widget')
+        }
+    }
+    redrawSpacing = (node) => {
+        if (selectedNodeList().length) showSelectedSpacing()
+        else showSpacing(node)
+    }
+    const setSelectedNodesFromPaths = (paths: ReturnType<typeof selectionPaths>) => {
+        ;(['slot', 'widget', 'element'] as const).forEach((kind) => {
+            const target = paths[kind].at(-1)
+            selectedNodes[kind] = target ? findTargetNode(root, target.id, target.widgetId, target.instanceId) : null
+        })
+    }
+    const setSelectedNodesFromTargets = (targets: NonNullable<RenderFrameMessage['selectedTargets']>) => {
+        selectedNodes = { slot: null, widget: null, element: null }
+        targets.forEach((target) => {
+            selectedNodes[target.selectionLevel] = findTargetNode(root, target.targetId, target.widgetId, target.targetInstanceId)
+        })
+    }
+    const selectedTargetsFromPaths = (paths: ReturnType<typeof selectionPaths>): NonNullable<RenderFrameMessage['selectedTargets']> => (
+        (['slot', 'widget', 'element'] as const).flatMap((selectionLevel) => {
+            const target = paths[selectionLevel].at(-1)
+            return target ? [{
+                targetId: target.id,
+                targetInstanceId: target.instanceId,
+                widgetId: target.widgetId,
+                selectionLevel,
+            }] : []
+        })
+    )
     const groups = designer.catalog?.designGroups || []
+    const widgetParts = designer.catalog?.widgetParts || []
     const layouts = designer.catalog?.layouts || []
     const layout = layouts.find((candidate: any) => candidate.key === model.layout)
 
@@ -539,12 +728,16 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         const slotName = node.dataset.slotName || ''
         if (!slotName) return
         const slot = (layout?.slots || []).find((candidate: any) => candidate.name === slotName)
+        const layoutNodeTarget = nodeTargets(node).find((candidate: any) => candidate.layoutNodeId)
         registerTarget(node, {
             id: `layout:${model.layout}:slot:${slotName}`,
+            styleTargetId: `layout:${model.layout}:slot:${slotName}`,
             kind: 'layoutSlot',
             label: slot?.label || slotName.replace(/[-_]+/g, ' ').replace(/^./, (character) => character.toUpperCase()),
             editable: false,
-        })
+            layoutNodeId: layoutNodeTarget?.layoutNodeId || '',
+            editableParameters: layoutNodeTarget?.editableParameters || [],
+        }, true)
     })
 
     const widgetRoots = [...root.querySelectorAll<HTMLElement>('[data-widget-id][data-widget-type]')]
@@ -554,11 +747,32 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         if (!widgetId) return
         registerTarget(node, {
             id: `widget:${widgetId}`,
+            styleTargetId: `widget-type:${widgetType}`,
             kind: 'widget',
             label: `${widgetTypeLabel(node) || 'Widget'} widget`,
             widgetId,
             widgetType,
             editable: false,
+        })
+    })
+
+    const themedWidgetTypes = new Set(groups.flatMap((group: any) => (group.widgetTypes || []).map(widgetTypeKey)))
+    widgetRoots.forEach((widgetRoot) => {
+        const widgetType = widgetRoot.dataset.widgetType || ''
+        const widgetId = widgetRoot.dataset.widgetId || ''
+        if (!widgetType) return
+        const themedWidget = themedWidgetTypes.has(widgetTypeKey(widgetType))
+        const definition = widgetParts.find((candidate: any) => widgetTypeKey(candidate.widgetType) === widgetTypeKey(widgetType))
+        ;(definition?.parts || []).filter((part: any) => part.designerLevel !== 'widget' || !themedWidget).forEach((part: any) => {
+            widgetRoot.querySelectorAll<HTMLElement>(`.${normalizeCssName(part.part)}`).forEach((node) => registerTarget(node, {
+                id: part.id || `widget-part:${widgetType}:${part.part}`,
+                styleTargetId: part.id || `widget-part:${widgetType}:${part.part}`,
+                kind: part.designerLevel === 'widget' ? 'part' : 'element',
+                label: part.label,
+                widgetId,
+                widgetType,
+                editable: false,
+            }, true))
         })
     })
 
@@ -569,6 +783,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         if (!slotName || !ownerWidgetId) return
         registerTarget(node, {
             id: `slot:${ownerWidgetId}:${slotName}`,
+            styleTargetId: `widget-slot:${owner?.dataset.widgetType || ''}:${slotName}`,
             kind: 'slot',
             label: `${slotName.replace(/[-_]+/g, ' ').replace(/^./, (character) => character.toUpperCase())} slot`,
             widgetId: ownerWidgetId,
@@ -609,7 +824,15 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         }
         roots.forEach((groupRoot) => {
             registerTarget(groupRoot, { id: group.id, kind: 'group', label: group.label, editable: false })
-            ;(group.parts || []).forEach((part: any) => groupRoot.querySelectorAll<HTMLElement>(`.${normalizeCssName(part.part)}`).forEach((node) => registerTarget(node, { id: part.id, kind: 'part', label: part.label, editable: false })))
+            ;(group.parts || []).forEach((part: any) => groupRoot.querySelectorAll<HTMLElement>(`.${normalizeCssName(part.part)}`).forEach((node) => {
+                const widgetLevel = part.designerLevel !== 'element'
+                registerTarget(node, {
+                    id: part.id,
+                    kind: widgetLevel ? 'part' : 'element',
+                    label: part.label,
+                    editable: false,
+                }, widgetLevel)
+            }))
             ;(group.assetKeys || []).forEach((assetKey: string) => {
                 const asset = designer.assets.find((candidate: any) => candidate.assetKey === assetKey)
                 const targetNode = asset?.part ? groupRoot.querySelector<HTMLElement>(`.${normalizeCssName(asset.part)}`) || groupRoot : groupRoot
@@ -711,14 +934,38 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     if (restoredSelection) {
         const restoredTarget = nodeTargets(restoredSelection)
             .find((target: any) => target.id === focusState.selectedTargetId)
-        applySelectionClasses(root, restoredSelection, restoredTarget)
+        if (focusState.selectedTargets.length) {
+            applyIndependentSelectionClasses(root, focusState.selectedTargets)
+            setSelectedNodesFromTargets(focusState.selectedTargets)
+        } else {
+            const paths = applySelectionClasses(root, restoredSelection, restoredTarget)
+            setSelectedNodesFromPaths(paths)
+            focusState.selectedTargets = selectedTargetsFromPaths(paths)
+        }
         selectedNode = restoredSelection
-        showSpacing(restoredSelection)
+        showSelectedSpacing()
     }
     restoredHighlight?.classList.add('designer-highlighted')
 
     root.querySelectorAll<HTMLElement>('[data-designer-target]').forEach((node) => {
-        const click = (event: Event) => { if (!node.isContentEditable) event.preventDefault(); event.stopPropagation(); applySelectionClasses(root, node); root.querySelectorAll('.designer-highlighted').forEach((highlighted) => highlighted.classList.remove('designer-highlighted')); selectedNode = node; focusState.selectedTargetId = nodeTargets(node)[0]?.id || ''; focusState.selectedWidgetId = node.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''; focusState.selectedInstanceId = designerInstanceId(node); focusState.highlightedTargetId = ''; focusState.highlightedWidgetId = ''; focusState.highlightedInstanceId = ''; showSpacing(node); postDesignerEvent(node, designer) }
+        const click = (event: Event) => {
+            if (!node.isContentEditable) event.preventDefault()
+            event.stopPropagation()
+            const primaryTarget = nodeTargets(node)[0]
+            const paths = applySelectionClasses(root, node, primaryTarget)
+            setSelectedNodesFromPaths(paths)
+            root.querySelectorAll('.designer-highlighted').forEach((highlighted) => highlighted.classList.remove('designer-highlighted'))
+            selectedNode = node
+            focusState.selectedTargetId = primaryTarget?.id || ''
+            focusState.selectedWidgetId = node.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''
+            focusState.selectedInstanceId = designerInstanceId(node)
+            focusState.selectedTargets = selectedTargetsFromPaths(paths)
+            focusState.highlightedTargetId = ''
+            focusState.highlightedWidgetId = ''
+            focusState.highlightedInstanceId = ''
+            showSelectedSpacing()
+            postDesignerEvent(node, designer, 'select', primaryTarget)
+        }
         let primaryTarget: any = null
         try { primaryTarget = JSON.parse(node.dataset.designerTargets || '[]')[0] } catch { primaryTarget = null }
         const activateEditing = (event?: Event) => {
@@ -766,15 +1013,17 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         closeContextMenu()
         clearSelectionClasses(root)
         root.querySelectorAll('.designer-highlighted').forEach((highlighted) => highlighted.classList.remove('designer-highlighted'))
-        applySelectionClasses(root, eventNode, primary)
+        const paths = applySelectionClasses(root, eventNode, primary)
+        setSelectedNodesFromPaths(paths)
         selectedNode = eventNode
         focusState.selectedTargetId = primary.id
         focusState.selectedWidgetId = eventNode.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''
         focusState.selectedInstanceId = designerInstanceId(eventNode)
+        focusState.selectedTargets = selectedTargetsFromPaths(paths)
         focusState.highlightedTargetId = ''
         focusState.highlightedWidgetId = ''
         focusState.highlightedInstanceId = ''
-        showSpacing(eventNode)
+        showSelectedSpacing()
         postDesignerEvent(eventNode, designer, 'select', primary)
 
         const menu = document.createElement('div')
@@ -840,16 +1089,22 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     }
     const dismissSpacingEditor = (event: Event) => {
         if (spacingEditor && !(event.target instanceof Node && spacingEditor.element.contains(event.target))) {
+            const pinnedNode = spacingEditor.node
             closeSpacingEditor()
+            if (root.contains(pinnedNode)) redrawSpacing(pinnedNode)
         }
     }
-    const dismissSpacingEditorOnBlur = () => closeSpacingEditor()
+    const dismissSpacingEditorOnBlur = () => {
+        const pinnedNode = spacingEditor?.node
+        closeSpacingEditor()
+        if (pinnedNode && root.contains(pinnedNode)) redrawSpacing(pinnedNode)
+    }
     const dismissOverlaysWithKeyboard = (event: KeyboardEvent) => {
         if (event.key !== 'Escape') return
         closeContextMenu()
         const pinnedNode = spacingEditor?.node
         closeSpacingEditor()
-        if (pinnedNode && root.contains(pinnedNode)) showSpacing(pinnedNode)
+        if (pinnedNode && root.contains(pinnedNode)) redrawSpacing(pinnedNode)
     }
     root.addEventListener('contextmenu', openContextMenu)
     document.addEventListener('pointerdown', dismissContextMenu)
@@ -859,35 +1114,43 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     const findHoveredNode = (target: EventTarget | null) => target instanceof HTMLElement ? target : null
     const over = (event: MouseEvent) => {
         if (spacingEditor) return
+        if (selectedNode && root.contains(selectedNode)) {
+            if (hoveredNode !== selectedNode) showSelectedSpacing()
+            return
+        }
         const node = findHoveredNode(event.target)
         if (node && root.contains(node) && node !== hoveredNode) showSpacing(node)
     }
     const out = (event: MouseEvent) => {
         if (spacingEditor) {
-            showSpacing(spacingEditor.node)
+            redrawSpacing(spacingEditor.node)
             return
         }
         if (!hoveredNode || (event.relatedTarget instanceof Node && hoveredNode.contains(event.relatedTarget))) return
         const next = findHoveredNode(event.relatedTarget)
         if (next && root.contains(next)) showSpacing(next)
-        else if (selectedNode && root.contains(selectedNode)) showSpacing(selectedNode)
+        else if (selectedNode && root.contains(selectedNode)) showSelectedSpacing()
         else clearGuides()
     }
     const selectFromInspector = (event: Event) => {
         const node = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-designer-target]') : null
         if (!node || !root.contains(node)) return
         selectedNode = node
-        showSpacing(node)
+        const selectedTargets = event instanceof CustomEvent ? event.detail?.selectedTargets : null
+        if (selectedTargets?.length) setSelectedNodesFromTargets(selectedTargets)
+        else setSelectedNodesFromPaths(selectionPaths(node))
+        showSelectedSpacing()
     }
     const clearFocus = () => {
         selectedNode = null
+        selectedNodes = { slot: null, widget: null, element: null }
         closeContextMenu()
         closeSpacingEditor()
         clearGuides()
     }
     const refreshGuides = () => {
-        const node = spacingEditor?.node || hoveredNode || selectedNode
-        if (node && root.contains(node)) showSpacing(node)
+        if (selectedNodeList().length || selectedNode && root.contains(selectedNode)) showSelectedSpacing()
+        else if (hoveredNode && root.contains(hoveredNode)) showSpacing(hoveredNode)
     }
     root.addEventListener('mouseover', over)
     root.addEventListener('mouseout', out)
@@ -917,7 +1180,7 @@ export const RenderFrameRuntime = () => {
     const [model, setModel] = useState<RenderPageModel | null>(null)
     const modelRef = useRef<RenderPageModel | null>(null)
     const rootRef = useRef<HTMLDivElement>(null)
-    const focusStateRef = useRef<DesignerFocusState>({ selectedTargetId: '', selectedWidgetId: '', selectedInstanceId: '', highlightedTargetId: '', highlightedWidgetId: '', highlightedInstanceId: '' })
+    const focusStateRef = useRef<DesignerFocusState>({ selectedTargetId: '', selectedWidgetId: '', selectedInstanceId: '', selectedTargets: [], highlightedTargetId: '', highlightedWidgetId: '', highlightedInstanceId: '' })
 
     useEffect(() => {
         const receive = (event: MessageEvent<RenderFrameMessage>) => {
@@ -931,6 +1194,7 @@ export const RenderFrameRuntime = () => {
                 focusStateRef.current.selectedTargetId = event.data.targetId
                 focusStateRef.current.selectedWidgetId = event.data.widgetId || ''
                 focusStateRef.current.selectedInstanceId = event.data.targetInstanceId || ''
+                focusStateRef.current.selectedTargets = event.data.selectedTargets || []
                 focusStateRef.current.highlightedTargetId = ''
                 focusStateRef.current.highlightedWidgetId = ''
                 focusStateRef.current.highlightedInstanceId = ''
@@ -938,15 +1202,22 @@ export const RenderFrameRuntime = () => {
                 document.querySelectorAll('.designer-highlighted').forEach((node) => node.classList.remove('designer-highlighted'))
                 const match = findTargetNode(document, event.data.targetId, event.data.widgetId, event.data.targetInstanceId)
                 const preferredTarget = match ? nodeTargets(match).find((target: any) => target.id === event.data.targetId) : null
-                if (match) applySelectionClasses(document, match, preferredTarget)
-                match?.dispatchEvent(new CustomEvent('designerselect', { bubbles: true }))
-                if (match && preferredTarget) postDesignerEvent(match, modelRef.current?.designer, 'select', preferredTarget)
+                if (event.data.selectedTargets?.length) applyIndependentSelectionClasses(document, event.data.selectedTargets)
+                else if (match) applySelectionClasses(document, match, preferredTarget)
+                match?.dispatchEvent(new CustomEvent('designerselect', {
+                    bubbles: true,
+                    detail: { selectedTargets: focusStateRef.current.selectedTargets },
+                }))
+                if (match && preferredTarget) postDesignerEvent(match, modelRef.current?.designer, 'select', preferredTarget, {
+                    ...(event.data.selectionLevel ? { selectionLevel: event.data.selectionLevel } : {}),
+                })
                 match?.scrollIntoView?.({ block: 'nearest' })
             }
             if (event.data.action === 'clearTarget') {
                 focusStateRef.current.selectedTargetId = ''
                 focusStateRef.current.selectedWidgetId = ''
                 focusStateRef.current.selectedInstanceId = ''
+                focusStateRef.current.selectedTargets = []
                 focusStateRef.current.highlightedTargetId = ''
                 focusStateRef.current.highlightedWidgetId = ''
                 focusStateRef.current.highlightedInstanceId = ''

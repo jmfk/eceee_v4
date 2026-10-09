@@ -2,15 +2,14 @@
 Navbar widget implementation.
 """
 
-from typing import Type, List, Optional, Literal
 import logging
-from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Optional, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
-from webpages.widget_registry import BaseWidget, register_widget_type
-from file_manager.imgproxy import imgproxy_service
-from utils.dict_utils import DictToObj
 from easy_widgets.models import LinkData
+from webpages.widget_registry import BaseWidget, register_widget_type
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +127,21 @@ class NavbarWidget(BaseWidget):
                 "color",
             ],
         },
+        "navbar-primary-menu": {
+            "label": "Primary menu area",
+            "selector": ".navbar-primary-menu",
+            "properties": ["padding", "margin"],
+        },
+        "navbar-secondary-menu": {
+            "label": "Secondary menu area",
+            "selector": ".navbar-secondary-menu",
+            "properties": ["padding", "margin"],
+        },
+        "navbar-menu-item": {
+            "label": "Menu item",
+            "selector": ".navbar-menu-item",
+            "properties": ["padding", "margin", "backgroundColor", "color"],
+        },
     }
 
     widget_css = """
@@ -176,7 +190,11 @@ class NavbarWidget(BaseWidget):
             font-family: "Source Sans 3", sans-serif;
             font-weight: 300;
             line-height: 22px;
-            margin-bottom: 0;          
+            margin-bottom: 0;
+        }
+
+        .navbar-primary-menu {
+            padding: 0 0 0 20px;
         }
 
         .navbar-menu-item {
@@ -186,7 +204,7 @@ class NavbarWidget(BaseWidget):
             font-family: "Source Sans 3", sans-serif;
             font-weight: 300;
             line-height: 22px;
-            margin-bottom: 0px;            
+            margin-bottom: 0px;
         }
 
         .navbar-menu-item  a {
@@ -195,16 +213,16 @@ class NavbarWidget(BaseWidget):
             font-family: "Source Sans 3", sans-serif;
             font-weight: 500;
         }
-        
+
         .navbar-secondary-menu {
             display: flex;
             gap: 0;
             list-style: none;
             margin: 0;
-            padding: 0;
+            padding: 0 20px 0 0;
             align-items: flex-end;
         }
-        
+
         .navbar-secondary-menu .navbar-menu-item {
             text-align: left;
             width: 140px;
@@ -212,7 +230,7 @@ class NavbarWidget(BaseWidget):
             margin-top: 2px;
             box-shadow: inset -1px -1px 1px rgba(0, 0, 0, 0.2);
         }
-        
+
         .navbar-secondary-menu .navbar-menu-item a {
             border-radius: 0 0 0 0;
         }
@@ -234,11 +252,7 @@ class NavbarWidget(BaseWidget):
         """Prepare navbar menu items for Mustache template (styling from design groups)"""
         template_config = super().prepare_template_context(config, context)
 
-        menu_items = (
-            config.get("menu_items")
-            if config.get("menu_items") is not None
-            else config.get("menuItems", [])
-        )
+        menu_items = config.get("menu_items") if config.get("menu_items") is not None else config.get("menuItems", [])
         secondary_menu_items = (
             config.get("secondary_menu_items")
             if config.get("secondary_menu_items") is not None
@@ -250,9 +264,7 @@ class NavbarWidget(BaseWidget):
         template_config["menuItems"] = processed_menu_items
 
         # Same for secondary menu items
-        processed_secondary = self._process_menu_items(
-            secondary_menu_items or [], context, is_secondary=True
-        )
+        processed_secondary = self._process_menu_items(secondary_menu_items or [], context, is_secondary=True)
         template_config["secondaryMenuItems"] = processed_secondary
         template_config["hasSecondaryMenuItems"] = len(processed_secondary) > 0
 
@@ -393,9 +405,7 @@ class NavbarWidget(BaseWidget):
                 if path is not None:
                     for idx in indices:
                         anchor = processed_items[idx].get("anchor")
-                        processed_items[idx]["url"] = (
-                            f"{path}#{anchor}" if anchor else path
-                        )
+                        processed_items[idx]["url"] = f"{path}#{anchor}" if anchor else path
                         valid_indices.add(idx)
 
             # Filter out items with unresolved internal links
@@ -426,8 +436,6 @@ class NavbarWidget(BaseWidget):
             else:
                 normalized["type"] = "external"
                 if not normalized.get("url"):
-                    normalized["url"] = (
-                        "/" if normalized.get("label") == "Home" else "#"
-                    )
+                    normalized["url"] = "/" if normalized.get("label") == "Home" else "#"
 
         return normalized

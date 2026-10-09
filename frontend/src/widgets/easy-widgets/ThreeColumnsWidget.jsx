@@ -435,7 +435,7 @@ const ThreeColumnsWidget = ({
 
         return (
             <div className={`three-columns-widget widget-type-easy-widgets-threecolumnswidget ${ratioClass}`}>
-                <div className="three-col-slot left" data-slot="left">
+                <div className="three-col-slot left" data-slot="left" data-widget-slot="left" data-owner-widget-type="easy_widgets.ThreeColumnsWidget">
                     {slotsData.left && slotsData.left.length > 0 ? (
                         slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
                     ) : (
@@ -443,7 +443,7 @@ const ThreeColumnsWidget = ({
                     )}
                 </div>
 
-                <div className="three-col-slot center" data-slot="center">
+                <div className="three-col-slot center" data-slot="center" data-widget-slot="center" data-owner-widget-type="easy_widgets.ThreeColumnsWidget">
                     {slotsData.center && slotsData.center.length > 0 ? (
                         slotsData.center.map((widget, index) => renderWidget(widget, 'center', index))
                     ) : (
@@ -451,7 +451,7 @@ const ThreeColumnsWidget = ({
                     )}
                 </div>
 
-                <div className="three-col-slot right" data-slot="right">
+                <div className="three-col-slot right" data-slot="right" data-widget-slot="right" data-owner-widget-type="easy_widgets.ThreeColumnsWidget">
                     {slotsData.right && slotsData.right.length > 0 ? (
                         slotsData.right.map((widget, index) => renderWidget(widget, 'right', index))
                     ) : (

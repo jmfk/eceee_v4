@@ -332,6 +332,12 @@ class PublicObjectWidgetTest(TestCase):
         self.assertEqual(context["published_version"], published)
         renderer.render_widget_json.assert_called_once_with(published.widgets["main"][0], page_context)
         self.assertEqual(context["rendered_widgets"]["main"], ["<p>Rendered</p>"])
+        html = render_to_string(
+            "object_storage/widgets/object_detail.html",
+            {**context, "current_page": page_context["current_page"]},
+        )
+        self.assertIn('data-widget-slot="main"', html)
+        self.assertIn('data-owner-widget-type="object_storage.ObjectDetailWidget"', html)
 
     def test_detail_hierarchy_uses_dynamic_page_paths(self):
         now = timezone.now()

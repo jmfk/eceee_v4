@@ -31,4 +31,24 @@ export const THEME_BREAKPOINTS = [
     },
 ]
 
-export const themeBreakpointDefinition = (key) => THEME_BREAKPOINTS.find((breakpoint) => breakpoint.key === key)
+export const DESIGNER_PREVIEW_BREAKPOINTS = [
+    {
+        key: 'xs',
+        label: 'Base (Mobile)',
+        description: 'The base styles used below the Small breakpoint',
+        icon: Smartphone,
+        defaultValue: 0,
+    },
+    ...THEME_BREAKPOINTS,
+]
+
+export const themeBreakpointDefinition = (key) => DESIGNER_PREVIEW_BREAKPOINTS.find((breakpoint) => breakpoint.key === key)
+
+export const designerPreviewWidth = (key, breakpoints = {}) => {
+    if (key === 'xs') {
+        const smallWidth = Number(breakpoints.sm ?? THEME_BREAKPOINTS[0].defaultValue)
+        return Math.max(1, Math.min(375, smallWidth - 1))
+    }
+    const definition = themeBreakpointDefinition(key)
+    return Number(breakpoints[key] ?? definition?.defaultValue ?? 1280)
+}

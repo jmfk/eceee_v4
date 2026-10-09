@@ -123,7 +123,7 @@ export const PreviewLink = ({ href = '#', children, className = '', ...props }: 
 
 export const imageUrl = (source: any): string => typeof source === 'string'
     ? source
-    : source?.imgproxyBaseUrl || source?.imgproxy_base_url || source?.fileUrl || source?.file_url
+    : source?.sourceUrl || source?.source_url || source?.imgproxyBaseUrl || source?.imgproxy_base_url || source?.fileUrl || source?.file_url
         || source?.publicUrl || source?.public_url || source?.absoluteUrl || source?.absolute_url
         || source?.downloadUrl || source?.download_url || source?.thumbnailUrl || source?.thumbnail_url || source?.url || ''
 

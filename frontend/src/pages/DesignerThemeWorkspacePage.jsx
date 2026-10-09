@@ -5,7 +5,7 @@ import { Download, Loader2, RotateCcw, Save, Send, Undo2 } from 'lucide-react'
 import { designerThemesApi } from '../api/designerThemes'
 import DesignerNavbar from '../components/DesignerNavbar'
 import SemanticThemeWorkspace from '../components/designer/SemanticThemeWorkspace'
-import { THEME_BREAKPOINTS } from '../components/theme/breakpointConfig'
+import { DESIGNER_PREVIEW_BREAKPOINTS, designerPreviewWidth } from '../components/theme/breakpointConfig'
 import StatusBar from '../components/StatusBar'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { buildResolvedRenderModel } from '../rendering/directRender'
@@ -19,7 +19,12 @@ const workspaceDraftPayload = (workspace) => workspace ? ({
     colors: Object.fromEntries(workspace.colors.map((color) => [color.name, color.value])),
     fonts: workspace.fonts.filter((font) => font.family.trim()).map((font) => ({ family: font.family, variants: font.variants, display: font.display })),
     typography: workspace.typography.map((row) => ({ groupIndex: row.groupIndex, element: row.element, values: row.values })),
-    spacing: workspace.spacing.map((row) => ({ scope: row.scope, groupIndex: row.groupIndex, element: row.element, part: row.part, breakpoint: row.breakpoint, values: row.values })),
+    ...(workspace.layouts ? { layouts: workspace.layouts } : {}),
+    spacing: workspace.spacing.map((row) => ({
+        scope: row.scope, groupIndex: row.groupIndex, element: row.element, part: row.part,
+        layout: row.layout, slot: row.slot, widgetType: row.widgetType,
+        breakpoint: row.breakpoint, values: row.values,
+    })),
 }) : null
 
 const workspaceSignature = (workspace) => JSON.stringify(workspaceDraftPayload(workspace))
@@ -350,9 +355,9 @@ const DesignerThemeWorkspacePage = () => {
                 <div><h1 className="font-semibold text-gray-900">{workspace.name}</h1><p className="text-xs text-gray-500">Designer draft · live theme version {workspace.liveSyncVersion}</p></div>
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="hidden rounded-md border border-gray-300 p-1 sm:flex" aria-label="Preview breakpoint">
-                        {THEME_BREAKPOINTS.map(({ key, label, icon, defaultValue }) => {
-                            const width = Number(workspace.breakpoints?.[key] ?? defaultValue)
-                            return <button type="button" key={key} onClick={() => setViewport(key)} aria-label={`${label} preview at ${width}px`} aria-pressed={viewport === key} title={`${label} · ${width}px`} className={`rounded p-1.5 ${viewport === key ? 'bg-gray-200 text-gray-900' : 'text-gray-500'}`}>{createElement(icon, { className: 'h-4 w-4' })}</button>
+                        {DESIGNER_PREVIEW_BREAKPOINTS.map(({ key, label, icon }) => {
+                            const width = designerPreviewWidth(key, workspace.breakpoints)
+                            return <button type="button" key={key} onClick={() => setViewport(key)} aria-label={`${label} preview at ${width}px`} aria-pressed={viewport === key} title={`${label} · ${width}px`} className={`rounded p-1.5 ${viewport === key ? 'bg-gray-200 text-gray-900' : 'text-gray-500'}`}>{key === 'xs' ? <span aria-hidden="true" className="flex h-4 w-4 items-center justify-center rounded-[2px] border border-current text-[8px] font-bold leading-none">B</span> : createElement(icon, { className: 'h-4 w-4' })}</button>
                         })}
                     </div>
                     <button type="button" onClick={exportPackage} disabled={exporting} title={exportProgress?.message} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-50">{exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{exporting ? `Export ${exportProgress?.percent || 0}%` : 'Export'}</button>
@@ -364,7 +369,7 @@ const DesignerThemeWorkspacePage = () => {
             </header>
             {workspace.draftIsStale && <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:px-6">The live theme changed after this draft was started. Discard the draft to reload the current live version before making or publishing more changes.</div>}
             <div className="flex border-b border-gray-200 bg-white xl:hidden"><button type="button" onClick={() => setMobilePane('edit')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'edit' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Edit</button><button type="button" onClick={() => setMobilePane('preview')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'preview' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Preview</button></div>
-            <SemanticThemeWorkspace workspace={workspace} preview={preview} viewport={viewport} mobilePane={mobilePane} updateWorkspace={updateWorkspace} replaceAsset={replaceAsset} createPlaceholder={createPlaceholder} placeholderDrafts={placeholderDrafts} setPlaceholderDrafts={setPlaceholderDrafts} loadPageContent={loadPageContent} loadObjectContent={loadObjectContent} importPreviewSource={importPreviewSource} deletePreviewContent={deletePreviewContent} savePreviewText={savePreviewText} replacePreviewImage={replacePreviewImage} pendingPreviewTextsRef={pendingPreviewTextsRef} onPendingPreviewTextsChange={refreshPendingPreviewTextState} previewTextResetVersion={previewTextResetVersion} disabled={controlsDisabled} />
+            <SemanticThemeWorkspace workspace={workspace} preview={preview} viewport={viewport} onViewportChange={setViewport} mobilePane={mobilePane} updateWorkspace={updateWorkspace} replaceAsset={replaceAsset} createPlaceholder={createPlaceholder} placeholderDrafts={placeholderDrafts} setPlaceholderDrafts={setPlaceholderDrafts} loadPageContent={loadPageContent} loadObjectContent={loadObjectContent} importPreviewSource={importPreviewSource} deletePreviewContent={deletePreviewContent} savePreviewText={savePreviewText} replacePreviewImage={replacePreviewImage} pendingPreviewTextsRef={pendingPreviewTextsRef} onPendingPreviewTextsChange={refreshPendingPreviewTextState} previewTextResetVersion={previewTextResetVersion} disabled={controlsDisabled} />
             <StatusBar customStatusContent={<span>{workspace.draftIsStale ? 'Draft is stale · discard to reload' : hasUnsavedLocalChanges ? 'Unsaved local draft changes' : workspace.hasDraftChanges ? 'Draft saved · not published' : 'Draft matches the live theme'}</span>} />
         </div>
     )

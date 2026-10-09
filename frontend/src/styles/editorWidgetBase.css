@@ -876,6 +876,10 @@
             margin-bottom: 0;          
         }
 
+        .navbar-primary-menu {
+            padding: 0 0 0 20px;
+        }
+
         .navbar-menu-item {
             list-style: none !important;
             font-size: 14px;
@@ -898,7 +902,7 @@
             gap: 0;
             list-style: none;
             margin: 0;
-            padding: 0;
+            padding: 0 20px 0 0;
             align-items: flex-end;
         }
         

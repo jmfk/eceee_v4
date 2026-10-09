@@ -5,6 +5,7 @@ Theme configurations for page styling including colors, fonts, and CSS.
 """
 
 import copy
+import re
 import uuid
 
 from django.contrib.auth.models import User
@@ -1582,7 +1583,85 @@ class PageTheme(models.Model):
             if element_css:
                 css_parts.append(element_css)
 
-        # Custom CSS (scoped)
+        def escape_structural_attribute(value):
+            return str(value).replace("\\", "\\\\").replace('"', '\\"')
+
+        structural_spacing = (self.design_groups or {}).get("structuralSpacing", [])
+        structural_breakpoints = self.get_breakpoints()
+
+        def structural_breakpoint_width(row):
+            breakpoint = {"default": "xs", "mobile": "xs", "tablet": "md", "desktop": "sm"}.get(
+                row.get("breakpoint", "xs"), row.get("breakpoint", "xs")
+            )
+            if breakpoint == "xs":
+                return 0
+            if str(breakpoint).isdigit():
+                return int(breakpoint)
+            return structural_breakpoints.get(breakpoint, float("inf"))
+
+        ordered_structural_spacing = (
+            sorted(
+                (row for row in structural_spacing if isinstance(row, dict)),
+                key=structural_breakpoint_width,
+            )
+            if isinstance(structural_spacing, list)
+            else []
+        )
+        for row in ordered_structural_spacing:
+            if not isinstance(row, dict):
+                continue
+            row_widget_type = row.get("widgetType") or row.get("widget_type")
+            row_scope = row.get("scope")
+            if row_scope == "layoutSlot" and row.get("layout") and row.get("slot"):
+                selector = (
+                    f'[data-render-layout="{escape_structural_attribute(row["layout"])}"] '
+                    f'.layout-slot[data-slot-name="{escape_structural_attribute(row["slot"])}"]'
+                )
+            elif row_scope == "widget" and row_widget_type:
+                selector = f'[data-widget-id][data-widget-type="{escape_structural_attribute(row_widget_type)}"]'
+            elif row_scope == "widgetSlot" and row_widget_type and row.get("slot"):
+                selector = (
+                    f'[data-widget-slot="{escape_structural_attribute(row["slot"])}"]'
+                    f'[data-owner-widget-type="{escape_structural_attribute(row_widget_type)}"]'
+                )
+            elif row_scope == "widgetPart" and row_widget_type and row.get("part"):
+                selector = (
+                    f'[data-widget-id][data-widget-type="{escape_structural_attribute(row_widget_type)}"] '
+                    f'.{escape_structural_attribute(row["part"])}'
+                )
+            else:
+                continue
+            if scope:
+                selector = f"{scope} {selector}".strip()
+            if frontend_scoped:
+                selector = f".cms-content {selector}".strip()
+
+            declarations = []
+            values = row.get("values") if isinstance(row.get("values"), dict) else {}
+            for property_name, property_value in values.items():
+                if property_value in (None, ""):
+                    continue
+                css_property = re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", property_name).replace("_", "-").lower()
+                declarations.append(f"  {css_property}: {property_value};")
+            if not declarations:
+                continue
+
+            breakpoint = {"default": "xs", "mobile": "xs", "tablet": "md", "desktop": "sm"}.get(
+                row.get("breakpoint", "xs"), row.get("breakpoint", "xs")
+            )
+            rule = f"{selector} {{\n" + "\n".join(declarations) + "\n}"
+            if breakpoint == "xs":
+                css_parts.append(rule)
+                continue
+            bp_px = int(breakpoint) if str(breakpoint).isdigit() else self.get_breakpoints().get(breakpoint)
+            if bp_px is not None:
+                css_parts.append(
+                    f"@media (min-width: {bp_px}px) {{\n  {selector} {{\n"
+                    + "\n".join(f"  {line}" for line in declarations)
+                    + "\n  }\n}"
+                )
+
+        # Custom CSS remains the final theme layer so existing explicit overrides win.
         if self.custom_css:
             scoped_custom_css = self._scope_custom_css(self.custom_css, scope)
             css_parts.append(scoped_custom_css)

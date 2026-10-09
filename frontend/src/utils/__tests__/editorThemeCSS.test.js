@@ -230,6 +230,25 @@ describe('shared TypeScript theme CSS', () => {
         expect(result).toContain('--legacyBrand: #654321;')
     })
 
+    it('keeps legacy element CSS when structural spacing is added', () => {
+        const result = buildThemeCSS({
+            theme: {
+                htmlElements: { h1: { color: 'red' } },
+                designGroups: {
+                    groups: [],
+                    structuralSpacing: [{
+                        scope: 'layoutSlot', layout: 'main_layout', slot: 'main', breakpoint: 'xs',
+                        values: { paddingLeft: '1rem' },
+                    }],
+                },
+            },
+        })
+
+        expect(result).toContain('h1 {\n  color: red;\n}')
+        expect(result).toContain('[data-render-layout="main_layout"] .layout-slot[data-slot-name="main"]')
+        expect(result).toContain('padding-left: 1rem;')
+    })
+
     it('includes gallery and carousel style collections', () => {
         const result = buildThemeCSS({
             theme: {
