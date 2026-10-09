@@ -42,6 +42,7 @@ docker_compose() {
     if [ "$1" = "exec" ] && [ "$3" = "publisher" ]; then
         case "$*" in
             *"api/health"*)
+                sleep "${TEST_PUBLISHER_DELAY:-0}"
                 printf '%s' "${TEST_PUBLISHER_STATUS:-200}"
                 return
                 ;;
@@ -88,6 +89,18 @@ if TEST_PUBLISHER_STATUS=503 HEALTHCHECK_TIMEOUT=1 HEALTHCHECK_INTERVAL=1 \
 fi
 
 printf 'header X-ECEEE-Renderer "nextjs"\n' > "$TEST_DIR/Caddyfile"
+
+if TEST_PUBLISHER_DELAY=1 HEALTHCHECK_TIMEOUT=1 HEALTHCHECK_INTERVAL=1 \
+    bash "$TEST_DIR/healthcheck.sh" >/dev/null 2>&1; then
+    echo "healthcheck unexpectedly passed without checking the public publisher routes" >&2
+    exit 1
+fi
+
+if PUBLISHER_PUBLIC_HOSTS='   ' HEALTHCHECK_TIMEOUT=1 HEALTHCHECK_INTERVAL=1 \
+    bash "$TEST_DIR/healthcheck.sh" >/dev/null 2>&1; then
+    echo "healthcheck unexpectedly accepted an empty public publisher host list" >&2
+    exit 1
+fi
 
 if TEST_INDUSTRY_STATUS=503 HEALTHCHECK_TIMEOUT=1 HEALTHCHECK_INTERVAL=1 \
     bash "$TEST_DIR/healthcheck.sh" >/dev/null 2>&1; then
