@@ -221,6 +221,41 @@ class ObjectTransferServiceTests(TestCase):
 
         self.assertEqual([group["object_type"]["name"] for group in catalog], [self.root_type.name])
 
+    def test_catalog_and_preflight_do_not_expose_foreign_topology_type_names(self):
+        foreign_user = User.objects.create_user("foreign-topology")
+        foreign_tenant = Tenant.objects.create(
+            name="Foreign topology",
+            identifier="foreign-topology",
+            created_by=foreign_user,
+        )
+        foreign_namespace = Namespace.objects.create(
+            name="Foreign topology namespace",
+            slug="foreign-topology",
+            tenant=foreign_tenant,
+            created_by=foreign_user,
+        )
+        foreign_type = ObjectTypeDefinition.objects.create(
+            name="foreign-topology-type",
+            label="Foreign topology type",
+            plural_label="Foreign topology types",
+            namespace=foreign_namespace,
+            created_by=foreign_user,
+        )
+        self.root_type.allowed_child_types.add(foreign_type)
+        self.root_type.browser_group = foreign_type
+        self.root_type.save(update_fields=["browser_group", "updated_at"])
+
+        catalog = candidate_catalog(self.tenant, [{"object_type": self.root_type.name, "limit": 1}])
+        preflight = build_preflight(self.tenant, [self.root.id])
+        catalog_type = catalog[0]["object_type"]
+        preflight_type = next(item for item in preflight["types"] if item["name"] == self.root_type.name)
+
+        self.assertNotIn(foreign_type.name, catalog_type["allowed_child_types"])
+        self.assertIsNone(catalog_type["browser_group"])
+        self.assertNotIn(foreign_type.name, {item["name"] for item in preflight["types"]})
+        self.assertNotIn(foreign_type.name, preflight_type["allowed_child_types"])
+        self.assertIsNone(preflight_type["browser_group"])
+
     def test_preflight_counts_referenced_managed_media(self):
         result = build_preflight(self.tenant, [self.root.id])
         self.assertEqual(result["object_count"], 3)
