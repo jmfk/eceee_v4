@@ -876,9 +876,29 @@ class ObjectPackageImporter:
         self.job.mark_completed(phase="completed", **result)
         return result
 
-    @transaction.atomic
     def import_package(self, package):
         manifest, payload = validate_package(package)
+        from object_storage.services.transfer_checkpoints import (
+            capture_object_import_checkpoint,
+            record_object_import_mutation,
+        )
+
+        checkpoint = capture_object_import_checkpoint(self.job, payload)
+        try:
+            with transaction.atomic():
+                result = self._apply_package(package, manifest, payload)
+                record_object_import_mutation(
+                    checkpoint,
+                    result,
+                    self.created_media_paths,
+                    self.created_type_icon_paths,
+                )
+        except Exception as exc:
+            checkpoint.mark_failed(exc)
+            raise
+        return {**result, "checkpoint_id": str(checkpoint.id)}
+
+    def _apply_package(self, package, manifest, payload):
         tenant, user = self.job.tenant, self.job.created_by
         resolutions = self.job.options.get("type_resolutions", {})
         namespace_resolutions = self.job.options.get("namespace_resolutions", {})

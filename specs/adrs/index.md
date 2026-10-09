@@ -22,6 +22,7 @@
 | ADR-0017 | [Browser-managed scoped remote access keys](active/0017-browser-managed-remote-access-keys.md) | accepted | PRD-0015 |
 | ADR-0018 | [Assess imports and scope replacement to imported bindings](active/0018-assessed-import-plans.md) | accepted | PRD-0016 |
 | ADR-0020 | [Bounded asynchronous remote object packages](active/0020-bounded-remote-object-packages.md) | accepted | PRD-0018 |
+| ADR-0021 | [Destination-owned transfer checkpoints](active/0021-destination-owned-transfer-checkpoints.md) | accepted | PRD-0019 |
 
 ## Archived Decisions
 

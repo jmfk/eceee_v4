@@ -7,11 +7,12 @@ import zipfile
 import requests
 from celery import shared_task
 from celery.exceptions import Retry
+from django.contrib.auth import get_user_model
 from django.core.files import File
 from django.utils import timezone
 
 from file_manager.storage import S3MediaStorage
-from object_storage.models import ObjectTransferJob
+from object_storage.models import ObjectTransferJob, TransferCheckpoint
 from object_storage.services.object_transfer import (
     MAX_ARCHIVE_BYTES,
     ObjectPackageExporter,
@@ -21,6 +22,20 @@ from object_storage.services.object_transfer import (
 from webpages.services.theme_remote import RemoteTransportError, remote_object_request
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task
+def restore_object_transfer_checkpoint(checkpoint_id, user_id):
+    from object_storage.services.transfer_checkpoints import restore_object_import_checkpoint
+
+    checkpoint = TransferCheckpoint.objects.get(id=checkpoint_id)
+    user = get_user_model().objects.get(id=user_id)
+    try:
+        restore_object_import_checkpoint(checkpoint, user)
+    except Exception as exc:
+        logger.error("Object transfer checkpoint restore %s failed: %s", checkpoint_id, exc)
+        raise
+    return {"checkpoint_id": str(checkpoint_id), "status": TransferCheckpoint.STATUS_RESTORED}
 
 
 def _stream_package_response(response, destination):

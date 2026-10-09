@@ -17,6 +17,7 @@
 | PRD-0013 | [Robust concurrent page editing](0013-robust-concurrent-page-editing.md) | completed | [ADR-0015](../adrs/active/0015-revision-based-page-collaboration.md) |
 | PRD-0014 | [Server-wide machine API access](0014-server-wide-machine-api-access.md) | started | [ADR-0016](../adrs/active/0016-scoped-machine-api-keys.md) |
 | PRD-0017 | [Public Next publisher cutover](0017-public-publisher-cutover.md) | in-progress | [ADR-0019](../adrs/active/0019-public-host-next-publisher.md) |
+| PRD-0019 | [Restorable mapped remote publishing](0019-restorable-remote-writes.md) | in-progress | [ADR-0021](../adrs/active/0021-destination-owned-transfer-checkpoints.md) |
 | PRD-0015 | [Unified remote site settings](0015-remote-site-settings.md) | completed | [ADR-0008](../adrs/active/0008-encrypted-workspace-remote-connections.md), [ADR-0017](../adrs/active/0017-browser-managed-remote-access-keys.md) |
 | PRD-0016 | [Assessed site imports with selectable dependencies](0016-assessed-site-imports.md) | completed | [ADR-0018](../adrs/active/0018-assessed-import-plans.md) |
 | PRD-0018 | [Remote object structure import](0018-remote-object-structure-import.md) | started | [ADR-0020](../adrs/active/0020-bounded-remote-object-packages.md) |

@@ -16,6 +16,8 @@ from .remote_views import (
     RemoteObjectSourceExportDownloadView,
     RemoteObjectSourceExportListView,
     RemoteObjectSourcePreflightView,
+    TransferCheckpointListView,
+    TransferCheckpointRestoreView,
 )
 
 # Create a router and register our viewsets
@@ -33,6 +35,12 @@ urlpatterns = [
     path("remote/preflight/", RemoteObjectPreflightView.as_view(), name="remote-object-preflight"),
     path("remote/imports/", RemoteObjectImportListView.as_view(), name="remote-object-imports"),
     path("remote/imports/<uuid:job_id>/", RemoteObjectImportDetailView.as_view(), name="remote-object-import-detail"),
+    path("remote/checkpoints/", TransferCheckpointListView.as_view(), name="transfer-checkpoints"),
+    path(
+        "remote/checkpoints/<uuid:checkpoint_id>/restore/",
+        TransferCheckpointRestoreView.as_view(),
+        name="transfer-checkpoint-restore",
+    ),
     path("remote-source/catalog/", RemoteObjectSourceCatalogView.as_view(), name="remote-object-source-catalog"),
     path("remote-source/preflight/", RemoteObjectSourcePreflightView.as_view(), name="remote-object-source-preflight"),
     path("remote-source/exports/", RemoteObjectSourceExportListView.as_view(), name="remote-object-source-exports"),
