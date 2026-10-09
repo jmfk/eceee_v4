@@ -2170,14 +2170,16 @@ class SitePackageAPITests(APITestCase):
         title="Imported Site",
         theme_source_id=None,
         theme_stable_key=None,
+        include_theme=False,
     ):
         stable_key = stable_key or uuid.uuid4()
         dependencies = {}
+        resolved_theme_stable_key = theme_stable_key or uuid.uuid4()
         if theme_source_id is not None:
             dependencies["themes"] = [
                 {
                     "source_id": theme_source_id,
-                    "stable_key": str(theme_stable_key or uuid.uuid4()),
+                    "stable_key": str(resolved_theme_stable_key),
                     "name": "Conference",
                 }
             ]
@@ -2227,7 +2229,49 @@ class SitePackageAPITests(APITestCase):
                     }
                 ),
             )
+            if theme_source_id is not None and include_theme:
+                package.writestr(
+                    f"themes/{theme_source_id}.json",
+                    json.dumps(
+                        {
+                            "source_id": theme_source_id,
+                            "stable_key": str(resolved_theme_stable_key),
+                            "name": "Conference",
+                            "layouts": {},
+                        }
+                    ),
+                )
         return ContentFile(buffer.getvalue(), name="site.zip")
+
+    def test_themes_only_update_reuses_the_imported_theme_lineage(self):
+        theme_stable_key = uuid.uuid4()
+        package_upload = self.site_package_upload(
+            theme_source_id=88,
+            theme_stable_key=theme_stable_key,
+            include_theme=True,
+        )
+
+        imported_ids = []
+        for _ in range(2):
+            job = SitePackageJob.objects.create(
+                kind=SitePackageJob.KIND_IMPORT,
+                status=SitePackageJob.STATUS_PENDING,
+                created_by=self.user,
+                options={
+                    "tenant_id": str(self.tenant.id),
+                    "mode": "update",
+                    "include_site": False,
+                    "include_media": False,
+                    "include_themes": True,
+                },
+            )
+            package_upload.seek(0)
+            with zipfile.ZipFile(package_upload, "r") as package:
+                SitePackageImporter(job, storage=MemoryStorage()).import_package(package)
+            imported_ids.append(PageTheme.objects.get(tenant=self.tenant, stable_key=theme_stable_key).id)
+
+        self.assertEqual(imported_ids[0], imported_ids[1])
+        self.assertEqual(PageTheme.objects.filter(tenant=self.tenant, stable_key=theme_stable_key).count(), 1)
 
     def test_assess_import_reports_existing_site_and_missing_related_theme(self):
         response = self.client.post(
