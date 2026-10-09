@@ -87,6 +87,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./frontend:/app
+      - ./backend/easy_widgets/widgets:/backend/easy_widgets/widgets:ro
       - ./docs:/docs:ro
       - ./.git:/repo/.git:ro
       - frontend_node_modules:/app/node_modules

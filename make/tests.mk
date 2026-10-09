@@ -7,7 +7,6 @@ prepare-test-infra: ## Start the isolated test infrastructure.
 	@set -e; \
 	echo "Starting isolated ephemeral test infrastructure..."; \
 	$(COMPOSE_TEST) up -d test-db test-redis test-minio test-minio-init; \
-	$(COMPOSE_INFRA) up -d imgproxy; \
 	echo "Waiting for Postgres..."; \
 	i=0; \
 	until $(COMPOSE_TEST) exec -T test-db pg_isready -U postgres -d eceee_v4_test >/dev/null 2>&1; do \
@@ -110,6 +109,10 @@ frontend-admin-e2e-test: prepare-frontend-e2e
 # Start and seed the Django public renderer without installing browser dependencies.
 .PHONY: prepare-public-e2e-backend
 prepare-public-e2e-backend: prepare-test-infra
+	@if [ -z "$(CI)" ] && [ -z "$(SKIP_PORT_REGISTRY_CHECK)" ]; then \
+		python3 scripts/configure_orbstack.py --runtime-check >/dev/null; \
+	fi
+	$(COMPOSE_INFRA) up -d imgproxy
 	DATABASE_URL=postgresql://postgres:test-only@test-db:5432/eceee_v4_test \
 	POSTGRES_DB=eceee_v4_test POSTGRES_USER=postgres POSTGRES_PASSWORD=test-only \
 	POSTGRES_HOST=test-db POSTGRES_PORT=5432 \
