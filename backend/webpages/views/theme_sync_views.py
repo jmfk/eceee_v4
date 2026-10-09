@@ -5,6 +5,7 @@ Provides endpoints for bidirectional sync between local Python files and server 
 """
 
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -14,6 +15,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from core.machine_api_keys import MachineAPIKeyAuthentication
+from core.models import Tenant
 from core.permissions import HasTenantAccess
 
 from ..models import PageTheme
@@ -29,6 +31,7 @@ from ..services.site_package import (
 )
 from ..services.theme_remote_credentials import ThemeRemoteAccessKeyAuthentication
 from ..services.theme_versions import SNAPSHOT_FIELDS, record_theme_version
+from ..theme_layouts import validate_layout_compatibility, validate_theme_layouts
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -195,6 +198,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
 
         try:
             with transaction.atomic():
+                Tenant.objects.select_for_update().get(pk=tenant.pk)
                 created = False
                 previous_version_ids = []
                 lookup = {"stable_key": stable_key} if stable_key else {"name": theme_name}
@@ -223,6 +227,12 @@ class ThemeSyncViewSet(viewsets.ViewSet):
                 if not serializer.is_valid():
                     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+                incoming_layouts = theme_data.get("layouts")
+                if incoming_layouts is not None:
+                    validate_theme_layouts(incoming_layouts)
+                    if not created:
+                        validate_layout_compatibility(theme, incoming_layouts)
+
                 save_kwargs = {"sync_source": "sync", "last_synced_at": timezone.now()}
                 if created:
                     save_kwargs.update({"tenant": tenant, "created_by": request.user})
@@ -230,6 +240,9 @@ class ThemeSyncViewSet(viewsets.ViewSet):
                 if transfer_package:
                     restored = restore_theme_transfer_package(transfer_package, theme)
                     restored.pop("is_default", None)
+                    restored_layouts = restored.get("layouts", theme.layouts)
+                    validate_theme_layouts(restored_layouts)
+                    validate_layout_compatibility(theme, restored_layouts)
                     for field in SNAPSHOT_FIELDS:
                         if field in restored:
                             setattr(theme, field, restored[field])
@@ -247,7 +260,7 @@ class ThemeSyncViewSet(viewsets.ViewSet):
                     )
                 elif theme.versions.count() == len(previous_version_ids):
                     record_theme_version(theme, source="remote-upload", source_label="Theme sync API", force=True)
-        except ValueError as exc:
+        except (ValueError, DjangoValidationError) as exc:
             return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(
@@ -360,19 +373,33 @@ class ThemeSyncViewSet(viewsets.ViewSet):
             )
 
         try:
-            theme = PageTheme.objects.get(name=theme_name, tenant=tenant)
-            serializer = ThemeSyncSerializer(theme, data=theme_data, partial=True, context={"request": request})
-        except PageTheme.DoesNotExist:
-            serializer = ThemeSyncSerializer(data=theme_data, context={"request": request})
+            with transaction.atomic():
+                Tenant.objects.select_for_update().get(pk=tenant.pk)
+                try:
+                    theme = PageTheme.objects.select_for_update().get(name=theme_name, tenant=tenant)
+                    serializer = ThemeSyncSerializer(theme, data=theme_data, partial=True, context={"request": request})
+                except PageTheme.DoesNotExist:
+                    theme = None
+                    serializer = ThemeSyncSerializer(data=theme_data, context={"request": request})
 
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                if not serializer.is_valid():
+                    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        theme = serializer.save(
-            sync_source="sync",
-            last_synced_at=timezone.now(),
-            skip_version_increment=False,
-        )
+                incoming_layouts = theme_data.get("layouts")
+                if incoming_layouts is not None:
+                    validate_theme_layouts(incoming_layouts)
+                    if theme is not None:
+                        validate_layout_compatibility(theme, incoming_layouts)
+
+                theme = serializer.save(
+                    tenant=tenant if theme is None else theme.tenant,
+                    created_by=request.user if theme is None else theme.created_by,
+                    sync_source="sync",
+                    last_synced_at=timezone.now(),
+                    skip_version_increment=False,
+                )
+        except (ValueError, DjangoValidationError) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(
             ThemeSyncSerializer(theme, context={"request": request}).data,

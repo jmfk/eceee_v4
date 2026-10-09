@@ -1,3 +1,4 @@
+import copy
 import uuid
 from unittest.mock import Mock, patch
 
@@ -9,7 +10,14 @@ from django.test import TestCase, TransactionTestCase, override_settings
 from rest_framework.test import APIClient
 
 from core.models import Tenant
-from webpages.models import PageTheme, ThemeDesignerAssignment, ThemeRemoteAccessKey, ThemeRemoteConnection
+from webpages.models import (
+    PageTheme,
+    PageVersion,
+    ThemeDesignerAssignment,
+    ThemeRemoteAccessKey,
+    ThemeRemoteConnection,
+    WebPage,
+)
 from webpages.services.theme_remote import RemoteThemeError, remote_sync_request
 from webpages.services.theme_remote_credentials import encrypt_access_key, generate_access_key
 
@@ -129,6 +137,40 @@ class ThemeVersionApiTests(TestCase):
         self.left.refresh_from_db()
         self.assertEqual(self.left.colors, {"brand": "#112233"})
         self.assertEqual(self.left.versions.count(), 3)
+
+    def test_restore_rejects_layout_policy_that_strands_page_widgets(self):
+        original = self.left.versions.first()
+        layouts = copy.deepcopy(self.left.layouts)
+        main_layout = next(item for item in layouts["items"] if item["key"] == "main_layout")
+        main_layout["slots"]["header"]["max_widgets"] = 2
+        self.left.layouts = layouts
+        self.left.save(version_created_by=self.user)
+        page = WebPage.objects.create(
+            title="Policy usage",
+            slug="policy-usage",
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        PageVersion.objects.create(
+            page=page,
+            version_number=1,
+            layout_key="main_layout",
+            code_layout="main_layout",
+            theme=self.left,
+            widgets={
+                "header": [
+                    {"type": "easy_widgets.HeaderWidget"},
+                    {"type": "easy_widgets.HeaderWidget"},
+                ]
+            },
+            created_by=self.user,
+        )
+
+        response = self.client.post(f"/api/v1/webpages/designer/themes/{self.left.id}/versions/{original.id}/restore/")
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("layouts", response.data)
 
     def test_preview_image_and_site_icon_are_versioned_and_restored(self):
         self.left.image.name = "theme_images/original-preview.png"

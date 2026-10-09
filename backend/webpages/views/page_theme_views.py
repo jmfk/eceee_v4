@@ -25,6 +25,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.response import Response
 
+from core.models import Tenant
 from file_manager.storage import system_storage
 
 from ..models import PageTheme
@@ -151,6 +152,9 @@ class PageThemeViewSet(viewsets.ModelViewSet):
 
         partial = kwargs.pop("partial", False)
         with transaction.atomic():
+            tenant = getattr(request, "tenant", None)
+            if tenant is not None:
+                Tenant.objects.select_for_update().get(pk=tenant.pk)
             instance = self._get_object_for_update()
             serializer = self.get_serializer(instance, data=data, partial=partial)
             serializer.is_valid(raise_exception=True)

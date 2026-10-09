@@ -35,7 +35,12 @@ from webpages.services.theme_preview_content import (
     normalize_theme_preview_namespaces,
     rewrite_theme_library_image_urls,
 )
-from webpages.theme_layouts import default_theme_layouts, legacy_compatibility_layout, validate_theme_layouts
+from webpages.theme_layouts import (
+    default_theme_layouts,
+    legacy_compatibility_layout,
+    validate_layout_widgets,
+    validate_theme_layouts,
+)
 
 PACKAGE_VERSION = "2.0"
 SUPPORTED_PACKAGE_VERSIONS = {"1.0", PACKAGE_VERSION}
@@ -1344,6 +1349,38 @@ class SitePackageImporter:
         temp_file.seek(0)
         return temp_file
 
+    @staticmethod
+    def _lock_layout_tenant(tenant):
+        """Serialize package writes with layout publication and page saves."""
+        Tenant.objects.select_for_update().get(pk=tenant.pk)
+
+    @staticmethod
+    def _validate_imported_version_layout(version):
+        """Apply the normal page/widget layout invariant to imported versions."""
+        theme = version.theme
+        layout_key = version.layout_key or version.code_layout
+        current = version.page.parent
+        while current and (theme is None or not layout_key):
+            parent_version = (
+                current.get_current_published_version() if version.is_published() else current.get_latest_version()
+            )
+            if parent_version:
+                theme = theme or parent_version.theme
+                layout_key = layout_key or parent_version.layout_key or parent_version.code_layout
+            current = current.parent
+        if theme is None:
+            theme = (
+                PageTheme.objects.filter(tenant=version.page.tenant, is_default=True, is_active=True).first()
+                or PageTheme.objects.filter(tenant=version.page.tenant, is_active=True).order_by("id").first()
+            )
+        if not layout_key and theme:
+            layout_key = (theme.layouts or {}).get("default_layout_key")
+        if theme and layout_key:
+            available = {item.get("key") for item in (theme.layouts or {}).get("items", [])}
+            if layout_key not in available:
+                raise ValueError(f"Layout '{layout_key}' is not defined by the effective imported theme.")
+        validate_layout_widgets(theme, layout_key, version.widgets)
+
     @transaction.atomic
     def import_package(self, package: zipfile.ZipFile) -> WebPage:
         _validate_site_package_members(package)
@@ -1360,11 +1397,12 @@ class SitePackageImporter:
             return self._update_package(package, manifest)
 
         pages_payload = json.loads(package.read("pages.json").decode("utf-8"))["pages"]
+        tenant = self._destination_tenant()
+        self._lock_layout_tenant(tenant)
         theme_map = self._import_themes(package, pages_payload)
         media_map = self._import_media(package)
         replacements = self._build_replacements(media_map)
 
-        tenant = self._destination_tenant()
         page_map: Dict[int, WebPage] = {}
         imported_versions: List[tuple[PageVersion, Optional[datetime], Optional[datetime]]] = []
         version_map: Dict[int, PageVersion] = {}
@@ -1465,6 +1503,9 @@ class SitePackageImporter:
                     imported_version.effective_date = effective_date
                     imported_version.expiry_date = expiry_date
                     imported_version.save(update_fields=["effective_date", "expiry_date", "updated_at"])
+
+        for imported_version, _, _ in imported_versions:
+            self._validate_imported_version_layout(imported_version)
 
         if not imported_root:
             raise ValueError("Package did not contain a root page")
@@ -1572,6 +1613,7 @@ class SitePackageImporter:
         options = self.job.options or {}
         tenant = self._destination_tenant()
         pages_payload = json.loads(package.read("pages.json").decode("utf-8"))["pages"]
+        self._lock_layout_tenant(tenant)
         binding = self._resolve_update_binding(tenant, pages_payload)
         theme_map = self._import_themes_for_update(package, binding, pages_payload)
         media_map = self._import_media(package)
@@ -1809,6 +1851,9 @@ class SitePackageImporter:
                 version.effective_date = effective_date
                 version.expiry_date = expiry_date
                 version.save(update_fields=["effective_date", "expiry_date", "updated_at"])
+
+        for version in new_versions:
+            self._validate_imported_version_layout(version)
 
         binding.page_map = next_page_binding
         binding.version_map = next_version_binding

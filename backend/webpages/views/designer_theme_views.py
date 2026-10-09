@@ -348,7 +348,10 @@ class DesignerThemeRestoreView(APIView):
     def post(self, request, theme_id, version_id):
         theme = _theme(request, theme_id)
         version = get_object_or_404(ThemeVersion, id=version_id, theme=theme)
-        restored = restore_theme_version(theme, version, user=request.user)
+        try:
+            restored = restore_theme_version(theme, version, user=request.user)
+        except DjangoValidationError as exc:
+            raise ValidationError({"layouts": exc.messages}) from exc
         return Response({"versionNumber": restored.version_number, "syncVersion": theme.sync_version})
 
 

@@ -17,6 +17,7 @@ from django.utils.text import slugify
 from PIL import Image, ImageDraw, ImageFont
 from rest_framework.exceptions import ValidationError
 
+from core.models import Tenant
 from file_manager.storage import system_storage
 from object_storage.models import ObjectInstance
 from utils.templatetags.security_filters import sanitize_html
@@ -1416,6 +1417,7 @@ def save_designer_draft(theme_id, tenant, user, payload):
 
 def publish_designer_draft(theme_id, tenant, user, draft_version):
     with transaction.atomic():
+        Tenant.objects.select_for_update().get(pk=tenant.pk)
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
         if not user_can_design_theme(user, theme):
             raise PermissionError
@@ -1480,6 +1482,7 @@ def publish_designer_draft(theme_id, tenant, user, draft_version):
 def publish_layout_draft(theme_id, tenant, user, draft_version):
     """Publish only the layout document without applying unrelated Designer draft fields."""
     with transaction.atomic():
+        Tenant.objects.select_for_update().get(pk=tenant.pk)
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
         if not user_can_design_theme(user, theme):
             raise PermissionError
@@ -1534,6 +1537,7 @@ def discard_layout_draft(theme_id, tenant, user, draft_version):
 def undo_designer_publish(theme_id, tenant, user, draft_version, live_sync_version):
     """Restore the latest pre-publish snapshot without overwriting draft work."""
     with transaction.atomic():
+        Tenant.objects.select_for_update().get(pk=tenant.pk)
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
         if not user_can_design_theme(user, theme):
             raise PermissionError
@@ -1554,6 +1558,9 @@ def undo_designer_publish(theme_id, tenant, user, draft_version, live_sync_versi
             raise DesignerDraftConflict("There is no Designer revision to restore.")
 
         replaced_snapshot = theme_designer_snapshot(theme)
+        restored_layouts = revision.snapshot.get("layouts", theme.layouts)
+        validate_theme_layouts(restored_layouts)
+        validate_layout_compatibility(theme, restored_layouts)
         apply_designer_snapshot(theme, revision.snapshot)
         if PageTheme.objects.filter(tenant=theme.tenant, name=theme.name).exclude(id=theme.id).exists():
             raise DesignerDraftConflict("Another theme now uses this name. Rename it before restoring.")

@@ -6,6 +6,9 @@ import json
 from django.db import transaction
 from django.db.models import Max
 
+from core.models import Tenant
+from webpages.theme_layouts import validate_layout_compatibility, validate_theme_layouts
+
 SNAPSHOT_FIELDS = (
     "name",
     "description",
@@ -88,6 +91,14 @@ def record_theme_version(theme, *, source="web", source_label="", name="", creat
 def restore_theme_version(theme, version, *, user):
     if version.theme_id != theme.id:
         raise ValueError("Version does not belong to this theme.")
+    Tenant.objects.select_for_update().get(pk=theme.tenant_id)
+    from webpages.models import PageTheme
+
+    PageTheme.objects.select_for_update().get(pk=theme.pk)
+    theme.refresh_from_db()
+    restored_layouts = version.snapshot.get("layouts", theme.layouts)
+    validate_theme_layouts(restored_layouts)
+    validate_layout_compatibility(theme, restored_layouts)
     for field in SNAPSHOT_FIELDS:
         if field in version.snapshot:
             setattr(theme, field, version.snapshot[field])
