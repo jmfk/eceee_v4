@@ -1760,3 +1760,72 @@ class ObjectTransferJob(models.Model):
         self.status = self.STATUS_FAILED
         self.errors = [*(self.errors or []), str(error)]
         self.save(update_fields=["status", "errors", "updated_at"])
+
+
+class TransferCheckpoint(models.Model):
+    """Immutable destination state captured before a transfer mutation."""
+
+    OPERATION_OBJECT_IMPORT = "object_import"
+    OPERATION_CHOICES = [(OPERATION_OBJECT_IMPORT, "Object import")]
+    STATUS_AVAILABLE = "available"
+    STATUS_RESTORE_PENDING = "restore_pending"
+    STATUS_RESTORING = "restoring"
+    STATUS_RESTORED = "restored"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = [
+        (STATUS_AVAILABLE, "Available"),
+        (STATUS_RESTORE_PENDING, "Restore pending"),
+        (STATUS_RESTORING, "Restoring"),
+        (STATUS_RESTORED, "Restored"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.CASCADE, related_name="transfer_checkpoints")
+    source_job = models.OneToOneField(
+        ObjectTransferJob,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="checkpoint",
+    )
+    operation = models.CharField(max_length=32, choices=OPERATION_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_AVAILABLE)
+    resource_scopes = models.JSONField(default=list)
+    snapshot = models.JSONField(default=dict)
+    created_resources = models.JSONField(default=dict, blank=True)
+    source_details = models.JSONField(default=dict, blank=True)
+    errors = models.JSONField(default=list, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_transfer_checkpoints")
+    restored_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="restored_transfer_checkpoints",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    restored_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["tenant", "status", "created_at"], name="transfercp_tenant_idx"),
+        ]
+
+    def mark_restoring(self, user):
+        self.status = self.STATUS_RESTORING
+        self.restored_by = user
+        self.errors = []
+        self.save(update_fields=["status", "restored_by", "errors", "updated_at"])
+
+    def mark_restored(self):
+        self.status = self.STATUS_RESTORED
+        self.restored_at = timezone.now()
+        self.save(update_fields=["status", "restored_at", "updated_at"])
+
+    def mark_failed(self, error):
+        self.status = self.STATUS_FAILED
+        self.errors = [*(self.errors or []), str(error)]
+        self.save(update_fields=["status", "errors", "updated_at"])

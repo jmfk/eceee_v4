@@ -10,6 +10,8 @@ export const objectTransfersApi = {
     createImport: async (connectionId, rootIds, typeResolutions, namespaceResolutions) => unwrap(await api.post(`${base}/imports/`, { connectionId, rootIds, typeResolutions, namespaceResolutions })),
     listImports: async () => unwrap(await api.get(`${base}/imports/`)),
     getImport: async jobId => unwrap(await api.get(`${base}/imports/${jobId}/`)),
+    listCheckpoints: async () => unwrap(await api.get(`${base}/checkpoints/`)),
+    restoreCheckpoint: async checkpointId => unwrap(await api.post(`${base}/checkpoints/${checkpointId}/restore/`, {})),
 }
 
 export default objectTransfersApi

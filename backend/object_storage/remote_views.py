@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+from django.db import transaction
 from django.db.models import Q
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
@@ -16,7 +17,7 @@ from core.machine_api_keys import MachineAPIKeyAuthentication
 from core.models import MachineAPIKey
 from core.permissions import HasTenantAccess
 from file_manager.storage import S3MediaStorage
-from object_storage.models import ObjectInstance, ObjectTransferJob, ObjectTypeDefinition
+from object_storage.models import ObjectInstance, ObjectTransferJob, ObjectTypeDefinition, TransferCheckpoint
 from object_storage.services.object_transfer import (
     MAX_CANDIDATES_PER_TYPE,
     build_preflight,
@@ -27,7 +28,7 @@ from object_storage.services.object_transfer import (
     type_has_foreign_tenant_usage,
     type_is_compatible,
 )
-from object_storage.tasks import export_object_package, import_remote_object_package
+from object_storage.tasks import export_object_package, import_remote_object_package, restore_object_transfer_checkpoint
 from webpages.models import ThemeRemoteConnection
 from webpages.services.theme_remote import RemoteThemeError, remote_object_request
 from webpages.services.theme_remote_credentials import RemoteCredentialConfigurationError
@@ -71,6 +72,24 @@ def _job_data(job):
         "errors": job.errors,
         "createdAt": job.created_at,
         "updatedAt": job.updated_at,
+    }
+
+
+def _checkpoint_data(checkpoint):
+    return {
+        "id": str(checkpoint.id),
+        "operation": checkpoint.operation,
+        "status": checkpoint.status,
+        "resourceScopes": checkpoint.resource_scopes,
+        "sourceDetails": checkpoint.source_details,
+        "createdResources": {
+            key: len(value) if isinstance(value, list) else value
+            for key, value in (checkpoint.created_resources or {}).items()
+            if not key.endswith("paths")
+        },
+        "errors": checkpoint.errors,
+        "createdAt": checkpoint.created_at,
+        "restoredAt": checkpoint.restored_at,
     }
 
 
@@ -341,3 +360,38 @@ class RemoteObjectImportDetailView(APIView):
         _admin(request)
         job = get_object_or_404(ObjectTransferJob, id=job_id, tenant=request.tenant, kind=ObjectTransferJob.KIND_IMPORT)
         return Response(_job_data(job))
+
+
+class TransferCheckpointListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
+
+    def get(self, request):
+        _admin(request)
+        checkpoints = TransferCheckpoint.objects.filter(tenant=request.tenant).select_related("source_job")[:50]
+        return Response({"results": [_checkpoint_data(item) for item in checkpoints]})
+
+
+class TransferCheckpointRestoreView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
+
+    @transaction.atomic
+    def post(self, request, checkpoint_id):
+        _admin(request)
+        checkpoint = get_object_or_404(
+            TransferCheckpoint.objects.select_for_update(),
+            id=checkpoint_id,
+            tenant=request.tenant,
+        )
+        if checkpoint.status == TransferCheckpoint.STATUS_RESTORED:
+            return Response(_checkpoint_data(checkpoint))
+        if checkpoint.status in {
+            TransferCheckpoint.STATUS_RESTORE_PENDING,
+            TransferCheckpoint.STATUS_RESTORING,
+        }:
+            raise serializers.ValidationError({"checkpointId": "This checkpoint is already being restored."})
+        checkpoint.status = TransferCheckpoint.STATUS_RESTORE_PENDING
+        checkpoint.restored_by = request.user
+        checkpoint.errors = []
+        checkpoint.save(update_fields=["status", "restored_by", "errors", "updated_at"])
+        transaction.on_commit(lambda: restore_object_transfer_checkpoint.delay(str(checkpoint.id), request.user.id))
+        return Response(_checkpoint_data(checkpoint), status=status.HTTP_202_ACCEPTED)

@@ -10,14 +10,23 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework import serializers
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from content.models import Namespace
 from core.models import Tenant
 from file_manager.models import MediaCollection, MediaFile, MediaTag
-from object_storage.models import ObjectInstance, ObjectTransferJob, ObjectTypeDefinition, ObjectVersion
+from object_storage.models import (
+    ObjectInstance,
+    ObjectTransferJob,
+    ObjectTypeDefinition,
+    ObjectVersion,
+    TransferCheckpoint,
+)
 from object_storage.remote_views import (
     RemoteObjectSourceExportListView,
     RemoteObjectSourcePreflightView,
+    TransferCheckpointListView,
+    TransferCheckpointRestoreView,
     _decorate_preflight,
 )
 from object_storage.services.object_transfer import (
@@ -29,6 +38,10 @@ from object_storage.services.object_transfer import (
     candidate_catalog,
     collect_object_graph,
     rebuild_imported_reverse_relationships,
+)
+from object_storage.services.transfer_checkpoints import (
+    capture_object_import_checkpoint,
+    restore_object_import_checkpoint,
 )
 from object_storage.tasks import _stream_package_response, cleanup_expired_object_packages, import_remote_object_package
 from taxonomy.models import Tag as TaxonomyTag
@@ -608,6 +621,171 @@ class ObjectTransferServiceTests(TestCase):
         self.assertEqual(list(imported_media.canonical_tags.values_list("slug", flat=True)), ["people"])
         self.assertEqual(list(imported_media.collections.values_list("slug", flat=True)), ["portraits"])
         self.assertEqual(result["created_versions"], 0)
+        self.assertEqual(TransferCheckpoint.objects.get(source_job=import_job).status, "available")
+
+    def test_import_checkpoint_restores_pre_import_object_and_media_state(self):
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+
+        self.root.title = "Destination title before import"
+        self.root.save(update_fields=["title", "updated_at"])
+        self.assertTrue(self.media.delete(user=self.user))
+        import_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"type_resolutions": {}},
+        )
+
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            result = ObjectPackageImporter(import_job, storage=storage).import_package(package)
+
+        checkpoint = TransferCheckpoint.objects.get(id=result["checkpoint_id"])
+        self.root.refresh_from_db()
+        self.media.refresh_from_db()
+        self.assertEqual(self.root.title, "Root")
+        self.assertFalse(self.media.is_deleted)
+
+        restore_object_import_checkpoint(checkpoint, self.user)
+
+        self.root.refresh_from_db()
+        restored_media = MediaFile.objects.with_deleted().get(pk=self.media.pk)
+        checkpoint.refresh_from_db()
+        self.assertEqual(self.root.title, "Destination title before import")
+        self.assertTrue(restored_media.is_deleted)
+        self.assertEqual(checkpoint.status, TransferCheckpoint.STATUS_RESTORED)
+
+    def test_checkpoint_failure_prevents_import_mutation(self):
+        storage = MemoryStorage()
+        storage.files[self.media.file_path] = b"image"
+        export_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_EXPORT,
+            created_by=self.user,
+            options={"root_ids": [self.root.id]},
+        )
+        package_file = io.BytesIO()
+        with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as package:
+            ObjectPackageExporter(export_job, storage=storage).write_package(package)
+        self.root.title = "Must survive"
+        self.root.save(update_fields=["title", "updated_at"])
+        import_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"type_resolutions": {}},
+        )
+
+        package_file.seek(0)
+        with zipfile.ZipFile(package_file, "r") as package:
+            with patch(
+                "object_storage.services.transfer_checkpoints.capture_object_import_checkpoint",
+                side_effect=RuntimeError("checkpoint unavailable"),
+            ):
+                with self.assertRaisesMessage(RuntimeError, "checkpoint unavailable"):
+                    ObjectPackageImporter(import_job, storage=storage).import_package(package)
+
+        self.root.refresh_from_db()
+        self.assertEqual(self.root.title, "Must survive")
+        self.assertFalse(TransferCheckpoint.objects.filter(source_job=import_job).exists())
+
+    def test_checkpoint_endpoints_are_tenant_scoped_and_queue_restore(self):
+        checkpoint = TransferCheckpoint.objects.create(
+            tenant=self.tenant,
+            operation=TransferCheckpoint.OPERATION_OBJECT_IMPORT,
+            resource_scopes=["objects", "media"],
+            snapshot={"schema_version": 1},
+            created_by=self.user,
+        )
+        factory = APIRequestFactory()
+        list_request = factory.get("/api/v1/objects/remote/checkpoints/")
+        list_request.tenant = self.tenant
+        force_authenticate(list_request, self.user)
+        response = TransferCheckpointListView.as_view()(list_request)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"][0]["id"], str(checkpoint.id))
+
+        foreign_tenant = Tenant.objects.create(name="Foreign", identifier="foreign-checkpoint", created_by=self.user)
+        restore_request = factory.post(f"/api/v1/objects/remote/checkpoints/{checkpoint.id}/restore/", {})
+        restore_request.tenant = foreign_tenant
+        force_authenticate(restore_request, self.user)
+        response = TransferCheckpointRestoreView.as_view()(restore_request, checkpoint_id=checkpoint.id)
+        self.assertEqual(response.status_code, 404)
+
+        restore_request = factory.post(f"/api/v1/objects/remote/checkpoints/{checkpoint.id}/restore/", {})
+        restore_request.tenant = self.tenant
+        force_authenticate(restore_request, self.user)
+        with patch("object_storage.remote_views.restore_object_transfer_checkpoint.delay") as delayed:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = TransferCheckpointRestoreView.as_view()(restore_request, checkpoint_id=checkpoint.id)
+        self.assertEqual(response.status_code, 202)
+        checkpoint.refresh_from_db()
+        self.assertEqual(checkpoint.status, TransferCheckpoint.STATUS_RESTORE_PENDING)
+        delayed.assert_called_once_with(str(checkpoint.id), self.user.id)
+
+    def test_failed_restore_rolls_back_and_records_failure(self):
+        checkpoint = TransferCheckpoint.objects.create(
+            tenant=self.tenant,
+            operation=TransferCheckpoint.OPERATION_OBJECT_IMPORT,
+            resource_scopes=["objects"],
+            snapshot={
+                "schema_version": 1,
+                "objects": [{"id": 999999, "version_ids": []}],
+                "media": [],
+                "types": [],
+            },
+            created_by=self.user,
+        )
+
+        with self.assertRaises(ObjectInstance.DoesNotExist):
+            restore_object_import_checkpoint(checkpoint, self.user)
+
+        checkpoint.refresh_from_db()
+        self.assertEqual(checkpoint.status, TransferCheckpoint.STATUS_FAILED)
+        self.assertTrue(checkpoint.errors)
+
+    def test_restore_detaches_existing_children_before_deleting_created_parent(self):
+        import_job = ObjectTransferJob.objects.create(
+            tenant=self.tenant,
+            kind=ObjectTransferJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"type_resolutions": {}},
+        )
+        checkpoint = capture_object_import_checkpoint(
+            import_job,
+            {
+                "types": [{"name": self.child_type.name}],
+                "objects": [{"type": self.child_type.name, "slug": self.child.slug}],
+                "media": [],
+            },
+        )
+        created_parent = ObjectInstance.objects.create(
+            tenant=self.tenant,
+            object_type=self.root_type,
+            title="Imported parent",
+            slug="imported-parent",
+            created_by=self.user,
+        )
+        self.child.parent = created_parent
+        self.child.save()
+        checkpoint.created_resources = {"object_ids": [created_parent.id]}
+        checkpoint.save(update_fields=["created_resources", "updated_at"])
+
+        restore_object_import_checkpoint(checkpoint, self.user)
+
+        self.child.refresh_from_db()
+        self.assertEqual(self.child.parent_id, self.root.id)
+        self.assertFalse(ObjectInstance.objects.filter(id=created_parent.id).exists())
 
     def test_import_reuses_media_tag_with_same_name_and_different_slug(self):
         storage = MemoryStorage()

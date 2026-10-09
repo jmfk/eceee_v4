@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Check, Copy, KeyRound, Link2, Pencil, Plus, RotateCw, Trash2, X } from 'lucide-react'
+import { Check, Copy, History, KeyRound, Link2, Pencil, Plus, RotateCw, Trash2, Undo2, X } from 'lucide-react'
 
 import { designerThemesApi } from '../api/designerThemes'
+import { objectTransfersApi } from '../api/objectTransfers'
 
 const emptyConnection = { name: '', baseUrl: '', remoteWorkspace: '', accessKey: '', credentialScheme: 'theme_key', isDefault: false }
 const defaultCapabilities = ['theme.transfer', 'site.transfer']
@@ -13,6 +14,7 @@ const formatDate = (value) => value
 export default function RemoteSitesSettings() {
     const [connections, setConnections] = useState([])
     const [accessKeys, setAccessKeys] = useState([])
+    const [checkpoints, setCheckpoints] = useState([])
     const [syncEnabled, setSyncEnabled] = useState(true)
     const [connectionForm, setConnectionForm] = useState(emptyConnection)
     const [editingConnectionId, setEditingConnectionId] = useState(null)
@@ -29,8 +31,10 @@ export default function RemoteSitesSettings() {
     const load = async () => {
         const connectionResult = await designerThemesApi.remoteConnections()
         const keyResult = await designerThemesApi.remoteAccessKeys()
+        const checkpointResult = await objectTransfersApi.listCheckpoints()
         setConnections(connectionResult.results || [])
         setAccessKeys(keyResult.results || [])
+        setCheckpoints(checkpointResult.results || [])
         setSyncEnabled(keyResult.syncEnabled !== false)
     }
 
@@ -160,6 +164,20 @@ export default function RemoteSitesSettings() {
         }
     }
 
+    const restoreCheckpoint = async (checkpoint) => {
+        if (!window.confirm('Restore this checkpoint? Current object and media changes in its scope will be replaced.')) return
+        setBusy(`restore-${checkpoint.id}`)
+        setError('')
+        try {
+            const result = await objectTransfersApi.restoreCheckpoint(checkpoint.id)
+            setCheckpoints((current) => current.map((item) => item.id === checkpoint.id ? result : item))
+        } catch (restoreError) {
+            setError(restoreError.message || 'The checkpoint restore could not be started.')
+        } finally {
+            setBusy('')
+        }
+    }
+
     if (busy === 'load') return <p className="p-8 text-sm text-gray-600">Loading remote site settings…</p>
 
     return <div className="p-8">
@@ -254,6 +272,24 @@ export default function RemoteSitesSettings() {
                         {accessKey.isActive && <button type="button" disabled={busy === `revoke-${accessKey.id}`} onClick={() => revokeKey(accessKey.id)} className="min-h-9 rounded border border-gray-300 px-3 text-sm text-gray-700">Revoke</button>}
                     </div>
                 </div>)}</div>}
+            </section>
+
+            <section className="mt-12 border-t border-gray-200 pt-10" aria-labelledby="recovery-checkpoints-heading">
+                <div>
+                    <h2 id="recovery-checkpoints-heading" className="text-lg font-semibold text-gray-900">Recovery checkpoints</h2>
+                    <p className="mt-1 max-w-2xl text-sm text-gray-600">Destination state saved automatically before a remote import changes objects or media.</p>
+                </div>
+                {checkpoints.length === 0 ? <div className="mt-6 py-6 text-sm text-gray-600">No transfer checkpoints yet.</div> : <div className="mt-6 divide-y divide-gray-200 border-y border-gray-200">{checkpoints.map((checkpoint) => {
+                    const restoring = ['restore_pending', 'restoring'].includes(checkpoint.status)
+                    const canRestore = checkpoint.status === 'available'
+                    return <div key={checkpoint.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2"><History className="h-4 w-4 text-gray-400" /><p className="font-medium text-gray-900">Object import checkpoint</p><span className="text-xs text-gray-500">{checkpoint.status.replace('_', ' ')}</span></div>
+                            <p className="mt-1 text-sm text-gray-600">Saved {formatDate(checkpoint.createdAt)} · {checkpoint.resourceScopes.join(' and ')}</p>
+                        </div>
+                        <button type="button" disabled={!canRestore || busy === `restore-${checkpoint.id}`} onClick={() => restoreCheckpoint(checkpoint)} className="inline-flex min-h-9 items-center gap-1.5 rounded border border-gray-300 px-3 text-sm text-gray-700 disabled:opacity-50"><Undo2 className="h-4 w-4" />{restoring ? 'Restore queued' : checkpoint.status === 'restored' ? 'Restored' : 'Restore'}</button>
+                    </div>
+                })}</div>}
             </section>
         </div>
     </div>

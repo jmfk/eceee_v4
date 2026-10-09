@@ -13,9 +13,12 @@ const mocks = vi.hoisted(() => ({
     createRemoteAccessKey: vi.fn(),
     rotateRemoteAccessKey: vi.fn(),
     revokeRemoteAccessKey: vi.fn(),
+    listCheckpoints: vi.fn(),
+    restoreCheckpoint: vi.fn(),
 }))
 
 vi.mock('../../api/designerThemes', () => ({ designerThemesApi: mocks }))
+vi.mock('../../api/objectTransfers', () => ({ objectTransfersApi: mocks }))
 
 const connection = {
     id: 'connection-1',
@@ -41,6 +44,7 @@ describe('RemoteSitesSettings', () => {
         vi.clearAllMocks()
         mocks.remoteConnections.mockResolvedValue({ results: [connection], canManage: true })
         mocks.remoteAccessKeys.mockResolvedValue({ results: [accessKey], syncEnabled: true })
+        mocks.listCheckpoints.mockResolvedValue({ results: [] })
         Object.defineProperty(navigator, 'clipboard', {
             configurable: true,
             value: { writeText: vi.fn(() => Promise.resolve()) },
@@ -53,9 +57,35 @@ describe('RemoteSitesSettings', () => {
 
         expect(await screen.findByRole('heading', { name: 'Connections to other sites' })).toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Access to this site' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Recovery checkpoints' })).toBeInTheDocument()
         expect(screen.getByText('Production')).toBeInTheDocument()
         expect(screen.getByText('Local development')).toBeInTheDocument()
         expect(screen.queryByText(/secret/i)).not.toBeInTheDocument()
+    })
+
+    it('lists and starts restoring a destination checkpoint', async () => {
+        mocks.listCheckpoints.mockResolvedValue({ results: [{
+            id: 'checkpoint-1',
+            operation: 'object_import',
+            status: 'available',
+            resourceScopes: ['objects', 'media'],
+            createdAt: '2026-10-09T10:00:00Z',
+        }] })
+        mocks.restoreCheckpoint.mockResolvedValue({
+            id: 'checkpoint-1',
+            operation: 'object_import',
+            status: 'restore_pending',
+            resourceScopes: ['objects', 'media'],
+            createdAt: '2026-10-09T10:00:00Z',
+        })
+        renderWithStateProviders(<RemoteSitesSettings />)
+
+        expect(await screen.findByText('Object import checkpoint')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Restore' }))
+
+        expect(window.confirm).toHaveBeenCalledWith('Restore this checkpoint? Current object and media changes in its scope will be replaced.')
+        await waitFor(() => expect(mocks.restoreCheckpoint).toHaveBeenCalledWith('checkpoint-1'))
+        expect(await screen.findByRole('button', { name: 'Restore queued' })).toBeDisabled()
     })
 
     it('creates an outgoing connection from Settings', async () => {
