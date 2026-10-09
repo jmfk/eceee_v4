@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import RenderFrame from './RenderFrame'
+import RenderDocument from './RenderDocument'
 import { loadDirectRenderModel, parseDirectRenderPath } from './directRender'
 import type { RenderPageModel } from './types'
 
@@ -31,11 +31,10 @@ export const StandaloneRenderRuntime = () => {
         return () => window.removeEventListener('popstate', handlePopState)
     }, [])
 
-    const handleFrameMessage = useCallback((event: MessageEvent) => {
-        if (event.data?.source !== 'eceee-render-frame' || event.data.action !== 'navigate') return
+    const handleNavigate = useCallback((href: string) => {
         let destination: URL
         try {
-            destination = new URL(event.data.href, window.location.origin)
+            destination = new URL(href, window.location.origin)
         } catch {
             return
         }
@@ -52,7 +51,7 @@ export const StandaloneRenderRuntime = () => {
     if (!model) {
         return <div className="min-h-screen bg-white p-6 text-gray-500">Preparing preview…</div>
     }
-    return <RenderFrame model={model} title="Saved page preview" className="block h-screen w-full border-0" onMessage={handleFrameMessage} />
+    return <RenderDocument model={model} onNavigate={handleNavigate} />
 }
 
 export default StandaloneRenderRuntime

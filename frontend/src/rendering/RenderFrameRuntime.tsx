@@ -1,11 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import DOMPurify from 'dompurify'
-import PageRenderer from './PageRenderer'
-import { RENDER_LAYOUT_CSS } from './layoutRenderers'
-import { PUBLIC_RENDER_CSS } from './publicRenderCss'
+import RenderDocument from './RenderDocument'
 import type { RenderFrameMessage, RenderPageModel } from './types'
 import { normalizeCssName } from './primitives'
-import { rewriteDirectRenderHref } from './directRenderNavigation'
 
 const DESIGNER_STYLE_PROPERTIES: Record<string, string> = {
     fontFamily: 'font-family', fontSize: 'font-size', fontWeight: 'font-weight', fontStyle: 'font-style',
@@ -29,8 +26,7 @@ const editableTextLabel = (node: HTMLElement) => {
     return ({ A: 'Link text', BLOCKQUOTE: 'Quote text', CAPTION: 'Table caption', CODE: 'Code text', FIGCAPTION: 'Image caption', LI: 'List item text', P: 'Paragraph text', PRE: 'Preformatted text' } as Record<string, string>)[node.tagName] || 'Text'
 }
 
-const FRAME_CSS = `${PUBLIC_RENDER_CSS}
-    .designer-preview [data-designer-target]{cursor:pointer}[data-designer-target].designer-selected-slot{outline:3px solid #eab308!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget{box-shadow:inset 0 0 0 3px #16a34a!important}[data-designer-target].designer-selected-element{outline:3px solid #2563eb!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget.designer-selected-element{box-shadow:inset 0 0 0 3px #16a34a,0 0 0 3px #2563eb!important}[data-designer-target].designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:0 0 0 3px rgba(245,158,11,.2)!important}[data-designer-target].designer-selected.designer-highlighted{outline-offset:-3px!important}[data-designer-target].designer-selected-slot.designer-highlighted{outline:3px solid #eab308!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget.designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:inset 0 0 0 3px #16a34a!important}[data-designer-target].designer-selected-element.designer-highlighted{outline:3px solid #2563eb!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget.designer-selected-element.designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:inset 0 0 0 3px #16a34a,0 0 0 3px #2563eb!important}.designer-guides .designer-hovered:not(.designer-selected):not(.designer-highlighted){outline:2px dotted #2563eb!important;outline-offset:-2px!important}
+const DESIGNER_CSS = `.designer-preview [data-designer-target]{cursor:pointer}[data-designer-target].designer-selected-slot{outline:3px solid #eab308!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget{box-shadow:inset 0 0 0 3px #16a34a!important}[data-designer-target].designer-selected-element{outline:3px solid #2563eb!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget.designer-selected-element{box-shadow:inset 0 0 0 3px #16a34a,0 0 0 3px #2563eb!important}[data-designer-target].designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:0 0 0 3px rgba(245,158,11,.2)!important}[data-designer-target].designer-selected.designer-highlighted{outline-offset:-3px!important}[data-designer-target].designer-selected-slot.designer-highlighted{outline:3px solid #eab308!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget.designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:inset 0 0 0 3px #16a34a!important}[data-designer-target].designer-selected-element.designer-highlighted{outline:3px solid #2563eb!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget.designer-selected-element.designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:inset 0 0 0 3px #16a34a,0 0 0 3px #2563eb!important}.designer-guides .designer-hovered:not(.designer-selected):not(.designer-highlighted){outline:2px dotted #2563eb!important;outline-offset:-2px!important}
 .designer-context-menu{position:fixed!important;z-index:2147483647!important;min-width:180px!important;max-width:260px!important;padding:6px!important;border:1px solid #d1d5db!important;border-radius:8px!important;background:#fff!important;box-shadow:0 10px 24px rgba(15,23,42,.2)!important;color:#111827!important;font:500 13px/1.35 system-ui,sans-serif!important}.designer-context-menu-title{overflow:hidden!important;padding:5px 8px 7px!important;color:#6b7280!important;font-size:11px!important;font-weight:600!important;text-overflow:ellipsis!important;white-space:nowrap!important}.designer-context-menu button{display:block!important;width:100%!important;padding:7px 8px!important;border:0!important;border-radius:5px!important;background:transparent!important;color:#111827!important;font:inherit!important;text-align:left!important;cursor:pointer!important}.designer-context-menu button:hover,.designer-context-menu button:focus-visible{background:#eff6ff!important;color:#1d4ed8!important;outline:none!important}
 .designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483644!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483645!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483645!important;transform:translate(-50%,-50%);padding:2px 3px!important;border:0!important;border-radius:3px!important;background:#fff!important;font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;box-shadow:0 0 0 1px rgba(255,255,255,.9)!important}.designer-spacing-value[data-editable="true"]{pointer-events:auto!important;cursor:pointer!important;box-shadow:0 0 0 1px currentColor!important}.designer-spacing-value[data-editable="true"]:hover,.designer-spacing-value[data-editable="true"]:focus-visible{outline:2px solid #2563eb!important;outline-offset:1px!important}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}.designer-spacing-editor{position:fixed!important;z-index:2147483647!important;display:flex!important;gap:4px!important;padding:5px!important;border:1px solid #93c5fd!important;border-radius:6px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.22)!important}.designer-spacing-editor input{width:72px!important;padding:5px 6px!important;border:1px solid #d1d5db!important;border-radius:4px!important;font:500 12px/1.2 system-ui,sans-serif!important}.designer-spacing-editor button{padding:5px 7px!important;border:0!important;border-radius:4px!important;background:#2563eb!important;color:#fff!important;font:600 12px/1.2 system-ui,sans-serif!important;cursor:pointer!important}
 .layout-designer-preview [data-layout-node-id]{position:relative!important;box-shadow:inset 0 0 0 1px rgba(30,64,175,.42)!important}.layout-designer-preview [data-layout-node-id]::before{content:attr(data-layout-node-type) " · " attr(data-layout-node-size)!important;display:none;position:absolute!important;z-index:20!important;top:3px!important;right:3px!important;max-width:calc(100% - 6px)!important;overflow:hidden!important;padding:2px 5px!important;border:1px solid rgba(255,255,255,.8)!important;border-radius:4px!important;background:rgba(15,23,42,.82)!important;color:#fff!important;font:600 10px/1.2 system-ui,sans-serif!important;text-overflow:ellipsis!important;text-transform:capitalize!important;white-space:nowrap!important;pointer-events:none!important}.layout-designer-preview [data-layout-node-type="slot"]::before,.layout-designer-preview [data-layout-node-id].designer-selected::before,.layout-designer-preview [data-layout-node-id].designer-highlighted::before,.layout-designer-preview [data-layout-node-id].designer-hovered::before{display:block}.layout-designer-preview [data-layout-node-type="container"]{background-color:rgba(59,130,246,.10)!important}.layout-designer-preview [data-layout-node-type="section"]{background-color:rgba(6,182,212,.12)!important}.layout-designer-preview [data-layout-node-type="grid"]{background-color:rgba(168,85,247,.12)!important}.layout-designer-preview [data-layout-node-type="row"]{background-color:rgba(99,102,241,.12)!important}.layout-designer-preview [data-layout-node-type="column"]{background-color:rgba(34,197,94,.12)!important}.layout-designer-preview [data-layout-node-type="semantic"]{background-color:rgba(245,158,11,.14)!important}.layout-designer-preview [data-layout-node-type="slot"]{min-height:40px;background-color:rgba(244,63,94,.13)!important;color:#881337!important;text-align:center!important}.layout-designer-preview [data-layout-node-type="slot"]::after{content:attr(data-layout-node-label)!important;position:absolute!important;z-index:10!important;inset:0!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:5px 9px!important;color:#881337!important;font:600 13px/1.25 system-ui,sans-serif!important;text-align:center!important;pointer-events:none!important}.layout-designer-preview [data-layout-presentation-color]{background-color:color-mix(in srgb,var(--layout-presentation-color) 16%,transparent)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--layout-presentation-color) 62%,transparent)!important}
@@ -1012,59 +1008,16 @@ export const RenderFrameRuntime = () => {
         return applyDesignerOverlay(model, rootRef.current, focusStateRef.current)
     }, [model])
 
-    useLayoutEffect(() => {
-        const routePrefix = model?.context.renderRoutePrefix
-        if (!routePrefix || !rootRef.current) return
-        rootRef.current.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((anchor) => {
-            const href = anchor.getAttribute('href') || ''
-            anchor.setAttribute('href', rewriteDirectRenderHref(href, {
-                routePrefix,
-                currentPath: model.context.simulatedPath,
-                siteHostnames: model.context.siteHostnames,
-            }))
-        })
-    }, [model])
+    const handleNavigate = (href: string) => {
+        window.parent.postMessage({ source: 'eceee-render-frame', action: 'navigate', href }, '*')
+    }
 
-    useEffect(() => {
-        if (!model) return
-        const preventNavigation = (event: Event) => {
-            const target = event.target as HTMLElement
-            const form = target.closest('form')
-            if (form) {
-                event.preventDefault()
-                return
-            }
-
-            const anchor = target.closest<HTMLAnchorElement>('a[href]')
-            if (!anchor) return
-            const href = anchor.getAttribute('href') || ''
-            const routePrefix = model.context.renderRoutePrefix
-            if (routePrefix && (href === routePrefix || href.startsWith(`${routePrefix}/`))) {
-                const mouseEvent = event as MouseEvent
-                if (mouseEvent.button === 0 && !mouseEvent.metaKey && !mouseEvent.ctrlKey && !mouseEvent.shiftKey && !mouseEvent.altKey) {
-                    event.preventDefault()
-                    window.parent.postMessage({ source: 'eceee-render-frame', action: 'navigate', href }, '*')
-                }
-                return
-            }
-            if (routePrefix && href.startsWith('#')) return
-            event.preventDefault()
-        }
-        document.addEventListener('click', preventNavigation)
-        document.addEventListener('submit', preventNavigation)
-        return () => { document.removeEventListener('click', preventNavigation); document.removeEventListener('submit', preventNavigation) }
-    }, [model])
-
-    return <>
-        <style>{`${FRAME_CSS}\n${RENDER_LAYOUT_CSS}`}</style>
-        {model?.fontUrl && <link rel="stylesheet" href={model.fontUrl} />}
-        {model?.themeCss && <style>{model.themeCss}</style>}
-        <div ref={rootRef} className={model?.designer
-            ? `designer-preview${model.designer.guidesEnabled === false ? '' : ' designer-guides'}${model.designer.layoutCanvas ? ' layout-designer-preview' : ''}`
-            : ''}>{model
-            ? <PageRenderer model={model} />
-            : <div className="p-4 text-gray-500">Preparing preview…</div>}</div>
-    </>
+    return <RenderDocument
+        model={model}
+        rootRef={rootRef}
+        additionalCss={DESIGNER_CSS}
+        onNavigate={handleNavigate}
+    />
 }
 
 export default RenderFrameRuntime

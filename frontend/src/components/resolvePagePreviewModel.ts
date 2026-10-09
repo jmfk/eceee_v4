@@ -117,17 +117,19 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
     const internalPageIds = new Set<string>()
     allWidgets.forEach((widget) => collectInternalPageIds(widget.config, internalPageIds))
     const pageLookup = new Map<string, any>()
-    await Promise.all([...internalPageIds].map(async (id) => {
+    if (internalPageIds.size) {
         try {
-            const response: any = await api.get(
-                `${endpoints.pages.lookup}?id=${encodeURIComponent(id)}`,
+            const response: any = await api.post(
+                endpoints.pages.lookup,
+                { ids: [...internalPageIds], currentSiteId: model.context.siteId },
                 tenantRequestConfig,
             )
-            pageLookup.set(id, response?.data || response)
+            const results = response?.data?.results || response?.results || []
+            results.forEach((page: any) => pageLookup.set(String(page.id), page))
         } catch {
-            pageLookup.set(id, null)
+            internalPageIds.forEach((id) => pageLookup.set(id, null))
         }
-    }))
+    }
     allWidgets.forEach((widget) => { widget.config = resolveConfigLinks(widget.config, pageLookup) })
     allWidgets = collectWidgets(Object.values(next.slots).flat())
 
