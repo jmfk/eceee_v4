@@ -206,17 +206,23 @@ def page_lookup(request):
         unique_ids = []
         seen_ids = set()
         for page_id in page_ids:
-            if (
-                isinstance(page_id, bool)
-                or not isinstance(page_id, (int, str))
-                or not str(page_id).isdigit()
-                or int(page_id) <= 0
-            ):
+            if isinstance(page_id, bool) or not isinstance(page_id, (int, str)):
                 return Response(
                     {"error": "ids must contain only positive integer page IDs"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            numeric_page_id = int(page_id)
+            try:
+                numeric_page_id = int(page_id)
+            except (TypeError, ValueError):
+                return Response(
+                    {"error": "ids must contain only positive integer page IDs"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if numeric_page_id <= 0:
+                return Response(
+                    {"error": "ids must contain only positive integer page IDs"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             if numeric_page_id not in seen_ids:
                 seen_ids.add(numeric_page_id)
                 unique_ids.append(numeric_page_id)

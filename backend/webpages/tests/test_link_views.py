@@ -108,9 +108,10 @@ class PageLookupTest(TestCase):
         self.assertEqual(response.data["results"], [])
 
     def test_batch_lookup_rejects_invalid_ids(self):
-        response = self.client.post(self.url, {"ids": [self.page.id, "nope"]}, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        for invalid_id in ("nope", "²", True, 0, -1):
+            with self.subTest(invalid_id=invalid_id):
+                response = self.client.post(self.url, {"ids": [self.page.id, invalid_id]}, format="json")
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_batch_lookup_requires_authentication(self):
         client = APIClient()

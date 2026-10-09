@@ -15,6 +15,7 @@ const dataDrivenNewsTypes = new Set([
 
 const linkTypes = new Set(['internal', 'external', 'email', 'phone', 'anchor', 'media'])
 const imgproxyBatchSize = 50
+const pageLookupBatchSize = 500
 
 const collectionFileToMediaItem = (file: any) => {
     const url = file.imgproxyBaseUrl || file.imgproxy_base_url || file.fileUrl || file.file_url || file.url || ''
@@ -117,19 +118,33 @@ export const resolvePagePreviewModel = async (model: RenderPageModel): Promise<R
     const internalPageIds = new Set<string>()
     allWidgets.forEach((widget) => collectInternalPageIds(widget.config, internalPageIds))
     const pageLookup = new Map<string, any>()
-    if (internalPageIds.size) {
+    internalPageIds.forEach((id) => pageLookup.set(id, null))
+    const lookupKeysById = new Map<number, string[]>()
+    internalPageIds.forEach((id) => {
+        const numericId = Number(id)
+        if (!/^\d+$/.test(id) || !Number.isSafeInteger(numericId) || numericId <= 0) return
+        lookupKeysById.set(numericId, [...(lookupKeysById.get(numericId) || []), id])
+    })
+    const validPageIds = [...lookupKeysById.keys()]
+    const pageIdChunks = Array.from(
+        { length: Math.ceil(validPageIds.length / pageLookupBatchSize) },
+        (_item, index) => validPageIds.slice(index * pageLookupBatchSize, (index + 1) * pageLookupBatchSize),
+    )
+    await Promise.all(pageIdChunks.map(async (ids) => {
         try {
             const response: any = await api.post(
                 endpoints.pages.lookup,
-                { ids: [...internalPageIds], currentSiteId: model.context.siteId },
+                { ids, currentSiteId: model.context.siteId },
                 tenantRequestConfig,
             )
             const results = response?.data?.results || response?.results || []
-            results.forEach((page: any) => pageLookup.set(String(page.id), page))
+            results.forEach((page: any) => {
+                ;(lookupKeysById.get(Number(page.id)) || []).forEach((id) => pageLookup.set(id, page))
+            })
         } catch {
-            internalPageIds.forEach((id) => pageLookup.set(id, null))
+            // Keep only this batch unresolved; other batches may still succeed.
         }
-    }
+    }))
     allWidgets.forEach((widget) => { widget.config = resolveConfigLinks(widget.config, pageLookup) })
     allWidgets = collectWidgets(Object.values(next.slots).flat())
 

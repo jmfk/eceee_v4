@@ -25,6 +25,10 @@ describe('StandaloneRenderRuntime', () => {
     })
 
     it('loads the route and renders the saved model without an iframe', async () => {
+        const renderReady = vi.fn()
+        const captureWindow = window as Window & { __ECEEE_CAPTURE_RENDER_MODEL__?: boolean }
+        captureWindow.__ECEEE_CAPTURE_RENDER_MODEL__ = true
+        window.addEventListener('eceee-standalone-render-ready', renderReady)
         directRender.load.mockResolvedValue(createPageRenderModel({
             widgets: {},
             context: { pageId: 92 },
@@ -39,6 +43,10 @@ describe('StandaloneRenderRuntime', () => {
             siteId: 85,
             slugPath: 'for-authors/review-process',
         })
+        expect(renderReady).toHaveBeenCalledOnce()
+        expect((renderReady.mock.calls[0][0] as CustomEvent).detail.model.context.pageId).toBe(92)
+        window.removeEventListener('eceee-standalone-render-ready', renderReady)
+        delete captureWindow.__ECEEE_CAPTURE_RENDER_MODEL__
     })
 
     it('shows a useful error when the saved route cannot be resolved', async () => {

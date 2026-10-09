@@ -31,6 +31,12 @@ export const StandaloneRenderRuntime = () => {
         return () => window.removeEventListener('popstate', handlePopState)
     }, [])
 
+    useEffect(() => {
+        const captureWindow = window as Window & { __ECEEE_CAPTURE_RENDER_MODEL__?: boolean }
+        if (!model || !captureWindow.__ECEEE_CAPTURE_RENDER_MODEL__) return
+        window.dispatchEvent(new CustomEvent('eceee-standalone-render-ready', { detail: { model } }))
+    }, [model])
+
     const handleNavigate = useCallback((href: string) => {
         let destination: URL
         try {
