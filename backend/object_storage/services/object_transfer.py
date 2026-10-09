@@ -10,6 +10,7 @@ from typing import Any
 
 from django.core.files import File
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
@@ -135,16 +136,20 @@ def collect_object_graph(tenant, root_ids):
     return list(collected.values())
 
 
+def _type_visible_to_tenant(obj_type, tenant_id):
+    if not getattr(obj_type, "namespace_id", None):
+        return True
+    namespace_tenant_id = getattr(getattr(obj_type, "namespace", None), "tenant_id", None)
+    return namespace_tenant_id in {None, tenant_id}
+
+
 def collect_type_definitions(objects):
     """Collect object types plus the topology types they reference."""
     tenant_ids = {obj.tenant_id for obj in objects}
     tenant_id = next(iter(tenant_ids)) if len(tenant_ids) == 1 else None
 
-    def visible_topology_type(obj_type):
-        if tenant_id is None or not getattr(obj_type, "namespace_id", None):
-            return True
-        namespace_tenant_id = getattr(getattr(obj_type, "namespace", None), "tenant_id", None)
-        return namespace_tenant_id in {None, tenant_id}
+    if tenant_id is not None and any(not _type_visible_to_tenant(obj.object_type, tenant_id) for obj in objects):
+        raise ValueError("One or more selected objects use an object type unavailable to this workspace.")
 
     collected = {}
     queue = deque(obj.object_type for obj in objects)
@@ -153,8 +158,8 @@ def collect_type_definitions(objects):
         if obj_type.id in collected:
             continue
         collected[obj_type.id] = obj_type
-        queue.extend(item for item in obj_type.allowed_child_types.all() if visible_topology_type(item))
-        if obj_type.browser_group_id and visible_topology_type(obj_type.browser_group):
+        queue.extend(item for item in obj_type.allowed_child_types.all() if _type_visible_to_tenant(item, tenant_id))
+        if obj_type.browser_group_id and _type_visible_to_tenant(obj_type.browser_group, tenant_id):
             queue.append(obj_type.browser_group)
     return collected
 
@@ -172,11 +177,15 @@ def candidate_catalog(tenant, selections):
         except (TypeError, ValueError):
             requested_limit = 100
         limit = min(max(requested_limit, 1), MAX_CANDIDATES_PER_TYPE)
-        obj_type = ObjectTypeDefinition.objects.filter(
-            name=type_name,
-            is_active=True,
-            id__in=tenant_root_type_ids,
-        ).first()
+        obj_type = (
+            ObjectTypeDefinition.objects.filter(
+                name=type_name,
+                is_active=True,
+                id__in=tenant_root_type_ids,
+            )
+            .filter(Q(namespace__isnull=True) | Q(namespace__tenant=tenant))
+            .first()
+        )
         if not obj_type:
             continue
         roots = ObjectInstance.objects.filter(tenant=tenant, object_type=obj_type, parent__isnull=True).order_by(
@@ -184,7 +193,7 @@ def candidate_catalog(tenant, selections):
         )[:limit]
         results.append(
             {
-                "object_type": serialize_type(obj_type),
+                "object_type": serialize_type(obj_type, tenant_id=tenant.id),
                 "limit": limit,
                 "candidates": [
                     {
@@ -202,7 +211,18 @@ def candidate_catalog(tenant, selections):
     return results
 
 
-def serialize_type(obj_type):
+def serialize_type(obj_type, *, tenant_id=None, included_type_names=None):
+    allowed_child_types = obj_type.allowed_child_types.all()
+    if tenant_id is not None:
+        allowed_child_types = [child for child in allowed_child_types if _type_visible_to_tenant(child, tenant_id)]
+    allowed_child_names = [child.name for child in allowed_child_types]
+    if included_type_names is not None:
+        allowed_child_names = [name for name in allowed_child_names if name in included_type_names]
+    browser_group = obj_type.browser_group if obj_type.browser_group_id else None
+    if browser_group and tenant_id is not None and not _type_visible_to_tenant(browser_group, tenant_id):
+        browser_group = None
+    if browser_group and included_type_names is not None and browser_group.name not in included_type_names:
+        browser_group = None
     return {
         "name": obj_type.name,
         "label": obj_type.label,
@@ -223,8 +243,8 @@ def serialize_type(obj_type):
             if obj_type.namespace_id
             else None
         ),
-        "allowed_child_types": list(obj_type.allowed_child_types.values_list("name", flat=True)),
-        "browser_group": obj_type.browser_group.name if obj_type.browser_group_id else None,
+        "allowed_child_types": allowed_child_names,
+        "browser_group": browser_group.name if browser_group else None,
     }
 
 
@@ -404,8 +424,12 @@ def serialize_media(media):
 
 def _build_payload(objects, media_files, type_map):
     object_ids = {obj.id for obj in objects}
+    included_type_names = {obj_type.name for obj_type in type_map.values()}
     return {
-        "types": [serialize_type(value) for value in sorted(type_map.values(), key=lambda value: value.name)],
+        "types": [
+            serialize_type(value, included_type_names=included_type_names)
+            for value in sorted(type_map.values(), key=lambda value: value.name)
+        ],
         "objects": [
             {
                 "source_id": obj.id,
@@ -516,7 +540,10 @@ def build_preflight(tenant, root_ids):
         "media_bytes": media_bytes,
         "type_icon_count": icon_count,
         "type_count": len(types),
-        "types": [serialize_type(item) for item in sorted(types.values(), key=lambda value: value.name)],
+        "types": [
+            serialize_type(item, included_type_names={obj_type.name for obj_type in types.values()})
+            for item in sorted(types.values(), key=lambda value: value.name)
+        ],
         "namespaces": sorted(namespaces.values(), key=lambda value: value["slug"]),
         "objects": [
             {"type": obj.object_type.name, "slug": obj.slug, "title": obj.title}

@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+from django.db.models import Q
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -163,8 +164,10 @@ class RemoteObjectSourceCatalogView(RemoteObjectSourceMixin, APIView):
         return Response(
             {
                 "object_types": [
-                    serialize_type(item)
-                    for item in ObjectTypeDefinition.objects.filter(is_active=True, id__in=type_ids).order_by("label")
+                    serialize_type(item, tenant_id=request.tenant.id)
+                    for item in ObjectTypeDefinition.objects.filter(is_active=True, id__in=type_ids)
+                    .filter(Q(namespace__isnull=True) | Q(namespace__tenant=request.tenant))
+                    .order_by("label")
                 ],
                 "results": candidate_catalog(request.tenant, selections) if selections else [],
                 "max_candidates_per_type": MAX_CANDIDATES_PER_TYPE,
