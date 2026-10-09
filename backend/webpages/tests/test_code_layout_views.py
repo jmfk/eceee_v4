@@ -1,6 +1,6 @@
 from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 from rest_framework.test import APIRequestFactory
 
 from webpages.layout_autodiscovery import reload_layouts
@@ -8,6 +8,7 @@ from webpages.layout_registry import layout_registry
 from webpages.views.code_layout_views import CodeLayoutViewSet
 
 
+@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
 class CodeLayoutViewTests(SimpleTestCase):
     @staticmethod
     def legacy_layout(name):
@@ -28,9 +29,12 @@ class CodeLayoutViewTests(SimpleTestCase):
 
         response = CodeLayoutViewSet.as_view({"get": "list"})(request)
         names = [item["name"] for item in response.data["results"]]
+        error_layout = next(item for item in response.data["results"] if item["name"] == "error_layout")
+        error_slots = [slot["name"] for slot in error_layout["slot_configuration"]["slots"]]
 
         self.assertEqual(names.count("error_layout"), 1)
         self.assertFalse({"error_403", "error_404", "error_500", "error_503"} & set(names))
+        self.assertEqual(error_slots, ["visual", "message", "actions"])
 
     def test_effective_layout_list_is_private_tenant_scoped_and_read_only(self):
         request = APIRequestFactory().get("/api/v1/webpages/layouts/")

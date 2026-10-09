@@ -6,7 +6,7 @@ Tests error page creation, validation, rendering, and fallback behavior.
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
 
 from webpages.layout_registry import layout_registry
 from webpages.models import WebPage
@@ -354,7 +354,7 @@ class ErrorPageRenderingTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
-class ErrorLayoutTests(TestCase):
+class ErrorLayoutTests(SimpleTestCase):
     """Test error layout registration and availability"""
 
     def setUp(self):
@@ -371,8 +371,8 @@ class ErrorLayoutTests(TestCase):
             layout = layout_registry.get_layout(layout_name)
             self.assertIsNotNone(layout, f"Layout {layout_name} should be registered")
 
-    def test_error_layout_has_required_slots(self):
-        """Test that error layouts have the expected slots"""
+    def test_shared_error_layout_has_canonical_theme_slots(self):
+        """The shared conversion source matches the required Theme Layout contract."""
         layout = layout_registry.get_layout("error_layout")
         self.assertIsNotNone(layout)
 
@@ -380,6 +380,13 @@ class ErrorLayoutTests(TestCase):
         slot_names = [slot["name"] for slot in slots]
 
         self.assertEqual(slot_names, ["visual", "message", "actions"])
+
+    def test_legacy_status_error_layouts_keep_their_template_slots(self):
+        """Django compatibility templates retain their original slot contract."""
+        layout = layout_registry.get_layout("error_404")
+        slot_names = [slot["name"] for slot in layout.slot_configuration.get("slots", [])]
+
+        self.assertEqual(slot_names, ["branding", "error_message", "helpful_content"])
 
     def test_error_layout_template_names(self):
         """Test that error layouts have correct template names"""

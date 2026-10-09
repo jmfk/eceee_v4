@@ -53,6 +53,15 @@ describe('theme layout rendering', () => {
         }))
     })
 
+    it('allows grid nodes to expose selected Theme Designer parameters', () => {
+        const editableGrid = structuredClone(layout)
+        editableGrid.root.type = 'grid'
+        delete editableGrid.root.tag
+        editableGrid.root.editable_parameters = ['grid_template_columns', 'gap', 'padding']
+
+        expect(validateLayoutDefinition(editableGrid)).toBe(true)
+    })
+
     it('compiles only allowlisted structured styles at configured breakpoints', () => {
         const css = layoutDefinitionCss(layout, { xs: 0, sm: 600, md: 900, lg: 1100, xl: 1400 })
 

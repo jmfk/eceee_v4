@@ -48,11 +48,38 @@ class ErrorLayout(BaseErrorLayout):
 
     @property
     def slot_configuration(self) -> Dict[str, Any]:
+        """Expose the canonical Theme Layout slots instead of legacy status-page slots."""
         return {
             "slots": [
-                {"name": "visual", "title": "Visual", "max_widgets": 1},
-                {"name": "message", "title": "Message", "max_widgets": None},
-                {"name": "actions", "title": "Actions", "max_widgets": None},
+                {
+                    "name": "visual",
+                    "title": "Illustration",
+                    "description": "An image or other visual that supports the error message.",
+                    "max_widgets": 1,
+                    "collapse_behavior": "any",
+                    "allowed_types": ["easy_widgets.ImageWidget"],
+                },
+                {
+                    "name": "message",
+                    "title": "Error Message",
+                    "description": "Status-specific heading and explanatory text.",
+                    "max_widgets": None,
+                    "required": True,
+                    "collapse_behavior": "never",
+                    "allowed_types": ["easy_widgets.HeadlineWidget", "easy_widgets.ContentWidget"],
+                },
+                {
+                    "name": "actions",
+                    "title": "Helpful Actions",
+                    "description": "Links and widgets that help visitors recover.",
+                    "max_widgets": None,
+                    "collapse_behavior": "any",
+                    "disallowed_types": [
+                        "easy_widgets.FooterWidget",
+                        "easy_widgets.HeaderWidget",
+                        "easy_widgets.NavbarWidget",
+                    ],
+                },
             ]
         }
 

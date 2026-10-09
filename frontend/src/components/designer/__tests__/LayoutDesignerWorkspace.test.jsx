@@ -55,9 +55,9 @@ const document = {
     }],
 }
 
-const Harness = ({ disabled = false }) => {
-    const [workspace, setWorkspace] = useState({ layouts: structuredClone(document), layoutUsage: {}, breakpoints: { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 } })
-    return <LayoutDesignerWorkspace workspace={workspace} viewport="md" updateWorkspace={(updater) => setWorkspace((current) => updater(structuredClone(current)))} disabled={disabled} />
+const Harness = ({ disabled = false, sourceDocument = document, viewport = 'md' }) => {
+    const [workspace, setWorkspace] = useState({ layouts: structuredClone(sourceDocument), layoutUsage: {}, breakpoints: { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 } })
+    return <LayoutDesignerWorkspace workspace={workspace} viewport={viewport} updateWorkspace={(updater) => setWorkspace((current) => updater(structuredClone(current)))} disabled={disabled} />
 }
 
 describe('LayoutDesignerWorkspace', () => {
@@ -76,7 +76,7 @@ describe('LayoutDesignerWorkspace', () => {
     it('switches the inspector between layouts and selected canvas elements', () => {
         render(<Harness />)
 
-        expect(screen.getByRole('heading', { name: 'container' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Container' })).toBeInTheDocument()
         expect(screen.queryByLabelText('Layout label')).not.toBeInTheDocument()
 
         fireEvent.click(screen.getByRole('button', { name: 'Canvas · Main layout' }))
@@ -128,6 +128,67 @@ describe('LayoutDesignerWorkspace', () => {
         expect(screen.queryByText('Designer-editable parameters')).not.toBeInTheDocument()
     })
 
+    it('names semantic nodes from their HTML element and qualifies custom names with the tag', () => {
+        const semanticDocument = structuredClone(document)
+        semanticDocument.items[0].root.type = 'semantic'
+        semanticDocument.items[0].root.tag = 'aside'
+
+        render(<Harness sourceDocument={semanticDocument} />)
+
+        expect(screen.getByRole('button', { name: 'Aside' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Aside' })).toBeInTheDocument()
+
+        fireEvent.change(screen.getByLabelText('Element name'), { target: { value: 'Sidebar' } })
+        expect(screen.getByRole('button', { name: 'Sidebar <aside>' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Sidebar <aside>' })).toBeInTheDocument()
+
+        fireEvent.change(screen.getByLabelText('Semantic element'), { target: { value: 'div' } })
+        expect(screen.getByRole('button', { name: 'Sidebar <div>' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Sidebar <div>' })).toBeInTheDocument()
+
+        fireEvent.change(screen.getByLabelText('Element name'), { target: { value: '' } })
+        expect(screen.getByRole('button', { name: 'Div' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Div' })).toBeInTheDocument()
+    })
+
+    it('shows inherited grid styles and creates and resets breakpoint overrides', () => {
+        const gridDocument = structuredClone(document)
+        const slot = gridDocument.items[0].root.children[0]
+        gridDocument.items[0].root.children = [{
+            id: 'dd8262a7-06c2-49e2-90c8-980ae681706f',
+            type: 'grid',
+            label: 'Content grid',
+            children: [slot],
+            class_names: ['main-layout-grid'],
+            styles: {
+                base: { display: 'grid', gap: '30px', padding: '30px 40px' },
+                lg: { grid_template_columns: 'repeat(3, minmax(0, 1fr))' },
+            },
+        }]
+
+        render(<Harness sourceDocument={gridDocument} viewport="xl" />)
+        fireEvent.click(screen.getByRole('button', { name: 'Content grid' }))
+
+        expect(screen.getByText('Grid layout')).toBeInTheDocument()
+        expect(screen.getByText('Other styles')).toBeInTheDocument()
+        expect(screen.getByLabelText('gap value')).toBeDisabled()
+        expect(screen.getByLabelText('gap value')).toHaveValue('30px')
+        expect(screen.getAllByText('Inherited from Base').length).toBeGreaterThan(0)
+        expect(screen.getByLabelText('grid template columns value')).toHaveValue('repeat(3, minmax(0, 1fr))')
+        expect(screen.getByText('Inherited from Large (Desktop)')).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Override gap at Extra Large' }))
+        expect(screen.getByLabelText('gap value')).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Reset gap override' })).toBeInTheDocument()
+        expect(screen.getByRole('checkbox', { name: 'Expose gap in Theme Designer' })).toBeInTheDocument()
+
+        fireEvent.change(screen.getByLabelText('gap value'), { target: { value: '36px' } })
+        expect(screen.getByLabelText('gap value')).toHaveValue('36px')
+        fireEvent.click(screen.getByRole('button', { name: 'Reset gap override' }))
+        expect(screen.getByLabelText('gap value')).toBeDisabled()
+        expect(screen.getByLabelText('gap value')).toHaveValue('30px')
+    })
+
     it('resizes the structure and inspector panels with accessible separators', () => {
         render(<Harness />)
 
@@ -151,13 +212,13 @@ describe('LayoutDesignerWorkspace', () => {
         expect(screen.getByRole('button', { name: 'Expand layout structure panel' })).toHaveAttribute('aria-expanded', 'false')
 
         fireEvent.click(screen.getByRole('button', { name: 'Collapse layout inspector' }))
-        expect(screen.queryByRole('heading', { name: 'container' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('heading', { name: 'Container' })).not.toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Expand layout inspector' })).toHaveAttribute('aria-expanded', 'false')
 
         fireEvent.click(screen.getByRole('button', { name: 'Expand layout structure panel' }))
         fireEvent.click(screen.getByRole('button', { name: 'Expand layout inspector' }))
         expect(screen.getByRole('heading', { name: 'Layouts' })).toBeInTheDocument()
-        expect(screen.getByRole('heading', { name: 'container' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Container' })).toBeInTheDocument()
     })
 
     it('sets responsive node colours with a visual picker while preserving text values', () => {
