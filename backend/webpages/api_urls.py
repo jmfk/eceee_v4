@@ -74,6 +74,7 @@ from .views.preview_views import (
     create_version_preview_grant,
     render_version_preview,
 )
+from .views.remote_site_views import RemoteAccessKeyRevokeView, RemoteAccessKeyRotateView, RemoteAccessKeysView
 from .views.simplified_layout_views import (
     simplified_layout_json,
     simplified_layout_schema,
@@ -155,6 +156,17 @@ widget_type_patterns = [
 
 # API URLs without app_name to avoid namespace conflicts when included in main API
 urlpatterns = [
+    path("remote-sites/access-keys/", RemoteAccessKeysView.as_view(), name="remote-access-keys"),
+    path(
+        "remote-sites/access-keys/<uuid:access_key_id>/rotate/",
+        RemoteAccessKeyRotateView.as_view(),
+        name="remote-access-key-rotate",
+    ),
+    path(
+        "remote-sites/access-keys/<uuid:access_key_id>/revoke/",
+        RemoteAccessKeyRevokeView.as_view(),
+        name="remote-access-key-revoke",
+    ),
     path("designer/themes/", DesignerThemeListView.as_view(), name="designer-theme-list"),
     path("designer/themes/compare/", DesignerThemeCompareView.as_view(), name="designer-theme-compare"),
     path("designer/themes/remote/", DesignerRemoteThemesView.as_view(), name="designer-remote-themes"),

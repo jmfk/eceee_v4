@@ -18,6 +18,7 @@
 | ADR-0014 | [Resolve publisher test hosts through CMS root aliases](active/0014-cms-root-hostname-aliases.md) | accepted | PRD-0010, PRD-0011 |
 | ADR-0015 | [Revision-based optimistic page collaboration](active/0015-revision-based-page-collaboration.md) | accepted | PRD-0013 |
 | ADR-0016 | [Scoped machine API keys across the supported CMS API](active/0016-scoped-machine-api-keys.md) | accepted | PRD-0014 |
+| ADR-0017 | [Browser-managed scoped remote access keys](active/0017-browser-managed-remote-access-keys.md) | accepted | PRD-0015 |
 
 ## Archived Decisions
 

@@ -96,6 +96,10 @@ vi.mock('../../components/DataConnectionsManager', () => ({
     default: () => <div data-testid="data-connections-manager">Data Connections Manager</div>,
 }))
 
+vi.mock('../../components/RemoteSitesSettings', () => ({
+    default: () => <div data-testid="remote-sites-settings">Remote Sites Settings</div>,
+}))
+
 vi.mock('../../components/contentMigration/MigrationManager', () => ({
     default: () => <div data-testid="migration-manager">Migration Manager</div>,
 }))
@@ -212,6 +216,12 @@ describe('SettingsManager', () => {
         renderSettings('/settings/namespaces')
 
         expect(screen.getByTestId('namespace-manager')).toBeInTheDocument()
+    })
+
+    it('renders remote site administration from the remote sites route', () => {
+        renderSettings('/settings/remote-sites')
+
+        expect(screen.getByTestId('remote-sites-settings')).toBeInTheDocument()
     })
 
     it('renders data connection management from nested data-connections routes', () => {

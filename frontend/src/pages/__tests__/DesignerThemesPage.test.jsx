@@ -62,33 +62,20 @@ describe('DesignerThemesPage', () => {
         await waitFor(() => expect(mocks.nameVersion).toHaveBeenCalledWith(1, 10, 'Production'))
     })
 
-    it('uses workspace language and never exposes a saved access key', async () => {
+    it('uses administrator-configured connections and links management to Settings', async () => {
         renderWithStateProviders(<DesignerThemesPage />)
-        fireEvent.click(await screen.findByRole('button', { name: 'Remote sites' }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Remote themes' }))
         expect(screen.getByLabelText('Remote site')).toHaveValue('connection-1')
-        expect(screen.getByText('Choose a saved connection. Access keys remain protected on the server.')).toBeInTheDocument()
+        expect(screen.getByText('Choose an administrator-configured connection to transfer theme versions.')).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Manage connections' })).toHaveAttribute('href', '/settings/remote-sites')
         expect(screen.queryByLabelText('Access key')).not.toBeInTheDocument()
-        expect(screen.queryByText(/tenant/i)).not.toBeInTheDocument()
-    })
-
-    it('lets an administrator add another saved remote site', async () => {
-        mocks.createRemoteConnection.mockResolvedValue({ id: 'connection-2' })
-        renderWithStateProviders(<DesignerThemesPage />)
-        fireEvent.click(await screen.findByRole('button', { name: 'Remote sites' }))
-        fireEvent.click(screen.getByRole('button', { name: 'Add remote site' }))
-        fireEvent.change(screen.getByLabelText('Connection name'), { target: { value: 'Staging' } })
-        fireEvent.change(screen.getByLabelText('Site URL'), { target: { value: 'https://staging.example' } })
-        fireEvent.change(screen.getByLabelText('Remote workspace'), { target: { value: 'staging' } })
-        fireEvent.change(screen.getByLabelText('Access key'), { target: { value: 'write-only-value' } })
-        fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
-        await waitFor(() => expect(mocks.createRemoteConnection).toHaveBeenCalledWith(expect.objectContaining({ name: 'Staging', remoteWorkspace: 'staging' })))
     })
 
     it('can upload the first theme to an empty remote site', async () => {
         mocks.remoteThemes.mockResolvedValue({ results: [] })
         mocks.pushRemoteTheme.mockResolvedValue({ name: 'Editorial', syncVersion: 1 })
         renderWithStateProviders(<DesignerThemesPage />)
-        fireEvent.click(await screen.findByRole('button', { name: 'Remote sites' }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Remote themes' }))
         fireEvent.click(screen.getByRole('button', { name: 'Refresh themes' }))
         await waitFor(() => expect(mocks.remoteThemes).toHaveBeenCalledWith('connection-1'))
 

@@ -14,6 +14,7 @@ import {
     Package,
     Database,
     Beaker,
+    Globe2,
     ChevronRight
 } from 'lucide-react'
 import { themesApi } from '../api'
@@ -126,6 +127,9 @@ export default function SettingsSidebar() {
                 { id: 'versions', label: 'Versions', icon: Cog, href: '/settings/versions' },
                 { id: 'publishing', label: 'Publishing', icon: Calendar, href: '/settings/publishing' },
                 { id: 'namespaces', label: 'Namespaces', icon: FolderOpen, href: '/settings/namespaces' },
+                ...((user?.hasTenantAdminAccess || user?.isStaff || user?.isSuperuser)
+                    ? [{ id: 'remote-sites', label: 'Remote Sites', icon: Globe2, href: '/settings/remote-sites' }]
+                    : []),
             ]
         },
         {
