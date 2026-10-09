@@ -3,7 +3,7 @@ import { Check, Copy, KeyRound, Link2, Pencil, Plus, RotateCw, Trash2, X } from 
 
 import { designerThemesApi } from '../api/designerThemes'
 
-const emptyConnection = { name: '', baseUrl: '', remoteWorkspace: '', accessKey: '', isDefault: false }
+const emptyConnection = { name: '', baseUrl: '', remoteWorkspace: '', accessKey: '', credentialScheme: 'theme_key', isDefault: false }
 const defaultCapabilities = ['theme.transfer', 'site.transfer']
 
 const formatDate = (value) => value
@@ -74,6 +74,7 @@ export default function RemoteSitesSettings() {
             baseUrl: connection.baseUrl,
             remoteWorkspace: connection.remoteWorkspace,
             accessKey: '',
+            credentialScheme: connection.credentialScheme || 'theme_key',
             isDefault: connection.isDefault,
         })
         setEditingConnectionId(connection.id)
@@ -199,6 +200,7 @@ export default function RemoteSitesSettings() {
                         <label className="text-sm font-medium text-gray-700">Name<input aria-label="Connection name" value={connectionForm.name} onChange={(event) => setConnectionForm({ ...connectionForm, name: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
                         <label className="text-sm font-medium text-gray-700">Site URL<input aria-label="Site URL" type="url" placeholder="https://example.org" value={connectionForm.baseUrl} onChange={(event) => setConnectionForm({ ...connectionForm, baseUrl: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
                         <label className="text-sm font-medium text-gray-700">Remote workspace<input aria-label="Remote workspace" value={connectionForm.remoteWorkspace} onChange={(event) => setConnectionForm({ ...connectionForm, remoteWorkspace: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
+                        <label className="text-sm font-medium text-gray-700">Credential type<select aria-label="Credential type" value={connectionForm.credentialScheme} onChange={(event) => setConnectionForm({ ...connectionForm, credentialScheme: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal"><option value="theme_key">Remote access key</option><option value="api_key">Machine API key</option></select></label>
                         <label className="text-sm font-medium text-gray-700">Access key{editingConnectionId && <span className="font-normal text-gray-500"> · leave blank to keep current</span>}<input aria-label="Access key" type="password" autoComplete="new-password" value={connectionForm.accessKey} onChange={(event) => setConnectionForm({ ...connectionForm, accessKey: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
                     </div>
                     <label className="mt-4 flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={connectionForm.isDefault} onChange={(event) => setConnectionForm({ ...connectionForm, isDefault: event.target.checked })} />Use as default</label>
@@ -211,7 +213,7 @@ export default function RemoteSitesSettings() {
                 {connections.length === 0 ? <div className="mt-6 py-6 text-sm text-gray-600">No remote connections. <button type="button" onClick={() => setShowConnectionForm(true)} className="font-medium text-blue-700">Add the first connection</button>.</div> : <div className="mt-6 divide-y divide-gray-200 border-y border-gray-200">{connections.map((connection) => <div key={connection.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
                     <div className="min-w-0">
                         <div className="flex items-center gap-2"><Link2 className="h-4 w-4 text-gray-400" /><p className="font-medium text-gray-900">{connection.name}</p>{connection.isDefault && <span className="text-xs text-gray-500">Default</span>}</div>
-                        <p className="mt-1 truncate text-sm text-gray-600">{connection.baseUrl} · {connection.remoteWorkspace}</p>
+                        <p className="mt-1 truncate text-sm text-gray-600">{connection.baseUrl} · {connection.remoteWorkspace} · {connection.credentialScheme === 'api_key' ? 'Machine API key' : 'Remote access key'}</p>
                     </div>
                     {confirmingConnectionId === connection.id ? <div className="flex items-center gap-2 text-sm"><span className="text-gray-700">Remove connection?</span><button type="button" onClick={() => removeConnection(connection.id)} className="min-h-9 rounded bg-red-600 px-3 text-white">Remove</button><button type="button" onClick={() => setConfirmingConnectionId(null)} className="min-h-9 rounded border border-gray-300 px-3">Cancel</button></div> : <div className="flex gap-2">
                         <button type="button" onClick={() => editConnection(connection)} className="inline-flex min-h-9 items-center gap-1.5 rounded border border-gray-300 px-3 text-sm text-gray-700"><Pencil className="h-4 w-4" />Edit</button>

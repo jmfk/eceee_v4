@@ -8,7 +8,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
     dependencies = [
         ("object_storage", "0024_objecttypedefinition_browser_group"),
-        ("webpages", "0080_themeremoteconnection_credential_scheme"),
+        ("webpages", "0084_themeremoteconnection_credential_scheme"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

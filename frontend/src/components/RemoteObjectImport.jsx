@@ -26,33 +26,38 @@ const RemoteObjectImport = ({ onClose, onCompleted }) => {
 
     useEffect(() => {
         let mounted = true
-        Promise.all([
-            designerThemesApi.remoteConnections(),
-            objectTransfersApi.listImports().catch(() => ({ results: [] })),
-        ]).then(([connectionResult, importResult]) => {
-            if (!mounted) return
-            const apiConnections = (connectionResult.results || []).filter(item => item.credentialScheme === 'api_key')
-            const activeJob = (importResult.results || []).find(item => ['pending', 'running'].includes(item.status))
-            setConnections(apiConnections)
-            setConnectionId(apiConnections.find(item => item.isDefault)?.id || apiConnections[0]?.id || '')
-            setJob(activeJob || null)
-            setBusy('')
-        }).catch(value => {
-            if (!mounted) return
-            setError(errorText(value))
-            setBusy('')
-        })
+        const load = async () => {
+            try {
+                const connectionResult = await designerThemesApi.remoteConnections()
+                const importResult = await objectTransfersApi.listImports().catch(() => ({ results: [] }))
+                if (!mounted) return
+                const apiConnections = (connectionResult.results || []).filter(item => item.credentialScheme === 'api_key')
+                const activeJob = (importResult.results || []).find(item => ['pending', 'running'].includes(item.status))
+                setConnections(apiConnections)
+                setConnectionId(apiConnections.find(item => item.isDefault)?.id || apiConnections[0]?.id || '')
+                setJob(activeJob || null)
+                setBusy('')
+            } catch (value) {
+                if (!mounted) return
+                setError(errorText(value))
+                setBusy('')
+            }
+        }
+        load()
         return () => { mounted = false }
     }, [])
 
+    const jobId = job?.id
+    const jobStatus = job?.status
+
     useEffect(() => {
-        if (!job || ['completed', 'failed'].includes(job.status)) return undefined
+        if (!jobId || ['completed', 'failed'].includes(jobStatus)) return undefined
         let cancelled = false
         let timer
         let retryDelay = 1500
         const poll = async () => {
             try {
-                const next = await objectTransfersApi.getImport(job.id)
+                const next = await objectTransfersApi.getImport(jobId)
                 if (cancelled) return
                 setError('')
                 setJob(next)
@@ -74,7 +79,7 @@ const RemoteObjectImport = ({ onClose, onCompleted }) => {
             cancelled = true
             window.clearTimeout(timer)
         }
-    }, [job?.id])
+    }, [jobId, jobStatus])
 
     const selectedTypes = useMemo(() => Object.keys(limits), [limits])
 
@@ -128,7 +133,7 @@ const RemoteObjectImport = ({ onClose, onCompleted }) => {
 
                 {!job && <div className="mt-6 space-y-6">
                     <div className="flex items-end gap-3"><label className="flex-1 text-sm font-medium text-gray-700">Remote site<select value={connectionId} onChange={event => { setConnectionId(event.target.value); setTypes([]); setLimits({}); setGroups([]); setSelected([]); setPreflight(null) }} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"><option value="">Choose a site</option>{connections.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><button type="button" disabled={!connectionId || busy} onClick={loadTypes} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Load types</button></div>
-                    {!busy && connections.length === 0 && <p className="text-sm text-gray-600">No remote site has a machine API key. Update a saved connection in Designer themes first.</p>}
+                    {!busy && connections.length === 0 && <p className="text-sm text-gray-600">No remote site has a machine API key. Add or update a connection in Settings → Remote sites first.</p>}
 
                     {types.length > 0 && <section><h3 className="text-sm font-semibold text-gray-900">Types and candidate limits</h3><div className="mt-3 grid gap-2 sm:grid-cols-2">{types.map(type => <label key={type.name} className="flex items-center gap-3 py-2 text-sm"><input type="checkbox" checked={limits[type.name] !== undefined} onChange={event => setLimits(current => { const next = { ...current }; if (event.target.checked) next[type.name] = 100; else delete next[type.name]; return next })} /><span className="min-w-0 flex-1 truncate">{type.pluralLabel || type.label}</span>{limits[type.name] !== undefined && <input aria-label={`Candidate limit for ${type.label}`} type="number" min="1" max="500" value={limits[type.name]} onChange={event => setLimits(current => ({ ...current, [type.name]: Math.min(500, Math.max(1, Number(event.target.value))) }))} className="w-20 rounded-md border border-gray-300 px-2 py-1" />}</label>)}</div><button type="button" disabled={!selectedTypes.length || busy} onClick={loadCandidates} className="mt-3 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Load candidates</button></section>}
 

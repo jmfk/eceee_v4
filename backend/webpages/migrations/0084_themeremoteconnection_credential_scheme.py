@@ -2,7 +2,7 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-    dependencies = [("webpages", "0079_remote_site_transfer")]
+    dependencies = [("webpages", "0083_clarify_layout_structure")]
 
     operations = [
         migrations.AddField(
