@@ -130,7 +130,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         response["X-API-Features"] = "rate-limiting,metrics,caching"
         return response
 
-    def _add_caching_headers(self, response, layout_name=None):
+    def _add_caching_headers(self, response, layout_name=None, tenant_scoped=False):
         """Add proper HTTP caching headers"""
         import time
 
@@ -144,8 +144,14 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         else:
             cache_max_age = 3600  # 1 hour in production
 
-        response["Cache-Control"] = f"public, max-age={cache_max_age}"
-        response["Vary"] = "Accept-Encoding, Accept, API-Version"
+        if tenant_scoped:
+            # Effective layouts depend on the request tenant and may expose its
+            # theme policy. Never allow a shared cache to reuse that response.
+            response["Cache-Control"] = "private, no-store"
+            response["Vary"] = "Accept-Encoding, Accept, API-Version, X-Tenant-ID"
+        else:
+            response["Cache-Control"] = f"public, max-age={cache_max_age}"
+            response["Vary"] = "Accept-Encoding, Accept, API-Version"
 
         if layout_name:
             # Use shorter time intervals in debug mode for more frequent cache invalidation
@@ -184,7 +190,11 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         elif tenant and theme_id:
             theme = PageTheme.objects.filter(tenant=tenant, id=theme_id).first()
         elif tenant:
-            theme = PageTheme.get_default_theme(tenant=tenant)
+            # Listing layouts is read-only. Do not use get_default_theme(),
+            # which intentionally repairs or creates a default theme.
+            theme = PageTheme.objects.filter(tenant=tenant, is_default=True, is_active=True).first()
+            if theme is None:
+                theme = PageTheme.objects.filter(tenant=tenant, is_active=True).order_by("id").first()
 
         theme_items = (theme.layouts or {}).get("items", []) if theme else []
         if source != "code" and theme_items:
@@ -231,7 +241,7 @@ class CodeLayoutViewSet(viewsets.ViewSet):
         }
 
         response = self._create_formatted_response(response_data, request)
-        response = self._add_caching_headers(response)
+        response = self._add_caching_headers(response, tenant_scoped=source != "code")
         response = self._add_rate_limiting_headers(response, request, "list")
         return response
 

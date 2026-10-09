@@ -1,4 +1,5 @@
 import base64
+import copy
 import hashlib
 import io
 import json
@@ -11,6 +12,7 @@ from datetime import timezone as datetime_timezone
 from unittest.mock import Mock, patch
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.test import TestCase
 from django.utils import timezone
@@ -45,6 +47,7 @@ from webpages.services.site_package import (
     restore_theme_transfer_package,
 )
 from webpages.tasks import import_remote_site_package
+from webpages.theme_layouts import default_theme_layouts
 
 
 class MemoryStorage:
@@ -135,7 +138,14 @@ class SitePackageServiceTests(TestCase):
             version_number=2,
             effective_date=timezone.now() - timedelta(days=1),
             page_data={"title": "Current"},
-            widgets={"main": [{"data": {"content": f"/media/{self.media.id}/hero.jpg"}}]},
+            widgets={
+                "main": [
+                    {
+                        "type": "easy_widgets.ContentWidget",
+                        "data": {"content": f"/media/{self.media.id}/hero.jpg"},
+                    }
+                ]
+            },
             theme=self.theme,
             created_by=self.user,
         )
@@ -334,6 +344,71 @@ class SitePackageServiceTests(TestCase):
 
         self.assertEqual(key, "error_layout")
         self.assertEqual(set(widgets), {"visual", "message", "actions"})
+
+    def test_imported_versions_enforce_layout_widget_policies(self):
+        self.theme.layouts = default_theme_layouts()
+        self.theme.save(update_fields=["layouts"])
+        version = PageVersion.objects.create(
+            page=self.root,
+            version_number=1,
+            layout_key="main_layout",
+            code_layout="main_layout",
+            theme=self.theme,
+            widgets={
+                "header": [
+                    {"type": "easy_widgets.HeaderWidget"},
+                    {"type": "easy_widgets.HeaderWidget"},
+                ]
+            },
+            created_by=self.user,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "allows at most 1 widgets"):
+            SitePackageImporter._validate_imported_version_layout(version)
+
+    def test_published_import_uses_the_published_parent_theme(self):
+        theme_a_layouts = default_theme_layouts()
+        theme_b_layouts = copy.deepcopy(theme_a_layouts)
+        for item in theme_a_layouts["items"]:
+            if item["key"] == "main_layout":
+                item["slots"]["main"]["allowed_widget_types"] = ["easy_widgets.ContentWidget"]
+                item["slots"]["main"].pop("disallowed_widget_types", None)
+        for item in theme_b_layouts["items"]:
+            if item["key"] == "main_layout":
+                item["slots"]["main"]["allowed_widget_types"] = ["easy_widgets.HeaderWidget"]
+                item["slots"]["main"].pop("disallowed_widget_types", None)
+        self.theme.layouts = theme_a_layouts
+        self.theme.save(update_fields=["layouts"])
+        theme_b = PageTheme.objects.create(
+            tenant=self.tenant,
+            name="Draft parent theme",
+            layouts=theme_b_layouts,
+            created_by=self.user,
+        )
+        PageVersion.objects.create(
+            page=self.root,
+            version_number=1,
+            layout_key="main_layout",
+            theme=self.theme,
+            effective_date=timezone.now() - timedelta(days=2),
+            created_by=self.user,
+        )
+        PageVersion.objects.create(
+            page=self.root,
+            version_number=2,
+            layout_key="main_layout",
+            theme=theme_b,
+            created_by=self.user,
+        )
+        child_version = PageVersion.objects.create(
+            page=self.child,
+            version_number=1,
+            widgets={"main": [{"type": "easy_widgets.ContentWidget"}]},
+            effective_date=timezone.now() - timedelta(days=1),
+            created_by=self.user,
+        )
+
+        SitePackageImporter._validate_imported_version_layout(child_version)
 
     def test_legacy_theme_import_seeds_referenced_custom_layout_and_observed_slots(self):
         theme_data = {"source_id": self.theme.id, "name": "Legacy theme"}
@@ -797,7 +872,14 @@ class SitePackageServiceTests(TestCase):
             version_number=1,
             effective_date=timezone.now() - timedelta(days=1),
             page_data={"title": "Root"},
-            widgets={"main": [{"data": {"content": f"/media/{self.media.id}/hero.jpg"}}]},
+            widgets={
+                "main": [
+                    {
+                        "type": "easy_widgets.ContentWidget",
+                        "data": {"content": f"/media/{self.media.id}/hero.jpg"},
+                    }
+                ]
+            },
             theme=self.theme,
             created_by=self.user,
         )
@@ -839,7 +921,14 @@ class SitePackageServiceTests(TestCase):
             page=self.root,
             version_number=1,
             page_data={},
-            widgets={"main": [{"data": {"content": f"/media/{self.media.id}/hero.jpg"}}]},
+            widgets={
+                "main": [
+                    {
+                        "type": "easy_widgets.ContentWidget",
+                        "data": {"content": f"/media/{self.media.id}/hero.jpg"},
+                    }
+                ]
+            },
             created_by=self.user,
         )
         export_job = SitePackageJob.objects.create(

@@ -14,6 +14,8 @@ from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
+from core.models import Tenant
+
 from ..filters import PageVersionFilter
 from ..models import PageVersion, WebPage
 from ..serializers import PageVersionComparisonSerializer, PageVersionListSerializer, PageVersionSerializer
@@ -43,6 +45,11 @@ class PageVersionViewSet(
     search_fields = ["version_title", "change_summary"]
     ordering_fields = ["created_at", "version_number", "version_title"]
     ordering = ["-created_at"]
+
+    @staticmethod
+    def _lock_layout_tenant(tenant_id):
+        """Serialize page validation with theme layout publication."""
+        Tenant.objects.select_for_update().get(pk=tenant_id)
 
     @staticmethod
     def _workflow_error_response(error):
@@ -378,6 +385,7 @@ class PageVersionViewSet(
 
         try:
             with transaction.atomic():
+                self._lock_layout_tenant(version.page.tenant_id)
                 locked_page = WebPage.objects.select_for_update().get(pk=version.page_id)
                 locked = PageVersion.objects.select_for_update().get(pk=version.pk, page=locked_page)
                 service = PageVersionWorkflowService(locked_page, request.user)
@@ -437,6 +445,7 @@ class PageVersionViewSet(
         page = get_object_or_404(self._page_queryset(), pk=page_id)
         try:
             with transaction.atomic():
+                self._lock_layout_tenant(page.tenant_id)
                 service = PageVersionWorkflowService(page, request.user)
                 version, created = service.resolve_atomic_save_target(
                     expected_version_id=expected_version_id,

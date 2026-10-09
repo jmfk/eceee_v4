@@ -17,6 +17,7 @@ from core.models import Tenant
 from webpages.models import PageDataSchema, PageTheme, PageVersion, WebPage
 from webpages.services.page_version_workflow import PageVersionWorkflowService
 from webpages.tasks import refresh_publication_caches
+from webpages.views.page_version_views import PageVersionViewSet
 
 
 class PageVersionWorkflowTest(TestCase):
@@ -81,6 +82,17 @@ class PageVersionWorkflowTest(TestCase):
         self.assertIsNone(first.effective_date)
         self.page.refresh_from_db()
         self.assertEqual(self.page.current_published_version_id, live.id)
+
+    def test_page_save_tenant_lock_uses_select_for_update(self):
+        with CaptureQueriesContext(connection) as queries:
+            PageVersionViewSet._lock_layout_tenant(self.tenant.id)
+
+        self.assertTrue(
+            any(
+                "FOR UPDATE" in query["sql"].upper() and "core_tenant" in query["sql"]
+                for query in queries.captured_queries
+            )
+        )
 
     def test_aggressive_pack_keeps_versions_that_were_published(self):
         self.user.is_staff = True
@@ -2068,9 +2080,10 @@ class PageVersionMutationTransactionTest(TransactionTestCase):
 
         lock_queries = [query["sql"] for query in queries.captured_queries if "FOR UPDATE" in query["sql"].upper()]
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertGreaterEqual(len(lock_queries), 2)
-        self.assertIn("webpages_webpage", lock_queries[0])
-        self.assertIn("webpages_pageversion", lock_queries[1])
+        self.assertGreaterEqual(len(lock_queries), 3)
+        self.assertIn("core_tenant", lock_queries[0])
+        self.assertIn("webpages_webpage", lock_queries[1])
+        self.assertIn("webpages_pageversion", lock_queries[2])
 
     def test_page_scoped_working_copy_save_locks_page_before_version(self):
         with CaptureQueriesContext(connection) as queries:
@@ -2086,9 +2099,10 @@ class PageVersionMutationTransactionTest(TransactionTestCase):
 
         lock_queries = [query["sql"] for query in queries.captured_queries if "FOR UPDATE" in query["sql"].upper()]
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertGreaterEqual(len(lock_queries), 2)
-        self.assertIn("webpages_webpage", lock_queries[0])
-        self.assertIn("webpages_pageversion", lock_queries[1])
+        self.assertGreaterEqual(len(lock_queries), 3)
+        self.assertIn("core_tenant", lock_queries[0])
+        self.assertIn("webpages_webpage", lock_queries[1])
+        self.assertIn("webpages_pageversion", lock_queries[2])
 
     def test_working_copy_delete_locks_page_before_version(self):
         with CaptureQueriesContext(connection) as queries:

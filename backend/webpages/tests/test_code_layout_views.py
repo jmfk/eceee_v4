@@ -32,6 +32,36 @@ class CodeLayoutViewTests(SimpleTestCase):
         self.assertEqual(names.count("error_layout"), 1)
         self.assertFalse({"error_403", "error_404", "error_500", "error_503"} & set(names))
 
+    def test_effective_layout_list_is_private_tenant_scoped_and_read_only(self):
+        request = APIRequestFactory().get("/api/v1/webpages/layouts/")
+        request.tenant = Mock()
+        default_queryset = Mock()
+        default_queryset.first.return_value = None
+        active_queryset = Mock()
+        active_queryset.order_by.return_value.first.return_value = None
+
+        with (
+            patch(
+                "webpages.models.PageTheme.objects.filter",
+                side_effect=[default_queryset, active_queryset],
+            ) as filter_themes,
+            patch("webpages.models.PageTheme.get_default_theme") as get_default_theme,
+        ):
+            response = CodeLayoutViewSet.as_view({"get": "list"})(request)
+
+        self.assertEqual(filter_themes.call_count, 2)
+        get_default_theme.assert_not_called()
+        self.assertEqual(response["Cache-Control"], "private, no-store")
+        self.assertIn("X-Tenant-ID", response["Vary"])
+
+    def test_code_layout_list_remains_publicly_cacheable(self):
+        request = APIRequestFactory().get("/api/v1/webpages/layouts/", {"source": "code"})
+
+        response = CodeLayoutViewSet.as_view({"get": "list"})(request)
+
+        self.assertTrue(response["Cache-Control"].startswith("public,"))
+        self.assertNotIn("X-Tenant-ID", response["Vary"])
+
     def test_shared_error_layout_alias_resolves_to_legacy_registry_layout(self):
         legacy_layout = Mock(name="legacy_error_layout")
         with patch(
