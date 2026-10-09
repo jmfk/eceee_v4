@@ -176,6 +176,7 @@ describe('LayoutDesignerWorkspace', () => {
         expect(screen.getAllByText('Inherited from Base').length).toBeGreaterThan(0)
         expect(screen.getByLabelText('grid template columns value')).toHaveValue('repeat(3, minmax(0, 1fr))')
         expect(screen.getByText('Inherited from Large (Desktop)')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Override gap at Extra Large' }).closest('label')).toBeNull()
 
         fireEvent.click(screen.getByRole('button', { name: 'Override gap at Extra Large' }))
         expect(screen.getByLabelText('gap value')).toBeEnabled()
