@@ -15,12 +15,13 @@ from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
 from django.contrib.auth.models import User
+from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from PIL import Image
 
 from content.models import Namespace
-from file_manager.storage import S3MediaStorage
+from file_manager.storage import S3CheckpointStorage, S3MediaStorage
 
 
 class S3MediaStorageTest(TestCase):
@@ -69,6 +70,61 @@ class S3MediaStorageTest(TestCase):
     def test_delete_file_from_s3(self, mock_boto_client):
         """Test deleting file from S3"""
         self.skipTest("Hanging in environment")
+
+    @patch("boto3.client")
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME="test-bucket",
+        AWS_CHECKPOINT_STORAGE_BUCKET_NAME="private-checkpoints",
+        AWS_S3_REGION_NAME="us-east-1",
+        AWS_S3_ENDPOINT_URL="http://minio:9000",
+        AWS_ACCESS_KEY_ID="minioadmin",
+        AWS_SECRET_ACCESS_KEY="minioadmin",
+        AWS_DEFAULT_ACL="public-read",
+    )
+    def test_checkpoint_save_forces_private_acl(self, mock_boto_client):
+        client = MagicMock()
+        mock_boto_client.return_value = client
+        storage = S3CheckpointStorage()
+
+        storage.save_private("transfer-checkpoints/checkpoint/media.bin", io.BytesIO(b"private"))
+
+        client.upload_fileobj.assert_called_once()
+        self.assertEqual(client.upload_fileobj.call_args.args[1], "private-checkpoints")
+        self.assertEqual(client.upload_fileobj.call_args.kwargs["ExtraArgs"]["ACL"], "private")
+
+    @patch("boto3.client")
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME="public-media",
+        AWS_CHECKPOINT_STORAGE_BUCKET_NAME="private-checkpoints",
+        AWS_S3_REGION_NAME="us-east-1",
+        AWS_S3_ENDPOINT_URL="http://minio:9000",
+        AWS_ACCESS_KEY_ID="minioadmin",
+        AWS_SECRET_ACCESS_KEY="minioadmin",
+        AWS_DEFAULT_ACL="public-read",
+    )
+    def test_media_restore_copies_from_private_checkpoint_bucket(self, mock_boto_client):
+        client = MagicMock()
+        mock_boto_client.return_value = client
+        media_storage = S3MediaStorage()
+        checkpoint_storage = S3CheckpointStorage()
+
+        media_storage.copy_from(checkpoint_storage, "checkpoint.bin", "uploads/restored.bin")
+
+        client.copy_object.assert_called_once_with(
+            Bucket="public-media",
+            Key="uploads/restored.bin",
+            CopySource={"Bucket": "private-checkpoints", "Key": "checkpoint.bin"},
+            ACL="public-read",
+        )
+
+    @patch("boto3.client")
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME="shared-bucket",
+        AWS_CHECKPOINT_STORAGE_BUCKET_NAME="shared-bucket",
+    )
+    def test_checkpoint_storage_rejects_public_media_bucket(self, _mock_boto_client):
+        with self.assertRaisesMessage(ImproperlyConfigured, "separate from public media"):
+            S3CheckpointStorage()
 
     @patch("boto3.client")
     def test_get_file_url(self, mock_boto_client):

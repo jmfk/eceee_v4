@@ -24,15 +24,49 @@ from webpages.services.theme_remote import RemoteTransportError, remote_object_r
 logger = logging.getLogger(__name__)
 
 
-@shared_task
-def restore_object_transfer_checkpoint(checkpoint_id, user_id):
-    from object_storage.services.transfer_checkpoints import restore_object_import_checkpoint
+def _clear_cleanup_retry_active(checkpoint_id):
+    checkpoint = TransferCheckpoint.objects.filter(id=checkpoint_id).first()
+    if not checkpoint or not checkpoint.source_details.get("binary_cleanup_retry_active", False):
+        return
+    checkpoint.source_details = {**checkpoint.source_details}
+    checkpoint.source_details.pop("binary_cleanup_retry_active", None)
+    checkpoint.save(update_fields=["source_details", "updated_at"])
 
-    checkpoint = TransferCheckpoint.objects.get(id=checkpoint_id)
-    user = get_user_model().objects.get(id=user_id)
+
+@shared_task(bind=True, reject_on_worker_lost=True, max_retries=3)
+def restore_object_transfer_checkpoint(self, checkpoint_id, user_id):
+    from object_storage.services.transfer_checkpoints import PostRestoreCleanupError, restore_object_import_checkpoint
+
     try:
+        checkpoint = TransferCheckpoint.objects.get(id=checkpoint_id)
+        checkpoint.source_details = {
+            **checkpoint.source_details,
+            "binary_cleanup_retry_active": True,
+        }
+        checkpoint.save(update_fields=["source_details", "updated_at"])
+        user = get_user_model().objects.get(id=user_id)
         restore_object_import_checkpoint(checkpoint, user)
+        _clear_cleanup_retry_active(checkpoint_id)
+    except PostRestoreCleanupError as exc:
+        checkpoint = TransferCheckpoint.objects.get(id=checkpoint_id)
+        checkpoint.source_details = {**checkpoint.source_details}
+        if self.request.retries >= self.max_retries:
+            checkpoint.source_details.pop("binary_cleanup_retry_active", None)
+            checkpoint.save(update_fields=["source_details", "updated_at"])
+            logger.error("Object transfer checkpoint cleanup %s exhausted automatic retries: %s", checkpoint_id, exc)
+            raise
+        checkpoint.source_details["binary_cleanup_retry_active"] = True
+        checkpoint.save(update_fields=["source_details", "updated_at"])
+        logger.warning("Object transfer checkpoint cleanup %s will retry: %s", checkpoint_id, exc)
+        try:
+            raise self.retry(exc=exc, countdown=2 ** min(self.request.retries, 3))
+        except Retry:
+            raise
+        except Exception:
+            _clear_cleanup_retry_active(checkpoint_id)
+            raise
     except Exception as exc:
+        _clear_cleanup_retry_active(checkpoint_id)
         logger.error("Object transfer checkpoint restore %s failed: %s", checkpoint_id, exc)
         raise
     return {"checkpoint_id": str(checkpoint_id), "status": TransferCheckpoint.STATUS_RESTORED}
@@ -77,7 +111,7 @@ def export_object_package(self, job_id):
         raise
 
 
-@shared_task(bind=True, max_retries=120)
+@shared_task(bind=True, max_retries=120, reject_on_worker_lost=True)
 def import_remote_object_package(self, job_id):
     job = ObjectTransferJob.objects.select_related("connection").get(id=job_id)
     if job.status in {ObjectTransferJob.STATUS_COMPLETED, ObjectTransferJob.STATUS_FAILED}:

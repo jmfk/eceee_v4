@@ -96,6 +96,33 @@ class DotenvHelpersTests(unittest.TestCase):
             )
 
     @mock.patch.object(configure_orbstack.subprocess, "run")
+    def test_checkpoint_bucket_check_passes_credentials_through_environment(self, run):
+        run.return_value = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="", stderr=""
+        )
+
+        configure_orbstack.check_minio_bucket(
+            "eceee-v4", "not-printed", "eceee-media-checkpoints"
+        )
+
+        command = run.call_args.args[0]
+        environment = run.call_args.kwargs["env"]
+        self.assertNotIn("not-printed", command)
+        self.assertEqual(environment["AWS_SECRET_ACCESS_KEY"], "not-printed")
+        self.assertEqual(environment["CHECKPOINT_BUCKET"], "eceee-media-checkpoints")
+
+    @mock.patch.object(configure_orbstack.subprocess, "run")
+    def test_checkpoint_bucket_check_rejects_missing_or_unauthorized_bucket(self, run):
+        run.return_value = subprocess.CompletedProcess(
+            args=[], returncode=1, stdout="", stderr="AccessDenied"
+        )
+
+        with self.assertRaisesRegex(SystemExit, "provider must provision"):
+            configure_orbstack.check_minio_bucket(
+                "eceee-v4", "not-printed", "eceee-media-checkpoints"
+            )
+
+    @mock.patch.object(configure_orbstack.subprocess, "run")
     def test_load_registered_ports_uses_the_checkout_path(self, run):
         run.return_value = subprocess.CompletedProcess(
             args=[],

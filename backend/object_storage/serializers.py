@@ -842,8 +842,11 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
             if "object_id" not in rel:
                 raise serializers.ValidationError(f"Relationship at index {idx} missing 'object_id' field")
 
-            # Validate object exists
-            if not ObjectInstance.objects.filter(id=rel["object_id"]).exists():
+            tenant = self._tenant()
+            # Object relationships are tenant-local. A global lookup here used
+            # to permit cross-workspace references that restore could later
+            # delete or leave dangling.
+            if tenant is None or not ObjectInstance.objects.filter(id=rel["object_id"], tenant=tenant).exists():
                 raise serializers.ValidationError(f"ObjectInstance with id {rel['object_id']} does not exist")
 
             # Prevent self-reference (will be checked in validate() with instance context)
@@ -852,6 +855,10 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """Cross-field validation"""
+        tenant = self._tenant()
+        if attrs.get("parent") and (tenant is None or attrs["parent"].tenant_id != tenant.id):
+            raise serializers.ValidationError({"parent": "Parent must belong to the same workspace"})
+
         # Validate parent-child relationship
         if attrs.get("parent") and attrs.get("object_type_id"):
             parent = attrs["parent"]
@@ -879,6 +886,12 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({"relationships": "Cannot create relationship to self"})
 
         return attrs
+
+    def _tenant(self):
+        request = self.context.get("request")
+        if request is not None and getattr(request, "tenant", None) is not None:
+            return request.tenant
+        return getattr(self.instance, "tenant", None)
 
     def _validate_data_against_schema(self, data, object_type):
         """Validate data against object type schema"""
@@ -1076,10 +1089,7 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
         schema_fields = object_instance.object_type.get_schema_fields()
 
         # Validate object_reference fields
-        from utils.schema_system import (
-            validate_object_reference,
-            validate_reverse_object_reference,
-        )
+        from utils.schema_system import validate_object_reference, validate_reverse_object_reference
 
         for field_def in schema_fields:
             field_name = field_def.get("name")

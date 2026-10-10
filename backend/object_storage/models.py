@@ -621,6 +621,14 @@ class ObjectInstance(MPTTModel):
     def save(self, *args, **kwargs):
         """Override save to handle slug generation and validation."""
         is_new = not self.pk
+        update_fields = kwargs.get("update_fields")
+        validates_parent = is_new or update_fields is None or "parent" in update_fields or "parent_id" in update_fields
+        if validates_parent and self.parent_id:
+            parent_tenant_id = (
+                ObjectInstance.objects.filter(pk=self.parent_id).values_list("tenant_id", flat=True).first()
+            )
+            if parent_tenant_id != self.tenant_id:
+                raise ValidationError({"parent": "Parent must belong to the same workspace."})
 
         if not self.slug:
             self.slug = slugify(self.title)
@@ -1767,12 +1775,14 @@ class TransferCheckpoint(models.Model):
 
     OPERATION_OBJECT_IMPORT = "object_import"
     OPERATION_CHOICES = [(OPERATION_OBJECT_IMPORT, "Object import")]
+    STATUS_PREPARING = "preparing"
     STATUS_AVAILABLE = "available"
     STATUS_RESTORE_PENDING = "restore_pending"
     STATUS_RESTORING = "restoring"
     STATUS_RESTORED = "restored"
     STATUS_FAILED = "failed"
     STATUS_CHOICES = [
+        (STATUS_PREPARING, "Preparing"),
         (STATUS_AVAILABLE, "Available"),
         (STATUS_RESTORE_PENDING, "Restore pending"),
         (STATUS_RESTORING, "Restoring"),
@@ -1790,10 +1800,11 @@ class TransferCheckpoint(models.Model):
         related_name="checkpoint",
     )
     operation = models.CharField(max_length=32, choices=OPERATION_CHOICES)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_AVAILABLE)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PREPARING)
     resource_scopes = models.JSONField(default=list)
     snapshot = models.JSONField(default=dict)
     created_resources = models.JSONField(default=dict, blank=True)
+    operation_result = models.JSONField(default=dict, blank=True)
     source_details = models.JSONField(default=dict, blank=True)
     errors = models.JSONField(default=list, blank=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_transfer_checkpoints")
