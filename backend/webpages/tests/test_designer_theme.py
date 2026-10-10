@@ -944,7 +944,7 @@ class DesignerThemeApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 400, response.data)
-        self.assertIn("mediaFileId", response.data)
+        self.assertIn("media_file_id", response.data)
         storage.save.assert_not_called()
 
     @patch("webpages.services.designer_theme.system_storage")
@@ -984,6 +984,8 @@ class DesignerThemeApiTests(TestCase):
             namespace=self.namespace,
             tenant=self.tenant,
             uploaded_by=self.designer,
+            created_by=self.designer,
+            last_modified_by=self.designer,
         )
         tag = MediaTag.objects.create(name="Designer", slug="designer", namespace=self.namespace, created_by=self.owner)
         media.tags.add(tag)
@@ -1030,6 +1032,8 @@ class DesignerThemeApiTests(TestCase):
             namespace=self.namespace,
             tenant=self.tenant,
             uploaded_by=self.designer,
+            created_by=self.designer,
+            last_modified_by=self.designer,
         )
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data
@@ -1095,6 +1099,8 @@ class DesignerThemeApiTests(TestCase):
                 namespace=self.namespace,
                 tenant=self.tenant,
                 uploaded_by=self.designer,
+                created_by=self.designer,
+                last_modified_by=self.designer,
             )
             media.tags.add(tag)
             media_files.append(media)
