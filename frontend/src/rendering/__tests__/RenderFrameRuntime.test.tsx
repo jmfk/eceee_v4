@@ -384,21 +384,39 @@ describe('RenderFrameRuntime designer overlay', () => {
             parts: [{ id: 'header-container', part: 'header-widget', label: 'Header container' }], elements: [], assetKeys: [],
         }]
         headerWorkspace.spacing = [{ targetId: 'header-container', values: { paddingTop: '12px' } }]
+        headerWorkspace.constraints.editableSpacingProperties = ['marginTop', 'paddingTop']
         const sourceModel = createPageRenderModel({
             layout: 'main_layout',
             widgets: { header: [{ id: 'header-1', type: 'easy_widgets.HeaderWidget', config: {} }] },
         })
         const postMessage = vi.spyOn(window, 'postMessage')
         render(<RenderFrameRuntime />)
-        sendModel(createDesignerRenderModel({ workspace: headerWorkspace, sourceModel, contentEditable: false }))
+        const renderModel = createDesignerRenderModel({ workspace: headerWorkspace, sourceModel, contentEditable: false })
+        expect(renderModel.designer?.editableSpacingTargets?.['widget-type:easy_widgets.HeaderWidget'])
+            .toEqual(expect.arrayContaining(['marginTop', 'paddingTop']))
+        sendModel(renderModel)
 
         const header = document.querySelector('.header-widget') as HTMLElement
         await waitFor(() => expect(header).toHaveAttribute('data-designer-target', 'header-container'))
+        const widgetRoot = header.closest<HTMLElement>('[data-widget-id]')!
+        widgetRoot.style.marginTop = '30px'
+        vi.spyOn(widgetRoot, 'getBoundingClientRect').mockReturnValue({
+            x: 40, y: 70, left: 40, top: 70, right: 440, bottom: 170, width: 400, height: 100,
+            toJSON: () => ({}),
+        })
         fireEvent.click(header)
 
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'select', targetId: 'header-container',
             label: 'Header container', kind: 'part', widgetType: 'easy_widgets.HeaderWidget',
+        }), '*')
+        fireEvent.click(widgetRoot)
+        fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
+        fireEvent.input(screen.getByLabelText('margin top value'), { target: { value: '36px' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'spacingChange',
+            targetId: 'widget-type:easy_widgets.HeaderWidget', property: 'marginTop', value: '36px',
         }), '*')
         postMessage.mockRestore()
     })
@@ -1366,9 +1384,6 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(image).toHaveAttribute('src', '/imgproxy/site-hero.jpg')
         fireEvent.contextMenu(image, { clientX: 30, clientY: 40 })
         fireEvent.click(screen.getByRole('menuitem', { name: 'Replace image' }))
-        const input = document.querySelector<HTMLInputElement>('input[type="file"][accept*="image/png"]')!
-        const replacement = new File(['replacement'], 'replacement.png', { type: 'image/png' })
-        fireEvent.change(input, { target: { files: [replacement] } })
 
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview',
@@ -1380,9 +1395,8 @@ describe('RenderFrameRuntime designer overlay', () => {
             sourceOccurrence: 1,
             sourcePath: ['images', 'preview:site-page:image:hero', 'url'],
             sourceMatchIndex: 0,
-            file: replacement,
         }), '*')
-        expect(input).not.toBeInTheDocument()
+        expect(document.querySelector('input[type="file"][accept*="image/png"]')).not.toBeInTheDocument()
         postMessage.mockRestore()
     })
 })

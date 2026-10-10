@@ -270,13 +270,13 @@ const DesignerThemeWorkspacePage = () => {
         }
     }
 
-    const replacePreviewImage = async (viewId, sourceUrl, sourcePath, sourceMatchIndex, file) => {
-        if (!file) return null
+    const replacePreviewImage = async (viewId, sourceUrl, sourcePath, sourceMatchIndex, media) => {
+        if (!media?.id) return null
         setSaving(true)
         try {
             const current = dirty || hasPendingPreviewTexts ? await saveDraft({ silent: true, manageSaving: false }) : workspace
             if (!current) return null
-            const result = await designerThemesApi.replacePreviewImage(themeId, viewId, sourceUrl, sourcePath, sourceMatchIndex, file, current.draftVersion)
+            const result = await designerThemesApi.replacePreviewImage(themeId, viewId, sourceUrl, sourcePath, sourceMatchIndex, media, current.draftVersion)
             acceptWorkspace(result)
             addNotification({ type: 'success', message: 'Example image replaced' })
             return result

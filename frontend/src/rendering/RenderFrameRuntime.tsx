@@ -1061,20 +1061,11 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         if (assetTarget) addAction('Edit image in inspector', assetTarget, 'inspect')
 
         const imageTargets = targets.filter((target) => target.kind === 'previewImage')
-        imageTargets.forEach((target) => addAction(imageTargets.length > 1 ? `Replace ${target.label}` : 'Replace image', target, 'replaceImage', () => {
-            const input = document.createElement('input')
-            input.type = 'file'
-            input.accept = 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml'
-            input.hidden = true
-            input.addEventListener('change', () => {
-                const file = input.files?.[0]
-                if (file) postDesignerEvent(eventNode, designer, 'contextAction', target, { command: 'replaceImage', file })
-                input.remove()
-            }, { once: true })
-            document.body.append(input)
-            window.addEventListener('focus', () => window.setTimeout(() => input.remove(), 0), { once: true })
-            input.click()
-        }))
+        imageTargets.forEach((target) => addAction(
+            imageTargets.length > 1 ? `Replace ${target.label}` : 'Replace image',
+            target,
+            'replaceImage',
+        ))
 
         addAction('Edit in inspector', primary, 'inspect')
         document.body.append(menu)

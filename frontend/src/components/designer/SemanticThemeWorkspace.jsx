@@ -3,6 +3,7 @@ import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileTex
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel, designerPreviewImageReferences } from '../../rendering/adapters'
+import MediaSelectModal from '../media/MediaSelectModal'
 import { getBreakpoints, mapBreakpointName } from '../../utils/themeUtils'
 import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
 import { designerPreviewWidth, themeBreakpointDefinition } from '../theme/breakpointConfig'
@@ -597,6 +598,7 @@ const SemanticThemeWorkspace = ({
     const pendingInspectorSelectionRef = useRef(null)
     const previewFrameRef = useRef(null)
     const uploadRefs = useRef({})
+    const [replacementImage, setReplacementImage] = useState(null)
     const [previewFrameWidth, setPreviewFrameWidth] = useState(1280)
 
     const clampSidebarWidth = (width) => {
@@ -840,7 +842,9 @@ const SemanticThemeWorkspace = ({
                         return next
                     })
                 } else if (structuralTarget
-                    && editableStructuralSpacingProperties(workspace.catalog, structuralTarget).includes(property)
+                    && (structuralTarget.scope === 'widget'
+                        ? property.startsWith('margin') || property.startsWith('padding')
+                        : editableStructuralSpacingProperties(workspace.catalog, structuralTarget).includes(property))
                     && workspace.constraints.editableSpacingProperties.includes(property)) {
                     updateWorkspace((next) => {
                         next.spacing.push({
@@ -1012,10 +1016,8 @@ const SemanticThemeWorkspace = ({
                 setSelectedTarget(target)
                 setSelectionExpanded(true)
                 setWorkspaceView('preview')
-                if (event.data.command === 'replaceImage' && event.data.file instanceof File) {
-                    if (target.kind === 'previewImage' && viewId && target.sourceUrl) {
-                        void replacePreviewImage?.(viewId, target.sourceUrl, target.sourcePath, target.sourceMatchIndex, event.data.file)
-                    }
+                if (event.data.command === 'replaceImage' && target.kind === 'previewImage' && viewId && target.sourceUrl) {
+                    setReplacementImage(target)
                 }
                 return
             }
@@ -1554,10 +1556,18 @@ const SemanticThemeWorkspace = ({
         setSelectedTarget(null)
     }
 
-    const uploadExampleImage = async (sourceUrl, sourcePath, sourceMatchIndex, file) => {
-        if (!selectedView || !file) return
-        const result = await replacePreviewImage?.(selectedView.id, sourceUrl, sourcePath, sourceMatchIndex, file)
+    const replaceExampleImage = async (mediaItems) => {
+        const media = Array.isArray(mediaItems) ? mediaItems[0] : null
+        if (!selectedView || !replacementImage || !media?.id) return
+        const result = await replacePreviewImage?.(
+            selectedView.id,
+            replacementImage.sourceUrl,
+            replacementImage.sourcePath,
+            replacementImage.sourceMatchIndex,
+            media,
+        )
         if (result?.previewContent?.views) setPreviewContent(result.previewContent)
+        setReplacementImage(null)
     }
 
     const addThemeValue = (encoded) => {
@@ -1868,9 +1878,14 @@ const SemanticThemeWorkspace = ({
                 const { computed, fields, entries } = spacingForLevelTarget(target)
                 const hasEditableSpacing = fields.length > 0
                 const isActiveTargetPanel = targetFocusKey(target) === targetFocusKey(selectedTarget)
+                const levelTypography = isActiveTargetPanel ? targetTypography.map(({ row, index }) => ({
+                    row,
+                    index,
+                    fields: activeFields('typography', index, row, workspace.constraints.editableTypographyProperties),
+                })).filter((entry) => entry.fields.length > 0) : []
                 const levelAssets = isActiveTargetPanel ? targetAssetAlternatives : []
                 const levelColors = isActiveTargetPanel ? relevantColors : []
-                const hasEditableProperties = hasEditableSpacing || levelAssets.length > 0 || levelColors.length > 0
+                const hasEditableProperties = hasEditableSpacing || levelTypography.length > 0 || levelAssets.length > 0 || levelColors.length > 0
                 const headerContent = <>
                     <div className="min-w-0 flex-1">
                         <p className={`text-[10px] font-semibold uppercase tracking-wide ${tone.label}`}>Selected {kind}</p>
@@ -1908,6 +1923,19 @@ const SemanticThemeWorkspace = ({
                                     />
                                 </label>
                             }} />}
+                        {levelTypography.map(({ row, index, fields: typographyFields }) => <section key={`level-type-${index}`} className="space-y-2 border-t border-gray-200 pt-3">
+                            <h3 className="text-sm font-medium text-gray-900">{sectionLabel('typography', row)}</h3>
+                            <ValueFields
+                                idPrefix={`level-${kind}-typography-${index}`}
+                                values={row.values}
+                                defaults={themeDefaults[row.targetId]}
+                                fields={typographyFields}
+                                labels={typographyLabels}
+                                onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })}
+                                onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)}
+                                disabled={disabled}
+                            />
+                        </section>)}
                         {levelAssets.length > 0 && <section className="space-y-2 border-t border-gray-200 pt-3">
                             <div className="grid gap-1">{levelAssets.map(renderTargetAssetAlternative)}</div>
                         </section>}
@@ -2087,16 +2115,14 @@ const SemanticThemeWorkspace = ({
 
     const exampleImageEditor = contentMode === 'demo' && selectedView && selectedElementImages.length > 0 && (
         <section className="space-y-2 border-t border-gray-200 pt-3">
-            <div><h2 className="text-sm font-semibold text-gray-900">Images in this element</h2><p className="mt-0.5 text-xs text-gray-500">Only images inside the selected element are shown.</p></div>
+            <div><h2 className="text-sm font-semibold text-gray-900">Images in this selection</h2><p className="mt-0.5 text-xs text-gray-500">Choose a tagged image from the Media Library, or upload and tag a new one there.</p></div>
             <div className="divide-y divide-gray-200 border-y border-gray-200">{selectedElementImages.map(({ sourceUrl, sourcePath, sourceMatchIndex }, index) => {
                 const url = sourceUrl
                 const name = decodeURIComponent(url.split('/').at(-1)?.split('?')[0] || `Image ${index + 1}`)
-                const inputKey = `example:${selectedView.id}:${index}`
                 return <article key={`${url}:${JSON.stringify(sourcePath)}:${sourceMatchIndex}`} className="flex min-w-0 items-center gap-2 py-1.5">
                     <img src={url} alt="" className="h-12 w-16 shrink-0 rounded border border-gray-200 bg-gray-50 object-contain" />
                     <span className="min-w-0 flex-1 truncate text-xs text-gray-600">{name}</span>
-                    <input ref={(node) => { uploadRefs.current[inputKey] = node }} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => uploadExampleImage(url, sourcePath, sourceMatchIndex, event.target.files?.[0])} className="sr-only" />
-                    <button type="button" aria-label={`Replace example image ${name}`} onClick={() => uploadRefs.current[inputKey]?.click()} disabled={disabled} className="shrink-0 rounded-md border border-blue-600 bg-white px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">Replace</button>
+                    <button type="button" aria-label={`Replace example image ${name}`} onClick={() => setReplacementImage({ sourceUrl, sourcePath, sourceMatchIndex, name })} disabled={disabled} className="shrink-0 rounded-md border border-blue-600 bg-white px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">Replace</button>
                 </article>
             })}</div>
         </section>
@@ -2105,10 +2131,11 @@ const SemanticThemeWorkspace = ({
     const navigationButtonClass = (active) => `flex w-full min-w-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium ${active ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' : 'text-gray-700 hover:bg-gray-50'}`
 
     return (
-        <main
-            ref={workspaceRef}
-            className={`grid min-h-0 flex-1 grid-cols-1 ${mobilePane === 'preview' ? 'grid-rows-1' : 'grid-rows-[auto_minmax(0,1fr)]'} xl:grid-cols-[var(--designer-sidebar-width)_var(--designer-sidebar-handle-width)_minmax(0,1fr)_var(--designer-inspector-handle-width)_var(--designer-inspector-width)] xl:grid-rows-1`}
-            style={{
+        <>
+            <main
+                ref={workspaceRef}
+                className={`grid min-h-0 flex-1 grid-cols-1 ${mobilePane === 'preview' ? 'grid-rows-1' : 'grid-rows-[auto_minmax(0,1fr)]'} xl:grid-cols-[var(--designer-sidebar-width)_var(--designer-sidebar-handle-width)_minmax(0,1fr)_var(--designer-inspector-handle-width)_var(--designer-inspector-width)] xl:grid-rows-1`}
+                style={{
                 '--designer-sidebar-width': sidebarCollapsed ? '0px' : `${sidebarWidth}px`,
                 '--designer-sidebar-handle-width': sidebarCollapsed ? '0px' : `${resizeHandleWidth}px`,
                 '--designer-inspector-width': inspectorCollapsed ? '0px' : `${inspectorWidth}px`,
@@ -2208,7 +2235,19 @@ const SemanticThemeWorkspace = ({
                             : <div className="flex min-h-0 flex-1 flex-col gap-3">{selectionSpacingPanels || selectedEditor || <div className="flex min-h-32 items-center justify-center border border-dashed border-gray-300 p-3 text-center text-sm text-gray-500">Select something in the preview to inspect its margin and padding.</div>}{exampleImageEditor}</div>}
                 </fieldset>
             </section>
-        </main>
+            </main>
+            <MediaSelectModal
+                isOpen={Boolean(replacementImage)}
+                onClose={() => setReplacementImage(null)}
+                onSelect={replaceExampleImage}
+                namespace={workspace.mediaNamespace || 'default'}
+                mediaTypes={['image']}
+                allowCollections={false}
+                multiple={false}
+                currentSelection={replacementImage ? { url: replacementImage.sourceUrl, title: replacementImage.name || replacementImage.label } : null}
+                customTitle="Choose tagged replacement image"
+            />
+        </>
     )
 }
 
