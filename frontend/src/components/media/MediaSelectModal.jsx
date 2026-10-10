@@ -29,8 +29,10 @@ const MediaSelectModal = ({
 
     // Selection options
     mediaTypes = ['image'], // Array of allowed types: 'image', 'video', etc.
+    requireTags = false, // Only show files with at least one tag
     allowCollections = true, // Whether to show collections tab
     multiple = false, // Allow multiple selection
+    allowRemove = true, // Allow clearing the current selection
 
     // Current selection (for showing "currently selected")
     currentSelection = null, // Current image/collection object
@@ -56,6 +58,7 @@ const MediaSelectModal = ({
     }, [collections]);
     const [loadingPendingFiles, setLoadingPendingFiles] = useState(false);
     const [selectedItems, setSelectedItems] = useState([]);
+    const [selecting, setSelecting] = useState(false);
 
     // Pending approval state
     const [hasPendingApprovals, setHasPendingApprovals] = useState(false);
@@ -147,10 +150,17 @@ const MediaSelectModal = ({
     };
 
     // Handle select button click
-    const handleSelectClick = () => {
+    const handleSelectClick = async () => {
         if (selectedItems.length > 0) {
-            onSelect(selectedItems);
-            handleClose();
+            setSelecting(true);
+            try {
+                const accepted = await onSelect(selectedItems);
+                if (accepted !== false) handleClose();
+            } catch (error) {
+                console.error('Media selection failed:', error);
+            } finally {
+                setSelecting(false);
+            }
         }
     };
 
@@ -233,13 +243,13 @@ const MediaSelectModal = ({
                                             </div>
                                         )}
                                     </div>
-                                    <button
+                                    {allowRemove && <button
                                         onClick={handleRemoveClick}
                                         className="flex-shrink-0 p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
                                         title="Remove image"
                                     >
                                         <Trash2 className="w-5 h-5" />
-                                    </button>
+                                    </button>}
                                 </div>
                             </div>
                         )}
@@ -347,6 +357,7 @@ const MediaSelectModal = ({
                                 onFileSelect={handleMediaSelect}
                                 selectionMode={multiple ? 'multiple' : 'single'}
                                 fileTypes={mediaTypes}
+                                requireTags={requireTags}
                                 namespace={namespace}
                                 showUploader={true}
                                 hideShowDeleted={true}
@@ -369,13 +380,13 @@ const MediaSelectModal = ({
                     </button>
                     <button
                         onClick={handleSelectClick}
-                        disabled={selectedItems.length === 0}
+                        disabled={selectedItems.length === 0 || selecting}
                         className={`px-4 py-2 text-sm font-medium text-white rounded-md transition-colors ${selectedItems.length === 0
                                 ? 'bg-gray-300 cursor-not-allowed'
                                 : 'bg-blue-600 hover:bg-blue-700'
                             }`}
                     >
-                        Select {selectedItems.length > 0 && `(${selectedItems.length})`}
+                        {selecting ? 'Selecting…' : <>Select {selectedItems.length > 0 && `(${selectedItems.length})`}</>}
                     </button>
                 </div>
             </div>

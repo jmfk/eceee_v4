@@ -1016,7 +1016,7 @@ const SemanticThemeWorkspace = ({
                 setSelectedTarget(target)
                 setSelectionExpanded(true)
                 setWorkspaceView('preview')
-                if (event.data.command === 'replaceImage' && target.kind === 'previewImage' && viewId && target.sourceUrl) {
+                if (event.data.command === 'replaceImage' && target.kind === 'previewImage' && viewId && target.sourceUrl && workspace.mediaNamespace) {
                     setReplacementImage(target)
                 }
                 return
@@ -1049,7 +1049,7 @@ const SemanticThemeWorkspace = ({
         }
         window.addEventListener('message', receive)
         return () => window.removeEventListener('message', receive)
-    }, [contentMode, onPendingPreviewTextsChange, pendingPreviewTextsRef, replaceAsset, replacePreviewImage, updateWorkspace, viewId, viewport, workspace.assets, workspace.breakpoints, workspace.catalog, workspace.constraints.editableSpacingProperties, workspace.spacing])
+    }, [contentMode, onPendingPreviewTextsChange, pendingPreviewTextsRef, replaceAsset, replacePreviewImage, updateWorkspace, viewId, viewport, workspace.assets, workspace.breakpoints, workspace.catalog, workspace.constraints.editableSpacingProperties, workspace.mediaNamespace, workspace.spacing])
 
     const selectedView = previewContent.views.find((view) => view.id === viewId) || previewContent.views[0] || null
     const selectedViewImages = useMemo(() => designerPreviewImageReferences(selectedView), [selectedView])
@@ -1558,7 +1558,7 @@ const SemanticThemeWorkspace = ({
 
     const replaceExampleImage = async (mediaItems) => {
         const media = Array.isArray(mediaItems) ? mediaItems[0] : null
-        if (!selectedView || !replacementImage || !media?.id) return
+        if (!selectedView || !replacementImage || !media?.id) return false
         const result = await replacePreviewImage?.(
             selectedView.id,
             replacementImage.sourceUrl,
@@ -1566,8 +1566,10 @@ const SemanticThemeWorkspace = ({
             replacementImage.sourceMatchIndex,
             media,
         )
+        if (!result) return false
         if (result?.previewContent?.views) setPreviewContent(result.previewContent)
         setReplacementImage(null)
+        return true
     }
 
     const addThemeValue = (encoded) => {
@@ -2122,7 +2124,7 @@ const SemanticThemeWorkspace = ({
                 return <article key={`${url}:${JSON.stringify(sourcePath)}:${sourceMatchIndex}`} className="flex min-w-0 items-center gap-2 py-1.5">
                     <img src={url} alt="" className="h-12 w-16 shrink-0 rounded border border-gray-200 bg-gray-50 object-contain" />
                     <span className="min-w-0 flex-1 truncate text-xs text-gray-600">{name}</span>
-                    <button type="button" aria-label={`Replace example image ${name}`} onClick={() => setReplacementImage({ sourceUrl, sourcePath, sourceMatchIndex, name })} disabled={disabled} className="shrink-0 rounded-md border border-blue-600 bg-white px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">Replace</button>
+                    <button type="button" aria-label={`Replace example image ${name}`} onClick={() => setReplacementImage({ sourceUrl, sourcePath, sourceMatchIndex, name })} disabled={disabled || !workspace.mediaNamespace} className="shrink-0 rounded-md border border-blue-600 bg-white px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">Replace</button>
                 </article>
             })}</div>
         </section>
@@ -2237,13 +2239,15 @@ const SemanticThemeWorkspace = ({
             </section>
             </main>
             <MediaSelectModal
-                isOpen={Boolean(replacementImage)}
+                isOpen={Boolean(replacementImage && workspace.mediaNamespace)}
                 onClose={() => setReplacementImage(null)}
                 onSelect={replaceExampleImage}
-                namespace={workspace.mediaNamespace || 'default'}
+                namespace={workspace.mediaNamespace}
                 mediaTypes={['image']}
+                requireTags
                 allowCollections={false}
                 multiple={false}
+                allowRemove={false}
                 currentSelection={replacementImage ? { url: replacementImage.sourceUrl, title: replacementImage.name || replacementImage.label } : null}
                 customTitle="Choose tagged replacement image"
             />

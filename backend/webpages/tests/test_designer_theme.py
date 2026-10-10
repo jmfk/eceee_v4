@@ -14,8 +14,8 @@ from PIL import Image
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
-from core.models import Tenant
 from content.models import Namespace
+from core.models import Tenant
 from easy_widgets.widgets.content import ContentWidget
 from easy_widgets.widgets.navbar import NavbarWidget
 from easy_widgets.widgets.section import SectionWidget
@@ -31,10 +31,12 @@ from webpages.models import (
 from webpages.renderers import WebPageRenderer
 from webpages.services.designer_export import ThemeDesignerExporter, cleanup_expired_designer_exports
 from webpages.services.designer_theme import (
+    MAX_IMAGE_BYTES,
     _safe_reference_preview_html,
     apply_designer_patch,
     collect_designer_assets,
     generate_placeholder_png,
+    replace_designer_preview_image,
     validate_image_upload,
 )
 from webpages.views.designer_theme_views import DesignerExportThrottle, DesignerThemeExportView
@@ -348,6 +350,34 @@ class DesignerThemeApiTests(TestCase):
     def workspace_url(self):
         return f"/api/v1/webpages/designer/themes/{self.theme.id}/workspace/"
 
+    def create_tagged_media(self, slug, *, access_level="public", file_size=1024, created_by=None):
+        owner = created_by or self.owner
+        media = MediaFile.objects.create(
+            title=slug.replace("-", " ").title(),
+            slug=slug,
+            original_filename=f"{slug}.png",
+            file_path=f"media/{slug}.png",
+            file_url=f"https://storage.test/media/{slug}.png",
+            file_size=file_size,
+            content_type="image/png",
+            file_hash=(slug[0] if slug else "a") * 64,
+            file_type="image",
+            access_level=access_level,
+            namespace=self.namespace,
+            tenant=self.tenant,
+            uploaded_by=owner,
+            created_by=owner,
+            last_modified_by=owner,
+        )
+        tag, _ = MediaTag.objects.get_or_create(
+            name="Designer",
+            slug="designer",
+            namespace=self.namespace,
+            defaults={"created_by": self.owner},
+        )
+        media.tags.add(tag)
+        return media
+
     def test_assignment_limits_designer_to_one_theme_and_not_advanced_api(self):
         self.authenticate(self.designer)
         response = self.client.get("/api/v1/webpages/designer/themes/")
@@ -474,6 +504,15 @@ class DesignerThemeApiTests(TestCase):
             {asset["assetKey"] for asset in workspace["assets"] if asset["kind"] in {"preview", "site-icon"}},
             {"preview", "site-icon"},
         )
+
+    def test_workspace_does_not_fall_back_to_another_tenants_default_media_namespace(self):
+        self.namespace.is_active = False
+        self.namespace.save(update_fields=["is_active"])
+        self.authenticate(self.designer)
+
+        workspace = self.client.get(self.workspace_url).data
+
+        self.assertIsNone(workspace["mediaNamespace"])
 
     def test_workspace_places_chrome_widgets_in_natural_preview_slots(self):
         groups = self.theme.design_groups
@@ -1016,6 +1055,7 @@ class DesignerThemeApiTests(TestCase):
             replacement_url,
         )
         storage.open.assert_called_once_with(media.file_path, "rb")
+        storage.open.return_value.__enter__.return_value.read.assert_called_once_with(MAX_IMAGE_BYTES + 1)
 
     @patch("webpages.services.designer_theme.system_storage")
     def test_designer_rejects_untagged_media_for_example_image_replacement(self, storage):
@@ -1056,6 +1096,73 @@ class DesignerThemeApiTests(TestCase):
         storage.open.assert_not_called()
 
     @patch("webpages.services.designer_theme.system_storage")
+    def test_designer_cannot_replace_an_example_with_restricted_tenant_media(self, storage):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+
+        for access_level in ("private", "staff"):
+            with self.subTest(access_level=access_level):
+                media = self.create_tagged_media(f"{access_level}-replacement", access_level=access_level)
+                response = self.client.post(
+                    f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/image/",
+                    {
+                        "view_id": "example-page",
+                        "source_url": "https://storage.test/original.png",
+                        "source_path": '["content", "imageUrl"]',
+                        "source_match_index": 0,
+                        "media_file_id": str(media.id),
+                        "draft_version": workspace["draftVersion"],
+                    },
+                    format="multipart",
+                )
+
+                self.assertEqual(response.status_code, 400, response.data)
+                self.assertIn("Media Library", str(response.data))
+        storage.open.assert_not_called()
+
+    @patch("webpages.services.designer_theme.system_storage")
+    def test_replacement_authorizes_the_designer_before_reading_media(self, storage):
+        media = self.create_tagged_media("authorized-only")
+
+        with self.assertRaises(PermissionError):
+            replace_designer_preview_image(
+                self.theme.id,
+                self.tenant,
+                self.other,
+                "example-page",
+                "https://storage.test/original.png",
+                ["content", "imageUrl"],
+                0,
+                media.id,
+                1,
+            )
+
+        storage.open.assert_not_called()
+
+    @patch("webpages.services.designer_theme.system_storage")
+    def test_replacement_rejects_known_oversized_media_before_reading_storage(self, storage):
+        media = self.create_tagged_media("oversized-replacement", file_size=MAX_IMAGE_BYTES + 1)
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+
+        response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/image/",
+            {
+                "view_id": "example-page",
+                "source_url": "https://storage.test/original.png",
+                "source_path": '["content", "imageUrl"]',
+                "source_match_index": 0,
+                "media_file_id": str(media.id),
+                "draft_version": workspace["draftVersion"],
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("10 MB", str(response.data))
+        storage.open.assert_not_called()
+
+    @patch("webpages.services.designer_theme.system_storage")
     def test_replacing_an_example_image_twice_removes_superseded_metadata(self, storage):
         source_url = "https://storage.test/theme_images/example/original.png"
         first_url = f"https://storage.test/theme_images/{self.theme.id}/designer_drafts/1/first.png"
@@ -1079,9 +1186,7 @@ class DesignerThemeApiTests(TestCase):
         storage.url.side_effect = lambda path: (
             second_url
             if path.endswith("second.png")
-            else first_url
-            if path.endswith("first.png")
-            else f"https://storage.test/{path}"
+            else first_url if path.endswith("first.png") else f"https://storage.test/{path}"
         )
         tag = MediaTag.objects.create(name="Designer", slug="designer", namespace=self.namespace, created_by=self.owner)
         media_files = []

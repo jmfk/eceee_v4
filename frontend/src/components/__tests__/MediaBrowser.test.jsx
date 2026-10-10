@@ -336,6 +336,16 @@ describe('MediaBrowser', () => {
         })
     })
 
+    it('can require media with at least one tag', async () => {
+        renderBrowser({ requireTags: true })
+
+        await waitFor(() => {
+            expect(mediaApi.search.search).toHaveBeenCalledWith(expect.objectContaining({
+                has_tags: true,
+            }))
+        })
+    })
+
     it('can hide the type filter', async () => {
         renderBrowser({ hideTypeFilter: true })
 

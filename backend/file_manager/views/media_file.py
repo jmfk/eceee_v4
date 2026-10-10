@@ -4,7 +4,6 @@ MediaFileViewSet for managing media files with security controls.
 
 import logging
 
-from django.db import models
 from django.http import Http404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -133,35 +132,14 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         else:
             queryset = MediaFile.objects.all()
 
-        # Filter by tenant from middleware
         tenant = getattr(self.request, "tenant", None)
-        if tenant:
-            queryset = queryset.filter(tenant=tenant)
+        from ..security import filter_media_files_for_user
 
-        # Staff users see all files
-        if user.is_staff:
-            queryset = queryset.select_related("namespace", "created_by", "last_modified_by").prefetch_related(
-                "tags", "collections"
-            )
-        else:
-            # Regular users only see files from accessible namespaces
-            from content.models import Namespace
-
-            # Get namespaces the user can access
-            accessible_namespaces = Namespace.objects.filter(models.Q(created_by=user) | models.Q(is_active=True))
-
-            queryset = (
-                MediaFile.objects.filter(namespace__in=accessible_namespaces)
-                .select_related("namespace", "created_by", "last_modified_by")
-                .prefetch_related("tags", "collections")
-            )
-
-            # Further filter by access level
-            from django.db.models import Q
-
-            queryset = queryset.filter(
-                Q(access_level="public") | Q(access_level="members") | Q(access_level="private", created_by=user)
-            )
+        queryset = (
+            filter_media_files_for_user(queryset, user, tenant=tenant)
+            .select_related("namespace", "created_by", "last_modified_by")
+            .prefetch_related("tags", "collections")
+        )
 
         # Filter by namespace if provided (slug only)
         namespace_param = self.request.query_params.get("namespace")
@@ -185,6 +163,9 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(tags__name=tag_name)
             # Remove duplicates that might occur from multiple tag joins
             queryset = queryset.distinct()
+
+        if self.request.query_params.get("has_tags", "").lower() == "true":
+            queryset = queryset.filter(tags__isnull=False).distinct()
 
         # Filter by collection if provided - EXCLUDE files already in the collection
         # This shows potential files that can be added to the collection
