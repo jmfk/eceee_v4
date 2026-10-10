@@ -2,16 +2,18 @@
 Tests for soft delete functionality in the file manager.
 """
 
-import uuid
 import hashlib
+import uuid
 from unittest.mock import Mock, patch
-from django.test import TestCase
+
 from django.contrib.auth.models import User
-from django.utils import timezone
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
+
 from content.models import Namespace
+
 from ..models import MediaFile, PendingMediaFile
 
 
@@ -21,21 +23,13 @@ class MediaFileSoftDeleteTests(TestCase):
     def setUp(self):
         """Set up test data."""
         from core.models import Tenant
+
         self.client = APIClient()
         self.user = User.objects.create_user(username="testuser", password="testpass")
-        self.staff_user = User.objects.create_user(
-            username="staffuser", password="testpass", is_staff=True
-        )
-        self.tenant = Tenant.objects.create(
-            name="Test Tenant",
-            identifier="test-tenant-soft",
-            created_by=self.user
-        )
+        self.staff_user = User.objects.create_user(username="staffuser", password="testpass", is_staff=True)
+        self.tenant = Tenant.objects.create(name="Test Tenant", identifier="test-tenant-soft", created_by=self.user)
         self.namespace = Namespace.objects.create(
-            name="Test Namespace",
-            slug="test-namespace",
-            created_by=self.user,
-            tenant=self.tenant
+            name="Test Namespace", slug="test-namespace", created_by=self.user, tenant=self.tenant
         )
         self.file = MediaFile.objects.create(
             title="Test File",
@@ -51,6 +45,7 @@ class MediaFileSoftDeleteTests(TestCase):
             last_modified_by=self.user,
         )
         self.client.force_authenticate(user=self.user)
+        self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
 
     def test_soft_delete(self):
         """Test that soft delete works correctly."""
@@ -100,9 +95,7 @@ class MediaFileSoftDeleteTests(TestCase):
         self.assertEqual(response.status_code, 204)
 
         # File should be completely gone
-        self.assertFalse(
-            MediaFile.objects.with_deleted().filter(id=self.file.id).exists()
-        )
+        self.assertFalse(MediaFile.objects.with_deleted().filter(id=self.file.id).exists())
 
     def test_prevent_delete_with_references(self):
         """Test that files with references can't be deleted."""
@@ -142,17 +135,16 @@ class MediaFileSoftDeleteTests(TestCase):
         url += f"?namespace={self.namespace.slug}"
         # Set tenant header
         self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
-        
+
         response = self.client.get(url)
         self.assertEqual(len(response.data["results"]), 1)
 
         # Search with show_deleted should show both files for staff
         self.client.force_authenticate(user=self.staff_user)
         # Ensure staff user has access to the namespace
-        from content.models import Namespace
         self.namespace.created_by = self.staff_user
         self.namespace.save()
-        
+
         response = self.client.get(url + "&show_deleted=true")
         self.assertEqual(len(response.data["results"]), 2)
 
@@ -163,20 +155,14 @@ class AtomicFileHashHandlingTests(TestCase):
     def setUp(self):
         """Set up test data."""
         from core.models import Tenant
+
         self.user = User.objects.create_user(username="testuser_atomic", password="testpass")
-        self.tenant = Tenant.objects.create(
-            name="Test Tenant",
-            identifier="test-tenant-atomic",
-            created_by=self.user
-        )
+        self.tenant = Tenant.objects.create(name="Test Tenant", identifier="test-tenant-atomic", created_by=self.user)
         #  Use the default namespace that's created in migrations
         self.namespace = Namespace.objects.filter(tenant=self.tenant).first()
         if not self.namespace:
             self.namespace = Namespace.objects.create(
-                name="Test Namespace Atomic",
-                slug="test-namespace-atomic",
-                created_by=self.user,
-                tenant=self.tenant
+                name="Test Namespace Atomic", slug="test-namespace-atomic", created_by=self.user, tenant=self.tenant
             )
         self.test_hash = hashlib.sha256(b"test content").hexdigest()
 
@@ -227,9 +213,7 @@ class AtomicFileHashHandlingTests(TestCase):
         self.assertFalse(MediaFile.objects.with_deleted().filter(id=file1_id).exists())
 
         # Verify only one file with this hash exists
-        files_with_hash = MediaFile.objects.with_deleted().filter(
-            file_hash=self.test_hash
-        )
+        files_with_hash = MediaFile.objects.with_deleted().filter(file_hash=self.test_hash)
         self.assertEqual(files_with_hash.count(), 1)
         self.assertEqual(files_with_hash.first().id, file2.id)
 
@@ -466,9 +450,7 @@ class AtomicFileHashHandlingTests(TestCase):
         self.assertFalse(MediaFile.objects.with_deleted().filter(id=file2_id).exists())
 
         # Verify only one file with this hash exists
-        files_with_hash = MediaFile.objects.with_deleted().filter(
-            file_hash=self.test_hash
-        )
+        files_with_hash = MediaFile.objects.with_deleted().filter(file_hash=self.test_hash)
         self.assertEqual(files_with_hash.count(), 1)
 
     def test_hard_delete_checks_all_references(self):
