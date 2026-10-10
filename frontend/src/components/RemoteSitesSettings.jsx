@@ -11,10 +11,28 @@ const formatDate = (value) => value
     ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
     : 'Never'
 
+const cursorFromUrl = (value) => value
+    ? new URL(value, window.location.origin).searchParams.get('cursor')
+    : null
+
+const loadCheckpointPages = async (pageCount) => {
+    const pages = []
+    let cursor = null
+    for (let index = 0; index < pageCount; index += 1) {
+        const result = await objectTransfersApi.listCheckpoints(cursor)
+        pages.push(result)
+        cursor = cursorFromUrl(result.next)
+        if (!cursor) break
+    }
+    return pages
+}
+
 export default function RemoteSitesSettings() {
     const [connections, setConnections] = useState([])
     const [accessKeys, setAccessKeys] = useState([])
     const [checkpoints, setCheckpoints] = useState([])
+    const [checkpointPage, setCheckpointPage] = useState(1)
+    const [hasMoreCheckpoints, setHasMoreCheckpoints] = useState(false)
     const [syncEnabled, setSyncEnabled] = useState(true)
     const [connectionForm, setConnectionForm] = useState(emptyConnection)
     const [editingConnectionId, setEditingConnectionId] = useState(null)
@@ -35,6 +53,8 @@ export default function RemoteSitesSettings() {
         setConnections(connectionResult.results || [])
         setAccessKeys(keyResult.results || [])
         setCheckpoints(checkpointResult.results || [])
+        setCheckpointPage(1)
+        setHasMoreCheckpoints(Boolean(checkpointResult.next))
         setSyncEnabled(keyResult.syncEnabled !== false)
     }
 
@@ -51,6 +71,38 @@ export default function RemoteSitesSettings() {
             .catch((loadError) => setError(loadError.message || 'Remote site settings could not be loaded.'))
             .finally(() => setBusy(''))
     }, [])
+
+    useEffect(() => {
+        if (!checkpoints.some((checkpoint) => ['restore_pending', 'restoring'].includes(checkpoint.status) || checkpoint.sourceDetails?.binaryCleanupRetryActive)) return undefined
+        const timer = window.setInterval(async () => {
+            try {
+                const pages = await loadCheckpointPages(checkpointPage)
+                const refreshed = pages.flatMap((result) => result.results || [])
+                setCheckpoints(Array.from(new Map(refreshed.map((checkpoint) => [checkpoint.id, checkpoint])).values()))
+                setHasMoreCheckpoints(Boolean(pages.at(-1)?.next))
+            } catch (pollError) {
+                setError(pollError.message || 'Checkpoint status could not be refreshed.')
+            }
+        }, 2000)
+        return () => window.clearInterval(timer)
+    }, [checkpointPage, checkpoints])
+
+    const loadMoreCheckpoints = async () => {
+        const nextPage = checkpointPage + 1
+        setBusy('checkpoints')
+        setError('')
+        try {
+            const pages = await loadCheckpointPages(nextPage)
+            const refreshed = pages.flatMap((result) => result.results || [])
+            setCheckpoints(Array.from(new Map(refreshed.map((checkpoint) => [checkpoint.id, checkpoint])).values()))
+            setCheckpointPage(nextPage)
+            setHasMoreCheckpoints(Boolean(pages.at(-1)?.next))
+        } catch (loadError) {
+            setError(loadError.message || 'More recovery checkpoints could not be loaded.')
+        } finally {
+            setBusy('')
+        }
+    }
 
     const saveConnection = async () => {
         setBusy('connection')
@@ -281,15 +333,18 @@ export default function RemoteSitesSettings() {
                 </div>
                 {checkpoints.length === 0 ? <div className="mt-6 py-6 text-sm text-gray-600">No transfer checkpoints yet.</div> : <div className="mt-6 divide-y divide-gray-200 border-y border-gray-200">{checkpoints.map((checkpoint) => {
                     const restoring = ['restore_pending', 'restoring'].includes(checkpoint.status)
-                    const canRestore = checkpoint.status === 'available'
+                    const cleanupPending = Boolean(checkpoint.sourceDetails?.binaryCleanupPending)
+                    const canRestore = checkpoint.canRestore ?? checkpoint.status === 'available'
                     return <div key={checkpoint.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
                         <div className="min-w-0">
-                            <div className="flex items-center gap-2"><History className="h-4 w-4 text-gray-400" /><p className="font-medium text-gray-900">Object import checkpoint</p><span className="text-xs text-gray-500">{checkpoint.status.replace('_', ' ')}</span></div>
+                            <div className="flex items-center gap-2"><History className="h-4 w-4 text-gray-400" /><p className="font-medium text-gray-900">Object import checkpoint</p><span className="text-xs text-gray-500">{cleanupPending ? 'cleanup failed' : checkpoint.status.replace('_', ' ')}</span></div>
                             <p className="mt-1 text-sm text-gray-600">Saved {formatDate(checkpoint.createdAt)} · {checkpoint.resourceScopes.join(' and ')}</p>
+                            {checkpoint.errors?.length > 0 && <p role="alert" className="mt-1 text-sm text-red-700">{checkpoint.errors.join(' ')}</p>}
                         </div>
-                        <button type="button" disabled={!canRestore || busy === `restore-${checkpoint.id}`} onClick={() => restoreCheckpoint(checkpoint)} className="inline-flex min-h-9 items-center gap-1.5 rounded border border-gray-300 px-3 text-sm text-gray-700 disabled:opacity-50"><Undo2 className="h-4 w-4" />{restoring ? 'Restore queued' : checkpoint.status === 'restored' ? 'Restored' : 'Restore'}</button>
+                        <button type="button" disabled={!canRestore || busy === `restore-${checkpoint.id}`} onClick={() => restoreCheckpoint(checkpoint)} className="inline-flex min-h-9 items-center gap-1.5 rounded border border-gray-300 px-3 text-sm text-gray-700 disabled:opacity-50"><Undo2 className="h-4 w-4" />{cleanupPending ? 'Retry cleanup' : restoring ? 'Restore queued' : checkpoint.status === 'restored' ? 'Restored' : 'Restore'}</button>
                     </div>
                 })}</div>}
+                {hasMoreCheckpoints && <button type="button" disabled={busy === 'checkpoints'} onClick={loadMoreCheckpoints} className="mt-4 min-h-9 rounded border border-gray-300 px-3 text-sm text-gray-700 disabled:opacity-50">Load older checkpoints</button>}
             </section>
         </div>
     </div>

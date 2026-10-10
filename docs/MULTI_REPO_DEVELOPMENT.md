@@ -14,7 +14,7 @@ ECEEE is a consumer of the machine-wide services in the sibling `shared-local-in
    make dev
    ```
 
-The configuration helper reads provider-managed credentials without printing them, atomically updates the ignored repo-root `.env`, and sets mode 0600.
+The configuration helper reads provider-managed credentials without printing them, atomically updates the ignored repo-root `.env`, and sets mode 0600. The provider admission must create and grant the ECEEE identity access to the private `eceee-media-checkpoints` bucket before this check succeeds.
 
 ## Isolation contract
 
@@ -22,7 +22,7 @@ The configuration helper reads provider-managed credentials without printing the
 |---|---|---|
 | PostgreSQL 17 | `127.0.0.1:10300` | database `eceee_v4`, role `local_eceee_v4` |
 | Redis 7.4 | `127.0.0.1:10301` | ACL user `eceee_v4`, keys/channels `eceee_v4:*` |
-| MinIO | `127.0.0.1:10302` (`10303` console) | access key `eceee-v4`, bucket `eceee-media` |
+| MinIO | `127.0.0.1:10302` (`10303` console) | access key `eceee-v4`, public bucket `eceee-media`, private bucket `eceee-media-checkpoints` |
 
 Do not run provider `down`, reset, or volume deletion commands from this project. `make infra-down` stops only ECEEE's imgproxy. `make clean` likewise leaves shared service containers and volumes untouched.
 
@@ -43,8 +43,8 @@ PostgreSQL-backed tests use `docker-compose.test-infra.yml`, which has isolated,
 ## Health checks
 
 - `make local-dev-check` validates OrbStack, registered checkout ports, provider
-  endpoints, secret-variable presence, and `.env` permissions without comparing
-  or printing credential values.
+  endpoints, private checkpoint-bucket access, secret-variable presence, and
+  `.env` permissions without comparing or printing credential values.
 - `make shared-infra-check` additionally verifies the canonical
   provider-managed ECEEE database and credential contract.
 - `make check-servers` reports the shared services plus the ECEEE application endpoints.

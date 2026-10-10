@@ -1,5 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithStateProviders } from '../../test/testUtils'
 import RemoteSitesSettings from '../RemoteSitesSettings'
@@ -52,6 +52,10 @@ describe('RemoteSitesSettings', () => {
         window.confirm = vi.fn(() => true)
     })
 
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
     it('unifies outgoing connections and incoming access keys', async () => {
         renderWithStateProviders(<RemoteSitesSettings />)
 
@@ -86,6 +90,110 @@ describe('RemoteSitesSettings', () => {
         expect(window.confirm).toHaveBeenCalledWith('Restore this checkpoint? Current object and media changes in its scope will be replaced.')
         await waitFor(() => expect(mocks.restoreCheckpoint).toHaveBeenCalledWith('checkpoint-1'))
         expect(await screen.findByRole('button', { name: 'Restore queued' })).toBeDisabled()
+    })
+
+    it('refetches loaded pages without losing checkpoints when page boundaries shift', async () => {
+        const checkpoint = (id, createdAt) => ({
+            id,
+            operation: 'object_import',
+            status: 'available',
+            resourceScopes: ['objects'],
+            createdAt,
+        })
+        mocks.listCheckpoints
+            .mockResolvedValueOnce({
+                results: [checkpoint('checkpoint-1', '2026-10-10T10:00:00Z')],
+                next: '/api/v1/objects/remote/checkpoints/?cursor=cursor-2',
+            })
+            .mockResolvedValueOnce({
+                results: [checkpoint('checkpoint-3', '2026-10-11T10:00:00Z')],
+                next: '/api/v1/objects/remote/checkpoints/?cursor=cursor-2',
+            })
+            .mockResolvedValueOnce({
+                results: [
+                    checkpoint('checkpoint-1', '2026-10-10T10:00:00Z'),
+                    checkpoint('checkpoint-2', '2026-10-09T10:00:00Z'),
+                ],
+                next: null,
+            })
+
+        renderWithStateProviders(<RemoteSitesSettings />)
+        fireEvent.click(await screen.findByRole('button', { name: 'Load older checkpoints' }))
+
+        await waitFor(() => expect(mocks.listCheckpoints).toHaveBeenCalledWith('cursor-2'))
+        expect(screen.getAllByText('Object import checkpoint')).toHaveLength(3)
+    })
+
+    it('polls an asynchronous restore and reports a retryable failure', async () => {
+        vi.useFakeTimers()
+        const pending = {
+            id: 'checkpoint-1',
+            operation: 'object_import',
+            status: 'restore_pending',
+            resourceScopes: ['objects', 'media'],
+            createdResources: { object_ids: ['123'] },
+            canRestore: false,
+            createdAt: '2026-10-09T10:00:00Z',
+        }
+        mocks.listCheckpoints
+            .mockResolvedValueOnce({ results: [pending] })
+            .mockResolvedValueOnce({
+                results: [{ ...pending, status: 'failed', canRestore: true, errors: ['Storage temporarily unavailable.'] }],
+            })
+
+        renderWithStateProviders(<RemoteSitesSettings />)
+        await act(async () => {})
+        expect(screen.getByRole('button', { name: 'Restore queued' })).toBeDisabled()
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(2000)
+        })
+
+        expect(screen.getByRole('alert')).toHaveTextContent('Storage temporarily unavailable.')
+        expect(screen.getByRole('button', { name: 'Restore' })).toBeEnabled()
+    })
+
+    it('shows failed binary cleanup as retryable', async () => {
+        vi.useFakeTimers()
+        mocks.listCheckpoints.mockResolvedValue({ results: [{
+            id: 'checkpoint-cleanup',
+            operation: 'object_import',
+            status: 'restored',
+            resourceScopes: ['media'],
+            sourceDetails: { binaryCleanupPending: true },
+            canRestore: true,
+            errors: ['Binary cleanup failed: storage unavailable'],
+            createdAt: '2026-10-09T10:00:00Z',
+        }] })
+
+        renderWithStateProviders(<RemoteSitesSettings />)
+
+        expect(await screen.findByText('cleanup failed')).toBeInTheDocument()
+        expect(screen.getByRole('alert')).toHaveTextContent('Binary cleanup failed')
+        expect(screen.getByRole('button', { name: 'Retry cleanup' })).toBeEnabled()
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(4000)
+        })
+        expect(mocks.listCheckpoints).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not queue another cleanup while an automatic retry is active', async () => {
+        mocks.listCheckpoints.mockResolvedValue({ results: [{
+            id: 'checkpoint-cleanup-active',
+            operation: 'object_import',
+            status: 'restored',
+            resourceScopes: ['media'],
+            sourceDetails: { binaryCleanupPending: true, binaryCleanupRetryActive: true },
+            canRestore: false,
+            errors: ['Binary cleanup failed: storage unavailable'],
+            createdAt: '2026-10-09T10:00:00Z',
+        }] })
+
+        renderWithStateProviders(<RemoteSitesSettings />)
+
+        expect(await screen.findByRole('button', { name: 'Retry cleanup' })).toBeDisabled()
+        expect(mocks.restoreCheckpoint).not.toHaveBeenCalled()
     })
 
     it('creates an outgoing connection from Settings', async () => {

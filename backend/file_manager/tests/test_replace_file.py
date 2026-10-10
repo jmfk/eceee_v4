@@ -17,17 +17,12 @@ from file_manager.models import MediaFile
 class MediaFileReplaceFileTests(APITestCase):
     def setUp(self):
         from core.models import Tenant
-        self.user = User.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
+
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
         self.client.force_authenticate(user=self.user)
         self.client.defaults["HTTP_HOST"] = "localhost"
 
-        self.tenant = Tenant.objects.create(
-            name="Test Tenant",
-            identifier="test-tenant-replace",
-            created_by=self.user
-        )
+        self.tenant = Tenant.objects.create(name="Test Tenant", identifier="test-tenant-replace", created_by=self.user)
         self.namespace, _ = Namespace.objects.get_or_create(
             slug="test-namespace",
             defaults={
@@ -68,9 +63,7 @@ class MediaFileReplaceFileTests(APITestCase):
         }
 
         url = f"/api/v1/media/files/{self.media_file.id}/replace_file/"
-        uploaded = SimpleUploadedFile(
-            "replacement.jpg", new_bytes, content_type="image/jpeg"
-        )
+        uploaded = SimpleUploadedFile("replacement.jpg", new_bytes, content_type="image/jpeg")
         response = self.client.post(url, {"file": uploaded}, format="multipart")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -100,9 +93,7 @@ class MediaFileReplaceFileTests(APITestCase):
         )
 
         url = f"/api/v1/media/files/{self.media_file.id}/replace_file/"
-        uploaded = SimpleUploadedFile(
-            "replacement.jpg", conflict_bytes, content_type="image/jpeg"
-        )
+        uploaded = SimpleUploadedFile("replacement.jpg", conflict_bytes, content_type="image/jpeg")
 
         with patch("file_manager.views.media_file.S3MediaStorage.overwrite_file") as mock_overwrite:
             response = self.client.post(url, {"file": uploaded}, format="multipart")
@@ -112,20 +103,41 @@ class MediaFileReplaceFileTests(APITestCase):
         self.assertEqual(self.media_file.replaced_by_id, existing.id)
         mock_overwrite.assert_not_called()
 
+    def test_replace_file_refetches_after_waiting_for_transfer_lock(self):
+        replacement_bytes = b"replacement-that-already-won"
+        replacement_hash = hashlib.sha256(replacement_bytes).hexdigest()
+
+        class MutatingLock:
+            def __enter__(inner_self):
+                MediaFile.objects.filter(pk=self.media_file.pk).update(file_hash=replacement_hash)
+                return inner_self
+
+            def __exit__(inner_self, exc_type, exc_value, traceback):
+                return False
+
+        uploaded = SimpleUploadedFile("replacement.jpg", replacement_bytes, content_type="image/jpeg")
+        url = f"/api/v1/media/files/{self.media_file.id}/replace_file/"
+        with (
+            patch(
+                "object_storage.services.transfer_checkpoints.tenant_transfer_lock",
+                return_value=MutatingLock(),
+            ),
+            patch("file_manager.views.media_file.S3MediaStorage.overwrite_file") as mock_overwrite,
+        ):
+            response = self.client.post(url, {"file": uploaded}, format="multipart")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_overwrite.assert_not_called()
+
 
 class MediaFileReplacementResolutionTests(APITestCase):
     def setUp(self):
         from core.models import Tenant
-        self.user = User.objects.create_user(
-            username="testuser_res", email="test@example.com", password="testpass123"
-        )
+
+        self.user = User.objects.create_user(username="testuser_res", email="test@example.com", password="testpass123")
         self.client.defaults["HTTP_HOST"] = "localhost"
-        
-        self.tenant = Tenant.objects.create(
-            name="Test Tenant",
-            identifier="test-tenant-res",
-            created_by=self.user
-        )
+
+        self.tenant = Tenant.objects.create(name="Test Tenant", identifier="test-tenant-res", created_by=self.user)
         self.namespace, _ = Namespace.objects.get_or_create(
             slug="test-namespace",
             defaults={
@@ -176,4 +188,3 @@ class MediaFileReplacementResolutionTests(APITestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], "https://signed.example/replacement")
-

@@ -17,8 +17,8 @@ from django.utils.text import slugify
 
 from content.models import Namespace
 from file_manager.models import MediaCollection, MediaFile, MediaTag
-from file_manager.storage import S3MediaStorage, system_storage
-from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
+from file_manager.storage import S3MediaStorage, checkpoint_storage, system_storage
+from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion, TransferCheckpoint
 from taxonomy.models import Tag as TaxonomyTag
 
 PACKAGE_VERSION = "object-transfer/1"
@@ -670,7 +670,7 @@ def validate_package(package):
     return manifest, payload
 
 
-def _namespace(tenant, user, data, resolutions=None):
+def _namespace(tenant, user, data, resolutions=None, on_created=None):
     resolutions = resolutions or {}
     if not data:
         namespace = Namespace.objects.filter(tenant=tenant, is_default=True).first()
@@ -691,12 +691,15 @@ def _namespace(tenant, user, data, resolutions=None):
         while Namespace.objects.filter(name=name).exists():
             name = f"{base_name[: 98 - len(str(counter))]} {counter}"
             counter += 1
-        return Namespace.objects.create(
+        namespace = Namespace.objects.create(
             tenant=tenant,
             created_by=user,
             name=name,
             slug=slug,
         )
+        if on_created:
+            on_created(namespace)
+        return namespace
     mapped_slug = resolutions.get(data["slug"], data["slug"])
     mapped = Namespace.objects.filter(tenant=tenant, slug=mapped_slug).first()
     if mapped:
@@ -712,13 +715,16 @@ def _namespace(tenant, user, data, resolutions=None):
         .exists()
     ):
         raise ValueError(f"Namespace {data['name']} conflicts with another workspace and needs an explicit mapping.")
-    return Namespace.objects.create(
+    namespace = Namespace.objects.create(
         tenant=tenant,
         created_by=user,
         name=data.get("name") or data["slug"],
         slug=data["slug"],
         description=data.get("description", ""),
     )
+    if on_created:
+        on_created(namespace)
+    return namespace
 
 
 def _remap_object_reference(value, object_map, skipped_ids, require_mapping=True):
@@ -845,12 +851,29 @@ def _relationship_target_ids(relationships):
 
 
 class ObjectPackageImporter:
-    def __init__(self, job, storage=None):
+    def __init__(self, job, storage=None, checkpoint_storage_backend=None, system_storage_backend=None):
         self.job = job
         self.storage = storage or S3MediaStorage()
+        uses_s3_media = storage is None or isinstance(storage, S3MediaStorage)
+        self.checkpoint_storage = checkpoint_storage_backend or (checkpoint_storage if uses_s3_media else self.storage)
+        self.system_storage = system_storage_backend or (system_storage if uses_s3_media else self.storage)
         self.created_media_paths = []
         self.created_type_icon_paths = []
         self.media_replacements = {}
+        self.created_resources = {
+            "object_ids": [],
+            "media_ids": [],
+            "type_ids": [],
+            "namespace_ids": [],
+            "media_tag_ids": [],
+            "taxonomy_tag_ids": [],
+            "collection_ids": [],
+        }
+
+    def _record_created(self, resource, instance):
+        value = str(instance.pk)
+        if value not in self.created_resources[resource]:
+            self.created_resources[resource].append(value)
 
     def run(self):
         self.job.mark_running(phase="importing")
@@ -859,16 +882,6 @@ class ObjectPackageImporter:
             with zipfile.ZipFile(file_obj, "r") as package:
                 result = self.import_package(package)
         except Exception as exc:
-            for path in self.created_media_paths:
-                try:
-                    self.storage.delete(path)
-                except Exception:
-                    pass
-            for path in self.created_type_icon_paths:
-                try:
-                    system_storage.delete(path)
-                except Exception:
-                    pass
             self.job.mark_failed(exc)
             raise
         finally:
@@ -879,24 +892,107 @@ class ObjectPackageImporter:
     def import_package(self, package):
         manifest, payload = validate_package(package)
         from object_storage.services.transfer_checkpoints import (
+            _cleanup_media_binaries,
+            _cleanup_type_icon_binaries,
+            assert_import_checkpoint_current,
+            begin_serializable_transfer,
             capture_object_import_checkpoint,
+            media_content_transfer_locks,
+            object_type_name_transfer_locks,
+            object_type_transfer_locks,
             record_object_import_mutation,
+            tenant_transfer_lock,
+            type_icon_path_locks,
         )
 
-        checkpoint = capture_object_import_checkpoint(self.job, payload)
+        checkpoint = None
+        type_names = [item["name"] for item in payload["types"]]
+        media_hashes = {
+            value
+            for item in payload.get("media", [])
+            for value in (
+                item["file_hash"],
+                hashlib.sha256(f"{item['file_hash']}:{self.job.tenant_id}".encode()).hexdigest(),
+            )
+        }
+        icon_paths = []
+        for item in payload["types"]:
+            member = next(
+                (name for name in package.namelist() if name.startswith(f"type-icons/{slugify(item['name'])}/")),
+                None,
+            )
+            if member:
+                suffix = os.path.splitext(item.get("icon_filename") or member)[1]
+                icon_paths.append(f"object_types/icons/remote/{manifest['checksums'][member]}{suffix}")
         try:
-            with transaction.atomic():
-                result = self._apply_package(package, manifest, payload)
-                record_object_import_mutation(
-                    checkpoint,
-                    result,
-                    self.created_media_paths,
-                    self.created_type_icon_paths,
+            with (
+                tenant_transfer_lock(self.job.tenant_id),
+                object_type_name_transfer_locks(type_names),
+                media_content_transfer_locks(media_hashes),
+            ):
+                existing_type_ids = list(
+                    ObjectTypeDefinition.objects.filter(name__in=type_names).values_list("id", flat=True)
                 )
+                # Shared type IDs must always be acquired before icon paths;
+                # restore uses the same order.
+                with object_type_transfer_locks(existing_type_ids), type_icon_path_locks(icon_paths):
+                    try:
+                        checkpoint = capture_object_import_checkpoint(
+                            self.job,
+                            payload,
+                            storage=self.storage,
+                            checkpoint_storage_backend=self.checkpoint_storage,
+                            system_storage_backend=self.system_storage,
+                        )
+                        if checkpoint.status == TransferCheckpoint.STATUS_AVAILABLE:
+                            return checkpoint.operation_result
+                        with transaction.atomic():
+                            begin_serializable_transfer()
+                            self.job.tenant.__class__.objects.select_for_update().only("pk").get(pk=self.job.tenant_id)
+                            checkpoint = TransferCheckpoint.objects.select_for_update().get(pk=checkpoint.pk)
+                            if checkpoint.status not in {
+                                TransferCheckpoint.STATUS_PREPARING,
+                                TransferCheckpoint.STATUS_FAILED,
+                            }:
+                                raise ValueError("This import checkpoint is not ready for an import retry.")
+                            assert_import_checkpoint_current(checkpoint, self.storage, self.system_storage)
+                            result = self._apply_package(package, manifest, payload)
+                            record_object_import_mutation(
+                                checkpoint,
+                                result,
+                                self.created_resources,
+                                self.created_media_paths,
+                                self.created_type_icon_paths,
+                            )
+                    except Exception:
+                        self._cleanup_created_binaries()
+                        raise
         except Exception as exc:
-            checkpoint.mark_failed(exc)
+            persisted = TransferCheckpoint.objects.filter(source_job=self.job).first()
+            if persisted:
+                persisted.mark_failed(exc)
+            elif checkpoint:
+                _cleanup_media_binaries(checkpoint.snapshot, self.checkpoint_storage)
+                _cleanup_type_icon_binaries(checkpoint.snapshot, self.checkpoint_storage)
             raise
         return {**result, "checkpoint_id": str(checkpoint.id)}
+
+    def _cleanup_created_binaries(self):
+        """Remove rolled-back uploads while the import's creation locks are held."""
+        for path in set(self.created_media_paths):
+            if MediaFile.objects.with_deleted().filter(file_path=path).exists():
+                continue
+            try:
+                self.storage.delete(path)
+            except Exception:
+                pass
+        for path in set(self.created_type_icon_paths):
+            if ObjectTypeDefinition.objects.filter(icon_image=path).exists():
+                continue
+            try:
+                self.system_storage.delete(path)
+            except Exception:
+                pass
 
     def _apply_package(self, package, manifest, payload):
         tenant, user = self.job.tenant, self.job.created_by
@@ -921,11 +1017,20 @@ class ObjectPackageImporter:
                 raise ValueError(f"Object type {data['name']} is used by another workspace and cannot be updated.")
             if differs and resolution not in {"keep", "update"}:
                 raise ValueError(f"Resolve the object type conflict for {data['name']} before importing.")
-            namespace = _namespace(tenant, user, data.get("namespace"), namespace_resolutions)
+            namespace = None
+            if created or resolution == "update":
+                namespace = _namespace(
+                    tenant,
+                    user,
+                    data.get("namespace"),
+                    namespace_resolutions,
+                    lambda item: self._record_created("namespace_ids", item),
+                )
             if not existing:
                 existing = ObjectTypeDefinition.objects.create(
                     name=data["name"], label=data["label"], plural_label=data["plural_label"], created_by=user
                 )
+                self._record_created("type_ids", existing)
             if created or resolution == "update":
                 for field in (
                     "label",
@@ -945,16 +1050,28 @@ class ObjectPackageImporter:
                     None,
                 )
                 if icon_member:
+                    from object_storage.services.transfer_checkpoints import transfer_advisory_lock
+
                     checksum = manifest["checksums"][icon_member]
                     suffix = os.path.splitext(data.get("icon_filename") or icon_member)[1]
-                    icon_path = f"object_types/icons/remote/{slugify(data['name'])}/{checksum}{suffix}"
-                    if not system_storage.exists(icon_path):
-                        with package.open(icon_member) as source:
-                            saved_path = system_storage.save(icon_path, File(source, name=os.path.basename(icon_path)))
-                        self.created_type_icon_paths.append(saved_path)
-                        icon_path = saved_path
-                    existing.icon_image.name = icon_path
-                    existing.save(update_fields=["icon_image", "updated_at"])
+                    # ImageField retains Django's default 100-character limit;
+                    # the content hash is globally unique without a type slug.
+                    icon_path = f"object_types/icons/remote/{checksum}{suffix}"
+                    with transfer_advisory_lock(f"type-icon-path:{icon_path}"):
+                        path_was_referenced = ObjectTypeDefinition.objects.filter(icon_image=icon_path).exists()
+                        if not self.system_storage.exists(icon_path):
+                            with package.open(icon_member) as source:
+                                icon_path = self.system_storage.save(
+                                    icon_path,
+                                    File(source, name=os.path.basename(icon_path)),
+                                )
+                        # A redelivery after worker loss may find the deterministic
+                        # object already present even though its DB transaction was
+                        # rolled back. Persist ownership so restore can remove it.
+                        if not path_was_referenced:
+                            self.created_type_icon_paths.append(icon_path)
+                        existing.icon_image.name = icon_path
+                        existing.save(update_fields=["icon_image", "updated_at"])
             type_map[data["name"]] = existing
             if created or resolution == "update":
                 pending_relations.append((existing, data))
@@ -989,6 +1106,8 @@ class ObjectPackageImporter:
                 slug=data["slug"],
                 defaults={"title": data["title"], "status": data["status"], "created_by": user},
             )
+            if created:
+                self._record_created("object_ids", obj)
             if created and obj.current_version_id:
                 obj.versions.all().delete()
                 obj.current_version = None
@@ -1138,6 +1257,7 @@ class ObjectPackageImporter:
                     self.job.created_by,
                     data.get("namespace"),
                     self.job.options.get("namespace_resolutions", {}),
+                    lambda item: self._record_created("namespace_ids", item),
                 )
                 suffix = os.path.splitext(data.get("original_filename", ""))[1]
                 path = f"{namespace.slug}/object-transfers/{destination_hash}{suffix}"
@@ -1171,19 +1291,22 @@ class ObjectPackageImporter:
                     last_modified_by=self.job.created_by,
                     uploaded_by=self.job.created_by,
                 )
+                self._record_created("media_ids", existing)
             media_tags = [
                 self._get_or_create_media_tag(item, existing.namespace) for item in data.get("media_tags", [])
             ]
-            canonical = [
-                TaxonomyTag.objects.get_or_create(
+            canonical = []
+            for item in data.get("canonical_tags", []):
+                tag, tag_created = TaxonomyTag.objects.get_or_create(
                     tenant=self.job.tenant,
                     namespace=existing.namespace,
                     tag_type=item.get("tag_type", "general"),
                     slug=item["slug"],
                     defaults={**item, "created_by": self.job.created_by},
-                )[0]
-                for item in data.get("canonical_tags", [])
-            ]
+                )
+                if tag_created:
+                    self._record_created("taxonomy_tag_ids", tag)
+                canonical.append(tag)
             if media_tags:
                 existing.tags.add(*media_tags)
             if canonical:
@@ -1201,21 +1324,25 @@ class ObjectPackageImporter:
                         "last_modified_by": self.job.created_by,
                     },
                 )
+                if _created:
+                    self._record_created("collection_ids", collection)
                 collection_tags = [
                     self._get_or_create_media_tag(tag, existing.namespace) for tag in item.get("media_tags", [])
                 ]
                 if collection_tags:
                     collection.tags.add(*collection_tags)
-                collection_canonical_tags = [
-                    TaxonomyTag.objects.get_or_create(
+                collection_canonical_tags = []
+                for tag_data in item.get("canonical_tags", []):
+                    tag, tag_created = TaxonomyTag.objects.get_or_create(
                         tenant=self.job.tenant,
                         namespace=existing.namespace,
-                        tag_type=tag.get("tag_type", "general"),
-                        slug=tag["slug"],
-                        defaults={**tag, "created_by": self.job.created_by},
-                    )[0]
-                    for tag in item.get("canonical_tags", [])
-                ]
+                        tag_type=tag_data.get("tag_type", "general"),
+                        slug=tag_data["slug"],
+                        defaults={**tag_data, "created_by": self.job.created_by},
+                    )
+                    if tag_created:
+                        self._record_created("taxonomy_tag_ids", tag)
+                    collection_canonical_tags.append(tag)
                 if collection_canonical_tags:
                     collection.canonical_tags.add(*collection_canonical_tags)
                 collections.append(collection)
@@ -1250,4 +1377,5 @@ class ObjectPackageImporter:
                 description=data.get("description", ""),
                 created_by=self.job.created_by,
             )
+            self._record_created("media_tag_ids", tag)
         return tag

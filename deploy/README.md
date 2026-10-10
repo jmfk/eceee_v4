@@ -65,7 +65,7 @@ cp /opt/eceee/app/deploy/.env.production.example /opt/eceee/app/deploy/.env
 nano /opt/eceee/app/deploy/.env
 ```
 
-Fill in all values — especially `DOMAIN`, `SECRET_KEY`, `POSTGRES_PASSWORD`, `POSTGRES_HOST=db`, Redis, Linode Object Storage, Postmark, imgproxy signing keys, and optional AI keys. The full variable set is documented in `deploy/.env.production.example`.
+Fill in all values — especially `DOMAIN`, `SECRET_KEY`, `POSTGRES_PASSWORD`, `POSTGRES_HOST=db`, Redis, Linode Object Storage, Postmark, imgproxy signing keys, and optional AI keys. Provision the `AWS_CHECKPOINT_STORAGE_BUCKET_NAME` bucket separately from the public media bucket, keep it private, and grant the backend/Celery object-storage credentials access. The full variable set is documented in `deploy/.env.production.example`.
 
 For the isolated TypeScript publisher, also generate independent values for `PUBLISHER_DB_PASSWORD` and `PUBLISHER_FORM_DB_PASSWORD` with `openssl rand -hex 32`. Deployment rejects equal values before backup or migration, then creates or rotates the fixed least-privilege PostgreSQL roles without printing either password. The publisher container receives only its two dedicated database URLs; it does not inherit the rest of `deploy/.env`.
 

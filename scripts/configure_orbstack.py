@@ -192,6 +192,47 @@ def check_port(name: str, port: int) -> None:
         raise SystemExit(f"shared {name} is not reachable on 127.0.0.1:{port}") from exc
 
 
+def check_minio_bucket(access_key: str, secret_key: str, bucket: str) -> None:
+    """Verify a provider-owned bucket without exposing credentials in arguments."""
+    environment = {
+        **os.environ,
+        "AWS_ACCESS_KEY_ID": access_key,
+        "AWS_SECRET_ACCESS_KEY": secret_key,
+        "CHECKPOINT_BUCKET": bucket,
+    }
+    result = subprocess.run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "-e",
+            "AWS_ACCESS_KEY_ID",
+            "-e",
+            "AWS_SECRET_ACCESS_KEY",
+            "-e",
+            "CHECKPOINT_BUCKET",
+            "--entrypoint",
+            "/bin/sh",
+            "minio/mc:RELEASE.2025-08-13T08-35-41Z",
+            "-c",
+            (
+                'mc alias set local http://host.docker.internal:10302 "$AWS_ACCESS_KEY_ID" '
+                '"$AWS_SECRET_ACCESS_KEY" >/dev/null 2>&1 && '
+                'mc stat "local/$CHECKPOINT_BUCKET" >/dev/null 2>&1'
+            ),
+        ],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"shared MinIO bucket {bucket!r} is missing or inaccessible; "
+            "the shared-local-infrastructure provider must provision it for eceee-v4"
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--provider-root", type=Path, default=DEFAULT_PROVIDER)
@@ -236,6 +277,7 @@ def main() -> int:
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY",
             "AWS_STORAGE_BUCKET_NAME",
+            "AWS_CHECKPOINT_STORAGE_BUCKET_NAME",
             "DATABASE_URL",
             "IMGPROXY_KEY",
             "IMGPROXY_SALT",
@@ -270,6 +312,11 @@ def main() -> int:
                 "local .env does not match this checkout's registered runtime for: "
                 + ", ".join(mismatched_keys)
             )
+        check_minio_bucket(
+            present["AWS_ACCESS_KEY_ID"],
+            present["AWS_SECRET_ACCESS_KEY"],
+            present["AWS_CHECKPOINT_STORAGE_BUCKET_NAME"],
+        )
         print("eceee-local-runtime=orbstack")
         print("eceee-shared-services=postgres,redis,minio:reachable")
         print("eceee-env=runtime-ready:mode-0600")
@@ -324,11 +371,17 @@ def main() -> int:
         "AWS_ACCESS_KEY_ID": "eceee-v4",
         "AWS_SECRET_ACCESS_KEY": minio_secret,
         "AWS_STORAGE_BUCKET_NAME": "eceee-media",
+        "AWS_CHECKPOINT_STORAGE_BUCKET_NAME": "eceee-media-checkpoints",
         "AWS_S3_ENDPOINT_URL": "http://localhost:10302",
         "AWS_S3_INTERNAL_ENDPOINT_URL": "http://host.docker.internal:10302",
         "IMGPROXY_KEY": present.get("IMGPROXY_KEY") or secrets.token_hex(32),
         "IMGPROXY_SALT": present.get("IMGPROXY_SALT") or secrets.token_hex(32),
     }
+    check_minio_bucket(
+        updates["AWS_ACCESS_KEY_ID"],
+        updates["AWS_SECRET_ACCESS_KEY"],
+        updates["AWS_CHECKPOINT_STORAGE_BUCKET_NAME"],
+    )
 
     if args.check_only:
         if not ENV_FILE.exists() or ENV_FILE.stat().st_mode & 0o077:

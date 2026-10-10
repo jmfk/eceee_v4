@@ -1,5 +1,6 @@
 """Remote object catalog, preflight, export, and local import endpoints."""
 
+import logging
 from datetime import timedelta
 
 from django.db import transaction
@@ -9,6 +10,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from djangorestframework_camel_case.render import CamelCaseJSONRenderer
 from rest_framework import authentication, permissions, serializers, status
+from rest_framework.pagination import CursorPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -32,6 +34,8 @@ from object_storage.tasks import export_object_package, import_remote_object_pac
 from webpages.models import ThemeRemoteConnection
 from webpages.services.theme_remote import RemoteThemeError, remote_object_request
 from webpages.services.theme_remote_credentials import RemoteCredentialConfigurationError
+
+logger = logging.getLogger(__name__)
 
 
 class ObjectTransferJSONRenderer(CamelCaseJSONRenderer):
@@ -87,6 +91,13 @@ def _checkpoint_data(checkpoint):
             for key, value in (checkpoint.created_resources or {}).items()
             if not key.endswith("paths")
         },
+        "canRestore": checkpoint.status == TransferCheckpoint.STATUS_AVAILABLE
+        or (checkpoint.status == TransferCheckpoint.STATUS_FAILED and bool(checkpoint.operation_result))
+        or (
+            checkpoint.status == TransferCheckpoint.STATUS_RESTORED
+            and checkpoint.source_details.get("binary_cleanup_pending", False)
+            and not checkpoint.source_details.get("binary_cleanup_retry_active", False)
+        ),
         "errors": checkpoint.errors,
         "createdAt": checkpoint.created_at,
         "restoredAt": checkpoint.restored_at,
@@ -367,8 +378,16 @@ class TransferCheckpointListView(APIView):
 
     def get(self, request):
         _admin(request)
-        checkpoints = TransferCheckpoint.objects.filter(tenant=request.tenant).select_related("source_job")[:50]
-        return Response({"results": [_checkpoint_data(item) for item in checkpoints]})
+        checkpoints = (
+            TransferCheckpoint.objects.filter(tenant=request.tenant)
+            .select_related("source_job")
+            .order_by("-created_at", "-id")
+        )
+        paginator = CursorPagination()
+        paginator.page_size = 25
+        paginator.ordering = ("-created_at", "-id")
+        page = paginator.paginate_queryset(checkpoints, request, view=self)
+        return paginator.get_paginated_response([_checkpoint_data(item) for item in page])
 
 
 class TransferCheckpointRestoreView(APIView):
@@ -383,15 +402,66 @@ class TransferCheckpointRestoreView(APIView):
             tenant=request.tenant,
         )
         if checkpoint.status == TransferCheckpoint.STATUS_RESTORED:
+            if checkpoint.source_details.get("binary_cleanup_pending", False):
+                if checkpoint.source_details.get("binary_cleanup_retry_active", False):
+                    return Response(_checkpoint_data(checkpoint), status=status.HTTP_202_ACCEPTED)
+                checkpoint.source_details = {
+                    **checkpoint.source_details,
+                    "binary_cleanup_retry_active": True,
+                }
+                checkpoint.save(update_fields=["source_details", "updated_at"])
+
+                def dispatch_cleanup():
+                    try:
+                        restore_object_transfer_checkpoint.delay(str(checkpoint.id), request.user.id)
+                    except Exception:
+                        logger.exception("Could not queue cleanup for object transfer checkpoint %s", checkpoint.id)
+                        failed = TransferCheckpoint.objects.filter(id=checkpoint.id, tenant=request.tenant).first()
+                        if failed:
+                            failed.source_details = {**failed.source_details}
+                            failed.source_details.pop("binary_cleanup_retry_active", None)
+                            failed.errors = [
+                                *(failed.errors or []),
+                                "The cleanup task could not be queued. Retry cleanup.",
+                            ]
+                            failed.save(update_fields=["source_details", "errors", "updated_at"])
+
+                transaction.on_commit(dispatch_cleanup)
+                return Response(_checkpoint_data(checkpoint), status=status.HTTP_202_ACCEPTED)
             return Response(_checkpoint_data(checkpoint))
-        if checkpoint.status in {
-            TransferCheckpoint.STATUS_RESTORE_PENDING,
-            TransferCheckpoint.STATUS_RESTORING,
-        }:
-            raise serializers.ValidationError({"checkpointId": "This checkpoint is already being restored."})
+        if checkpoint.status not in {TransferCheckpoint.STATUS_AVAILABLE, TransferCheckpoint.STATUS_FAILED}:
+            raise serializers.ValidationError({"checkpointId": "This checkpoint is not available to restore."})
+        if checkpoint.status == TransferCheckpoint.STATUS_FAILED and not checkpoint.operation_result:
+            raise serializers.ValidationError(
+                {"checkpointId": "The import did not complete, so there is nothing to restore."}
+            )
+        if checkpoint.status == TransferCheckpoint.STATUS_FAILED:
+            # A failed binary compensation must retry from the already-captured
+            # inverse. Capturing the damaged live state as a new inverse would
+            # destroy the last known recovery anchor.
+            if not checkpoint.source_details.get("binary_recovery_failed", False):
+                checkpoint.source_details = {
+                    key: value
+                    for key, value in checkpoint.source_details.items()
+                    if key not in {"inverse_checkpoint_id", "inverse_capture_pending", "restore_mutation_intent"}
+                }
         checkpoint.status = TransferCheckpoint.STATUS_RESTORE_PENDING
         checkpoint.restored_by = request.user
         checkpoint.errors = []
-        checkpoint.save(update_fields=["status", "restored_by", "errors", "updated_at"])
-        transaction.on_commit(lambda: restore_object_transfer_checkpoint.delay(str(checkpoint.id), request.user.id))
+        checkpoint.save(update_fields=["source_details", "status", "restored_by", "errors", "updated_at"])
+
+        def dispatch_restore():
+            try:
+                restore_object_transfer_checkpoint.delay(str(checkpoint.id), request.user.id)
+            except Exception:
+                logger.exception("Could not queue restore for object transfer checkpoint %s", checkpoint.id)
+                failed = TransferCheckpoint.objects.filter(
+                    id=checkpoint.id,
+                    tenant=request.tenant,
+                    status=TransferCheckpoint.STATUS_RESTORE_PENDING,
+                ).first()
+                if failed:
+                    failed.mark_failed("The restore task could not be queued. Retry the restore.")
+
+        transaction.on_commit(dispatch_restore)
         return Response(_checkpoint_data(checkpoint), status=status.HTTP_202_ACCEPTED)

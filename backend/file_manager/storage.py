@@ -10,20 +10,22 @@ including features like:
 - Access control
 """
 
-import os
-import boto3
-import logging
 import hashlib
+import io
+import logging
+import os
 import uuid
-from typing import Optional, Dict, Any, BinaryIO
+from typing import Any, BinaryIO, Dict
+
+import boto3
+from botocore.config import Config
+from botocore.exceptions import ClientError
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.core.files.storage import Storage
 from django.core.files.uploadedfile import UploadedFile
 from django.utils.deconstruct import deconstructible
-from botocore.exceptions import ClientError
-from botocore.config import Config
-from PIL import Image, ExifTags
-import io
+from PIL import ExifTags, Image
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +41,7 @@ class S3MediaStorage(Storage):
         self.access_key = settings.AWS_ACCESS_KEY_ID
         self.secret_key = settings.AWS_SECRET_ACCESS_KEY
         self.endpoint_url = getattr(settings, "AWS_S3_ENDPOINT_URL", None)
-        self.internal_endpoint_url = getattr(
-            settings, "AWS_S3_INTERNAL_ENDPOINT_URL", self.endpoint_url
-        )
+        self.internal_endpoint_url = getattr(settings, "AWS_S3_INTERNAL_ENDPOINT_URL", self.endpoint_url)
         self.custom_domain = getattr(settings, "AWS_S3_CUSTOM_DOMAIN", None)
         self.default_acl = getattr(settings, "AWS_DEFAULT_ACL", "private")
         self.querystring_auth = getattr(settings, "AWS_QUERYSTRING_AUTH", True)
@@ -49,9 +49,7 @@ class S3MediaStorage(Storage):
         self.object_parameters = getattr(settings, "AWS_S3_OBJECT_PARAMETERS", {})
         self.signature_version = getattr(settings, "AWS_S3_SIGNATURE_VERSION", "s3v4")
         self.addressing_style = getattr(settings, "AWS_S3_ADDRESSING_STYLE", "path")
-        self.max_file_size = getattr(
-            settings, "MAX_FILE_SIZE", 100 * 1024 * 1024
-        )  # 100MB
+        self.max_file_size = getattr(settings, "MAX_FILE_SIZE", 100 * 1024 * 1024)  # 100MB
         self.allowed_file_types = getattr(
             settings,
             "ALLOWED_FILE_TYPES",
@@ -102,14 +100,10 @@ class S3MediaStorage(Storage):
         """
         try:
             name = name.lstrip("/")
-            self.client.put_object_acl(
-                Bucket=self.bucket_name,
-                Key=name,
-                ACL='public-read'
-            )
+            self.client.put_object_acl(Bucket=self.bucket_name, Key=name, ACL="public-read")
             return True
         except ClientError as e:
-            if e.response['Error']['Code'] == 'NotImplemented':
+            if e.response["Error"]["Code"] == "NotImplemented":
                 # ACLs are likely disabled on this bucket/server
                 # We should use bucket policies instead
                 logger.warning(f"ACLs not implemented for {name}. Use bucket policy instead.")
@@ -134,16 +128,13 @@ class S3MediaStorage(Storage):
                     "Effect": "Allow",
                     "Principal": {"AWS": ["*"]},
                     "Action": ["s3:GetObject"],
-                    "Resource": [f"arn:aws:s3:::{self.bucket_name}/{prefix}*"]
+                    "Resource": [f"arn:aws:s3:::{self.bucket_name}/{prefix}*"],
                 }
-            ]
+            ],
         }
 
         try:
-            self.client.put_bucket_policy(
-                Bucket=self.bucket_name,
-                Policy=json.dumps(policy)
-            )
+            self.client.put_bucket_policy(Bucket=self.bucket_name, Policy=json.dumps(policy))
             logger.info(f"Successfully set public-read bucket policy for {prefix}")
             return True
         except Exception as e:
@@ -155,6 +146,7 @@ class S3MediaStorage(Storage):
         Check if a file is publicly accessible via an anonymous HEAD request.
         """
         import requests
+
         url = self.get_public_url(name)
         try:
             response = requests.head(url, timeout=5)
@@ -181,13 +173,14 @@ class S3MediaStorage(Storage):
 
         try:
             # Use list_objects_v2 for better performance
-            response = self.client.list_objects_v2(
-                Bucket=self.bucket_name, Prefix=path, Delimiter="/"
-            )
+            response = self.client.list_objects_v2(Bucket=self.bucket_name, Prefix=path, Delimiter="/")
 
             # Log for debugging
             logger.info(
-                f"list_objects_v2 response for {path}: {response.get('Contents', [])} directories: {response.get('CommonPrefixes', [])}"
+                "list_objects_v2 response for %s: %s directories: %s",
+                path,
+                response.get("Contents", []),
+                response.get("CommonPrefixes", []),
             )
 
             # Get subdirectories (CommonPrefixes)
@@ -328,9 +321,7 @@ class S3MediaStorage(Storage):
         try:
             self._save(file_path, file)
         except Exception as e:
-            logger.error(
-                f"Failed to overwrite file {file.name} to S3 path {file_path}: {e}"
-            )
+            logger.error(f"Failed to overwrite file {file.name} to S3 path {file_path}: {e}")
             raise
 
         return result
@@ -432,12 +423,25 @@ class S3MediaStorage(Storage):
             extra_args["ACL"] = self.default_acl
 
         try:
-            self.client.upload_fileobj(
-                content, self.bucket_name, key, ExtraArgs=extra_args
-            )
+            self.client.upload_fileobj(content, self.bucket_name, key, ExtraArgs=extra_args)
             return name
         except ClientError as e:
             logger.error(f"Failed to save file {name} to S3: {e}")
+            raise
+
+    def save_private(self, name: str, content: UploadedFile) -> str:
+        """Save a checkpoint object with an explicit private ACL."""
+        key = self._get_key(name)
+        extra_args = self.object_parameters.copy()
+        extra_args["ACL"] = "private"
+        content_type = getattr(content, "content_type", None)
+        if content_type:
+            extra_args["ContentType"] = content_type
+        try:
+            self.client.upload_fileobj(content, self.bucket_name, key, ExtraArgs=extra_args)
+            return name
+        except ClientError as e:
+            logger.error(f"Failed to save private file {name} to S3: {e}")
             raise
 
     def delete(self, name: str) -> None:
@@ -452,6 +456,25 @@ class S3MediaStorage(Storage):
             self.client.delete_object(Bucket=self.bucket_name, Key=key)
         except ClientError as e:
             logger.error(f"Failed to delete file {name} from S3: {e}")
+            raise
+
+    def copy(self, source: str, destination: str) -> None:
+        """Atomically copy an object within the configured bucket."""
+        self.copy_from(self, source, destination)
+
+    def copy_from(self, source_storage: "S3MediaStorage", source: str, destination: str) -> None:
+        """Atomically copy an object from another bucket into this storage."""
+        options = {
+            "Bucket": self.bucket_name,
+            "Key": self._get_key(destination),
+            "CopySource": {"Bucket": source_storage.bucket_name, "Key": source_storage._get_key(source)},
+        }
+        if self.default_acl and self.default_acl != "None":
+            options["ACL"] = self.default_acl
+        try:
+            self.client.copy_object(**options)
+        except ClientError as e:
+            logger.error(f"Failed to copy file {source} to {destination}: {e}")
             raise
 
     def exists(self, name: str) -> bool:
@@ -501,9 +524,7 @@ class S3MediaStorage(Storage):
         """
         return self.url(name)
 
-    def generate_signed_url(
-        self, name: str, expires: int = 3600, response_filename: str = None
-    ) -> str:
+    def generate_signed_url(self, name: str, expires: int = 3600, response_filename: str = None) -> str:
         """
         Generate a pre-signed URL for a file.
 
@@ -530,13 +551,9 @@ class S3MediaStorage(Storage):
             logger.error(f"Failed to generate signed URL for {name}: {e}")
             raise
 
-    def generate_presigned_url(
-        self, name: str, expiration: int = 3600, response_filename: str = None
-    ) -> str:
+    def generate_presigned_url(self, name: str, expiration: int = 3600, response_filename: str = None) -> str:
         """Backward-compatible alias for generate_signed_url."""
-        return self.generate_signed_url(
-            name, expires=expiration, response_filename=response_filename
-        )
+        return self.generate_signed_url(name, expires=expiration, response_filename=response_filename)
 
     def validate_file_type(self, file: UploadedFile) -> bool:
         """
@@ -569,9 +586,7 @@ class S3MediaStorage(Storage):
         """
         return file.size <= self.max_file_size
 
-    def extract_metadata(
-        self, file_content: bytes, content_type: str
-    ) -> Dict[str, Any]:
+    def extract_metadata(self, file_content: bytes, content_type: str) -> Dict[str, Any]:
         """
         Extract metadata from file content.
 
@@ -602,11 +617,7 @@ class S3MediaStorage(Storage):
                 # Extract EXIF data if available
                 if hasattr(image, "_getexif") and image._getexif():
                     exif = image._getexif()
-                    metadata["exif"] = {
-                        ExifTags.TAGS[k]: v
-                        for k, v in exif.items()
-                        if k in ExifTags.TAGS
-                    }
+                    metadata["exif"] = {ExifTags.TAGS[k]: v for k, v in exif.items() if k in ExifTags.TAGS}
             except Exception as e:
                 logger.warning(f"Failed to extract image metadata: {e}")
 
@@ -658,6 +669,21 @@ class S3SystemStorage(S3MediaStorage):
         self.querystring_auth = False
 
 
+@deconstructible
+class S3CheckpointStorage(S3MediaStorage):
+    """Private storage isolated from the public media bucket and its policy."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bucket_name = settings.AWS_CHECKPOINT_STORAGE_BUCKET_NAME
+        if self.bucket_name == settings.AWS_STORAGE_BUCKET_NAME:
+            raise ImproperlyConfigured("Transfer checkpoints require a bucket separate from public media.")
+        self.custom_domain = None
+        self.default_acl = "private"
+        self.querystring_auth = True
+
+
 # Create singleton instances
 storage = S3MediaStorage()
 system_storage = S3SystemStorage()
+checkpoint_storage = S3CheckpointStorage()

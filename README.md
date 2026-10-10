@@ -21,7 +21,10 @@ make dev
 
 `configure-local-infra` reads this checkout's assigned ports from the machine port
 registry and writes the ignored mode-0600 `.env` from provider-managed
-credentials. `make dev` starts the ECEEE-owned backend, frontend, Celery worker,
+credentials. The provider admission must grant `eceee-v4` access to both the
+public `eceee-media` bucket and the private `eceee-media-checkpoints` bucket;
+configuration fails closed when the private bucket is unavailable. `make dev`
+starts the ECEEE-owned backend, frontend, Celery worker,
 and imgproxy in the background. PostgreSQL, Redis, and MinIO remain
 lifecycle-owned by `../shared-local-infrastructure`.
 

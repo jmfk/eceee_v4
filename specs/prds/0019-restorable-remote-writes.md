@@ -91,6 +91,11 @@ Remote theme uploads and site-package imports can mutate theme, content, and med
 
 - 2026-10-09: Implementation started from the bounded remote object package foundation delivered by PRD-0018. The first slice establishes destination-owned checkpoints around object imports before expanding the same guard to page and theme publishing.
 - 2026-10-09: Bounded object imports now abort when checkpoint capture fails, record updated and created object/media resources, expose tenant-admin checkpoint history in Remote Sites settings, and queue tenant-scoped restoration.
+- 2026-10-10: Review hardening made import application idempotent per job, records created resources at their creation sites, prevents in-flight restore races, and creates a full inverse checkpoint before every restore so restoration can itself be reversed.
+- 2026-10-10: Checkpoints now retain verified copies of affected media binaries in a dedicated private bucket, restore complete namespace/tag/collection state, compensate storage changes after failed database restoration, and reject restores that would leave external content, usage, collection, or page references dangling.
+- 2026-10-10: Import and restore preparation commit durable checkpoints before mutation, tenant transfer leases plus serializable mutation transactions close cross-transaction races without global table locks, normal media/icon writers honor the same lease, worker-loss redelivery classifies database state before repairing interrupted binary writes, planned reusable resources are revalidated, cross-tenant path reuse is rejected, and checkpoint history uses stable cursor pagination.
+- 2026-10-10: PostgreSQL write barriers now coordinate every object/page JSON-reference mutation with restore, global dependency scans prevent cross-workspace dangling references, object parents and explicit relationships are tenant-bound, object-type icon writes use shared resource/path locks, inverse capture uses a durable per-attempt identity, and MPTT-aware moves avoid global tree rebuilds.
+- 2026-10-10: Known scalability limit: the final correctness recheck streams global JSON-reference history while holding the global reference-write barrier through the restore transaction. A normalized indexed reference inventory or bounded change journal is required before this path is suitable for a mature, high-write installation.
 
 ## Linked ADRs
 
@@ -98,6 +103,6 @@ Remote theme uploads and site-package imports can mutate theme, content, and med
 
 ## Completion Evidence
 
-- Object-transfer backend suite passes: 31 tests, including capture failure, tenant isolation, restoration, created-parent rollback, and failed-restore rollback.
-- Remote Sites settings tests pass: 7 tests, including checkpoint listing and restore confirmation.
+- Object-transfer backend suite passes: 73 tests, including capture failure, durable pre-mutation capture and snapshot reuse, tenant and cross-tenant reference isolation, PostgreSQL write barriers, media and type-icon binary restoration, replacement-icon cleanup and lock-ordering, compensation and compensation-failure recovery, inverse restoration, created-resource recreation and bounded retryable post-commit cleanup, cleanup visibility races, terminal worker failure, planned-resource and path-reuse locking, worker-interruption redelivery, repair, and user-change preservation, MPTT-safe parent rollback, and failed-restore rollback. Three focused storage tests cover private-bucket isolation and cross-bucket restoration.
+- Remote Sites settings tests pass: 11 tests, including checkpoint listing and pagination de-duplication, restore confirmation, asynchronous status polling, failure and cleanup reporting, terminal retry availability, and duplicate retry prevention.
 - Focused backend and frontend lint, migration drift, diff checks, and repository spec validation pass.

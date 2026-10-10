@@ -1521,8 +1521,23 @@ class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 
+def _can_manage_object_type_icon(user, tenant, object_type):
+    if user.is_superuser:
+        return True
+    if tenant is None:
+        return False
+    if ObjectInstance.objects.filter(object_type=object_type).exclude(tenant=tenant).exists():
+        return False
+    namespace_tenant_id = object_type.namespace.tenant_id if object_type.namespace_id else None
+    if namespace_tenant_id == tenant.id:
+        return True
+    return (
+        namespace_tenant_id is None and ObjectInstance.objects.filter(object_type=object_type, tenant=tenant).exists()
+    )
+
+
 @api_view(["POST"])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.IsAuthenticated, HasTenantAccess])
 def upload_image(request):
     """
     Upload an image file and optionally save it directly to an object type.
@@ -1552,7 +1567,10 @@ def upload_image(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # If object_type_id is provided, validate it exists
+    # If object_type_id is provided, validate it exists and is owned by this
+    # workspace. Legacy global types may only be changed by a superuser, or by
+    # their sole tenant user; otherwise an icon change would affect another
+    # workspace without its authorization.
     object_type = None
     if object_type_id:
         try:
@@ -1560,7 +1578,29 @@ def upload_image(request):
         except ObjectTypeDefinition.DoesNotExist:
             return Response({"error": "Object type not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        if not _can_manage_object_type_icon(request.user, getattr(request, "tenant", None), object_type):
+            return Response(
+                {"error": "You do not have permission to update this object type"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+    transfer_lock = None
+    if object_type:
+        from object_storage.services.transfer_checkpoints import object_type_transfer_lock
+
+        transfer_lock = object_type_transfer_lock(object_type.id)
+        transfer_lock.__enter__()
     try:
+        if object_type:
+            # Refetch after waiting for the shared resource lock. Its namespace
+            # or tenant usage may have changed while this request was queued.
+            object_type = ObjectTypeDefinition.objects.select_related("namespace").get(pk=object_type.pk)
+            if not _can_manage_object_type_icon(request.user, getattr(request, "tenant", None), object_type):
+                return Response(
+                    {"error": "You do not have permission to update this object type"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
         # Sanitize and validate file extension
         file_extension = os.path.splitext(image_file.name)[1].lower()
 
@@ -1576,24 +1616,39 @@ def upload_image(request):
         safe_extension = re.sub(r"[^a-zA-Z0-9.]", "", file_extension)
         unique_filename = f"object_type_icons/{uuid.uuid4()}{safe_extension}"
 
-        # Save the file
-        file_path = default_storage.save(unique_filename, ContentFile(image_file.read()))
+        # Attached icons must use the model field's system storage; checkpoints
+        # and renderers read that same backend. Unattached uploads retain the
+        # historical default-storage behavior.
+        icon_storage = object_type.icon_image.storage if object_type else default_storage
+        file_path = icon_storage.save(unique_filename, ContentFile(image_file.read()))
 
         # Get the full URL
-        file_url = request.build_absolute_uri(default_storage.url(file_path))
+        file_url = request.build_absolute_uri(icon_storage.url(file_path))
 
-        # If object_type_id was provided, save the image to the object type
+        # If object_type_id was provided, save the image to the object type.
+        # The short global barrier makes the final authorization check atomic
+        # with ObjectInstance creation in another workspace.
         if object_type:
-            # Remove old image if it exists
-            if object_type.icon_image:
-                try:
-                    default_storage.delete(object_type.icon_image.name)
-                except Exception:
-                    pass  # Ignore errors when deleting old image
+            from object_storage.services.transfer_checkpoints import reference_write_barrier, type_icon_path_locks
 
-            # Save the new image path to the object type
-            object_type.icon_image.name = file_path
-            object_type.save(update_fields=["icon_image"])
+            old_path = object_type.icon_image.name if object_type.icon_image else ""
+            with type_icon_path_locks([old_path, file_path]):
+                with reference_write_barrier():
+                    object_type = ObjectTypeDefinition.objects.select_related("namespace").get(pk=object_type.pk)
+                    if not _can_manage_object_type_icon(request.user, getattr(request, "tenant", None), object_type):
+                        icon_storage.delete(file_path)
+                        return Response(
+                            {"error": "You do not have permission to update this object type"},
+                            status=status.HTTP_403_FORBIDDEN,
+                        )
+                    old_path = object_type.icon_image.name if object_type.icon_image else ""
+                    object_type.icon_image.name = file_path
+                    object_type.save(update_fields=["icon_image"])
+                if old_path and not ObjectTypeDefinition.objects.filter(icon_image=old_path).exists():
+                    try:
+                        icon_storage.delete(old_path)
+                    except Exception:
+                        logger.exception("Could not delete superseded object-type icon %s", old_path)
 
         return Response(
             {
@@ -1624,3 +1679,6 @@ def upload_image(request):
             {"error": "Upload failed due to server error"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+    finally:
+        if transfer_lock:
+            transfer_lock.__exit__(None, None, None)

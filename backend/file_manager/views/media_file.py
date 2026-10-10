@@ -3,21 +3,19 @@ MediaFileViewSet for managing media files with security controls.
 """
 
 import logging
-from django.utils import timezone
+
 from django.db import models
 from django.http import Http404
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
-from django.core.exceptions import ValidationError
-from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
-from rest_framework.response import Response
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.response import Response
 
 from ..models import MediaFile
-from ..serializers import MediaFileListSerializer, MediaFileDetailSerializer
-from ..storage import storage, S3MediaStorage
+from ..serializers import MediaFileDetailSerializer, MediaFileListSerializer
+from ..storage import S3MediaStorage, storage
 from .pagination import MediaFilePagination
 
 logger = logging.getLogger(__name__)
@@ -70,18 +68,14 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             raise Http404
 
         if not instance.is_deleted:
-            return Response(
-                {"error": "File is not deleted"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "File is not deleted"}, status=status.HTTP_400_BAD_REQUEST)
 
         success = instance.restore(request.user)
         if success:
             serializer = self.get_serializer(instance)
             return Response(serializer.data)
         else:
-            return Response(
-                {"error": "Failed to restore file"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Failed to restore file"}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=["post"])
     def force_delete(self, request, pk=None):
@@ -96,7 +90,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             instance = MediaFile.objects.with_deleted().get(pk=pk)
         except MediaFile.DoesNotExist:
             raise Http404
-            
+
         instance.delete(user=request.user, force=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -107,7 +101,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             instance = MediaFile.objects.with_deleted().get(pk=pk)
         except MediaFile.DoesNotExist:
             raise Http404
-            
+
         return Response(
             {
                 "reference_count": instance.reference_count,
@@ -128,14 +122,10 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         - text_search: Search across title, description, filename, and AI text
         - show_deleted: Include soft-deleted files (staff only)
         """
-        from ..security import SecurityAuditLogger
-
         user = self.request.user
 
         # Handle soft deletes
-        show_deleted = (
-            self.request.query_params.get("show_deleted", "").lower() == "true"
-        )
+        show_deleted = self.request.query_params.get("show_deleted", "").lower() == "true"
         if show_deleted and user.is_staff:
             queryset = MediaFile.objects.with_deleted()
         elif show_deleted:
@@ -144,23 +134,21 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             queryset = MediaFile.objects.all()
 
         # Filter by tenant from middleware
-        tenant = getattr(self.request, 'tenant', None)
+        tenant = getattr(self.request, "tenant", None)
         if tenant:
             queryset = queryset.filter(tenant=tenant)
 
         # Staff users see all files
         if user.is_staff:
-            queryset = queryset.select_related(
-                "namespace", "created_by", "last_modified_by"
-            ).prefetch_related("tags", "collections")
+            queryset = queryset.select_related("namespace", "created_by", "last_modified_by").prefetch_related(
+                "tags", "collections"
+            )
         else:
             # Regular users only see files from accessible namespaces
             from content.models import Namespace
 
             # Get namespaces the user can access
-            accessible_namespaces = Namespace.objects.filter(
-                models.Q(created_by=user) | models.Q(is_active=True)
-            )
+            accessible_namespaces = Namespace.objects.filter(models.Q(created_by=user) | models.Q(is_active=True))
 
             queryset = (
                 MediaFile.objects.filter(namespace__in=accessible_namespaces)
@@ -172,9 +160,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
             from django.db.models import Q
 
             queryset = queryset.filter(
-                Q(access_level="public")
-                | Q(access_level="members")
-                | Q(access_level="private", created_by=user)
+                Q(access_level="public") | Q(access_level="members") | Q(access_level="private", created_by=user)
             )
 
         # Filter by namespace if provided (slug only)
@@ -244,11 +230,12 @@ class MediaFileViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set user and perform security logging on create."""
         from ..security import SecurityAuditLogger
-        
+
         # Get tenant from request (set by middleware)
-        tenant = getattr(self.request, 'tenant', None)
+        tenant = getattr(self.request, "tenant", None)
         if not tenant:
             from rest_framework.exceptions import ValidationError
+
             raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
 
         media_file = serializer.save(
@@ -349,17 +336,17 @@ class MediaFileViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def replace_file(self, request, pk=None):
         """Replace the file in storage while preserving all metadata."""
-        from ..security import SecurityAuditLogger
-        from django.db import transaction
         import hashlib
+
+        from django.db import transaction
+
+        from ..security import SecurityAuditLogger
 
         media_file = self.get_object()
 
         # Check if file is provided
         if "file" not in request.FILES:
-            return Response(
-                {"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
 
         uploaded_file = request.FILES["file"]
 
@@ -387,13 +374,20 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         ]
         if uploaded_file.content_type not in allowed_types:
             return Response(
-                {
-                    "error": f"Invalid file type. Allowed types: {', '.join(allowed_types)}"
-                },
+                {"error": f"Invalid file type. Allowed types: {', '.join(allowed_types)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        from object_storage.services.transfer_checkpoints import tenant_transfer_lock
+
+        transfer_lock = tenant_transfer_lock(media_file.tenant_id)
+        transfer_lock.__enter__()
         try:
+            # The request may have waited behind an import/restore or another
+            # replacement. Never make hash or storage decisions from the stale
+            # instance fetched before acquiring the tenant barrier.
+            media_file = MediaFile.objects.get(pk=media_file.pk, tenant_id=media_file.tenant_id)
+
             # Compute hash up-front (avoids uploading something we can't store)
             uploaded_file.seek(0)
             file_bytes = uploaded_file.read()
@@ -402,18 +396,12 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
             # Scenario 1: Same content as current - no-op (optionally overwrite anyway)
             if new_file_hash == media_file.file_hash:
-                logger.info(
-                    f"Replacement file has same hash as current file {media_file.id}, no changes needed"
-                )
+                logger.info(f"Replacement file has same hash as current file {media_file.id}, no changes needed")
                 serializer = self.get_serializer(media_file)
                 return Response(serializer.data, status=status.HTTP_200_OK)
 
             # Scenario 2: Hash matches a different active file -> link replacement (keep uniqueness)
-            existing_active = (
-                MediaFile.objects.filter(file_hash=new_file_hash)
-                .exclude(id=media_file.id)
-                .first()
-            )
+            existing_active = MediaFile.objects.filter(file_hash=new_file_hash).exclude(id=media_file.id).first()
 
             if existing_active:
                 with transaction.atomic():
@@ -468,28 +456,31 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                 {"error": f"Failed to replace file: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+        finally:
+            transfer_lock.__exit__(None, None, None)
 
     def _clear_imgproxy_cache(self, source_url: str):
         """
         Clear Django cache entries for imgproxy URLs matching the source URL.
-        
+
         Args:
             source_url: The source URL to clear cache entries for
         """
-        from django.core.cache import cache
         import hashlib
-        
+
+        from django.core.cache import cache
+
         try:
             # Try to clear cache entries using pattern matching (Redis backend)
             # Cache keys are in format: imgproxy_url:{md5_hash}
             # We need to find all keys that contain this source_url in their hash
-            
+
             # Try delete_pattern if available (Redis cache backend)
             try:
                 # Generate pattern to match cache keys for this source URL
                 # Since cache keys include all parameters, we'll try to clear
                 # entries that might contain this source URL
-                pattern = f"imgproxy_url:*"
+                pattern = "imgproxy_url:*"
                 cache.delete_pattern(pattern)
                 logger.info(f"Cleared imgproxy cache pattern: {pattern}")
             except AttributeError:
@@ -503,7 +494,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                     {"width": 600, "height": 600, "resize_type": "fit"},
                     {"width": 1280, "height": 720, "resize_type": "fill", "gravity": "sm"},
                 ]
-                
+
                 for params in common_params:
                     cache_key_parts = [
                         source_url,
@@ -518,9 +509,9 @@ class MediaFileViewSet(viewsets.ModelViewSet):
                     cache_key_string = "|".join(str(p) for p in cache_key_parts if p)
                     cache_key = f"imgproxy_url:{hashlib.md5(cache_key_string.encode()).hexdigest()}"
                     cache.delete(cache_key)
-                
+
                 logger.info(f"Cleared imgproxy cache entries for source URL: {source_url}")
-                
+
         except Exception as e:
             # Don't fail the request if cache clearing fails
             logger.warning(f"Failed to clear imgproxy cache for {source_url}: {e}")
@@ -528,8 +519,8 @@ class MediaFileViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def add_tags(self, request, pk=None):
         """Add tags to a media file. Creates tags if they don't exist."""
-        from ..serializers import convert_tag_names_to_ids
         from ..models import MediaTag
+        from ..serializers import convert_tag_names_to_ids
 
         media_file = self.get_object()
         tag_names = request.data.get("tag_names", [])
@@ -542,9 +533,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
         try:
             # Convert tag names to IDs, creating new tags as needed
-            tag_ids = convert_tag_names_to_ids(
-                tag_names, media_file.namespace, request.user
-            )
+            tag_ids = convert_tag_names_to_ids(tag_names, media_file.namespace, request.user)
 
             # Get existing tag IDs
             existing_tag_ids = set(str(tag.id) for tag in media_file.tags.all())
@@ -588,9 +577,7 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
         try:
             # Get tags to remove (only those that belong to this file's namespace)
-            tags_to_remove = MediaTag.objects.filter(
-                id__in=tag_ids, namespace=media_file.namespace
-            )
+            tags_to_remove = MediaTag.objects.filter(id__in=tag_ids, namespace=media_file.namespace)
 
             # Remove tags from media file
             media_file.tags.remove(*tags_to_remove)
