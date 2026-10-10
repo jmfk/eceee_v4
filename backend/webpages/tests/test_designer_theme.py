@@ -1035,6 +1035,7 @@ class DesignerThemeApiTests(TestCase):
         storage.url.return_value = replacement_url
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data
+        storage.reset_mock()
 
         response = self.client.post(
             f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/image/",
@@ -1077,6 +1078,7 @@ class DesignerThemeApiTests(TestCase):
         )
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data
+        storage.reset_mock()
 
         response = self.client.post(
             f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/image/",
@@ -1099,6 +1101,7 @@ class DesignerThemeApiTests(TestCase):
     def test_designer_cannot_replace_an_example_with_restricted_tenant_media(self, storage):
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data
+        storage.reset_mock()
 
         for access_level in ("private", "staff"):
             with self.subTest(access_level=access_level):
@@ -1144,6 +1147,7 @@ class DesignerThemeApiTests(TestCase):
         media = self.create_tagged_media("oversized-replacement", file_size=MAX_IMAGE_BYTES + 1)
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data
+        storage.reset_mock()
 
         response = self.client.post(
             f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/image/",
