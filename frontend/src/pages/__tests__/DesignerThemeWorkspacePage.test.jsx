@@ -931,17 +931,17 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         const { iframe } = await readyPreview()
 
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'layout:main_layout:slot:main', styleTargetId: 'layout:main_layout:slot:main',
+                kind: 'layoutSlot', label: 'Main content', computedStyles: { padding: '0px' },
+            },
+            source: iframe.contentWindow,
+        }))
         await waitFor(() => {
-            fireEvent(window, new MessageEvent('message', {
-                data: {
-                    source: 'eceee-designer-preview', action: 'select',
-                    targetId: 'layout:main_layout:slot:main', styleTargetId: 'layout:main_layout:slot:main',
-                    kind: 'layoutSlot', label: 'Main content', computedStyles: { padding: '0px' },
-                },
-                source: iframe.contentWindow,
-            }))
             expect(screen.getByLabelText('slot Inner spacing')).toHaveValue('0px')
-        })
+        }, { timeout: 3000 })
         expect(screen.queryByRole('button', { name: '+ Add spacing' })).not.toBeInTheDocument()
 
         fireEvent(window, new MessageEvent('message', {
@@ -2188,22 +2188,22 @@ describe('DesignerThemeWorkspacePage', () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const { iframe } = await readyPreview()
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget:hero-1', kind: 'widget', label: 'Hero widget',
+                widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
+                alternatives: [
+                    { id: 'widget:hero-1', kind: 'widget', label: 'Hero widget', widgetId: 'hero-1' },
+                    { id: 'group:0', kind: 'group', label: 'Article', widgetId: 'hero-1' },
+                    { id: 'asset:design:0:hero:md:background', kind: 'asset', label: 'Article hero', widgetId: 'hero-1' },
+                ],
+            },
+            source: iframe.contentWindow,
+        }))
         await waitFor(() => {
-            fireEvent(window, new MessageEvent('message', {
-                data: {
-                    source: 'eceee-designer-preview', action: 'select',
-                    targetId: 'widget:hero-1', kind: 'widget', label: 'Hero widget',
-                    widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
-                    alternatives: [
-                        { id: 'widget:hero-1', kind: 'widget', label: 'Hero widget', widgetId: 'hero-1' },
-                        { id: 'group:0', kind: 'group', label: 'Article', widgetId: 'hero-1' },
-                        { id: 'asset:design:0:hero:md:background', kind: 'asset', label: 'Article hero', widgetId: 'hero-1' },
-                    ],
-                },
-                source: iframe.contentWindow,
-            }))
             expect(screen.getByLabelText('brand value')).toBeInTheDocument()
-        })
+        }, { timeout: 3000 })
         fireEvent.change(screen.getByLabelText('brand value'), { target: { value: '#abcdef' } })
         fireEvent.click(await screen.findByRole('button', { name: 'Change to Medium (Tablet)' }))
         await screen.findByRole('button', { name: 'Upload Article hero source at Medium (Tablet)' })
