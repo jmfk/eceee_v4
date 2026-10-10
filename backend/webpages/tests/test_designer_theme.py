@@ -15,9 +15,11 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
 from core.models import Tenant
+from content.models import Namespace
 from easy_widgets.widgets.content import ContentWidget
 from easy_widgets.widgets.navbar import NavbarWidget
 from easy_widgets.widgets.section import SectionWidget
+from file_manager.models import MediaFile, MediaTag
 from webpages.models import (
     PageTheme,
     PageVersion,
@@ -277,6 +279,14 @@ class DesignerThemeApiTests(TestCase):
         self.designer = User.objects.create_user("theme-designer", password="test")
         self.other = User.objects.create_user("other-designer", password="test")
         self.tenant = Tenant.objects.create(name="Theme tenant", identifier="theme-tenant", created_by=self.owner)
+        self.namespace = Namespace.objects.create(
+            name="Theme media",
+            slug="theme-media",
+            is_active=True,
+            is_default=True,
+            created_by=self.owner,
+            tenant=self.tenant,
+        )
         self.theme = PageTheme.objects.create(
             tenant=self.tenant,
             created_by=self.owner,
@@ -453,6 +463,7 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(workspace["catalog"]["previewViews"], [])
         self.assertEqual(workspace["contentObjects"], [])
         self.assertEqual(workspace["name"], "Editorial")
+        self.assertEqual(workspace["mediaNamespace"], "theme-media")
         self.assertEqual(workspace["themeConfig"]["colors"], self.theme.colors)
         self.assertEqual(
             workspace["themeConfig"]["design_groups"]["groups"][0]["elements"],
@@ -881,7 +892,7 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(deleted.data["previewContent"]["views"], [])
 
     @patch("webpages.services.designer_theme.system_storage")
-    def test_assigned_designer_can_replace_an_image_in_an_example(self, storage):
+    def test_designer_rejects_direct_untagged_image_uploads(self, storage):
         source_url = "https://storage.test/theme_images/example/original.png"
         self.theme.designer_preview = {
             "views": [
@@ -911,9 +922,6 @@ class DesignerThemeApiTests(TestCase):
             ]
         }
         self.theme.save(update_fields=["designer_preview"])
-        storage.save.return_value = f"theme_images/{self.theme.id}/designer_drafts/1/replacement.png"
-        replacement_url = "https://storage.test/theme_images/example/replacement.png"
-        storage.url.return_value = replacement_url
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data
         upload = SimpleUploadedFile(
@@ -935,14 +943,113 @@ class DesignerThemeApiTests(TestCase):
             format="multipart",
         )
 
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("mediaFileId", response.data)
+        storage.save.assert_not_called()
+
+    @patch("webpages.services.designer_theme.system_storage")
+    def test_assigned_designer_can_replace_an_example_image_with_tagged_tenant_media(self, storage):
+        source_url = "https://storage.test/theme_images/example/original.png"
+        self.theme.designer_preview = {
+            "views": [
+                {
+                    "id": "example-page",
+                    "label": "Example page",
+                    "kind": "page",
+                    "layout": "main_layout",
+                    "content": {
+                        "widgets": {
+                            "main": [
+                                {
+                                    "type": "easy_widgets.ImageWidget",
+                                    "config": {"imageUrl": source_url},
+                                }
+                            ]
+                        }
+                    },
+                }
+            ]
+        }
+        self.theme.save(update_fields=["designer_preview"])
+        media = MediaFile.objects.create(
+            title="Tagged replacement",
+            slug="tagged-replacement",
+            original_filename="tagged.png",
+            file_path="media/tagged.png",
+            file_url="https://storage.test/media/tagged.png",
+            file_size=1024,
+            content_type="image/png",
+            file_hash="a" * 64,
+            file_type="image",
+            namespace=self.namespace,
+            tenant=self.tenant,
+            uploaded_by=self.designer,
+        )
+        tag = MediaTag.objects.create(name="Designer", slug="designer", namespace=self.namespace, created_by=self.owner)
+        media.tags.add(tag)
+        image_content = generate_placeholder_png("Tagged", "Replacement", 32, 32)
+        storage.open.return_value.__enter__.return_value.read.return_value = image_content
+        storage.save.return_value = f"theme_images/{self.theme.id}/designer_drafts/1/tagged.png"
+        replacement_url = "https://storage.test/theme_images/example/tagged.png"
+        storage.url.return_value = replacement_url
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+
+        response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/image/",
+            {
+                "view_id": "example-page",
+                "source_url": source_url,
+                "source_path": '["content", "widgets", "main", 0, "config", "imageUrl"]',
+                "source_match_index": 0,
+                "media_file_id": str(media.id),
+                "draft_version": workspace["draftVersion"],
+            },
+            format="multipart",
+        )
+
         self.assertEqual(response.status_code, 200, response.data)
-        saved_view = response.data["previewContent"]["views"][0]
-        self.assertEqual(saved_view["content"]["widgets"]["main"][0]["config"]["caption"], source_url)
-        self.assertEqual(saved_view["content"]["widgets"]["main"][0]["config"]["imageUrl"], source_url)
-        self.assertEqual(saved_view["content"]["widgets"]["main"][1]["config"]["imageUrl"], replacement_url)
-        self.assertEqual(saved_view["imageMetadata"][source_url]["filename"], "original.png")
-        self.assertEqual(saved_view["imageMetadata"][replacement_url]["width"], 32)
-        self.assertTrue(storage.save.call_args.args[0].startswith(f"theme_images/{self.theme.id}/designer_drafts/"))
+        self.assertEqual(
+            response.data["previewContent"]["views"][0]["content"]["widgets"]["main"][0]["config"]["imageUrl"],
+            replacement_url,
+        )
+        storage.open.assert_called_once_with(media.file_path, "rb")
+
+    @patch("webpages.services.designer_theme.system_storage")
+    def test_designer_rejects_untagged_media_for_example_image_replacement(self, storage):
+        media = MediaFile.objects.create(
+            title="Untagged replacement",
+            slug="untagged-replacement",
+            original_filename="untagged.png",
+            file_path="media/untagged.png",
+            file_url="https://storage.test/media/untagged.png",
+            file_size=1024,
+            content_type="image/png",
+            file_hash="b" * 64,
+            file_type="image",
+            namespace=self.namespace,
+            tenant=self.tenant,
+            uploaded_by=self.designer,
+        )
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+
+        response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/image/",
+            {
+                "view_id": "example-page",
+                "source_url": "https://storage.test/original.png",
+                "source_path": '["content", "imageUrl"]',
+                "source_match_index": 0,
+                "media_file_id": str(media.id),
+                "draft_version": workspace["draftVersion"],
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("at least one tag", str(response.data))
+        storage.open.assert_not_called()
 
     @patch("webpages.services.designer_theme.system_storage")
     def test_replacing_an_example_image_twice_removes_superseded_metadata(self, storage):
@@ -968,12 +1075,36 @@ class DesignerThemeApiTests(TestCase):
         storage.url.side_effect = lambda path: (
             second_url
             if path.endswith("second.png")
-            else first_url if path.endswith("first.png") else f"https://storage.test/{path}"
+            else first_url
+            if path.endswith("first.png")
+            else f"https://storage.test/{path}"
+        )
+        tag = MediaTag.objects.create(name="Designer", slug="designer", namespace=self.namespace, created_by=self.owner)
+        media_files = []
+        for index in range(2):
+            media = MediaFile.objects.create(
+                title=f"Replacement {index + 1}",
+                slug=f"replacement-{index + 1}",
+                original_filename="replacement.png",
+                file_path=f"media/replacement-{index + 1}.png",
+                file_url=f"https://storage.test/media/replacement-{index + 1}.png",
+                file_size=1024,
+                content_type="image/png",
+                file_hash=str(index + 1) * 64,
+                file_type="image",
+                namespace=self.namespace,
+                tenant=self.tenant,
+                uploaded_by=self.designer,
+            )
+            media.tags.add(tag)
+            media_files.append(media)
+        storage.open.return_value.__enter__.return_value.read.return_value = generate_placeholder_png(
+            "Replacement", "Theme example", 32, 32
         )
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data
 
-        def replace(url, draft_version):
+        def replace(url, draft_version, media):
             return self.client.post(
                 f"/api/v1/webpages/designer/themes/{self.theme.id}/preview-content/image/",
                 {
@@ -981,21 +1112,17 @@ class DesignerThemeApiTests(TestCase):
                     "source_url": url,
                     "source_path": '["content", "image", "url"]',
                     "source_match_index": 0,
-                    "image": SimpleUploadedFile(
-                        "replacement.png",
-                        generate_placeholder_png("Replacement", "Theme example", 32, 32),
-                        content_type="image/png",
-                    ),
+                    "media_file_id": str(media.id),
                     "draft_version": draft_version,
                 },
                 format="multipart",
             )
 
-        first = replace(source_url, workspace["draftVersion"])
+        first = replace(source_url, workspace["draftVersion"], media_files[0])
         self.assertEqual(first.status_code, 200, first.data)
         storage.exists.return_value = True
         with self.captureOnCommitCallbacks(execute=True):
-            second = replace(first_url, first.data["draftVersion"])
+            second = replace(first_url, first.data["draftVersion"], media_files[1])
         self.assertEqual(second.status_code, 200, second.data)
 
         saved_view = second.data["previewContent"]["views"][0]

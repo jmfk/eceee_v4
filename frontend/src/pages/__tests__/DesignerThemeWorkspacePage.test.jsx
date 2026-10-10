@@ -17,6 +17,9 @@ vi.mock('../../api/designerThemes', () => ({ designerThemesApi: mocks }))
 vi.mock('../../rendering/directRender', () => ({ buildResolvedRenderModel: mocks.buildResolvedRenderModel }))
 vi.mock('../../components/DesignerNavbar', () => ({ default: () => <div>Designer navigation</div> }))
 vi.mock('../../components/StatusBar', () => ({ default: ({ customStatusContent }) => <div>{customStatusContent}</div> }))
+vi.mock('../../components/media/MediaSelectModal', () => ({
+    default: ({ isOpen, onSelect }) => isOpen ? <div role="dialog" aria-label="Tagged media selector"><button type="button" onClick={() => onSelect([{ id: 'media-1', title: 'Tagged replacement' }])}>Use tagged replacement</button></div> : null,
+}))
 vi.mock('react-router-dom', async () => {
     const actual = await vi.importActual('react-router-dom')
     return { ...actual, useParams: () => ({ themeId: '7' }) }
@@ -29,6 +32,7 @@ const previewViews = [
 
 const workspace = {
     id: 7, name: 'Editorial', description: 'Theme for editorial sites', syncVersion: 4, liveSyncVersion: 4, draftVersion: 2, hasDraftChanges: false,
+    mediaNamespace: 'theme-tenant',
     themeConfig: {
         colors: { brand: '#000000' },
         fonts: { googleFonts: [{ family: 'Roboto', variants: ['400'] }] },
@@ -493,9 +497,8 @@ describe('DesignerThemeWorkspacePage', () => {
             source: iframe.contentWindow,
         }))
         const replaceButton = await screen.findByRole('button', { name: 'Replace example image imported.jpg' })
-        const upload = new File(['replacement'], 'replacement.png', { type: 'image/png' })
-
-        fireEvent.change(replaceButton.closest('article').querySelector('input[type="file"]'), { target: { files: [upload] } })
+        await user.click(replaceButton)
+        await user.click(screen.getByRole('button', { name: 'Use tagged replacement' }))
 
         await waitFor(() => expect(mocks.replacePreviewImage).toHaveBeenCalledWith(
             '7',
@@ -503,7 +506,7 @@ describe('DesignerThemeWorkspacePage', () => {
             'https://storage.test/theme_images/7/library/imported.jpg',
             ['content', 'image', 'url'],
             0,
-            upload,
+            { id: 'media-1', title: 'Tagged replacement' },
             3,
         ))
     })
@@ -929,6 +932,70 @@ describe('DesignerThemeWorkspacePage', () => {
                 breakpoint: 'xl', values: expect.objectContaining({ padding: '28px' }),
             }),
         ]))
+    })
+
+    it('shows and creates the first responsive margin override for any selected widget', async () => {
+        const widgetWorkspace = structuredClone(workspace)
+        widgetWorkspace.spacing = []
+        widgetWorkspace.constraints.editableSpacingProperties = ['marginTop', 'paddingTop']
+        mocks.workspace.mockResolvedValue(widgetWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget:header-1', styleTargetId: 'widget-type:easy_widgets.HeaderWidget',
+                kind: 'widget', widgetType: 'easy_widgets.HeaderWidget', label: 'Header widget',
+                computedStyles: { marginTop: '30px', paddingTop: '16px' },
+            },
+            source: iframe.contentWindow,
+        }))
+        expect(await screen.findByLabelText('widget Margin top')).toHaveValue('30px')
+        expect(screen.getByLabelText('widget Padding top')).toHaveValue('16px')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'spacingChange',
+                targetId: 'widget-type:easy_widgets.HeaderWidget',
+                targetIds: ['widget:header-1', 'widget-type:easy_widgets.HeaderWidget'],
+                property: 'marginTop', value: '36px',
+            },
+            source: iframe.contentWindow,
+        }))
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        expect(mocks.save.mock.calls[0][1].spacing).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                scope: 'widget',
+                widgetType: 'easy_widgets.HeaderWidget', breakpoint: 'xl',
+                values: { marginTop: '36px' },
+            }),
+        ]))
+    })
+
+    it('shows design-group properties directly below a selected element row', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const iframe = screen.getByTitle('Live theme preview')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'group:0:element:h1', kind: 'element', label: 'Heading 1', editable: false,
+                computedStyles: { fontFamily: 'Inter', fontSize: '32px', marginBottom: '16px' },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        const selectedPanel = await screen.findByRole('button', { name: 'Collapse selected element Heading 1' })
+        const panel = document.getElementById(selectedPanel.getAttribute('aria-controls'))
+        expect(within(panel).getByRole('heading', { name: 'Typography · Heading 1' })).toBeInTheDocument()
+        expect(within(panel).getByDisplayValue('Inter')).toBeInTheDocument()
+        expect(within(panel).getByDisplayValue('32px')).toBeInTheDocument()
+        expect(within(panel).getByLabelText('element Margin bottom')).toHaveValue('16px')
     })
 
     it('shows only meaningful computed spacing controls for a selected widget', async () => {
@@ -2050,8 +2117,6 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         const { iframe, postMessage } = await readyPreview()
         postMessage.mockRestore()
-        const replacement = new File(['photo'], 'photo.webp', { type: 'image/webp' })
-
         fireEvent(window, new MessageEvent('message', {
             data: {
                 source: 'eceee-designer-preview',
@@ -2063,10 +2128,10 @@ describe('DesignerThemeWorkspacePage', () => {
                 sourceUrl: 'https://storage.test/article-photo.jpg',
                 sourcePath: ['content', 'widgets', 'main', 0, 'config', 'imageUrl'],
                 sourceMatchIndex: 0,
-                file: replacement,
             },
             source: iframe.contentWindow,
         }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Use tagged replacement' }))
 
         await waitFor(() => expect(mocks.replacePreviewImage).toHaveBeenCalledWith(
             '7',
@@ -2074,7 +2139,7 @@ describe('DesignerThemeWorkspacePage', () => {
             'https://storage.test/article-photo.jpg',
             ['content', 'widgets', 'main', 0, 'config', 'imageUrl'],
             0,
-            replacement,
+            { id: 'media-1', title: 'Tagged replacement' },
             2,
         ))
     })

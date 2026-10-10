@@ -128,7 +128,7 @@ class DesignerPreviewImageSerializer(serializers.Serializer):
     source_url = serializers.CharField(max_length=2000)
     source_path = serializers.CharField(max_length=5000)
     source_match_index = serializers.IntegerField(min_value=0)
-    image = serializers.FileField()
+    media_file_id = serializers.UUIDField()
     draft_version = serializers.IntegerField(min_value=1)
 
     def validate_source_path(self, value):
@@ -931,7 +931,7 @@ class DesignerThemePreviewImageView(APIView):
                 data["source_url"],
                 data["source_path"],
                 data["source_match_index"],
-                data["image"],
+                data["media_file_id"],
                 data["draft_version"],
             )
         except PermissionError:

@@ -18,6 +18,18 @@ const configuredSpacingFields = (values: Record<string, any> = {}) => [...new Se
         .flatMap(([field]) => [field, ...(spacingDirections[field] || [])]),
 )]
 
+const renderedWidgetTypes = (slots: Record<string, RenderWidgetModel[]>) => {
+    const types = new Set<string>()
+    const visit = (widget: RenderWidgetModel) => {
+        if (widget.type) types.add(widget.type)
+        Object.values(widget.config?.slots || {}).forEach((children: any) => {
+            if (Array.isArray(children)) children.forEach(visit)
+        })
+    }
+    Object.values(slots).forEach((widgets) => widgets.forEach(visit))
+    return types
+}
+
 const isRenderedImageReference = (value: string, key: string, matchIndex: number) => {
     const before = value.slice(Math.max(0, matchIndex - 500), matchIndex)
     const openImageTag = before.toLowerCase().lastIndexOf('<img')
@@ -230,6 +242,11 @@ export const createDesignerRenderModel = ({
                 : [])
         )),
     ])
+    const genericWidgetSpacing = Object.fromEntries([...renderedWidgetTypes(slots)].map((widgetType) => [
+        `widget-type:${widgetType}`,
+        (workspace?.constraints?.editableSpacingProperties || [])
+            .filter((field: string) => field.startsWith('margin') || field.startsWith('padding')),
+    ]))
     const editableSpacingTargets = (workspace?.spacing || []).reduce((targets: Record<string, string[]>, row: any) => {
         const fields = row.scope === 'layoutSlot'
             ? structuralSlotSpacing[row.targetId] || []
@@ -238,7 +255,7 @@ export const createDesignerRenderModel = ({
                 : configuredSpacingFields(row.values)
         if (fields.length) targets[row.targetId] = [...new Set([...(targets[row.targetId] || []), ...fields])]
         return targets
-    }, { ...structuralSlotSpacing, ...structuralWidgetPartSpacing })
+    }, { ...genericWidgetSpacing, ...structuralSlotSpacing, ...structuralWidgetPartSpacing })
 
     return {
         layout,

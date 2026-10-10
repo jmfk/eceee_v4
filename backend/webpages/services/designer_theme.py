@@ -18,6 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 from rest_framework.exceptions import ValidationError
 
 from core.models import Tenant
+from file_manager.models import MediaFile
 from file_manager.storage import system_storage
 from object_storage.models import ObjectInstance
 from utils.templatetags.security_filters import sanitize_html
@@ -1273,10 +1274,17 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
 
     assets = collect_designer_assets(theme)
     catalog = build_designer_catalog(theme, assets, include_reference_previews=include_tenant_content)
+    media_namespace = (
+        theme.tenant.namespaces.filter(is_active=True)
+        .order_by("-is_default", "name")
+        .values_list("slug", flat=True)
+        .first()
+    )
     return {
         "id": theme.id,
         "name": theme.name,
         "description": theme.description,
+        "mediaNamespace": media_namespace,
         "themeConfig": PageThemeSerializer(theme).data,
         "syncVersion": theme.sync_version,
         "colors": colors,
@@ -1984,7 +1992,15 @@ def _replace_preview_image_reference(value, source_url, source_path, source_matc
 
 
 def replace_designer_preview_image(
-    theme_id, tenant, user, view_id, source_url, source_path, source_match_index, upload, draft_version
+    theme_id,
+    tenant,
+    user,
+    view_id,
+    source_url,
+    source_path,
+    source_match_index,
+    media_file_id,
+    draft_version,
 ):
     """Replace an image already present in a detached example document."""
     if not isinstance(source_url, str) or not source_url or len(source_url) > 2000:
@@ -2011,6 +2027,22 @@ def replace_designer_preview_image(
         or source_match_index < 0
     ):
         raise ValidationError("Choose a valid example image path.")
+    media = (
+        MediaFile.objects.filter(id=media_file_id, tenant=tenant, file_type="image")
+        .select_related("namespace")
+        .prefetch_related("tags")
+        .first()
+    )
+    if not media or media.namespace.tenant_id != tenant.id:
+        raise ValidationError("Choose an image from this tenant's Media Library.")
+    if not media.tags.filter(namespace=media.namespace).exists():
+        raise ValidationError("Choose an image with at least one tag.")
+    try:
+        with system_storage.open(media.file_path, "rb") as source:
+            upload = ContentFile(source.read(), name=media.original_filename)
+    except Exception as exc:
+        raise ValidationError("The selected Media Library image could not be read.") from exc
+    upload.content_type = media.content_type
     content, (width, height) = validate_image_upload(upload)
     saved_path = None
     try:
