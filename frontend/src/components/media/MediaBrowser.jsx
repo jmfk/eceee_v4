@@ -50,6 +50,7 @@ const MediaBrowser = ({
     onFilesLoaded,
     selectionMode = 'single', // 'single', 'multiple', 'none'
     fileTypes = [], // Filter by file types
+    requireTags = false, // Only show files with at least one tag
     namespace,
     showUploader = true,
     refreshTrigger = 0, // External trigger to force refresh
@@ -135,7 +136,8 @@ const MediaBrowser = ({
                 page: currentPage,
                 pageSize: currentPageSize,
                 namespace: namespace,
-                show_deleted: memoizedFilters.showDeleted
+                show_deleted: memoizedFilters.showDeleted,
+                ...(requireTags ? { has_tags: true } : {}),
             };
 
             // Add text search (only one allowed)
@@ -185,7 +187,7 @@ const MediaBrowser = ({
             setLoading(false);
             if (onFilesLoaded) onFilesLoaded();
         }
-    }, [searchTerms, memoizedFilters, namespace, memoizedFileTypes, addNotification]);
+    }, [searchTerms, memoizedFilters, namespace, memoizedFileTypes, requireTags, addNotification]);
 
     // Load files on mount and when dependencies change
     useEffect(() => {

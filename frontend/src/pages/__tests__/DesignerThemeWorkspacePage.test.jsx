@@ -18,7 +18,7 @@ vi.mock('../../rendering/directRender', () => ({ buildResolvedRenderModel: mocks
 vi.mock('../../components/DesignerNavbar', () => ({ default: () => <div>Designer navigation</div> }))
 vi.mock('../../components/StatusBar', () => ({ default: ({ customStatusContent }) => <div>{customStatusContent}</div> }))
 vi.mock('../../components/media/MediaSelectModal', () => ({
-    default: ({ isOpen, onSelect }) => isOpen ? <div role="dialog" aria-label="Tagged media selector"><button type="button" onClick={() => onSelect([{ id: 'media-1', title: 'Tagged replacement' }])}>Use tagged replacement</button></div> : null,
+    default: ({ isOpen, onSelect, namespace, requireTags }) => isOpen ? <div role="dialog" aria-label="Tagged media selector" data-namespace={namespace} data-require-tags={String(requireTags)}><button type="button" onClick={() => onSelect([{ id: 'media-1', title: 'Tagged replacement' }])}>Use tagged replacement</button></div> : null,
 }))
 vi.mock('react-router-dom', async () => {
     const actual = await vi.importActual('react-router-dom')
@@ -462,7 +462,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('tab', { name: 'Theme demo' })).toHaveAttribute('aria-selected', 'true')
         expect(screen.getByRole('button', { name: 'Select Programme' })).toHaveAttribute('aria-current', 'true')
         expect(screen.queryByRole('heading', { name: 'Images in this element' })).not.toBeInTheDocument()
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
         fireEvent(window, new MessageEvent('message', {
             data: { source: 'eceee-designer-preview', action: 'select', targetId: 'content-image:0', kind: 'previewImage', label: 'Imported image', sourceUrl: 'https://storage.test/theme_images/7/library/imported.jpg', sourcePath: ['content', 'image', 'url'], sourceMatchIndex: 0 },
             source: iframe.contentWindow,
@@ -491,13 +491,16 @@ describe('DesignerThemeWorkspacePage', () => {
         const importButton = screen.getByRole('button', { name: 'Import as theme example' })
         await waitFor(() => expect(importButton).toBeEnabled())
         await user.click(importButton)
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
         fireEvent(window, new MessageEvent('message', {
             data: { source: 'eceee-designer-preview', action: 'select', targetId: 'content-image:0', kind: 'previewImage', label: 'Imported image', sourceUrl: 'https://storage.test/theme_images/7/library/imported.jpg', sourcePath: ['content', 'image', 'url'], sourceMatchIndex: 0 },
             source: iframe.contentWindow,
         }))
         const replaceButton = await screen.findByRole('button', { name: 'Replace example image imported.jpg' })
         await user.click(replaceButton)
+        const mediaDialog = screen.getByRole('dialog', { name: 'Tagged media selector' })
+        expect(mediaDialog).toHaveAttribute('data-namespace', 'theme-tenant')
+        expect(mediaDialog).toHaveAttribute('data-require-tags', 'true')
         await user.click(screen.getByRole('button', { name: 'Use tagged replacement' }))
 
         await waitFor(() => expect(mocks.replacePreviewImage).toHaveBeenCalledWith(
@@ -509,6 +512,31 @@ describe('DesignerThemeWorkspacePage', () => {
             { id: 'media-1', title: 'Tagged replacement' },
             3,
         ))
+    })
+
+    it('does not offer a cross-tenant media fallback when the workspace has no namespace', async () => {
+        const noNamespaceWorkspace = structuredClone(workspace)
+        noNamespaceWorkspace.mediaNamespace = null
+        noNamespaceWorkspace.previewContent.views[0].content = {
+            image: { url: 'https://storage.test/theme_images/7/library/imported.jpg' },
+        }
+        mocks.workspace.mockResolvedValue(noNamespaceWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const { iframe } = await readyPreview()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select', targetId: 'content-image:0',
+                kind: 'previewImage', label: 'Imported image',
+                sourceUrl: 'https://storage.test/theme_images/7/library/imported.jpg',
+                sourcePath: ['content', 'image', 'url'], sourceMatchIndex: 0,
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(await screen.findByRole('button', { name: 'Replace example image imported.jpg' })).toBeDisabled()
+        expect(screen.queryByRole('dialog', { name: 'Tagged media selector' })).not.toBeInTheDocument()
     })
 
     it('searches pages from every site and excludes pages without content', async () => {
@@ -649,8 +677,7 @@ describe('DesignerThemeWorkspacePage', () => {
     it('keeps nested elements as accordions and opens the matching item when preview focus changes', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
-        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+        const { iframe, postMessage } = await readyPreview()
 
         await waitFor(() => {
             fireEvent(window, new MessageEvent('message', {
@@ -781,7 +808,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.workspace.mockResolvedValue(layoutSlotWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         await waitFor(() => {
             fireEvent(window, new MessageEvent('message', {
@@ -827,7 +854,7 @@ describe('DesignerThemeWorkspacePage', () => {
     it('keeps layout slots informative when the layout exposes no editable spacing', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -847,7 +874,7 @@ describe('DesignerThemeWorkspacePage', () => {
     it('identifies widget selections separately from slots and elements', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         await waitFor(() => {
             fireEvent(window, new MessageEvent('message', {
@@ -871,7 +898,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.workspace.mockResolvedValue(widgetSlotWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -902,7 +929,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.workspace.mockResolvedValue(layoutSlotWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -941,7 +968,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.workspace.mockResolvedValue(widgetWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -979,7 +1006,7 @@ describe('DesignerThemeWorkspacePage', () => {
     it('shows design-group properties directly below a selected element row', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -1012,7 +1039,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.workspace.mockResolvedValue(compactSpacingWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -1066,7 +1093,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.workspace.mockResolvedValue(columnWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -1118,7 +1145,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.workspace.mockResolvedValue(reusedTargetWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -1229,7 +1256,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.workspace.mockResolvedValue(widgetPartWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -1287,7 +1314,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.workspace.mockResolvedValue(inheritedWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -1322,7 +1349,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.workspace.mockResolvedValue(inheritedWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -1386,7 +1413,7 @@ describe('DesignerThemeWorkspacePage', () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
 
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
         fireEvent(window, new MessageEvent('message', {
             data: {
                 source: 'eceee-designer-preview', action: 'select',
@@ -1444,7 +1471,7 @@ describe('DesignerThemeWorkspacePage', () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
 
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
         fireEvent(window, new MessageEvent('message', {
             data: { source: 'eceee-designer-preview', targetId: 'group:0:part:content-widget', kind: 'part', label: 'Content' },
             source: iframe.contentWindow,
@@ -1476,7 +1503,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByLabelText('Preview text')).not.toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Expand Heading 1 settings' })).toHaveAttribute('aria-expanded', 'false')
 
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
         await waitFor(() => {
             fireEvent(window, new MessageEvent('message', {
                 data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'group:0:element:li', kind: 'element', label: 'List item', text: 'Changed nested text' },
@@ -1492,7 +1519,7 @@ describe('DesignerThemeWorkspacePage', () => {
     it('shows editable typography and spacing defaults directly and restores the rendered default when an override is removed', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
         fireEvent(window, new MessageEvent('message', {
             data: {
                 source: 'eceee-designer-preview', action: 'select', targetId: 'content:99', kind: 'element', label: 'Heading 1 text', text: 'Heading', editable: true,
@@ -1585,8 +1612,7 @@ describe('DesignerThemeWorkspacePage', () => {
     it('keeps repeated targets inside one widget as separate selectable DOM instances', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
-        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+        const { iframe, postMessage } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -1622,8 +1648,7 @@ describe('DesignerThemeWorkspacePage', () => {
     it('shows one navigable widget and slot trail while preserving the original selection', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
-        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+        const { iframe, postMessage } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
                 data: {
@@ -1717,8 +1742,7 @@ describe('DesignerThemeWorkspacePage', () => {
     it('clears the preview target when the content source changes', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
-        const postMessage = vi.spyOn(iframe.contentWindow, 'postMessage')
+        const { iframe, postMessage } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -1795,7 +1819,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.workspace.mockResolvedValue(propertyWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
         fireEvent(window, new MessageEvent('message', {
                 data: { source: 'eceee-designer-preview', targetId: 'group:0', kind: 'group', label: 'Article' },
                 source: iframe.contentWindow,
@@ -1813,7 +1837,7 @@ describe('DesignerThemeWorkspacePage', () => {
     it('shows widget images and colors at the selected widget level', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -1920,7 +1944,7 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         fireEvent.click(screen.getByRole('button', { name: 'Small (Mobile) preview at 640px' }))
 
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
         fireEvent(window, new MessageEvent('message', {
                 data: {
                     source: 'eceee-designer-preview',
@@ -2069,7 +2093,7 @@ describe('DesignerThemeWorkspacePage', () => {
         await screen.findByRole('heading', { name: 'Editorial' })
         await selectHeading()
         fireEvent.change(screen.getByDisplayValue('32px'), { target: { value: '40px' } })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
         fireEvent(window, new MessageEvent('message', {
                 data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'content:0', kind: 'element', label: 'Heading 1 text', text: 'One write only', editable: true },
                 source: iframe.contentWindow,
@@ -2161,7 +2185,7 @@ describe('DesignerThemeWorkspacePage', () => {
         mocks.replaceAsset.mockResolvedValue({ ...structuredClone(workspace), draftVersion: 4, hasDraftChanges: true })
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
-        const iframe = screen.getByTitle('Live theme preview')
+        const { iframe } = await readyPreview()
         fireEvent(window, new MessageEvent('message', {
             data: {
                 source: 'eceee-designer-preview', action: 'select',

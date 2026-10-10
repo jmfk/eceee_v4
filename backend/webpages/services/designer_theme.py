@@ -19,6 +19,7 @@ from rest_framework.exceptions import ValidationError
 
 from core.models import Tenant
 from file_manager.models import MediaFile
+from file_manager.security import filter_media_files_for_user
 from file_manager.storage import system_storage
 from object_storage.models import ObjectInstance
 from utils.templatetags.security_filters import sanitize_html
@@ -2027,8 +2028,13 @@ def replace_designer_preview_image(
         or source_match_index < 0
     ):
         raise ValidationError("Choose a valid example image path.")
+
+    theme = PageTheme.objects.filter(id=theme_id, tenant=tenant).first()
+    if not theme or not user_can_design_theme(user, theme):
+        raise PermissionError
     media = (
-        MediaFile.objects.filter(id=media_file_id, tenant=tenant, file_type="image")
+        filter_media_files_for_user(MediaFile.objects.all(), user, tenant=tenant)
+        .filter(id=media_file_id, file_type="image")
         .select_related("namespace")
         .prefetch_related("tags")
         .first()
@@ -2037,11 +2043,16 @@ def replace_designer_preview_image(
         raise ValidationError("Choose an image from this tenant's Media Library.")
     if not media.tags.filter(namespace=media.namespace).exists():
         raise ValidationError("Choose an image with at least one tag.")
+    if media.file_size > MAX_IMAGE_BYTES:
+        raise ValidationError("Image exceeds the 10 MB limit.")
     try:
         with system_storage.open(media.file_path, "rb") as source:
-            upload = ContentFile(source.read(), name=media.original_filename)
+            media_content = source.read(MAX_IMAGE_BYTES + 1)
     except Exception as exc:
         raise ValidationError("The selected Media Library image could not be read.") from exc
+    if len(media_content) > MAX_IMAGE_BYTES:
+        raise ValidationError("Image exceeds the 10 MB limit.")
+    upload = ContentFile(media_content, name=media.original_filename)
     upload.content_type = media.content_type
     content, (width, height) = validate_image_upload(upload)
     saved_path = None

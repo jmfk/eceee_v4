@@ -3,20 +3,22 @@ Views for media file search and AI suggestions.
 """
 
 import logging
-from django.utils import timezone
-from django.db.models import Q
-from rest_framework import status, permissions
-from rest_framework.views import APIView
-from rest_framework.response import Response
 
-from ..models import MediaFile, MediaCollection
+from django.db.models import Q
+from django.utils import timezone
+from rest_framework import permissions, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from ..ai_services import ai_service
+from ..models import MediaCollection, MediaFile
+from ..security import filter_media_files_for_user
 from ..serializers import (
-    MediaSearchSerializer,
-    MediaFileListSerializer,
     AIMediaSuggestionsSerializer,
+    MediaFileListSerializer,
+    MediaSearchSerializer,
 )
 from ..storage import storage
-from ..ai_services import ai_service
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +36,15 @@ class MediaSearchView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         # Start with base queryset
-        queryset = MediaFile.objects.select_related(
-            "namespace", "created_by"
-        ).prefetch_related("tags", "collections")
+        queryset = (
+            filter_media_files_for_user(
+                MediaFile.objects.all(),
+                request.user,
+                tenant=getattr(request, "tenant", None),
+            )
+            .select_related("namespace", "created_by")
+            .prefetch_related("tags", "collections")
+        )
 
         # Apply filters
         filters = serializer.validated_data
@@ -56,9 +64,7 @@ class MediaSearchView(APIView):
         # Text search - searches in title and tag names for better discoverability
         if filters.get("text_search"):
             text_query = filters["text_search"]
-            queryset = queryset.filter(
-                Q(title__icontains=text_query) | Q(tags__name__icontains=text_query)
-            ).distinct()
+            queryset = queryset.filter(Q(title__icontains=text_query) | Q(tags__name__icontains=text_query)).distinct()
 
         # Tag search - must match ALL provided tags (AND logic)
         if filters.get("tag_names"):
@@ -71,8 +77,7 @@ class MediaSearchView(APIView):
             text_tags = filters["text_tags"]
             for text_tag in text_tags:
                 queryset = queryset.filter(
-                    Q(tags__name__icontains=text_tag)
-                    | Q(tags__slug__icontains=text_tag)
+                    Q(tags__name__icontains=text_tag) | Q(tags__slug__icontains=text_tag)
                 ).distinct()
 
         # Handle file type filtering (multiple types supported)
@@ -98,6 +103,9 @@ class MediaSearchView(APIView):
 
         if filters.get("namespace"):
             queryset = queryset.filter(namespace__slug=filters["namespace"])
+
+        if request.query_params.get("has_tags", "").lower() == "true":
+            queryset = queryset.filter(tags__isnull=False).distinct()
 
         if filters.get("created_after"):
             queryset = queryset.filter(created_at__gte=filters["created_after"])
@@ -154,12 +162,8 @@ class MediaAISuggestionsView(APIView):
 
         try:
             # Check if user has access to this file
-            if media_file.namespace and not request.user.has_perm(
-                "content.view_namespace", media_file.namespace
-            ):
-                return Response(
-                    {"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN
-                )
+            if media_file.namespace and not request.user.has_perm("content.view_namespace", media_file.namespace):
+                return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
             # Get file content from storage
             file_content = storage.get_file_content(media_file.file_path)
@@ -178,9 +182,7 @@ class MediaAISuggestionsView(APIView):
 
             # Generate slug suggestions
             existing_slugs = list(
-                MediaFile.objects.filter(namespace=media_file.namespace).values_list(
-                    "slug", flat=True
-                )
+                MediaFile.objects.filter(namespace=media_file.namespace).values_list("slug", flat=True)
             )
 
             slug_suggestions = ai_service.generate_slug_suggestions(
@@ -190,9 +192,7 @@ class MediaAISuggestionsView(APIView):
 
             # Generate collection suggestions
             existing_collections = list(
-                MediaCollection.objects.filter(
-                    namespace=media_file.namespace
-                ).values_list("name", flat=True)
+                MediaCollection.objects.filter(namespace=media_file.namespace).values_list("name", flat=True)
             )
 
             collection_suggestions = ai_service.suggest_collections(

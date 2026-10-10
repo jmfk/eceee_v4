@@ -3,19 +3,35 @@ Security utilities and validators for the media management system.
 """
 
 import hashlib
-import magic
+import logging
 import os
 import re
-from typing import Dict, List, Optional, Tuple
-from django.conf import settings
-from django.core.exceptions import ValidationError
+from typing import Dict
+
+import magic
 from django.core.files.uploadedfile import UploadedFile
 from rest_framework import permissions
-from rest_framework.request import Request
-from rest_framework.views import APIView
-import logging
 
 logger = logging.getLogger(__name__)
+
+
+def filter_media_files_for_user(queryset, user, tenant=None):
+    """Apply the Media Library's tenant, namespace, and access-level rules."""
+    from django.db.models import Q
+
+    from content.models import Namespace
+
+    if tenant is not None:
+        queryset = queryset.filter(tenant=tenant)
+    if user.is_staff:
+        return queryset
+
+    accessible_namespaces = Namespace.objects.filter(Q(created_by=user) | Q(is_active=True))
+    if tenant is not None:
+        accessible_namespaces = accessible_namespaces.filter(tenant=tenant)
+    return queryset.filter(namespace__in=accessible_namespaces).filter(
+        Q(access_level="public") | Q(access_level="members") | Q(access_level="private", created_by=user)
+    )
 
 
 class MediaFilePermission(permissions.BasePermission):
@@ -108,9 +124,7 @@ class FileUploadValidator:
         # Documents
         "application/pdf": [".pdf"],
         "application/msword": [".doc"],
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
-            ".docx"
-        ],
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
         "text/plain": [".txt"],
         # Audio
         "audio/mpeg": [".mp3"],
@@ -213,18 +227,14 @@ class FileUploadValidator:
         filename_lower = uploaded_file.name.lower()
         for pattern in cls.DANGEROUS_PATTERNS:
             if re.search(pattern, filename_lower):
-                results["errors"].append(
-                    f"Dangerous file type detected: {uploaded_file.name}"
-                )
+                results["errors"].append(f"Dangerous file type detected: {uploaded_file.name}")
                 results["is_valid"] = False
                 return
 
         # Check for suspicious filename patterns
         for pattern in cls.SUSPICIOUS_PATTERNS:
             if re.search(pattern, uploaded_file.name, re.IGNORECASE):
-                results["warnings"].append(
-                    f"Suspicious filename pattern: {uploaded_file.name}"
-                )
+                results["warnings"].append(f"Suspicious filename pattern: {uploaded_file.name}")
 
     @classmethod
     def _validate_file_content(cls, uploaded_file: UploadedFile, results: Dict):
@@ -238,12 +248,8 @@ class FileUploadValidator:
         try:
             actual_mime_type = magic.from_buffer(file_content, mime=True)
         except Exception as e:
-            logger.error(
-                f"Could not detect MIME type for file {uploaded_file.name}: {e}"
-            )
-            results["errors"].append(
-                "Unable to verify file type - file rejected for security"
-            )
+            logger.error(f"Could not detect MIME type for file {uploaded_file.name}: {e}")
+            results["errors"].append("Unable to verify file type - file rejected for security")
             results["is_valid"] = False
             return
 
@@ -254,31 +260,20 @@ class FileUploadValidator:
             return
 
         # Cross-check client-provided content type with detected type
-        if (
-            uploaded_file.content_type
-            and uploaded_file.content_type != actual_mime_type
-        ):
+        if uploaded_file.content_type and uploaded_file.content_type != actual_mime_type:
             # Allow some common variations and aliases
             allowed_variations = {
                 "image/jpeg": ["image/jpg"],
                 "text/plain": ["text/x-plain"],
-                "application/octet-stream": list(
-                    cls.ALLOWED_MIME_TYPES.keys()
-                ),  # Generic binary type
+                "application/octet-stream": list(cls.ALLOWED_MIME_TYPES.keys()),  # Generic binary type
             }
 
             is_valid_variation = False
             for base_type, variations in allowed_variations.items():
-                if (
-                    actual_mime_type == base_type
-                    and uploaded_file.content_type in variations
-                ):
+                if actual_mime_type == base_type and uploaded_file.content_type in variations:
                     is_valid_variation = True
                     break
-                elif (
-                    uploaded_file.content_type == base_type
-                    and actual_mime_type in variations
-                ):
+                elif uploaded_file.content_type == base_type and actual_mime_type in variations:
                     is_valid_variation = True
                     break
 
@@ -293,9 +288,7 @@ class FileUploadValidator:
         allowed_extensions = cls.ALLOWED_MIME_TYPES[actual_mime_type]
 
         if file_ext not in allowed_extensions:
-            results["errors"].append(
-                f"File extension {file_ext} doesn't match content type {actual_mime_type}"
-            )
+            results["errors"].append(f"File extension {file_ext} doesn't match content type {actual_mime_type}")
             results["is_valid"] = False
             return
 
@@ -304,9 +297,7 @@ class FileUploadValidator:
         max_size = cls.MAX_FILE_SIZES.get(file_type, cls.MAX_FILE_SIZES["document"])
 
         if uploaded_file.size > max_size:
-            results["errors"].append(
-                f"File too large: {uploaded_file.size} bytes (max: {max_size} bytes)"
-            )
+            results["errors"].append(f"File too large: {uploaded_file.size} bytes (max: {max_size} bytes)")
             results["is_valid"] = False
             return
 
@@ -345,18 +336,14 @@ class FileUploadValidator:
             suspicious_patterns = [b"<?php", b"<script", b"javascript:", b"eval("]
             for pattern in suspicious_patterns:
                 if pattern in file_content.lower():
-                    results["warnings"].append(
-                        "Suspicious content detected in image metadata"
-                    )
+                    results["warnings"].append("Suspicious content detected in image metadata")
                     break
 
     @classmethod
     def _check_malicious_patterns(cls, file_content: bytes, results: Dict):
         """Check for common malicious patterns."""
         # Get content type and filename from results (extracted at start of validation)
-        content_type = results.get("metadata", {}).get(
-            "content_type", ""
-        ) or results.get("content_type", "")
+        content_type = results.get("metadata", {}).get("content_type", "") or results.get("content_type", "")
         filename = results.get("filename", "")
 
         # Fallback: if content_type is missing or generic, use file extension
@@ -390,9 +377,7 @@ class FileUploadValidator:
 
             for pattern in executable_patterns:
                 if file_content.startswith(pattern):
-                    results["errors"].append(
-                        f"Executable content detected in media file"
-                    )
+                    results["errors"].append("Executable content detected in media file")
                     results["is_valid"] = False
             return
 
@@ -416,12 +401,8 @@ class FileUploadValidator:
         content_lower = file_content.lower()
         for pattern in malicious_patterns:
             if pattern in content_lower:
-                logger.warning(
-                    f"Found malicious pattern {pattern} in content_type {content_type}"
-                )
-                results["errors"].append(
-                    f"Malicious pattern detected: {pattern.decode('utf-8', errors='ignore')}"
-                )
+                logger.warning(f"Found malicious pattern {pattern} in content_type {content_type}")
+                results["errors"].append(f"Malicious pattern detected: {pattern.decode('utf-8', errors='ignore')}")
                 results["is_valid"] = False
                 break
 
@@ -622,7 +603,6 @@ class SecurityAuditLogger:
     @staticmethod
     def log_file_deletion(user, file_obj, context: Dict = None):
         """Log file deletion events."""
-        context_info = f", Context: {context}" if context else ""
 
     @staticmethod
     def _has_namespace_access(user, namespace):
