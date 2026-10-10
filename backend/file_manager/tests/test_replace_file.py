@@ -23,6 +23,7 @@ class MediaFileReplaceFileTests(APITestCase):
         self.client.defaults["HTTP_HOST"] = "localhost"
 
         self.tenant = Tenant.objects.create(name="Test Tenant", identifier="test-tenant-replace", created_by=self.user)
+        self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
         self.namespace, _ = Namespace.objects.get_or_create(
             slug="test-namespace",
             defaults={
