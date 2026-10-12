@@ -163,19 +163,6 @@ const selectionKind = (target: any): 'slot' | 'widget' | 'element' => target?.ki
         ? 'widget'
         : 'element'
 
-const selectorSpecificity = (selector: string) => {
-    const source = selector
-        .replace(/:where\([^)]*\)/g, '')
-        .replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, '')
-    const ids = (source.match(/#[\w-]+/g) || []).length
-    const classes = (source.match(/\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+(?:\([^)]*\))?/g) || []).length
-    const elements = source
-        .replace(/#[\w-]+|\.[\w-]+|\[[^\]]+\]|::?[\w-]+(?:\([^)]*\))?/g, ' ')
-        .split(/[\s>+~,]+/)
-        .filter((token) => /^[a-z][\w-]*$/i.test(token)).length
-    return [ids, classes, elements]
-}
-
 const groupPartSelectors = (group: any, part: any) => {
     const normalize = (value: string) => normalizeCssName(value)
     const targeting = group.previewTargeting || {}
@@ -199,14 +186,160 @@ const groupPartSelectors = (group: any, part: any) => {
     return bases.flatMap((base) => base ? [`${base}${partSelector}`, `${base} ${partSelector}`] : [partSelector])
 }
 
-const matchingGroupPartPriority = (node: HTMLElement, group: any, part: any) => {
-    const matching = groupPartSelectors(group, part).filter((selector) => {
+const matchesCascadeTarget = (node: HTMLElement, target: any) => {
+    const selectors = Array.isArray(target?.cascadeSelectors) ? target.cascadeSelectors : []
+    if (!selectors.length) return true
+    return selectors.some((selector: string) => {
         try { return node.matches(selector) } catch { return false }
     })
-    const specificity = matching.map(selectorSpecificity).sort((left, right) => (
-        right[0] - left[0] || right[1] - left[1] || right[2] - left[2]
-    ))[0]
-    return specificity ? [...specificity, Number(group.groupIndex) || 0] : null
+}
+
+type SelectorSpecificity = [number, number, number]
+
+const compareSelectorSpecificity = (left: SelectorSpecificity, right: SelectorSpecificity) => (
+    left[0] - right[0] || left[1] - right[1] || left[2] - right[2]
+)
+
+const addSelectorSpecificity = (left: SelectorSpecificity, right: SelectorSpecificity): SelectorSpecificity => [
+    left[0] + right[0],
+    left[1] + right[1],
+    left[2] + right[2],
+]
+
+const splitSelectorList = (value: string) => {
+    const selectors: string[] = []
+    let start = 0
+    let depth = 0
+    let quote = ''
+    for (let index = 0; index < value.length; index += 1) {
+        const character = value[index]
+        if (quote) {
+            if (character === '\\') index += 1
+            else if (character === quote) quote = ''
+        } else if (character === '"' || character === "'") quote = character
+        else if (character === '(' || character === '[') depth += 1
+        else if (character === ')' || character === ']') depth = Math.max(0, depth - 1)
+        else if (character === ',' && depth === 0) {
+            selectors.push(value.slice(start, index).trim())
+            start = index + 1
+        }
+    }
+    selectors.push(value.slice(start).trim())
+    return selectors.filter(Boolean)
+}
+
+const selectorSpecificity = (selector: string): SelectorSpecificity => {
+    let specificity: SelectorSpecificity = [0, 0, 0]
+    const consumeName = (start: number) => {
+        let end = start
+        while (end < selector.length && /[\w-]/.test(selector[end])) end += 1
+        return end
+    }
+    const consumeBlock = (start: number, opener: string, closer: string) => {
+        let depth = 1
+        let quote = ''
+        let end = start + 1
+        for (; end < selector.length && depth; end += 1) {
+            const character = selector[end]
+            if (quote) {
+                if (character === '\\') end += 1
+                else if (character === quote) quote = ''
+            } else if (character === '"' || character === "'") quote = character
+            else if (character === opener) depth += 1
+            else if (character === closer) depth -= 1
+        }
+        return end
+    }
+    const maxArgumentSpecificity = (argument: string) => splitSelectorList(argument)
+        .map(selectorSpecificity)
+        .sort(compareSelectorSpecificity)
+        .at(-1) || [0, 0, 0] as SelectorSpecificity
+    const nthOfSelector = (argument: string) => {
+        let depth = 0
+        let quote = ''
+        for (let index = 0; index < argument.length - 1; index += 1) {
+            const character = argument[index]
+            if (quote) {
+                if (character === '\\') index += 1
+                else if (character === quote) quote = ''
+            } else if (character === '"' || character === "'") quote = character
+            else if (character === '(' || character === '[') depth += 1
+            else if (character === ')' || character === ']') depth = Math.max(0, depth - 1)
+            else if (depth === 0 && argument.slice(index).match(/^of(?:\s|$)/i)) return argument.slice(index + 2).trim()
+        }
+        return ''
+    }
+
+    for (let index = 0; index < selector.length;) {
+        const character = selector[index]
+        if (character === '[') {
+            specificity[1] += 1
+            index = consumeBlock(index, '[', ']')
+        } else if (character === '#') {
+            specificity[0] += 1
+            index = consumeName(index + 1)
+        } else if (character === '.') {
+            specificity[1] += 1
+            index = consumeName(index + 1)
+        } else if (character === ':') {
+            const pseudoElement = selector[index + 1] === ':'
+            const nameStart = index + (pseudoElement ? 2 : 1)
+            const nameEnd = consumeName(nameStart)
+            const name = selector.slice(nameStart, nameEnd).toLowerCase()
+            if (pseudoElement) specificity[2] += 1
+            else if (selector[nameEnd] !== '(') specificity[1] += 1
+            if (selector[nameEnd] !== '(') index = nameEnd
+            else {
+                const end = consumeBlock(nameEnd, '(', ')')
+                const argument = selector.slice(nameEnd + 1, Math.max(nameEnd + 1, end - 1))
+                if (!pseudoElement && ['is', 'not', 'has'].includes(name)) {
+                    specificity = addSelectorSpecificity(specificity, maxArgumentSpecificity(argument))
+                } else if (!pseudoElement && ['nth-child', 'nth-last-child'].includes(name)) {
+                    specificity[1] += 1
+                    const ofSelector = nthOfSelector(argument)
+                    if (ofSelector) specificity = addSelectorSpecificity(specificity, maxArgumentSpecificity(ofSelector))
+                } else if (!pseudoElement && name !== 'where') specificity[1] += 1
+                index = end
+            }
+        } else if (/[a-z_]/i.test(character)) {
+            specificity[2] += 1
+            index = consumeName(index)
+        } else if (character === '\\') index += 2
+        else index += 1
+    }
+    return specificity
+}
+
+const fallbackCascadeWinner = (node: HTMLElement, targets: any[]) => [...targets]
+    .map((target) => {
+        const specificity = (target.cascadeSelectors || [])
+            .filter((selector: string) => {
+                try { return node.matches(selector) } catch { return false }
+            })
+            .map(selectorSpecificity)
+            .sort(compareSelectorSpecificity)
+            .at(-1) || [0, 0, 0]
+        return { target, specificity: specificity as SelectorSpecificity }
+    })
+    .sort((left, right) => (
+        compareSelectorSpecificity(left.specificity, right.specificity)
+        || Number(left.target.cascadeSourceOrder ?? -1) - Number(right.target.cascadeSourceOrder ?? -1)
+    ))
+    .at(-1)?.target || null
+
+const selectorCascadeWinner = (node: HTMLElement, targets: any[]) => {
+    const applicable = targets.filter((target) => matchesCascadeTarget(node, target))
+    if (applicable.length < 2) return applicable[0] || null
+    return fallbackCascadeWinner(node, applicable)
+}
+
+const editableCascadeWinner = (node: HTMLElement, targets: any[], property: string) => {
+    const applicable = targets.filter((target) => matchesCascadeTarget(node, target))
+    const declaring = applicable.filter((target) => (target.activeSpacingProperties || []).includes(property))
+    const candidates = declaring.length ? declaring : applicable
+    const cascadeCandidates = candidates.filter((target) => (target.cascadeSelectors || []).length)
+    if (cascadeCandidates.length) return selectorCascadeWinner(node, cascadeCandidates)
+    return [...candidates].sort(compareCascadePriorityForProperty(property)).at(-1) || null
 }
 
 const compareCascadePriority = (left: any, right: any) => {
@@ -234,21 +367,40 @@ const widgetSpacingConfigurationTargets = (
     const widgetRoot = node.closest<HTMLElement>('[data-widget-id][data-widget-type]')
     if (!widgetRoot) return []
     const seen = new Set<string>()
-    return [...widgetRoot.querySelectorAll<HTMLElement>('[data-designer-target]')].flatMap((configurationNode) => {
+    const candidates = [...widgetRoot.querySelectorAll<HTMLElement>('[data-designer-target]')].flatMap((configurationNode) => {
         if (configurationNode.closest<HTMLElement>('[data-widget-id]') !== widgetRoot) return []
         return nodeTargets(configurationNode).flatMap((candidate: any) => {
             const targetId = candidate.styleTargetId || candidate.id
             const editableFields = designer.editableSpacingTargets?.[targetId] || []
-            if (!targetId || !editableFields.length || !candidate.isWidgetSurface || seen.has(targetId)) return []
+            if (!targetId || !editableFields.length || !candidate.isWidgetSurface || seen.has(targetId)
+                || !matchesCascadeTarget(configurationNode, candidate)) return []
             seen.add(targetId)
             return [{
                 ...candidate,
+                _cascadeNode: configurationNode,
                 widgetId: candidate.widgetId || widgetRoot.dataset.widgetId || '',
                 widgetType: candidate.widgetType || widgetRoot.dataset.widgetType || '',
                 computedStyles: computedThemeValues(configurationNode),
             }]
         })
     })
+    const properties = [...new Set(candidates.flatMap((candidate: any) => (
+        designer.editableSpacingTargets?.[candidate.styleTargetId || candidate.id] || []
+    )))]
+    const winningProperties = new Map<string, string[]>()
+    properties.forEach((property) => {
+        const eligible = candidates.filter((candidate: any) => (
+            designer.editableSpacingTargets?.[candidate.styleTargetId || candidate.id]?.includes(property)
+        ))
+        const node = eligible[0]?._cascadeNode
+        const winner = node ? editableCascadeWinner(node, eligible, property) : null
+        const winnerId = winner?.styleTargetId || winner?.id
+        if (winnerId) winningProperties.set(winnerId, [...(winningProperties.get(winnerId) || []), property])
+    })
+    return candidates.map(({ _cascadeNode, ...candidate }: any) => ({
+        ...candidate,
+        cascadeWinningProperties: winningProperties.get(candidate.styleTargetId || candidate.id) || [],
+    }))
 }
 
 const selectionPaths = (node: HTMLElement, preferredTarget?: any, designer?: RenderPageModel['designer']) => {
@@ -411,12 +563,14 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     let selectedNodes: Record<'slot' | 'widget' | 'element', HTMLElement | null> = { slot: null, widget: null, element: null }
     let previewedSelectionLevel: 'slot' | 'widget' | 'element' | null = null
     let contextMenu: HTMLElement | null = null
+    let dynamicSelectionRefreshFrame = 0
     const measurementTargets = new Map<string, {
         node: HTMLElement
         property: string
         targetId: string
         targetIds: string[]
         editableTargetIds: string[]
+        editableTargets: any[]
         axis: 'horizontal' | 'vertical'
     }>()
     if (designer.layoutCanvas) {
@@ -570,8 +724,9 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                 [target.id, target.styleTargetId].filter(Boolean).flatMap((targetId) => (
                     designer.editableSpacingTargets?.[targetId]?.includes(property) ? [{ ...target, targetId }] : []
                 ))
-            )).sort(compareCascadePriorityForProperty(property)).reverse()
-            const editableTargetIds = editableTargets.length ? [editableTargets[0].targetId] : []
+            ))
+            const editableTarget = editableCascadeWinner(editNode, editableTargets, property)
+            const editableTargetIds = editableTarget ? [editableTarget.targetId] : []
             const spacingTargetId = editableTargetIds[0] || ''
             const editable = Boolean(spacingTargetId)
             label.setAttribute('aria-hidden', editable ? 'false' : 'true')
@@ -587,6 +742,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                     targetId: spacingTargetId,
                     targetIds,
                     editableTargetIds,
+                    editableTargets,
                     axis,
                 })
                 label.dataset.editable = 'true'
@@ -877,15 +1033,17 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         }
         const registerParts = (searchRoot: HTMLElement) => {
             ;(group.parts || []).forEach((part: any) => searchRoot.querySelectorAll<HTMLElement>(`.${normalizeCssName(part.part)}`).forEach((node) => {
-                const cascadePriority = matchingGroupPartPriority(node, group, part)
-                if (!cascadePriority) return
                 const widgetLevel = part.designerLevel !== 'element'
                 registerTarget(node, {
                     id: part.id,
                     kind: widgetLevel ? 'part' : 'element',
                     label: part.label,
                     isWidgetSurface: part.isWidgetSurface === true,
-                    cascadePriority,
+                    cascadePriority: [0,
+                        Number((group.widgetTypes || []).length > 0) + Number((group.slots || []).length > 0) + 1,
+                        0, Number(group.groupIndex) || 0],
+                    cascadeSelectors: groupPartSelectors(group, part),
+                    cascadeSourceOrder: Number(group.groupIndex) || 0,
                     activeSpacingProperties: part.activeSpacingProperties || [],
                     editable: false,
                 }, widgetLevel)
@@ -1190,12 +1348,14 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             if (!match) return []
             const value = `${Math.max(0, Math.round((Number(match[1]) + direction * step) * 1000) / 1000)}${match[2] || 'px'}`
             target.node.style.setProperty(cssProperty, value)
-            return target.editableTargetIds.map((targetId) => ({
+            const editableTarget = editableCascadeWinner(target.node, target.editableTargets, target.property)
+            const targetId = editableTarget?.targetId
+            return targetId ? [{
                 targetId,
                 targetIds: target.targetIds,
                 property: target.property,
                 value,
-            }))
+            }] : []
         })
         if (changes.length === 1) window.parent.postMessage({
             source: 'eceee-designer-preview',
@@ -1215,13 +1375,23 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     document.addEventListener('pointerdown', dismissContextMenu)
     document.addEventListener('keydown', handleMeasurementKeyboard)
     const findHoveredNode = (target: EventTarget | null) => target instanceof HTMLElement ? target : null
+    const refreshSelectedInspectorTargets = () => {
+        if (!selectedNode || !root.contains(selectedNode)) return
+        cancelAnimationFrame(dynamicSelectionRefreshFrame)
+        dynamicSelectionRefreshFrame = requestAnimationFrame(() => {
+            if (!selectedNode || !root.contains(selectedNode)) return
+            postDesignerEvent(selectedNode, designer, 'select', nodeTargets(selectedNode)[0])
+        })
+    }
     const over = (event: MouseEvent) => {
         if (selectedNode && root.contains(selectedNode)) {
             if (hoveredNode !== selectedNode) showSelectedSpacing()
+            refreshSelectedInspectorTargets()
             return
         }
         const node = findHoveredNode(event.target)
         if (node && root.contains(node) && node !== hoveredNode) showSpacing(node)
+        refreshSelectedInspectorTargets()
     }
     const out = (event: MouseEvent) => {
         if (!hoveredNode || (event.relatedTarget instanceof Node && hoveredNode.contains(event.relatedTarget))) return
@@ -1229,6 +1399,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         if (next && root.contains(next)) showSpacing(next)
         else if (selectedNode && root.contains(selectedNode)) showSelectedSpacing()
         else clearGuides()
+        refreshSelectedInspectorTargets()
     }
     const selectFromInspector = (event: Event) => {
         const node = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-designer-target]') : null
@@ -1254,6 +1425,8 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     }
     root.addEventListener('mouseover', over)
     root.addEventListener('mouseout', out)
+    root.addEventListener('focusin', refreshSelectedInspectorTargets)
+    root.addEventListener('focusout', refreshSelectedInspectorTargets)
     root.addEventListener('designerselect', selectFromInspector)
     root.addEventListener('designerclear', clearFocus)
     const previewSelectionLevel = (event: Event) => {
@@ -1271,6 +1444,9 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         document.removeEventListener('keydown', handleMeasurementKeyboard)
         root.removeEventListener('mouseover', over)
         root.removeEventListener('mouseout', out)
+        root.removeEventListener('focusin', refreshSelectedInspectorTargets)
+        root.removeEventListener('focusout', refreshSelectedInspectorTargets)
+        cancelAnimationFrame(dynamicSelectionRefreshFrame)
         root.removeEventListener('designerselect', selectFromInspector)
         root.removeEventListener('designerclear', clearFocus)
         root.removeEventListener('designerpreviewselectionlevel', previewSelectionLevel)

@@ -544,7 +544,9 @@ const compareCascadePriority = (left, right) => {
 }
 
 const compareCascadePriorityForField = (field) => (left, right) => (
-    Number((left?.activeSpacingProperties || []).includes(field))
+    Number((left?.cascadeWinningProperties || []).includes(field))
+    - Number((right?.cascadeWinningProperties || []).includes(field))
+    || Number((left?.activeSpacingProperties || []).includes(field))
     - Number((right?.activeSpacingProperties || []).includes(field))
     || compareCascadePriority(left, right)
 )
@@ -931,6 +933,7 @@ const SemanticThemeWorkspace = ({
                     isWidgetSurface: option.isWidgetSurface === true,
                     cascadePriority: Array.isArray(option.cascadePriority) ? option.cascadePriority : [],
                     activeSpacingProperties: Array.isArray(option.activeSpacingProperties) ? option.activeSpacingProperties : [],
+                    cascadeWinningProperties: Array.isArray(option.cascadeWinningProperties) ? option.cascadeWinningProperties : [],
                     configurationSpacingTargets: Array.isArray(option.configurationSpacingTargets)
                         ? option.configurationSpacingTargets.map(normalizeTarget)
                         : [],
