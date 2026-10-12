@@ -18,6 +18,36 @@ const configuredSpacingFields = (values: Record<string, any> = {}) => [...new Se
         .flatMap(([field]) => [field, ...(spacingDirections[field] || [])]),
 )]
 
+const normalizedBreakpoint = (breakpoint: unknown) => ({
+    default: 'xs', mobile: 'xs', desktop: 'sm', tablet: 'md',
+}[String(breakpoint || 'xs')] || String(breakpoint || 'xs'))
+
+const defaultBreakpoints = { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 }
+
+const breakpointWidth = (breakpoint: unknown, breakpoints: Record<string, number>) => {
+    const normalized = normalizedBreakpoint(breakpoint)
+    return /^\d+$/.test(normalized) ? Number(normalized) : Number(breakpoints?.[normalized] ?? defaultBreakpoints[normalized])
+}
+
+const activeSpacingProperties = (
+    rows: any[],
+    breakpoints: Record<string, number>,
+    viewportWidth: number | undefined,
+) => {
+    if (!Number.isFinite(viewportWidth)) return [...new Set(rows.flatMap((row) => configuredSpacingFields(row.values)))]
+    const applicable = rows.filter((row) => {
+        const width = breakpointWidth(row.breakpoint, breakpoints)
+        return Number.isFinite(width) && width <= Number(viewportWidth)
+    })
+    const properties = new Set(applicable.flatMap((row) => configuredSpacingFields(row.values)))
+    return [...properties].filter((property) => applicable.some((row) => (
+        configuredSpacingFields(row.values).includes(property)
+        && breakpointWidth(row.breakpoint, breakpoints) === Math.max(...applicable
+            .filter((candidate) => configuredSpacingFields(candidate.values).includes(property))
+            .map((candidate) => breakpointWidth(candidate.breakpoint, breakpoints)))
+    )))
+}
+
 const renderedWidgetTypes = (slots: Record<string, RenderWidgetModel[]>) => {
     const types = new Set<string>()
     const visit = (widget: RenderWidgetModel) => {
@@ -128,6 +158,7 @@ export const createPageRenderModel = ({
 
 export const createDesignerRenderModel = ({
     workspace, viewId, themeCss = '', fontUrl = '', sourceModel = null, guidesEnabled = true, contentEditable = false,
+    viewportWidth = undefined,
 }: any): RenderPageModel => {
     const views = workspace?.previewContent?.views || workspace?.catalog?.previewViews || []
     const view = views.find((candidate: any) => candidate.id === viewId) || views[0] || {}
@@ -257,6 +288,29 @@ export const createDesignerRenderModel = ({
         return targets
     }, { ...genericWidgetSpacing, ...structuralSlotSpacing, ...structuralWidgetPartSpacing })
 
+    const themeGroups = workspace?.themeConfig?.designGroups?.groups
+        || workspace?.themeConfig?.design_groups?.groups
+        || []
+    const designGroupTargeting = Object.fromEntries((workspace?.catalog?.designGroups || []).map((group: any) => {
+        const themeGroup = themeGroups[group.groupIndex] || {}
+        return [group.id, {
+                targetingMode: themeGroup.targetingMode || themeGroup.targeting_mode || 'widget-slot',
+                targetCssClasses: themeGroup.targetCssClasses || themeGroup.target_css_classes || '',
+                variants: themeGroup.variants?.length ? themeGroup.variants : [themeGroup.variant].filter(Boolean),
+                cssModifier: themeGroup.cssModifier || themeGroup.css_modifier || '',
+            }]
+    }))
+    const activeSpacingPropertiesByTarget = Object.fromEntries(
+        (workspace?.catalog?.designGroups || []).flatMap((group: any) => (group.parts || []).map((part: any) => [
+            part.id,
+            activeSpacingProperties(
+                (workspace?.spacing || []).filter((row: any) => row.targetId === part.id),
+                workspace?.breakpoints || {},
+                viewportWidth,
+            ),
+        ])),
+    )
+
     return {
         layout,
         layoutDefinition,
@@ -277,6 +331,8 @@ export const createDesignerRenderModel = ({
         fontUrl,
         designer: {
             catalog: workspace?.catalog || {},
+            designGroupTargeting,
+            activeSpacingPropertiesByTarget,
             texts: sourceModel ? {} : view.texts || {},
             assets: workspace?.assets || [],
             editableTypographyTargets: (workspace?.typography || []).reduce((targets: Record<string, string[]>, row: any) => {

@@ -163,12 +163,51 @@ const selectionKind = (target: any): 'slot' | 'widget' | 'element' => target?.ki
         ? 'widget'
         : 'element'
 
-const cascadePriorityForGroupPart = (group: any) => [
-    0,
-    Number((group.widgetTypes || []).length > 0) + Number((group.slots || []).length > 0) + 1,
-    0,
-    Number(group.groupIndex) || 0,
-]
+const selectorSpecificity = (selector: string) => {
+    const source = selector
+        .replace(/:where\([^)]*\)/g, '')
+        .replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, '')
+    const ids = (source.match(/#[\w-]+/g) || []).length
+    const classes = (source.match(/\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+(?:\([^)]*\))?/g) || []).length
+    const elements = source
+        .replace(/#[\w-]+|\.[\w-]+|\[[^\]]+\]|::?[\w-]+(?:\([^)]*\))?/g, ' ')
+        .split(/[\s>+~,]+/)
+        .filter((token) => /^[a-z][\w-]*$/i.test(token)).length
+    return [ids, classes, elements]
+}
+
+const groupPartSelectors = (group: any, part: any) => {
+    const normalize = (value: string) => normalizeCssName(value)
+    const targeting = group.previewTargeting || {}
+    const variants = (targeting.variants || []).map((variant: string) => `.${variant}`).join('')
+    const modifier = targeting.cssModifier || ''
+    const partSelector = `.${normalize(part.part)}${variants}${modifier}`
+    let bases: string[] = []
+    if (targeting.targetingMode === 'css-classes') {
+        bases = String(targeting.targetCssClasses || '').split(/[,\n]/).map((value) => value.trim()).filter(Boolean)
+    } else {
+        const widgetTypes = group.widgetTypes || []
+        const slots = group.slots || []
+        if (widgetTypes.length && slots.length) {
+            bases = widgetTypes.flatMap((widgetType: string) => slots.map((slot: string) => (
+                `.slot-${normalize(slot)} > .widget-type-${normalize(widgetType)}`
+            )))
+        } else if (widgetTypes.length) bases = widgetTypes.map((widgetType: string) => `.widget-type-${normalize(widgetType)}`)
+        else if (slots.length) bases = slots.map((slot: string) => `.slot-${normalize(slot)}`)
+        else bases = ['']
+    }
+    return bases.flatMap((base) => base ? [`${base}${partSelector}`, `${base} ${partSelector}`] : [partSelector])
+}
+
+const matchingGroupPartPriority = (node: HTMLElement, group: any, part: any) => {
+    const matching = groupPartSelectors(group, part).filter((selector) => {
+        try { return node.matches(selector) } catch { return false }
+    })
+    const specificity = matching.map(selectorSpecificity).sort((left, right) => (
+        right[0] - left[0] || right[1] - left[1] || right[2] - left[2]
+    ))[0]
+    return specificity ? [...specificity, Number(group.groupIndex) || 0] : null
+}
 
 const compareCascadePriority = (left: any, right: any) => {
     const leftPriority = Array.isArray(left?.cascadePriority) ? left.cascadePriority : [0, 0, 0, -1]
@@ -179,6 +218,12 @@ const compareCascadePriority = (left: any, right: any) => {
     }
     return 0
 }
+
+const compareCascadePriorityForProperty = (property: string) => (left: any, right: any) => (
+    Number((left.activeSpacingProperties || []).includes(property))
+    - Number((right.activeSpacingProperties || []).includes(property))
+    || compareCascadePriority(left, right)
+)
 
 const widgetSpacingConfigurationTargets = (
     node: HTMLElement,
@@ -525,7 +570,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                 [target.id, target.styleTargetId].filter(Boolean).flatMap((targetId) => (
                     designer.editableSpacingTargets?.[targetId]?.includes(property) ? [{ ...target, targetId }] : []
                 ))
-            )).sort(compareCascadePriority).reverse()
+            )).sort(compareCascadePriorityForProperty(property)).reverse()
             const editableTargetIds = editableTargets.length ? [editableTargets[0].targetId] : []
             const spacingTargetId = editableTargetIds[0] || ''
             const editable = Boolean(spacingTargetId)
@@ -737,7 +782,14 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             }] : []
         })
     )
-    const groups = designer.catalog?.designGroups || []
+    const groups = (designer.catalog?.designGroups || []).map((group: any) => ({
+        ...group,
+        previewTargeting: designer.designGroupTargeting?.[group.id] || {},
+        parts: (group.parts || []).map((part: any) => ({
+            ...part,
+            activeSpacingProperties: designer.activeSpacingPropertiesByTarget?.[part.id] || [],
+        })),
+    }))
     const widgetParts = designer.catalog?.widgetParts || []
     const layouts = designer.catalog?.layouts || []
     const layout = layouts.find((candidate: any) => candidate.key === model.layout)
@@ -823,6 +875,22 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                 } catch { /* Invalid theme selector metadata is ignored in preview. */ }
             })
         }
+        const registerParts = (searchRoot: HTMLElement) => {
+            ;(group.parts || []).forEach((part: any) => searchRoot.querySelectorAll<HTMLElement>(`.${normalizeCssName(part.part)}`).forEach((node) => {
+                const cascadePriority = matchingGroupPartPriority(node, group, part)
+                if (!cascadePriority) return
+                const widgetLevel = part.designerLevel !== 'element'
+                registerTarget(node, {
+                    id: part.id,
+                    kind: widgetLevel ? 'part' : 'element',
+                    label: part.label,
+                    isWidgetSurface: part.isWidgetSurface === true,
+                    cascadePriority,
+                    activeSpacingProperties: part.activeSpacingProperties || [],
+                    editable: false,
+                }, widgetLevel)
+            }))
+        }
         const allowedSlots = new Set<string>(group.slots || [])
         const groupWidgetTypes = new Set<string>((group.widgetTypes || []).map(widgetTypeKey))
         widgetRoots.forEach((node) => {
@@ -834,26 +902,20 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         if (!(group.widgetTypes || []).length) {
             if (allowedSlots.size) {
                 allowedSlots.forEach((slot) => {
-                    root.querySelectorAll<HTMLElement>(`.slot-${normalizeCssName(slot)}`).forEach(registerElements)
+                    root.querySelectorAll<HTMLElement>(`.slot-${normalizeCssName(slot)}`).forEach((slotRoot) => {
+                        registerParts(slotRoot)
+                        registerElements(slotRoot)
+                    })
                 })
             } else {
+                registerParts(root)
                 registerElements(root)
             }
             return
         }
         roots.forEach((groupRoot) => {
             registerTarget(groupRoot, { id: group.id, kind: 'group', label: group.label, editable: false })
-            ;(group.parts || []).forEach((part: any) => groupRoot.querySelectorAll<HTMLElement>(`.${normalizeCssName(part.part)}`).forEach((node) => {
-                const widgetLevel = part.designerLevel !== 'element'
-                registerTarget(node, {
-                    id: part.id,
-                    kind: widgetLevel ? 'part' : 'element',
-                    label: part.label,
-                    isWidgetSurface: part.isWidgetSurface === true,
-                    cascadePriority: cascadePriorityForGroupPart(group),
-                    editable: false,
-                }, widgetLevel)
-            }))
+            registerParts(groupRoot)
             ;(group.assetKeys || []).forEach((assetKey: string) => {
                 const asset = designer.assets.find((candidate: any) => candidate.assetKey === assetKey)
                 const targetNode = asset?.part ? groupRoot.querySelector<HTMLElement>(`.${normalizeCssName(asset.part)}`) || groupRoot : groupRoot

@@ -57,6 +57,8 @@ export interface DesignerRenderOptions {
     assets: Array<Record<string, any>>
     editableTypographyTargets?: Record<string, string[]>
     editableSpacingTargets?: Record<string, string[]>
+    designGroupTargeting?: Record<string, Record<string, any>>
+    activeSpacingPropertiesByTarget?: Record<string, string[]>
     previewImageReferences?: DesignerPreviewImageReference[]
     contentEditable?: boolean
     guidesEnabled?: boolean

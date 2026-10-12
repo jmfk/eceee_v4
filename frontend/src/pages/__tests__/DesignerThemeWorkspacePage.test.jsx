@@ -1204,6 +1204,57 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(within(panel).getByLabelText('element Margin bottom')).toHaveValue('16px')
     })
 
+    it('saves a merged widget surface to the group declaring the property at the active breakpoint', async () => {
+        const responsiveWorkspace = structuredClone(workspace)
+        responsiveWorkspace.catalog.designGroups = [0, 1].map((groupIndex) => ({
+            id: `group:${groupIndex}`, groupIndex, label: `Content ${groupIndex + 1}`,
+            widgetTypes: ['easy_widgets.ContentWidget'], slots: groupIndex === 0 ? ['main'] : [], elements: [], assetKeys: [],
+            parts: [{
+                id: `group:${groupIndex}:part:content-widget`, part: 'content-widget',
+                label: 'Content area', editableSpacingProperties: ['paddingTop'], isWidgetSurface: true,
+            }],
+        }))
+        responsiveWorkspace.spacing = [{
+            targetId: 'group:0:part:content-widget', scope: 'layout', groupIndex: 0,
+            part: 'content-widget', breakpoint: 'xl', values: { paddingTop: '50px' },
+        }, {
+            targetId: 'group:1:part:content-widget', scope: 'layout', groupIndex: 1,
+            part: 'content-widget', breakpoint: 'xs', values: { paddingTop: '20px' },
+        }]
+        responsiveWorkspace.constraints.editableSpacingProperties = ['paddingTop']
+        mocks.workspace.mockResolvedValue(responsiveWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        fireEvent.click(screen.getByRole('button', { name: 'Base (Mobile) preview at 375px' }))
+        const { iframe } = await readyPreview()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget:content-1', styleTargetId: 'widget-type:easy_widgets.ContentWidget',
+                kind: 'widget', widgetType: 'easy_widgets.ContentWidget', widgetId: 'content-1', label: 'Content widget',
+                computedStyles: { paddingTop: '20px' },
+                configurationSpacingTargets: [{
+                    id: 'group:0:part:content-widget', kind: 'part', label: 'Content area',
+                    widgetId: 'content-1', widgetType: 'easy_widgets.ContentWidget', isWidgetSurface: true,
+                    cascadePriority: [0, 3, 0, 0], activeSpacingProperties: [], computedStyles: { paddingTop: '20px' },
+                }, {
+                    id: 'group:1:part:content-widget', kind: 'part', label: 'Content area',
+                    widgetId: 'content-1', widgetType: 'easy_widgets.ContentWidget', isWidgetSurface: true,
+                    cascadePriority: [0, 2, 0, 1], activeSpacingProperties: ['paddingTop'], computedStyles: { paddingTop: '20px' },
+                }],
+            },
+            source: iframe.contentWindow,
+        }))
+
+        fireEvent.change(await screen.findByLabelText('widget Padding top'), { target: { value: '24px' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        const savedSpacing = mocks.save.mock.calls[0][1].spacing
+        expect(savedSpacing.find((row) => row.groupIndex === 0).values.paddingTop).toBe('50px')
+        expect(savedSpacing.find((row) => row.groupIndex === 1).values.paddingTop).toBe('24px')
+    })
+
     it('shows only meaningful computed spacing controls for a selected widget', async () => {
         const compactSpacingWorkspace = structuredClone(workspace)
         compactSpacingWorkspace.constraints.editableSpacingProperties = [
