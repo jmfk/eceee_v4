@@ -1020,6 +1020,14 @@ describe('DesignerThemeWorkspacePage', () => {
         zeroSpacingWorkspace.constraints.editableWidgetSurfaceSpacingProperties = [
             'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'gap', 'width', 'height',
         ]
+        zeroSpacingWorkspace.catalog.widgetParts = [{
+            widgetType: 'easy_widgets.HeroWidget', label: 'Hero',
+            parts: [{
+                id: 'widget-part:easy_widgets.HeroWidget:hero-widget', part: 'hero-widget',
+                label: 'Hero content', designerLevel: 'widget', isWidgetSurface: true,
+                editableSpacingProperties: zeroSpacingWorkspace.constraints.editableWidgetSurfaceSpacingProperties,
+            }],
+        }]
         mocks.workspace.mockResolvedValue(zeroSpacingWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
@@ -1035,6 +1043,14 @@ describe('DesignerThemeWorkspacePage', () => {
                     paddingTop: '0px', paddingRight: '0px', paddingBottom: '0px', paddingLeft: '0px',
                     gap: '0px', width: '960px', height: '320px',
                 },
+                configurationSpacingTargets: [{
+                    id: 'widget-part:easy_widgets.HeroWidget:hero-widget', kind: 'part', label: 'Hero content',
+                    widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget', isWidgetSurface: true,
+                    computedStyles: {
+                        paddingTop: '0px', paddingRight: '0px', paddingBottom: '0px', paddingLeft: '0px',
+                        gap: '0px', width: '960px', height: '320px',
+                    },
+                }],
             },
             source: iframe.contentWindow,
         }))
@@ -1046,8 +1062,10 @@ describe('DesignerThemeWorkspacePage', () => {
         fireEvent.click(collapsedPanel)
 
         expect(screen.getByRole('button', { name: 'Collapse selected widget Hero widget' })).toHaveAttribute('aria-expanded', 'true')
-        expect(screen.getByLabelText('widget Margin top')).toHaveValue('0px')
-        expect(screen.queryByLabelText('widget Padding bottom')).not.toBeInTheDocument()
+        expect(screen.getByLabelText('widget Widget placement Margin top')).toHaveValue('0px')
+        expect(screen.getByLabelText('widget Widget content · Hero content Padding bottom')).toHaveValue('0px')
+        expect(screen.getByRole('heading', { name: 'Widget placement' })).toBeInTheDocument()
+        expect(screen.getByLabelText('widget Widget placement Width')).toHaveValue('960px')
     })
 
     it('shows one widget-content section and hides zero-valued widget placement spacing', async () => {
@@ -1148,6 +1166,16 @@ describe('DesignerThemeWorkspacePage', () => {
         const reopenedPanelButton = await screen.findByRole('button', { name: 'Collapse selected widget Content widget' })
         const reopenedPanel = document.getElementById(reopenedPanelButton.getAttribute('aria-controls'))
         expect(within(reopenedPanel).getAllByRole('heading', { name: 'Widget content · Content area' })).toHaveLength(1)
+
+        fireEvent.change(within(reopenedPanel).getByLabelText('widget Padding top'), { target: { value: '42px' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        expect(mocks.save.mock.calls[0][1].spacing).toEqual(expect.arrayContaining([0, 1, 2].map((groupIndex) => (
+            expect.objectContaining({
+                scope: 'layout', groupIndex, part: 'content-widget', breakpoint: 'xl',
+                values: expect.objectContaining({ paddingTop: '42px' }),
+            })
+        ))))
     })
 
     it('shows design-group properties directly below a selected element row', async () => {

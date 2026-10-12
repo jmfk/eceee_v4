@@ -1408,14 +1408,48 @@ const SemanticThemeWorkspace = ({
         return { computed, fields, entries, structural }
     }
     const updateLevelSpacing = (target, field, value) => {
+        const representedTargets = [target, ...(target.configurationSpacingTargets || [])]
         setThemeDefaults((current) => ({
             ...current,
-            [target.id]: { ...(current[target.id] || target.computedStyles || {}), [field]: value },
-            ...(target.styleTargetId ? {
-                [target.styleTargetId]: { ...(current[target.styleTargetId] || target.computedStyles || {}), [field]: value },
-            } : {}),
+            ...Object.fromEntries(representedTargets.flatMap((representedTarget) => [
+                [representedTarget.id, { ...(current[representedTarget.id] || representedTarget.computedStyles || {}), [field]: value }],
+                ...(representedTarget.styleTargetId ? [[
+                    representedTarget.styleTargetId,
+                    { ...(current[representedTarget.styleTargetId] || representedTarget.computedStyles || {}), [field]: value },
+                ]] : []),
+            ])),
         }))
         const { entries } = spacingForLevelTarget(target)
+        if (representedTargets.length > 1) {
+            const representedEntries = representedTargets.flatMap((representedTarget) => {
+                const structural = structuralSpacingTargetFor(representedTarget)
+                if (!structural || !editableSpacingFieldsForTarget(representedTarget, structural).includes(field)) return []
+                const entry = spacingEntryForField(entries.filter((candidate) => candidate.row.targetId === structural.targetId), field)
+                return [{ structural, entry }]
+            })
+            if (representedEntries.length) {
+                updateWorkspace((next) => {
+                    const configured = getBreakpoints(next)
+                    representedEntries.forEach(({ structural, entry }) => {
+                        const inherited = entry?.row.breakpoint
+                            && breakpointWidth(entry.row.breakpoint, configured) !== breakpointWidth(viewport, configured)
+                        let row = !inherited && entry?.index >= 0 ? next.spacing[entry.index] : null
+                        if (!row) {
+                            row = next.spacing.find((candidate) => (
+                                candidate.targetId === structural.targetId && candidate.breakpoint === viewport
+                            ))
+                        }
+                        if (!row) {
+                            row = { ...(entry?.row || structural), breakpoint: viewport, values: {} }
+                            next.spacing.push(row)
+                        }
+                        row.values[field] = value
+                    })
+                    return next
+                })
+                return
+            }
+        }
         const entry = spacingEntryForField(entries, field)
         const configured = getBreakpoints(workspace)
         const inherited = entry?.row.breakpoint
@@ -1958,8 +1992,16 @@ const SemanticThemeWorkspace = ({
                 }
                 const panelId = `selected-${kind}-spacing`
                 const label = target.displayLabel || target.label
-                const configurationSpacingTargets = [...new Map((target.configurationSpacingTargets || [])
-                    .map((spacingTarget) => [configurationSpacingTargetKey(spacingTarget), spacingTarget])).values()]
+                const configurationSpacingTargets = [...(target.configurationSpacingTargets || []).reduce((targets, spacingTarget) => {
+                    const key = configurationSpacingTargetKey(spacingTarget)
+                    const current = targets.get(key)
+                    if (!current) targets.set(key, spacingTarget)
+                    else targets.set(key, {
+                        ...current,
+                        configurationSpacingTargets: [...(current.configurationSpacingTargets || []), spacingTarget],
+                    })
+                    return targets
+                }, new Map()).values()]
                 const spacingSectionCandidates = [
                     { target: { ...target, configurationSpacingTargets: [] }, configuration: false },
                     ...configurationSpacingTargets.map((spacingTarget) => ({ target: spacingTarget, configuration: true })),
@@ -1971,6 +2013,7 @@ const SemanticThemeWorkspace = ({
                 const hasConfigurationSpacing = spacingSectionCandidates.some(({ configuration }) => configuration)
                 const spacingSections = spacingSectionCandidates.filter((section) => (
                     section.configuration || !hasConfigurationSpacing || !spacingSectionIsAllZero(section)
+                    || section.fields.some((field) => ['width', 'height'].includes(field))
                 ))
                 const hasEditableSpacing = spacingSections.length > 0
                 const isActiveTargetPanel = targetFocusKey(target) === targetFocusKey(selectedTarget)

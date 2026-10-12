@@ -163,17 +163,6 @@ const selectionKind = (target: any): 'slot' | 'widget' | 'element' => target?.ki
         ? 'widget'
         : 'element'
 
-const configurationSpacingTargetKey = (target: any) => {
-    const targetId = target?.styleTargetId || target?.id || ''
-    const designGroupPart = targetId.match(/^group:[^:]+:part:(.+)$/)
-    return designGroupPart ? `design-group-part:${designGroupPart[1]}` : targetId
-}
-
-const designGroupIndex = (target: any) => {
-    const match = String(target?.styleTargetId || target?.id || '').match(/^group:(\d+):part:/)
-    return match ? Number(match[1]) : -1
-}
-
 const widgetSpacingConfigurationTargets = (
     node: HTMLElement,
     designer: RenderPageModel['designer'],
@@ -182,27 +171,22 @@ const widgetSpacingConfigurationTargets = (
     if (!designer || target?.kind !== 'widget') return []
     const widgetRoot = node.closest<HTMLElement>('[data-widget-id][data-widget-type]')
     if (!widgetRoot) return []
-    const targetsBySurface = new Map<string, any>()
-    ;[...widgetRoot.querySelectorAll<HTMLElement>('[data-designer-target]')].forEach((configurationNode) => {
-        if (configurationNode.closest<HTMLElement>('[data-widget-id]') !== widgetRoot) return
-        nodeTargets(configurationNode).forEach((candidate: any) => {
+    const seen = new Set<string>()
+    return [...widgetRoot.querySelectorAll<HTMLElement>('[data-designer-target]')].flatMap((configurationNode) => {
+        if (configurationNode.closest<HTMLElement>('[data-widget-id]') !== widgetRoot) return []
+        return nodeTargets(configurationNode).flatMap((candidate: any) => {
             const targetId = candidate.styleTargetId || candidate.id
-            const targetKey = configurationSpacingTargetKey(candidate)
             const editableFields = designer.editableSpacingTargets?.[targetId] || []
-            if (!targetId || !editableFields.length || !candidate.isWidgetSurface) return
-            // Design groups are registered in CSS cascade order. Keep the last
-            // applicable group so the Inspector edits the rule that wins.
-            const current = targetsBySurface.get(targetKey)
-            if (current && designGroupIndex(current) > designGroupIndex(candidate)) return
-            targetsBySurface.set(targetKey, {
+            if (!targetId || !editableFields.length || !candidate.isWidgetSurface || seen.has(targetId)) return []
+            seen.add(targetId)
+            return [{
                 ...candidate,
                 widgetId: candidate.widgetId || widgetRoot.dataset.widgetId || '',
                 widgetType: candidate.widgetType || widgetRoot.dataset.widgetType || '',
                 computedStyles: computedThemeValues(configurationNode),
-            })
+            }]
         })
     })
-    return [...targetsBySurface.values()]
 }
 
 const selectionPaths = (node: HTMLElement, preferredTarget?: any, designer?: RenderPageModel['designer']) => {
@@ -370,6 +354,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         property: string
         targetId: string
         targetIds: string[]
+        editableTargetIds: string[]
         axis: 'horizontal' | 'vertical'
     }>()
     if (designer.layoutCanvas) {
@@ -518,7 +503,9 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                 })
                 targetNode = targetNode.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
             }
-            const editableTargetIds = directTargetIds.filter((targetId: string) => designer.editableSpacingTargets?.[targetId]?.includes(property))
+            const editableTargetIds = [...new Set(directTargetIds.filter((targetId: string) => (
+                designer.editableSpacingTargets?.[targetId]?.includes(property)
+            )))]
             const spacingTargetId = editableTargetIds[0] || ''
             const editable = Boolean(spacingTargetId)
             label.setAttribute('aria-hidden', editable ? 'false' : 'true')
@@ -533,6 +520,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                     property,
                     targetId: spacingTargetId,
                     targetIds,
+                    editableTargetIds,
                     axis,
                 })
                 label.dataset.editable = 'true'
@@ -1118,12 +1106,12 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             if (!match) return []
             const value = `${Math.max(0, Math.round((Number(match[1]) + direction * step) * 1000) / 1000)}${match[2] || 'px'}`
             target.node.style.setProperty(cssProperty, value)
-            return [{
-                targetId: target.targetId,
+            return target.editableTargetIds.map((targetId) => ({
+                targetId,
                 targetIds: target.targetIds,
                 property: target.property,
                 value,
-            }]
+            }))
         })
         if (changes.length === 1) window.parent.postMessage({
             source: 'eceee-designer-preview',
