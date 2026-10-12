@@ -23,6 +23,15 @@ const directionalSpacingFields = [
     'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
 ]
 const visibleSpacingFields = [...directionalSpacingFields, 'gap']
+const spacingDirections = {
+    margin: ['marginTop', 'marginRight', 'marginBottom', 'marginLeft'],
+    padding: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'],
+}
+const configuredSpacingFields = (values = {}) => [...new Set(
+    Object.entries(values)
+        .filter(([, value]) => value !== '' && value !== null && value !== undefined)
+        .flatMap(([field]) => [field, ...(spacingDirections[field] || [])]),
+)]
 
 const layoutParameterFields = new Set([
     'display', 'width', 'max_width', 'min_height', 'grid_template_columns', 'grid_column',
@@ -1257,7 +1266,13 @@ const SemanticThemeWorkspace = ({
         if (structural) {
             const declared = editableStructuralSpacingProperties(workspace.catalog, structural)
                 .filter((field) => workspace.constraints.editableSpacingProperties.includes(field))
-            if (structural.scope !== 'widget' || declared.length) return declared
+            if (declared.length) return declared
+            const configured = workspace.spacing
+                .filter((row) => row.targetId === structural.targetId)
+                .flatMap((row) => configuredSpacingFields(row.values))
+                .filter((field) => workspace.constraints.editableSpacingProperties.includes(field))
+            if (configured.length) return [...new Set(configured)]
+            if (structural.scope !== 'widget') return []
         }
         if (target?.kind !== 'layoutSlot' && target?.kind !== 'slot') return workspace.constraints.editableSpacingProperties
         const layoutMatch = target.id.match(/^layout:(.+):slot:([^:]+)$/)
@@ -1872,13 +1887,29 @@ const SemanticThemeWorkspace = ({
             />
             {(['slot', 'widget', 'element']).map((kind) => {
                 const target = levelSelections[kind]
-                if (!target) return null
                 const tone = selectionTones[kind]
+                if (!target) {
+                    if (kind !== 'element' || !levelSelections.widget) return null
+                    return <section key={kind} className={`shrink-0 border-b ${tone.border}`}>
+                        <div className={`flex w-full items-center gap-2 px-3 py-2 text-left ${tone.header}`}>
+                            <div className="min-w-0 flex-1">
+                                <p className={`text-[10px] font-semibold uppercase tracking-wide ${tone.label}`}>Selected element</p>
+                                <h2 className="truncate text-sm font-semibold text-gray-900">Widget</h2>
+                            </div>
+                        </div>
+                    </section>
+                }
                 const expanded = expandedSelectionLevels.has(kind)
                 const panelId = `selected-${kind}-spacing`
                 const label = target.displayLabel || target.label
-                const { computed, fields, entries } = spacingForLevelTarget(target)
-                const hasEditableSpacing = fields.length > 0
+                const spacingSections = [
+                    { ...target, configurationSpacingTargets: [] },
+                    ...(target.configurationSpacingTargets || []),
+                ].map((spacingTarget) => ({
+                    target: spacingTarget,
+                    ...spacingForLevelTarget(spacingTarget),
+                })).filter(({ fields: sectionFields }) => sectionFields.length > 0)
+                const hasEditableSpacing = spacingSections.length > 0
                 const isActiveTargetPanel = targetFocusKey(target) === targetFocusKey(selectedTarget)
                 const levelTypography = isActiveTargetPanel ? targetTypography.map(({ row, index }) => ({
                     row,
@@ -1911,20 +1942,27 @@ const SemanticThemeWorkspace = ({
                         >{headerContent}</button>
                         : <div className={`flex w-full items-center gap-2 px-3 py-2 text-left ${tone.header}`}>{headerContent}</div>}
                     {hasEditableProperties && expanded && <div id={panelId} className="space-y-3 px-3 py-3">
-                        {hasEditableSpacing && fields.length > 0 && <FieldLayout fields={fields} renderField={(field, className) => {
-                                const entry = spacingEntryForField(entries, field)
-                                const value = entry?.row.values[field] || computed[field] || ''
-                                return <label key={field} className={`block min-w-0 text-xs font-medium text-gray-700 ${className}`} data-spacing-side={field.match(/(Top|Right|Bottom|Left)$/)?.[1]?.toLowerCase()}>
-                                    {spacingLabels[field]}
-                                    <input
-                                        aria-label={`${kind} ${spacingLabels[field]}`}
-                                        value={value}
-                                        onChange={(event) => updateLevelSpacing(target, field, event.target.value)}
-                                        disabled={disabled || !entry}
-                                        className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50"
-                                    />
-                                </label>
-                            }} />}
+                        {spacingSections.map(({ target: spacingTarget, computed, fields, entries }, sectionIndex) => {
+                            const spacingTargetLabel = spacingTarget.displayLabel || spacingTarget.label
+                            return <section key={targetFocusKey(spacingTarget)} className={sectionIndex > 0 ? 'border-t border-gray-200 pt-3' : ''}>
+                                {spacingSections.length > 1 && <h3 className="mb-2 text-sm font-medium text-gray-900">{spacingTargetLabel}</h3>}
+                                <FieldLayout fields={fields} renderField={(field, className) => {
+                                    const entry = spacingEntryForField(entries, field)
+                                    const value = entry?.row.values[field] || computed[field] || ''
+                                    const targetQualifier = spacingSections.length > 1 ? ` ${spacingTargetLabel}` : ''
+                                    return <label key={field} className={`block min-w-0 text-xs font-medium text-gray-700 ${className}`} data-spacing-side={field.match(/(Top|Right|Bottom|Left)$/)?.[1]?.toLowerCase()}>
+                                        {spacingLabels[field]}
+                                        <input
+                                            aria-label={`${kind}${targetQualifier} ${spacingLabels[field]}`}
+                                            value={value}
+                                            onChange={(event) => updateLevelSpacing(spacingTarget, field, event.target.value)}
+                                            disabled={disabled || !entry}
+                                            className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50"
+                                        />
+                                    </label>
+                                }} />
+                            </section>
+                        })}
                         {levelTypography.map(({ row, index, fields: typographyFields }) => <section key={`level-type-${index}`} className="space-y-2 border-t border-gray-200 pt-3">
                             <h3 className="text-sm font-medium text-gray-900">{sectionLabel('typography', row)}</h3>
                             <ValueFields

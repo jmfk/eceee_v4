@@ -39,6 +39,7 @@ DEFAULT_PORT_REGISTRY_SCRIPT = Path(
         / "port_space_registry.py",
     )
 ).expanduser()
+SHARED_MINIO_CONTAINER = "shared-local-infrastructure-minio-1"
 
 
 def load_registered_ports(
@@ -194,34 +195,23 @@ def check_port(name: str, port: int) -> None:
 
 def check_minio_bucket(access_key: str, secret_key: str, bucket: str) -> None:
     """Verify a provider-owned bucket without exposing credentials in arguments."""
-    environment = {
-        **os.environ,
-        "AWS_ACCESS_KEY_ID": access_key,
-        "AWS_SECRET_ACCESS_KEY": secret_key,
-        "CHECKPOINT_BUCKET": bucket,
-    }
     result = subprocess.run(
         [
             "docker",
-            "run",
-            "--rm",
-            "-e",
-            "AWS_ACCESS_KEY_ID",
-            "-e",
-            "AWS_SECRET_ACCESS_KEY",
-            "-e",
-            "CHECKPOINT_BUCKET",
-            "--entrypoint",
+            "exec",
+            "-i",
+            SHARED_MINIO_CONTAINER,
             "/bin/sh",
-            "minio/mc:RELEASE.2025-08-13T08-35-41Z",
-            "-c",
+            "-ceu",
             (
-                'mc alias set local http://host.docker.internal:10302 "$AWS_ACCESS_KEY_ID" '
-                '"$AWS_SECRET_ACCESS_KEY" >/dev/null 2>&1 && '
-                'mc stat "local/$CHECKPOINT_BUCKET" >/dev/null 2>&1'
+                'config_dir="$(mktemp -d)"; trap \'rm -rf "$config_dir"\' EXIT; '
+                "IFS= read -r access_key; IFS= read -r secret_key; IFS= read -r bucket; "
+                'mc --config-dir "$config_dir" alias set local http://127.0.0.1:9000 '
+                '"$access_key" "$secret_key" >/dev/null 2>&1; '
+                'mc --config-dir "$config_dir" stat "local/$bucket" >/dev/null 2>&1'
             ),
         ],
-        env=environment,
+        input="\n".join((access_key, secret_key, bucket)) + "\n",
         text=True,
         capture_output=True,
         check=False,

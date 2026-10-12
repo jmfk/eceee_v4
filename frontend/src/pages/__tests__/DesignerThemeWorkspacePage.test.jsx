@@ -1734,6 +1734,8 @@ describe('DesignerThemeWorkspacePage', () => {
 
         expect(screen.getByRole('heading', { name: 'Navigation Bar' })).toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Navbar widget container' })).toBeInTheDocument()
+        const elementFallback = screen.getByText('Selected element').closest('section')
+        expect(within(elementFallback).getByRole('heading', { name: 'Widget' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Collapse selected element Heading' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Expand selected element Heading' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Expand selected slot Navigation Bar' })).not.toBeInTheDocument()
@@ -1864,6 +1866,81 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('button', { name: 'Medium (Tablet) preview at 768px' })).toHaveAttribute('aria-pressed', 'true')
         expect(await screen.findByRole('button', { name: 'Upload Article hero source at Medium (Tablet)' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Add Article hero image here for Extra Large' })).not.toBeInTheDocument()
+    })
+
+    it('shows configured widget-part spacing under the canonical widget selection', async () => {
+        const heroWorkspace = structuredClone(workspace)
+        heroWorkspace.catalog.widgetParts = [{
+            widgetType: 'easy_widgets.HeroWidget', label: 'Hero',
+            parts: [{
+                id: 'widget-part:easy_widgets.HeroWidget:hero-main', part: 'hero-main',
+                label: 'Main hero container', designerLevel: 'widget', editableSpacingProperties: [],
+            }, {
+                id: 'widget-part:easy_widgets.HeroWidget:hero-content', part: 'hero-content',
+                label: 'Text content overlay', designerLevel: 'widget', editableSpacingProperties: [],
+            }],
+        }]
+        heroWorkspace.constraints.editableSpacingProperties = ['paddingTop', 'paddingRight']
+        heroWorkspace.spacing.push({
+            targetId: 'widget-part:easy_widgets.HeroWidget:hero-main', scope: 'widgetPart',
+            widgetType: 'easy_widgets.HeroWidget', part: 'hero-main',
+            values: { paddingTop: '12px' },
+        })
+        heroWorkspace.spacing.push({
+            targetId: 'widget-part:easy_widgets.HeroWidget:hero-content', scope: 'widgetPart',
+            widgetType: 'easy_widgets.HeroWidget', part: 'hero-content',
+            values: { paddingTop: '30px', paddingRight: '40px' },
+        })
+        mocks.workspace.mockResolvedValue(heroWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const { iframe } = await readyPreview()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget-part:easy_widgets.HeroWidget:hero-content', kind: 'part',
+                label: 'Text content overlay', widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
+                computedStyles: { paddingTop: '30px', paddingRight: '40px' },
+                selectionPaths: {
+                    slot: [{ id: 'layout:main_layout:slot:hero', kind: 'layoutSlot', label: 'Hero' }],
+                    widget: [{
+                        id: 'widget:hero-1', styleTargetId: 'widget-type:easy_widgets.HeroWidget',
+                        kind: 'widget', label: 'Hero widget', widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
+                        configurationSpacingTargets: [{
+                            id: 'widget-part:easy_widgets.HeroWidget:hero-main',
+                            styleTargetId: 'widget-part:easy_widgets.HeroWidget:hero-main',
+                            kind: 'part', label: 'Main hero container', widgetId: 'hero-1',
+                            widgetType: 'easy_widgets.HeroWidget',
+                            computedStyles: { paddingTop: '12px' },
+                        }, {
+                            id: 'widget-part:easy_widgets.HeroWidget:hero-content',
+                            styleTargetId: 'widget-part:easy_widgets.HeroWidget:hero-content',
+                            kind: 'part', label: 'Text content overlay', widgetId: 'hero-1',
+                            widgetType: 'easy_widgets.HeroWidget',
+                            computedStyles: { paddingTop: '30px', paddingRight: '40px' },
+                        }],
+                    }],
+                    element: [],
+                },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(await screen.findByRole('heading', { name: 'Hero widget' })).toBeInTheDocument()
+        expect(screen.getByLabelText('widget Main hero container Padding top')).toHaveValue('12px')
+        expect(screen.getByLabelText('widget Text content overlay Padding top')).toHaveValue('30px')
+        expect(screen.getByLabelText('widget Text content overlay Padding right')).toHaveValue('40px')
+        const elementFallback = screen.getByText('Selected element').closest('section')
+        expect(within(elementFallback).getByRole('heading', { name: 'Widget' })).toBeInTheDocument()
+
+        fireEvent.change(screen.getByLabelText('widget Text content overlay Padding right'), { target: { value: '48px' } })
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        const savedSpacing = mocks.save.mock.calls.at(-1)[1].spacing
+        expect(savedSpacing.find((row) => row.part === 'hero-main').values.paddingTop).toBe('12px')
+        expect(savedSpacing.find((row) => row.part === 'hero-content' && row.values.paddingRight === '48px')).toBeDefined()
     })
 
     it('keeps the preview visible while editing images in the right inspector', async () => {

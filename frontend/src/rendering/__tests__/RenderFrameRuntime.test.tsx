@@ -271,7 +271,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         postMessage.mockRestore()
     })
 
-    it('flattens declared internal widget parts into the widget selection level', async () => {
+    it('keeps declared internal widget parts editable under the canonical widget selection', async () => {
         const structuralWorkspace = structuredClone(workspace)
         structuralWorkspace.catalog.designGroups = []
         structuralWorkspace.catalog.widgetParts = [{
@@ -309,7 +309,9 @@ describe('RenderFrameRuntime designer overlay', () => {
         })
         fireEvent.click(content)
 
-        expect(content).toHaveClass('designer-selected-widget')
+        const widgetRoot = content.closest<HTMLElement>('[data-widget-id]')!
+        expect(widgetRoot).toHaveClass('designer-selected-widget')
+        expect(content).not.toHaveClass('designer-selected-widget')
         expect(content).not.toHaveClass('designer-selected-element')
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview',
@@ -317,7 +319,12 @@ describe('RenderFrameRuntime designer overlay', () => {
             kind: 'part',
             selectionPaths: expect.objectContaining({
                 widget: expect.arrayContaining([
-                    expect.objectContaining({ id: 'widget-part:easy_widgets.HeroWidget:hero-content' }),
+                    expect.objectContaining({
+                        id: 'widget:hero-1', kind: 'widget', label: 'Hero widget',
+                        configurationSpacingTargets: expect.arrayContaining([
+                            expect.objectContaining({ id: 'widget-part:easy_widgets.HeroWidget:hero-content' }),
+                        ]),
+                    }),
                 ]),
                 element: [],
             }),
@@ -409,6 +416,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'select', targetId: 'header-container',
             label: 'Header container', kind: 'part', widgetType: 'easy_widgets.HeaderWidget',
+            selectionPaths: expect.objectContaining({ element: [] }),
         }), '*')
         fireEvent.click(widgetRoot)
         fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
@@ -867,7 +875,7 @@ describe('RenderFrameRuntime designer overlay', () => {
             editable: true,
             richText: true,
             selectionPaths: expect.objectContaining({
-                widget: expect.arrayContaining([expect.objectContaining({ id: 'article-body', kind: 'part' })]),
+                widget: expect.arrayContaining([expect.objectContaining({ id: 'widget:designer-0', kind: 'widget' })]),
             }),
         }), '*'))
 
@@ -930,7 +938,8 @@ describe('RenderFrameRuntime designer overlay', () => {
             { id: 'asset:design:0:content-widget:md:background', kind: 'asset', label: 'Article background' },
         ])
         fireEvent.click(contentContainer)
-        expect(contentContainer).toHaveClass('designer-selected-widget')
+        expect(contentContainer.closest('[data-widget-id]')).toHaveClass('designer-selected-widget')
+        expect(contentContainer).not.toHaveClass('designer-selected-widget')
         expect(contentContainer).not.toHaveClass('designer-selected-element')
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview',

@@ -96,7 +96,7 @@ class DotenvHelpersTests(unittest.TestCase):
             )
 
     @mock.patch.object(configure_orbstack.subprocess, "run")
-    def test_checkpoint_bucket_check_passes_credentials_through_environment(self, run):
+    def test_checkpoint_bucket_check_passes_credentials_over_stdin(self, run):
         run.return_value = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="", stderr=""
         )
@@ -106,10 +106,12 @@ class DotenvHelpersTests(unittest.TestCase):
         )
 
         command = run.call_args.args[0]
-        environment = run.call_args.kwargs["env"]
         self.assertNotIn("not-printed", command)
-        self.assertEqual(environment["AWS_SECRET_ACCESS_KEY"], "not-printed")
-        self.assertEqual(environment["CHECKPOINT_BUCKET"], "eceee-media-checkpoints")
+        self.assertEqual(command[:4], ["docker", "exec", "-i", "shared-local-infrastructure-minio-1"])
+        self.assertEqual(
+            run.call_args.kwargs["input"],
+            "eceee-v4\nnot-printed\neceee-media-checkpoints\n",
+        )
 
     @mock.patch.object(configure_orbstack.subprocess, "run")
     def test_checkpoint_bucket_check_rejects_missing_or_unauthorized_bucket(self, run):
