@@ -19,7 +19,7 @@ PRD-0012 requires legacy News imports to be resumable and idempotent. URL and co
 
 Allow only one write-mode legacy News import at a time. The management command acquires a process-local lock and a PostgreSQL session advisory lock before sample or database writes. A competing writer exits without importing; dry runs remain concurrent and read-only.
 
-Derive each new legacy media object-storage key deterministically from the complete source URL while preserving a bounded file extension. Replaying an interrupted import overwrites the same key rather than allocating another object. If `MediaFile` creation raises after upload, make a best-effort deletion of that exact key before propagating the error.
+Derive each new legacy media object-storage key deterministically from the target tenant ID, namespace ID, and complete source URL while preserving a bounded file extension. Replaying an interrupted import overwrites the same scoped key rather than allocating another object. If `MediaFile` creation raises after upload, make a best-effort deletion of that exact key before propagating the error.
 
 Continue to reconcile existing media first by legacy source URL and then by content hash. Resume mode retries placeholders and overwrites the existing media path so object and widget references retain the same media ID.
 
@@ -31,7 +31,7 @@ The advisory lock removes the supported command's check-then-create race without
 
 - Write-mode sample and database imports are deliberately serialized across tenants and namespaces.
 - A stopped process releases the PostgreSQL advisory lock with its database session.
-- Replaying a source URL converges on one storage key and one media record.
+- Replaying a source URL converges on one storage key and one media record within its tenant and namespace without sharing the key across tenant boundaries.
 - Object storage and PostgreSQL are not a distributed transaction; temporary unreferenced bytes can exist until the next replay if the process is killed at the upload boundary.
 - Existing UUID-named legacy media remains valid and is reused through its metadata; only newly created media adopts deterministic keys.
 

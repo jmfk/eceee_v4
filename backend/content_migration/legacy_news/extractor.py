@@ -107,12 +107,12 @@ def extract_news_html(html: str, source_url: str, slug: str = "") -> ExtractedNe
     main = soup.select_one(".mainContentColumn")
     if main is None:
         raise ValueError("Legacy News page has no .mainContentColumn")
-    source_checksum = hashlib.sha256(str(main).encode("utf-8")).hexdigest()
-
     for unwanted in main.select(
         ".share-on-social, .social, .social-share, aside, script, style, iframe, object, embed"
     ):
         unwanted.decompose()
+
+    source_checksum = hashlib.sha256(str(main).encode("utf-8")).hexdigest()
 
     title_node = main.find("h1")
     if title_node is None or not title_node.get_text(" ", strip=True):
