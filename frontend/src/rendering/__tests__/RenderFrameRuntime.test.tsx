@@ -430,7 +430,7 @@ describe('RenderFrameRuntime designer overlay', () => {
             .map(([message]) => message)
             .find((message) => message?.action === 'select' && message?.targetId === 'widget:content-1')
         expect(selection?.configurationSpacingTargets).toHaveLength(1)
-        expect(selection?.configurationSpacingTargets?.[0].id).toMatch(/^group:\d+:part:content-widget$/)
+        expect(selection?.configurationSpacingTargets?.[0].id).toBe('group:1:part:content-widget')
         postMessage.mockRestore()
     })
 
@@ -1268,24 +1268,31 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(document.querySelector('.designer-spacing-padding-value[data-side="left"]')).toHaveStyle({ left: '69px', top: '199px' })
         expect(window.getComputedStyle(document.querySelector('.designer-spacing-measure')! as HTMLElement).zIndex).toBe('2147483645')
         const marginTopLabel = screen.getByRole('button', { name: 'Select margin top' })
+        const marginBottomLabel = screen.getByRole('button', { name: 'Select margin bottom' })
         const paddingLeftLabel = screen.getByRole('button', { name: 'Select padding left' })
         fireEvent.click(marginTopLabel)
+        fireEvent.click(marginBottomLabel)
         fireEvent.click(paddingLeftLabel)
         expect(marginTopLabel).toHaveAttribute('aria-pressed', 'true')
+        expect(marginBottomLabel).toHaveAttribute('aria-pressed', 'true')
         expect(paddingLeftLabel).toHaveAttribute('aria-pressed', 'true')
         expect(screen.queryByRole('form')).not.toBeInTheDocument()
 
         fireEvent.keyDown(document, { key: 'ArrowRight' })
         expect(heading).toHaveStyle({ paddingLeft: '9px', marginTop: '10px' })
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
-            source: 'eceee-designer-preview', action: 'spacingChange', property: 'paddingLeft', value: '9px',
-            targetId: 'heading', targetIds: expect.arrayContaining(['heading']), viewportWidth: window.innerWidth,
+            source: 'eceee-designer-preview', action: 'spacingChange', viewportWidth: window.innerWidth,
+            property: 'paddingLeft', value: '9px', targetId: 'heading', targetIds: expect.arrayContaining(['heading']),
         }), '*')
         fireEvent.keyDown(document, { key: 'ArrowDown', shiftKey: true })
-        expect(heading).toHaveStyle({ marginTop: '20px' })
+        expect(heading).toHaveStyle({ marginTop: '20px', marginBottom: '40px' })
         expect(heading).toHaveStyle({ paddingLeft: '9px' })
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
-            source: 'eceee-designer-preview', action: 'spacingChange', property: 'marginTop', value: '20px',
+            source: 'eceee-designer-preview', action: 'spacingChanges',
+            changes: expect.arrayContaining([
+                expect.objectContaining({ property: 'marginTop', value: '20px' }),
+                expect.objectContaining({ property: 'marginBottom', value: '40px' }),
+            ]),
         }), '*')
         fireEvent.keyDown(document, { key: 'Escape' })
         expect(document.querySelectorAll('.designer-spacing-value[data-selected="true"]')).toHaveLength(0)
@@ -1300,7 +1307,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         })
         expect(heading).toHaveClass('designer-hovered')
         expect(document.querySelector('.designer-spacing-margin[data-side="bottom"]')).toHaveStyle({
-            left: '40px', top: '300px', width: '360px', height: '30px',
+            left: '40px', top: '300px', width: '360px', height: '40px',
         })
         expect(document.querySelector('.designer-spacing-padding[data-side="left"]')).toHaveStyle({
             left: '82px', top: '107px', width: '9px', height: '184px',
