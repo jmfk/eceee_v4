@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
+import { useLayoutEffect, useRef, type RefObject } from 'react'
 import PageRenderer from './PageRenderer'
 import { RENDER_LAYOUT_CSS } from './layoutRenderers'
 import { PUBLIC_RENDER_CSS } from './publicRenderCss'
@@ -30,7 +30,7 @@ export const RenderDocument = ({ model, rootRef, additionalCss = '', onNavigate 
         })
     }, [model, renderRootRef])
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const root = renderRootRef.current
         if (!model || !root) return
 
