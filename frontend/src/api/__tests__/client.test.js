@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { mockAxiosInstance } from '../../test/setup'
+import { setCurrentTenantId } from '../../utils/tenant'
 import '../client'
 
 describe('API client session handling', () => {
     afterEach(() => {
         localStorage.clear()
+        setCurrentTenantId('')
     })
 
     it('rejects standalone preview 401 responses instead of waiting for AuthProvider', async () => {
@@ -24,7 +26,7 @@ describe('API client session handling', () => {
     })
 
     it('can bootstrap a standalone route without a stale tenant header', async () => {
-        localStorage.setItem('eceee_tenant_id', 'stale-workspace')
+        setCurrentTenantId('stale-workspace')
         const prepareRequest = mockAxiosInstance.interceptors.request.use.mock.calls[0][0]
 
         const config = await prepareRequest({ headers: {}, method: 'get', skipTenantHeader: true })

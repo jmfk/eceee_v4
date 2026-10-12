@@ -6,6 +6,7 @@ import {
     parseDirectRenderPath,
     parseVersionRenderPath,
 } from '../directRender'
+import { setCurrentTenantId } from '../../utils/tenant'
 
 const clientApi = vi.hoisted(() => ({ get: vi.fn() }))
 const previewResolver = vi.hoisted(() => ({ resolve: vi.fn(async (model) => model) }))
@@ -17,6 +18,7 @@ vi.mock('../../utils/pathParser', () => ({ buildPathVariablesContext: pathParser
 describe('direct render URL', () => {
     beforeEach(() => {
         localStorage.clear()
+        setCurrentTenantId('')
         clientApi.get.mockReset()
         previewResolver.resolve.mockClear()
         pathParser.build.mockClear()
@@ -44,7 +46,7 @@ describe('direct render URL', () => {
     })
 
     it('loads an exact historical version through the TypeScript renderer', async () => {
-        localStorage.setItem('eceee_tenant_id', 'theme-tenant')
+        setCurrentTenantId('theme-tenant')
         clientApi.get
             .mockResolvedValueOnce({
                 data: {

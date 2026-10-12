@@ -4,7 +4,7 @@ import { useGlobalNotifications } from '../contexts/GlobalNotificationContext';
 import { changePassword, switchCurrentWorkspace } from '../api/users';
 import { Lock, User, Mail, Shield, AlertCircle, CheckCircle, Building2 } from 'lucide-react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { getCurrentTenantId } from '../utils/tenant';
+import { getCurrentTenantId, setCurrentTenantId } from '../utils/tenant';
 
 const ProfilePage = () => {
     // Set document title
@@ -39,7 +39,7 @@ const ProfilePage = () => {
         try {
             const response = await switchCurrentWorkspace(selectedWorkspace);
             const identifier = response.data.currentWorkspace.identifier;
-            localStorage.setItem('eceee_tenant_id', identifier);
+            setCurrentTenantId(identifier);
             window.location.assign('/profile');
         } catch (error) {
             addNotification(error.response?.data?.error || 'Failed to switch workspace', 'error');
