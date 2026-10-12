@@ -1,13 +1,19 @@
 from copy import deepcopy
+from datetime import timedelta
 
+from bs4 import BeautifulSoup
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 
 from content.models import Namespace
+from content_migration.legacy_news.extractor import extract_news_html
+from content_migration.legacy_news.links import LegacyNewsLinkRewriter
 from content_migration.legacy_news.repository import LegacyNewsDefinitionError, LegacyNewsRepository
 from content_migration.legacy_news.transformer import LegacyNewsPayload
 from core.models import Tenant
-from object_storage.models import ObjectInstance, ObjectTypeDefinition
+from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
+from webpages.models import WebPage
 
 TAXONOMY_FIELDS = {
     "types": ("news_type", "news_types"),
@@ -207,3 +213,160 @@ class LegacyNewsRepositoryDefinitionTest(TestCase):
         self.assertTrue(changed)
         self.assertEqual(obj.versions.count(), version_count)
         self.assertEqual([relationship["type"] for relationship in obj.relationships], ["news_sources"])
+
+    def test_internal_link_targets_include_news_with_an_older_live_version(self):
+        repository = self.repository()
+        obj, _, _ = repository.upsert(
+            LegacyNewsPayload(
+                title="Existing article",
+                slug="existing",
+                data={"presentationalPublishingDate": "2026-09-30T00:00:00+00:00"},
+                widgets={"main": []},
+                metadata={
+                    "legacy": True,
+                    "legacy_source_url": "https://www.eceee.org/all-news/news/news-2026/existing/",
+                },
+            )
+        )
+        live_version = obj.current_version
+        live_version.effective_date = timezone.now() - timedelta(days=2)
+        live_version.save(update_fields=["effective_date"])
+        scheduled_version = ObjectVersion.objects.create(
+            object_instance=obj,
+            version_number=live_version.version_number + 1,
+            data=live_version.data,
+            widgets=live_version.widgets,
+            created_by=self.user,
+            effective_date=timezone.now() + timedelta(days=2),
+        )
+        obj.current_version = scheduled_version
+        obj.status = "draft"
+        obj.save(update_fields=["current_version", "status"])
+
+        targets = LegacyNewsLinkRewriter._internal_targets(
+            self.tenant,
+            repository.object_types["news"],
+        )
+
+        self.assertEqual(targets["/all-news/news/news-2026/existing/"], "/news/existing/")
+        self.assertEqual(targets["/news/existing/"], "/news/existing/")
+
+    def test_page_targets_are_scoped_to_the_hostname_root_and_do_not_override_news(self):
+        repository = self.repository()
+        repository.upsert(
+            LegacyNewsPayload(
+                title="Existing article",
+                slug="existing",
+                data={"presentationalPublishingDate": "2026-09-30T00:00:00+00:00"},
+                widgets={"main": []},
+                metadata={
+                    "legacy": True,
+                    "legacy_source_url": "https://www.eceee.org/all-news/news/news-2026/existing/",
+                },
+            )
+        )
+        root = WebPage.objects.create(
+            tenant=self.tenant,
+            slug="eceee",
+            cached_path="/",
+            title="ECEEE",
+            hostnames=["www.eceee.org"],
+            created_by=self.user,
+            last_modified_by=self.user,
+            is_currently_published=True,
+        )
+        root.cached_root_id = root.pk
+        root.save(update_fields=["cached_root_id"])
+        WebPage.objects.create(
+            tenant=self.tenant,
+            slug="about",
+            cached_path="/about/",
+            title="About",
+            parent=root,
+            cached_root_id=root.pk,
+            created_by=self.user,
+            last_modified_by=self.user,
+            is_currently_published=True,
+        )
+        WebPage.objects.create(
+            tenant=self.tenant,
+            slug="collision",
+            cached_path="/all-news/news/news-2026/existing/",
+            title="Collision",
+            parent=root,
+            cached_root_id=root.pk,
+            created_by=self.user,
+            last_modified_by=self.user,
+            is_currently_published=True,
+        )
+        preview_root = WebPage.objects.create(
+            tenant=self.tenant,
+            slug="preview",
+            cached_path="/",
+            title="Preview",
+            hostnames=["migration-preview.localhost"],
+            created_by=self.user,
+            last_modified_by=self.user,
+            is_currently_published=True,
+        )
+        preview_root.cached_root_id = preview_root.pk
+        preview_root.save(update_fields=["cached_root_id"])
+        WebPage.objects.create(
+            tenant=self.tenant,
+            slug="preview-only",
+            cached_path="/preview-only/",
+            title="Preview only",
+            parent=preview_root,
+            cached_root_id=preview_root.pk,
+            created_by=self.user,
+            last_modified_by=self.user,
+            is_currently_published=True,
+        )
+        bare_root = WebPage.objects.create(
+            tenant=self.tenant,
+            slug="bare",
+            cached_path="/",
+            title="Bare host",
+            hostnames=["eceee.org"],
+            created_by=self.user,
+            last_modified_by=self.user,
+            is_currently_published=True,
+        )
+        bare_root.cached_root_id = bare_root.pk
+        bare_root.save(update_fields=["cached_root_id"])
+        WebPage.objects.create(
+            tenant=self.tenant,
+            slug="bare-only",
+            cached_path="/bare-only/",
+            title="Bare only",
+            parent=bare_root,
+            cached_root_id=bare_root.pk,
+            created_by=self.user,
+            last_modified_by=self.user,
+            is_currently_published=True,
+        )
+
+        article = extract_news_html(
+            '<div class="mainContentColumn"><h1>Links</h1><p>'
+            '<a href="/about/">About</a>'
+            '<a href="/preview-only/">Preview only</a>'
+            '<a href="https://eceee.org/bare-only/">Bare only</a>'
+            '<a href="/all-news/news/news-2026/existing/">News</a>'
+            "</p></div>",
+            "https://www.eceee.org/all-news/news/news-2026/source/",
+            "source",
+        )
+        rewritten = LegacyNewsLinkRewriter(
+            tenant=self.tenant,
+            news_object_type=repository.object_types["news"],
+        ).rewrite(article)
+        soup = BeautifulSoup(rewritten.body_html, "html.parser")
+
+        self.assertEqual(soup.find(string="About").parent["href"], "/about/")
+        preview_only = soup.find(string="Preview only").parent
+        self.assertEqual(preview_only.name, "span")
+        self.assertEqual(preview_only["data-legacy-link-status"], "missing-internal-target")
+        bare_only = soup.find(string="Bare only").parent
+        self.assertEqual(bare_only.name, "span")
+        self.assertEqual(bare_only["data-legacy-link-status"], "missing-internal-target")
+        self.assertEqual(soup.find(string="News").parent["href"], "/news/existing/")

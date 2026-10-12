@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from typing import Optional
 from urllib.parse import urljoin, urlparse
@@ -53,9 +53,16 @@ def _normalize_urls_and_attributes(root: Tag, source_url: str) -> None:
     for tag in root.find_all(True):
         if tag.name == "a":
             href = _safe_absolute_url(tag.get("href", ""), source_url)
-            tag.attrs = {"href": href} if href else {}
+            if href:
+                tag["href"] = href
+            else:
+                tag.attrs.pop("href", None)
             if href.startswith(("http://", "https://")) and urlparse(href).netloc != urlparse(source_url).netloc:
-                tag.attrs.update({"rel": "noopener noreferrer"})
+                rel = list(tag.get("rel", []))
+                for value in ("noopener", "noreferrer"):
+                    if value not in rel:
+                        rel.append(value)
+                tag["rel"] = rel
         elif tag.name == "img":
             src = _safe_absolute_url(tag.get("src", ""), source_url)
             attrs = {"src": src} if src else {}
@@ -99,6 +106,22 @@ def _extract_external_link(root: Tag, source_url: str) -> str:
             node.extract()
         return external_url
     return ""
+
+
+def content_checksum(article: ExtractedNews, body_html: str) -> str:
+    """Compute the transformed-content identity after link/media-safe HTML changes."""
+
+    content_fingerprint = "\n".join(
+        [
+            article.title,
+            article.summary,
+            article.source_name,
+            article.source_date.isoformat() if article.source_date else "",
+            article.external_url,
+            body_html,
+        ]
+    )
+    return hashlib.sha256(content_fingerprint.encode("utf-8")).hexdigest()
 
 
 def extract_news_html(html: str, source_url: str, slug: str = "") -> ExtractedNews:
@@ -150,19 +173,7 @@ def extract_news_html(html: str, source_url: str, slug: str = "") -> ExtractedNe
     body_html = str(cleaned_soup).strip()
     image_urls = tuple(dict.fromkeys(image.get("src") for image in cleaned_soup.find_all("img", src=True)))
     canonical_slug = slug.strip("/") or urlparse(source_url).path.rstrip("/").split("/")[-1]
-    content_fingerprint = "\n".join(
-        [
-            title,
-            summary,
-            source_name,
-            source_date.isoformat() if source_date else "",
-            external_url,
-            body_html,
-        ]
-    )
-    content_checksum = hashlib.sha256(content_fingerprint.encode("utf-8")).hexdigest()
-
-    return ExtractedNews(
+    article = ExtractedNews(
         title=title,
         slug=canonical_slug,
         summary=summary,
@@ -173,5 +184,6 @@ def extract_news_html(html: str, source_url: str, slug: str = "") -> ExtractedNe
         image_urls=image_urls,
         source_url=source_url,
         source_checksum=source_checksum,
-        content_checksum=content_checksum,
+        content_checksum="",
     )
+    return replace(article, content_checksum=content_checksum(article, body_html))

@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import io
-import ipaddress
 import logging
 import mimetypes
-import socket
 import textwrap
 import unicodedata
 from pathlib import Path
@@ -24,6 +22,7 @@ from file_manager.models import MediaFile, MediaTag
 from file_manager.storage import storage
 
 from .fetcher import USER_AGENT
+from .remote import validate_public_http_url
 
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
 logger = logging.getLogger(__name__)
@@ -228,30 +227,7 @@ class LegacyMediaImporter:
 
     @staticmethod
     def _validate_remote_url(url: str) -> None:
-        parsed = urlparse(url)
-        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-            raise ValueError("unsupported-image-url")
-        try:
-            addresses = {
-                ipaddress.ip_address(item[4][0])
-                for item in socket.getaddrinfo(
-                    parsed.hostname,
-                    parsed.port or (443 if parsed.scheme == "https" else 80),
-                    type=socket.SOCK_STREAM,
-                )
-            }
-        except (socket.gaierror, ValueError) as exc:
-            raise ValueError("unresolvable-image-host") from exc
-        if not addresses or any(
-            address.is_private
-            or address.is_loopback
-            or address.is_link_local
-            or address.is_multicast
-            or address.is_reserved
-            or address.is_unspecified
-            for address in addresses
-        ):
-            raise ValueError("non-public-image-host")
+        validate_public_http_url(url, subject="image")
 
     def _apply_tags(self, media: MediaFile, *, placeholder: bool) -> None:
         names = ["legacy", "news"] + (["migration-placeholder"] if placeholder else [])

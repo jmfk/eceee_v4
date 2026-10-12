@@ -24,6 +24,7 @@
 | ADR-0020 | [Bounded asynchronous remote object packages](active/0020-bounded-remote-object-packages.md) | accepted | PRD-0018 |
 | ADR-0021 | [Destination-owned transfer checkpoints](active/0021-destination-owned-transfer-checkpoints.md) | accepted | PRD-0019 |
 | ADR-0022 | [Serialize legacy News imports and use replayable media keys](active/0022-replayable-legacy-news-media-imports.md) | accepted | PRD-0012 |
+| ADR-0023 | [Reconcile legacy News links and retain disabled link evidence](active/0023-reconcilable-legacy-news-links.md) | accepted | PRD-0012 |
 
 ## Archived Decisions
 

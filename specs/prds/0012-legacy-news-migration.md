@@ -7,6 +7,7 @@ created: 2026-09-30
 related_adrs:
   - ADR-0013
   - ADR-0022
+  - ADR-0023
 ---
 
 # PRD-0012: Legacy News Golden Samples and Migration
@@ -65,6 +66,7 @@ The full database import must not begin until the golden sample evidence is acce
 
 - [ADR-0013: Gate the legacy News migration through canonical golden samples](../adrs/active/0013-legacy-news-golden-sample-gate.md)
 - [ADR-0022: Serialize legacy News imports and use replayable media keys](../adrs/active/0022-replayable-legacy-news-media-imports.md)
+- [ADR-0023: Reconcile legacy News links and retain disabled link evidence](../adrs/active/0023-reconcilable-legacy-news-links.md)
 
 ## Implementation Notes
 
@@ -75,3 +77,4 @@ The full database import must not begin until the golden sample evidence is acce
 - 2026-09-30: Added a 40-capture desktop/mobile harness covering Django public, standalone React, editor render-frame, and Designer surfaces.
 - 2026-10-12: Added deterministic newest-first selection for bounded development imports such as the latest 100 published News items.
 - 2026-10-12: Serialized write-mode imports and made new media storage keys replayable across interruptions; dev verification confirmed rewritten references and HTTP-loadable rendered images.
+- 2026-10-12: Added destination-aware body-link reconciliation. Published v4 targets receive relative links; unresolved internal targets and external HEAD failures remain reparsable marked spans with sanitized source attributes.

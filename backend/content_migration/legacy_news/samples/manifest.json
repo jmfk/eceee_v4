@@ -21,7 +21,7 @@
       "url": "https://www.eceee.org/all-news/news/news-2019/what-does-greta-thunbergs-call-for-equity-mean/",
       "slug": "what-does-greta-thunbergs-call-for-equity-mean",
       "synthetic": false,
-      "expected": {"hasLinks": true, "forbiddenAttributes": ["class", "id", "style"]}
+      "expected": {"hasLinks": true, "forbiddenAttributes": ["style"]}
     },
     {
       "id": "current-2026",

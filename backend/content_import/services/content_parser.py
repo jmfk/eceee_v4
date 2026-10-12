@@ -1,11 +1,12 @@
 """Content parser service for splitting HTML into content segments."""
 
 import logging
-from typing import List, Dict, Any
-from bs4 import BeautifulSoup, NavigableString, Tag
-from ..utils.html_sanitizer import sanitize_html, deep_clean_html
-from ..utils.content_analyzer import is_file_link, extract_file_extension
+from typing import Any, Dict, List
 
+from bs4 import BeautifulSoup, NavigableString, Tag
+
+from ..utils.content_analyzer import extract_file_extension, is_file_link
+from ..utils.html_sanitizer import deep_clean_html, sanitize_html
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +14,7 @@ logger = logging.getLogger(__name__)
 class ContentSegment:
     """Represents a segment of content."""
 
-    def __init__(
-        self, segment_type: str, content: Any, metadata: Dict[str, Any] = None
-    ):
+    def __init__(self, segment_type: str, content: Any, metadata: Dict[str, Any] = None):
         self.type = segment_type
         self.content = content
         self.metadata = metadata or {}
@@ -63,25 +62,6 @@ class ContentParser:
             div_count += 1
 
         # Show first 10 elements after unwrapping
-        content_elements = soup.find_all(
-            [
-                "h1",
-                "h2",
-                "h3",
-                "h4",
-                "h5",
-                "h6",
-                "p",
-                "blockquote",
-                "ul",
-                "ol",
-                "table",
-                "img",
-            ]
-        )[:10]
-        for i, tag in enumerate(content_elements, 1):
-            tag_str = str(tag)[:150].replace("\n", " ")
-
         segments = []
 
         # Process content (keeping images inline)
@@ -121,8 +101,10 @@ class ContentParser:
                     if is_file_link(href):
                         self._extract_file_link(child, segments)
                     else:
-                        # Regular link - include in text content
-                        self._process_element(child, segments, depth + 1)
+                        # Preserve a top-level link and its reconciliation attributes.
+                        segments.append(ContentSegment("content", str(child), {"tag": child.name}))
+                elif child.name == "span" and "legacy-link-unresolved" in child.get("class", []):
+                    segments.append(ContentSegment("content", str(child), {"tag": child.name}))
                 elif child.name in [
                     "h1",
                     "h2",
@@ -137,9 +119,7 @@ class ContentParser:
                     "pre",
                 ]:
                     # Content blocks - extract as HTML
-                    segments.append(
-                        ContentSegment("content", str(child), {"tag": child.name})
-                    )
+                    segments.append(ContentSegment("content", str(child), {"tag": child.name}))
                 else:
                     # Other tags - process children
                     self._process_element(child, segments, depth + 1)
@@ -197,9 +177,7 @@ class ContentParser:
             )
         )
 
-    def _merge_text_segments(
-        self, segments: List[ContentSegment]
-    ) -> List[ContentSegment]:
+    def _merge_text_segments(self, segments: List[ContentSegment]) -> List[ContentSegment]:
         """
         Merge only consecutive text segments, preserving order with tables/images.
 
