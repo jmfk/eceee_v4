@@ -103,6 +103,7 @@ frontend-admin-e2e-test: prepare-frontend-e2e
 		sleep 1; \
 	done
 	$(COMPOSE_DEV) run --rm --no-deps -T \
+		-e CI=1 \
 		-e PLAYWRIGHT_BASE_URL=http://frontend:3000 \
 		frontend-e2e npm run test:e2e:admin
 
@@ -134,6 +135,7 @@ prepare-public-e2e-backend: prepare-test-infra
 # Run public browser regression tests against the Django public renderer.
 frontend-public-e2e-test: prepare-public-e2e-backend prepare-frontend-e2e
 	$(COMPOSE_DEV) run --rm --no-deps -T \
+		-e CI=1 \
 		-e PLAYWRIGHT_PUBLIC_BASE_URL=http://public-regression.test:8000 \
 		frontend-e2e npm run test:e2e:public
 
