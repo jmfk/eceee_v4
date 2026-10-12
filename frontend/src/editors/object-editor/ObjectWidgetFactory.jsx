@@ -4,10 +4,9 @@
  * This is the ObjectEditor-specific widget factory that wraps shared widget
  * implementations with ObjectEditor-specific behaviors and integrations.
  */
-import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { Layout, Settings, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import React, { useState, useRef, useMemo } from 'react'
+import { Layout, Settings, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getWidgetComponent, getWidgetDisplayName } from '../../widgets'
-import { renderWidgetPreview } from '../../utils/widgetPreview'
 import ObjectWidgetHeader from './ObjectWidgetHeader'
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal'
 import { useClipboard } from '../../contexts/ClipboardContext'
@@ -41,7 +40,6 @@ const ObjectWidgetFactory = ({
     allowedWidgetTypes = [],
     maxWidgets = null,
     context,
-    slotType = 'content', // 'content' or 'inherited' - determines default preview mode
     // Selection props
     isWidgetSelected = false,
     isWidgetCut = false,
@@ -57,12 +55,8 @@ const ObjectWidgetFactory = ({
     // Get global hover tracking for paste markers
     const { hoveredWidgetId, setHoveredWidget, clearHoveredWidget } = useClipboard();
 
-    const [showPreview, setShowPreview] = useState(false)
-    const [isLoadingPreview, setIsLoadingPreview] = useState(false)
-    const [previewContent, setPreviewContent] = useState(null)
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
-    const previewContainerRef = useRef(null)
 
     // Paste mode state
     const [pasteHoverPosition, setPasteHoverPosition] = useState(null) // 'before' | 'after' | null
@@ -122,7 +116,7 @@ const ObjectWidgetFactory = ({
     }
 
     // Handle pasting a widget after this one
-    const handlePaste = (pastedWidget, metadata) => {
+    const handlePaste = () => {
         if (onPasteAtPosition) {
             onPasteAtPosition(slotName, index + 1, false); // index + 1 to paste AFTER
         }
@@ -174,50 +168,6 @@ const ObjectWidgetFactory = ({
         // Reset hover state
         setPasteHoverPosition(null);
     };
-
-    // Enhanced preview with object context and slot type awareness
-    const handleModalPreview = async () => {
-        setShowPreview(true)
-        setIsLoadingPreview(true)
-        setPreviewContent(null)
-
-        try {
-            // Determine preview mode based on slot type and widget inheritance
-            const isInheritedWidget = widget.inherit_from_parent || widget.inherited_from
-            const defaultToViewMode = slotType === 'inherited' || isInheritedWidget
-
-            // ObjectEditor-specific: Include object type and slot context in preview
-            const result = await renderWidgetPreview(widget, {
-                objectType: objectType?.name,
-                slotName: actualSlotName,
-                slotConfig,
-                objectContext: true,
-                previewMode: defaultToViewMode ? 'view' : 'edit',
-                slotType,
-                isInherited: isInheritedWidget
-            })
-            setPreviewContent(result)
-        } catch (error) {
-            console.error('Error loading widget preview:', error)
-            setPreviewContent({
-                html: `<div class="text-red-600 p-4 border border-red-200 rounded bg-red-50">
-                    <span className="font-bold">Preview Error:</span> Could not load widget preview
-                    <br><small>${error.message || 'Unknown error'}</small>
-                </div>`,
-                css: '',
-                success: false,
-                error: error.message
-            })
-        } finally {
-            setIsLoadingPreview(false)
-        }
-    }
-
-    const handleClosePreview = () => {
-        setShowPreview(false)
-        setPreviewContent(null)
-        setIsLoadingPreview(false)
-    }
 
     // Handle slot-specific actions
     const handleSlotAction = (action) => {
@@ -323,58 +273,6 @@ const ObjectWidgetFactory = ({
                         />
                     </div>
                 </div>
-
-                {/* ObjectEditor-specific Preview Modal */}
-                {showPreview && (
-                    <div
-                        className="eceee-editor-ui fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-                        onClick={handleClosePreview}
-                    >
-                        <div
-                            className="bg-white rounded-lg shadow-xl max-w-4xl max-h-[80vh] overflow-auto m-4"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                                <div>
-                                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
-                                        Preview: {getWidgetDisplayName(widget.type)}
-                                    </div>
-                                    <div className="text-sm text-gray-500">
-                                        {objectType?.name} • {slotConfig?.label || actualSlotName}
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={handleClosePreview}
-                                    className="text-gray-400 hover:text-gray-600 w-6 h-6"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-                            <div className="p-4">
-                                {isLoadingPreview ? (
-                                    <div className="text-center py-12">
-                                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                        <div className="mt-2 text-sm text-gray-600">Rendering preview...</div>
-                                    </div>
-                                ) : previewContent ? (
-                                    <div
-                                        ref={previewContainerRef}
-                                        className="widget-preview-content"
-                                        dangerouslySetInnerHTML={{ __html: previewContent.html }}
-                                    />
-                                ) : (
-                                    <div className="text-center py-12 text-gray-500">
-                                        <div>No preview available</div>
-                                    </div>
-                                )}
-                            </div>
-                            {/* Add CSS if available */}
-                            {previewContent?.css && (
-                                <style dangerouslySetInnerHTML={{ __html: previewContent.css }} />
-                            )}
-                        </div>
-                    </div>
-                )}
 
                 {/* Delete Confirmation Modal */}
                 <DeleteConfirmationModal

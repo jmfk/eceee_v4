@@ -39,10 +39,6 @@ vi.mock('../../../widgets', () => ({
     getWidgetIcon: vi.fn(() => null)
 }))
 
-vi.mock('../../../utils/widgetPreview', () => ({
-    renderWidgetPreview: vi.fn()
-}))
-
 vi.mock('../../../utils/pageEditorPropAdapter', () => ({
     createPageWidgetConfigChangeHandler: vi.fn(() => vi.fn())
 }))

@@ -7,6 +7,7 @@ import { resolvePagePreviewModel } from '../components/resolvePagePreviewModel'
 import { createPageRenderModel } from './adapters'
 import { buildThemeCSS } from '../utils/editorThemeCSS'
 import { googleFontsStylesheetUrl } from './primitives'
+import { getCurrentTenantId } from '../utils/tenant'
 import type { RenderPageModel } from './types'
 
 export interface DirectRenderLocation {
@@ -21,6 +22,11 @@ export interface ResolvedRenderLocation extends DirectRenderLocation {
     pathPatternPath?: string
 }
 
+export interface VersionRenderLocation {
+    pageId: number
+    versionId: number
+}
+
 export const parseDirectRenderPath = (pathname: string): DirectRenderLocation | null => {
     const match = pathname.match(/^\/_render\/(\d+)(?:\/(.*))?\/?$/)
     if (!match) return null
@@ -32,6 +38,12 @@ export const parseDirectRenderPath = (pathname: string): DirectRenderLocation | 
     } catch {
         return null
     }
+}
+
+export const parseVersionRenderPath = (pathname: string): VersionRenderLocation | null => {
+    const match = pathname.match(/^\/_render-version\/(\d+)\/(\d+)\/?$/)
+    if (!match) return null
+    return { pageId: Number(match[1]), versionId: Number(match[2]) }
 }
 
 export const buildResolvedRenderModel = async ({
@@ -126,4 +138,50 @@ export const loadDirectRenderModel = async ({ siteId, slugPath }: DirectRenderLo
     } catch (error: any) {
         throw new Error(error?.response?.data?.detail || 'Could not resolve this page.')
     }
+}
+
+export const loadVersionRenderModel = async ({ pageId, versionId }: VersionRenderLocation): Promise<RenderPageModel> => {
+    const [pageResponse, versionResponse, inheritanceResponse]: any[] = await Promise.all([
+        api.get(endpoints.pages.detail(pageId)),
+        api.get(endpoints.versions.pageVersionDetail(pageId, versionId)),
+        api.get(endpoints.pages.widgetInheritance(pageId)),
+    ])
+    const page = pageResponse.data || pageResponse
+    const version = versionResponse.data || versionResponse
+    const siteId = Number(
+        page?.cachedRootId
+        || page?.cached_root_id
+        || page?.breadcrumbs?.[0]?.id
+        || (!page?.parentId && !page?.parent_id ? page?.id : 0),
+    )
+    if (!siteId) throw new Error('Could not resolve the site for this page version.')
+
+    const rawPath = String(page?.cachedPath || page?.cached_path || page?.absoluteUrl || page?.slug || '')
+    const slugPath = rawPath.split('?')[0].replace(/^\/+|\/+$/g, '')
+    const theme = version?.effectiveTheme
+        || (typeof version?.theme === 'object' ? version.theme : null)
+        || page?.effectiveTheme
+    const themeCss = buildThemeCSS({
+        theme,
+        pageCssVariables: page?.pageCssVariables ?? page?.page_css_variables
+            ?? version?.pageCssVariables ?? version?.page_css_variables,
+        pageCustomCss: page?.pageCustomCss ?? page?.page_custom_css
+            ?? version?.pageCustomCss ?? version?.page_custom_css,
+        enableCssInjection: page?.enableCssInjection ?? page?.enable_css_injection
+            ?? version?.enableCssInjection ?? version?.enable_css_injection ?? true,
+    })
+
+    return buildResolvedRenderModel({
+        resolved: {
+            tenantIdentifier: getCurrentTenantId(),
+            siteId,
+            slugPath,
+            pageId,
+            versionId,
+        },
+        page,
+        version,
+        rawInheritance: inheritanceResponse.data || inheritanceResponse,
+        themeCss,
+    })
 }

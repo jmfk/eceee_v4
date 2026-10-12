@@ -11,7 +11,6 @@ vi.mock('../resolvePagePreviewModel', () => ({ resolvePagePreviewModel: previewR
 vi.mock('../../api', () => ({
     previewSizesApi: {
         list: vi.fn().mockResolvedValue([]),
-        getPreviewUrl: vi.fn(() => '/api/v1/webpages/pages/86/versions/83/preview/'),
     },
 }))
 

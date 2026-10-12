@@ -69,6 +69,8 @@ Fill in all values — especially `DOMAIN`, `SECRET_KEY`, `POSTGRES_PASSWORD`, `
 
 For the isolated TypeScript publisher, also generate independent values for `PUBLISHER_DB_PASSWORD` and `PUBLISHER_FORM_DB_PASSWORD` with `openssl rand -hex 32`. Deployment rejects equal values before backup or migration, then creates or rotates the fixed least-privilege PostgreSQL roles without printing either password. The publisher container receives only its two dedicated database URLs; it does not inherit the rest of `deploy/.env`.
 
+Keep `DJANGO_PUBLIC_RENDERER_ENABLED=false` and `DJANGO_LEGACY_RENDER_API_ENABLED=false` in production. Public pages and editor previews are rendered by the TypeScript renderer; the Django HTML renderers remain temporarily available only as explicitly enabled rollback surfaces. Blocked attempts return HTTP 410 and emit a warning without request content.
+
 ### Secrets
 
 - Keep real secrets **only** in `deploy/.env` on the server (not in git, not in tickets or chat). Copy from `deploy/.env.production.example` and replace every placeholder.

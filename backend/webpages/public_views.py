@@ -17,6 +17,8 @@ from django.urls import reverse
 from django.contrib.sitemaps import Sitemap
 import json
 
+from django.conf import settings
+
 from .models import WebPage
 from .renderers import WebPageRenderer
 from .serializers import PageHierarchySerializer
@@ -501,6 +503,11 @@ class HostnamePageView(View):
         """
         import re
 
+        if not settings.DJANGO_PUBLIC_RENDERER_ENABLED:
+            from .rendering_deprecation import disabled_public_render_response
+
+            return disabled_public_render_response(request)
+
         # Get hostname from request with validation
         hostname = self.request.get_host().lower()
 
@@ -850,6 +857,9 @@ def custom_404_handler(request, exception=None):
     from django.views.defaults import page_not_found
     from django.core.exceptions import DisallowedHost
 
+    if not settings.DJANGO_PUBLIC_RENDERER_ENABLED:
+        return page_not_found(request, exception)
+
     # Get hostname from request
     try:
         hostname = request.get_host().lower()
@@ -891,6 +901,11 @@ def custom_500_handler(request):
     """
     import re
 
+    if not settings.DJANGO_PUBLIC_RENDERER_ENABLED:
+        from django.views.defaults import server_error
+
+        return server_error(request)
+
     # Get hostname from request
     try:
         hostname = request.get_host().lower()
@@ -927,6 +942,11 @@ def custom_403_handler(request, exception=None):
     """
     import re
 
+    if not settings.DJANGO_PUBLIC_RENDERER_ENABLED:
+        from django.views.defaults import permission_denied
+
+        return permission_denied(request, exception)
+
     # Get hostname from request
     try:
         hostname = request.get_host().lower()
@@ -962,6 +982,14 @@ def custom_503_handler(request, exception=None):
     in custom middleware or views when the service is unavailable.
     """
     import re
+
+    if not settings.DJANGO_PUBLIC_RENDERER_ENABLED:
+        from django.http import HttpResponse
+
+        return HttpResponse(
+            "<h1>503 Service Unavailable</h1><p>The service is temporarily unavailable. Please try again later.</p>",
+            status=503,
+        )
 
     # Get hostname from request
     try:

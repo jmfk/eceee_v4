@@ -107,6 +107,11 @@ def render_page_backend(request, page_id, version_id=None):
     Returns:
         JSON response with 'html', 'css', 'meta', and optionally 'debug_info'
     """
+    if not settings.DJANGO_LEGACY_RENDER_API_ENABLED:
+        from ..rendering_deprecation import disabled_legacy_render_api_response
+
+        return disabled_legacy_render_api_response(request, "page-render-api")
+
     try:
         # Get the page
         page = get_object_or_404(WebPage, id=page_id)
@@ -203,6 +208,11 @@ def render_page_preview(request):
     Returns:
         JSON response with rendered HTML and optional CSS/debug info
     """
+    if not settings.DJANGO_LEGACY_RENDER_API_ENABLED:
+        from ..rendering_deprecation import disabled_legacy_render_api_response
+
+        return disabled_legacy_render_api_response(request, "page-preview-api")
+
     try:
         # Validate request data
         page_id = request.data.get("page_id")

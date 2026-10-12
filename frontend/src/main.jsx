@@ -14,15 +14,19 @@ import analytics from './utils/analytics'
 import { getCurrentTenantId } from './utils/tenant'
 import RenderFrameRuntime from './rendering/RenderFrameRuntime'
 import StandaloneRenderRuntime from './rendering/StandaloneRenderRuntime'
+import StandaloneVersionRenderRuntime from './rendering/StandaloneVersionRenderRuntime'
 
 const isRenderFrame = window.location.pathname === '/__render-frame'
 const isStandaloneRender = window.location.pathname.startsWith('/_render/')
-if (!isRenderFrame && !isStandaloneRender) analytics.init(getCurrentTenantId());
+const isStandaloneVersionRender = window.location.pathname.startsWith('/_render-version/')
+if (!isRenderFrame && !isStandaloneRender && !isStandaloneVersionRender) analytics.init(getCurrentTenantId());
 
 const RootComponent = isRenderFrame
     ? RenderFrameRuntime
     : isStandaloneRender
         ? StandaloneRenderRuntime
-        : App
+        : isStandaloneVersionRender
+            ? StandaloneVersionRenderRuntime
+            : App
 
 createRoot(document.getElementById('root')).render(<RootComponent />)

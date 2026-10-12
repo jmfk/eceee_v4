@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { loadDirectRenderModel, loadResolvedRenderModel, parseDirectRenderPath } from '../directRender'
+import {
+    loadDirectRenderModel,
+    loadResolvedRenderModel,
+    loadVersionRenderModel,
+    parseDirectRenderPath,
+    parseVersionRenderPath,
+} from '../directRender'
 
 const clientApi = vi.hoisted(() => ({ get: vi.fn() }))
 const previewResolver = vi.hoisted(() => ({ resolve: vi.fn(async (model) => model) }))
@@ -10,6 +16,7 @@ vi.mock('../../utils/pathParser', () => ({ buildPathVariablesContext: pathParser
 
 describe('direct render URL', () => {
     beforeEach(() => {
+        localStorage.clear()
         clientApi.get.mockReset()
         previewResolver.resolve.mockClear()
         pathParser.build.mockClear()
@@ -29,6 +36,31 @@ describe('direct render URL', () => {
 
     it('rejects malformed percent-encoded paths without crashing', () => {
         expect(parseDirectRenderPath('/_render/85/%E0%A4%A')).toBeNull()
+    })
+
+    it('parses a TypeScript page-version preview route', () => {
+        expect(parseVersionRenderPath('/_render-version/42/9/')).toEqual({ pageId: 42, versionId: 9 })
+        expect(parseVersionRenderPath('/_render-version/42/not-a-version/')).toBeNull()
+    })
+
+    it('loads an exact historical version through the TypeScript renderer', async () => {
+        localStorage.setItem('eceee_tenant_id', 'theme-tenant')
+        clientApi.get
+            .mockResolvedValueOnce({ data: { id: 42, cachedRootId: 12, cachedPath: '/programme/' } })
+            .mockResolvedValueOnce({ data: { id: 9, codeLayout: 'main_layout', widgets: {} } })
+            .mockResolvedValueOnce({ data: { slots: {} } })
+
+        const model = await loadVersionRenderModel({ pageId: 42, versionId: 9 })
+
+        expect(clientApi.get.mock.calls[0][0]).toContain('/pages/42/')
+        expect(clientApi.get.mock.calls[1][0]).toContain('/pages/42/versions/9/')
+        expect(model.context).toMatchObject({
+            tenantId: 'theme-tenant',
+            siteId: 12,
+            pageId: 42,
+            versionId: 9,
+            renderRoutePrefix: '/_render/12',
+        })
     })
 
     it('loads the saved page using the resolved tenant', async () => {

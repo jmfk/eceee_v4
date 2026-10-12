@@ -63,18 +63,7 @@ export const previewSizesApi = {
      */
     async delete(id) {
         await api.delete(endpoints.previewSizes.delete(id))
-    },
-
-    /**
-     * Get preview URL for a specific page version
-     * @param {number} pageId - Page ID
-     * @param {number} versionId - Version ID
-     * @returns {string} Preview URL
-     */
-    getPreviewUrl(pageId, versionId) {
-        return endpoints.previewSizes.preview(pageId, versionId)
     }
 }
 
 export default previewSizesApi
-

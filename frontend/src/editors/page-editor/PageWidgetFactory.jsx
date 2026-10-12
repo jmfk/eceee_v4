@@ -5,9 +5,8 @@
  * implementations with PageEditor-specific behaviors and integrations.
  */
 import React, { useState, useEffect, useRef, useMemo, Component } from 'react'
-import { Layout, Settings, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X, AlertCircle, Edit3 } from 'lucide-react'
+import { Layout, Settings, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, AlertCircle, Edit3 } from 'lucide-react'
 import { getWidgetComponent, getWidgetDisplayName, getWidgetIcon } from '../../widgets'
-import { renderWidgetPreview } from '../../utils/widgetPreview'
 import { createPageWidgetConfigChangeHandler } from '../../utils/pageEditorPropAdapter'
 import PageWidgetHeader from './PageWidgetHeader'
 import { useClipboard } from '../../contexts/ClipboardContext'
@@ -59,7 +58,6 @@ const PageWidgetFactory = ({
     nestedParentSlotName,
     // Widget path for infinite nesting support
     widgetPath = [],
-    slotType = 'content', // 'content' or 'inherited' - determines default preview mode
     // NEW: Inheritance props
     isInherited = false,
     // Widget modal for replace functionality
@@ -95,11 +93,6 @@ const PageWidgetFactory = ({
     // Get global hover tracking for paste markers
     const { hoveredWidgetId, setHoveredWidget, clearHoveredWidget } = useClipboard();
 
-    const [showPreview, setShowPreview] = useState(false)
-    const [isLoadingPreview, setIsLoadingPreview] = useState(false)
-    const [previewContent, setPreviewContent] = useState(null)
-    const previewContainerRef = useRef(null)
-    
     // Paste mode state
     const [pasteHoverPosition, setPasteHoverPosition] = useState(null) // 'before' | 'after' | null
     const widgetRef = useRef(null)
@@ -199,49 +192,6 @@ const PageWidgetFactory = ({
         // Reset hover state
         setPasteHoverPosition(null);
     };
-
-    // Enhanced preview with publishing context and slot type awareness
-    const handleModalPreview = async () => {
-        setShowPreview(true)
-        setIsLoadingPreview(true)
-        setPreviewContent(null)
-
-        try {
-            // Determine preview mode based on slot type and widget inheritance
-            const isInheritedWidget = widget.inherit_from_parent || widget.inherited_from
-            const defaultToViewMode = slotType === 'inherited' || isInheritedWidget
-
-            // PageEditor-specific: Include version and publishing context in preview
-            const result = await renderWidgetPreview(widget, {
-                versionId,
-                publishingContext: isPublished,
-                layoutContext: null,
-                previewMode: defaultToViewMode ? 'view' : 'edit',
-                slotType,
-                isInherited: isInheritedWidget
-            })
-            setPreviewContent(result)
-        } catch (error) {
-            console.error('Error loading widget preview:', error)
-            setPreviewContent({
-                html: `<div class="text-red-600 p-4 border border-red-200 bg-red-50">
-                    <span className="font-bold">Preview Error:</span> Could not load widget preview
-                    <br><small>${error.message || 'Unknown error'}</small>
-                </div>`,
-                css: '',
-                success: false,
-                error: error.message
-            })
-        } finally {
-            setIsLoadingPreview(false)
-        }
-    }
-
-    const handleClosePreview = () => {
-        setShowPreview(false)
-        setPreviewContent(null)
-        setIsLoadingPreview(false)
-    }
 
     // Get the widget component (supports EASY widgets and overrides)
     const CoreWidgetComponent = getWidgetComponent(widget.type)
@@ -596,59 +546,6 @@ const PageWidgetFactory = ({
                     </div>
                 </div>
 
-                {/* PageEditor-specific Preview Modal */}
-                {showPreview && (
-                    <div
-                        className="eceee-editor-ui fixed inset-0 bg-black/50 flex items-center justify-center z-[10010]"
-                        onClick={handleClosePreview}
-                    >
-                        <div
-                            className="bg-white rounded-lg shadow-xl max-w-4xl max-h-[80vh] overflow-auto m-4"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                                <div>
-                                    <div className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
-                                        Preview: {getWidgetDisplayName(widget.type)}
-                                    </div>
-                                    {versionId && (
-                                        <div className="text-sm text-gray-500">Version: {versionId}</div>
-                                    )}
-                                </div>
-                                <button
-                                    onClick={handleClosePreview}
-                                    className="text-gray-400 hover:text-gray-600 w-6 h-6"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-                            <div className="p-4">
-                                {isLoadingPreview ? (
-                                    <div className="text-center py-12">
-                                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                        <div className="mt-2 text-sm text-gray-600">Rendering preview...</div>
-                                    </div>
-                                ) : previewContent ? (
-                                    <div className="cms-content">
-                                        <div
-                                            ref={previewContainerRef}
-                                            className="widget-preview-content"
-                                            dangerouslySetInnerHTML={{ __html: previewContent.html }}
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-12 text-gray-500">
-                                        <div>No preview available</div>
-                                    </div>
-                                )}
-                            </div>
-                            {/* Add CSS if available */}
-                            {previewContent?.css && (
-                                <style dangerouslySetInnerHTML={{ __html: previewContent.css }} />
-                            )}
-                        </div>
-                    </div>
-                )}
             </div>
         )
     }
