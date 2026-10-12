@@ -66,15 +66,16 @@ export const AuthProvider = ({ children }) => {
                 const data = await response.json();
                 if (data.designerTenants?.length) {
                     const currentTenant = getCurrentTenantId();
-                    const canUseCurrentTenant = data.designerTenants.some((tenant) =>
+                    const currentWorkspace = data.designerTenants.find((tenant) =>
                         tenant.id === currentTenant || tenant.identifier === currentTenant
                     );
-                    if (!canUseCurrentTenant) {
-                        const serverWorkspace = data.currentWorkspace;
-                        const fallback = data.designerTenants.find((workspace) =>
-                            workspace.id === serverWorkspace?.id || workspace.identifier === serverWorkspace?.identifier
-                        ) || data.designerTenants[0];
-                        localStorage.setItem('eceee_tenant_id', fallback.identifier);
+                    const serverWorkspace = data.designerTenants.find((workspace) =>
+                        workspace.id === data.currentWorkspace?.id ||
+                        workspace.identifier === data.currentWorkspace?.identifier
+                    );
+                    const activeWorkspace = serverWorkspace || currentWorkspace || data.designerTenants[0];
+                    if (activeWorkspace?.identifier && activeWorkspace.identifier !== currentTenant) {
+                        localStorage.setItem('eceee_tenant_id', activeWorkspace.identifier);
                     }
                 }
                 return data;
