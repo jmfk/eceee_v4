@@ -123,13 +123,12 @@ const ImageWidget = ({
     const isCollection = useMemo(() => {
         return isImageCollectionReference(localConfig.image)
     }, [localConfig.image])
+    const collectionId = localConfig.image?.id
+    const collectionNamespace = localConfig.image?.namespace
 
     // Resolve collection files when image is a collection
     useEffect(() => {
-        const image = localConfig.image
-        const hasResolvedMediaItems = Object.hasOwn(localConfig, 'mediaItems')
-            || Object.hasOwn(localConfig, 'media_items')
-        if (!isCollection || !image?.id || hasResolvedMediaItems) {
+        if (!isCollection || !collectionId) {
             setCollectionMediaItems([])
             return
         }
@@ -142,10 +141,10 @@ const ImageWidget = ({
                 // provided. Forward it from the collection object so files
                 // from non-default namespaces resolve in production.
                 const params = { page_size: 100 }
-                if (image.namespace) {
-                    params.namespace = image.namespace
+                if (collectionNamespace) {
+                    params.namespace = collectionNamespace
                 }
-                const result = await mediaCollectionsApi.getFiles(image.id, params)()
+                const result = await mediaCollectionsApi.getFiles(collectionId, params)()
                 const files = result.results || result || []
 
                 // Convert collection files to media_items format
@@ -182,10 +181,8 @@ const ImageWidget = ({
         fetchCollectionFiles()
     }, [
         isCollection,
-        localConfig.image?.id,
-        localConfig.image?.namespace,
-        localConfig.mediaItems,
-        localConfig.media_items,
+        collectionId,
+        collectionNamespace,
     ])
 
     // Backend now provides media_items in config (resolved from image field)
