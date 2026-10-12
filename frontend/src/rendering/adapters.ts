@@ -29,13 +29,34 @@ const breakpointWidth = (breakpoint: unknown, breakpoints: Record<string, number
     return /^\d+$/.test(normalized) ? Number(normalized) : Number(breakpoints?.[normalized] ?? defaultBreakpoints[normalized])
 }
 
+const resolvedSpacingRows = (rows: any[]) => {
+    const rawBreakpoints = new Map<string, Record<string, any>>()
+    rows.forEach((row) => {
+        const breakpoint = String(row.breakpoint || 'xs')
+        rawBreakpoints.set(breakpoint, { ...(rawBreakpoints.get(breakpoint) || {}), ...(row.values || {}) })
+    })
+    const merge = (...breakpoints: string[]) => Object.assign({}, ...breakpoints.map((breakpoint) => rawBreakpoints.get(breakpoint) || {}))
+    const resolved = [
+        { breakpoint: 'xs', values: merge('default', 'mobile', 'xs') },
+        { breakpoint: 'sm', values: merge('desktop', 'sm') },
+        { breakpoint: 'md', values: rawBreakpoints.has('md') ? merge('md') : merge('tablet') },
+        { breakpoint: 'lg', values: merge('lg') },
+        { breakpoint: 'xl', values: merge('xl') },
+    ]
+    rawBreakpoints.forEach((values, breakpoint) => {
+        if (/^\d+$/.test(breakpoint)) resolved.push({ breakpoint, values })
+    })
+    return resolved.filter((row) => Object.keys(row.values).length)
+}
+
 const activeSpacingProperties = (
     rows: any[],
     breakpoints: Record<string, number>,
     viewportWidth: number | undefined,
 ) => {
-    if (!Number.isFinite(viewportWidth)) return [...new Set(rows.flatMap((row) => configuredSpacingFields(row.values)))]
-    const applicable = rows.filter((row) => {
+    const resolvedRows = resolvedSpacingRows(rows)
+    if (!Number.isFinite(viewportWidth)) return [...new Set(resolvedRows.flatMap((row) => configuredSpacingFields(row.values)))]
+    const applicable = resolvedRows.filter((row) => {
         const width = breakpointWidth(row.breakpoint, breakpoints)
         return Number.isFinite(width) && width <= Number(viewportWidth)
     })

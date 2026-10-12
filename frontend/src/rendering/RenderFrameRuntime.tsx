@@ -171,7 +171,7 @@ const groupPartSelectors = (group: any, part: any) => {
     const partSelector = `.${normalize(part.part)}${variants}${modifier}`
     let bases: string[] = []
     if (targeting.targetingMode === 'css-classes') {
-        bases = String(targeting.targetCssClasses || '').split(/[,\n]/).map((value) => value.trim()).filter(Boolean)
+        bases = splitSelectorList(String(targeting.targetCssClasses || ''))
     } else {
         const widgetTypes = group.widgetTypes || []
         const slots = group.slots || []
@@ -286,7 +286,8 @@ const selectorSpecificity = (selector: string): SelectorSpecificity => {
             const nameStart = index + (pseudoElement ? 2 : 1)
             const nameEnd = consumeName(nameStart)
             const name = selector.slice(nameStart, nameEnd).toLowerCase()
-            if (pseudoElement) specificity[2] += 1
+            const legacyPseudoElement = ['after', 'before', 'first-letter', 'first-line'].includes(name)
+            if (pseudoElement || legacyPseudoElement) specificity[2] += 1
             else if (selector[nameEnd] !== '(') specificity[1] += 1
             if (selector[nameEnd] !== '(') index = nameEnd
             else {
@@ -1021,6 +1022,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
 
     groups.forEach((group: any) => {
         const roots = new Set<HTMLElement>()
+        const customClassTargeting = group.previewTargeting?.targetingMode === 'css-classes'
         const registerElements = (groupRoot: HTMLElement) => {
             ;(group.elements || []).forEach((element: any) => {
                 const selector = element.element === 'a:hover' ? 'a' : element.element
@@ -1051,13 +1053,23 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         }
         const allowedSlots = new Set<string>(group.slots || [])
         const groupWidgetTypes = new Set<string>((group.widgetTypes || []).map(widgetTypeKey))
+        if (customClassTargeting) {
+            registerParts(root)
+            splitSelectorList(String(group.previewTargeting?.targetCssClasses || '')).forEach((selector) => {
+                try {
+                    if (root.matches(selector)) roots.add(root)
+                    root.querySelectorAll<HTMLElement>(selector).forEach((node) => roots.add(node))
+                } catch { /* Invalid theme selector metadata is ignored in preview. */ }
+            })
+        }
         widgetRoots.forEach((node) => {
+            if (customClassTargeting) return
             if (!groupWidgetTypes.has(widgetTypeKey(node.dataset.widgetType || ''))) return
             const slotName = node.closest<HTMLElement>('[data-slot-name]')?.dataset.slotName || ''
             if (allowedSlots.size && !allowedSlots.has(slotName)) return
             roots.add(node)
         })
-        if (!(group.widgetTypes || []).length) {
+        if (!customClassTargeting && !(group.widgetTypes || []).length) {
             if (allowedSlots.size) {
                 allowedSlots.forEach((slot) => {
                     root.querySelectorAll<HTMLElement>(`.slot-${normalizeCssName(slot)}`).forEach((slotRoot) => {
@@ -1340,23 +1352,26 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         event.stopPropagation()
         const direction = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1
         const step = event.shiftKey ? 10 : 1
-        const changes = targets.flatMap((target) => {
+        const resolvedChanges = targets.flatMap((target) => {
             if (!target) return []
             const cssProperty = target.property.replace(/[A-Z]/g, (character) => `-${character.toLowerCase()}`)
             const currentValue = getComputedStyle(target.node).getPropertyValue(cssProperty).trim()
             const match = currentValue.match(/^(-?(?:\d+(?:\.\d*)?|\.\d+))\s*([a-z%]*)$/i)
             if (!match) return []
             const value = `${Math.max(0, Math.round((Number(match[1]) + direction * step) * 1000) / 1000)}${match[2] || 'px'}`
-            target.node.style.setProperty(cssProperty, value)
             const editableTarget = editableCascadeWinner(target.node, target.editableTargets, target.property)
             const targetId = editableTarget?.targetId
             return targetId ? [{
+                node: target.node,
+                cssProperty,
                 targetId,
                 targetIds: target.targetIds,
                 property: target.property,
                 value,
             }] : []
         })
+        resolvedChanges.forEach(({ node, cssProperty, value }) => node.style.setProperty(cssProperty, value))
+        const changes = resolvedChanges.map(({ node: _node, cssProperty: _cssProperty, ...change }) => change)
         if (changes.length === 1) window.parent.postMessage({
             source: 'eceee-designer-preview',
             action: 'spacingChange',
@@ -1427,6 +1442,11 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     root.addEventListener('mouseout', out)
     root.addEventListener('focusin', refreshSelectedInspectorTargets)
     root.addEventListener('focusout', refreshSelectedInspectorTargets)
+    root.addEventListener('pointerdown', refreshSelectedInspectorTargets)
+    root.addEventListener('pointerup', refreshSelectedInspectorTargets)
+    root.addEventListener('pointercancel', refreshSelectedInspectorTargets)
+    root.addEventListener('keydown', refreshSelectedInspectorTargets)
+    root.addEventListener('keyup', refreshSelectedInspectorTargets)
     root.addEventListener('designerselect', selectFromInspector)
     root.addEventListener('designerclear', clearFocus)
     const previewSelectionLevel = (event: Event) => {
@@ -1446,6 +1466,11 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         root.removeEventListener('mouseout', out)
         root.removeEventListener('focusin', refreshSelectedInspectorTargets)
         root.removeEventListener('focusout', refreshSelectedInspectorTargets)
+        root.removeEventListener('pointerdown', refreshSelectedInspectorTargets)
+        root.removeEventListener('pointerup', refreshSelectedInspectorTargets)
+        root.removeEventListener('pointercancel', refreshSelectedInspectorTargets)
+        root.removeEventListener('keydown', refreshSelectedInspectorTargets)
+        root.removeEventListener('keyup', refreshSelectedInspectorTargets)
         cancelAnimationFrame(dynamicSelectionRefreshFrame)
         root.removeEventListener('designerselect', selectFromInspector)
         root.removeEventListener('designerclear', clearFocus)
