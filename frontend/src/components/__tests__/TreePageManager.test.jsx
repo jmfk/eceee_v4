@@ -274,7 +274,7 @@ describe('TreePageManager', () => {
             target: { files: [new File(['zip'], 'summer-study.zip', { type: 'application/zip' })] },
         })
 
-        expect(await screen.findByRole('heading', { name: 'Review import' })).toBeInTheDocument()
+        expect(await screen.findByRole('heading', { name: 'Select what to import' })).toBeInTheDocument()
         expect(screen.getByText('Conference')).toBeInTheDocument()
         expect(screen.getByText('1 theme package(s) missing. They will be skipped.')).toBeInTheDocument()
         expect(screen.getByLabelText(/Optional theme ZIP files/)).toBeInTheDocument()
@@ -301,7 +301,7 @@ describe('TreePageManager', () => {
         fireEvent.change(screen.getByLabelText('Site package ZIP'), {
             target: { files: [new File(['zip'], 'summer-study.zip', { type: 'application/zip' })] },
         })
-        await screen.findByRole('heading', { name: 'Review import' })
+        await screen.findByRole('heading', { name: 'Select what to import' })
         fireEvent.change(screen.getByLabelText('Import mode'), { target: { value: 'update' } })
         fireEvent.click(screen.getByLabelText('Media'))
         fireEvent.click(screen.getByRole('button', { name: 'Start import' }))
@@ -332,7 +332,7 @@ describe('TreePageManager', () => {
         fireEvent.change(screen.getByLabelText('Site package ZIP'), {
             target: { files: [new File(['zip'], 'summer-study.zip', { type: 'application/zip' })] },
         })
-        await screen.findByRole('heading', { name: 'Review import' })
+        await screen.findByRole('heading', { name: 'Select what to import' })
         fireEvent.click(screen.getByLabelText('Put cloned media in a separate namespace'))
         fireEvent.change(screen.getByLabelText('Namespace name'), { target: { value: 'Summer Study media' } })
         fireEvent.click(screen.getByRole('button', { name: 'Start import' }))
@@ -383,8 +383,8 @@ describe('TreePageManager', () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Load sites' }))
 
         expect(await screen.findByText('Remote Site')).toBeInTheDocument()
-        fireEvent.click(screen.getByRole('button', { name: 'Review import' }))
-        expect(await screen.findByRole('heading', { name: 'Review import' })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Select what to import' }))
+        expect(await screen.findByRole('heading', { name: 'Select what to import' })).toBeInTheDocument()
         expect(screen.getByLabelText('Import mode')).toHaveValue('update')
         expect(screen.getByLabelText('Existing site')).toHaveValue('17')
         fireEvent.click(screen.getByRole('button', { name: 'Start import' }))

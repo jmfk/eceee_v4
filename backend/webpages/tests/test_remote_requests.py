@@ -32,6 +32,20 @@ class RemoteRequestTests(SimpleTestCase):
     @patch("webpages.services.theme_remote.validate_remote_url", return_value="https://remote.example/")
     @patch("webpages.services.theme_remote_credentials.decrypt_access_key", return_value="secret")
     @patch("webpages.services.theme_remote.requests.request")
+    def test_streamed_site_download_accepts_file_response_without_drf_406(self, request, _decrypt, _validate):
+        response = Mock(status_code=200)
+        request.return_value = response
+
+        result = remote_site_request(self.connection("theme_key"), "GET", "exports/job/download/", stream=True)
+
+        self.assertIs(result, response)
+        self.assertEqual(request.call_args.kwargs["headers"]["Accept"], "*/*")
+        self.assertEqual(request.call_args.kwargs["headers"]["Authorization"], "ThemeKey secret")
+        response.close.assert_not_called()
+
+    @patch("webpages.services.theme_remote.validate_remote_url", return_value="https://remote.example/")
+    @patch("webpages.services.theme_remote_credentials.decrypt_access_key", return_value="secret")
+    @patch("webpages.services.theme_remote.requests.request")
     def test_object_request_returns_json_and_closes_response(self, request, _decrypt, _validate):
         response = Mock(status_code=200)
         response.json.return_value = {"object_count": 3}

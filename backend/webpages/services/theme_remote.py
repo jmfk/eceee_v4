@@ -76,7 +76,10 @@ def remote_site_request(connection, method, path, payload=None, stream=False):
             headers={
                 "Authorization": f"{'ApiKey' if connection.credential_scheme == 'api_key' else 'ThemeKey'} {token}",
                 "X-Tenant-ID": connection.remote_workspace,
-                "Accept": "application/zip" if stream else "application/json",
+                # DRF negotiates the API view before its FileResponse is built.
+                # Accepting any response type lets downloads pass negotiation;
+                # the caller still validates the returned ZIP before importing it.
+                "Accept": "*/*" if stream else "application/json",
             },
             timeout=(5, 60),
             allow_redirects=False,
