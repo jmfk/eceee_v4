@@ -97,7 +97,7 @@ const descendantTargets = (node: HTMLElement) => {
         if (!primary?.id || seen.has(instanceKey)) return null
         seen.add(instanceKey)
         const parentNode = descendant.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
-        const parentId = parentNode && (parentNode === node || node.contains(parentNode)) ? nodeTargets(parentNode)[0]?.id || '' : ''
+        const parentId = parentNode && (parentNode === node || node.contains(parentNode)) ? primaryNodeTarget(parentNode)?.id || '' : ''
         const parentWidgetId = parentNode?.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''
         const parentInstanceId = parentNode ? designerInstanceId(parentNode) : ''
         let depth = 1
@@ -138,7 +138,7 @@ const targetPath = (node: HTMLElement, preferredTarget?: any) => {
     let current: HTMLElement | null = node
     let first = true
     while (current) {
-        const candidate = first && preferredTarget ? preferredTarget : nodeTargets(current)[0]
+        const candidate = first && preferredTarget ? preferredTarget : primaryNodeTarget(current)
         const target = selectionKind(candidate) === 'widget' && candidate?.kind !== 'widget' ? null : candidate
         const widgetNode = current.closest<HTMLElement>('[data-widget-id]')
         const widgetId = target?.widgetId || widgetNode?.dataset.widgetId || ''
@@ -171,7 +171,7 @@ const groupPartSelectors = (group: any, part: any) => {
     const partSelector = `.${normalize(part.part)}${variants}${modifier}`
     let bases: string[] = []
     if (targeting.targetingMode === 'css-classes') {
-        bases = splitSelectorList(String(targeting.targetCssClasses || ''))
+        bases = splitTargetSelectorList(String(targeting.targetCssClasses || ''))
     } else {
         const widgetTypes = group.widgetTypes || []
         const slots = group.slots || []
@@ -192,6 +192,11 @@ const matchesCascadeTarget = (node: HTMLElement, target: any) => {
     return selectors.some((selector: string) => {
         try { return node.matches(selector) } catch { return false }
     })
+}
+
+const primaryNodeTarget = (node: HTMLElement) => {
+    const targets = nodeTargets(node)
+    return targets.find((target: any) => matchesCascadeTarget(node, target))
 }
 
 type SelectorSpecificity = [number, number, number]
@@ -228,11 +233,45 @@ const splitSelectorList = (value: string) => {
     return selectors.filter(Boolean)
 }
 
+const splitTargetSelectorList = (value: string) => {
+    const selectors: string[] = []
+    let start = 0
+    let depth = 0
+    let quote = ''
+    for (let index = 0; index < value.length; index += 1) {
+        const character = value[index]
+        if (quote) {
+            if (character === '\\') index += 1
+            else if (character === quote) quote = ''
+        } else if (character === '"' || character === "'") quote = character
+        else if (character === '(' || character === '[') depth += 1
+        else if (character === ')' || character === ']') depth = Math.max(0, depth - 1)
+        else if (depth === 0 && (character === ',' || character === '\n' || character === '\r')) {
+            selectors.push(value.slice(start, index).trim())
+            start = index + 1
+        }
+    }
+    selectors.push(value.slice(start).trim())
+    return selectors.filter(Boolean)
+}
+
 const selectorSpecificity = (selector: string): SelectorSpecificity => {
     let specificity: SelectorSpecificity = [0, 0, 0]
     const consumeName = (start: number) => {
         let end = start
-        while (end < selector.length && /[\w-]/.test(selector[end])) end += 1
+        while (end < selector.length) {
+            if (/[\w-]/.test(selector[end])) end += 1
+            else if (selector[end] === '\\' && end + 1 < selector.length) {
+                end += 1
+                let hexadecimalDigits = 0
+                while (end < selector.length && /[\da-f]/i.test(selector[end]) && hexadecimalDigits < 6) {
+                    end += 1
+                    hexadecimalDigits += 1
+                }
+                if (!hexadecimalDigits) end += 1
+                else if (/\s/.test(selector[end] || '')) end += 1
+            } else break
+        }
         return end
     }
     const consumeBlock = (start: number, opener: string, closer: string) => {
@@ -413,9 +452,10 @@ const selectionPaths = (node: HTMLElement, preferredTarget?: any, designer?: Ren
     let first = true
     while (current) {
         const targets = nodeTargets(current)
+        const primaryTarget = primaryNodeTarget(current)
         const candidates = first && preferredTarget
             ? [preferredTarget, ...targets.filter((target: any) => target.id !== preferredTarget.id)]
-            : targets
+            : primaryTarget ? [primaryTarget, ...targets.filter((target: any) => target !== primaryTarget)] : targets
         ;(['slot', 'widget', 'element'] as const).forEach((kind) => {
             if (preferredTarget && preferredKind !== 'element' && kind === 'element') return
             if (first && preferredTarget && selectionRank[kind] > selectionRank[preferredKind]) return
@@ -1055,7 +1095,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         const groupWidgetTypes = new Set<string>((group.widgetTypes || []).map(widgetTypeKey))
         if (customClassTargeting) {
             registerParts(root)
-            splitSelectorList(String(group.previewTargeting?.targetCssClasses || '')).forEach((selector) => {
+            splitTargetSelectorList(String(group.previewTargeting?.targetCssClasses || '')).forEach((selector) => {
                 try {
                     if (root.matches(selector)) roots.add(root)
                     root.querySelectorAll<HTMLElement>(selector).forEach((node) => roots.add(node))
@@ -1204,21 +1244,27 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         const click = (event: Event) => {
             if (!node.isContentEditable) event.preventDefault()
             event.stopPropagation()
-            const primaryTarget = nodeTargets(node)[0]
-            const paths = applySelectionClasses(root, node, primaryTarget)
+            let selectionNode: HTMLElement | null = node
+            let primaryTarget = primaryNodeTarget(selectionNode)
+            while (!primaryTarget) {
+                selectionNode = selectionNode.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
+                if (!selectionNode || !root.contains(selectionNode)) return
+                primaryTarget = primaryNodeTarget(selectionNode)
+            }
+            const paths = applySelectionClasses(root, selectionNode, primaryTarget)
             setSelectedNodesFromPaths(paths)
             root.querySelectorAll('.designer-highlighted').forEach((highlighted) => highlighted.classList.remove('designer-highlighted'))
-            selectedNode = node
+            selectedNode = selectionNode
             focusState.selectedMeasurementKeys = []
             focusState.selectedTargetId = primaryTarget?.id || ''
-            focusState.selectedWidgetId = node.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''
-            focusState.selectedInstanceId = designerInstanceId(node)
+            focusState.selectedWidgetId = selectionNode.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''
+            focusState.selectedInstanceId = designerInstanceId(selectionNode)
             focusState.selectedTargets = selectedTargetsFromPaths(paths)
             focusState.highlightedTargetId = ''
             focusState.highlightedWidgetId = ''
             focusState.highlightedInstanceId = ''
             showSelectedSpacing()
-            postDesignerEvent(node, designer, 'select', primaryTarget)
+            postDesignerEvent(selectionNode, designer, 'select', primaryTarget)
         }
         let primaryTarget: any = null
         try { primaryTarget = JSON.parse(node.dataset.designerTargets || '[]')[0] } catch { primaryTarget = null }
@@ -1395,9 +1441,11 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         cancelAnimationFrame(dynamicSelectionRefreshFrame)
         dynamicSelectionRefreshFrame = requestAnimationFrame(() => {
             if (!selectedNode || !root.contains(selectedNode)) return
-            postDesignerEvent(selectedNode, designer, 'select', nodeTargets(selectedNode)[0])
+            postDesignerEvent(selectedNode, designer, 'select', primaryNodeTarget(selectedNode))
         })
     }
+    document.addEventListener('pointerup', refreshSelectedInspectorTargets)
+    document.addEventListener('pointercancel', refreshSelectedInspectorTargets)
     const over = (event: MouseEvent) => {
         if (selectedNode && root.contains(selectedNode)) {
             if (hoveredNode !== selectedNode) showSelectedSpacing()
@@ -1443,8 +1491,6 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     root.addEventListener('focusin', refreshSelectedInspectorTargets)
     root.addEventListener('focusout', refreshSelectedInspectorTargets)
     root.addEventListener('pointerdown', refreshSelectedInspectorTargets)
-    root.addEventListener('pointerup', refreshSelectedInspectorTargets)
-    root.addEventListener('pointercancel', refreshSelectedInspectorTargets)
     root.addEventListener('keydown', refreshSelectedInspectorTargets)
     root.addEventListener('keyup', refreshSelectedInspectorTargets)
     root.addEventListener('designerselect', selectFromInspector)
@@ -1461,14 +1507,14 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         closeContextMenu()
         root.removeEventListener('contextmenu', openContextMenu)
         document.removeEventListener('pointerdown', dismissContextMenu)
+        document.removeEventListener('pointerup', refreshSelectedInspectorTargets)
+        document.removeEventListener('pointercancel', refreshSelectedInspectorTargets)
         document.removeEventListener('keydown', handleMeasurementKeyboard)
         root.removeEventListener('mouseover', over)
         root.removeEventListener('mouseout', out)
         root.removeEventListener('focusin', refreshSelectedInspectorTargets)
         root.removeEventListener('focusout', refreshSelectedInspectorTargets)
         root.removeEventListener('pointerdown', refreshSelectedInspectorTargets)
-        root.removeEventListener('pointerup', refreshSelectedInspectorTargets)
-        root.removeEventListener('pointercancel', refreshSelectedInspectorTargets)
         root.removeEventListener('keydown', refreshSelectedInspectorTargets)
         root.removeEventListener('keyup', refreshSelectedInspectorTargets)
         cancelAnimationFrame(dynamicSelectionRefreshFrame)
