@@ -71,8 +71,8 @@ class LegacyNewsMediaImporterTests(TestCase):
 
     @patch("content_migration.legacy_news.media.storage")
     def test_resume_replaces_placeholder_without_changing_media_id(self, mocked_storage):
-        source_url = "https://legacy.example/retry.png"
-        stable_path = self.importer._storage_path(source_url, "placeholder.png", "image/png")
+        source_url = "https://legacy.example/retry.jpg"
+        stable_path = self.importer._storage_path(source_url)
         placeholder_result = self._upload_result(b"placeholder", stable_path)
         real_result = self._upload_result(b"real-image", stable_path)
         mocked_storage.overwrite_file.side_effect = [placeholder_result, real_result]
@@ -81,7 +81,7 @@ class LegacyNewsMediaImporterTests(TestCase):
         with patch.object(self.importer, "_read_image", side_effect=ValueError("not-an-image")):
             placeholder = self.importer.import_image(source_url)
 
-        with patch.object(self.importer, "_read_image", return_value=(b"real-image", "image/png")):
+        with patch.object(self.importer, "_read_image", return_value=(b"real-image", "image/jpeg")):
             resumed = self.importer.import_image(source_url, resume=True)
 
         self.assertEqual(placeholder.id, resumed.id)
@@ -111,20 +111,12 @@ class LegacyNewsMediaImporterTests(TestCase):
         mocked_storage.delete.assert_called_once_with(result["file_path"])
 
     def test_storage_path_is_stable_for_the_source_url(self):
-        first = self.importer._storage_path(
-            "https://legacy.example/photo.png",
-            "photo.png",
-            "image/png",
-        )
-        second = self.importer._storage_path(
-            "https://legacy.example/photo.png",
-            "renamed.png",
-            "image/png",
-        )
+        source_url = "https://legacy.example/photo.png"
+        first = self.importer._storage_path(source_url)
+        second = self.importer._storage_path(source_url)
 
         self.assertEqual(first, second)
         self.assertTrue(first.startswith(f"legacy/news/{self.tenant.id}/{self.namespace.id}/"))
-        self.assertTrue(first.endswith(".png"))
 
     def test_storage_path_is_isolated_by_tenant_and_namespace(self):
         sibling_namespace = Namespace.objects.create(
@@ -156,9 +148,9 @@ class LegacyNewsMediaImporterTests(TestCase):
         )
         source_url = "https://legacy.example/shared.png"
 
-        local_path = self.importer._storage_path(source_url, "shared.png", "image/png")
-        sibling_path = sibling_importer._storage_path(source_url, "shared.png", "image/png")
-        other_path = other_importer._storage_path(source_url, "shared.png", "image/png")
+        local_path = self.importer._storage_path(source_url)
+        sibling_path = sibling_importer._storage_path(source_url)
+        other_path = other_importer._storage_path(source_url)
 
         self.assertNotEqual(local_path, sibling_path)
         self.assertNotEqual(local_path, other_path)

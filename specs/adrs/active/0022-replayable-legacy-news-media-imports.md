@@ -19,7 +19,7 @@ PRD-0012 requires legacy News imports to be resumable and idempotent. URL and co
 
 Allow only one write-mode legacy News import at a time. The management command acquires a process-local lock and a PostgreSQL session advisory lock before sample or database writes. A competing writer exits without importing; dry runs remain concurrent and read-only.
 
-Derive each new legacy media object-storage key deterministically from the target tenant ID, namespace ID, and complete source URL while preserving a bounded file extension. Replaying an interrupted import overwrites the same scoped key rather than allocating another object. If `MediaFile` creation raises after upload, make a best-effort deletion of that exact key before propagating the error.
+Derive each new legacy media object-storage key deterministically from the target tenant ID, namespace ID, and complete source URL without incorporating the fetched filename, media type, or placeholder state. Replaying an interrupted import overwrites the same scoped key rather than allocating another object. If `MediaFile` creation raises after upload, make a best-effort deletion of that exact key before propagating the error.
 
 Continue to reconcile existing media first by legacy source URL and then by content hash. Resume mode retries placeholders and overwrites the existing media path so object and widget references retain the same media ID.
 
