@@ -2,6 +2,8 @@
 Tests for Media System API Endpoints
 """
 
+import uuid
+
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
@@ -142,3 +144,21 @@ class MediaFileAPITest(APITestCase):
             [str(item["id"]) for item in search_response.data["results"]],
             [str(self.media_file.id)],
         )
+
+
+class MediaCollectionAPITest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="testuser_collection_api", email="collection@example.com", password="testpass123"
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_missing_collection_files_returns_not_found(self):
+        url = reverse(
+            "api:file_manager:mediacollection-files",
+            kwargs={"pk": uuid.uuid4()},
+        )
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

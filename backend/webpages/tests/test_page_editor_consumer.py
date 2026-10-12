@@ -6,6 +6,7 @@ from django.test import TransactionTestCase, override_settings
 
 from config.routing import websocket_urlpatterns
 from core.models import Tenant
+from utils.middleware.dev_auth import DevAutoLoginASGIMiddleware
 from webpages.models import WebPage
 
 IN_MEMORY_CHANNEL_LAYERS = {
@@ -31,7 +32,7 @@ class PageEditorConsumerTest(TransactionTestCase):
             created_by=self.owner,
             last_modified_by=self.owner,
         )
-        self.application = URLRouter(websocket_urlpatterns)
+        self.application = DevAutoLoginASGIMiddleware(URLRouter(websocket_urlpatterns))
 
     async def connect_as(self, user):
         communicator = WebsocketCommunicator(
@@ -51,6 +52,22 @@ class PageEditorConsumerTest(TransactionTestCase):
                 self.assertEqual(message["type"], "auth_failure")
                 self.assertEqual(message["code"], "FORBIDDEN")
                 await communicator.wait()
+
+        async_to_sync(scenario)()
+
+    @override_settings(DEBUG=True)
+    def test_debug_auto_login_authenticates_websocket_scope(self):
+        async def scenario():
+            communicator = WebsocketCommunicator(
+                self.application,
+                f"/ws/pages/{self.page.pk}/editor/",
+            )
+            connected, _ = await communicator.connect()
+
+            self.assertTrue(connected)
+            established = await communicator.receive_json_from()
+            self.assertEqual(established["type"], "connection_established")
+            await communicator.disconnect()
 
         async_to_sync(scenario)()
 

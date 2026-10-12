@@ -127,7 +127,9 @@ const ImageWidget = ({
     // Resolve collection files when image is a collection
     useEffect(() => {
         const image = localConfig.image
-        if (!isCollection || !image?.id) {
+        const hasResolvedMediaItems = Object.hasOwn(localConfig, 'mediaItems')
+            || Object.hasOwn(localConfig, 'media_items')
+        if (!isCollection || !image?.id || hasResolvedMediaItems) {
             setCollectionMediaItems([])
             return
         }
@@ -178,7 +180,13 @@ const ImageWidget = ({
         }
 
         fetchCollectionFiles()
-    }, [isCollection, localConfig.image])
+    }, [
+        isCollection,
+        localConfig.image?.id,
+        localConfig.image?.namespace,
+        localConfig.mediaItems,
+        localConfig.media_items,
+    ])
 
     // Backend now provides media_items in config (resolved from image field)
     // Use media_items directly from config, or resolved collection files
