@@ -118,7 +118,7 @@ export const EditorNavLinkMenu = ({
     const publicPath = appendAnchor(pageInfo?.path || item.url, anchor)
     const isPublished = pageInfo?.isPublished ?? item.isPublished ?? false
     const versionId = latestVersion?.versionId || latestVersion?.id || item.currentVersionId
-    const previewUrl = pageId && versionId ? endpoints.previewSizes.preview(pageId, versionId) : ''
+    const previewUrl = pageId && versionId ? `/_render-version/${pageId}/${versionId}/` : ''
     const editorUrl = pageId ? `/pages/${pageId}/edit` : ''
     const externalUrl = item.url || ''
 

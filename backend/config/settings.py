@@ -38,6 +38,13 @@ DEBUG = config("DEBUG", default=True, cast=bool)
 APP_VERSION = config("APP_VERSION", default="")
 DEPLOYMENT_ENVIRONMENT = config("DEPLOYMENT_ENVIRONMENT", default="development" if DEBUG else "production")
 
+# Django's HTML renderers are retained temporarily as rollback-only compatibility
+# surfaces while public and editor rendering moves to the TypeScript renderer.
+# They default off outside DEBUG so a production backend cannot silently become a
+# page renderer when reverse-proxy routing is misconfigured.
+DJANGO_PUBLIC_RENDERER_ENABLED = config("DJANGO_PUBLIC_RENDERER_ENABLED", default=DEBUG, cast=bool)
+DJANGO_LEGACY_RENDER_API_ENABLED = config("DJANGO_LEGACY_RENDER_API_ENABLED", default=DEBUG, cast=bool)
+
 # Layout caching configuration
 if DEBUG:
     # Disable layout caching in development for immediate updates

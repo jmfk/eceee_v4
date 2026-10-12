@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Eye, History, RefreshCw, RotateCcw } from 'lucide-react'
-import { endpoints } from '../api/endpoints'
 import { versionsApi } from '../api/versions'
 
 const statusStyles = {
@@ -69,21 +68,9 @@ const PageVersionHistoryPanel = ({ pageId, workflow, onRestored, onRestoreError,
     }
 
     const openVersionPreview = async (versionId) => {
-        const previewWindow = window.open('about:blank', '_blank')
+        const previewWindow = window.open(`/_render-version/${pageId}/${versionId}/`, '_blank', 'noopener,noreferrer')
         if (!previewWindow) {
             await onRestoreError?.(new Error('The preview window was blocked by the browser.'))
-            return
-        }
-        previewWindow.opener = null
-        try {
-            const grant = await versionsApi.createPreviewGrant(pageId, versionId)
-            const previewUrl = new URL(endpoints.previewSizes.preview(pageId, versionId), window.location.origin)
-            previewUrl.searchParams.set('standalone', '1')
-            previewUrl.searchParams.set('preview_token', grant.previewToken)
-            previewWindow.location.replace(previewUrl.toString())
-        } catch (error) {
-            previewWindow.close()
-            await onRestoreError?.(error)
         }
     }
 

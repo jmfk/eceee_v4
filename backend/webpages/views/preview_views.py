@@ -443,6 +443,11 @@ PREVIEW_NAVIGATION_MENU_SCRIPT = r"""
 @permission_classes([permissions.IsAuthenticated])
 def create_version_preview_grant(request, page_id, version_id):
     """Issue a short-lived grant that cannot authorize anything except one preview."""
+    if not settings.DJANGO_LEGACY_RENDER_API_ENABLED:
+        from ..rendering_deprecation import disabled_legacy_render_api_response
+
+        return disabled_legacy_render_api_response(request, "version-preview-grant-api")
+
     page = get_object_or_404(WebPage.objects.select_related("tenant"), id=page_id)
     get_object_or_404(PageVersion, id=version_id, page=page)
     if not page.tenant.user_has_access(request.user):
@@ -486,6 +491,11 @@ def render_version_preview(request, page_id, version_id):
     Returns:
         HttpResponse with complete HTML page including CSS and meta tags
     """
+
+    if not settings.DJANGO_LEGACY_RENDER_API_ENABLED:
+        from ..rendering_deprecation import disabled_legacy_render_api_response
+
+        return disabled_legacy_render_api_response(request, "version-preview-api")
 
     if not request.user.is_authenticated:
         return HttpResponse(
