@@ -543,6 +543,12 @@ const compareCascadePriority = (left, right) => {
     return 0
 }
 
+const compareCascadePriorityForField = (field) => (left, right) => (
+    Number((left?.activeSpacingProperties || []).includes(field))
+    - Number((right?.activeSpacingProperties || []).includes(field))
+    || compareCascadePriority(left, right)
+)
+
 const directionalFieldPosition = {
     Top: 'col-start-2 row-start-1',
     Left: 'col-start-1 row-start-2',
@@ -924,6 +930,7 @@ const SemanticThemeWorkspace = ({
                     computedStyles: option.computedStyles || {},
                     isWidgetSurface: option.isWidgetSurface === true,
                     cascadePriority: Array.isArray(option.cascadePriority) ? option.cascadePriority : [],
+                    activeSpacingProperties: Array.isArray(option.activeSpacingProperties) ? option.activeSpacingProperties : [],
                     configurationSpacingTargets: Array.isArray(option.configurationSpacingTargets)
                         ? option.configurationSpacingTargets.map(normalizeTarget)
                         : [],
@@ -1168,8 +1175,9 @@ const SemanticThemeWorkspace = ({
             sourceModel: contentMode === 'content' ? sourceContentModel : null,
             contentEditable: contentMode === 'demo',
             guidesEnabled,
+            viewportWidth: designerPreviewWidth(viewport, getBreakpoints(previewWorkspace)),
         })
-    }, [contentMode, guidesEnabled, pendingPreviewTextsRef, previewContent, preview, sourceContentModel, viewId, workspace])
+    }, [contentMode, guidesEnabled, pendingPreviewTextsRef, previewContent, preview, sourceContentModel, viewId, viewport, workspace])
     const [renderPreviewModel, setRenderPreviewModel] = useState(previewModel)
 
     useEffect(() => {
@@ -1423,7 +1431,7 @@ const SemanticThemeWorkspace = ({
         const editableTargets = representedTargets.filter((representedTarget) => {
             const structural = structuralSpacingTargetFor(representedTarget)
             return structural && editableSpacingFieldsForTarget(representedTarget, structural).includes(field)
-        }).sort(compareCascadePriority).reverse()
+        }).sort(compareCascadePriorityForField(field)).reverse()
         const editableTarget = editableTargets[0] || target
         setThemeDefaults((current) => ({
             ...current,
