@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import ipaddress
+import logging
 import mimetypes
 import socket
 import textwrap
@@ -25,6 +26,7 @@ from file_manager.storage import storage
 from .fetcher import USER_AGENT
 
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
+logger = logging.getLogger(__name__)
 
 
 def placeholder_png(source_url: str, failure: str) -> bytes:
@@ -137,35 +139,42 @@ class LegacyMediaImporter:
             self._apply_tags(duplicate, placeholder=placeholder)
             return duplicate
 
-        result = storage.upload_file(uploaded, "legacy/news")
+        result = storage.overwrite_file(self._storage_path(source_url, filename, content_type), uploaded)
 
-        media = MediaFile.objects.create(
-            title=alt.strip() or filename,
-            slug=self._unique_slug(filename),
-            description=(f"Legacy image unavailable: {failure}" if placeholder else "Imported legacy News image"),
-            original_filename=filename,
-            file_path=result["file_path"],
-            file_url=storage.get_public_url(result["file_path"]),
-            file_size=result["file_size"],
-            content_type=result["content_type"],
-            file_hash=result["file_hash"],
-            file_type="image",
-            width=result.get("width"),
-            height=result.get("height"),
-            namespace=self.namespace,
-            tenant=self.tenant,
-            access_level="public",
-            created_by=self.user,
-            last_modified_by=self.user,
-            uploaded_by=self.user,
-            metadata={
-                "legacy_source_url": source_url,
-                "legacy_source_urls": [source_url],
-                "migration_placeholder": placeholder,
-                "legacy_media_failure": failure,
-                "legacy_news_articles": [article_identity] if article_identity else [],
-            },
-        )
+        try:
+            media = MediaFile.objects.create(
+                title=alt.strip() or filename,
+                slug=self._unique_slug(filename),
+                description=(f"Legacy image unavailable: {failure}" if placeholder else "Imported legacy News image"),
+                original_filename=filename,
+                file_path=result["file_path"],
+                file_url=storage.get_public_url(result["file_path"]),
+                file_size=result["file_size"],
+                content_type=result["content_type"],
+                file_hash=result["file_hash"],
+                file_type="image",
+                width=result.get("width"),
+                height=result.get("height"),
+                namespace=self.namespace,
+                tenant=self.tenant,
+                access_level="public",
+                created_by=self.user,
+                last_modified_by=self.user,
+                uploaded_by=self.user,
+                metadata={
+                    "legacy_source_url": source_url,
+                    "legacy_source_urls": [source_url],
+                    "migration_placeholder": placeholder,
+                    "legacy_media_failure": failure,
+                    "legacy_news_articles": [article_identity] if article_identity else [],
+                },
+            )
+        except Exception:
+            try:
+                storage.delete(result["file_path"])
+            except Exception:
+                logger.exception("Could not clean up failed legacy media upload at %s", result["file_path"])
+            raise
         self._apply_tags(media, placeholder=placeholder)
         return media
 
@@ -266,6 +275,16 @@ class LegacyMediaImporter:
             slug = f"{base}-{suffix}"
             suffix += 1
         return slug
+
+    @staticmethod
+    def _storage_path(source_url: str, filename: str, content_type: str) -> str:
+        """Return the stable object key used to make interrupted uploads replayable."""
+
+        suffix = Path(filename).suffix.lower()
+        if not suffix or len(suffix) > 12:
+            suffix = mimetypes.guess_extension(content_type) or ""
+        source_id = hashlib.sha256(source_url.encode("utf-8")).hexdigest()
+        return f"legacy/news/{source_id}{suffix}"
 
     @staticmethod
     def _failure_category(exc: Exception) -> str:
