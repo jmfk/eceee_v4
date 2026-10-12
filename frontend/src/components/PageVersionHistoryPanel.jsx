@@ -67,11 +67,8 @@ const PageVersionHistoryPanel = ({ pageId, workflow, onRestored, onRestoreError,
         }
     }
 
-    const openVersionPreview = async (versionId) => {
-        const previewWindow = window.open(`/_render-version/${pageId}/${versionId}/`, '_blank', 'noopener,noreferrer')
-        if (!previewWindow) {
-            await onRestoreError?.(new Error('The preview window was blocked by the browser.'))
-        }
+    const openVersionPreview = (versionId) => {
+        window.open(`/_render-version/${pageId}/${versionId}/`, '_blank', 'noopener,noreferrer')
     }
 
     return (

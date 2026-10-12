@@ -144,10 +144,11 @@ export const loadVersionRenderModel = async ({ pageId, versionId }: VersionRende
     const [pageResponse, versionResponse, inheritanceResponse]: any[] = await Promise.all([
         api.get(endpoints.pages.detail(pageId)),
         api.get(endpoints.versions.pageVersionDetail(pageId, versionId)),
-        api.get(endpoints.pages.widgetInheritance(pageId)),
+        api.get(endpoints.pages.widgetInheritance(pageId, versionId)),
     ])
     const page = pageResponse.data || pageResponse
     const version = versionResponse.data || versionResponse
+    const inheritance = inheritanceResponse.data || inheritanceResponse
     const siteId = Number(
         page?.cachedRootId
         || page?.cached_root_id
@@ -158,17 +159,23 @@ export const loadVersionRenderModel = async ({ pageId, versionId }: VersionRende
 
     const rawPath = String(page?.cachedPath || page?.cached_path || page?.absoluteUrl || page?.slug || '')
     const slugPath = rawPath.split('?')[0].replace(/^\/+|\/+$/g, '')
-    const theme = version?.effectiveTheme
+    const theme = inheritance?.effectiveTheme
+        || version?.effectiveTheme
         || (typeof version?.theme === 'object' ? version.theme : null)
         || page?.effectiveTheme
+    const renderVersion = {
+        ...version,
+        effectiveTheme: theme,
+        layoutKey: version?.layoutKey || version?.codeLayout || inheritance?.effectiveLayoutKey,
+    }
     const themeCss = buildThemeCSS({
         theme,
-        pageCssVariables: page?.pageCssVariables ?? page?.page_css_variables
-            ?? version?.pageCssVariables ?? version?.page_css_variables,
-        pageCustomCss: page?.pageCustomCss ?? page?.page_custom_css
-            ?? version?.pageCustomCss ?? version?.page_custom_css,
-        enableCssInjection: page?.enableCssInjection ?? page?.enable_css_injection
-            ?? version?.enableCssInjection ?? version?.enable_css_injection ?? true,
+        pageCssVariables: version?.pageCssVariables ?? version?.page_css_variables
+            ?? page?.pageCssVariables ?? page?.page_css_variables,
+        pageCustomCss: version?.pageCustomCss ?? version?.page_custom_css
+            ?? page?.pageCustomCss ?? page?.page_custom_css,
+        enableCssInjection: version?.enableCssInjection ?? version?.enable_css_injection
+            ?? page?.enableCssInjection ?? page?.enable_css_injection ?? true,
     })
 
     return buildResolvedRenderModel({
@@ -180,8 +187,8 @@ export const loadVersionRenderModel = async ({ pageId, versionId }: VersionRende
             versionId,
         },
         page,
-        version,
-        rawInheritance: inheritanceResponse.data || inheritanceResponse,
+        version: renderVersion,
+        rawInheritance: inheritance,
         themeCss,
     })
 }

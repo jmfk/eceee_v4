@@ -38,14 +38,21 @@ describe('PageVersionHistoryPanel', () => {
     })
 
     it('opens a TypeScript preview for a historical version', async () => {
-        const previewWindow = {}
-        const openSpy = vi.spyOn(window, 'open').mockReturnValue(previewWindow)
-        render(<PageVersionHistoryPanel pageId={4} workflow={{ editableVersion: { id: 11 } }} />)
+        const onRestoreError = vi.fn()
+        const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+        render(
+            <PageVersionHistoryPanel
+                pageId={4}
+                workflow={{ editableVersion: { id: 11 } }}
+                onRestoreError={onRestoreError}
+            />
+        )
 
         const previewButtons = await screen.findAllByRole('button', { name: /preview/i })
         fireEvent.click(previewButtons[1])
 
         expect(openSpy).toHaveBeenCalledWith('/_render-version/4/10/', '_blank', 'noopener,noreferrer')
+        expect(onRestoreError).not.toHaveBeenCalled()
     })
 
     it('keeps technical version details in history and reports legacy conflicts', async () => {

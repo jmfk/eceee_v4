@@ -5,19 +5,13 @@ Handles public-facing page rendering with layout/theme inheritance,
 widget rendering, and object publishing support.
 """
 
-from django.shortcuts import get_object_or_404, render
+from django.conf import settings
+from django.db.models import Q
 from django.http import Http404, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, ListView
-from django.utils import timezone
-from django.db.models import Q
-from django.template.loader import get_template, render_to_string
-from django.template import TemplateDoesNotExist
-from django.urls import reverse
-from django.contrib.sitemaps import Sitemap
-import json
-
-from django.conf import settings
 
 from .models import WebPage
 from .renderers import WebPageRenderer
@@ -50,9 +44,7 @@ class PublishedPageMixin:
             .distinct()
         )
 
-        return WebPage.objects.filter(id__in=published_page_ids).select_related(
-            "parent"
-        )
+        return WebPage.objects.filter(id__in=published_page_ids).select_related("parent")
 
 
 class PageDetailView(PublishedPageMixin, DetailView):
@@ -107,19 +99,13 @@ class PageDetailView(PublishedPageMixin, DetailView):
         if current_version:
             renderer = WebPageRenderer(request=self.request)
             base_context = renderer._build_base_context(page, current_version, {})
-            context["widgets_by_slot"] = renderer._render_widgets_by_slot(
-                page, current_version, base_context
-            )
+            context["widgets_by_slot"] = renderer._render_widgets_by_slot(page, current_version, base_context)
 
             # Add SEO metadata from version
             page_data = current_version.page_data or {}
-            context["meta_title"] = (
-                page_data.get("meta_title") or page_data.get("metaTitle") or page.title
-            )
+            context["meta_title"] = page_data.get("meta_title") or page_data.get("metaTitle") or page.title
             context["meta_description"] = (
-                page_data.get("meta_description")
-                or page_data.get("metaDescription")
-                or page.description
+                page_data.get("meta_description") or page_data.get("metaDescription") or page.description
             )
             context["page_data"] = page_data
             context["content"] = current_version
@@ -195,9 +181,7 @@ class PageListView(PublishedPageMixin, ListView):
             .distinct()
         )
 
-        return WebPage.objects.filter(
-            parent__isnull=True, id__in=published_page_ids
-        ).order_by("sort_order")
+        return WebPage.objects.filter(parent__isnull=True, id__in=published_page_ids).order_by("sort_order")
 
 
 class ObjectDetailView(DetailView):
@@ -297,9 +281,7 @@ def page_sitemap_view(request):
 
     for page in pages:
         xml_content.append("  <url>")
-        xml_content.append(
-            f"    <loc>{request.build_absolute_uri(page.get_absolute_url())}</loc>"
-        )
+        xml_content.append(f"    <loc>{request.build_absolute_uri(page.get_absolute_url())}</loc>")
         xml_content.append(f"    <lastmod>{page.updated_at.date()}</lastmod>")
         xml_content.append("    <changefreq>weekly</changefreq>")
         xml_content.append("    <priority>0.8</priority>")
@@ -334,9 +316,7 @@ def page_hierarchy_api(request):
         .order_by("sort_order")
     )
 
-    serializer = PageHierarchySerializer(
-        root_pages, many=True, context={"request": request}
-    )
+    serializer = PageHierarchySerializer(root_pages, many=True, context={"request": request})
 
     return JsonResponse({"pages": serializer.data})
 
@@ -373,16 +353,10 @@ def page_search_view(request):
             {
                 "id": page.id,
                 "title": page.title,
-                "description": (
-                    page.description[:200] + "..."
-                    if len(page.description) > 200
-                    else page.description
-                ),
+                "description": (page.description[:200] + "..." if len(page.description) > 200 else page.description),
                 "url": page.get_absolute_url(),
                 "is_object_page": page.is_object_page(),
-                "object_type": (
-                    page.linked_object_type if page.is_object_page() else None
-                ),
+                "object_type": (page.linked_object_type if page.is_object_page() else None),
             }
         )
 
@@ -437,6 +411,7 @@ class HostnamePageView(View):
             HttpResponse with the rendered error page
         """
         from django.shortcuts import render
+
         from .renderers import WebPageRenderer
 
         # Get the published version
@@ -448,11 +423,7 @@ class HostnamePageView(View):
 
         effective_layout = error_page.get_effective_layout()
 
-        template_name = (
-            effective_layout.template_name
-            if effective_layout
-            else "webpages/page_detail.html"
-        )
+        template_name = effective_layout.template_name if effective_layout else "webpages/page_detail.html"
 
         # Build context for error page
         context = {
@@ -479,9 +450,7 @@ class HostnamePageView(View):
         # Build widgets_by_slot via renderer
         renderer = WebPageRenderer(request=self.request)
         base_context = renderer._build_base_context(error_page, content, {})
-        context["widgets_by_slot"] = renderer._render_widgets_by_slot(
-            error_page, content, base_context
-        )
+        context["widgets_by_slot"] = renderer._render_widgets_by_slot(error_page, content, base_context)
 
         if effective_layout:
             context["slots"] = effective_layout.slot_configuration["slots"]
@@ -518,9 +487,7 @@ class HostnamePageView(View):
 
         # Get the path from the URL
         slug_path = getattr(self, "kwargs", {}).get("slug_path", "")
-        slug_parts = (
-            [part for part in slug_path.split("/") if part] if slug_path else []
-        )
+        slug_parts = [part for part in slug_path.split("/") if part] if slug_path else []
 
         # Find the root page for this hostname
         root_page = WebPage.get_root_page_for_hostname(hostname)
@@ -539,15 +506,11 @@ class HostnamePageView(View):
                 remaining_path = ""
             else:
                 # NEW: Smart path resolution - find longest matching page path
-                current_page, remaining_path = self._resolve_page_with_pattern(
-                    root_page, slug_parts
-                )
+                current_page, remaining_path = self._resolve_page_with_pattern(root_page, slug_parts)
 
                 # If we have a remaining path and the page has a path_pattern_key, extract variables
                 if remaining_path and current_page.path_pattern_key:
-                    path_variables = self._extract_path_variables(
-                        current_page.path_pattern_key, remaining_path
-                    )
+                    path_variables = self._extract_path_variables(current_page.path_pattern_key, remaining_path)
 
                     # If pattern doesn't match, it's a 404
                     if path_variables is None:
@@ -561,7 +524,7 @@ class HostnamePageView(View):
 
             # Handle case where no published version exists
             if not content:
-                raise Http404(f"No published content available for this page")
+                raise Http404("No published content available for this page")
 
             # Check if page is published and effective
             if not self._is_page_accessible(current_page):
@@ -569,26 +532,16 @@ class HostnamePageView(View):
 
             effective_layout = current_page.get_effective_layout()
 
-            template_name = (
-                effective_layout.template_name
-                if effective_layout
-                else "webpages/page_detail.html"
-            )
+            template_name = effective_layout.template_name if effective_layout else "webpages/page_detail.html"
 
             # Build context with path_variables
             widgets = content.widgets
             page_data = content.page_data
 
             # Get SEO metadata from page_data
-            meta_title = (
-                page_data.get("meta_title")
-                or page_data.get("metaTitle")
-                or current_page.title
-            )
+            meta_title = page_data.get("meta_title") or page_data.get("metaTitle") or current_page.title
             meta_description = (
-                page_data.get("meta_description")
-                or page_data.get("metaDescription")
-                or current_page.description
+                page_data.get("meta_description") or page_data.get("metaDescription") or current_page.description
             )
 
             context = {
@@ -618,12 +571,8 @@ class HostnamePageView(View):
             # Build widgets_by_slot via renderer (new system)
             renderer = WebPageRenderer(request=request)
             # Pass path_variables in the extra context
-            base_context = renderer._build_base_context(
-                current_page, content, {"path_variables": path_variables}
-            )
-            context["widgets_by_slot"] = renderer._render_widgets_by_slot(
-                current_page, content, base_context
-            )
+            base_context = renderer._build_base_context(current_page, content, {"path_variables": path_variables})
+            context["widgets_by_slot"] = renderer._render_widgets_by_slot(current_page, content, base_context)
 
             # Add theme_css_url from renderer context
             context["theme_css_url"] = base_context.get("theme_css_url")
@@ -689,9 +638,7 @@ class HostnamePageView(View):
                 current_page = temp_page
                 # Calculate remaining path
                 remaining_parts = slug_parts[i:]
-                remaining_path = (
-                    "/".join(remaining_parts) + "/" if remaining_parts else ""
-                )
+                remaining_path = "/".join(remaining_parts) + "/" if remaining_parts else ""
                 return current_page, remaining_path
 
         # No page found in hierarchy
@@ -717,9 +664,11 @@ class HostnamePageView(View):
             All extracted path variables are HTML-escaped to prevent XSS attacks.
             This provides defense-in-depth even though Django templates auto-escape by default.
         """
-        from .path_pattern_registry import path_pattern_registry
-        from django.utils.html import escape
         import logging
+
+        from django.utils.html import escape
+
+        from .path_pattern_registry import path_pattern_registry
 
         logger = logging.getLogger(__name__)
 
@@ -736,14 +685,10 @@ class HostnamePageView(View):
                 # Sanitize path variables to prevent XSS attacks
                 # Even though Django templates auto-escape by default, this provides
                 # defense-in-depth in case templates use |safe filter or raw rendering
-                variables = {
-                    key: escape(str(value)) for key, value in variables.items()
-                }
+                variables = {key: escape(str(value)) for key, value in variables.items()}
             return variables
         except Exception as e:
-            logger.error(
-                f"Error validating path '{remaining_path}' with pattern '{pattern_key}': {e}"
-            )
+            logger.error(f"Error validating path '{remaining_path}' with pattern '{pattern_key}': {e}")
             return None
 
     def get_context_data(self, **kwargs):
@@ -825,9 +770,7 @@ class HostnamePageView(View):
         layout = page.get_effective_layout()
         if layout:
             hostname_safe = hostname.replace(".", "_")
-            template_names.append(
-                f"webpages/sites/{hostname_safe}/layouts/{layout.name.lower()}.html"
-            )
+            template_names.append(f"webpages/sites/{hostname_safe}/layouts/{layout.name.lower()}.html")
             template_names.append(f"webpages/layouts/{layout.name.lower()}.html")
 
         # Try hostname + page specific template
@@ -854,8 +797,8 @@ def custom_404_handler(request, exception=None):
     """
     import re
 
-    from django.views.defaults import page_not_found
     from django.core.exceptions import DisallowedHost
+    from django.views.defaults import page_not_found
 
     if not settings.DJANGO_PUBLIC_RENDERER_ENABLED:
         return page_not_found(request, exception)

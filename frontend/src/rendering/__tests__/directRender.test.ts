@@ -46,14 +46,42 @@ describe('direct render URL', () => {
     it('loads an exact historical version through the TypeScript renderer', async () => {
         localStorage.setItem('eceee_tenant_id', 'theme-tenant')
         clientApi.get
-            .mockResolvedValueOnce({ data: { id: 42, cachedRootId: 12, cachedPath: '/programme/' } })
-            .mockResolvedValueOnce({ data: { id: 9, codeLayout: 'main_layout', widgets: {} } })
-            .mockResolvedValueOnce({ data: { slots: {} } })
+            .mockResolvedValueOnce({
+                data: {
+                    id: 42,
+                    cachedRootId: 12,
+                    cachedPath: '/programme/',
+                    effectiveTheme: { colors: { brand: '#current' } },
+                },
+            })
+            .mockResolvedValueOnce({
+                data: {
+                    id: 9,
+                    widgets: {},
+                    pageCssVariables: { historicalSpacing: '2rem' },
+                },
+            })
+            .mockResolvedValueOnce({
+                data: {
+                    effectiveTheme: {
+                        colors: { brand: '#123456' },
+                        layouts: {
+                            items: [{ key: 'historical_layout', slots: {} }],
+                        },
+                    },
+                    effectiveLayoutKey: 'historical_layout',
+                    legacy: { slots: {} },
+                },
+            })
 
         const model = await loadVersionRenderModel({ pageId: 42, versionId: 9 })
 
         expect(clientApi.get.mock.calls[0][0]).toContain('/pages/42/')
         expect(clientApi.get.mock.calls[1][0]).toContain('/pages/42/versions/9/')
+        expect(clientApi.get.mock.calls[2][0]).toContain('widget-inheritance/?version_id=9')
+        expect(model.layout).toBe('historical_layout')
+        expect(model.themeCss).toContain('--brand: #123456')
+        expect(model.themeCss).toContain('--historicalSpacing: 2rem')
         expect(model.context).toMatchObject({
             tenantId: 'theme-tenant',
             siteId: 12,

@@ -210,6 +210,42 @@ class InheritanceTreeTest(TestCase):
         self.assertEqual(live_tree.parent.parent.slots["header"][0].id, "home-header-2")
         self.assertEqual(historical_tree.parent.parent.slots["header"][0].id, "home-header-1")
 
+    def test_widget_inheritance_api_can_resolve_a_historical_version(self):
+        """The TypeScript version preview must not receive current parent content."""
+        child_version = self.history_page.versions.get(version_number=1)
+        current_parent_version = PageVersion.objects.create(
+            page=self.home_page,
+            version_number=2,
+            effective_date=timezone.now(),
+            created_by=self.user,
+            widgets={
+                "header": [
+                    {
+                        "id": "home-header-2",
+                        "type": "HeaderWidget",
+                        "config": {"title": "Current site header"},
+                        "inheritance_behavior": "insert_after_parent",
+                        "is_published": True,
+                        "inheritance_level": -1,
+                    }
+                ]
+            },
+        )
+        self.home_page.current_published_version = current_parent_version
+        self.home_page.latest_version = current_parent_version
+        self.home_page.save(update_fields=["current_published_version", "latest_version"])
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            f"/api/v1/webpages/pages/{self.history_page.id}/widget-inheritance/",
+            {"version_id": child_version.id},
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        historical_header = response.json()["tree"]["parent"]["parent"]["slots"]["header"]
+        self.assertEqual([widget["id"] for widget in historical_header], ["home-header-1"])
+
     def test_get_all_widgets(self):
         """Test getAllWidgets helper function"""
         from django.db import connection

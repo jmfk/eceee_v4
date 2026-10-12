@@ -157,6 +157,10 @@ class InheritanceTreeBuilder:
         layout = self._layout_for_page(self._target_page, 0)
         return layout.slot_configuration if layout else {"slots": []}
 
+    def effective_theme(self):
+        """Return the theme resolved for the tree's target snapshot."""
+        return self._effective_theme()
+
     def _check_circular_references(self, page: WebPage, visited: Set[int]) -> None:
         """Check for circular parent references"""
         if page.id in visited:
