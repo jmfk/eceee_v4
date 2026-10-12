@@ -123,8 +123,45 @@ class LegacyNewsMediaImporterTests(TestCase):
         )
 
         self.assertEqual(first, second)
-        self.assertTrue(first.startswith("legacy/news/"))
+        self.assertTrue(first.startswith(f"legacy/news/{self.tenant.id}/{self.namespace.id}/"))
         self.assertTrue(first.endswith(".png"))
+
+    def test_storage_path_is_isolated_by_tenant_and_namespace(self):
+        sibling_namespace = Namespace.objects.create(
+            name="Sibling legacy media",
+            slug="sibling-legacy-media",
+            tenant=self.tenant,
+            created_by=self.user,
+        )
+        sibling_importer = LegacyMediaImporter(
+            namespace=sibling_namespace,
+            tenant=self.tenant,
+            user=self.user,
+        )
+        other_tenant = Tenant.objects.create(
+            name="Other legacy media",
+            identifier="other-legacy-media",
+            created_by=self.user,
+        )
+        other_namespace = Namespace.objects.create(
+            name="Other legacy media",
+            slug="other-legacy-media",
+            tenant=other_tenant,
+            created_by=self.user,
+        )
+        other_importer = LegacyMediaImporter(
+            namespace=other_namespace,
+            tenant=other_tenant,
+            user=self.user,
+        )
+        source_url = "https://legacy.example/shared.png"
+
+        local_path = self.importer._storage_path(source_url, "shared.png", "image/png")
+        sibling_path = sibling_importer._storage_path(source_url, "shared.png", "image/png")
+        other_path = other_importer._storage_path(source_url, "shared.png", "image/png")
+
+        self.assertNotEqual(local_path, sibling_path)
+        self.assertNotEqual(local_path, other_path)
 
 
 class LegacyNewsImportLockTests(TestCase):

@@ -52,21 +52,21 @@ class LegacyNewsExtractorTests(SimpleTestCase):
             extract_news_html("<h1>Outside</h1>", "https://www.eceee.org/news/outside/")
 
     def test_source_checksum_ignores_dynamic_page_chrome(self):
-        article = """
+        article_template = """
           <div class="mainContentColumn">
             <h1>Stable article</h1>
+            <div class="share-on-social">{share_state}</div>
             <p>Stable body.</p>
           </div>
         """
 
-        first = extract_news_html(
-            f'<html data-request="one"><nav>Dynamic one</nav>{article}</html>',
-            "https://www.eceee.org/news/stable/",
-        )
-        second = extract_news_html(
-            f'<html data-request="two"><nav>Dynamic two</nav>{article}</html>',
-            "https://www.eceee.org/news/stable/",
-        )
+        first_article = article_template.format(share_state="Share one")
+        second_article = article_template.format(share_state="Share two")
+        first_html = f'<html data-request="one"><nav>Dynamic one</nav>{first_article}</html>'
+        second_html = f'<html data-request="two"><nav>Dynamic two</nav>{second_article}</html>'
+
+        first = extract_news_html(first_html, "https://www.eceee.org/news/stable/")
+        second = extract_news_html(second_html, "https://www.eceee.org/news/stable/")
 
         self.assertEqual(first.source_checksum, second.source_checksum)
         self.assertEqual(first.content_checksum, second.content_checksum)
