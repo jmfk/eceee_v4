@@ -139,7 +139,7 @@ class LegacyMediaImporter:
             self._apply_tags(duplicate, placeholder=placeholder)
             return duplicate
 
-        result = storage.overwrite_file(self._storage_path(source_url, filename, content_type), uploaded)
+        result = storage.overwrite_file(self._storage_path(source_url), uploaded)
 
         try:
             media = MediaFile.objects.create(
@@ -276,14 +276,11 @@ class LegacyMediaImporter:
             suffix += 1
         return slug
 
-    def _storage_path(self, source_url: str, filename: str, content_type: str) -> str:
+    def _storage_path(self, source_url: str) -> str:
         """Return the stable object key used to make interrupted uploads replayable."""
 
-        suffix = Path(filename).suffix.lower()
-        if not suffix or len(suffix) > 12:
-            suffix = mimetypes.guess_extension(content_type) or ""
         source_id = hashlib.sha256(source_url.encode("utf-8")).hexdigest()
-        return f"legacy/news/{self.tenant.id}/{self.namespace.id}/{source_id}{suffix}"
+        return f"legacy/news/{self.tenant.id}/{self.namespace.id}/{source_id}"
 
     @staticmethod
     def _failure_category(exc: Exception) -> str:
