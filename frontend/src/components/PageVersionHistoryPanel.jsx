@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Eye, History, RefreshCw, RotateCcw } from 'lucide-react'
 import { versionsApi } from '../api/versions'
+import { getCurrentTenantId } from '../utils/tenant'
 
 const statusStyles = {
     published: 'bg-green-50 text-green-700 border-green-200',
@@ -68,7 +69,9 @@ const PageVersionHistoryPanel = ({ pageId, workflow, onRestored, onRestoreError,
     }
 
     const openVersionPreview = (versionId) => {
-        window.open(`/_render-version/${pageId}/${versionId}/`, '_blank', 'noopener,noreferrer')
+        const workspace = getCurrentTenantId()
+        const query = workspace ? `?workspace=${encodeURIComponent(workspace)}` : ''
+        window.open(`/_render-version/${pageId}/${versionId}/${query}`, '_blank', 'noopener,noreferrer')
     }
 
     return (

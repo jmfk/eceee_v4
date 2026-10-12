@@ -25,6 +25,7 @@ export interface ResolvedRenderLocation extends DirectRenderLocation {
 export interface VersionRenderLocation {
     pageId: number
     versionId: number
+    tenantIdentifier?: string
 }
 
 export const parseDirectRenderPath = (pathname: string): DirectRenderLocation | null => {
@@ -40,10 +41,11 @@ export const parseDirectRenderPath = (pathname: string): DirectRenderLocation | 
     }
 }
 
-export const parseVersionRenderPath = (pathname: string): VersionRenderLocation | null => {
+export const parseVersionRenderPath = (pathname: string, search = ''): VersionRenderLocation | null => {
     const match = pathname.match(/^\/_render-version\/(\d+)\/(\d+)\/?$/)
     if (!match) return null
-    return { pageId: Number(match[1]), versionId: Number(match[2]) }
+    const tenantIdentifier = new URLSearchParams(search).get('workspace') || undefined
+    return { pageId: Number(match[1]), versionId: Number(match[2]), ...(tenantIdentifier ? { tenantIdentifier } : {}) }
 }
 
 export const buildResolvedRenderModel = async ({
@@ -140,11 +142,13 @@ export const loadDirectRenderModel = async ({ siteId, slugPath }: DirectRenderLo
     }
 }
 
-export const loadVersionRenderModel = async ({ pageId, versionId }: VersionRenderLocation): Promise<RenderPageModel> => {
+export const loadVersionRenderModel = async ({ pageId, versionId, tenantIdentifier }: VersionRenderLocation): Promise<RenderPageModel> => {
+    const tenantId = tenantIdentifier || getCurrentTenantId()
+    const requestConfig = tenantId ? { headers: { 'X-Tenant-ID': tenantId } } : undefined
     const [pageResponse, versionResponse, inheritanceResponse]: any[] = await Promise.all([
-        api.get(endpoints.pages.detail(pageId)),
-        api.get(endpoints.versions.pageVersionDetail(pageId, versionId)),
-        api.get(endpoints.pages.widgetInheritance(pageId, versionId)),
+        api.get(endpoints.pages.detail(pageId), requestConfig),
+        api.get(endpoints.versions.pageVersionDetail(pageId, versionId), requestConfig),
+        api.get(endpoints.pages.widgetInheritance(pageId, versionId), requestConfig),
     ])
     const page = pageResponse.data || pageResponse
     const version = versionResponse.data || versionResponse
@@ -180,7 +184,7 @@ export const loadVersionRenderModel = async ({ pageId, versionId }: VersionRende
 
     return buildResolvedRenderModel({
         resolved: {
-            tenantIdentifier: getCurrentTenantId(),
+            tenantIdentifier: tenantId,
             siteId,
             slugPath,
             pageId,

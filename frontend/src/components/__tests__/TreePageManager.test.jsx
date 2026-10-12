@@ -7,6 +7,7 @@ import * as pagesApi from '../../api/pages'
 import { api } from '../../api/client.js'
 import { NotificationProvider } from '../NotificationManager'
 import { GlobalNotificationProvider } from '../../contexts/GlobalNotificationContext'
+import { setCurrentTenantId } from '../../utils/tenant'
 
 const pageApiMocks = vi.hoisted(() => ({
     getRootPages: vi.fn(() => Promise.resolve({ results: [], count: 0 })),
@@ -157,10 +158,10 @@ const createTestQueryClient = () => {
     })
 }
 
-const renderWithProviders = (component) => {
-    const queryClient = createTestQueryClient()
+const renderWithProviders = (component, queryClient = createTestQueryClient()) => {
 
-    return render(
+    return {
+        ...render(
         <MemoryRouter>
             <QueryClientProvider client={queryClient}>
                 <GlobalNotificationProvider>
@@ -170,7 +171,9 @@ const renderWithProviders = (component) => {
                 </GlobalNotificationProvider>
             </QueryClientProvider>
         </MemoryRouter>
-    )
+        ),
+        queryClient,
+    }
 }
 
 const assessedSite = {
@@ -193,6 +196,7 @@ describe('TreePageManager', () => {
         pagesApi.searchAllPages.mockResolvedValue({ results: [] })
         api.get.mockResolvedValue({ data: [] })
         localStorage.clear()
+        setCurrentTenantId('')
     })
 
     it('renders without crashing', async () => {
@@ -223,6 +227,22 @@ describe('TreePageManager', () => {
         await waitFor(() => {
             expect(screen.getByText('2 root pages')).toBeInTheDocument()
         })
+    })
+
+    it('keeps tenant-scoped root queries under the existing invalidation prefix', async () => {
+        setCurrentTenantId('production-copy')
+        const { queryClient } = renderWithProviders(<TreePageManager onEditPage={vi.fn()} />)
+
+        await waitFor(() => expect(screen.getByText('Home Page')).toBeInTheDocument())
+        const [rootQuery] = queryClient.getQueryCache().findAll({
+            queryKey: ['pages', 'root', 'production-copy'],
+        })
+        expect(rootQuery).toBeDefined()
+        expect(rootQuery.state.isInvalidated).toBe(false)
+
+        await queryClient.invalidateQueries({ queryKey: ['pages', 'root'], refetchType: 'none' })
+
+        expect(rootQuery.state.isInvalidated).toBe(true)
     })
 
     it('allows searching pages', async () => {

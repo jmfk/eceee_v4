@@ -42,6 +42,11 @@ describe('direct render URL', () => {
 
     it('parses a TypeScript page-version preview route', () => {
         expect(parseVersionRenderPath('/_render-version/42/9/')).toEqual({ pageId: 42, versionId: 9 })
+        expect(parseVersionRenderPath('/_render-version/42/9/', '?workspace=theme-tenant')).toEqual({
+            pageId: 42,
+            versionId: 9,
+            tenantIdentifier: 'theme-tenant',
+        })
         expect(parseVersionRenderPath('/_render-version/42/not-a-version/')).toBeNull()
     })
 
@@ -76,9 +81,10 @@ describe('direct render URL', () => {
                 },
             })
 
-        const model = await loadVersionRenderModel({ pageId: 42, versionId: 9 })
+        const model = await loadVersionRenderModel({ pageId: 42, versionId: 9, tenantIdentifier: 'theme-tenant' })
 
         expect(clientApi.get.mock.calls[0][0]).toContain('/pages/42/')
+        expect(clientApi.get.mock.calls[0][1]).toEqual({ headers: { 'X-Tenant-ID': 'theme-tenant' } })
         expect(clientApi.get.mock.calls[1][0]).toContain('/pages/42/versions/9/')
         expect(clientApi.get.mock.calls[2][0]).toContain('widget-inheritance/?version_id=9')
         expect(model.layout).toBe('historical_layout')

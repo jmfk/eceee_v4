@@ -1,6 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { getCurrentTenantId, reconcileCurrentTenantId, setCurrentTenantId } from '../tenant'
+import {
+    getCurrentTenantId,
+    reconcileCurrentTenantId,
+    setCurrentTenantId,
+    subscribeToCurrentTenantId,
+} from '../tenant'
 
 describe('getCurrentTenantId', () => {
     afterEach(() => {
@@ -19,6 +24,18 @@ describe('getCurrentTenantId', () => {
         setCurrentTenantId('production-copy')
 
         expect(getCurrentTenantId()).toBe('production-copy')
+    })
+
+    it('notifies runtime consumers when authentication resolves the workspace', () => {
+        const listener = vi.fn()
+        const unsubscribe = subscribeToCurrentTenantId(listener)
+
+        setCurrentTenantId('production-copy')
+        unsubscribe()
+        setCurrentTenantId('other-workspace')
+
+        expect(listener).toHaveBeenCalledTimes(1)
+        expect(listener).toHaveBeenCalledWith('production-copy')
     })
 })
 

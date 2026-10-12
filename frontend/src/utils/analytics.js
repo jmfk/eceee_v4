@@ -6,7 +6,7 @@
 import { getSessionId } from './sessionId';
 import { getCurrentTenantId } from './tenant';
 
-class Analytics {
+export class Analytics {
   constructor(config = {}) {
     this.tenantId = config.tenantId || null;
     this.endpoint = config.endpoint || '/api/v1/statistics/ingest/';
@@ -19,8 +19,17 @@ class Analytics {
   }
 
   init(tenantId) {
-    if (this.initialized) return;
-    this.tenantId = tenantId || getCurrentTenantId();
+    const nextTenantId = arguments.length > 0
+      ? tenantId || null
+      : getCurrentTenantId() || null;
+    if (this.initialized) {
+      if (nextTenantId === this.tenantId) return;
+      this.flush();
+      this.tenantId = nextTenantId;
+      return;
+    }
+    if (!nextTenantId) return;
+    this.tenantId = nextTenantId;
     this._setupAutoTrack();
     this._startTimer();
     this.initialized = true;
@@ -51,13 +60,14 @@ class Analytics {
   }
 
   flush() {
-    if (this.queue.length === 0) return;
+    const tenantId = this.tenantId;
+    if (this.queue.length === 0 || !tenantId) return;
 
     const eventsToFlush = [...this.queue];
     this.queue = [];
 
     const payload = {
-      tenantId: this.tenantId,
+      tenantId,
       events: eventsToFlush,
     };
 
@@ -65,13 +75,15 @@ class Analytics {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Tenant-ID': this.tenantId,
+        'X-Tenant-ID': tenantId,
       },
       body: JSON.stringify(payload),
     }).catch(err => {
       console.error('ECEEE Analytics: Failed to flush events', err);
-      // Put events back at the beginning of the queue
-      this.queue = [...eventsToFlush, ...this.queue];
+      // Never move events from one workspace into another workspace's queue.
+      if (this.tenantId === tenantId) {
+        this.queue = [...eventsToFlush, ...this.queue];
+      }
     });
   }
 

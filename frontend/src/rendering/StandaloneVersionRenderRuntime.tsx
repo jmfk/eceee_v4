@@ -8,7 +8,7 @@ export const StandaloneVersionRenderRuntime = () => {
     const [error, setError] = useState('')
 
     useEffect(() => {
-        const location = parseVersionRenderPath(window.location.pathname)
+        const location = parseVersionRenderPath(window.location.pathname, window.location.search)
         if (!location) {
             setError('Invalid page-version preview URL.')
             return undefined
