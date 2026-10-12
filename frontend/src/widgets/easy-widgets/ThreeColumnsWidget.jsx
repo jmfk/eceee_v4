@@ -434,7 +434,7 @@ const ThreeColumnsWidget = ({
         const ratioClass = `three-col-ratio-${layoutStyle.replace(/:/g, '-')}`
 
         return (
-            <div className={`three-columns-widget widget-type-easy-widgets-threecolumnswidget ${ratioClass}`}>
+            <div className={`three-columns-widget ${ratioClass}`}>
                 <div className="three-col-slot left" data-slot="left" data-widget-slot="left" data-owner-widget-type="easy_widgets.ThreeColumnsWidget">
                     {slotsData.left && slotsData.left.length > 0 ? (
                         slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))

@@ -23,6 +23,8 @@ const directionalSpacingFields = [
     'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
 ]
 const visibleSpacingFields = [...directionalSpacingFields, 'gap']
+const widgetFrameSpacingProperties = (constraints) => constraints.editableWidgetFrameSpacingProperties
+    || constraints.editableSpacingProperties.filter((field) => field.startsWith('margin'))
 const spacingDirections = {
     margin: ['marginTop', 'marginRight', 'marginBottom', 'marginLeft'],
     padding: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'],
@@ -512,6 +514,19 @@ const spacingEntryForField = (entries, field) => (
     || entries[0]
 )
 
+const spacingSectionIsAllZero = ({ computed, fields, entries }) => fields.length > 0 && fields.every((field) => {
+        const entry = spacingEntryForField(entries, field)
+        return isZeroCssValue(entry?.row.values[field] || computed[field] || '')
+    })
+
+const spacingSectionsAreAllZero = (sections) => sections.length > 0 && sections.every(spacingSectionIsAllZero)
+
+const configurationSpacingTargetKey = (target) => {
+    const targetId = target?.styleTargetId || target?.id || ''
+    const designGroupPart = targetId.match(/^group:[^:]+:part:(.+)$/)
+    return designGroupPart ? `design-group-part:${designGroupPart[1]}` : targetFocusKey(target)
+}
+
 const directionalFieldPosition = {
     Top: 'col-start-2 row-start-1',
     Left: 'col-start-1 row-start-2',
@@ -577,6 +592,7 @@ const SemanticThemeWorkspace = ({
     const [selectionTrail, setSelectionTrail] = useState([])
     const [selectionTrailOriginKey, setSelectionTrailOriginKey] = useState('')
     const [expandedSelectionLevels, setExpandedSelectionLevels] = useState(() => new Set(['slot', 'widget', 'element']))
+    const [expandedZeroSpacingTargets, setExpandedZeroSpacingTargets] = useState(() => new Set())
     const [inspectorRoot, setInspectorRoot] = useState(null)
     const [openTargetId, setOpenTargetId] = useState('')
     const [highlightedTargetId, setHighlightedTargetId] = useState('')
@@ -852,7 +868,7 @@ const SemanticThemeWorkspace = ({
                     })
                 } else if (structuralTarget
                     && (structuralTarget.scope === 'widget'
-                        ? property.startsWith('margin') || property.startsWith('padding')
+                        ? widgetFrameSpacingProperties(workspace.constraints).includes(property)
                         : editableStructuralSpacingProperties(workspace.catalog, structuralTarget).includes(property))
                     && workspace.constraints.editableSpacingProperties.includes(property)) {
                     updateWorkspace((next) => {
@@ -1160,6 +1176,13 @@ const SemanticThemeWorkspace = ({
         ...(selectedTarget?.alternatives || []).map((target) => target.id),
         ...(selectedTarget?.alternatives || []).map((target) => target.styleTargetId),
     ].filter(Boolean))]
+    const selectedSpacingTargetIds = selectedTarget?.kind === 'element'
+        ? [...new Set([
+            selectedTarget,
+            ...(selectedTarget.alternatives || []).filter((target) => targetSelectionKind(target) === 'element'),
+            ...(selectedTarget.ancestors || []).filter((target) => targetSelectionKind(target) === 'element'),
+        ].flatMap((target) => [target?.id, target?.styleTargetId]).filter(Boolean))]
+        : selectedTargetIds
     const selectedGroupIndex = Number(selectedTargetIds.map((id) => id.match(/^group:(\d+)/)?.[1]).find((value) => value !== undefined))
     const selectedGroup = Number.isInteger(selectedGroupIndex)
         ? workspace.catalog.designGroups.find((group) => group.groupIndex === selectedGroupIndex)
@@ -1172,7 +1195,7 @@ const SemanticThemeWorkspace = ({
     const matchingTargetSpacing = workspace.spacing.map((row, index) => ({ row, index })).filter(({ row }) => (
         selectedTarget?.kind === 'group' && selectedGroup
             ? row.groupIndex === selectedGroup.groupIndex
-            : selectedTargetIds.includes(row.targetId)
+            : selectedSpacingTargetIds.includes(row.targetId)
     ))
     const targetSpacing = effectiveSpacingEntries(
         matchingTargetSpacing.map((entry) => ({ ...entry, breakpoint: entry.row.breakpoint })),
@@ -1283,13 +1306,14 @@ const SemanticThemeWorkspace = ({
         if (structural) {
             const declared = editableStructuralSpacingProperties(workspace.catalog, structural)
                 .filter((field) => workspace.constraints.editableSpacingProperties.includes(field))
-            if (declared.length) return declared
             const configured = workspace.spacing
                 .filter((row) => row.targetId === structural.targetId)
                 .flatMap((row) => configuredSpacingFields(row.values))
                 .filter((field) => workspace.constraints.editableSpacingProperties.includes(field))
-            if (configured.length) return [...new Set(configured)]
-            if (structural.scope !== 'widget') return []
+            const defaults = structural.scope === 'widget'
+                ? widgetFrameSpacingProperties(workspace.constraints)
+                : []
+            return [...new Set([...declared, ...configured, ...defaults])]
         }
         if (target?.kind !== 'layoutSlot' && target?.kind !== 'slot') return workspace.constraints.editableSpacingProperties
         const layoutMatch = target.id.match(/^layout:(.+):slot:([^:]+)$/)
@@ -1521,6 +1545,10 @@ const SemanticThemeWorkspace = ({
         ...target,
         path: selectionTrail,
     }, { selectionLevel: target.selectionLevel || targetSelectionKind(target) })
+    const previewSelectionLevel = (selectionLevel) => iframeRef.current?.contentWindow?.postMessage({
+        source: 'eceee-render-host', action: 'previewSelectionLevel',
+        ...(selectionLevel ? { selectionLevel } : {}),
+    }, '*')
 
     const updateSelectedExampleText = (text) => {
         if (!selectedView || !selectedTarget) return
@@ -1890,7 +1918,7 @@ const SemanticThemeWorkspace = ({
 
     const requiresSelectedEditor = selectedLayoutParameters.length > 0
         || (selectedTarget?.kind === 'part' && !Object.keys(selectedTarget.computedStyles || {}).length)
-        || (contentMode === 'demo' && [selectedTarget, inspectorRoot]
+        || (contentMode === 'demo' && selectedTargetKind === 'element' && [selectedTarget, inspectorRoot]
             .some((target) => target?.kind === 'element' && target.editable
                 && (target.richText || target.text)))
     const selectionSpacingPanels = !requiresSelectedEditor
@@ -1916,16 +1944,22 @@ const SemanticThemeWorkspace = ({
                         </div>
                     </section>
                 }
-                const expanded = expandedSelectionLevels.has(kind)
                 const panelId = `selected-${kind}-spacing`
                 const label = target.displayLabel || target.label
-                const spacingSections = [
-                    { ...target, configurationSpacingTargets: [] },
-                    ...(target.configurationSpacingTargets || []),
-                ].map((spacingTarget) => ({
+                const configurationSpacingTargets = [...new Map((target.configurationSpacingTargets || [])
+                    .map((spacingTarget) => [configurationSpacingTargetKey(spacingTarget), spacingTarget])).values()]
+                const spacingSectionCandidates = [
+                    { target: { ...target, configurationSpacingTargets: [] }, configuration: false },
+                    ...configurationSpacingTargets.map((spacingTarget) => ({ target: spacingTarget, configuration: true })),
+                ].map(({ target: spacingTarget, configuration }) => ({
                     target: spacingTarget,
+                    configuration,
                     ...spacingForLevelTarget(spacingTarget),
                 })).filter(({ fields: sectionFields }) => sectionFields.length > 0)
+                const hasConfigurationSpacing = spacingSectionCandidates.some(({ configuration }) => configuration)
+                const spacingSections = spacingSectionCandidates.filter((section) => (
+                    section.configuration || !hasConfigurationSpacing || !spacingSectionIsAllZero(section)
+                ))
                 const hasEditableSpacing = spacingSections.length > 0
                 const isActiveTargetPanel = targetFocusKey(target) === targetFocusKey(selectedTarget)
                     || (kind === 'widget' && targetSelectionKind(selectedTarget) === 'widget'
@@ -1938,6 +1972,15 @@ const SemanticThemeWorkspace = ({
                 const levelAssets = isActiveTargetPanel ? targetAssetAlternatives : []
                 const levelColors = isActiveTargetPanel ? relevantColors : []
                 const hasEditableProperties = hasEditableSpacing || levelTypography.length > 0 || levelAssets.length > 0 || levelColors.length > 0
+                const expansionKey = `${kind}:${targetFocusKey(target)}`
+                const collapseZeroSpacing = kind === 'widget'
+                    && hasEditableSpacing
+                    && levelTypography.length === 0
+                    && levelAssets.length === 0
+                    && levelColors.length === 0
+                    && spacingSectionsAreAllZero(spacingSections)
+                const expanded = expandedSelectionLevels.has(kind)
+                    && (!collapseZeroSpacing || expandedZeroSpacingTargets.has(expansionKey))
                 const headerContent = <>
                     <div className="min-w-0 flex-1">
                         <p className={`text-[10px] font-semibold uppercase tracking-wide ${tone.label}`}>Selected {kind}</p>
@@ -1951,20 +1994,37 @@ const SemanticThemeWorkspace = ({
                             aria-expanded={expanded}
                             aria-controls={panelId}
                             aria-label={`${expanded ? 'Collapse' : 'Expand'} selected ${kind} ${label}`}
-                            onClick={() => setExpandedSelectionLevels((current) => {
-                                const next = new Set(current)
-                                if (next.has(kind)) next.delete(kind)
-                                else next.add(kind)
-                                return next
-                            })}
+                            onClick={() => {
+                                const nextExpanded = !expanded
+                                setExpandedSelectionLevels((current) => {
+                                    const next = new Set(current)
+                                    if (nextExpanded) next.add(kind)
+                                    else next.delete(kind)
+                                    return next
+                                })
+                                setExpandedZeroSpacingTargets((current) => {
+                                    const next = new Set(current)
+                                    if (nextExpanded && collapseZeroSpacing) next.add(expansionKey)
+                                    else next.delete(expansionKey)
+                                    return next
+                                })
+                            }}
+                            onMouseEnter={() => previewSelectionLevel(kind)}
+                            onMouseLeave={() => previewSelectionLevel(null)}
                             className={`flex w-full items-center gap-2 px-3 py-2 text-left ${tone.header}`}
                         >{headerContent}</button>
-                        : <div className={`flex w-full items-center gap-2 px-3 py-2 text-left ${tone.header}`}>{headerContent}</div>}
+                        : <div
+                            onMouseEnter={() => previewSelectionLevel(kind)}
+                            onMouseLeave={() => previewSelectionLevel(null)}
+                            className={`flex w-full items-center gap-2 px-3 py-2 text-left ${tone.header}`}
+                        >{headerContent}</div>}
                     {hasEditableProperties && expanded && <div id={panelId} className="space-y-3 px-3 py-3">
-                        {spacingSections.map(({ target: spacingTarget, computed, fields, entries }, sectionIndex) => {
-                            const spacingTargetLabel = spacingTarget.displayLabel || spacingTarget.label
+                        {spacingSections.map(({ target: spacingTarget, configuration, computed, fields, entries }, sectionIndex) => {
+                            const spacingTargetLabel = !configuration && kind === 'widget'
+                                ? 'Widget placement'
+                                : spacingTarget.displayLabel || spacingTarget.label
                             return <section key={targetFocusKey(spacingTarget)} className={sectionIndex > 0 ? 'border-t border-gray-200 pt-3' : ''}>
-                                {spacingSections.length > 1 && <h3 className="mb-2 text-sm font-medium text-gray-900">{spacingTargetLabel}</h3>}
+                                {(kind === 'widget' || configuration || spacingSections.length > 1) && <h3 className="mb-2 text-sm font-medium text-gray-900">{spacingTargetLabel}</h3>}
                                 <FieldLayout fields={fields} renderField={(field, className) => {
                                     const entry = spacingEntryForField(entries, field)
                                     const value = entry?.row.values[field] || computed[field] || ''
@@ -2013,7 +2073,30 @@ const SemanticThemeWorkspace = ({
         </section>
     )
 
-    const selectedEditor = selectedTarget && (
+    const selectedEditorAncestorHeaders = requiresSelectedEditor && (['slot', 'widget']).map((kind) => {
+        const target = levelSelections[kind]
+        if (!target || kind === selectedTargetKind) return null
+        const tone = selectionTones[kind]
+        const label = target.displayLabel || target.label
+        return <section key={`editor-${kind}`} className={`shrink-0 border-b ${tone.border}`}>
+            <button
+                type="button"
+                aria-label={`Inspect selected ${kind} ${label}`}
+                onClick={() => selectTargetFromInspector(target, { selectionLevel: kind })}
+                onMouseEnter={() => previewSelectionLevel(kind)}
+                onMouseLeave={() => previewSelectionLevel(null)}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left ${tone.header}`}
+            >
+                <div className="min-w-0 flex-1">
+                    <p className={`text-[10px] font-semibold uppercase tracking-wide ${tone.label}`}>Selected {kind}</p>
+                    <h2 className="truncate text-sm font-semibold text-gray-900">{label}</h2>
+                </div>
+            </button>
+        </section>
+    })
+
+    const selectedEditor = selectedTarget && (<>
+        {selectedEditorAncestorHeaders}
         <section className="flex min-h-0 flex-1 flex-col border-b border-gray-200 bg-white">
             <button
                 type="button"
@@ -2021,6 +2104,8 @@ const SemanticThemeWorkspace = ({
                 aria-controls="selected-element-editor"
                 aria-label={`${selectionExpanded ? 'Collapse' : 'Expand'} ${selectedTargetLabel} settings`}
                 onClick={() => setSelectionExpanded((current) => !current)}
+                onMouseEnter={() => previewSelectionLevel(selectedTargetKind)}
+                onMouseLeave={() => previewSelectionLevel(null)}
                 className={`flex w-full shrink-0 items-center gap-2 px-3 py-2 text-left ${selectedTargetTone.header}`}
             >
                 <div className="min-w-0 flex-1">
@@ -2170,7 +2255,7 @@ const SemanticThemeWorkspace = ({
                 </div>
             )}
         </section>
-    )
+    </>)
 
     const exampleImageEditor = contentMode === 'demo' && selectedView && selectedElementImages.length > 0 && (
         <section className="space-y-2 border-t border-gray-200 pt-3">

@@ -126,19 +126,11 @@ export function calculateSelectorsForGroup(group, scope = '', frontendScoped = f
     const layoutProperties = group.layoutProperties || {};
     if (layoutProperties && Object.keys(layoutProperties).length > 0) {
         for (const part of Object.keys(layoutProperties)) {
-            // Determine relationship based on heuristic (mirrors themeUtils.js)
-            const isRootElement = (part.endsWith('-widget') || part === 'container') && part !== 'content-widget';
-
-            // Part selectors combine base with part class AND variants AND modifier at the end
+            // Widget type identifies the outer placement frame. Layout parts are
+            // semantic content surfaces inside that frame.
             layoutPartSelectors[part] = baseSelectors.map(base => {
                 if (base) {
-                    if (isRootElement) {
-                        // Same element: .widget-type-x.part-widget.variant:modifier
-                        return `${base}.${part}${variantsSelector}${cssModifier}`.trim();
-                    } else {
-                        // Descendant: .widget-type-x .part.variant:modifier
-                        return `${base} .${part}${variantsSelector}${cssModifier}`.trim();
-                    }
+                    return `${base} .${part}${variantsSelector}${cssModifier}`.trim();
                 } else {
                     // Fallback for global layout parts
                     return `.${part}${variantsSelector}${cssModifier}`.trim();

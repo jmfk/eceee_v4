@@ -55,6 +55,13 @@ SPACING_PROPERTIES = {
     "paddingBottom",
     "paddingLeft",
 }
+WIDGET_FRAME_SPACING_PROPERTIES = {
+    "margin",
+    "marginTop",
+    "marginRight",
+    "marginBottom",
+    "marginLeft",
+}
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_PIXELS = 16_777_216
 REVISION_LIMIT = 20
@@ -204,12 +211,20 @@ def _normalized_layout_parts(source):
         elif not isinstance(config, dict):
             config = {}
         semantic_part = str(part_name).endswith(("-image", "-header", "-text", "-caption", "-link"))
+        properties = config.get("properties")
+        declared_spacing = (
+            config.get("designerEditableSpacingProperties") or config.get("designer_editable_spacing_properties") or []
+        )
+        editable_spacing = set(declared_spacing)
+        if "padding" in (properties or []):
+            editable_spacing.update({"paddingTop", "paddingRight", "paddingBottom", "paddingLeft"})
+        editable_spacing.update(
+            prop for prop in (properties or []) if prop == "gap" or prop.startswith("padding") and prop != "padding"
+        )
         normalized[part_name] = {
             "label": config.get("label") or _humanize_identifier(part_name),
-            "properties": config.get("properties"),
-            "editableSpacingProperties": config.get("designerEditableSpacingProperties")
-            or config.get("designer_editable_spacing_properties")
-            or [],
+            "properties": properties,
+            "editableSpacingProperties": sorted(editable_spacing & SPACING_PROPERTIES),
             "designerLevel": config.get("designerLevel")
             or config.get("designer_level")
             or ("element" if semantic_part else "widget"),
@@ -1305,6 +1320,7 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
         "constraints": {
             "editableTypographyProperties": sorted(TYPE_PROPERTIES),
             "editableSpacingProperties": sorted(SPACING_PROPERTIES),
+            "editableWidgetFrameSpacingProperties": sorted(WIDGET_FRAME_SPACING_PROPERTIES),
             "maxImageBytes": MAX_IMAGE_BYTES,
         },
     }

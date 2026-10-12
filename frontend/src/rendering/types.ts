@@ -139,7 +139,7 @@ export type LayoutRenderComponent = ComponentType<LayoutRenderProps>
 
 export interface RenderFrameMessage {
     source: 'eceee-render-host'
-    action: 'render' | 'selectTarget' | 'clearTarget' | 'highlightTarget' | 'readTargetStyles' | 'updateText' | 'formatText'
+    action: 'render' | 'selectTarget' | 'clearTarget' | 'highlightTarget' | 'previewSelectionLevel' | 'readTargetStyles' | 'updateText' | 'formatText'
     model?: RenderPageModel
     targetId?: string
     targetInstanceId?: string
