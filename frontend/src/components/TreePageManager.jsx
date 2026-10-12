@@ -2309,7 +2309,7 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                                             disabled={isImporting}
                                             className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
                                         >
-                                            Review import
+                                            Select what to import
                                         </button>
                                     </div>
                                 </div>)}
@@ -2364,7 +2364,7 @@ const SitePackageImportModal = ({ isOpen, onClose, onImport, onRemoteImport }) =
                         {assessment?.assessment && <section className="border-t border-gray-200 pt-6" aria-labelledby="import-assessment-heading">
                             <div className="flex flex-wrap items-start justify-between gap-4">
                                 <div>
-                                    <h3 id="import-assessment-heading" className="text-lg font-semibold text-gray-900">Review import</h3>
+                                    <h3 id="import-assessment-heading" className="text-lg font-semibold text-gray-900">Select what to import</h3>
                                     <p className="mt-1 text-sm text-gray-600">
                                         {assessment.title || assessment.assessment.title || 'Site package'} · {assessment.assessment.counts.pages} pages · {assessment.assessment.counts.themes} themes · {assessment.assessment.counts.media} media files
                                     </p>
