@@ -533,6 +533,16 @@ const configurationSpacingTargetKey = (target) => {
     return designGroupPart ? `design-group-part:${designGroupPart[1]}` : targetFocusKey(target)
 }
 
+const compareCascadePriority = (left, right) => {
+    const leftPriority = Array.isArray(left?.cascadePriority) ? left.cascadePriority : [0, 0, 0, -1]
+    const rightPriority = Array.isArray(right?.cascadePriority) ? right.cascadePriority : [0, 0, 0, -1]
+    for (let index = 0; index < Math.max(leftPriority.length, rightPriority.length); index += 1) {
+        const difference = Number(leftPriority[index] || 0) - Number(rightPriority[index] || 0)
+        if (difference) return difference
+    }
+    return 0
+}
+
 const directionalFieldPosition = {
     Top: 'col-start-2 row-start-1',
     Left: 'col-start-1 row-start-2',
@@ -913,6 +923,7 @@ const SemanticThemeWorkspace = ({
                     sourceMatchIndex: option.sourceMatchIndex ?? 0,
                     computedStyles: option.computedStyles || {},
                     isWidgetSurface: option.isWidgetSurface === true,
+                    cascadePriority: Array.isArray(option.cascadePriority) ? option.cascadePriority : [],
                     configurationSpacingTargets: Array.isArray(option.configurationSpacingTargets)
                         ? option.configurationSpacingTargets.map(normalizeTarget)
                         : [],
@@ -1409,47 +1420,21 @@ const SemanticThemeWorkspace = ({
     }
     const updateLevelSpacing = (target, field, value) => {
         const representedTargets = [target, ...(target.configurationSpacingTargets || [])]
+        const editableTargets = representedTargets.filter((representedTarget) => {
+            const structural = structuralSpacingTargetFor(representedTarget)
+            return structural && editableSpacingFieldsForTarget(representedTarget, structural).includes(field)
+        }).sort(compareCascadePriority).reverse()
+        const editableTarget = editableTargets[0] || target
         setThemeDefaults((current) => ({
             ...current,
-            ...Object.fromEntries(representedTargets.flatMap((representedTarget) => [
-                [representedTarget.id, { ...(current[representedTarget.id] || representedTarget.computedStyles || {}), [field]: value }],
-                ...(representedTarget.styleTargetId ? [[
-                    representedTarget.styleTargetId,
-                    { ...(current[representedTarget.styleTargetId] || representedTarget.computedStyles || {}), [field]: value },
-                ]] : []),
-            ])),
+            [editableTarget.id]: { ...(current[editableTarget.id] || editableTarget.computedStyles || {}), [field]: value },
+            ...(editableTarget.styleTargetId ? {
+                [editableTarget.styleTargetId]: {
+                    ...(current[editableTarget.styleTargetId] || editableTarget.computedStyles || {}), [field]: value,
+                },
+            } : {}),
         }))
-        const { entries } = spacingForLevelTarget(target)
-        if (representedTargets.length > 1) {
-            const representedEntries = representedTargets.flatMap((representedTarget) => {
-                const structural = structuralSpacingTargetFor(representedTarget)
-                if (!structural || !editableSpacingFieldsForTarget(representedTarget, structural).includes(field)) return []
-                const entry = spacingEntryForField(entries.filter((candidate) => candidate.row.targetId === structural.targetId), field)
-                return [{ structural, entry }]
-            })
-            if (representedEntries.length) {
-                updateWorkspace((next) => {
-                    const configured = getBreakpoints(next)
-                    representedEntries.forEach(({ structural, entry }) => {
-                        const inherited = entry?.row.breakpoint
-                            && breakpointWidth(entry.row.breakpoint, configured) !== breakpointWidth(viewport, configured)
-                        let row = !inherited && entry?.index >= 0 ? next.spacing[entry.index] : null
-                        if (!row) {
-                            row = next.spacing.find((candidate) => (
-                                candidate.targetId === structural.targetId && candidate.breakpoint === viewport
-                            ))
-                        }
-                        if (!row) {
-                            row = { ...(entry?.row || structural), breakpoint: viewport, values: {} }
-                            next.spacing.push(row)
-                        }
-                        row.values[field] = value
-                    })
-                    return next
-                })
-                return
-            }
-        }
+        const { entries } = spacingForLevelTarget(editableTarget)
         const entry = spacingEntryForField(entries, field)
         const configured = getBreakpoints(workspace)
         const inherited = entry?.row.breakpoint
@@ -1996,6 +1981,10 @@ const SemanticThemeWorkspace = ({
                     const key = configurationSpacingTargetKey(spacingTarget)
                     const current = targets.get(key)
                     if (!current) targets.set(key, spacingTarget)
+                    else if (compareCascadePriority(spacingTarget, current) > 0) targets.set(key, {
+                        ...spacingTarget,
+                        configurationSpacingTargets: [current, ...(current.configurationSpacingTargets || [])],
+                    })
                     else targets.set(key, {
                         ...current,
                         configurationSpacingTargets: [...(current.configurationSpacingTargets || []), spacingTarget],
