@@ -1,11 +1,13 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 
 import { mockAxiosInstance } from '../../test/setup'
+import { setCurrentTenantId } from '../../utils/tenant'
 import { statisticsApi } from '../statistics'
 
 describe('statisticsApi', () => {
   beforeEach(() => {
     localStorage.clear()
+    setCurrentTenantId('')
     mockAxiosInstance.get.mockClear()
     mockAxiosInstance.post.mockClear()
     mockAxiosInstance.patch.mockClear()
@@ -34,7 +36,7 @@ describe('statisticsApi', () => {
   })
 
   it('falls back to configured browser tenant state', async () => {
-    localStorage.setItem('eceee_tenant_id', 'stored-tenant')
+    setCurrentTenantId('stored-tenant')
 
     await statisticsApi.getExperiments()
 

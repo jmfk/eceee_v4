@@ -265,7 +265,7 @@ const TreePageManager = () => {
         error,
         refetch
     } = useQuery({
-        queryKey: ['pages', 'root', { search: debouncedSearchTerm, status: statusFilter }],
+        queryKey: ['pages', tenantId, 'root', { search: debouncedSearchTerm, status: statusFilter }],
         queryFn: async () => {
             const filters = {}
             if (debouncedSearchTerm) filters.search = debouncedSearchTerm
@@ -283,7 +283,7 @@ const TreePageManager = () => {
         isLoading: searchLoading,
         error: searchError
     } = useQuery({
-        queryKey: ['pages', 'search', { search: debouncedSearchTerm, status: statusFilter }],
+        queryKey: ['pages', tenantId, 'search', { search: debouncedSearchTerm, status: statusFilter }],
         queryFn: async () => {
             const filters = {}
             if (statusFilter !== 'all') filters.workflow_state = statusFilter

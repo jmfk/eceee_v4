@@ -14,7 +14,10 @@ vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: mocks.use
 vi.mock('../../contexts/GlobalNotificationContext', () => ({ useGlobalNotifications: () => ({ addNotification: mocks.addNotification }) }))
 vi.mock('../../api/users', () => ({ changePassword: mocks.changePassword, switchCurrentWorkspace: mocks.switchCurrentWorkspace }))
 vi.mock('../../hooks/useDocumentTitle', () => ({ useDocumentTitle: vi.fn() }))
-vi.mock('../../utils/tenant', () => ({ getCurrentTenantId: () => 'first-workspace' }))
+vi.mock('../../utils/tenant', () => ({
+    getCurrentTenantId: () => 'first-workspace',
+    setCurrentTenantId: vi.fn(),
+}))
 
 describe('ProfilePage workspace selection', () => {
     beforeEach(() => {

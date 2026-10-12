@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
-import { getCurrentTenantId } from '../utils/tenant';
+import { reconcileCurrentTenantId } from '../utils/tenant';
 
 const AuthContext = createContext();
 
@@ -65,18 +65,10 @@ export const AuthProvider = ({ children }) => {
             if (response.ok) {
                 const data = await response.json();
                 if (data.designerTenants?.length) {
-                    const currentTenant = getCurrentTenantId();
-                    const currentWorkspace = data.designerTenants.find((tenant) =>
-                        tenant.id === currentTenant || tenant.identifier === currentTenant
-                    );
-                    const serverWorkspace = data.designerTenants.find((workspace) =>
-                        workspace.id === data.currentWorkspace?.id ||
-                        workspace.identifier === data.currentWorkspace?.identifier
-                    );
-                    const activeWorkspace = serverWorkspace || currentWorkspace || data.designerTenants[0];
-                    if (activeWorkspace?.identifier && activeWorkspace.identifier !== currentTenant) {
-                        localStorage.setItem('eceee_tenant_id', activeWorkspace.identifier);
-                    }
+                    // The server-side session is authoritative. Repair a missing
+                    // or stale browser selection before workspace-scoped screens
+                    // mount and start populating their query caches.
+                    reconcileCurrentTenantId(data.currentWorkspace, data.designerTenants);
                 }
                 return data;
             }
