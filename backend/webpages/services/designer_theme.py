@@ -44,6 +44,7 @@ TYPE_PROPERTIES = {
 }
 SPACING_PROPERTIES = {
     "gap",
+    "height",
     "margin",
     "marginTop",
     "marginRight",
@@ -54,13 +55,25 @@ SPACING_PROPERTIES = {
     "paddingRight",
     "paddingBottom",
     "paddingLeft",
+    "width",
 }
 WIDGET_FRAME_SPACING_PROPERTIES = {
+    "height",
     "margin",
     "marginTop",
     "marginRight",
     "marginBottom",
     "marginLeft",
+    "width",
+}
+WIDGET_SURFACE_SPACING_PROPERTIES = {
+    "gap",
+    "height",
+    "paddingTop",
+    "paddingRight",
+    "paddingBottom",
+    "paddingLeft",
+    "width",
 }
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_PIXELS = 16_777_216
@@ -205,12 +218,18 @@ def _designer_element_label(element):
 
 def _normalized_layout_parts(source):
     normalized = {}
-    for part_name, config in (source or {}).items():
+    for position, (part_name, config) in enumerate((source or {}).items()):
         if isinstance(config, str):
             config = {"label": config}
         elif not isinstance(config, dict):
             config = {}
-        semantic_part = str(part_name).endswith(("-image", "-header", "-text", "-caption", "-link"))
+        explicit_level = config.get("designerLevel") or config.get("designer_level")
+        designer_level = explicit_level or (
+            "widget" if position == 0 or str(part_name).endswith("-widget") else "element"
+        )
+        is_widget_surface = bool(
+            config.get("designerSurface", config.get("designer_surface", designer_level == "widget"))
+        )
         properties = config.get("properties")
         declared_spacing = (
             config.get("designerEditableSpacingProperties") or config.get("designer_editable_spacing_properties") or []
@@ -218,16 +237,26 @@ def _normalized_layout_parts(source):
         editable_spacing = set(declared_spacing)
         if "padding" in (properties or []):
             editable_spacing.update({"paddingTop", "paddingRight", "paddingBottom", "paddingLeft"})
+        if designer_level == "element" and "margin" in (properties or []):
+            editable_spacing.update({"marginTop", "marginRight", "marginBottom", "marginLeft"})
         editable_spacing.update(
-            prop for prop in (properties or []) if prop == "gap" or prop.startswith("padding") and prop != "padding"
+            prop
+            for prop in (properties or [])
+            if prop in {"gap", "width", "height"}
+            or prop.startswith("padding")
+            and prop != "padding"
+            or designer_level == "element"
+            and prop.startswith("margin")
+            and prop != "margin"
         )
+        if is_widget_surface:
+            editable_spacing.intersection_update(WIDGET_SURFACE_SPACING_PROPERTIES)
         normalized[part_name] = {
             "label": config.get("label") or _humanize_identifier(part_name),
             "properties": properties,
             "editableSpacingProperties": sorted(editable_spacing & SPACING_PROPERTIES),
-            "designerLevel": config.get("designerLevel")
-            or config.get("designer_level")
-            or ("element" if semantic_part else "widget"),
+            "designerLevel": designer_level,
+            "isWidgetSurface": is_widget_surface,
         }
     return normalized
 
@@ -340,6 +369,7 @@ def build_designer_catalog(theme, assets, include_reference_previews=True):
                 "label": config.get("label") or _humanize_identifier(part),
                 "breakpoints": [],
                 "designerLevel": config.get("designerLevel", "widget"),
+                "isWidgetSurface": config.get("isWidgetSurface", False),
                 "editableSpacingProperties": [
                     prop for prop in (config.get("editableSpacingProperties") or []) if prop in SPACING_PROPERTIES
                 ],
@@ -355,6 +385,7 @@ def build_designer_catalog(theme, assets, include_reference_previews=True):
                     "label": widget_parts.get(part, {}).get("label") or _humanize_identifier(part),
                     "breakpoints": [],
                     "designerLevel": widget_parts.get(part, {}).get("designerLevel", "widget"),
+                    "isWidgetSurface": widget_parts.get(part, {}).get("isWidgetSurface", False),
                     "editableSpacingProperties": [
                         prop
                         for prop in (widget_parts.get(part, {}).get("editableSpacingProperties") or [])
@@ -403,6 +434,7 @@ def build_designer_catalog(theme, assets, include_reference_previews=True):
                     "part": part,
                     "label": config.get("label") or _humanize_identifier(part),
                     "designerLevel": config.get("designerLevel", "widget"),
+                    "isWidgetSurface": config.get("isWidgetSurface", False),
                     "editableSpacingProperties": [
                         prop for prop in (config.get("editableSpacingProperties") or []) if prop in SPACING_PROPERTIES
                     ],
@@ -1321,6 +1353,7 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
             "editableTypographyProperties": sorted(TYPE_PROPERTIES),
             "editableSpacingProperties": sorted(SPACING_PROPERTIES),
             "editableWidgetFrameSpacingProperties": sorted(WIDGET_FRAME_SPACING_PROPERTIES),
+            "editableWidgetSurfaceSpacingProperties": sorted(WIDGET_SURFACE_SPACING_PROPERTIES),
             "maxImageBytes": MAX_IMAGE_BYTES,
         },
     }

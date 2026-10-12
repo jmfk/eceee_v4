@@ -9,7 +9,7 @@ const DESIGNER_STYLE_PROPERTIES: Record<string, string> = {
     lineHeight: 'line-height', letterSpacing: 'letter-spacing',
     margin: 'margin', marginTop: 'margin-top', marginRight: 'margin-right', marginBottom: 'margin-bottom', marginLeft: 'margin-left',
     padding: 'padding', paddingTop: 'padding-top', paddingRight: 'padding-right', paddingBottom: 'padding-bottom', paddingLeft: 'padding-left',
-    gap: 'gap',
+    gap: 'gap', width: 'width', height: 'height',
 }
 
 const EDITABLE_TEXT_SELECTOR = 'a,blockquote,caption,code,em,figcaption,h1,h2,h3,h4,h5,h6,li,p,pre,span,strong'
@@ -29,7 +29,7 @@ const editableTextLabel = (node: HTMLElement) => {
 
 const DESIGNER_CSS = `.designer-preview [data-designer-target]{cursor:pointer}.designer-selection-outline{position:fixed!important;z-index:2147483646!important;box-sizing:border-box!important;border:1px solid!important;background:transparent!important;pointer-events:none!important}.designer-selection-outline-slot{border-color:#eab308!important}.designer-selection-outline-widget{border-color:#16a34a!important}.designer-selection-outline-element{border-color:#2563eb!important}[data-designer-target].designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:0 0 0 3px rgba(245,158,11,.2)!important}.designer-guides .designer-hovered:not(.designer-selected):not(.designer-highlighted){outline:2px dotted #2563eb!important;outline-offset:-2px!important}
 .designer-context-menu{position:fixed!important;z-index:2147483647!important;min-width:180px!important;max-width:260px!important;padding:6px!important;border:1px solid #d1d5db!important;border-radius:8px!important;background:#fff!important;box-shadow:0 10px 24px rgba(15,23,42,.2)!important;color:#111827!important;font:500 13px/1.35 system-ui,sans-serif!important}.designer-context-menu-title{overflow:hidden!important;padding:5px 8px 7px!important;color:#6b7280!important;font-size:11px!important;font-weight:600!important;text-overflow:ellipsis!important;white-space:nowrap!important}.designer-context-menu button{display:block!important;width:100%!important;padding:7px 8px!important;border:0!important;border-radius:5px!important;background:transparent!important;color:#111827!important;font:inherit!important;text-align:left!important;cursor:pointer!important}.designer-context-menu button:hover,.designer-context-menu button:focus-visible{background:#eff6ff!important;color:#1d4ed8!important;outline:none!important}
-.designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483644!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483645!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483645!important;transform:translate(-50%,-50%);padding:2px 3px!important;border:0!important;border-radius:3px!important;background:#fff!important;font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;box-shadow:0 0 0 1px rgba(255,255,255,.9)!important}.designer-spacing-value[data-editable="true"]{pointer-events:auto!important;cursor:pointer!important;box-shadow:0 0 0 1px currentColor!important}.designer-spacing-value[data-editable="true"]:hover,.designer-spacing-value[data-editable="true"]:focus-visible{outline:2px solid #2563eb!important;outline-offset:1px!important}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}.designer-spacing-editor{position:fixed!important;z-index:2147483647!important;display:flex!important;gap:4px!important;padding:5px!important;border:1px solid #93c5fd!important;border-radius:6px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.22)!important}.designer-spacing-editor input{width:72px!important;padding:5px 6px!important;border:1px solid #d1d5db!important;border-radius:4px!important;font:500 12px/1.2 system-ui,sans-serif!important}.designer-spacing-editor button{min-width:28px!important;padding:5px 7px!important;border:0!important;border-radius:4px!important;background:#2563eb!important;color:#fff!important;font:600 12px/1.2 system-ui,sans-serif!important;cursor:pointer!important}.designer-spacing-editor .designer-spacing-step{background:#e5e7eb!important;color:#111827!important;font-size:16px!important}
+.designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483644!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-size{background:transparent!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483645!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483645!important;transform:translate(-50%,-50%);padding:2px 3px!important;border:0!important;border-radius:3px!important;background:#fff!important;font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;box-shadow:0 0 0 1px rgba(255,255,255,.9)!important}.designer-spacing-value[data-editable="true"]{pointer-events:auto!important;cursor:pointer!important;box-shadow:0 0 0 1px currentColor!important}.designer-spacing-value[data-editable="true"]:hover,.designer-spacing-value[data-editable="true"]:focus-visible,.designer-spacing-value[data-selected="true"]{outline:2px solid #2563eb!important;outline-offset:2px!important}.designer-spacing-value[data-selected="true"]{background:#dbeafe!important;color:#1e3a8a!important}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}.designer-spacing-size-value{color:#4338ca}
 .designer-spacing-guide.designer-spacing-level-slot.designer-spacing-margin{background:rgba(234,179,8,.2)!important}.designer-spacing-guide.designer-spacing-level-slot.designer-spacing-padding{background:rgba(234,179,8,.32)!important}.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-margin{background:rgba(22,163,74,.18)!important}.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-padding,.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-gap{background:rgba(22,163,74,.3)!important}.designer-spacing-guide.designer-spacing-level-element.designer-spacing-margin{background:rgba(37,99,235,.18)!important}.designer-spacing-guide.designer-spacing-level-element.designer-spacing-padding{background:rgba(37,99,235,.3)!important}.designer-spacing-content.designer-spacing-level-slot,.designer-spacing-content.designer-spacing-level-widget,.designer-spacing-content.designer-spacing-level-element{box-sizing:border-box!important;border-style:solid!important;border-width:2px!important}.designer-spacing-content.designer-spacing-level-slot{border-color:#ca8a04!important}.designer-spacing-content.designer-spacing-level-widget{border-color:#16a34a!important}.designer-spacing-content.designer-spacing-level-element{border-color:#2563eb!important}.designer-column-slot-guide{box-sizing:border-box!important;border:2px solid #eab308!important;background:rgba(234,179,8,.06)!important}.designer-spacing-value.designer-spacing-level-slot{background:#fefce8!important;color:#854d0e!important}.designer-spacing-value.designer-spacing-level-widget{background:#f0fdf4!important;color:#166534!important}.designer-spacing-value.designer-spacing-level-element{background:#eff6ff!important;color:#1d4ed8!important}.designer-spacing-measure.designer-spacing-level-slot,.designer-spacing-measure.designer-spacing-level-slot::before,.designer-spacing-measure.designer-spacing-level-slot::after{background:#eab308!important;box-shadow:0 0 0 1px #854d0e!important}.designer-spacing-measure.designer-spacing-level-widget,.designer-spacing-measure.designer-spacing-level-widget::before,.designer-spacing-measure.designer-spacing-level-widget::after{background:#16a34a!important;box-shadow:0 0 0 1px #166534!important}.designer-spacing-measure.designer-spacing-level-element,.designer-spacing-measure.designer-spacing-level-element::before,.designer-spacing-measure.designer-spacing-level-element::after{background:#2563eb!important;box-shadow:0 0 0 1px #1d4ed8!important}
 .layout-designer-preview [data-layout-node-id]{position:relative!important;box-shadow:inset 0 0 0 1px rgba(30,64,175,.42)!important}.layout-designer-preview [data-layout-node-id]::before{content:attr(data-layout-node-type) " · " attr(data-layout-node-size)!important;display:none;position:absolute!important;z-index:20!important;top:3px!important;right:3px!important;max-width:calc(100% - 6px)!important;overflow:hidden!important;padding:2px 5px!important;border:1px solid rgba(255,255,255,.8)!important;border-radius:4px!important;background:rgba(15,23,42,.82)!important;color:#fff!important;font:600 10px/1.2 system-ui,sans-serif!important;text-overflow:ellipsis!important;text-transform:capitalize!important;white-space:nowrap!important;pointer-events:none!important}.layout-designer-preview [data-layout-node-type="slot"]::before,.layout-designer-preview [data-layout-node-id].designer-selected::before,.layout-designer-preview [data-layout-node-id].designer-highlighted::before,.layout-designer-preview [data-layout-node-id].designer-hovered::before{display:block}.layout-designer-preview [data-layout-node-type="container"]{background-color:rgba(59,130,246,.10)!important}.layout-designer-preview [data-layout-node-type="section"]{background-color:rgba(6,182,212,.12)!important}.layout-designer-preview [data-layout-node-type="grid"]{background-color:rgba(168,85,247,.12)!important}.layout-designer-preview [data-layout-node-type="row"]{background-color:rgba(99,102,241,.12)!important}.layout-designer-preview [data-layout-node-type="column"]{background-color:rgba(34,197,94,.12)!important}.layout-designer-preview [data-layout-node-type="semantic"]{background-color:rgba(245,158,11,.14)!important}.layout-designer-preview [data-layout-node-type="slot"]{min-height:40px;background-color:rgba(244,63,94,.13)!important;color:#881337!important;text-align:center!important}.layout-designer-preview [data-layout-node-type="slot"]::after{content:attr(data-layout-node-label)!important;position:absolute!important;z-index:10!important;inset:0!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:5px 9px!important;color:#881337!important;font:600 13px/1.25 system-ui,sans-serif!important;text-align:center!important;pointer-events:none!important}.layout-designer-preview [data-layout-presentation-color]{background-color:color-mix(in srgb,var(--layout-presentation-color) 16%,transparent)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--layout-presentation-color) 62%,transparent)!important}
 `
@@ -184,7 +184,7 @@ const widgetSpacingConfigurationTargets = (
             const targetId = candidate.styleTargetId || candidate.id
             const targetKey = configurationSpacingTargetKey(candidate)
             const editableFields = designer.editableSpacingTargets?.[targetId] || []
-            if (!targetId || !editableFields.length || selectionKind(candidate) !== 'widget' || seen.has(targetKey)) return []
+            if (!targetId || !editableFields.length || !candidate.isWidgetSurface || seen.has(targetKey)) return []
             seen.add(targetKey)
             return [{
                 ...candidate,
@@ -339,6 +339,7 @@ type DesignerFocusState = {
     selectedWidgetId: string
     selectedInstanceId: string
     selectedTargets: NonNullable<RenderFrameMessage['selectedTargets']>
+    selectedMeasurementKeys: string[]
     highlightedTargetId: string
     highlightedWidgetId: string
     highlightedInstanceId: string
@@ -355,7 +356,13 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     let selectedNodes: Record<'slot' | 'widget' | 'element', HTMLElement | null> = { slot: null, widget: null, element: null }
     let previewedSelectionLevel: 'slot' | 'widget' | 'element' | null = null
     let contextMenu: HTMLElement | null = null
-    let spacingEditor: { element: HTMLFormElement, node: HTMLElement, property: string, restore: () => void } | null = null
+    const measurementTargets = new Map<string, {
+        node: HTMLElement
+        property: string
+        targetId: string
+        targetIds: string[]
+        axis: 'horizontal' | 'vertical'
+    }>()
     if (designer.layoutCanvas) {
         const layoutNodes = [...root.querySelectorAll<HTMLElement>('[data-layout-node-id]')]
         const updateNodeSize = (node: HTMLElement) => {
@@ -380,30 +387,17 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         selectionOutlines.forEach((outline) => outline.remove())
         selectionOutlines = []
     }
-    const closeSpacingEditor = (restore = true) => {
-        if (restore) spacingEditor?.restore()
-        spacingEditor?.element.remove()
-        spacingEditor = null
+    const removeGuides = () => {
+        guides.forEach((guide) => guide.remove())
+        guides = []
+        measurementTargets.clear()
     }
-    const positionSpacingEditor = (editor: HTMLFormElement, labelLeft: number, labelTop: number) => {
-        const gap = 12
-        const width = editor.offsetWidth || 164
-        const height = editor.offsetHeight || 44
-        const left = Math.max(8, Math.min(window.innerWidth - width - 8, labelLeft - width / 2))
-        const preferredTop = labelTop + gap
-        const top = preferredTop + height <= window.innerHeight - 8
-            ? preferredTop
-            : Math.max(8, labelTop - height - gap)
-        Object.assign(editor.style, { left: `${left}px`, top: `${top}px` })
-    }
-    const removeGuides = () => { guides.forEach((guide) => guide.remove()); guides = [] }
     const clearGuides = () => {
         removeGuides()
         hoveredNode?.classList.remove('designer-hovered')
         hoveredNode = null
     }
     let showSelectedSpacing: () => void = () => undefined
-    let redrawSpacing: (node: HTMLElement) => void = () => undefined
     const showSpacing = (node: HTMLElement, append = false, selectionLevel?: 'slot' | 'widget' | 'element', includeDescendantGrid = true) => {
         if (!append) {
             removeGuides()
@@ -431,10 +425,15 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             width: number,
             height: number,
             side?: string,
-            spacing?: 'margin' | 'padding' | 'gap',
+            spacing?: 'margin' | 'padding' | 'gap' | 'size',
             value?: number,
+            propertyOverride?: 'width' | 'height',
         ) => {
-            if (width <= 0 || height <= 0) return
+            if (width <= 0 || height <= 0) {
+                if (!spacing || value !== 0) return
+                width = Math.max(1, width)
+                height = Math.max(1, height)
+            }
             const guide = document.createElement('div')
             guide.className = `designer-spacing-guide ${className}${levelClass}`
             guide.setAttribute('aria-hidden', 'true')
@@ -497,8 +496,8 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                 left: `${labelLeft}px`,
                 top: `${labelTop}px`,
             })
-            const property = spacing === 'gap' ? 'gap' : `${spacing}${side ? side[0].toUpperCase() + side.slice(1) : ''}`
-            const spacingDescription = spacing === 'gap' ? 'column gap' : `${spacing} ${side}`
+            const property = propertyOverride || (spacing === 'gap' ? 'gap' : `${spacing}${side ? side[0].toUpperCase() + side.slice(1) : ''}`)
+            const spacingDescription = propertyOverride || (spacing === 'gap' ? 'column gap' : `${spacing} ${side}`)
             const editNode = spacing === 'gap' && columnGrid ? columnGrid : node
             const directTargetIds = nodeTargets(editNode).flatMap((target: any) => [target.id, target.styleTargetId]).filter(Boolean)
             const targetIds: string[] = []
@@ -515,107 +514,41 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             const editable = Boolean(spacingTargetId)
             label.setAttribute('aria-hidden', editable ? 'false' : 'true')
             if (editable) {
+                const widgetId = editNode.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''
+                const measurementKey = `${widgetId}:${spacingTargetId}:${property}`
+                const axis = property === 'width' || side === 'left' || side === 'right'
+                    ? 'horizontal'
+                    : 'vertical'
+                measurementTargets.set(measurementKey, {
+                    node: editNode,
+                    property,
+                    targetId: spacingTargetId,
+                    targetIds,
+                    axis,
+                })
                 label.dataset.editable = 'true'
+                label.dataset.selected = String(focusState.selectedMeasurementKeys.includes(measurementKey))
                 label.tabIndex = 0
                 label.setAttribute('role', 'button')
-                label.setAttribute('aria-label', `Edit ${spacingDescription}`)
-                const openEditor = (event: Event) => {
+                label.setAttribute('aria-pressed', String(focusState.selectedMeasurementKeys.includes(measurementKey)))
+                label.setAttribute('aria-label', `Select ${spacingDescription}`)
+                const toggleMeasurement = (event: Event) => {
                     event.preventDefault()
                     event.stopPropagation()
-                    closeSpacingEditor()
-                    const editor = document.createElement('form')
-                    editor.className = 'designer-spacing-editor'
-                    editor.setAttribute('aria-label', `Edit ${spacingDescription}`)
-                    const input = document.createElement('input')
-                    input.setAttribute('aria-label', `${spacingDescription} value`)
-                    input.value = `${value}px`
-                    const cssProperty = property.replace(/[A-Z]/g, (character) => `-${character.toLowerCase()}`)
-                    const originalInlineValue = editNode.style.getPropertyValue(cssProperty)
-                    const originalInlinePriority = editNode.style.getPropertyPriority(cssProperty)
-                    const restoreValue = () => {
-                        if (originalInlineValue) editNode.style.setProperty(cssProperty, originalInlineValue, originalInlinePriority)
-                        else editNode.style.removeProperty(cssProperty)
-                    }
-                    const previewValue = () => {
-                        editNode.style.setProperty(cssProperty, input.value.trim())
-                        redrawSpacing(node)
-                    }
-                    const decrease = document.createElement('button')
-                    decrease.type = 'button'
-                    decrease.className = 'designer-spacing-step'
-                    decrease.textContent = '−'
-                    decrease.setAttribute('aria-label', `Decrease ${spacingDescription}`)
-                    const increase = document.createElement('button')
-                    increase.type = 'button'
-                    increase.className = 'designer-spacing-step'
-                    increase.textContent = '+'
-                    increase.setAttribute('aria-label', `Increase ${spacingDescription}`)
-                    const save = document.createElement('button')
-                    save.type = 'submit'
-                    save.textContent = 'Apply'
-                    editor.append(decrease, input, increase, save)
-                    const applyValue = (close = true) => {
-                        if (!editor.isConnected) return
-                        previewValue()
-                        window.parent.postMessage({
-                            source: 'eceee-designer-preview', action: 'spacingChange', targetId: spacingTargetId, targetIds, property,
-                            value: input.value.trim(), viewportWidth: window.innerWidth,
-                        }, '*')
-                        if (close) closeSpacingEditor(false)
-                    }
-                    const adjustValue = (direction: number, step: number) => {
-                        const match = input.value.match(/^\s*(-?(?:\d+(?:\.\d*)?|\.\d+))\s*([a-z%]*)\s*$/i)
-                        if (!match) return
-                        const nextValue = Math.max(0, Math.round((Number(match[1]) + direction * step) * 1000) / 1000)
-                        input.value = `${nextValue}${match[2] || 'px'}`
-                        input.select()
-                        previewValue()
-                    }
-                    editor.addEventListener('submit', (submitEvent) => {
-                        submitEvent.preventDefault()
-                        applyValue()
-                    })
-                    save.addEventListener('click', (clickEvent) => {
-                        clickEvent.preventDefault()
-                        applyValue()
-                    })
-                    input.addEventListener('keydown', (keyEvent) => {
-                        if (keyEvent.key === 'Escape') {
-                            keyEvent.preventDefault()
-                            keyEvent.stopPropagation()
-                            closeSpacingEditor()
-                            redrawSpacing(node)
-                            return
-                        }
-                        if (keyEvent.key === 'Enter') {
-                            keyEvent.preventDefault()
-                            applyValue()
-                            return
-                        }
-                        if (keyEvent.key !== 'ArrowUp' && keyEvent.key !== 'ArrowDown') return
-                        keyEvent.preventDefault()
-                        const direction = keyEvent.key === 'ArrowUp' ? 1 : -1
-                        adjustValue(direction, keyEvent.shiftKey ? 5 : 1)
-                    })
-                    decrease.addEventListener('click', (clickEvent) => { clickEvent.preventDefault(); adjustValue(-1, 1) })
-                    increase.addEventListener('click', (clickEvent) => { clickEvent.preventDefault(); adjustValue(1, 1) })
-                    input.addEventListener('input', previewValue)
-                    document.body.append(editor)
-                    spacingEditor = { element: editor, node: editNode, property, restore: restoreValue }
-                    positionSpacingEditor(editor, labelLeft, labelTop)
-                    input.focus()
-                    input.select()
+                    const selected = new Set(focusState.selectedMeasurementKeys)
+                    if (selected.has(measurementKey)) selected.delete(measurementKey)
+                    else selected.add(measurementKey)
+                    focusState.selectedMeasurementKeys = [...selected]
+                    label.dataset.selected = String(selected.has(measurementKey))
+                    label.setAttribute('aria-pressed', String(selected.has(measurementKey)))
                 }
-                label.addEventListener('click', openEditor)
+                label.addEventListener('click', toggleMeasurement)
                 label.addEventListener('keydown', (event) => {
-                    if (event.key === 'Enter' || event.key === ' ') openEditor(event)
+                    if (event.key === 'Enter' || event.key === ' ') toggleMeasurement(event)
                 })
             }
             document.body.append(label)
             guides.push(label)
-            if (spacingEditor?.node === editNode && spacingEditor.property === property) {
-                positionSpacingEditor(spacingEditor.element, labelLeft, labelTop)
-            }
         }
 
         const marginLeft = Math.max(0, margin.left)
@@ -641,6 +574,8 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         addGuide('designer-spacing-padding', contentLeft + contentWidth, contentTop, Math.max(0, padding.right), contentHeight, 'right', 'padding', Math.max(0, padding.right))
         addGuide('designer-spacing-padding', innerLeft, contentTop + contentHeight, innerWidth, Math.max(0, padding.bottom), 'bottom', 'padding', Math.max(0, padding.bottom))
         addGuide('designer-spacing-padding', innerLeft, contentTop, Math.max(0, padding.left), contentHeight, 'left', 'padding', Math.max(0, padding.left))
+        addGuide('designer-spacing-size', rect.left, rect.top + 4, rect.width, 1, 'right', 'size', Math.round(rect.width), 'width')
+        addGuide('designer-spacing-size', rect.right - 4, rect.top, 1, rect.height, 'bottom', 'size', Math.round(rect.height), 'height')
         const contentOutlineInset = selectionLevel === 'widget' ? 3 : selectionLevel === 'element' ? 1 : 0
         addGuide(
             'designer-spacing-content',
@@ -665,13 +600,15 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                 const next = slotRects[index + 1]
                 const horizontalGap = Math.max(0, next.left - current.right)
                 const verticalGap = Math.max(0, next.top - current.bottom)
+                const verticalOverlap = Math.max(0, Math.min(current.bottom, next.bottom) - Math.max(current.top, next.top))
+                const horizontalOverlap = Math.max(0, Math.min(current.right, next.right) - Math.max(current.left, next.left))
                 if (horizontalGap > 0) {
                     addGuide(
                         'designer-spacing-gap',
                         current.right,
                         Math.max(current.top, next.top),
                         horizontalGap,
-                        Math.max(0, Math.min(current.bottom, next.bottom) - Math.max(current.top, next.top)),
+                        verticalOverlap,
                         'right',
                         'gap',
                         horizontalGap,
@@ -681,12 +618,16 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                         'designer-spacing-gap',
                         Math.max(current.left, next.left),
                         current.bottom,
-                        Math.max(0, Math.min(current.right, next.right) - Math.max(current.left, next.left)),
+                        horizontalOverlap,
                         verticalGap,
                         'bottom',
                         'gap',
                         verticalGap,
                     )
+                } else if (verticalOverlap > 0) {
+                    addGuide('designer-spacing-gap', current.right, Math.max(current.top, next.top), 0, verticalOverlap, 'right', 'gap', 0)
+                } else if (horizontalOverlap > 0) {
+                    addGuide('designer-spacing-gap', Math.max(current.left, next.left), current.bottom, horizontalOverlap, 0, 'bottom', 'gap', 0)
                 }
             }
         }
@@ -754,10 +695,6 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             && !levelByNode.has(selectedNode) && !widgetConfigurationNodes.includes(selectedNode)) {
             showSpacing(selectedNode, true, 'widget')
         }
-    }
-    redrawSpacing = (node) => {
-        if (selectedNodeList().length) showSelectedSpacing()
-        else showSpacing(node)
     }
     const setSelectedNodesFromPaths = (paths: ReturnType<typeof selectionPaths>) => {
         ;(['slot', 'widget', 'element'] as const).forEach((kind) => {
@@ -832,6 +769,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                 styleTargetId: part.id || `widget-part:${widgetType}:${part.part}`,
                 kind: part.designerLevel === 'widget' ? 'part' : 'element',
                 label: part.label,
+                isWidgetSurface: part.isWidgetSurface === true,
                 widgetId,
                 widgetType,
                 editable: false,
@@ -893,6 +831,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                     id: part.id,
                     kind: widgetLevel ? 'part' : 'element',
                     label: part.label,
+                    isWidgetSurface: part.isWidgetSurface === true,
                     editable: false,
                 }, widgetLevel)
             }))
@@ -1019,6 +958,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             setSelectedNodesFromPaths(paths)
             root.querySelectorAll('.designer-highlighted').forEach((highlighted) => highlighted.classList.remove('designer-highlighted'))
             selectedNode = node
+            focusState.selectedMeasurementKeys = []
             focusState.selectedTargetId = primaryTarget?.id || ''
             focusState.selectedWidgetId = node.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''
             focusState.selectedInstanceId = designerInstanceId(node)
@@ -1079,6 +1019,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         const paths = applySelectionClasses(root, eventNode, primary)
         setSelectedNodesFromPaths(paths)
         selectedNode = eventNode
+        focusState.selectedMeasurementKeys = []
         focusState.selectedTargetId = primary.id
         focusState.selectedWidgetId = eventNode.closest<HTMLElement>('[data-widget-id]')?.dataset.widgetId || ''
         focusState.selectedInstanceId = designerInstanceId(eventNode)
@@ -1141,33 +1082,50 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     const dismissContextMenu = (event: Event) => {
         if (contextMenu && !(event.target instanceof Node && contextMenu.contains(event.target))) closeContextMenu()
     }
-    const dismissSpacingEditor = (event: Event) => {
-        if (spacingEditor && !(event.target instanceof Node && spacingEditor.element.contains(event.target))) {
-            const pinnedNode = spacingEditor.node
-            closeSpacingEditor()
-            if (root.contains(pinnedNode)) redrawSpacing(pinnedNode)
+    const handleMeasurementKeyboard = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+            closeContextMenu()
+            focusState.selectedMeasurementKeys = []
+            refreshGuides()
+            return
         }
-    }
-    const dismissSpacingEditorOnBlur = () => {
-        const pinnedNode = spacingEditor?.node
-        closeSpacingEditor()
-        if (pinnedNode && root.contains(pinnedNode)) redrawSpacing(pinnedNode)
-    }
-    const dismissOverlaysWithKeyboard = (event: KeyboardEvent) => {
-        if (event.key !== 'Escape') return
-        closeContextMenu()
-        const pinnedNode = spacingEditor?.node
-        closeSpacingEditor()
-        if (pinnedNode && root.contains(pinnedNode)) redrawSpacing(pinnedNode)
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return
+        if (event.target instanceof HTMLElement
+            && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName))) return
+        const axis = event.key === 'ArrowLeft' || event.key === 'ArrowRight' ? 'horizontal' : 'vertical'
+        const targets = focusState.selectedMeasurementKeys
+            .map((key) => measurementTargets.get(key))
+            .filter((target) => target?.axis === axis)
+        if (!targets.length) return
+        event.preventDefault()
+        event.stopPropagation()
+        const direction = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1
+        const step = event.shiftKey ? 10 : 1
+        targets.forEach((target) => {
+            if (!target) return
+            const cssProperty = target.property.replace(/[A-Z]/g, (character) => `-${character.toLowerCase()}`)
+            const currentValue = getComputedStyle(target.node).getPropertyValue(cssProperty).trim()
+            const match = currentValue.match(/^(-?(?:\d+(?:\.\d*)?|\.\d+))\s*([a-z%]*)$/i)
+            if (!match) return
+            const value = `${Math.max(0, Math.round((Number(match[1]) + direction * step) * 1000) / 1000)}${match[2] || 'px'}`
+            target.node.style.setProperty(cssProperty, value)
+            window.parent.postMessage({
+                source: 'eceee-designer-preview',
+                action: 'spacingChange',
+                targetId: target.targetId,
+                targetIds: target.targetIds,
+                property: target.property,
+                value,
+                viewportWidth: window.innerWidth,
+            }, '*')
+        })
+        refreshGuides()
     }
     root.addEventListener('contextmenu', openContextMenu)
     document.addEventListener('pointerdown', dismissContextMenu)
-    document.addEventListener('pointerdown', dismissSpacingEditor)
-    document.addEventListener('keydown', dismissOverlaysWithKeyboard)
-    window.addEventListener('blur', dismissSpacingEditorOnBlur)
+    document.addEventListener('keydown', handleMeasurementKeyboard)
     const findHoveredNode = (target: EventTarget | null) => target instanceof HTMLElement ? target : null
     const over = (event: MouseEvent) => {
-        if (spacingEditor) return
         if (selectedNode && root.contains(selectedNode)) {
             if (hoveredNode !== selectedNode) showSelectedSpacing()
             return
@@ -1176,10 +1134,6 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         if (node && root.contains(node) && node !== hoveredNode) showSpacing(node)
     }
     const out = (event: MouseEvent) => {
-        if (spacingEditor) {
-            redrawSpacing(spacingEditor.node)
-            return
-        }
         if (!hoveredNode || (event.relatedTarget instanceof Node && hoveredNode.contains(event.relatedTarget))) return
         const next = findHoveredNode(event.relatedTarget)
         if (next && root.contains(next)) showSpacing(next)
@@ -1199,9 +1153,9 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         selectedNode = null
         selectedNodes = { slot: null, widget: null, element: null }
         previewedSelectionLevel = null
+        focusState.selectedMeasurementKeys = []
         removeSelectionOutlines()
         closeContextMenu()
-        closeSpacingEditor()
         clearGuides()
     }
     const refreshGuides = () => {
@@ -1222,12 +1176,9 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     window.addEventListener('resize', refreshGuides)
     cleanups.push(() => {
         closeContextMenu()
-        closeSpacingEditor()
         root.removeEventListener('contextmenu', openContextMenu)
         document.removeEventListener('pointerdown', dismissContextMenu)
-        document.removeEventListener('pointerdown', dismissSpacingEditor)
-        document.removeEventListener('keydown', dismissOverlaysWithKeyboard)
-        window.removeEventListener('blur', dismissSpacingEditorOnBlur)
+        document.removeEventListener('keydown', handleMeasurementKeyboard)
         root.removeEventListener('mouseover', over)
         root.removeEventListener('mouseout', out)
         root.removeEventListener('designerselect', selectFromInspector)
@@ -1236,14 +1187,14 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         window.removeEventListener('scroll', refreshGuides, true)
         window.removeEventListener('resize', refreshGuides)
     })
-    return () => { clearGuides(); removeSelectionOutlines(); closeSpacingEditor(); cleanups.forEach((cleanup) => cleanup()) }
+    return () => { clearGuides(); removeSelectionOutlines(); cleanups.forEach((cleanup) => cleanup()) }
 }
 
 export const RenderFrameRuntime = () => {
     const [model, setModel] = useState<RenderPageModel | null>(null)
     const modelRef = useRef<RenderPageModel | null>(null)
     const rootRef = useRef<HTMLDivElement>(null)
-    const focusStateRef = useRef<DesignerFocusState>({ selectedTargetId: '', selectedWidgetId: '', selectedInstanceId: '', selectedTargets: [], highlightedTargetId: '', highlightedWidgetId: '', highlightedInstanceId: '' })
+    const focusStateRef = useRef<DesignerFocusState>({ selectedTargetId: '', selectedWidgetId: '', selectedInstanceId: '', selectedTargets: [], selectedMeasurementKeys: [], highlightedTargetId: '', highlightedWidgetId: '', highlightedInstanceId: '' })
 
     useEffect(() => {
         const receive = (event: MessageEvent<RenderFrameMessage>) => {
@@ -1258,6 +1209,7 @@ export const RenderFrameRuntime = () => {
                 focusStateRef.current.selectedWidgetId = event.data.widgetId || ''
                 focusStateRef.current.selectedInstanceId = event.data.targetInstanceId || ''
                 focusStateRef.current.selectedTargets = event.data.selectedTargets || []
+                focusStateRef.current.selectedMeasurementKeys = []
                 focusStateRef.current.highlightedTargetId = ''
                 focusStateRef.current.highlightedWidgetId = ''
                 focusStateRef.current.highlightedInstanceId = ''
@@ -1281,6 +1233,7 @@ export const RenderFrameRuntime = () => {
                 focusStateRef.current.selectedWidgetId = ''
                 focusStateRef.current.selectedInstanceId = ''
                 focusStateRef.current.selectedTargets = []
+                focusStateRef.current.selectedMeasurementKeys = []
                 focusStateRef.current.highlightedTargetId = ''
                 focusStateRef.current.highlightedWidgetId = ''
                 focusStateRef.current.highlightedInstanceId = ''
