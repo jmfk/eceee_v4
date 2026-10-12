@@ -1060,6 +1060,23 @@ const SemanticThemeWorkspace = ({
         return () => window.removeEventListener('message', receive)
     }, [contentMode, onPendingPreviewTextsChange, pendingPreviewTextsRef, replaceAsset, replacePreviewImage, updateWorkspace, viewId, viewport, workspace.assets, workspace.breakpoints, workspace.catalog, workspace.constraints.editableSpacingProperties, workspace.mediaNamespace, workspace.spacing])
 
+    useEffect(() => {
+        const selectedStyleTargets = [...new Map(Object.values(levelSelections)
+            .filter(Boolean)
+            .flatMap((target) => [target, ...(target.configurationSpacingTargets || [])])
+            .filter((target) => targetSelectionKind(target) !== 'element')
+            .map((target) => [targetFocusKey(target), target])).values()]
+        if (!selectedStyleTargets.length) return undefined
+        const timer = window.setTimeout(() => selectedStyleTargets.forEach((target) => {
+            iframeRef.current?.contentWindow?.postMessage({
+                source: 'eceee-render-host', action: 'readTargetStyles', targetId: target.id,
+                ...(target.widgetId ? { widgetId: target.widgetId } : {}),
+                ...(target.instanceId ? { targetInstanceId: target.instanceId } : {}),
+            }, '*')
+        }), 0)
+        return () => window.clearTimeout(timer)
+    }, [levelSelections, viewport])
+
     const selectedView = previewContent.views.find((view) => view.id === viewId) || previewContent.views[0] || null
     const selectedViewImages = useMemo(() => designerPreviewImageReferences(selectedView), [selectedView])
     const selectedSourceContent = externalContentOptions.find((source) => source.value === sourceContentId) || null
@@ -1911,6 +1928,8 @@ const SemanticThemeWorkspace = ({
                 })).filter(({ fields: sectionFields }) => sectionFields.length > 0)
                 const hasEditableSpacing = spacingSections.length > 0
                 const isActiveTargetPanel = targetFocusKey(target) === targetFocusKey(selectedTarget)
+                    || (kind === 'widget' && targetSelectionKind(selectedTarget) === 'widget'
+                        && target.widgetId && target.widgetId === selectedTarget?.widgetId)
                 const levelTypography = isActiveTargetPanel ? targetTypography.map(({ row, index }) => ({
                     row,
                     index,

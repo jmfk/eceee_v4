@@ -172,8 +172,9 @@ const widgetSpacingConfigurationTargets = (
     const widgetRoot = node.closest<HTMLElement>('[data-widget-id][data-widget-type]')
     if (!widgetRoot) return []
     const seen = new Set<string>()
-    return [...widgetRoot.querySelectorAll<HTMLElement>('[data-designer-target]')].flatMap((configurationNode) => (
-        nodeTargets(configurationNode).flatMap((candidate: any) => {
+    return [...widgetRoot.querySelectorAll<HTMLElement>('[data-designer-target]')].flatMap((configurationNode) => {
+        if (configurationNode.closest<HTMLElement>('[data-widget-id]') !== widgetRoot) return []
+        return nodeTargets(configurationNode).flatMap((candidate: any) => {
             const targetId = candidate.styleTargetId || candidate.id
             const editableFields = designer.editableSpacingTargets?.[targetId] || []
             if (!targetId || !editableFields.length || selectionKind(candidate) !== 'widget' || seen.has(targetId)) return []
@@ -185,7 +186,7 @@ const widgetSpacingConfigurationTargets = (
                 computedStyles: computedThemeValues(configurationNode),
             }]
         })
-    ))
+    })
 }
 
 const selectionPaths = (node: HTMLElement, preferredTarget?: any, designer?: RenderPageModel['designer']) => {
@@ -713,7 +714,8 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             node !== selectedWidgetRoot || widgetConfigurationNodes.length === 0,
         ))
         widgetConfigurationNodes.forEach((configurationNode) => showSpacing(configurationNode, true, 'widget'))
-        if (selectedNode?.matches('.two-columns-widget,.three-columns-widget') && !levelByNode.has(selectedNode)) {
+        if (selectedNode?.matches('.two-columns-widget,.three-columns-widget')
+            && !levelByNode.has(selectedNode) && !widgetConfigurationNodes.includes(selectedNode)) {
             showSpacing(selectedNode, true, 'widget')
         }
     }

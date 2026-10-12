@@ -1838,7 +1838,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(mocks.save.mock.calls[0][1].colors).toEqual(expect.objectContaining({ brand: '#abcdef' }))
     })
 
-    it('shows widget images and colors at the selected widget level', async () => {
+    it('keeps semantic widget images and colors in the canonical widget panel', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const { iframe } = await readyPreview()
@@ -1846,8 +1846,16 @@ describe('DesignerThemeWorkspacePage', () => {
         fireEvent(window, new MessageEvent('message', {
             data: {
                 source: 'eceee-designer-preview', action: 'select',
-                targetId: 'widget:hero-1', kind: 'widget', label: 'Hero widget',
+                targetId: 'group:0', kind: 'group', label: 'Article',
                 widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
+                selectionPaths: {
+                    slot: [],
+                    widget: [{
+                        id: 'widget:hero-1', kind: 'widget', label: 'Hero widget',
+                        widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
+                    }],
+                    element: [],
+                },
                 alternatives: [
                     { id: 'widget:hero-1', kind: 'widget', label: 'Hero widget', widgetId: 'hero-1' },
                     { id: 'group:0', kind: 'group', label: 'Article', widgetId: 'hero-1' },
@@ -1941,6 +1949,68 @@ describe('DesignerThemeWorkspacePage', () => {
         const savedSpacing = mocks.save.mock.calls.at(-1)[1].spacing
         expect(savedSpacing.find((row) => row.part === 'hero-main').values.paddingTop).toBe('12px')
         expect(savedSpacing.find((row) => row.part === 'hero-content' && row.values.paddingRight === '48px')).toBeDefined()
+    })
+
+    it('refreshes unconfigured widget-part values after changing preview breakpoint', async () => {
+        const heroWorkspace = structuredClone(workspace)
+        heroWorkspace.catalog.widgetParts = [{
+            widgetType: 'easy_widgets.HeroWidget', label: 'Hero',
+            parts: [{
+                id: 'widget-part:easy_widgets.HeroWidget:hero-content', part: 'hero-content',
+                label: 'Text content overlay', designerLevel: 'widget', editableSpacingProperties: ['paddingTop'],
+            }],
+        }]
+        heroWorkspace.constraints.editableSpacingProperties = ['paddingTop']
+        mocks.workspace.mockResolvedValue(heroWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const { iframe, postMessage } = await readyPreview()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget-part:easy_widgets.HeroWidget:hero-content', kind: 'part',
+                label: 'Text content overlay', widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
+                computedStyles: { paddingTop: '30px' },
+                selectionPaths: {
+                    slot: [],
+                    widget: [{
+                        id: 'widget:hero-1', styleTargetId: 'widget-type:easy_widgets.HeroWidget',
+                        kind: 'widget', label: 'Hero widget', widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
+                        configurationSpacingTargets: [{
+                            id: 'widget-part:easy_widgets.HeroWidget:hero-content',
+                            styleTargetId: 'widget-part:easy_widgets.HeroWidget:hero-content',
+                            kind: 'part', label: 'Text content overlay', widgetId: 'hero-1',
+                            widgetType: 'easy_widgets.HeroWidget', computedStyles: { paddingTop: '30px' },
+                        }],
+                    }],
+                    element: [],
+                },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        expect(await screen.findByLabelText('widget Padding top')).toHaveValue('30px')
+        await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-render-host', action: 'readTargetStyles',
+            targetId: 'widget-part:easy_widgets.HeroWidget:hero-content', widgetId: 'hero-1',
+        }), '*'))
+        postMessage.mockClear()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Medium (Tablet) preview at 768px' }))
+        await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-render-host', action: 'readTargetStyles',
+            targetId: 'widget-part:easy_widgets.HeroWidget:hero-content', widgetId: 'hero-1',
+        }), '*'))
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'targetStyles',
+                targetId: 'widget-part:easy_widgets.HeroWidget:hero-content',
+                computedStyles: { paddingTop: '12px' },
+            },
+            source: iframe.contentWindow,
+        }))
+        expect(screen.getByLabelText('widget Padding top')).toHaveValue('12px')
     })
 
     it('keeps the preview visible while editing images in the right inspector', async () => {

@@ -340,6 +340,66 @@ describe('RenderFrameRuntime designer overlay', () => {
         postMessage.mockRestore()
     })
 
+    it('keeps nested widget spacing targets out of the parent widget selection', async () => {
+        const structuralWorkspace = structuredClone(workspace)
+        structuralWorkspace.catalog.designGroups = []
+        structuralWorkspace.catalog.widgetParts = [{
+            widgetType: 'easy_widgets.TwoColumnsWidget',
+            label: 'Two Columns',
+            parts: [{
+                id: 'widget-part:easy_widgets.TwoColumnsWidget:two-columns-widget',
+                part: 'two-columns-widget', label: 'Columns container', designerLevel: 'widget',
+            }],
+        }, {
+            widgetType: 'easy_widgets.HeroWidget',
+            label: 'Hero',
+            parts: [{
+                id: 'widget-part:easy_widgets.HeroWidget:hero-content',
+                part: 'hero-content', label: 'Hero content area', designerLevel: 'widget',
+            }],
+        }]
+        structuralWorkspace.spacing = [{
+            targetId: 'widget-part:easy_widgets.TwoColumnsWidget:two-columns-widget', scope: 'widgetPart',
+            widgetType: 'easy_widgets.TwoColumnsWidget', part: 'two-columns-widget', values: { gap: '24px' },
+        }, {
+            targetId: 'widget-part:easy_widgets.HeroWidget:hero-content', scope: 'widgetPart',
+            widgetType: 'easy_widgets.HeroWidget', part: 'hero-content', values: { paddingTop: '30px' },
+        }]
+        structuralWorkspace.constraints.editableSpacingProperties = ['gap', 'paddingTop']
+        const sourceModel = createPageRenderModel({
+            layout: 'main_layout',
+            widgets: {
+                main: [{
+                    id: 'columns-1',
+                    type: 'easy_widgets.TwoColumnsWidget',
+                    config: {
+                        slots: {
+                            left: [{ id: 'hero-1', type: 'easy_widgets.HeroWidget', config: { header: 'Nested hero' } }],
+                            right: [],
+                        },
+                    },
+                }],
+            },
+        })
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: structuralWorkspace, sourceModel, contentEditable: false }))
+
+        const heading = await screen.findByRole('heading', { name: 'Nested hero' })
+        const parentWidget = heading.closest<HTMLElement>('[data-widget-id="columns-1"]')!
+        await waitFor(() => expect(parentWidget).toHaveAttribute('data-designer-target', 'widget:columns-1'))
+        fireEvent.click(parentWidget)
+
+        const selection = postMessage.mock.calls
+            .map(([message]) => message)
+            .find((message) => message?.action === 'select' && message?.targetId === 'widget:columns-1')
+        const selectedParent = selection?.selectionPaths?.widget?.find((target: any) => target.id === 'widget:columns-1')
+        expect(selectedParent?.configurationSpacingTargets?.map((target: any) => target.id)).toEqual([
+            'widget-part:easy_widgets.TwoColumnsWidget:two-columns-widget',
+        ])
+        postMessage.mockRestore()
+    })
+
     it('uses a semantic widget element instead of a generic theme element when both match', async () => {
         const semanticWorkspace = structuredClone(workspace)
         semanticWorkspace.catalog.designGroups = [{
@@ -478,6 +538,10 @@ describe('RenderFrameRuntime designer overlay', () => {
         fireEvent.click(widgetRoot)
         expect(widgetRoot).toHaveClass('designer-selected-widget')
         expect(document.querySelectorAll('.designer-column-slot-guide')).toHaveLength(slotNames.length)
+        fireEvent.click(columns)
+        expect(document.querySelectorAll('.designer-column-slot-guide')).toHaveLength(slotNames.length)
+        expect([...document.querySelectorAll('.designer-spacing-gap-value')]
+            .filter((spacing) => spacing.textContent === '30px')).toHaveLength(slotNames.length - 1)
         const gapLabel = [...document.querySelectorAll('.designer-spacing-gap-value')]
             .find((label) => label.textContent === '30px') as HTMLElement
         expect(gapLabel).toHaveClass('designer-spacing-level-widget')
