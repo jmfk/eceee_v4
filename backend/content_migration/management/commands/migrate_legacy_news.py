@@ -18,6 +18,7 @@ from content.models import Namespace
 from content_migration.legacy_news.database import LegacyNewsDatabase
 from content_migration.legacy_news.extractor import extract_news_html
 from content_migration.legacy_news.fetcher import ManifestFetcher
+from content_migration.legacy_news.locking import LegacyNewsImportAlreadyRunning, legacy_news_import_lock
 from content_migration.legacy_news.media import LegacyMediaImporter
 from content_migration.legacy_news.preview import ensure_news_preview_page
 from content_migration.legacy_news.repository import (
@@ -51,6 +52,11 @@ class Command(BaseCommand):
             help="Retry placeholder media and continue idempotently",
         )
         parser.add_argument("--limit", type=int)
+        parser.add_argument(
+            "--newest-first",
+            action="store_true",
+            help="Select database rows by newest presentational publishing date first",
+        )
         parser.add_argument("--env-file", default=".env.local")
         parser.add_argument(
             "--accept-golden-sample",
@@ -59,6 +65,8 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        if options["sample_manifest"] and options["newest_first"]:
+            raise CommandError("--newest-first is only valid with --database")
         if options["dry_run"]:
             if options["accept_golden_sample"]:
                 raise CommandError("Cannot accept the golden sample during a dry run")
@@ -70,12 +78,16 @@ class Command(BaseCommand):
         user = self._user(tenant, options.get("user"))
         if not tenant.user_has_access(user):
             raise CommandError("User is not authorized for the target tenant")
-        if options["sample_manifest"]:
-            return self._import_manifest(Path(options["sample_manifest"]), tenant, namespace, user, options)
-        if options["accept_golden_sample"]:
-            raise CommandError("--accept-golden-sample is only valid with --sample-manifest")
-        self._require_sample_acceptance(tenant)
-        return self._import_database(tenant, namespace, user, options)
+        try:
+            with legacy_news_import_lock():
+                if options["sample_manifest"]:
+                    return self._import_manifest(Path(options["sample_manifest"]), tenant, namespace, user, options)
+                if options["accept_golden_sample"]:
+                    raise CommandError("--accept-golden-sample is only valid with --sample-manifest")
+                self._require_sample_acceptance(tenant)
+                return self._import_database(tenant, namespace, user, options)
+        except LegacyNewsImportAlreadyRunning as exc:
+            raise CommandError(str(exc)) from exc
 
     def _import_manifest(self, manifest_path, tenant, namespace, user, options):
         manifest_path = manifest_path.resolve()
@@ -176,10 +188,18 @@ class Command(BaseCommand):
             summary = database.summary()
             self.stdout.write("Legacy read-only summary: " + json.dumps(summary, default=str, sort_keys=True))
             if options["dry_run"]:
-                return self._reconcile_database_rows(database, summary, limit=options.get("limit"))
+                return self._reconcile_database_rows(
+                    database,
+                    summary,
+                    limit=options.get("limit"),
+                    newest_first=options["newest_first"],
+                )
             repository = self._repository(tenant=tenant, namespace=namespace, user=user)
             counts = {"created": 0, "updated": 0, "unchanged": 0}
-            for row in database.iter_published(limit=options.get("limit")):
+            for row in database.iter_published(
+                limit=options.get("limit"),
+                newest_first=options["newest_first"],
+            ):
                 article = self._article_from_database_row(row)
                 media_importer = LegacyMediaImporter(namespace=namespace, tenant=tenant, user=user)
                 media_by_url = {
@@ -208,7 +228,7 @@ class Command(BaseCommand):
         finally:
             database.close()
 
-    def _reconcile_database_rows(self, database, summary, *, limit=None):
+    def _reconcile_database_rows(self, database, summary, *, limit=None, newest_first=False):
         taxonomy_counts = {field_name: 0 for field_name in ("types", "categories", "sources", "topics", "keywords")}
         observed = {
             "eligible": 0,
@@ -224,7 +244,7 @@ class Command(BaseCommand):
             "errors": [],
         }
         media_urls = set()
-        for row in database.iter_published(limit=limit):
+        for row in database.iter_published(limit=limit, newest_first=newest_first):
             observed["eligible"] += 1
             observed["with_expiry"] += int(row.expiry_date is not None)
             observed["featured"] += int(row.featured)
@@ -277,7 +297,12 @@ class Command(BaseCommand):
                         }
                     )
 
-        result = {"bounded_by_limit": limit, "observed": observed, "mismatches": mismatches}
+        result = {
+            "bounded_by_limit": limit,
+            "newest_first": newest_first,
+            "observed": observed,
+            "mismatches": mismatches,
+        }
         self.stdout.write("Legacy dry-run reconciliation: " + json.dumps(result, default=str, sort_keys=True))
         if observed["errors"] or mismatches:
             raise CommandError("Legacy database dry-run found transformation errors or count mismatches")

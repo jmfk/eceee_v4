@@ -10,8 +10,10 @@ from content_migration.management.commands.migrate_legacy_news import Command
 class _Database:
     def __init__(self, rows):
         self.rows = rows
+        self.calls = []
 
-    def iter_published(self, *, limit=None):
+    def iter_published(self, *, limit=None, newest_first=False):
+        self.calls.append({"limit": limit, "newest_first": newest_first})
         yield from self.rows[:limit]
 
 
@@ -63,3 +65,15 @@ class MigrateLegacyNewsCommandTests(SimpleTestCase):
         }
 
         Command()._reconcile_database_rows(_Database([self.row]), summary)
+
+    def test_database_dry_run_can_select_latest_bounded_rows(self):
+        database = _Database([self.row])
+
+        Command()._reconcile_database_rows(
+            database,
+            {},
+            limit=100,
+            newest_first=True,
+        )
+
+        self.assertEqual(database.calls, [{"limit": 100, "newest_first": True}])

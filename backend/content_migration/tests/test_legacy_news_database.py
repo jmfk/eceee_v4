@@ -28,3 +28,24 @@ class LegacyNewsDatabaseTests(SimpleTestCase):
         database.close()
         connection.rollback.assert_called_once()
         connection.close.assert_called_once()
+
+    @patch("content_migration.legacy_news.database.psycopg2.connect")
+    def test_iter_published_can_select_newest_rows_first(self, connect):
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchone.return_value = (73,)
+        cursor.fetchall.return_value = []
+        connect.return_value = connection
+        database = LegacyNewsDatabase(
+            host="127.0.0.1",
+            port=10110,
+            dbname="legacy",
+            user="reader",
+            password="not-logged",
+        )
+
+        list(database.iter_published(limit=100, newest_first=True))
+
+        query, params = cursor.execute.call_args.args
+        self.assertIn("ORDER BY presentational_publishing_date DESC NULLS LAST, id DESC", query)
+        self.assertEqual(params, [100])

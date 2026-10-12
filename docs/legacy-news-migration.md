@@ -31,7 +31,7 @@ cd backend
 python manage.py migrate_legacy_news --sample-manifest --tenant eceee --resume
 ```
 
-The non-dry run creates or updates the dedicated local preview site at `http://migration-preview.localhost:10101/migration-preview/news/<slug>/` and the canonical sample objects after the definition preflight passes. Repeating it does not create duplicate objects, versions, media, tags, or taxonomy terms. `--resume` retries original URLs represented by placeholders.
+The non-dry run creates or updates the dedicated local preview site at `http://migration-preview.localhost:10101/migration-preview/news/<slug>/` and the canonical sample objects after the definition preflight passes. Repeating it does not create duplicate objects, versions, media, tags, or taxonomy terms. `--resume` retries original URLs represented by placeholders. Write-mode imports are serialized with a database advisory lock, so a second importer exits instead of racing the active run. New media uses a deterministic storage key derived from its source URL, which lets a restart replay an upload without accumulating UUID-named orphan objects. If a media upload succeeds but its database record cannot be created, the command also makes a best-effort deletion of the unreferenced uploaded file before failing.
 
 After the Django public, standalone React, and editor/Designer desktop and mobile captures have passed review, record that explicit gate:
 
@@ -82,6 +82,18 @@ Only after reconciling that report against the golden samples should an operator
 cd backend
 python manage.py migrate_legacy_news --database --tenant eceee --env-file ../.env.local --resume
 ```
+
+For a bounded development dataset containing the 100 most recent published News
+items, use the same selection for the dry run and import:
+
+```sh
+python manage.py migrate_legacy_news --database --tenant eceee --env-file ../.env.local --dry-run --limit 100 --newest-first
+python manage.py migrate_legacy_news --database --tenant eceee --env-file ../.env.local --resume --limit 100 --newest-first
+```
+
+`--newest-first` orders by the legacy presentational publishing date, then by
+legacy ID for deterministic ties. Without it, the established ascending legacy-ID
+order remains unchanged.
 
 The source connection uses a read-only PostgreSQL transaction and imports only `status=2`. Local v4 writes remain transactional per article.
 

@@ -52,6 +52,7 @@ backend-news-test: prepare-test-infra refresh-db-collation ## Run focused News m
 			content_migration/tests/test_legacy_news_database.py \
 			content_migration/tests/test_legacy_news_extractor.py \
 			content_migration/tests/test_legacy_news_fetcher.py \
+			content_migration/tests/test_legacy_news_media.py \
 			content_migration/tests/test_legacy_news_preview.py \
 			content_migration/tests/test_legacy_news_repository.py \
 			content_migration/tests/test_legacy_news_transformer.py \

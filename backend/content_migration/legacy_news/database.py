@@ -108,15 +108,23 @@ class LegacyNewsDatabase:
             summary.update(dict(cursor.fetchone()))
             return summary
 
-    def iter_published(self, *, limit: Optional[int] = None) -> Iterator[LegacyDatabaseNews]:
+    def iter_published(
+        self,
+        *,
+        limit: Optional[int] = None,
+        newest_first: bool = False,
+    ) -> Iterator[LegacyDatabaseNews]:
         query = """
             SELECT id, title, slug, description, content,
                    presentational_publishing_date, source_date, publish_date,
                    expiry_date, external_url, publish_on_front_page
             FROM eceeenews_eceeenews
             WHERE status = 2
-            ORDER BY id
         """
+        if newest_first:
+            query += " ORDER BY presentational_publishing_date DESC NULLS LAST, id DESC"
+        else:
+            query += " ORDER BY id"
         params = []
         if limit:
             query += " LIMIT %s"
