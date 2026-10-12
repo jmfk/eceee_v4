@@ -12,17 +12,25 @@ from urllib.parse import urlsplit, urlunsplit
 from .fetcher import USER_AGENT
 
 
+def _ascii_hostname(hostname: str, *, subject: str) -> str:
+    try:
+        return hostname.encode("idna").decode("ascii")
+    except UnicodeError as exc:
+        raise ValueError(f"unsupported-{subject}-host") from exc
+
+
 def validate_public_http_url(url: str, *, subject: str) -> tuple[str, ...]:
     """Reject non-HTTP and non-public destinations before an outbound request."""
 
     parsed = urlsplit(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise ValueError(f"unsupported-{subject}-url")
+    hostname = _ascii_hostname(parsed.hostname, subject=subject)
     try:
         addresses = {
             ipaddress.ip_address(item[4][0])
             for item in socket.getaddrinfo(
-                parsed.hostname,
+                hostname,
                 parsed.port or (443 if parsed.scheme == "https" else 80),
                 type=socket.SOCK_STREAM,
             )
@@ -30,12 +38,7 @@ def validate_public_http_url(url: str, *, subject: str) -> tuple[str, ...]:
     except (socket.gaierror, ValueError) as exc:
         raise ValueError(f"unresolvable-{subject}-host") from exc
     if not addresses or any(
-        address.is_private
-        or address.is_loopback
-        or address.is_link_local
-        or address.is_multicast
-        or address.is_reserved
-        or address.is_unspecified
+        not address.is_global or getattr(address, "is_site_local", False) or address.is_multicast
         for address in addresses
     ):
         raise ValueError(f"non-public-{subject}-host")
@@ -46,6 +49,13 @@ def validate_public_http_url(url: str, *, subject: str) -> tuple[str, ...]:
 class HeadResponse:
     status_code: int
     headers: dict[str, str]
+
+
+@dataclass(frozen=True)
+class GetResponse:
+    status_code: int
+    headers: dict[str, str]
+    content: bytes
 
 
 class _PinnedHTTPSConnection(http.client.HTTPSConnection):
@@ -69,7 +79,7 @@ def head_public_url(url: str, *, timeout: float = 10.0) -> HeadResponse:
 
     parsed = urlsplit(url)
     addresses = validate_public_http_url(url, subject="link")
-    hostname = parsed.hostname or ""
+    hostname = _ascii_hostname(parsed.hostname or "", subject="link")
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
     authority_host = f"[{hostname}]" if ":" in hostname else hostname
     authority = f"{authority_host}:{parsed.port}" if parsed.port else authority_host
@@ -94,3 +104,36 @@ def head_public_url(url: str, *, timeout: float = 10.0) -> HeadResponse:
                 connection.close()
 
     raise ValueError("unreachable-link-host") from last_error
+
+
+def get_public_url(url: str, *, timeout: float = 20.0, max_bytes: int) -> GetResponse:
+    """GET a public URL through a DNS-pinned connection with a bounded body."""
+
+    parsed = urlsplit(url)
+    addresses = validate_public_http_url(url, subject="image")
+    hostname = _ascii_hostname(parsed.hostname or "", subject="image")
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    authority_host = f"[{hostname}]" if ":" in hostname else hostname
+    authority = f"{authority_host}:{parsed.port}" if parsed.port else authority_host
+    target = urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
+    last_error: Exception | None = None
+
+    for address in addresses:
+        connection = None
+        try:
+            if parsed.scheme == "https":
+                connection = _PinnedHTTPSConnection(address, hostname=hostname, port=port, timeout=timeout)
+            else:
+                connection = http.client.HTTPConnection(address, port=port, timeout=timeout)
+            connection.request("GET", target, headers={"Host": authority, "User-Agent": USER_AGENT})
+            response = connection.getresponse()
+            headers = {name.lower(): value for name, value in response.getheaders()}
+            content = response.read(max_bytes + 1) if 200 <= response.status < 300 else b""
+            return GetResponse(status_code=response.status, headers=headers, content=content)
+        except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
+            last_error = exc
+        finally:
+            if connection is not None:
+                connection.close()
+
+    raise ValueError("unreachable-image-host") from last_error

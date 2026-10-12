@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Mapping, Optional
 from urllib.parse import urlparse
 
-import requests
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import Q
 from django.utils.text import slugify
@@ -21,8 +20,7 @@ from PIL import Image, ImageDraw, UnidentifiedImageError
 from file_manager.models import MediaFile, MediaTag
 from file_manager.storage import storage
 
-from .fetcher import USER_AGENT
-from .remote import validate_public_http_url
+from .remote import get_public_url, validate_public_http_url
 
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
 logger = logging.getLogger(__name__)
@@ -67,8 +65,6 @@ class LegacyMediaImporter:
         self.tenant = tenant
         self.user = user
         self.local_assets = dict(local_assets or {})
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": USER_AGENT})
 
     def import_image(
         self,
@@ -198,10 +194,9 @@ class LegacyMediaImporter:
             current_url = source_url
             response = None
             for _ in range(4):
-                self._validate_remote_url(current_url)
-                response = self.session.get(current_url, timeout=20, allow_redirects=False)
-                if response.is_redirect or response.is_permanent_redirect:
-                    location = response.headers.get("Location")
+                response = get_public_url(current_url, timeout=20, max_bytes=MAX_IMAGE_BYTES)
+                if response.status_code in {301, 302, 303, 307, 308}:
+                    location = response.headers.get("location")
                     if not location:
                         raise ValueError("redirect-without-location")
                     from urllib.parse import urljoin
@@ -213,9 +208,10 @@ class LegacyMediaImporter:
                 raise ValueError("too-many-redirects")
             if response is None:
                 raise ValueError("empty-response")
-            response.raise_for_status()
+            if not 200 <= response.status_code < 300:
+                raise ValueError(f"http-{response.status_code}")
             content = response.content
-            content_type = response.headers.get("Content-Type", "").split(";", 1)[0].strip()
+            content_type = response.headers.get("content-type", "").split(";", 1)[0].strip()
         if not content or len(content) > MAX_IMAGE_BYTES:
             raise ValueError("empty-or-oversized")
         if not content_type.startswith("image/"):
@@ -260,12 +256,6 @@ class LegacyMediaImporter:
 
     @staticmethod
     def _failure_category(exc: Exception) -> str:
-        if isinstance(exc, requests.Timeout):
-            return "timeout"
-        if isinstance(exc, requests.HTTPError) and exc.response is not None:
-            return f"http-{exc.response.status_code}"
-        if isinstance(exc, requests.RequestException):
-            return "network-error"
         if isinstance(exc, ValueError):
             category = str(exc)
             if category and all(character.isalnum() or character == "-" for character in category):
