@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PageVersionHistoryPanel from '../PageVersionHistoryPanel'
 import { versionsApi } from '../../api/versions'
+import { setCurrentTenantId } from '../../utils/tenant'
 
 vi.mock('../../api/versions', () => ({
     versionsApi: {
@@ -32,6 +33,7 @@ describe('PageVersionHistoryPanel', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         localStorage.clear()
+        setCurrentTenantId('theme-tenant')
         versionsApi.getPageVersionsList.mockResolvedValue(versions)
         versionsApi.compare.mockResolvedValue({ changes: { fieldsChanged: ['metaTitle'] } })
         versionsApi.restore.mockResolvedValue({ version: versions[0] })
@@ -51,7 +53,11 @@ describe('PageVersionHistoryPanel', () => {
         const previewButtons = await screen.findAllByRole('button', { name: /preview/i })
         fireEvent.click(previewButtons[1])
 
-        expect(openSpy).toHaveBeenCalledWith('/_render-version/4/10/', '_blank', 'noopener,noreferrer')
+        expect(openSpy).toHaveBeenCalledWith(
+            '/_render-version/4/10/?workspace=theme-tenant',
+            '_blank',
+            'noopener,noreferrer'
+        )
         expect(onRestoreError).not.toHaveBeenCalled()
     })
 

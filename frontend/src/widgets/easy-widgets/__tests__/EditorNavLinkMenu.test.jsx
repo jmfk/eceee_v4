@@ -9,6 +9,7 @@ import NavbarWidget from '../NavbarWidget'
 import { api } from '../../../api/client'
 import { versionsApi } from '../../../api/versions'
 import { usePageChildren } from '../../../hooks/usePageStructure'
+import { setCurrentTenantId } from '../../../utils/tenant'
 
 vi.mock('../../../api/client', () => ({
     api: {
@@ -62,6 +63,7 @@ beforeEach(() => {
         id: 99,
         versionId: 99,
     })
+    setCurrentTenantId('theme-tenant')
 })
 
 describe('EditorNavLink', () => {
@@ -85,6 +87,25 @@ describe('EditorNavLink', () => {
         expect(screen.getByRole('menuitem', { name: 'Open preview in new tab' })).toBeEnabled()
         expect(screen.getByRole('menuitem', { name: 'Open editor here' })).toBeEnabled()
         expect(screen.getByRole('menuitem', { name: 'Open editor in new tab' })).toBeEnabled()
+    })
+
+    it('passes the active workspace to standalone version previews', async () => {
+        const user = userEvent.setup()
+        render(
+            <EditorNavLink
+                mode="editor"
+                item={{ type: 'internal', pageId: 42, label: 'Published Page' }}
+            />
+        )
+
+        await user.click(screen.getByRole('link', { name: 'Published Page' }))
+        await user.click(await screen.findByRole('menuitem', { name: 'Open preview in new tab' }))
+
+        expect(openSpy).toHaveBeenCalledWith(
+            '/_render-version/42/99/?workspace=theme-tenant',
+            '_blank',
+            'noopener,noreferrer'
+        )
     })
 
     it('disables public-page opening for an unpublished internal target page', async () => {

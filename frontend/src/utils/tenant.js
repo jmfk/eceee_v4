@@ -1,5 +1,6 @@
 const LEGACY_TENANT_STORAGE_KEY = 'eceee_tenant_id'
 let currentTenantId = ''
+const tenantListeners = new Set()
 
 export const getCurrentTenantId = () => {
   if (typeof window === 'undefined') {
@@ -15,8 +16,17 @@ export const getCurrentTenantId = () => {
 }
 
 export const setCurrentTenantId = (identifier) => {
-  currentTenantId = identifier || ''
+  const nextTenantId = identifier || ''
+  if (nextTenantId === currentTenantId) return currentTenantId
+
+  currentTenantId = nextTenantId
+  tenantListeners.forEach((listener) => listener(currentTenantId))
   return currentTenantId
+}
+
+export const subscribeToCurrentTenantId = (listener) => {
+  tenantListeners.add(listener)
+  return () => tenantListeners.delete(listener)
 }
 
 export const reconcileCurrentTenantId = (currentWorkspace, availableWorkspaces = []) => {

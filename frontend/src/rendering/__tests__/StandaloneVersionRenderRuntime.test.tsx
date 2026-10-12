@@ -19,6 +19,7 @@ describe('StandaloneVersionRenderRuntime', () => {
     })
 
     it('renders the selected version without Django HTML', async () => {
+        window.history.replaceState({}, '', '/_render-version/42/9/?workspace=theme-tenant')
         versionRender.load.mockResolvedValue(createPageRenderModel({
             widgets: {},
             context: { pageId: 42, versionId: 9 },
@@ -28,7 +29,11 @@ describe('StandaloneVersionRenderRuntime', () => {
 
         expect(screen.getByText('Preparing preview…')).toBeInTheDocument()
         await waitFor(() => expect(screen.getByTestId('version-render-document')).toHaveTextContent('9'))
-        expect(versionRender.load).toHaveBeenCalledWith({ pageId: 42, versionId: 9 })
+        expect(versionRender.load).toHaveBeenCalledWith({
+            pageId: 42,
+            versionId: 9,
+            tenantIdentifier: 'theme-tenant',
+        })
         expect(document.querySelector('iframe')).not.toBeInTheDocument()
     })
 

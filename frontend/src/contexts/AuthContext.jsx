@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
-import { reconcileCurrentTenantId } from '../utils/tenant';
+import { reconcileCurrentTenantId, setCurrentTenantId } from '../utils/tenant';
 
 const AuthContext = createContext();
 
@@ -237,6 +237,7 @@ export const AuthProvider = ({ children }) => {
             // Clear JWT tokens from localStorage
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
+            setCurrentTenantId('');
             // Clear any queued requests
             clearRequestQueue();
         } catch (error) {

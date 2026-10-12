@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthProvider, useAuth } from '../AuthContext'
+import { getCurrentTenantId, setCurrentTenantId } from '../../utils/tenant'
 
 const AuthState = () => {
     const { isLoading, user } = useAuth()
@@ -12,6 +13,7 @@ describe('AuthProvider workspace synchronization', () => {
     beforeEach(() => {
         vi.restoreAllMocks()
         localStorage.clear()
+        setCurrentTenantId('')
     })
 
     it('uses the server workspace when another valid workspace is stale in browser storage', async () => {
@@ -42,7 +44,8 @@ describe('AuthProvider workspace synchronization', () => {
 
         expect(await screen.findByText('dev_auto_user')).toBeInTheDocument()
         await waitFor(() => {
-            expect(localStorage.getItem('eceee_tenant_id')).toBe('eceee-production-copy')
+            expect(getCurrentTenantId()).toBe('eceee-production-copy')
+            expect(localStorage.getItem('eceee_tenant_id')).toBeNull()
         })
     })
 })

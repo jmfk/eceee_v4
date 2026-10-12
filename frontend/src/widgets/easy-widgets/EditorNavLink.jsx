@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, ExternalLink, Eye, FileText, Loader2, Pencil, Pl
 import { api } from '../../api/client'
 import { endpoints } from '../../api/endpoints'
 import { versionsApi } from '../../api/versions'
+import { getCurrentTenantId } from '../../utils/tenant'
 import LinkField from '../../components/form-fields/LinkField'
 import {
     appendAnchor,
@@ -118,7 +119,9 @@ export const EditorNavLinkMenu = ({
     const publicPath = appendAnchor(pageInfo?.path || item.url, anchor)
     const isPublished = pageInfo?.isPublished ?? item.isPublished ?? false
     const versionId = latestVersion?.versionId || latestVersion?.id || item.currentVersionId
-    const previewUrl = pageId && versionId ? `/_render-version/${pageId}/${versionId}/` : ''
+    const workspace = getCurrentTenantId()
+    const previewQuery = workspace ? `?workspace=${encodeURIComponent(workspace)}` : ''
+    const previewUrl = pageId && versionId ? `/_render-version/${pageId}/${versionId}/${previewQuery}` : ''
     const editorUrl = pageId ? `/pages/${pageId}/edit` : ''
     const externalUrl = item.url || ''
 

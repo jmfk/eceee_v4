@@ -11,7 +11,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import analytics from './utils/analytics'
-import { getCurrentTenantId } from './utils/tenant'
+import { getCurrentTenantId, subscribeToCurrentTenantId } from './utils/tenant'
 import RenderFrameRuntime from './rendering/RenderFrameRuntime'
 import StandaloneRenderRuntime from './rendering/StandaloneRenderRuntime'
 import StandaloneVersionRenderRuntime from './rendering/StandaloneVersionRenderRuntime'
@@ -19,7 +19,13 @@ import StandaloneVersionRenderRuntime from './rendering/StandaloneVersionRenderR
 const isRenderFrame = window.location.pathname === '/__render-frame'
 const isStandaloneRender = window.location.pathname.startsWith('/_render/')
 const isStandaloneVersionRender = window.location.pathname.startsWith('/_render-version/')
-if (!isRenderFrame && !isStandaloneRender && !isStandaloneVersionRender) analytics.init(getCurrentTenantId());
+if (!isRenderFrame && !isStandaloneRender && !isStandaloneVersionRender) {
+    const initializeAnalytics = (tenantId) => {
+        analytics.init(tenantId)
+    }
+    initializeAnalytics(getCurrentTenantId())
+    subscribeToCurrentTenantId(initializeAnalytics)
+}
 
 const RootComponent = isRenderFrame
     ? RenderFrameRuntime
