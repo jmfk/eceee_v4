@@ -4,9 +4,10 @@ WebPage ViewSet for managing web pages.
 
 from django.db import models
 from django.db.models import Count, Exists, F, OuterRef, Q
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
@@ -14,7 +15,7 @@ from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
 
 from ..filters import WebPageFilter
 from ..models import PageVersion, WebPage
-from ..serializers import PageHierarchySerializer, WebPageListSerializer, WebPageSimpleSerializer
+from ..serializers import PageHierarchySerializer, PageThemeSerializer, WebPageListSerializer, WebPageSimpleSerializer
 from ..services.page_version_workflow import normalize_change_summary
 
 
@@ -373,14 +374,20 @@ class WebPageViewSet(viewsets.ModelViewSet):
         Provides backward compatibility by also including legacy slot format.
         """
         page = self.get_object()
+        target_version = None
+        version_id = request.query_params.get("version_id")
+        if version_id:
+            validated_version_id = serializers.IntegerField(min_value=1).run_validation(version_id)
+            target_version = get_object_or_404(PageVersion, id=validated_version_id, page=page)
 
         try:
             # NEW: Build inheritance tree
-            from .inheritance_helpers import InheritanceTreeHelpers
-            from .inheritance_tree import InheritanceTreeBuilder
+            from ..inheritance_helpers import InheritanceTreeHelpers
+            from ..inheritance_tree import InheritanceTreeBuilder
 
             builder = InheritanceTreeBuilder()
-            tree = builder.build_tree(page)
+            as_of = target_version.effective_date or target_version.created_at if target_version else None
+            tree = builder.build_tree(page, target_version=target_version, as_of=as_of)
             helpers = InheritanceTreeHelpers(tree)
 
             # Convert tree to JSON-serializable format
@@ -388,6 +395,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
             # Get tree statistics
             stats = builder.get_tree_statistics(tree)
+            effective_theme = builder.effective_theme()
 
             # Build new response format (snake_case auto-converted to camelCase)
             response_data = {
@@ -399,6 +407,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
                     "total_widgets": stats.total_widgets,
                     "generation_time_ms": stats.generation_time_ms,
                 },
+                "effective_theme": (PageThemeSerializer(effective_theme).data if effective_theme else None),
+                "effective_layout_key": tree.page.layout,
                 # Legacy compatibility - convert tree back to slot format
                 "legacy": self._convert_tree_to_legacy_format(tree, helpers, builder.effective_slot_configuration()),
             }
@@ -406,6 +416,8 @@ class WebPageViewSet(viewsets.ModelViewSet):
             return Response(response_data)
 
         except Exception:
+            if target_version:
+                raise
             # Fallback to old system
             return self._widget_inheritance_legacy(page)
 

@@ -6,7 +6,6 @@ from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.response import Response
 
-
 logger = logging.getLogger(__name__)
 
 

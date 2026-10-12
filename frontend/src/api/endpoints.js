@@ -33,7 +33,10 @@ export const endpoints = {
         linkObject: (id) => `${BASE_PATH}/webpages/pages/${id}/link-object/`,
         unlinkObject: (id) => `${BASE_PATH}/webpages/pages/${id}/unlink-object/`,
         syncObject: (id) => `${BASE_PATH}/webpages/pages/${id}/sync-object/`,
-        widgetInheritance: (id) => `${BASE_PATH}/webpages/pages/${id}/widget-inheritance/`,
+        widgetInheritance: (id, versionId = null) => (
+            `${BASE_PATH}/webpages/pages/${id}/widget-inheritance/`
+            + (versionId ? `?version_id=${versionId}` : '')
+        ),
         publicationStatus: `${BASE_PATH}/webpages/pages/publicationStatus/`,
         anchors: (id) => `${BASE_PATH}/webpages/pages/${id}/anchors/`,
         lookup: `${BASE_PATH}/webpages/pages/lookup/`,
