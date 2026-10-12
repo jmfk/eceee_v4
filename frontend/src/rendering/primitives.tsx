@@ -45,7 +45,7 @@ export const backendCompatibleHtml = (html: unknown): string => String(html || '
 )
 
 export const sanitizeHtml = (html?: string): string => String(DOMPurify.sanitize(backendCompatibleHtml(html), {
-    ADD_ATTR: ['loading'],
+    ADD_ATTR: ['loading', 'target', 'referrerpolicy'],
 }))
 
 export const SafeHtml = ({ html, className = '', as: Tag = 'div' }: { html?: string, className?: string, as?: React.ElementType }) => (

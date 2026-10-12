@@ -80,6 +80,21 @@ describe('PageRenderer', () => {
         expect(container.querySelector('script')).toBeNull()
     })
 
+    it('preserves reparsable disabled legacy link attributes', () => {
+        const content = '<p><span class="legacy-link-unresolved" href="https://example.com/missing" title="Try later" target="_blank" rel="noopener" referrerpolicy="no-referrer" data-legacy-link-status="external-head-404">Missing</span></p>'
+        const model = createPageRenderModel({ widgets: { main: [{ id: 'legacy-link', type: 'easy_widgets.ContentWidget', config: { content } }] } })
+
+        const { container } = render(<PageRenderer model={model} />)
+        const disabled = container.querySelector('span.legacy-link-unresolved')
+
+        expect(disabled).toHaveAttribute('href', 'https://example.com/missing')
+        expect(disabled).toHaveAttribute('title', 'Try later')
+        expect(disabled).toHaveAttribute('target', '_blank')
+        expect(disabled).toHaveAttribute('rel', 'noopener')
+        expect(disabled).toHaveAttribute('referrerpolicy', 'no-referrer')
+        expect(disabled).toHaveAttribute('data-legacy-link-status', 'external-head-404')
+    })
+
     it('applies configured component styles around render output', () => {
         const model = createPageRenderModel({ layout: 'main_layout', widgets: { main: [{ id: 'styled', type: 'easy_widgets.HeadlineWidget', config: { content: 'Styled', componentStyle: 'card' } }] }, context: { componentStyles: { card: { template: '<article class="feature-card">{{{content}}}</article>' } } } })
         const { container } = render(<PageRenderer model={model} />)

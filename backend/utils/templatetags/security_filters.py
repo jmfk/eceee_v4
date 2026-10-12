@@ -123,6 +123,17 @@ ALLOWED_TAGS = [
 ALLOWED_ATTRIBUTES = {
     "*": ["class", "id", "title", "data-*", "style"],
     "a": ["href", "title", "rel", "target"],
+    "span": [
+        "href",
+        "title",
+        "rel",
+        "target",
+        "download",
+        "hreflang",
+        "type",
+        "referrerpolicy",
+        "data-legacy-link-status",
+    ],
     "img": ["src", "alt", "title", "width", "height", "loading"],
     "table": ["border", "cellpadding", "cellspacing"],
     "td": ["colspan", "rowspan", "align", "valign"],

@@ -2,8 +2,9 @@
 Tests for security-focused template filters
 """
 
-from django.test import TestCase
 from django.template import Context, Template
+from django.test import TestCase
+
 from utils.templatetags.security_filters import sanitize_html
 
 
@@ -57,6 +58,22 @@ class TestSanitizeHtmlFilter(TestCase):
         result = sanitize_html(html)
         assert "https://example.com" in result
         assert "<a" in result
+
+    def test_preserves_reparsable_disabled_legacy_link_attributes(self):
+        html = (
+            '<span class="legacy-link-unresolved" href="https://example.com/missing" '
+            'title="Try later" target="_blank" rel="noopener" '
+            'data-legacy-link-status="external-head-404">Missing</span>'
+        )
+
+        result = sanitize_html(html)
+
+        assert '<span class="legacy-link-unresolved"' in result
+        assert 'href="https://example.com/missing"' in result
+        assert 'title="Try later"' in result
+        assert 'target="_blank"' in result
+        assert 'rel="noopener"' in result
+        assert 'data-legacy-link-status="external-head-404"' in result
 
     def test_allows_images(self):
         """Test that images with safe URLs are preserved"""
@@ -232,9 +249,7 @@ class TestSanitizeHtmlInTemplate(TestCase):
 
     def test_filter_in_template_with_false_parameter(self):
         """Test using the filter with allow_scripts=False"""
-        template = Template(
-            "{% load security_filters %}" "{{ content|sanitize_html:allow_scripts }}"
-        )
+        template = Template("{% load security_filters %}" "{{ content|sanitize_html:allow_scripts }}")
         context = Context(
             {
                 "content": '<p>Safe</p><script>alert("XSS")</script>',
@@ -247,9 +262,7 @@ class TestSanitizeHtmlInTemplate(TestCase):
 
     def test_filter_in_template_with_true_parameter(self):
         """Test using the filter with allow_scripts=True"""
-        template = Template(
-            "{% load security_filters %}" "{{ content|sanitize_html:allow_scripts }}"
-        )
+        template = Template("{% load security_filters %}" "{{ content|sanitize_html:allow_scripts }}")
         context = Context(
             {
                 "content": '<p>Safe</p><script>console.log("trusted")</script>',
@@ -262,10 +275,7 @@ class TestSanitizeHtmlInTemplate(TestCase):
 
     def test_filter_with_config_object(self):
         """Test using the filter with a config object (like widget config)"""
-        template = Template(
-            "{% load security_filters %}"
-            "{{ content|sanitize_html:config.allow_scripts }}"
-        )
+        template = Template("{% load security_filters %}" "{{ content|sanitize_html:config.allow_scripts }}")
 
         class MockConfig:
             allow_scripts = False

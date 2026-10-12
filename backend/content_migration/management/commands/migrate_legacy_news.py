@@ -6,6 +6,7 @@ import json
 import stat
 from dataclasses import replace
 from html import escape
+from itertools import islice
 from pathlib import Path
 
 from bs4 import BeautifulSoup
@@ -18,6 +19,7 @@ from content.models import Namespace
 from content_migration.legacy_news.database import LegacyNewsDatabase
 from content_migration.legacy_news.extractor import extract_news_html
 from content_migration.legacy_news.fetcher import ManifestFetcher
+from content_migration.legacy_news.links import LegacyNewsLinkRewriter
 from content_migration.legacy_news.locking import LegacyNewsImportAlreadyRunning, legacy_news_import_lock
 from content_migration.legacy_news.media import LegacyMediaImporter
 from content_migration.legacy_news.preview import ensure_news_preview_page
@@ -102,6 +104,7 @@ class Command(BaseCommand):
         repository = None if options["dry_run"] else self._repository(tenant=tenant, namespace=namespace, user=user)
         counts = {"created": 0, "updated": 0, "unchanged": 0, "validated": 0}
         fingerprints = []
+        records = []
 
         for entry in entries:
             source_url = entry.get("url") or entry.get("sourceUrl")
@@ -112,6 +115,24 @@ class Command(BaseCommand):
             )
             article = extract_news_html(html, source_url, entry["slug"])
             self._check_expected(article, entry.get("expected", {}))
+            counts["validated"] += 1
+            records.append((entry, article))
+            if options["dry_run"]:
+                self.stdout.write(f"VALID {article.slug}: {article.title} ({len(article.image_urls)} images)")
+
+        if repository:
+            link_rewriter = LegacyNewsLinkRewriter(
+                tenant=tenant,
+                news_object_type=repository.object_types["news"],
+            )
+        else:
+            link_rewriter = None
+        rewritten_articles = link_rewriter.rewrite_many(article for _entry, article in records) if link_rewriter else []
+
+        for index, (entry, _extracted_article) in enumerate(records):
+            if options["dry_run"]:
+                continue
+            article = rewritten_articles[index]
             fingerprints.append(
                 {
                     "id": entry["id"],
@@ -119,10 +140,6 @@ class Command(BaseCommand):
                     "content_checksum": article.content_checksum,
                 }
             )
-            counts["validated"] += 1
-            if options["dry_run"]:
-                self.stdout.write(f"VALID {article.slug}: {article.title} ({len(article.image_urls)} images)")
-                continue
 
             local_assets = {}
             if entry.get("fixture"):
@@ -196,34 +213,40 @@ class Command(BaseCommand):
                 )
             repository = self._repository(tenant=tenant, namespace=namespace, user=user)
             counts = {"created": 0, "updated": 0, "unchanged": 0}
-            for row in database.iter_published(
+            rows = database.iter_published(
                 limit=options.get("limit"),
                 newest_first=options["newest_first"],
-            ):
-                article = self._article_from_database_row(row)
-                media_importer = LegacyMediaImporter(namespace=namespace, tenant=tenant, user=user)
-                media_by_url = {
-                    image_url: media_importer.import_image(
-                        image_url,
-                        article_identity=str(row.legacy_id),
-                        resume=options["resume"],
+            )
+            media_importer = LegacyMediaImporter(namespace=namespace, tenant=tenant, user=user)
+            while row_batch := list(islice(rows, 100)):
+                link_rewriter = LegacyNewsLinkRewriter(
+                    tenant=tenant,
+                    news_object_type=repository.object_types["news"],
+                )
+                articles = link_rewriter.rewrite_many(self._article_from_database_row(row) for row in row_batch)
+                for row, article in zip(row_batch, articles):
+                    media_by_url = {
+                        image_url: media_importer.import_image(
+                            image_url,
+                            article_identity=str(row.legacy_id),
+                            resume=options["resume"],
+                        )
+                        for image_url in article.image_urls
+                    }
+                    payload = build_payload(article, media_by_url=media_by_url, taxonomy=row.taxonomy)
+                    data = self._database_payload_data(payload, row)
+                    payload = replace(
+                        payload,
+                        data=data,
+                        metadata={**payload.metadata, "legacy_id": row.legacy_id},
                     )
-                    for image_url in article.image_urls
-                }
-                payload = build_payload(article, media_by_url=media_by_url, taxonomy=row.taxonomy)
-                data = self._database_payload_data(payload, row)
-                payload = replace(
-                    payload,
-                    data=data,
-                    metadata={**payload.metadata, "legacy_id": row.legacy_id},
-                )
-                _, created, changed = repository.upsert(
-                    payload,
-                    published_at=row.publish_date or row.presentational_publishing_date,
-                    expires_at=row.expiry_date,
-                    featured=row.featured,
-                )
-                counts["created" if created else "updated" if changed else "unchanged"] += 1
+                    _, created, changed = repository.upsert(
+                        payload,
+                        published_at=row.publish_date or row.presentational_publishing_date,
+                        expires_at=row.expiry_date,
+                        featured=row.featured,
+                    )
+                    counts["created" if created else "updated" if changed else "unchanged"] += 1
             self.stdout.write(self.style.SUCCESS("Database import result: " + json.dumps(counts, sort_keys=True)))
         finally:
             database.close()

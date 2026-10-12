@@ -1,9 +1,6 @@
 """HTML sanitization utilities for safe content import."""
 
-import re
 from bs4 import BeautifulSoup
-from typing import List
-
 
 # Allowed HTML tags for content widgets
 ALLOWED_TAGS = {
@@ -41,13 +38,25 @@ ALLOWED_TAGS = {
 
 # Allowed HTML attributes
 ALLOWED_ATTRIBUTES = {
-    "a": ["href", "title", "target", "rel"],
+    "a": ["href", "title", "target", "rel", "class", "id", "download", "hreflang", "type", "referrerpolicy"],
     "img": ["src", "alt", "title", "width", "height", "class"],
     "table": ["class", "border", "cellspacing", "cellpadding"],
     "td": ["colspan", "rowspan", "class"],
     "th": ["colspan", "rowspan", "class", "scope"],
     "div": ["class"],
-    "span": ["class"],
+    "span": [
+        "href",
+        "title",
+        "target",
+        "rel",
+        "class",
+        "id",
+        "download",
+        "hreflang",
+        "type",
+        "referrerpolicy",
+        "data-legacy-link-status",
+    ],
     "p": ["class"],
     "h1": ["class"],
     "h2": ["class"],
@@ -89,9 +98,7 @@ PROTECTED_DIV_CLASSES = {
 }
 
 
-def sanitize_html(
-    html: str, allowed_tags: set = None, allowed_attrs: dict = None
-) -> str:
+def sanitize_html(html: str, allowed_tags: set = None, allowed_attrs: dict = None) -> str:
     """
     Sanitize HTML by removing dangerous tags, attributes, and scripts.
 
@@ -139,9 +146,7 @@ def sanitize_html(
                 attrs_to_remove.append(attr_name)
             # Check for javascript: in URLs
             elif attr_name in ["href", "src"]:
-                if isinstance(tag[attr_name], str) and tag[
-                    attr_name
-                ].lower().startswith("javascript:"):
+                if isinstance(tag[attr_name], str) and tag[attr_name].lower().startswith("javascript:"):
                     attrs_to_remove.append(attr_name)
 
         for attr in attrs_to_remove:
@@ -253,38 +258,17 @@ def deep_clean_html(html: str, url_mapping: dict = None) -> str:
     Returns:
         Deeply cleaned HTML string
     """
-    import logging
-
-    logger = logging.getLogger(__name__)
-
     if not html:
         return ""
     url_mapping = url_mapping or {}
 
     soup = BeautifulSoup(html, "html.parser")
 
-    # Show first 10 block elements
-    block_tags = soup.find_all(
-        [
-            "p",
-            "h1",
-            "h2",
-            "h3",
-            "h4",
-            "h5",
-            "h6",
-            "div",
-            "blockquote",
-            "ul",
-            "ol",
-            "table",
-        ]
-    )[:10]
-    for i, tag in enumerate(block_tags, 1):
-        tag_str = str(tag)[:150].replace("\n", " ")
-
-    # STEP 1: Remove span and font tags (unwrap - keep content)
+    # STEP 1: Remove presentational span/font tags, but retain disabled legacy
+    # links so their sanitized original attributes can be reconciled later.
     for tag in soup.find_all(["span", "font"]):
+        if tag.name == "span" and "legacy-link-unresolved" in tag.get("class", []):
+            continue
         tag.unwrap()
 
     # STEP 2: Fix nested block tags
@@ -330,7 +314,32 @@ def deep_clean_html(html: str, url_mapping: dict = None) -> str:
         attrs_to_keep = []
 
         if tag.name == "a":
-            attrs_to_keep = ["href", "target", "name"]
+            attrs_to_keep = [
+                "href",
+                "title",
+                "target",
+                "rel",
+                "class",
+                "id",
+                "download",
+                "hreflang",
+                "type",
+                "referrerpolicy",
+            ]
+        elif tag.name == "span" and "legacy-link-unresolved" in tag.get("class", []):
+            attrs_to_keep = [
+                "href",
+                "title",
+                "target",
+                "rel",
+                "class",
+                "id",
+                "download",
+                "hreflang",
+                "type",
+                "referrerpolicy",
+                "data-legacy-link-status",
+            ]
         elif tag.name == "img":
             attrs_to_keep = ["src", "alt"]
         elif tag.name == "div":
@@ -391,26 +400,6 @@ def deep_clean_html(html: str, url_mapping: dict = None) -> str:
 
         if removed_count == 0:
             break  # No more empty tags found
-
-    # Show first 10 block elements after cleaning
-    block_tags_after = soup.find_all(
-        [
-            "p",
-            "h1",
-            "h2",
-            "h3",
-            "h4",
-            "h5",
-            "h6",
-            "div",
-            "blockquote",
-            "ul",
-            "ol",
-            "table",
-        ]
-    )[:10]
-    for i, tag in enumerate(block_tags_after, 1):
-        tag_str = str(tag)[:150].replace("\n", " ")
 
     result = str(soup)
 
