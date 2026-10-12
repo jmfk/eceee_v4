@@ -88,7 +88,7 @@ const descendantDisplayLabel = (node: HTMLElement, target: any) => {
 const descendantTargets = (node: HTMLElement) => {
     const seen = new Set<string>()
     return [...node.querySelectorAll<HTMLElement>('[data-designer-target]')].map((descendant) => {
-        const targets = nodeTargets(descendant)
+        const targets = applicableNodeTargets(descendant)
         const primary = targets[0]
         const widgetNode = descendant.closest<HTMLElement>('[data-widget-id]')
         const widgetType = widgetNode?.dataset.widgetType || ''
@@ -194,10 +194,10 @@ const matchesCascadeTarget = (node: HTMLElement, target: any) => {
     })
 }
 
-const primaryNodeTarget = (node: HTMLElement) => {
-    const targets = nodeTargets(node)
-    return targets.find((target: any) => matchesCascadeTarget(node, target))
-}
+const applicableNodeTargets = (node: HTMLElement) => nodeTargets(node)
+    .filter((target: any) => matchesCascadeTarget(node, target))
+
+const primaryNodeTarget = (node: HTMLElement) => applicableNodeTargets(node)[0]
 
 type SelectorSpecificity = [number, number, number]
 
@@ -451,7 +451,7 @@ const selectionPaths = (node: HTMLElement, preferredTarget?: any, designer?: Ren
     let current: HTMLElement | null = node
     let first = true
     while (current) {
-        const targets = nodeTargets(current)
+        const targets = applicableNodeTargets(current)
         const primaryTarget = primaryNodeTarget(current)
         const candidates = first && preferredTarget
             ? [preferredTarget, ...targets.filter((target: any) => target.id !== preferredTarget.id)]
@@ -515,7 +515,7 @@ const ancestorTargets = (node: HTMLElement, designer: NonNullable<RenderPageMode
     let foundSpacing = false
     let ancestor = node.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
     while (ancestor) {
-        nodeTargets(ancestor).forEach((target: any) => {
+        applicableNodeTargets(ancestor).forEach((target: any) => {
             const typographyTarget = Boolean(designer.editableTypographyTargets?.[target.id])
             const spacingTarget = Boolean(designer.editableSpacingTargets?.[target.styleTargetId || target.id])
             if (!target.id || seen.has(target.id) || (!typographyTarget || foundTypography) && (!spacingTarget || foundSpacing)) return
@@ -1225,7 +1225,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         ? findTargetNode(root, focusState.highlightedTargetId, focusState.highlightedWidgetId, focusState.highlightedInstanceId)
         : null
     if (restoredSelection) {
-        const restoredTarget = nodeTargets(restoredSelection)
+        const restoredTarget = applicableNodeTargets(restoredSelection)
             .find((target: any) => target.id === focusState.selectedTargetId)
         if (focusState.selectedTargets.length) {
             applyIndependentSelectionClasses(root, focusState.selectedTargets)
@@ -1300,7 +1300,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         let targetNode: HTMLElement | null = eventNode
         while (targetNode && root.contains(targetNode)) {
             try {
-                JSON.parse(targetNode.dataset.designerTargets || '[]').forEach((target: any) => {
+                applicableNodeTargets(targetNode).forEach((target: any) => {
                     if (!targets.some((candidate) => candidate.id === target.id)) targets.push(target)
                 })
             } catch { /* Invalid target metadata is ignored. */ }
@@ -1553,7 +1553,9 @@ export const RenderFrameRuntime = () => {
                 clearSelectionClasses(document)
                 document.querySelectorAll('.designer-highlighted').forEach((node) => node.classList.remove('designer-highlighted'))
                 const match = findTargetNode(document, event.data.targetId, event.data.widgetId, event.data.targetInstanceId)
-                const preferredTarget = match ? nodeTargets(match).find((target: any) => target.id === event.data.targetId) : null
+                const preferredTarget = match
+                    ? applicableNodeTargets(match).find((target: any) => target.id === event.data.targetId) || primaryNodeTarget(match)
+                    : null
                 if (event.data.selectedTargets?.length) applyIndependentSelectionClasses(document, event.data.selectedTargets)
                 else if (match) applySelectionClasses(document, match, preferredTarget)
                 match?.dispatchEvent(new CustomEvent('designerselect', {
@@ -1603,13 +1605,13 @@ export const RenderFrameRuntime = () => {
             }
             if (event.data.action === 'updateText' && event.data.targetId && typeof event.data.text === 'string') {
                 const match = findTargetNode(document, event.data.targetId, event.data.widgetId, event.data.targetInstanceId)
-                const richText = match ? nodeTargets(match)[0]?.richText : false
+                const richText = match ? primaryNodeTarget(match)?.richText : false
                 if (match && richText && match.innerHTML !== event.data.text) match.innerHTML = DOMPurify.sanitize(event.data.text)
                 if (match && !richText && match.textContent !== event.data.text) match.textContent = event.data.text
             }
             if (event.data.action === 'formatText' && event.data.targetId && event.data.command) {
                 const match = findTargetNode(document, event.data.targetId, event.data.widgetId, event.data.targetInstanceId)
-                if (!match || !nodeTargets(match)[0]?.richText) return
+                if (!match || !primaryNodeTarget(match)?.richText) return
                 match.contentEditable = 'true'
                 match.focus()
                 const selection = window.getSelection()

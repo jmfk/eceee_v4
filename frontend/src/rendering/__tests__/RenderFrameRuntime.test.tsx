@@ -671,9 +671,9 @@ describe('RenderFrameRuntime designer overlay', () => {
 
     it('handles custom selector lists, escaped classes, and stale widget metadata', async () => {
         const pseudoWorkspace = structuredClone(workspace)
-        pseudoWorkspace.catalog.designGroups = [0, 1].map((groupIndex) => ({
+        pseudoWorkspace.catalog.designGroups = [0, 1, 2].map((groupIndex) => ({
             id: `group:${groupIndex}`, groupIndex, label: `Content ${groupIndex + 1}`,
-            widgetTypes: [groupIndex === 0 ? 'easy_widgets.HeroWidget' : 'easy_widgets.ContentWidget'],
+            widgetTypes: [groupIndex === 1 ? 'easy_widgets.ContentWidget' : 'easy_widgets.HeroWidget'],
             slots: [], elements: [], assetKeys: [],
             parts: [{
                 id: `group:${groupIndex}:part:content-widget`, part: 'content-widget',
@@ -686,6 +686,10 @@ describe('RenderFrameRuntime designer overlay', () => {
                 targetCssClasses: '.never\n.custom-scope:is(.widget-item,.missing.extra)\n.md\\:px-4',
             },
             { widgetTypes: ['easy_widgets.ContentWidget'] },
+            {
+                widgetTypes: ['easy_widgets.HeroWidget'], targetingMode: 'css-classes',
+                targetCssClasses: '.late-scope',
+            },
         ] } }
         pseudoWorkspace.spacing = [0, 1].map((groupIndex) => ({
             targetId: `group:${groupIndex}:part:content-widget`, scope: 'layout', groupIndex,
@@ -726,6 +730,15 @@ describe('RenderFrameRuntime designer overlay', () => {
         fireEvent.click(plainContent)
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'select', targetId: 'group:1:part:content-widget',
+        }), '*')
+
+        postMessage.mockClear()
+        fireEvent.contextMenu(plainContent, { clientX: 48, clientY: 64 })
+        const menu = screen.getByRole('menu', { name: 'Actions for Content area' })
+        fireEvent.click(within(menu).getByRole('menuitem', { name: 'Edit in inspector' }))
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'contextAction',
+            command: 'inspect', targetId: 'group:1:part:content-widget',
         }), '*')
         postMessage.mockRestore()
     })
