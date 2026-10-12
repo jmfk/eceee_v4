@@ -559,9 +559,9 @@ describe('RenderFrameRuntime designer overlay', () => {
         postMessage.mockRestore()
     })
 
-    it('uses functional pseudo-class argument specificity when choosing an editable rule', async () => {
-        const pseudoWorkspace = structuredClone(workspace)
-        pseudoWorkspace.catalog.designGroups = [0, 1].map((groupIndex) => ({
+    it('resolves every spacing owner before inline preview feedback changes selector state', async () => {
+        const modifierWorkspace = structuredClone(workspace)
+        modifierWorkspace.catalog.designGroups = [0, 1].map((groupIndex) => ({
             id: `group:${groupIndex}`, groupIndex, label: `Content ${groupIndex + 1}`,
             widgetTypes: ['easy_widgets.ContentWidget'], slots: [], elements: [], assetKeys: [],
             parts: [{
@@ -569,8 +569,122 @@ describe('RenderFrameRuntime designer overlay', () => {
                 label: 'Content area', editableSpacingProperties: ['paddingTop'], isWidgetSurface: true,
             }],
         }))
+        modifierWorkspace.themeConfig = { designGroups: { groups: [
+            { widgetTypes: ['easy_widgets.ContentWidget'], cssModifier: ':not([style])' },
+            { widgetTypes: ['easy_widgets.ContentWidget'] },
+        ] } }
+        modifierWorkspace.spacing = [0, 1].map((groupIndex) => ({
+            targetId: `group:${groupIndex}:part:content-widget`, scope: 'layout', groupIndex,
+            part: 'content-widget', breakpoint: 'xs', values: { paddingTop: `${20 + groupIndex}px` },
+        }))
+        modifierWorkspace.constraints.editableSpacingProperties = ['paddingTop']
+        const sourceModel = createPageRenderModel({
+            widgets: { main: [{ id: 'content-1', type: 'easy_widgets.ContentWidget', config: { content: '<h2>Style-state content</h2>' } }] },
+        })
+        const computedStyle = document.createElement('style')
+        computedStyle.textContent = '.content-widget { padding-top: 20px; }'
+        document.head.append(computedStyle)
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: modifierWorkspace, sourceModel, viewportWidth: 375 }))
+
+        const widgetRoot = (await screen.findByRole('heading', { name: 'Style-state content' }))
+            .closest<HTMLElement>('[data-widget-id]')!
+        const content = widgetRoot.querySelector<HTMLElement>('.content-widget')!
+        expect(content).not.toHaveAttribute('style')
+        vi.spyOn(content, 'getBoundingClientRect').mockReturnValue({
+            x: 40, y: 40, left: 40, top: 40, right: 440, bottom: 240, width: 400, height: 200,
+            toJSON: () => ({}),
+        })
+        fireEvent.click(widgetRoot)
+        fireEvent.click(screen.getByRole('button', { name: 'Select padding top' }))
+        fireEvent.keyDown(document, { key: 'ArrowDown' })
+
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'spacingChange',
+            targetId: 'group:0:part:content-widget', property: 'paddingTop', value: '21px',
+        }), '*')
+        computedStyle.remove()
+        postMessage.mockRestore()
+    })
+
+    it('refreshes Inspector cascade ownership when active pointer state starts and ends', async () => {
+        const activeWorkspace = structuredClone(workspace)
+        activeWorkspace.catalog.designGroups = [0, 1].map((groupIndex) => ({
+            id: `group:${groupIndex}`, groupIndex, label: `Content ${groupIndex + 1}`,
+            widgetTypes: ['easy_widgets.ContentWidget'], slots: [], elements: [], assetKeys: [],
+            parts: [{
+                id: `group:${groupIndex}:part:content-widget`, part: 'content-widget',
+                label: 'Content area', editableSpacingProperties: ['paddingTop'], isWidgetSurface: true,
+            }],
+        }))
+        activeWorkspace.themeConfig = { designGroups: { groups: [
+            { widgetTypes: ['easy_widgets.ContentWidget'], cssModifier: ':active' },
+            { widgetTypes: ['easy_widgets.ContentWidget'] },
+        ] } }
+        activeWorkspace.spacing = [0, 1].map((groupIndex) => ({
+            targetId: `group:${groupIndex}:part:content-widget`, scope: 'layout', groupIndex,
+            part: 'content-widget', breakpoint: 'xs', values: { paddingTop: `${20 + groupIndex}px` },
+        }))
+        activeWorkspace.constraints.editableSpacingProperties = ['paddingTop']
+        const sourceModel = createPageRenderModel({
+            widgets: { main: [{ id: 'content-1', type: 'easy_widgets.ContentWidget', config: { content: '<h2>Active content</h2>' } }] },
+        })
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: activeWorkspace, sourceModel, viewportWidth: 375 }))
+
+        const widgetRoot = (await screen.findByRole('heading', { name: 'Active content' }))
+            .closest<HTMLElement>('[data-widget-id]')!
+        const content = widgetRoot.querySelector<HTMLElement>('.content-widget')!
+        const nativeMatches = content.matches.bind(content)
+        let active = false
+        vi.spyOn(content, 'matches').mockImplementation((selector) => (
+            selector.includes(':active')
+                ? active && nativeMatches(selector.replaceAll(':active', ''))
+                : nativeMatches(selector)
+        ))
+        fireEvent.click(widgetRoot)
+        postMessage.mockClear()
+        active = true
+        fireEvent.pointerDown(content)
+        await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'select',
+            configurationSpacingTargets: expect.arrayContaining([expect.objectContaining({
+                id: 'group:0:part:content-widget',
+                cascadeWinningProperties: expect.arrayContaining(['paddingTop']),
+            })]),
+        }), '*'))
+
+        postMessage.mockClear()
+        active = false
+        fireEvent.pointerUp(content)
+        await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'select',
+            configurationSpacingTargets: expect.arrayContaining([expect.objectContaining({
+                id: 'group:1:part:content-widget',
+                cascadeWinningProperties: expect.arrayContaining(['paddingTop']),
+            })]),
+        }), '*'))
+        postMessage.mockRestore()
+    })
+
+    it('uses comma-containing CSS-class selectors independently of stale widget metadata', async () => {
+        const pseudoWorkspace = structuredClone(workspace)
+        pseudoWorkspace.catalog.designGroups = [0, 1].map((groupIndex) => ({
+            id: `group:${groupIndex}`, groupIndex, label: `Content ${groupIndex + 1}`,
+            widgetTypes: [groupIndex === 0 ? 'easy_widgets.HeroWidget' : 'easy_widgets.ContentWidget'],
+            slots: [], elements: [], assetKeys: [],
+            parts: [{
+                id: `group:${groupIndex}:part:content-widget`, part: 'content-widget',
+                label: 'Content area', editableSpacingProperties: ['paddingTop'], isWidgetSurface: true,
+            }],
+        }))
         pseudoWorkspace.themeConfig = { designGroups: { groups: [
-            { widgetTypes: ['easy_widgets.ContentWidget'], cssModifier: ':not(.foo.bar)' },
+            {
+                widgetTypes: ['easy_widgets.HeroWidget'], targetingMode: 'css-classes',
+                targetCssClasses: '.widget-type-easy-widgets-contentwidget:is(.widget-item,.missing.extra)',
+            },
             { widgetTypes: ['easy_widgets.ContentWidget'], variants: ['content-widget'] },
         ] } }
         pseudoWorkspace.spacing = [0, 1].map((groupIndex) => ({
@@ -604,7 +718,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         postMessage.mockRestore()
     })
 
-    it('edits an active mobile declaration before an inactive xl rule', async () => {
+    it('ignores a legacy tablet property when an md declaration replaces that breakpoint map', async () => {
         const breakpointWorkspace = structuredClone(workspace)
         breakpointWorkspace.catalog.designGroups = [0, 1].map((groupIndex) => ({
             id: `group:${groupIndex}`, groupIndex, label: `Content ${groupIndex + 1}`,
@@ -620,20 +734,23 @@ describe('RenderFrameRuntime designer overlay', () => {
         ] } }
         breakpointWorkspace.spacing = [{
             targetId: 'group:0:part:content-widget', scope: 'layout', groupIndex: 0,
-            part: 'content-widget', breakpoint: 'xl', values: { paddingTop: '50px' },
+            part: 'content-widget', breakpoint: 'tablet', values: { paddingTop: '50px' },
+        }, {
+            targetId: 'group:0:part:content-widget', scope: 'layout', groupIndex: 0,
+            part: 'content-widget', breakpoint: 'md', values: { paddingLeft: '10px' },
         }, {
             targetId: 'group:1:part:content-widget', scope: 'layout', groupIndex: 1,
             part: 'content-widget', breakpoint: 'xs', values: { paddingTop: '20px' },
         }]
         breakpointWorkspace.constraints.editableSpacingProperties = ['paddingTop']
         const sourceModel = createPageRenderModel({
-            widgets: { main: [{ id: 'content-1', type: 'easy_widgets.ContentWidget', config: { content: '<h2>Mobile content</h2>' } }] },
+            widgets: { main: [{ id: 'content-1', type: 'easy_widgets.ContentWidget', config: { content: '<h2>Alias content</h2>' } }] },
         })
         const postMessage = vi.spyOn(window, 'postMessage')
         render(<RenderFrameRuntime />)
-        sendModel(createDesignerRenderModel({ workspace: breakpointWorkspace, sourceModel, viewportWidth: 375 }))
+        sendModel(createDesignerRenderModel({ workspace: breakpointWorkspace, sourceModel, viewportWidth: 768 }))
 
-        const widgetRoot = (await screen.findByRole('heading', { name: 'Mobile content' }))
+        const widgetRoot = (await screen.findByRole('heading', { name: 'Alias content' }))
             .closest<HTMLElement>('[data-widget-id]')!
         const content = widgetRoot.querySelector<HTMLElement>('.content-widget')!
         content.style.paddingTop = '20px'
