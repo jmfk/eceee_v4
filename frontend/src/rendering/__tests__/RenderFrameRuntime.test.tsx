@@ -503,6 +503,107 @@ describe('RenderFrameRuntime designer overlay', () => {
         postMessage.mockRestore()
     })
 
+    it('re-evaluates dynamic modifier selectors when a selected measurement is edited', async () => {
+        const modifierWorkspace = structuredClone(workspace)
+        modifierWorkspace.catalog.designGroups = [0, 1].map((groupIndex) => ({
+            id: `group:${groupIndex}`, groupIndex, label: `Content ${groupIndex + 1}`,
+            widgetTypes: ['easy_widgets.ContentWidget'], slots: [], elements: [], assetKeys: [],
+            parts: [{
+                id: `group:${groupIndex}:part:content-widget`, part: 'content-widget',
+                label: 'Content area', editableSpacingProperties: ['paddingTop'], isWidgetSurface: true,
+            }],
+        }))
+        modifierWorkspace.themeConfig = { designGroups: { groups: [
+            { widgetTypes: ['easy_widgets.ContentWidget'], cssModifier: ':focus' },
+            { widgetTypes: ['easy_widgets.ContentWidget'] },
+        ] } }
+        modifierWorkspace.spacing = [0, 1].map((groupIndex) => ({
+            targetId: `group:${groupIndex}:part:content-widget`, scope: 'layout', groupIndex,
+            part: 'content-widget', breakpoint: 'xs', values: { paddingTop: `${20 + groupIndex}px` },
+        }))
+        modifierWorkspace.constraints.editableSpacingProperties = ['paddingTop']
+        const sourceModel = createPageRenderModel({
+            widgets: { main: [{ id: 'content-1', type: 'easy_widgets.ContentWidget', config: { content: '<h2>Focused content</h2>' } }] },
+        })
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: modifierWorkspace, sourceModel, viewportWidth: 375 }))
+
+        const widgetRoot = (await screen.findByRole('heading', { name: 'Focused content' }))
+            .closest<HTMLElement>('[data-widget-id]')!
+        const content = widgetRoot.querySelector<HTMLElement>('.content-widget')!
+        content.style.paddingTop = '20px'
+        content.tabIndex = 0
+        vi.spyOn(content, 'getBoundingClientRect').mockReturnValue({
+            x: 40, y: 40, left: 40, top: 40, right: 440, bottom: 240, width: 400, height: 200,
+            toJSON: () => ({}),
+        })
+        fireEvent.click(widgetRoot)
+        fireEvent.click(screen.getByRole('button', { name: 'Select padding top' }))
+        content.focus()
+        fireEvent.keyDown(document, { key: 'ArrowDown' })
+
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'spacingChange',
+            targetId: 'group:0:part:content-widget', property: 'paddingTop', value: '21px',
+        }), '*')
+        await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'select',
+            configurationSpacingTargets: expect.arrayContaining([
+                expect.objectContaining({
+                    id: 'group:0:part:content-widget',
+                    cascadeWinningProperties: expect.arrayContaining(['paddingTop']),
+                }),
+            ]),
+        }), '*'))
+        postMessage.mockRestore()
+    })
+
+    it('uses functional pseudo-class argument specificity when choosing an editable rule', async () => {
+        const pseudoWorkspace = structuredClone(workspace)
+        pseudoWorkspace.catalog.designGroups = [0, 1].map((groupIndex) => ({
+            id: `group:${groupIndex}`, groupIndex, label: `Content ${groupIndex + 1}`,
+            widgetTypes: ['easy_widgets.ContentWidget'], slots: [], elements: [], assetKeys: [],
+            parts: [{
+                id: `group:${groupIndex}:part:content-widget`, part: 'content-widget',
+                label: 'Content area', editableSpacingProperties: ['paddingTop'], isWidgetSurface: true,
+            }],
+        }))
+        pseudoWorkspace.themeConfig = { designGroups: { groups: [
+            { widgetTypes: ['easy_widgets.ContentWidget'], cssModifier: ':not(.foo.bar)' },
+            { widgetTypes: ['easy_widgets.ContentWidget'], variants: ['content-widget'] },
+        ] } }
+        pseudoWorkspace.spacing = [0, 1].map((groupIndex) => ({
+            targetId: `group:${groupIndex}:part:content-widget`, scope: 'layout', groupIndex,
+            part: 'content-widget', breakpoint: 'xs', values: { paddingTop: `${20 + groupIndex}px` },
+        }))
+        pseudoWorkspace.constraints.editableSpacingProperties = ['paddingTop']
+        const sourceModel = createPageRenderModel({
+            widgets: { main: [{ id: 'content-1', type: 'easy_widgets.ContentWidget', config: { content: '<h2>Pseudo content</h2>' } }] },
+        })
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: pseudoWorkspace, sourceModel, viewportWidth: 375 }))
+
+        const widgetRoot = (await screen.findByRole('heading', { name: 'Pseudo content' }))
+            .closest<HTMLElement>('[data-widget-id]')!
+        const content = widgetRoot.querySelector<HTMLElement>('.content-widget')!
+        content.style.paddingTop = '20px'
+        vi.spyOn(content, 'getBoundingClientRect').mockReturnValue({
+            x: 40, y: 40, left: 40, top: 40, right: 440, bottom: 240, width: 400, height: 200,
+            toJSON: () => ({}),
+        })
+        fireEvent.click(widgetRoot)
+        fireEvent.click(screen.getByRole('button', { name: 'Select padding top' }))
+        fireEvent.keyDown(document, { key: 'ArrowDown' })
+
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'spacingChange',
+            targetId: 'group:0:part:content-widget', property: 'paddingTop', value: '21px',
+        }), '*')
+        postMessage.mockRestore()
+    })
+
     it('edits an active mobile declaration before an inactive xl rule', async () => {
         const breakpointWorkspace = structuredClone(workspace)
         breakpointWorkspace.catalog.designGroups = [0, 1].map((groupIndex) => ({
