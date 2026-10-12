@@ -504,6 +504,7 @@ const effectiveSpacingEntries = (entries, activeBreakpoint, breakpoints, fields)
 }
 
 const isZeroCssValue = (value) => /^0(?:\.0+)?(?:px|rem|em|%|vh|vw)?$/i.test(String(value || '').trim())
+const isCollapsibleSpacingField = (field) => /^(?:margin|padding)(?:Top|Right|Bottom|Left)?$/.test(field) || field === 'gap'
 
 const spacingEntryForField = (entries, field) => (
     entries.find((entry) => entry.row.breakpoint && entry.fields?.includes(field))
@@ -516,10 +517,13 @@ const spacingEntryForField = (entries, field) => (
     || entries[0]
 )
 
-const spacingSectionIsAllZero = ({ computed, fields, entries }) => fields.length > 0 && fields.every((field) => {
+const spacingSectionIsAllZero = ({ computed, fields, entries }) => {
+    const spacingFields = fields.filter(isCollapsibleSpacingField)
+    return spacingFields.length > 0 && spacingFields.every((field) => {
         const entry = spacingEntryForField(entries, field)
         return isZeroCssValue(entry?.row.values[field] || computed[field] || '')
     })
+}
 
 const spacingSectionsAreAllZero = (sections) => sections.length > 0 && sections.every(spacingSectionIsAllZero)
 
@@ -840,48 +844,50 @@ const SemanticThemeWorkspace = ({
                 setThemeDefaults((current) => ({ ...current, [event.data.targetId]: event.data.computedStyles || {} }))
                 return
             }
-            if (event.data.action === 'spacingChange') {
-                const targetIds = Array.isArray(event.data.targetIds) ? event.data.targetIds : []
-                const exactTargetIds = event.data.targetId ? [event.data.targetId] : targetIds
-                const structuralTarget = structuralTargetForChange(exactTargetIds)
-                const index = spacingRowIndexForChange(
-                    workspace.spacing,
-                    structuralTarget ? [structuralTarget.targetId] : exactTargetIds,
-                    workspace.breakpoints,
-                    workspace.breakpoints?.[viewport],
-                )
-                const property = event.data.property
-                if (index >= 0 && workspace.constraints.editableSpacingProperties.includes(property)) {
-                    updateWorkspace((next) => {
-                        const source = next.spacing[index]
-                        const configuredBreakpoints = getBreakpoints(next)
-                        const sourceWidth = breakpointWidth(source.breakpoint, configuredBreakpoints)
-                        const activeWidth = breakpointWidth(viewport, configuredBreakpoints)
-                        if (source.breakpoint && sourceWidth !== activeWidth) {
+            if (event.data.action === 'spacingChange' || event.data.action === 'spacingChanges') {
+                const changes = event.data.action === 'spacingChanges'
+                    ? Array.isArray(event.data.changes) ? event.data.changes : []
+                    : [event.data]
+                updateWorkspace((next) => {
+                    changes.forEach((change) => {
+                        const targetIds = Array.isArray(change.targetIds) ? change.targetIds : []
+                        const exactTargetIds = change.targetId ? [change.targetId] : targetIds
+                        const structuralTarget = structuralTargetForChange(exactTargetIds)
+                        const index = spacingRowIndexForChange(
+                            next.spacing,
+                            structuralTarget ? [structuralTarget.targetId] : exactTargetIds,
+                            next.breakpoints,
+                            next.breakpoints?.[viewport],
+                        )
+                        const property = change.property
+                        if (index >= 0 && next.constraints.editableSpacingProperties.includes(property)) {
+                            const source = next.spacing[index]
+                            const configuredBreakpoints = getBreakpoints(next)
+                            const sourceWidth = breakpointWidth(source.breakpoint, configuredBreakpoints)
+                            const activeWidth = breakpointWidth(viewport, configuredBreakpoints)
+                            if (source.breakpoint && sourceWidth !== activeWidth) {
+                                next.spacing.push({
+                                    ...source,
+                                    breakpoint: viewport,
+                                    values: { [property]: change.value },
+                                })
+                            } else {
+                                source.values[property] = change.value
+                            }
+                        } else if (structuralTarget
+                            && (structuralTarget.scope === 'widget'
+                                ? widgetFrameSpacingProperties(next.constraints).includes(property)
+                                : editableStructuralSpacingProperties(next.catalog, structuralTarget).includes(property))
+                            && next.constraints.editableSpacingProperties.includes(property)) {
                             next.spacing.push({
-                                ...source,
+                                ...structuralTarget,
                                 breakpoint: viewport,
-                                values: { [property]: event.data.value },
+                                values: { [property]: change.value },
                             })
-                        } else {
-                            source.values[property] = event.data.value
                         }
-                        return next
                     })
-                } else if (structuralTarget
-                    && (structuralTarget.scope === 'widget'
-                        ? widgetFrameSpacingProperties(workspace.constraints).includes(property)
-                        : editableStructuralSpacingProperties(workspace.catalog, structuralTarget).includes(property))
-                    && workspace.constraints.editableSpacingProperties.includes(property)) {
-                    updateWorkspace((next) => {
-                        next.spacing.push({
-                            ...structuralTarget,
-                            breakpoint: viewport,
-                            values: { [property]: event.data.value },
-                        })
-                        return next
-                    })
-                }
+                    return next
+                })
                 return
             }
             function normalizeTarget(option) {

@@ -1012,6 +1012,13 @@ describe('DesignerThemeWorkspacePage', () => {
         zeroSpacingWorkspace.constraints.editableSpacingProperties = [
             'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
             'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+            'gap', 'width', 'height',
+        ]
+        zeroSpacingWorkspace.constraints.editableWidgetFrameSpacingProperties = [
+            'marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'width', 'height',
+        ]
+        zeroSpacingWorkspace.constraints.editableWidgetSurfaceSpacingProperties = [
+            'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'gap', 'width', 'height',
         ]
         mocks.workspace.mockResolvedValue(zeroSpacingWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
@@ -1026,6 +1033,7 @@ describe('DesignerThemeWorkspacePage', () => {
                 computedStyles: {
                     marginTop: '0px', marginRight: '0px', marginBottom: '0px', marginLeft: '0px',
                     paddingTop: '0px', paddingRight: '0px', paddingBottom: '0px', paddingLeft: '0px',
+                    gap: '0px', width: '960px', height: '320px',
                 },
             },
             source: iframe.contentWindow,
@@ -1332,6 +1340,38 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(mocks.save.mock.calls[0][1].spacing[1].values.padding).toBe('8px')
         expect(mocks.save.mock.calls[0][1].spacing[2].values.padding).toBe('24px')
         expect(mocks.save.mock.calls[0][1].spacing[3]).toEqual(expect.objectContaining({ breakpoint: 'xl', values: { padding: '32px' } }))
+    })
+
+    it('applies same-axis preview measurements as one atomic workspace update', async () => {
+        mocks.workspace.mockResolvedValue(structuredClone(workspace))
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const { iframe, postMessage } = await readyPreview()
+        postMessage.mockRestore()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'spacingChanges', viewportWidth: 1280,
+                changes: [{
+                    targetId: 'group:0:part:content-widget',
+                    targetIds: ['group:0:part:content-widget'],
+                    property: 'padding', value: '32px',
+                }, {
+                    targetId: 'group:0:part:content-widget',
+                    targetIds: ['group:0:part:content-widget'],
+                    property: 'marginBottom', value: '24px',
+                }],
+            },
+            source: iframe.contentWindow,
+        }))
+
+        await waitFor(() => expect(screen.getByRole('button', { name: /save draft/i })).toBeEnabled())
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        const activeRow = mocks.save.mock.calls[0][1].spacing.find((row) => (
+            row.scope === 'layout' && row.groupIndex === 0 && row.part === 'content-widget' && row.breakpoint === 'xl'
+        ))
+        expect(activeRow.values).toEqual({ padding: '32px', marginBottom: '24px' })
     })
 
     it('ignores inline spacing changes for widget parts not exposed by the theme', async () => {
