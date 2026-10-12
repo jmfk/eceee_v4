@@ -1,3 +1,4 @@
+import socket
 from unittest.mock import patch
 
 from bs4 import BeautifulSoup
@@ -5,7 +6,7 @@ from django.test import SimpleTestCase
 
 from content_migration.legacy_news.extractor import extract_news_html
 from content_migration.legacy_news.links import ExternalHeadChecker, LegacyNewsLinkRewriter
-from content_migration.legacy_news.remote import HeadResponse, head_public_url
+from content_migration.legacy_news.remote import HeadResponse, head_public_url, validate_public_http_url
 from content_migration.legacy_news.transformer import build_payload
 
 
@@ -131,6 +132,14 @@ class LegacyNewsLinkRewriterTests(SimpleTestCase):
 
 
 class ExternalHeadCheckerTests(SimpleTestCase):
+    @patch("content_migration.legacy_news.remote.socket.getaddrinfo")
+    def test_public_validation_rejects_cgnat_and_ipv6_site_local(self, getaddrinfo):
+        for address in ("100.64.0.1", "fec0::1"):
+            getaddrinfo.return_value = [(2, 1, 6, "", (address, 80))]
+            with self.subTest(address=address):
+                with self.assertRaisesRegex(ValueError, "non-public-link-host"):
+                    validate_public_http_url("http://external.example/resource", subject="link")
+
     def test_follows_validated_redirects_and_requires_exact_200(self):
         request = _HeadRequest(
             [
@@ -160,15 +169,16 @@ class ExternalHeadCheckerTests(SimpleTestCase):
         response.status = 200
         response.getheaders.return_value = []
 
-        result = head_public_url("http://external.example/research?source=legacy", timeout=3)
+        result = head_public_url("http://例え.テスト/research?source=legacy", timeout=3)
 
         self.assertEqual(result.status_code, 200)
+        getaddrinfo.assert_called_once_with("xn--r8jz45g.xn--zckzah", 80, type=socket.SOCK_STREAM)
         connection_class.assert_called_once_with("93.184.216.34", port=80, timeout=3)
         connection_class.return_value.request.assert_called_once_with(
             "HEAD",
             "/research?source=legacy",
             headers={
-                "Host": "external.example",
+                "Host": "xn--r8jz45g.xn--zckzah",
                 "User-Agent": "ECEEE-v4-Legacy-News-Migrator/1.0 (+https://www.eceee.org/)",
             },
         )

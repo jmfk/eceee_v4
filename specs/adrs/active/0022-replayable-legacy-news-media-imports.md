@@ -23,6 +23,8 @@ Derive each new legacy media object-storage key deterministically from the targe
 
 Continue to reconcile existing media first by legacy source URL and then by content hash. Resume mode retries placeholders and overwrites the existing media path so object and widget references retain the same media ID.
 
+Fetch remote media only through DNS-pinned HTTP(S) connections. Reject every resolved address that is not globally routable, including CGNAT, multicast, and IPv6 site-local ranges; preserve the original Host header and TLS identity; repeat validation after every redirect; and bound the response body before image validation.
+
 ## Rationale
 
 The advisory lock removes the supported command's check-then-create race without adding migration-job infrastructure. Deterministic storage keys close the practical crash window between object storage and PostgreSQL: a hard interruption may temporarily leave an unreferenced object, but the next run converges on that same key. Exception cleanup handles ordinary database failures immediately.
@@ -34,6 +36,7 @@ The advisory lock removes the supported command's check-then-create race without
 - Replaying a source URL converges on one storage key and one media record within its tenant and namespace without sharing the key across tenant boundaries.
 - Object storage and PostgreSQL are not a distributed transaction; temporary unreferenced bytes can exist until the next replay if the process is killed at the upload boundary.
 - Existing UUID-named legacy media remains valid and is reused through its metadata; only newly created media adopts deterministic keys.
+- Imported image URLs cannot redirect or rebind onto loopback, private, shared, site-local, multicast, reserved, or otherwise non-global networks.
 
 ## Alternatives Considered
 

@@ -1,12 +1,13 @@
 import hashlib
-from unittest.mock import patch
+import socket
+from unittest.mock import MagicMock, call, patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from content.models import Namespace
 from content_migration.legacy_news.locking import LegacyNewsImportAlreadyRunning, legacy_news_import_lock
-from content_migration.legacy_news.media import LegacyMediaImporter
+from content_migration.legacy_news.media import MAX_IMAGE_BYTES, LegacyMediaImporter
 from core.models import Tenant
 from file_manager.models import MediaFile
 
@@ -154,6 +155,58 @@ class LegacyNewsMediaImporterTests(TestCase):
 
         self.assertNotEqual(local_path, sibling_path)
         self.assertNotEqual(local_path, other_path)
+
+    @patch("content_migration.legacy_news.remote.http.client.HTTPConnection")
+    @patch("content_migration.legacy_news.remote.socket.getaddrinfo")
+    def test_remote_image_get_pins_and_revalidates_redirect_addresses(self, getaddrinfo, connection_class):
+        getaddrinfo.side_effect = [
+            [(2, 1, 6, "", ("93.184.216.34", 80))],
+            [(2, 1, 6, "", ("93.184.216.35", 80))],
+        ]
+        redirect_connection = MagicMock()
+        redirect_response = redirect_connection.getresponse.return_value
+        redirect_response.status = 302
+        redirect_response.getheaders.return_value = [("Location", "http://例え.テスト/image.svg")]
+        image_connection = MagicMock()
+        image_response = image_connection.getresponse.return_value
+        image_response.status = 200
+        image_response.getheaders.return_value = [("Content-Type", "image/svg+xml")]
+        image_response.read.return_value = b"<svg/>"
+        connection_class.side_effect = [redirect_connection, image_connection]
+
+        content, content_type = self.importer._read_image("http://external.example/image.svg?legacy=1")
+
+        self.assertEqual(content, b"<svg/>")
+        self.assertEqual(content_type, "image/svg+xml")
+        self.assertEqual(getaddrinfo.call_count, 2)
+        self.assertEqual(
+            getaddrinfo.call_args_list[1],
+            call("xn--r8jz45g.xn--zckzah", 80, type=socket.SOCK_STREAM),
+        )
+        self.assertEqual(
+            connection_class.call_args_list,
+            [
+                call("93.184.216.34", port=80, timeout=20),
+                call("93.184.216.35", port=80, timeout=20),
+            ],
+        )
+        redirect_connection.request.assert_called_once_with(
+            "GET",
+            "/image.svg?legacy=1",
+            headers={
+                "Host": "external.example",
+                "User-Agent": "ECEEE-v4-Legacy-News-Migrator/1.0 (+https://www.eceee.org/)",
+            },
+        )
+        image_connection.request.assert_called_once_with(
+            "GET",
+            "/image.svg",
+            headers={
+                "Host": "xn--r8jz45g.xn--zckzah",
+                "User-Agent": "ECEEE-v4-Legacy-News-Migrator/1.0 (+https://www.eceee.org/)",
+            },
+        )
+        image_response.read.assert_called_once_with(MAX_IMAGE_BYTES + 1)
 
 
 class LegacyNewsImportLockTests(TestCase):
