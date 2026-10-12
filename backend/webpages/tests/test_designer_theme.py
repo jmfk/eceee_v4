@@ -32,6 +32,7 @@ from webpages.renderers import WebPageRenderer
 from webpages.services.designer_export import ThemeDesignerExporter, cleanup_expired_designer_exports
 from webpages.services.designer_theme import (
     MAX_IMAGE_BYTES,
+    _normalized_layout_parts,
     _safe_reference_preview_html,
     apply_designer_patch,
     collect_designer_assets,
@@ -43,6 +44,36 @@ from webpages.views.designer_theme_views import DesignerExportThrottle, Designer
 
 
 class DesignerStructuralSpacingTests(SimpleTestCase):
+    def test_widget_parts_normalize_to_one_surface_level_and_nested_elements(self):
+        parts = _normalized_layout_parts(
+            {
+                "hero-widget": {"properties": ["width", "height", "padding", "margin"]},
+                "hero-content": {"properties": ["padding", "margin"]},
+            }
+        )
+
+        self.assertEqual(parts["hero-widget"]["designerLevel"], "widget")
+        self.assertTrue(parts["hero-widget"]["isWidgetSurface"])
+        self.assertEqual(
+            parts["hero-widget"]["editableSpacingProperties"],
+            ["height", "paddingBottom", "paddingLeft", "paddingRight", "paddingTop", "width"],
+        )
+        self.assertEqual(parts["hero-content"]["designerLevel"], "element")
+        self.assertFalse(parts["hero-content"]["isWidgetSurface"])
+        self.assertEqual(
+            parts["hero-content"]["editableSpacingProperties"],
+            [
+                "marginBottom",
+                "marginLeft",
+                "marginRight",
+                "marginTop",
+                "paddingBottom",
+                "paddingLeft",
+                "paddingRight",
+                "paddingTop",
+            ],
+        )
+
     def test_structural_spacing_is_validated_and_emitted_as_responsive_css(self):
         theme = PageTheme(
             name="Structural theme",
@@ -72,7 +103,7 @@ class DesignerStructuralSpacingTests(SimpleTestCase):
                         "scope": "widget",
                         "widget_type": "easy_widgets.ContentWidget",
                         "breakpoint": "md",
-                        "values": {"marginBottom": "2rem"},
+                        "values": {"marginBottom": "2rem", "width": "80%"},
                     },
                     {
                         "scope": "widgetSlot",
@@ -93,7 +124,7 @@ class DesignerStructuralSpacingTests(SimpleTestCase):
                         "widget_type": "easy_widgets.TwoColumnsWidget",
                         "part": "two-columns-widget",
                         "breakpoint": "xl",
-                        "values": {"gap": "36px"},
+                        "values": {"gap": "36px", "height": "320px"},
                     },
                 ]
             },
@@ -105,11 +136,13 @@ class DesignerStructuralSpacingTests(SimpleTestCase):
         self.assertIn("padding-left: 16px", css)
         self.assertIn("@media (min-width: 768px)", css)
         self.assertIn('[data-widget-id][data-widget-type="easy_widgets.ContentWidget"]', css)
+        self.assertIn("width: 80%", css)
         self.assertIn('[data-widget-slot="left"][data-owner-widget-type="easy_widgets.TwoColumnsWidget"]', css)
         self.assertIn('[data-widget-id][data-widget-type="easy_widgets.HeroWidget"] .hero-content', css)
         self.assertIn("padding-top: 32px", css)
         self.assertIn('[data-widget-id][data-widget-type="easy_widgets.TwoColumnsWidget"] .two-columns-widget', css)
         self.assertIn("gap: 36px", css)
+        self.assertIn("height: 320px", css)
         self.assertLess(css.index("padding-left: 16px"), css.index("padding-left: 64px"))
 
     def test_structural_spacing_canonicalizes_breakpoint_and_widget_aliases(self):
@@ -456,6 +489,12 @@ class DesignerThemeApiTests(TestCase):
             if widget["widgetType"] == "easy_widgets.HeroWidget"
         )
         self.assertIn("hero-content", {part["part"] for part in hero_parts["parts"]})
+        hero_surface = next(part for part in hero_parts["parts"] if part["part"] == "hero-widget")
+        hero_content = next(part for part in hero_parts["parts"] if part["part"] == "hero-content")
+        self.assertEqual(hero_surface["designerLevel"], "widget")
+        self.assertTrue(hero_surface["isWidgetSurface"])
+        self.assertEqual(hero_content["designerLevel"], "element")
+        self.assertFalse(hero_content["isWidgetSurface"])
         banner_parts = next(
             widget
             for widget in workspace["catalog"]["widgetParts"]
@@ -469,9 +508,10 @@ class DesignerThemeApiTests(TestCase):
             if widget["widgetType"] == "easy_widgets.ContentWidget"
         )
         content_area = next(part for part in content_parts["parts"] if part["part"] == "content-widget")
+        self.assertTrue(content_area["isWidgetSurface"])
         self.assertEqual(
             content_area["editableSpacingProperties"],
-            ["paddingBottom", "paddingLeft", "paddingRight", "paddingTop"],
+            ["height", "paddingBottom", "paddingLeft", "paddingRight", "paddingTop", "width"],
         )
         self.assertNotIn("margin", content_area["editableSpacingProperties"])
         self.assertNotIn("selector", str(workspace["catalog"]).lower())
@@ -497,8 +537,9 @@ class DesignerThemeApiTests(TestCase):
             column_part = next(part for part in column_parts["parts"] if part["part"] == part_name)
             self.assertEqual(
                 column_part["editableSpacingProperties"],
-                ["gap", "paddingBottom", "paddingLeft", "paddingRight", "paddingTop"],
+                ["gap", "height", "paddingBottom", "paddingLeft", "paddingRight", "paddingTop", "width"],
             )
+            self.assertTrue(column_part["isWidgetSurface"])
         self.assertIn('class="main-layout-container"', main_layout["previewTemplate"])
         self.assertIn("__DESIGNER_SLOT_main__", main_layout["previewTemplate"])
         self.assertTrue(main_layout["layoutCss"])
@@ -516,7 +557,11 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(workspace["description"], "Theme for editorial sites")
         self.assertEqual(
             workspace["constraints"]["editableWidgetFrameSpacingProperties"],
-            ["margin", "marginBottom", "marginLeft", "marginRight", "marginTop"],
+            ["height", "margin", "marginBottom", "marginLeft", "marginRight", "marginTop", "width"],
+        )
+        self.assertEqual(
+            workspace["constraints"]["editableWidgetSurfaceSpacingProperties"],
+            ["gap", "height", "paddingBottom", "paddingLeft", "paddingRight", "paddingTop", "width"],
         )
         self.assertEqual(
             {asset["assetKey"] for asset in workspace["assets"] if asset["kind"] in {"preview", "site-icon"}},

@@ -10,7 +10,7 @@ const workspace = {
         componentStyles: [],
         designGroups: [{
             id: 'article', label: 'Article', widgetTypes: ['easy_widgets.ContentWidget'], slots: ['main'],
-            parts: [{ id: 'article-body', part: 'content-widget', label: 'Body' }],
+            parts: [{ id: 'article-body', part: 'content-widget', label: 'Body', isWidgetSurface: true }],
             elements: [{ id: 'heading', element: 'h1', label: 'Heading' }],
             assetKeys: [],
         }],
@@ -278,15 +278,15 @@ describe('RenderFrameRuntime designer overlay', () => {
             widgetType: 'easy_widgets.HeroWidget',
             label: 'Hero',
             parts: [
-                { id: 'widget-part:easy_widgets.HeroWidget:hero-widget', part: 'hero-widget', label: 'Hero background', designerLevel: 'widget' },
-                { id: 'widget-part:easy_widgets.HeroWidget:hero-content', part: 'hero-content', label: 'Hero content area', designerLevel: 'widget' },
+                { id: 'widget-part:easy_widgets.HeroWidget:hero-widget', part: 'hero-widget', label: 'Hero background', designerLevel: 'widget', isWidgetSurface: true, editableSpacingProperties: ['paddingTop', 'width', 'height'] },
+                { id: 'widget-part:easy_widgets.HeroWidget:hero-content', part: 'hero-content', label: 'Hero content area', designerLevel: 'element' },
             ],
         }]
         structuralWorkspace.spacing = [{
-            targetId: 'widget-part:easy_widgets.HeroWidget:hero-content', scope: 'widgetPart',
-            widgetType: 'easy_widgets.HeroWidget', part: 'hero-content', values: { paddingTop: '30px' },
+            targetId: 'widget-part:easy_widgets.HeroWidget:hero-widget', scope: 'widgetPart',
+            widgetType: 'easy_widgets.HeroWidget', part: 'hero-widget', values: { paddingTop: '30px' },
         }]
-        structuralWorkspace.constraints.editableSpacingProperties = ['paddingTop']
+        structuralWorkspace.constraints.editableSpacingProperties = ['paddingTop', 'width', 'height']
         const sourceModel = createPageRenderModel({
             layout: 'main_layout',
             widgets: {
@@ -296,46 +296,45 @@ describe('RenderFrameRuntime designer overlay', () => {
         const postMessage = vi.spyOn(window, 'postMessage')
         render(<RenderFrameRuntime />)
         const renderModel = createDesignerRenderModel({ workspace: structuralWorkspace, sourceModel, contentEditable: false })
-        expect(renderModel.designer?.editableSpacingTargets?.['widget-part:easy_widgets.HeroWidget:hero-content']).toContain('paddingTop')
+        expect(renderModel.designer?.editableSpacingTargets?.['widget-part:easy_widgets.HeroWidget:hero-widget']).toContain('paddingTop')
         sendModel(renderModel)
 
         const heading = await screen.findByRole('heading', { name: 'Structural hero' })
-        const content = heading.closest('.hero-content') as HTMLElement
-        await waitFor(() => expect(content).toHaveAttribute('data-designer-target', 'widget-part:easy_widgets.HeroWidget:hero-content'))
+        const content = heading.closest('.hero-widget') as HTMLElement
+        await waitFor(() => expect(content).toHaveAttribute('data-designer-target', 'widget-part:easy_widgets.HeroWidget:hero-widget'))
         content.style.paddingTop = '30px'
         vi.spyOn(content, 'getBoundingClientRect').mockReturnValue({
             x: 40, y: 40, left: 40, top: 40, right: 440, bottom: 240, width: 400, height: 200,
             toJSON: () => ({}),
         })
-        fireEvent.click(content)
-
         const widgetRoot = content.closest<HTMLElement>('[data-widget-id]')!
+        fireEvent.click(widgetRoot)
         expect(widgetRoot).toHaveClass('designer-selected-widget')
         expect(content).not.toHaveClass('designer-selected-widget')
         expect(content).not.toHaveClass('designer-selected-element')
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview',
             action: 'select',
-            kind: 'part',
+            kind: 'widget',
             selectionPaths: expect.objectContaining({
                 widget: expect.arrayContaining([
                     expect.objectContaining({
                         id: 'widget:hero-1', kind: 'widget', label: 'Hero widget',
                         configurationSpacingTargets: expect.arrayContaining([
-                            expect.objectContaining({ id: 'widget-part:easy_widgets.HeroWidget:hero-content' }),
+                            expect.objectContaining({ id: 'widget-part:easy_widgets.HeroWidget:hero-widget' }),
                         ]),
                     }),
                 ]),
                 element: [],
             }),
         }), '*')
-        fireEvent.click(screen.getByRole('button', { name: 'Edit padding top' }))
-        fireEvent.input(screen.getByLabelText('padding top value'), { target: { value: '34px' } })
-        expect(content).toHaveStyle({ paddingTop: '34px' })
-        fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Select padding top' }))
+        expect(screen.queryByRole('form')).not.toBeInTheDocument()
+        fireEvent.keyDown(document, { key: 'ArrowDown', shiftKey: true })
+        expect(content).toHaveStyle({ paddingTop: '40px' })
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
-            source: 'eceee-designer-preview', action: 'spacingChange', property: 'paddingTop', value: '34px',
-            targetIds: expect.arrayContaining(['widget-part:easy_widgets.HeroWidget:hero-content']),
+            source: 'eceee-designer-preview', action: 'spacingChange', property: 'paddingTop', value: '40px',
+            targetIds: expect.arrayContaining(['widget-part:easy_widgets.HeroWidget:hero-widget']),
         }), '*')
         postMessage.mockRestore()
     })
@@ -348,7 +347,7 @@ describe('RenderFrameRuntime designer overlay', () => {
             label: 'Two Columns',
             parts: [{
                 id: 'widget-part:easy_widgets.TwoColumnsWidget:two-columns-widget',
-                part: 'two-columns-widget', label: 'Columns container', designerLevel: 'widget',
+                part: 'two-columns-widget', label: 'Columns container', designerLevel: 'widget', isWidgetSurface: true,
             }],
         }, {
             widgetType: 'easy_widgets.HeroWidget',
@@ -407,7 +406,7 @@ describe('RenderFrameRuntime designer overlay', () => {
             widgetTypes: ['easy_widgets.ContentWidget'], slots: ['main'], elements: [], assetKeys: [],
             parts: [{
                 id: `group:${groupIndex}:part:content-widget`, part: 'content-widget',
-                label: 'Content area', editableSpacingProperties: ['paddingTop'],
+                label: 'Content area', editableSpacingProperties: ['paddingTop'], isWidgetSurface: true,
             }],
         }))
         duplicatedWorkspace.spacing = [0, 1].map((groupIndex) => ({
@@ -480,10 +479,10 @@ describe('RenderFrameRuntime designer overlay', () => {
         const headerWorkspace = structuredClone(workspace)
         headerWorkspace.catalog.designGroups = [{
             id: 'wrong-header', label: 'Header elsewhere', widgetTypes: ['easy_widgets.HeaderWidget'], slots: ['footer'],
-            parts: [{ id: 'wrong-header-part', part: 'header-widget', label: 'Wrong header' }], elements: [], assetKeys: [],
+            parts: [{ id: 'wrong-header-part', part: 'header-widget', label: 'Wrong header', isWidgetSurface: true }], elements: [], assetKeys: [],
         }, {
             id: 'header-group', label: 'Page header', widgetTypes: ['easy_widgets.HeaderWidget'], slots: ['header'],
-            parts: [{ id: 'header-container', part: 'header-widget', label: 'Header container' }], elements: [], assetKeys: [],
+            parts: [{ id: 'header-container', part: 'header-widget', label: 'Header container', isWidgetSurface: true }], elements: [], assetKeys: [],
         }]
         headerWorkspace.spacing = [{ targetId: 'header-container', values: { paddingTop: '12px' } }]
         headerWorkspace.constraints.editableSpacingProperties = ['marginTop', 'paddingTop']
@@ -514,12 +513,11 @@ describe('RenderFrameRuntime designer overlay', () => {
             selectionPaths: expect.objectContaining({ element: [] }),
         }), '*')
         fireEvent.click(widgetRoot)
-        fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
-        fireEvent.input(screen.getByLabelText('margin top value'), { target: { value: '36px' } })
-        fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Select margin top' }))
+        fireEvent.keyDown(document, { key: 'ArrowDown' })
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'spacingChange',
-            targetId: 'widget-type:easy_widgets.HeaderWidget', property: 'marginTop', value: '36px',
+            targetId: 'widget-type:easy_widgets.HeaderWidget', property: 'marginTop', value: '31px',
         }), '*')
         postMessage.mockRestore()
     })
@@ -540,6 +538,7 @@ describe('RenderFrameRuntime designer overlay', () => {
             parts: [{
                 id: 'columns-container', part, label,
                 editableSpacingProperties: ['gap'],
+                isWidgetSurface: true,
             }],
             elements: [], assetKeys: [],
         }]
@@ -566,7 +565,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         vi.spyOn(widgetRoot, 'getBoundingClientRect').mockReturnValue(rect(10, 10, 430, 160))
         vi.spyOn(columns, 'getBoundingClientRect').mockReturnValue(rect(10, 10, 430, 160))
         const slotWidth = slotNames.length === 2 ? 200 : 120
-        slots.forEach((slot, index) => vi.spyOn(slot, 'getBoundingClientRect').mockReturnValue(
+        const slotRectSpies = slots.map((slot, index) => vi.spyOn(slot, 'getBoundingClientRect').mockReturnValue(
             rect(10 + index * (slotWidth + 30), 10, slotWidth, 160),
         ))
         columns.style.gap = '30px'
@@ -582,11 +581,10 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(gapLabel).toHaveClass('designer-spacing-level-widget')
         expect(gapLabel).toHaveAttribute('data-editable', 'true')
         fireEvent.click(gapLabel)
-        fireEvent.input(screen.getByLabelText('column gap value'), { target: { value: '36px' } })
-        fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+        fireEvent.keyDown(document, { key: 'ArrowRight', shiftKey: true })
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'spacingChange', targetId: 'columns-container',
-            property: 'gap', value: '36px',
+            property: 'gap', value: '40px',
         }), '*')
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'select', targetId: 'widget:columns-1',
@@ -594,6 +592,13 @@ describe('RenderFrameRuntime designer overlay', () => {
                 id: 'columns-container', computedStyles: expect.objectContaining({ gap: '30px' }),
             })],
         }), '*')
+        columns.style.gap = '0px'
+        slotRectSpies.forEach((slotRectSpy, index) => slotRectSpy.mockReturnValue(
+            rect(10 + index * slotWidth, 10, slotWidth, 160),
+        ))
+        fireEvent.scroll(window)
+        expect([...document.querySelectorAll('.designer-spacing-gap-value')]
+            .filter((spacing) => spacing.textContent === '0px')).toHaveLength(slotNames.length - 1)
         postMessage.mockRestore()
     })
 
@@ -866,10 +871,9 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(document.querySelector('.designer-spacing-content.designer-spacing-level-element')).toHaveStyle({ left: '81px' })
 
         fireEvent.click(slotPaddingLabel!)
-        fireEvent.input(screen.getByLabelText('padding top value'), { target: { value: '18px' } })
-        fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+        fireEvent.keyDown(document, { key: 'ArrowDown' })
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
-            source: 'eceee-designer-preview', action: 'spacingChange', property: 'paddingTop', value: '18px',
+            source: 'eceee-designer-preview', action: 'spacingChange', property: 'paddingTop', value: '12px',
             targetId: 'widget-slot:easy_widgets.TwoColumnsWidget:left',
             targetIds: expect.arrayContaining(['widget-slot:easy_widgets.TwoColumnsWidget:left']),
         }), '*')
@@ -907,7 +911,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(nestedSlot).toHaveClass('designer-selected-slot')
         expect(columnsWidget).toHaveClass('designer-selected-widget')
         expect(selectedElement).toHaveClass('designer-selected-element')
-        expect(spacingLabel('.designer-spacing-padding-value[data-side="top"]', '18px')).toHaveClass('designer-spacing-level-slot')
+        expect(spacingLabel('.designer-spacing-padding-value[data-side="top"]', '12px')).toHaveClass('designer-spacing-level-slot')
         expect(spacingLabel('.designer-spacing-margin-value[data-side="right"]', '14px')).toHaveClass('designer-spacing-level-widget')
         expect(spacingLabel('.designer-spacing-padding-value[data-side="bottom"]', '13px')).toHaveClass('designer-spacing-level-element')
 
@@ -1262,77 +1266,47 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(document.querySelector('.designer-spacing-padding-value[data-side="left"]')).toHaveTextContent('8px')
         expect(document.querySelector('.designer-spacing-padding-value[data-side="left"]')).toHaveAttribute('data-placement', 'outside')
         expect(document.querySelector('.designer-spacing-padding-value[data-side="left"]')).toHaveStyle({ left: '69px', top: '199px' })
-        fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
-        const spacingInput = screen.getByLabelText('margin top value')
-        const spacingEditor = screen.getByRole('form', { name: 'Edit margin top' })
-        expect(window.getComputedStyle(spacingEditor).zIndex).toBe('2147483647')
         expect(window.getComputedStyle(document.querySelector('.designer-spacing-measure')! as HTMLElement).zIndex).toBe('2147483645')
-        expect(spacingEditor).toHaveStyle({ top: '92px' })
-        fireEvent.keyDown(spacingInput, { key: 'ArrowUp' })
-        expect(spacingInput).toHaveValue('11px')
-        fireEvent.keyDown(spacingInput, { key: 'ArrowDown', shiftKey: true })
-        expect(spacingInput).toHaveValue('6px')
-        fireEvent.click(screen.getByRole('button', { name: 'Increase margin top' }))
-        expect(spacingInput).toHaveValue('7px')
-        expect(heading).toHaveStyle({ marginTop: '7px' })
-        expect(document.querySelector('.designer-spacing-margin-value[data-side="top"]')).toHaveTextContent('7px')
+        const marginTopLabel = screen.getByRole('button', { name: 'Select margin top' })
+        const paddingLeftLabel = screen.getByRole('button', { name: 'Select padding left' })
+        fireEvent.click(marginTopLabel)
+        fireEvent.click(paddingLeftLabel)
+        expect(marginTopLabel).toHaveAttribute('aria-pressed', 'true')
+        expect(paddingLeftLabel).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.queryByRole('form')).not.toBeInTheDocument()
 
-        headingRect = { ...headingRect, y: 140, top: 140, bottom: 340 }
-        fireEvent.scroll(window)
-        expect(spacingEditor).toHaveStyle({ top: '135px' })
-
-        fireEvent.input(spacingInput, { target: { value: '18px' } })
-        expect(heading).toHaveStyle({ marginTop: '18px' })
-        fireEvent.keyDown(spacingInput, { key: 'Enter' })
+        fireEvent.keyDown(document, { key: 'ArrowRight' })
+        expect(heading).toHaveStyle({ paddingLeft: '9px', marginTop: '10px' })
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
-            source: 'eceee-designer-preview', action: 'spacingChange', property: 'marginTop', value: '18px',
+            source: 'eceee-designer-preview', action: 'spacingChange', property: 'paddingLeft', value: '9px',
             targetId: 'heading', targetIds: expect.arrayContaining(['heading']), viewportWidth: window.innerWidth,
         }), '*')
-        expect(screen.queryByRole('form', { name: 'Edit margin top' })).not.toBeInTheDocument()
-
-        const appliedChanges = () => postMessage.mock.calls.filter(([message]) => message?.action === 'spacingChange')
-        fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
-        fireEvent.change(screen.getByLabelText('margin top value'), { target: { value: '19px' } })
-        fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
-        expect(appliedChanges().at(-1)?.[0]).toEqual(expect.objectContaining({ value: '19px' }))
-
-        const appliedCount = appliedChanges().length
-        fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
-        fireEvent.input(screen.getByLabelText('margin top value'), { target: { value: '20px' } })
+        fireEvent.keyDown(document, { key: 'ArrowDown', shiftKey: true })
         expect(heading).toHaveStyle({ marginTop: '20px' })
-        fireEvent.keyDown(screen.getByLabelText('margin top value'), { key: 'Escape' })
-        expect(heading).toHaveStyle({ marginTop: '19px' })
-        expect(screen.queryByRole('form', { name: 'Edit margin top' })).not.toBeInTheDocument()
-        expect(appliedChanges()).toHaveLength(appliedCount)
+        expect(heading).toHaveStyle({ paddingLeft: '9px' })
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'spacingChange', property: 'marginTop', value: '20px',
+        }), '*')
+        fireEvent.keyDown(document, { key: 'Escape' })
+        expect(document.querySelectorAll('.designer-spacing-value[data-selected="true"]')).toHaveLength(0)
 
-        fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
-        fireEvent.change(screen.getByLabelText('margin top value'), { target: { value: '21px' } })
-        fireEvent.pointerDown(document.body)
-        expect(screen.queryByRole('form', { name: 'Edit margin top' })).not.toBeInTheDocument()
-        expect(appliedChanges()).toHaveLength(appliedCount)
-
-        fireEvent.click(screen.getByRole('button', { name: 'Edit margin top' }))
-        fireEvent.change(screen.getByLabelText('margin top value'), { target: { value: '22px' } })
-        fireEvent.blur(window)
-        expect(screen.queryByRole('form', { name: 'Edit margin top' })).not.toBeInTheDocument()
-        expect(appliedChanges()).toHaveLength(appliedCount)
         headingRect = { ...headingRect, y: 100, top: 100, bottom: 300 }
         fireEvent.scroll(window)
         expect(document.querySelector('.designer-spacing-margin-measure[data-side="top"]')).toHaveStyle({
-            left: '220px', top: '81px', height: '19px',
+            left: '220px', top: '80px', height: '20px',
         })
         expect(document.querySelector('.designer-spacing-padding-measure[data-side="left"]')).toHaveStyle({
-            left: '82px', top: '199px', width: '8px',
+            left: '82px', top: '199px', width: '9px',
         })
         expect(heading).toHaveClass('designer-hovered')
         expect(document.querySelector('.designer-spacing-margin[data-side="bottom"]')).toHaveStyle({
             left: '40px', top: '300px', width: '360px', height: '30px',
         })
         expect(document.querySelector('.designer-spacing-padding[data-side="left"]')).toHaveStyle({
-            left: '82px', top: '107px', width: '8px', height: '184px',
+            left: '82px', top: '107px', width: '9px', height: '184px',
         })
         expect(document.querySelector('.designer-spacing-content')).toHaveStyle({
-            left: '90px', top: '107px', width: '282px', height: '184px',
+            left: '91px', top: '107px', width: '281px', height: '184px',
         })
         fireEvent.click(heading)
         const selectedMarginLabel = document.querySelector('.designer-spacing-margin-value[data-side="top"]')
@@ -1360,7 +1334,10 @@ describe('RenderFrameRuntime designer overlay', () => {
         fireEvent.mouseOut(heading, { relatedTarget: document.body })
         expect(heading).toHaveClass('designer-selected')
         expect(heading).toHaveClass('designer-hovered')
-        expect(document.querySelector('.designer-spacing-margin-value[data-side="top"]')).toHaveTextContent('19px')
+        expect(
+            [...document.querySelectorAll('.designer-spacing-margin-value[data-side="top"]')]
+                .some((label) => label.textContent === '20px'),
+        ).toBe(true)
         postMessage.mockRestore()
     })
 

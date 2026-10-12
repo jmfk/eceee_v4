@@ -15,16 +15,18 @@ const typographyLabels = {
 
 const spacingLabels = {
     gap: 'Column gap',
+    height: 'Height',
     margin: 'Outer spacing', marginTop: 'Margin top', marginRight: 'Margin right', marginBottom: 'Margin bottom', marginLeft: 'Margin left',
     padding: 'Inner spacing', paddingTop: 'Padding top', paddingRight: 'Padding right', paddingBottom: 'Padding bottom', paddingLeft: 'Padding left',
+    width: 'Width',
 }
 const directionalSpacingFields = [
     'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
     'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
 ]
-const visibleSpacingFields = [...directionalSpacingFields, 'gap']
+const visibleSpacingFields = [...directionalSpacingFields, 'gap', 'width', 'height']
 const widgetFrameSpacingProperties = (constraints) => constraints.editableWidgetFrameSpacingProperties
-    || constraints.editableSpacingProperties.filter((field) => field.startsWith('margin'))
+    || constraints.editableSpacingProperties.filter((field) => field.startsWith('margin') || ['width', 'height'].includes(field))
 const spacingDirections = {
     margin: ['marginTop', 'marginRight', 'marginBottom', 'marginLeft'],
     padding: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'],
@@ -904,6 +906,7 @@ const SemanticThemeWorkspace = ({
                     sourcePath: Array.isArray(option.sourcePath) ? option.sourcePath : [],
                     sourceMatchIndex: option.sourceMatchIndex ?? 0,
                     computedStyles: option.computedStyles || {},
+                    isWidgetSurface: option.isWidgetSurface === true,
                     configurationSpacingTargets: Array.isArray(option.configurationSpacingTargets)
                         ? option.configurationSpacingTargets.map(normalizeTarget)
                         : [],
@@ -1221,7 +1224,9 @@ const SemanticThemeWorkspace = ({
                 hasThemeValue(row.values[field]) || !isZeroCssValue(defaults[field])
             )).forEach((field) => selected.add(field))
         })
-        return [...directionalSpacingFields, 'margin', 'padding'].filter((field) => fields.includes(field) && selected.has(field))
+        return [...visibleSpacingFields, 'margin', 'padding'].filter((field) => fields.includes(field) && (
+            ['gap', 'width', 'height'].includes(field) || selected.has(field)
+        ))
     }
     const activeFields = (kind, index, row, fields) => selectedTarget
             ? ['layoutSlot', 'widget', 'widgetSlot', 'widgetPart'].includes(row.scope)
@@ -1834,6 +1839,7 @@ const SemanticThemeWorkspace = ({
 
     const childTargets = [...new Map((inspectorRoot?.descendants || [])
         .filter((target) => targetFocusKey(target) !== targetFocusKey(inspectorRoot))
+        .filter((target) => targetSelectionKind(target) === 'element')
         .map((target) => [targetFocusKey(target), target])).values()]
     const childTargetsByParent = childTargets.reduce((targetsByParent, target) => {
         const parent = target.parentId !== target.id && childTargets.find((candidate) => (
@@ -2019,10 +2025,13 @@ const SemanticThemeWorkspace = ({
                             className={`flex w-full items-center gap-2 px-3 py-2 text-left ${tone.header}`}
                         >{headerContent}</div>}
                     {hasEditableProperties && expanded && <div id={panelId} className="space-y-3 px-3 py-3">
+                        {hasEditableSpacing && <p className="text-xs text-gray-500">Select one or more measurements in the preview. Left/right changes horizontal values; up/down changes vertical values. Hold Shift for 10 px steps.</p>}
                         {spacingSections.map(({ target: spacingTarget, configuration, computed, fields, entries }, sectionIndex) => {
                             const spacingTargetLabel = !configuration && kind === 'widget'
                                 ? 'Widget placement'
-                                : spacingTarget.displayLabel || spacingTarget.label
+                                : configuration && kind === 'widget'
+                                    ? `Widget content · ${spacingTarget.displayLabel || spacingTarget.label}`
+                                    : spacingTarget.displayLabel || spacingTarget.label
                             return <section key={targetFocusKey(spacingTarget)} className={sectionIndex > 0 ? 'border-t border-gray-200 pt-3' : ''}>
                                 {(kind === 'widget' || configuration || spacingSections.length > 1) && <h3 className="mb-2 text-sm font-medium text-gray-900">{spacingTargetLabel}</h3>}
                                 <FieldLayout fields={fields} renderField={(field, className) => {
@@ -2166,7 +2175,7 @@ const SemanticThemeWorkspace = ({
                                     </div>
                                     : <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Defined at {activeLabel}.</strong> Changes start here and are inherited by larger breakpoints without their own value.</p>)
                                     : <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global value.</strong> This spacing is the same at every breakpoint.</p>}
-                                <p className="text-xs text-gray-500">Spacing and column gaps can also be changed by clicking their labels in the preview. On an inherited level, that creates an override here.</p>
+                                <p className="text-xs text-gray-500">Select one or more measurements in the preview and use the arrow keys. Left/right changes horizontal values, up/down changes vertical values, and Shift changes in 10 px steps. An inherited level creates an override here.</p>
                                 {fields.length > 0
                                     ? <ValueFields idPrefix={`spacing-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={spacingLabels} disabled={!canEditSource} onOverride={isInherited && !canEditSource ? (field) => createSpacingOverride(row, field) : null} overrideLabel={activeLabel} onChange={(field, value) => ['layoutSlot', 'widget', 'widgetSlot', 'widgetPart'].includes(row.scope) ? updateStructuralSpacing(row, field, value) : updateWorkspace((next) => { next.spacing[index].values[field] = value; return next })} onRemove={index < 0 ? null : (field) => removeThemeValue('spacing', index, row, field, spacingLabels[field] || field)} />
                                     : <p className="rounded-md border border-dashed border-gray-300 p-3 text-xs text-gray-500">This target has no visible spacing at {activeLabel}.</p>}
