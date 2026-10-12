@@ -138,7 +138,8 @@ const targetPath = (node: HTMLElement, preferredTarget?: any) => {
     let current: HTMLElement | null = node
     let first = true
     while (current) {
-        const target = first && preferredTarget ? preferredTarget : nodeTargets(current)[0]
+        const candidate = first && preferredTarget ? preferredTarget : nodeTargets(current)[0]
+        const target = selectionKind(candidate) === 'widget' && candidate?.kind !== 'widget' ? null : candidate
         const widgetNode = current.closest<HTMLElement>('[data-widget-id]')
         const widgetId = target?.widgetId || widgetNode?.dataset.widgetId || ''
         const key = `${widgetId}:${target?.id || ''}:${target?.instanceId || ''}`
@@ -200,8 +201,12 @@ const selectionPaths = (node: HTMLElement, preferredTarget?: any, designer?: Ren
             ? [preferredTarget, ...targets.filter((target: any) => target.id !== preferredTarget.id)]
             : targets
         ;(['slot', 'widget', 'element'] as const).forEach((kind) => {
+            if (preferredTarget && preferredKind !== 'element' && kind === 'element') return
             if (first && preferredTarget && selectionRank[kind] > selectionRank[preferredKind]) return
-            const target = candidates.find((candidate: any) => selectionKind(candidate) === kind)
+            const target = candidates.find((candidate: any) => (
+                selectionKind(candidate) === kind
+                && (kind !== 'widget' || candidate.kind === 'widget')
+            ))
             const widgetNode = current?.closest<HTMLElement>('[data-widget-id]')
             const widgetId = target?.widgetId || widgetNode?.dataset.widgetId || ''
             const key = `${kind}:${widgetId}:${target?.id || ''}:${target?.instanceId || ''}`
@@ -385,7 +390,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     }
     let showSelectedSpacing: () => void = () => undefined
     let redrawSpacing: (node: HTMLElement) => void = () => undefined
-    const showSpacing = (node: HTMLElement, append = false, selectionLevel?: 'slot' | 'widget' | 'element') => {
+    const showSpacing = (node: HTMLElement, append = false, selectionLevel?: 'slot' | 'widget' | 'element', includeDescendantGrid = true) => {
         if (!append) {
             removeGuides()
             hoveredNode?.classList.remove('designer-hovered')
@@ -401,7 +406,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         const border = { top: number('border-top-width'), right: number('border-right-width'), bottom: number('border-bottom-width'), left: number('border-left-width') }
         const columnGrid = node.matches('.two-columns-widget,.three-columns-widget')
             ? node
-            : node.querySelector<HTMLElement>('.two-columns-widget,.three-columns-widget')
+            : includeDescendantGrid ? node.querySelector<HTMLElement>('.two-columns-widget,.three-columns-widget') : null
         const levelClass = selectionLevel
             ? ` designer-spacing-level-${selectionLevel}`
             : columnGrid === node ? ' designer-spacing-level-widget' : ''
@@ -687,7 +692,27 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         hoveredNode?.classList.add('designer-hovered')
         const levelByNode = new Map<HTMLElement, 'slot' | 'widget' | 'element'>()
         entries.forEach(([kind, node]) => levelByNode.set(node, kind))
-        levelByNode.forEach((kind, node) => showSpacing(node, true, kind))
+        const selectedWidgetRoot = selectedNodes.widget
+        const widgetConfigurationNodes: HTMLElement[] = []
+        if (selectedWidgetRoot) {
+            selectedWidgetRoot.querySelectorAll<HTMLElement>('[data-designer-target]').forEach((configurationNode) => {
+                if (configurationNode.closest<HTMLElement>('[data-widget-id]') !== selectedWidgetRoot) return
+                const hasEditableWidgetTarget = nodeTargets(configurationNode).some((target: any) => (
+                    selectionKind(target) === 'widget'
+                    && [target.id, target.styleTargetId].filter(Boolean).some((targetId) => (
+                        (designer.editableSpacingTargets?.[targetId] || []).length > 0
+                    ))
+                ))
+                if (hasEditableWidgetTarget && !levelByNode.has(configurationNode)) widgetConfigurationNodes.push(configurationNode)
+            })
+        }
+        levelByNode.forEach((kind, node) => showSpacing(
+            node,
+            true,
+            kind,
+            node !== selectedWidgetRoot || widgetConfigurationNodes.length === 0,
+        ))
+        widgetConfigurationNodes.forEach((configurationNode) => showSpacing(configurationNode, true, 'widget'))
         if (selectedNode?.matches('.two-columns-widget,.three-columns-widget') && !levelByNode.has(selectedNode)) {
             showSpacing(selectedNode, true, 'widget')
         }
