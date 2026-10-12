@@ -658,7 +658,7 @@ describe('RenderFrameRuntime designer overlay', () => {
 
         postMessage.mockClear()
         active = false
-        fireEvent.pointerUp(content)
+        fireEvent.pointerUp(document.body)
         await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'select',
             configurationSpacingTargets: expect.arrayContaining([expect.objectContaining({
@@ -669,7 +669,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         postMessage.mockRestore()
     })
 
-    it('uses comma-containing CSS-class selectors independently of stale widget metadata', async () => {
+    it('handles custom selector lists, escaped classes, and stale widget metadata', async () => {
         const pseudoWorkspace = structuredClone(workspace)
         pseudoWorkspace.catalog.designGroups = [0, 1].map((groupIndex) => ({
             id: `group:${groupIndex}`, groupIndex, label: `Content ${groupIndex + 1}`,
@@ -683,9 +683,9 @@ describe('RenderFrameRuntime designer overlay', () => {
         pseudoWorkspace.themeConfig = { designGroups: { groups: [
             {
                 widgetTypes: ['easy_widgets.HeroWidget'], targetingMode: 'css-classes',
-                targetCssClasses: '.widget-type-easy-widgets-contentwidget:is(.widget-item,.missing.extra)',
+                targetCssClasses: '.never\n.custom-scope:is(.widget-item,.missing.extra)\n.md\\:px-4',
             },
-            { widgetTypes: ['easy_widgets.ContentWidget'], variants: ['content-widget'] },
+            { widgetTypes: ['easy_widgets.ContentWidget'] },
         ] } }
         pseudoWorkspace.spacing = [0, 1].map((groupIndex) => ({
             targetId: `group:${groupIndex}:part:content-widget`, scope: 'layout', groupIndex,
@@ -693,7 +693,10 @@ describe('RenderFrameRuntime designer overlay', () => {
         }))
         pseudoWorkspace.constraints.editableSpacingProperties = ['paddingTop']
         const sourceModel = createPageRenderModel({
-            widgets: { main: [{ id: 'content-1', type: 'easy_widgets.ContentWidget', config: { content: '<h2>Pseudo content</h2>' } }] },
+            widgets: {
+                main: [{ id: 'content-1', type: 'easy_widgets.ContentWidget', config: { content: '<h2>Pseudo content</h2>' } }],
+                hero: [{ id: 'content-2', type: 'easy_widgets.ContentWidget', config: { content: '<h2>Plain content</h2>' } }],
+            },
         })
         const postMessage = vi.spyOn(window, 'postMessage')
         render(<RenderFrameRuntime />)
@@ -701,6 +704,7 @@ describe('RenderFrameRuntime designer overlay', () => {
 
         const widgetRoot = (await screen.findByRole('heading', { name: 'Pseudo content' }))
             .closest<HTMLElement>('[data-widget-id]')!
+        widgetRoot.classList.add('custom-scope')
         const content = widgetRoot.querySelector<HTMLElement>('.content-widget')!
         content.style.paddingTop = '20px'
         vi.spyOn(content, 'getBoundingClientRect').mockReturnValue({
@@ -714,6 +718,14 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview', action: 'spacingChange',
             targetId: 'group:0:part:content-widget', property: 'paddingTop', value: '21px',
+        }), '*')
+
+        postMessage.mockClear()
+        const plainContent = screen.getByRole('heading', { name: 'Plain content' }).closest<HTMLElement>('.content-widget')!
+        plainContent.classList.add('md:px-4')
+        fireEvent.click(plainContent)
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'select', targetId: 'group:1:part:content-widget',
         }), '*')
         postMessage.mockRestore()
     })
@@ -740,7 +752,10 @@ describe('RenderFrameRuntime designer overlay', () => {
             part: 'content-widget', breakpoint: 'md', values: { paddingLeft: '10px' },
         }, {
             targetId: 'group:1:part:content-widget', scope: 'layout', groupIndex: 1,
-            part: 'content-widget', breakpoint: 'xs', values: { paddingTop: '20px' },
+            part: 'content-widget', breakpoint: 'default', values: { paddingTop: '20px', marginTop: '' },
+        }, {
+            targetId: 'group:1:part:content-widget', scope: 'layout', groupIndex: 1,
+            part: 'content-widget', breakpoint: 'mobile', values: { paddingTop: '', marginTop: '5px' },
         }]
         breakpointWorkspace.constraints.editableSpacingProperties = ['paddingTop']
         const sourceModel = createPageRenderModel({

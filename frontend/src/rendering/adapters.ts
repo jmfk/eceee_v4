@@ -33,7 +33,10 @@ const resolvedSpacingRows = (rows: any[]) => {
     const rawBreakpoints = new Map<string, Record<string, any>>()
     rows.forEach((row) => {
         const breakpoint = String(row.breakpoint || 'xs')
-        rawBreakpoints.set(breakpoint, { ...(rawBreakpoints.get(breakpoint) || {}), ...(row.values || {}) })
+        const sparseValues = Object.fromEntries(Object.entries(row.values || {}).filter(([, value]) => (
+            value !== '' && value !== null && value !== undefined
+        )))
+        rawBreakpoints.set(breakpoint, { ...(rawBreakpoints.get(breakpoint) || {}), ...sparseValues })
     })
     const merge = (...breakpoints: string[]) => Object.assign({}, ...breakpoints.map((breakpoint) => rawBreakpoints.get(breakpoint) || {}))
     const resolved = [
