@@ -399,11 +399,11 @@ describe('RenderFrameRuntime designer overlay', () => {
         postMessage.mockRestore()
     })
 
-    it('deduplicates equivalent design-group spacing targets within a widget', async () => {
+    it('keeps every equivalent design-group spacing target behind one widget surface', async () => {
         const duplicatedWorkspace = structuredClone(workspace)
         duplicatedWorkspace.catalog.designGroups = [0, 1].map((groupIndex) => ({
             id: `group:${groupIndex}`, groupIndex, label: `Content ${groupIndex + 1}`,
-            widgetTypes: ['easy_widgets.ContentWidget'], slots: ['main'], elements: [], assetKeys: [],
+            widgetTypes: ['easy_widgets.ContentWidget'], slots: groupIndex === 0 ? ['main'] : [], elements: [], assetKeys: [],
             parts: [{
                 id: `group:${groupIndex}:part:content-widget`, part: 'content-widget',
                 label: 'Content area', editableSpacingProperties: ['paddingTop'], isWidgetSurface: true,
@@ -429,8 +429,10 @@ describe('RenderFrameRuntime designer overlay', () => {
         const selection = postMessage.mock.calls
             .map(([message]) => message)
             .find((message) => message?.action === 'select' && message?.targetId === 'widget:content-1')
-        expect(selection?.configurationSpacingTargets).toHaveLength(1)
-        expect(selection?.configurationSpacingTargets?.[0].id).toBe('group:1:part:content-widget')
+        expect(selection?.configurationSpacingTargets?.map((target: any) => target.id)).toEqual([
+            'group:1:part:content-widget',
+            'group:0:part:content-widget',
+        ])
         postMessage.mockRestore()
     })
 
