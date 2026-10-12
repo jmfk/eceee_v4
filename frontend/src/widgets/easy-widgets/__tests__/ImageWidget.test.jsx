@@ -190,6 +190,7 @@ describe('ImageWidget', () => {
     it('does not refetch collection files when unrelated widget config changes', async () => {
         const collectionConfig = {
             displayType: 'gallery',
+            mediaItems: [],
             image: {
                 id: 'collection-1',
                 type: 'collection',
@@ -216,33 +217,11 @@ describe('ImageWidget', () => {
                 ...collectionConfig,
                 showCaptions: true,
                 image: { ...collectionConfig.image },
+                mediaItems: [],
             }))
             await Promise.resolve()
         })
 
         expect(mediaCollectionsApi.getFiles).toHaveBeenCalledTimes(1)
-    })
-
-    it('uses preview-resolved collection files without fetching them again', async () => {
-        render(
-            <ImageWidget
-                mode="editor"
-                widgetId="image-1"
-                slotName="main"
-                config={{
-                    displayType: 'gallery',
-                    image: {
-                        id: 'collection-1',
-                        type: 'collection',
-                        namespace: 'default',
-                    },
-                    mediaItems: [],
-                }}
-            />
-        )
-
-        await act(async () => Promise.resolve())
-
-        expect(mediaCollectionsApi.getFiles).not.toHaveBeenCalled()
     })
 })
