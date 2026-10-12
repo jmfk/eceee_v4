@@ -19,7 +19,7 @@ vi.mock('../../../hooks/useTheme', () => ({
 import ThreeColumnsWidget from '../ThreeColumnsWidget'
 
 describe('ThreeColumnsWidget display markup', () => {
-    it('preserves the public class contract used by theme CSS', () => {
+    it('preserves the semantic class contract used by theme CSS', () => {
         const { container } = render(
             <ThreeColumnsWidget
                 mode="display"
@@ -38,7 +38,6 @@ describe('ThreeColumnsWidget display markup', () => {
         const root = container.firstElementChild
         expect(root).toHaveClass(
             'three-columns-widget',
-            'widget-type-easy-widgets-threecolumnswidget',
             'three-col-ratio-2-2-2'
         )
         expect(screen.getByTestId('nested-nested-1').parentElement).toHaveClass('three-col-widget-wrapper')

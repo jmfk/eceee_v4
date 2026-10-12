@@ -4,7 +4,7 @@ import { processNavigationItems } from '../utils/navigationItems'
 import { asArray, EmptyRender, formatDisplayDate, formatDisplayDateTime, imageUrl, ImageView, normalizeContentMediaHtml, PreviewLink, RenderFailure, SafeHtml, sanitizeHtml, TextWithBreaks, value } from './primitives'
 import { imageWidgetMediaItems, isImageCollectionReference } from '../utils/imageWidgetMedia'
 
-const ContentRender: WidgetRenderComponent = ({ widget }) => <div className="widget-type-easy-widgets-contentwidget">
+const ContentRender: WidgetRenderComponent = ({ widget }) => <div>
     <SafeHtml className={`content-widget${value(widget.config, 'variantClasses') ? ` ${value(widget.config, 'variantClasses')}` : ''}${value(widget.config, 'showBorder', 'show_border') ? ' border-enabled' : ''}`} html={normalizeContentMediaHtml(value(widget.config, 'content', 'html'))} />
 </div>
 
@@ -42,7 +42,7 @@ const HeadlineRender: WidgetRenderComponent = ({ widget }) => {
     const Tag = (/^h[1-6]$/.test(requested) ? requested : `h${Math.min(6, Math.max(1, Number(requested) || 1))}`) as React.ElementType
     const content = value(widget.config, 'content', 'text', 'headline')
     if (!content) return null
-    return <div className={`headline-widget widget-type-easy-widgets-headlinewidget cms-content${value(widget.config, 'showBorder', 'show_border') ? '' : ' border-disabled'}`} id={value(widget.config, 'anchor') || undefined}>
+    return <div className={`headline-widget cms-content${value(widget.config, 'showBorder', 'show_border') ? '' : ' border-disabled'}`} id={value(widget.config, 'anchor') || undefined}>
         <Tag className="headline-content"><SafeHtml as="span" html={content} /></Tag>
     </div>
 }
@@ -52,7 +52,7 @@ const HeaderRender: WidgetRenderComponent = ({ widget }) => (
 )
 
 const FooterRender: WidgetRenderComponent = ({ widget, renderWidgets }) => (
-    <footer className="footer-widget widget-type-easy-widgets-footerwidget" data-slot="content" data-widget-slot="content" data-owner-widget-type={widget.type} style={{
+    <footer className="footer-widget" data-slot="content" data-widget-slot="content" data-owner-widget-type={widget.type} style={{
         backgroundColor: value(widget.config, 'backgroundColor', 'background_color') || undefined,
         backgroundImage: imageUrl(value(widget.config, 'backgroundImage', 'background_image')) ? `url('${imageUrl(value(widget.config, 'backgroundImage', 'background_image'))}')` : undefined,
         backgroundSize: value(widget.config, 'backgroundSize', 'background_size') || undefined,
@@ -68,7 +68,7 @@ const FooterRender: WidgetRenderComponent = ({ widget, renderWidgets }) => (
 const HeroRender: WidgetRenderComponent = ({ widget }) => {
     const background = value(widget.config, 'backgroundImageUrl', 'background_image_url') || imageUrl(value(widget.config, 'image', 'backgroundImage', 'background_image'))
     const background2x = value(widget.config, 'backgroundImageUrl2x', 'background_image_url_2x')
-    return <div className="hero-widget widget-type-easy-widgets-herowidget cms-content" style={{
+    return <div className="hero-widget cms-content" style={{
         '--hero-text-color': value(widget.config, 'textColor', 'text_color') || '#ffffff',
         '--hero-decor-color': value(widget.config, 'decorColor', 'decor_color') || '#cccccc',
         '--hero-bg-color': value(widget.config, 'backgroundColor', 'background_color') || '#000000',
@@ -93,7 +93,7 @@ const BannerRender: WidgetRenderComponent = ({ widget }) => {
     const image = value(config, 'image1Url', 'image_1_url') || imageUrl(value(config, 'image1', 'image_1'))
     const image2x = value(config, 'image1Url2x', 'image_1_url_2x')
     return <div
-        className={`banner-widget widget-type-easy-widgets-bannerwidget cms-content${value(config, 'showBorder', 'show_border') ? ' border-enabled' : ''}`}
+        className={`banner-widget cms-content${value(config, 'showBorder', 'show_border') ? ' border-enabled' : ''}`}
         id={value(config, 'anchor') || undefined}
         style={{ backgroundColor: value(config, 'backgroundColor', 'background_color') || '#ffffff', color: value(config, 'textColor', 'text_color') || '#000000' }}
     >
@@ -111,7 +111,7 @@ const BioRender: WidgetRenderComponent = ({ widget }) => {
     const caption = value(config, 'caption')
     const textLayout = value(config, 'textLayout', 'text_layout') || 'column'
     return <div
-        className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget`}
+        className={`bio-widget bio-widget--${textLayout}`}
         id={value(config, 'anchor') || undefined}
     >
         <div className="bio-widget__container">
@@ -158,7 +158,7 @@ const ImageRender: WidgetRenderComponent = ({ widget }) => {
         return () => window.clearInterval(interval)
     }, [autoPlay, autoPlayInterval, displayType, items.length])
     if ((displayType === 'gallery' || displayType === 'carousel') && items.length) {
-        return <div className="image-widget widget-type-easy-widgets-imagewidget cms-content" data-widget-type={displayType}>
+        return <div className="image-widget cms-content" data-widget-type={displayType}>
             <div className={displayType === 'gallery' ? 'gallery-container' : 'carousel-container'}>
                 <div className={displayType === 'gallery' ? 'gallery-grid' : 'carousel-track'} style={displayType === 'gallery'
                     ? { gridTemplateColumns: `repeat(${value(config, 'galleryColumns', 'gallery_columns') || 3}, 1fr)` }
@@ -188,7 +188,7 @@ const ImageRender: WidgetRenderComponent = ({ widget }) => {
     const alt = source && typeof source === 'object'
         ? source.altText || source.alt_text || source.alt || source.title || value(config, 'altText', 'alt_text', 'alt') || ''
         : value(config, 'altText', 'alt_text', 'alt') || ''
-    return <div className={`image-widget widget-type-easy-widgets-imagewidget image-size-${value(config, 'size') || 'medium'} image-align-${value(config, 'alignment') || 'center'} cms-content`}>
+    return <div className={`image-widget image-size-${value(config, 'size') || 'medium'} image-align-${value(config, 'alignment') || 'center'} cms-content`}>
         <figure className="image-container">
             <ImageView source={source} alt={alt} className="widget-image" />
             {value(config, 'caption') && <figcaption className="image-caption">{value(config, 'caption')}</figcaption>}
@@ -204,7 +204,7 @@ const ContentCardRender: WidgetRenderComponent = ({ widget }) => {
     const imageSize = value(config, 'imageSize', 'image_size') || 'square'
     if (!header && !content && !imageUrl(image)) return null
     return <div
-        className={`content-card-widget widget-type-easy-widgets-contentcardwidget cms-content${value(config, 'showBorder', 'show_border') === false ? ' border-disabled' : ''}`}
+        className={`content-card-widget cms-content${value(config, 'showBorder', 'show_border') === false ? ' border-disabled' : ''}`}
         id={value(config, 'anchor') || undefined}
     >
         {header && <h2 className="content-card-header"><TextWithBreaks>{header}</TextWithBreaks></h2>}
@@ -271,7 +271,6 @@ const TableRender: WidgetRenderComponent = ({ widget }) => {
     if (!rows.length) return <EmptyRender>No table data</EmptyRender>
     const showBorders = value(config, 'showBorders', 'show_borders') !== false
     const className = [
-        'widget-type-easy-widgets-tablewidget',
         'table-widget',
         'cms-content',
         showBorders ? '' : 'table-no-borders',
@@ -356,12 +355,12 @@ const NavigationRender: WidgetRenderComponent = ({ widget, context }) => {
     if (style === 'sub-page-navigation' && publisherNavigation?.isInherited) {
         const children = processNavigationItems(publisherNavigation.currentChildren)
         const parent = publisherNavigation.parentPage
-        if (children.length) return <nav className="current-page-menu widget-type-navigation widget-type-easy-widgets-navigationwidget"><CurrentNavigationList items={children} /></nav>
-        if (Number(publisherNavigation.depth) >= 2 && parent?.path) return <nav className="current-page-menu widget-type-navigation widget-type-easy-widgets-navigationwidget"><ul className="current-menu-list"><li className="current-menu-item"><PreviewLink href={parent.path}>← Back to {parent.title}</PreviewLink></li></ul></nav>
+        if (children.length) return <nav className="current-page-menu widget-type-navigation"><CurrentNavigationList items={children} /></nav>
+        if (Number(publisherNavigation.depth) >= 2 && parent?.path) return <nav className="current-page-menu widget-type-navigation"><ul className="current-menu-list"><li className="current-menu-item"><PreviewLink href={parent.path}>← Back to {parent.title}</PreviewLink></li></ul></nav>
         return null
     }
     const items = sameSiteNavigationItems(widget.config, context)
-    return <nav className="navigation-widget widget-type-navigation widget-type-easy-widgets-navigationwidget">{items.length ? <NavigationList items={items} className="nav-container" /> : null}</nav>
+    return <nav className="navigation-widget widget-type-navigation">{items.length ? <NavigationList items={items} className="nav-container" /> : null}</nav>
 }
 
 const NavbarRender: WidgetRenderComponent = ({ widget, context }) => {
@@ -403,7 +402,7 @@ const SidebarRender: WidgetRenderComponent = ({ widget }) => {
     const sections = asArray<any>(value(config, 'widgets'))
     const background = imageUrl(value(config, 'backgroundImage', 'background_image'))
     return <aside
-        className={`widget-type-easy-widgets-sidebarwidget position-${value(config, 'position') || 'right'}${value(config, 'collapsible') ? ' collapsible' : ''}${value(config, 'cssClass', 'css_class') ? ` ${value(config, 'cssClass', 'css_class')}` : ''}`}
+        className={`sidebar-widget position-${value(config, 'position') || 'right'}${value(config, 'collapsible') ? ' collapsible' : ''}${value(config, 'cssClass', 'css_class') ? ` ${value(config, 'cssClass', 'css_class')}` : ''}`}
         style={{
             backgroundColor: value(config, 'backgroundColor', 'background_color') || undefined,
             backgroundImage: background ? `url('${background}')` : undefined,
@@ -519,7 +518,7 @@ const FormRender: WidgetRenderComponent = ({ widget, context }) => {
         {result === 'error' && <div className="form-error" role="alert">{value(config, 'errorMessage', 'error_message') || 'There was an error submitting the form. Please try again.'}</div>}
         {publicWithoutHandler && <div className="form-error" role="alert">Form submission is currently unavailable.</div>}
     </>
-    return <div className="widget-type-easy-widgets-formswidget" data-widget-type="forms">
+    return <div data-widget-type="forms">
         {value(config, 'title', 'formTitle', 'form_title') && <header className="form-header">
             <h2 className="form-title">{value(config, 'title', 'formTitle', 'form_title')}</h2>
             {value(config, 'description', 'formDescription', 'form_description') && <p className="form-description">{value(config, 'description', 'formDescription', 'form_description')}</p>}
@@ -540,7 +539,7 @@ const ColumnRender = ({ widget, renderWidgets, count }: WidgetRenderProps & { co
     const layoutStyle = value(widget.config, 'layoutStyle', 'layout_style')
     const ratio = value(widget.config, 'ratioClass', 'ratio_class')
         || (layoutStyle ? `${count === 2 ? 'two' : 'three'}-col-ratio-${layoutStyle.replaceAll(':', '-')}` : '')
-    return <div className={`${base} widget-type-easy-widgets-${count === 2 ? 'twocolumnswidget' : 'threecolumnswidget'} ${ratio}`} data-widget-type={count === 2 ? 'two-columns' : 'three-columns'}>
+    return <div className={`${base} ${ratio}`} data-widget-type={count === 2 ? 'two-columns' : 'three-columns'}>
         {names.map((name) => <div key={name} className={`${slotBase}-slot ${name}`} data-slot={name} data-widget-slot={name} data-owner-widget-type={widget.type}>{asArray<RenderWidgetModel>(slots[name]).map((nested, index) => <div className={`${slotBase}-widget-wrapper`} key={nested.id || index}>{renderWidgets([nested])}</div>)}</div>)}
     </div>
 }
@@ -564,12 +563,12 @@ const SectionRender: WidgetRenderComponent = ({ widget, renderWidgets }) => {
     }, [accordion, collapsible, widget.id])
     if (!content.length) return null
     const variants = value(widget.config, 'variantClasses') ? ` ${value(widget.config, 'variantClasses')}` : ''
-    if (!collapsible) return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} data-slot="content" data-widget-slot="content" data-owner-widget-type={widget.type} className={`section-content-only-widget${variants}${bordered ? ' border-enabled' : ''}`}>{renderWidgets(content)}</div></div>
+    if (!collapsible) return <div><div id={value(widget.config, 'anchor') || undefined} data-slot="content" data-widget-slot="content" data-owner-widget-type={widget.type} className={`section-content-only-widget${variants}${bordered ? ' border-enabled' : ''}`}>{renderWidgets(content)}</div></div>
     const toggleExpanded = () => setExpanded((current) => {
         if (!current && accordion) window.dispatchEvent(new CustomEvent('eceee-section-expand', { detail: widget.id }))
         return !current
     })
-    return <div className="widget-type-easy-widgets-sectionwidget"><div id={value(widget.config, 'anchor') || undefined} data-accordion-mode={accordion || undefined} className={`section-widget${variants}${bordered ? ' border-enabled' : ''}${expanded ? '' : ' section-collapsed'}`}>
+    return <div><div id={value(widget.config, 'anchor') || undefined} data-accordion-mode={accordion || undefined} className={`section-widget${variants}${bordered ? ' border-enabled' : ''}${expanded ? '' : ' section-collapsed'}`}>
         <div className="slot-section-content" data-slot="content" data-widget-slot="content" data-owner-widget-type={widget.type}>
             {renderWidgets(content.slice(0, 1))}
             {expanded && <div className="section-remaining-content">{renderWidgets(content.slice(1))}</div>}

@@ -27,7 +27,7 @@ const editableTextLabel = (node: HTMLElement) => {
     return ({ A: 'Link text', BLOCKQUOTE: 'Quote text', CAPTION: 'Table caption', CODE: 'Code text', FIGCAPTION: 'Image caption', LI: 'List item text', P: 'Paragraph text', PRE: 'Preformatted text' } as Record<string, string>)[node.tagName] || 'Text'
 }
 
-const DESIGNER_CSS = `.designer-preview [data-designer-target]{cursor:pointer}[data-designer-target].designer-selected-slot{outline:3px solid #eab308!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget{box-shadow:inset 0 0 0 3px #16a34a!important}[data-designer-target].designer-selected-element{outline:3px solid #2563eb!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget.designer-selected-element{box-shadow:inset 0 0 0 3px #16a34a,0 0 0 3px #2563eb!important}[data-designer-target].designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:0 0 0 3px rgba(245,158,11,.2)!important}[data-designer-target].designer-selected.designer-highlighted{outline-offset:-3px!important}[data-designer-target].designer-selected-slot.designer-highlighted{outline:3px solid #eab308!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget.designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:inset 0 0 0 3px #16a34a!important}[data-designer-target].designer-selected-element.designer-highlighted{outline:3px solid #2563eb!important;outline-offset:-3px!important}[data-designer-target].designer-selected-widget.designer-selected-element.designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:inset 0 0 0 3px #16a34a,0 0 0 3px #2563eb!important}.designer-guides .designer-hovered:not(.designer-selected):not(.designer-highlighted){outline:2px dotted #2563eb!important;outline-offset:-2px!important}
+const DESIGNER_CSS = `.designer-preview [data-designer-target]{cursor:pointer}.designer-selection-outline{position:fixed!important;z-index:2147483646!important;box-sizing:border-box!important;border:1px solid!important;background:transparent!important;pointer-events:none!important}.designer-selection-outline-slot{border-color:#eab308!important}.designer-selection-outline-widget{border-color:#16a34a!important}.designer-selection-outline-element{border-color:#2563eb!important}[data-designer-target].designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:0 0 0 3px rgba(245,158,11,.2)!important}.designer-guides .designer-hovered:not(.designer-selected):not(.designer-highlighted){outline:2px dotted #2563eb!important;outline-offset:-2px!important}
 .designer-context-menu{position:fixed!important;z-index:2147483647!important;min-width:180px!important;max-width:260px!important;padding:6px!important;border:1px solid #d1d5db!important;border-radius:8px!important;background:#fff!important;box-shadow:0 10px 24px rgba(15,23,42,.2)!important;color:#111827!important;font:500 13px/1.35 system-ui,sans-serif!important}.designer-context-menu-title{overflow:hidden!important;padding:5px 8px 7px!important;color:#6b7280!important;font-size:11px!important;font-weight:600!important;text-overflow:ellipsis!important;white-space:nowrap!important}.designer-context-menu button{display:block!important;width:100%!important;padding:7px 8px!important;border:0!important;border-radius:5px!important;background:transparent!important;color:#111827!important;font:inherit!important;text-align:left!important;cursor:pointer!important}.designer-context-menu button:hover,.designer-context-menu button:focus-visible{background:#eff6ff!important;color:#1d4ed8!important;outline:none!important}
 .designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483644!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483645!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483645!important;transform:translate(-50%,-50%);padding:2px 3px!important;border:0!important;border-radius:3px!important;background:#fff!important;font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;box-shadow:0 0 0 1px rgba(255,255,255,.9)!important}.designer-spacing-value[data-editable="true"]{pointer-events:auto!important;cursor:pointer!important;box-shadow:0 0 0 1px currentColor!important}.designer-spacing-value[data-editable="true"]:hover,.designer-spacing-value[data-editable="true"]:focus-visible{outline:2px solid #2563eb!important;outline-offset:1px!important}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}.designer-spacing-editor{position:fixed!important;z-index:2147483647!important;display:flex!important;gap:4px!important;padding:5px!important;border:1px solid #93c5fd!important;border-radius:6px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.22)!important}.designer-spacing-editor input{width:72px!important;padding:5px 6px!important;border:1px solid #d1d5db!important;border-radius:4px!important;font:500 12px/1.2 system-ui,sans-serif!important}.designer-spacing-editor button{min-width:28px!important;padding:5px 7px!important;border:0!important;border-radius:4px!important;background:#2563eb!important;color:#fff!important;font:600 12px/1.2 system-ui,sans-serif!important;cursor:pointer!important}.designer-spacing-editor .designer-spacing-step{background:#e5e7eb!important;color:#111827!important;font-size:16px!important}
 .designer-spacing-guide.designer-spacing-level-slot.designer-spacing-margin{background:rgba(234,179,8,.2)!important}.designer-spacing-guide.designer-spacing-level-slot.designer-spacing-padding{background:rgba(234,179,8,.32)!important}.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-margin{background:rgba(22,163,74,.18)!important}.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-padding,.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-gap{background:rgba(22,163,74,.3)!important}.designer-spacing-guide.designer-spacing-level-element.designer-spacing-margin{background:rgba(37,99,235,.18)!important}.designer-spacing-guide.designer-spacing-level-element.designer-spacing-padding{background:rgba(37,99,235,.3)!important}.designer-spacing-content.designer-spacing-level-slot,.designer-spacing-content.designer-spacing-level-widget,.designer-spacing-content.designer-spacing-level-element{box-sizing:border-box!important;border-style:solid!important;border-width:2px!important}.designer-spacing-content.designer-spacing-level-slot{border-color:#ca8a04!important}.designer-spacing-content.designer-spacing-level-widget{border-color:#16a34a!important}.designer-spacing-content.designer-spacing-level-element{border-color:#2563eb!important}.designer-column-slot-guide{box-sizing:border-box!important;border:2px solid #eab308!important;background:rgba(234,179,8,.06)!important}.designer-spacing-value.designer-spacing-level-slot{background:#fefce8!important;color:#854d0e!important}.designer-spacing-value.designer-spacing-level-widget{background:#f0fdf4!important;color:#166534!important}.designer-spacing-value.designer-spacing-level-element{background:#eff6ff!important;color:#1d4ed8!important}.designer-spacing-measure.designer-spacing-level-slot,.designer-spacing-measure.designer-spacing-level-slot::before,.designer-spacing-measure.designer-spacing-level-slot::after{background:#eab308!important;box-shadow:0 0 0 1px #854d0e!important}.designer-spacing-measure.designer-spacing-level-widget,.designer-spacing-measure.designer-spacing-level-widget::before,.designer-spacing-measure.designer-spacing-level-widget::after{background:#16a34a!important;box-shadow:0 0 0 1px #166534!important}.designer-spacing-measure.designer-spacing-level-element,.designer-spacing-measure.designer-spacing-level-element::before,.designer-spacing-measure.designer-spacing-level-element::after{background:#2563eb!important;box-shadow:0 0 0 1px #1d4ed8!important}
@@ -163,6 +163,12 @@ const selectionKind = (target: any): 'slot' | 'widget' | 'element' => target?.ki
         ? 'widget'
         : 'element'
 
+const configurationSpacingTargetKey = (target: any) => {
+    const targetId = target?.styleTargetId || target?.id || ''
+    const designGroupPart = targetId.match(/^group:[^:]+:part:(.+)$/)
+    return designGroupPart ? `design-group-part:${designGroupPart[1]}` : targetId
+}
+
 const widgetSpacingConfigurationTargets = (
     node: HTMLElement,
     designer: RenderPageModel['designer'],
@@ -176,9 +182,10 @@ const widgetSpacingConfigurationTargets = (
         if (configurationNode.closest<HTMLElement>('[data-widget-id]') !== widgetRoot) return []
         return nodeTargets(configurationNode).flatMap((candidate: any) => {
             const targetId = candidate.styleTargetId || candidate.id
+            const targetKey = configurationSpacingTargetKey(candidate)
             const editableFields = designer.editableSpacingTargets?.[targetId] || []
-            if (!targetId || !editableFields.length || selectionKind(candidate) !== 'widget' || seen.has(targetId)) return []
-            seen.add(targetId)
+            if (!targetId || !editableFields.length || selectionKind(candidate) !== 'widget' || seen.has(targetKey)) return []
+            seen.add(targetKey)
             return [{
                 ...candidate,
                 widgetId: candidate.widgetId || widgetRoot.dataset.widgetId || '',
@@ -342,9 +349,11 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     if (!designer) return () => undefined
     const cleanups: Array<() => void> = []
     let guides: HTMLElement[] = []
+    let selectionOutlines: HTMLElement[] = []
     let hoveredNode: HTMLElement | null = null
     let selectedNode: HTMLElement | null = null
     let selectedNodes: Record<'slot' | 'widget' | 'element', HTMLElement | null> = { slot: null, widget: null, element: null }
+    let previewedSelectionLevel: 'slot' | 'widget' | 'element' | null = null
     let contextMenu: HTMLElement | null = null
     let spacingEditor: { element: HTMLFormElement, node: HTMLElement, property: string, restore: () => void } | null = null
     if (designer.layoutCanvas) {
@@ -367,6 +376,10 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         })
     }
     const closeContextMenu = () => { contextMenu?.remove(); contextMenu = null }
+    const removeSelectionOutlines = () => {
+        selectionOutlines.forEach((outline) => outline.remove())
+        selectionOutlines = []
+    }
     const closeSpacingEditor = (restore = true) => {
         if (restore) spacingEditor?.restore()
         spacingEditor?.element.remove()
@@ -681,8 +694,31 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     const selectedNodeEntries = () => (Object.entries(selectedNodes) as Array<['slot' | 'widget' | 'element', HTMLElement | null]>)
         .filter((entry): entry is ['slot' | 'widget' | 'element', HTMLElement] => Boolean(entry[1] && root.contains(entry[1])))
     const selectedNodeList = () => [...new Set(selectedNodeEntries().map(([, node]) => node))]
+    const drawSelectionOutlines = () => {
+        removeSelectionOutlines()
+        const entries = selectedNodeEntries()
+        const selectedEntry = previewedSelectionLevel
+            ? entries.find(([kind]) => kind === previewedSelectionLevel)
+            : entries.at(-1)
+        if (!selectedEntry) return
+        const [kind, node] = selectedEntry
+        const rect = node.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) return
+        const outline = document.createElement('div')
+        outline.className = `designer-selection-outline designer-selection-outline-${kind}`
+        outline.setAttribute('aria-hidden', 'true')
+        Object.assign(outline.style, {
+            left: `${rect.left - 1}px`,
+            top: `${rect.top - 1}px`,
+            width: `${rect.width + 2}px`,
+            height: `${rect.height + 2}px`,
+        })
+        document.body.append(outline)
+        selectionOutlines.push(outline)
+    }
     showSelectedSpacing = () => {
         const entries = selectedNodeEntries()
+        drawSelectionOutlines()
         if (!entries.length) {
             if (selectedNode && root.contains(selectedNode)) showSpacing(selectedNode)
             return
@@ -1162,6 +1198,8 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     const clearFocus = () => {
         selectedNode = null
         selectedNodes = { slot: null, widget: null, element: null }
+        previewedSelectionLevel = null
+        removeSelectionOutlines()
         closeContextMenu()
         closeSpacingEditor()
         clearGuides()
@@ -1174,6 +1212,12 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     root.addEventListener('mouseout', out)
     root.addEventListener('designerselect', selectFromInspector)
     root.addEventListener('designerclear', clearFocus)
+    const previewSelectionLevel = (event: Event) => {
+        const selectionLevel = event instanceof CustomEvent ? event.detail?.selectionLevel : null
+        previewedSelectionLevel = ['slot', 'widget', 'element'].includes(selectionLevel) ? selectionLevel : null
+        drawSelectionOutlines()
+    }
+    root.addEventListener('designerpreviewselectionlevel', previewSelectionLevel)
     window.addEventListener('scroll', refreshGuides, true)
     window.addEventListener('resize', refreshGuides)
     cleanups.push(() => {
@@ -1188,10 +1232,11 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         root.removeEventListener('mouseout', out)
         root.removeEventListener('designerselect', selectFromInspector)
         root.removeEventListener('designerclear', clearFocus)
+        root.removeEventListener('designerpreviewselectionlevel', previewSelectionLevel)
         window.removeEventListener('scroll', refreshGuides, true)
         window.removeEventListener('resize', refreshGuides)
     })
-    return () => { clearGuides(); closeSpacingEditor(); cleanups.forEach((cleanup) => cleanup()) }
+    return () => { clearGuides(); removeSelectionOutlines(); closeSpacingEditor(); cleanups.forEach((cleanup) => cleanup()) }
 }
 
 export const RenderFrameRuntime = () => {
@@ -1253,6 +1298,11 @@ export const RenderFrameRuntime = () => {
                     match?.classList.add('designer-highlighted')
                     match?.scrollIntoView?.({ block: 'nearest' })
                 }
+            }
+            if (event.data.action === 'previewSelectionLevel') {
+                rootRef.current?.dispatchEvent(new CustomEvent('designerpreviewselectionlevel', {
+                    detail: { selectionLevel: event.data.selectionLevel },
+                }))
             }
             if (event.data.action === 'readTargetStyles' && event.data.targetId) {
                 const match = findTargetNode(document, event.data.targetId, event.data.widgetId, event.data.targetInstanceId)

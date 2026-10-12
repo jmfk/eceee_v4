@@ -296,7 +296,7 @@ const FooterWidget = ({
 
     return (
         <footer
-            className="footer-widget widget-type-easy-widgets-footerwidget"
+            className="footer-widget"
             style={footerStyle}
         >
             {contentWidgets.length > 0 ? (

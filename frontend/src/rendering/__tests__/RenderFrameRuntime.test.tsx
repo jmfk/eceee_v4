@@ -257,7 +257,7 @@ describe('RenderFrameRuntime designer overlay', () => {
             source: window.parent,
         }))
         expect(heading).toHaveClass('designer-selected', 'designer-highlighted')
-        expect(getComputedStyle(heading).outline).toBe('3px solid #2563eb')
+        expect(getComputedStyle(heading).outline).toBe('3px dashed #d97706')
 
         fireEvent(window, new MessageEvent('message', {
             data: { source: 'eceee-render-host', action: 'highlightTarget', targetId: 'global-heading', active: false },
@@ -400,6 +400,41 @@ describe('RenderFrameRuntime designer overlay', () => {
         postMessage.mockRestore()
     })
 
+    it('deduplicates equivalent design-group spacing targets within a widget', async () => {
+        const duplicatedWorkspace = structuredClone(workspace)
+        duplicatedWorkspace.catalog.designGroups = [0, 1].map((groupIndex) => ({
+            id: `group:${groupIndex}`, groupIndex, label: `Content ${groupIndex + 1}`,
+            widgetTypes: ['easy_widgets.ContentWidget'], slots: ['main'], elements: [], assetKeys: [],
+            parts: [{
+                id: `group:${groupIndex}:part:content-widget`, part: 'content-widget',
+                label: 'Content area', editableSpacingProperties: ['paddingTop'],
+            }],
+        }))
+        duplicatedWorkspace.spacing = [0, 1].map((groupIndex) => ({
+            targetId: `group:${groupIndex}:part:content-widget`, scope: 'layout', groupIndex,
+            part: 'content-widget', values: { paddingTop: '30px' },
+        }))
+        duplicatedWorkspace.constraints.editableSpacingProperties = ['paddingTop']
+        const sourceModel = createPageRenderModel({
+            layout: 'main_layout',
+            widgets: { main: [{ id: 'content-1', type: 'easy_widgets.ContentWidget', config: { content: '<h2>Duplicated content</h2>' } }] },
+        })
+        const postMessage = vi.spyOn(window, 'postMessage')
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({ workspace: duplicatedWorkspace, sourceModel, contentEditable: false }))
+
+        const heading = await screen.findByRole('heading', { name: 'Duplicated content' })
+        const widgetRoot = heading.closest<HTMLElement>('[data-widget-id="content-1"]')!
+        fireEvent.click(widgetRoot)
+
+        const selection = postMessage.mock.calls
+            .map(([message]) => message)
+            .find((message) => message?.action === 'select' && message?.targetId === 'widget:content-1')
+        expect(selection?.configurationSpacingTargets).toHaveLength(1)
+        expect(selection?.configurationSpacingTargets?.[0].id).toMatch(/^group:\d+:part:content-widget$/)
+        postMessage.mockRestore()
+    })
+
     it('uses a semantic widget element instead of a generic theme element when both match', async () => {
         const semanticWorkspace = structuredClone(workspace)
         semanticWorkspace.catalog.designGroups = [{
@@ -460,7 +495,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         render(<RenderFrameRuntime />)
         const renderModel = createDesignerRenderModel({ workspace: headerWorkspace, sourceModel, contentEditable: false })
         expect(renderModel.designer?.editableSpacingTargets?.['widget-type:easy_widgets.HeaderWidget'])
-            .toEqual(expect.arrayContaining(['marginTop', 'paddingTop']))
+            .toEqual(['marginTop'])
         sendModel(renderModel)
 
         const header = document.querySelector('.header-widget') as HTMLElement
@@ -792,6 +827,33 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(columnsWidget).not.toHaveClass('designer-selected-widget')
         expect(nestedWidget).toHaveClass('designer-selected-widget')
         expect(selectedElement).toHaveClass('designer-selected-element')
+        expect(document.querySelector('.designer-selection-outline-slot')).not.toBeInTheDocument()
+        expect(document.querySelector('.designer-selection-outline-widget')).not.toBeInTheDocument()
+        let selectionOutline = document.querySelector<HTMLElement>('.designer-selection-outline-element')
+        expect(selectionOutline).toHaveStyle({ left: '79px', top: '89px', width: '302px', height: '82px' })
+        expect(getComputedStyle(selectionOutline!).pointerEvents).toBe('none')
+
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-host', action: 'previewSelectionLevel', selectionLevel: 'widget' },
+            source: window.parent,
+        }))
+        expect(document.querySelectorAll('.designer-selection-outline')).toHaveLength(1)
+        selectionOutline = document.querySelector<HTMLElement>('.designer-selection-outline-widget')
+        expect(selectionOutline).toHaveStyle({ left: '39px', top: '49px', width: '402px', height: '202px' })
+
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-host', action: 'previewSelectionLevel', selectionLevel: 'slot' },
+            source: window.parent,
+        }))
+        expect(document.querySelectorAll('.designer-selection-outline')).toHaveLength(1)
+        selectionOutline = document.querySelector<HTMLElement>('.designer-selection-outline-slot')
+        expect(selectionOutline).toHaveStyle({ left: '9px', top: '9px', width: '502px', height: '302px' })
+
+        fireEvent(window, new MessageEvent('message', {
+            data: { source: 'eceee-render-host', action: 'previewSelectionLevel' },
+            source: window.parent,
+        }))
+        expect(document.querySelector('.designer-selection-outline-element')).toBeInTheDocument()
         const spacingLabel = (selector: string, value: string) => [...document.querySelectorAll(selector)]
             .find((label) => label.textContent === value)
         const slotPaddingLabel = spacingLabel('.designer-spacing-padding-value[data-side="top"]', '11px')

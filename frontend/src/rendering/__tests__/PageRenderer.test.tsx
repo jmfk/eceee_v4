@@ -13,6 +13,17 @@ describe('PageRenderer', () => {
         expect(container.querySelector('.widget-header,.page-editor-widget,[contenteditable="true"]')).toBeNull()
     })
 
+    it.each(Object.keys(RENDER_WIDGET_FIXTURES))('keeps the canonical type class only on the %s widget frame', (type) => {
+        const fixture = getRenderFixture(type)!
+        const model = createPageRenderModel({ layout: 'main_layout', widgets: { main: [fixture] } })
+        const { container } = render(<PageRenderer model={model} />)
+        const typeClass = `widget-type-${type.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`
+        const widgetFrame = container.querySelector<HTMLElement>(`[data-widget-id="${fixture.id}"][data-widget-type="${type}"]`)
+
+        expect(widgetFrame).toHaveClass('widget-item', typeClass)
+        expect(widgetFrame?.querySelectorAll(`.${typeClass}`)).toHaveLength(0)
+    })
+
     it.each(Object.keys(RENDER_WIDGET_FIXTURES))('handles empty and malformed config for %s', (type) => {
         const emptyModel = createPageRenderModel({ layout: 'main_layout', widgets: { main: [{ id: 'empty', type, config: {} }] } })
         const malformedModel = createPageRenderModel({ layout: 'main_layout', widgets: { main: [{ id: 'malformed', type, config: null }] } })

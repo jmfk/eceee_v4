@@ -463,6 +463,17 @@ class DesignerThemeApiTests(TestCase):
         )
         banner_content = next(part for part in banner_parts["parts"] if part["part"] == "banner-text")
         self.assertEqual(banner_content["designerLevel"], "element")
+        content_parts = next(
+            widget
+            for widget in workspace["catalog"]["widgetParts"]
+            if widget["widgetType"] == "easy_widgets.ContentWidget"
+        )
+        content_area = next(part for part in content_parts["parts"] if part["part"] == "content-widget")
+        self.assertEqual(
+            content_area["editableSpacingProperties"],
+            ["paddingBottom", "paddingLeft", "paddingRight", "paddingTop"],
+        )
+        self.assertNotIn("margin", content_area["editableSpacingProperties"])
         self.assertNotIn("selector", str(workspace["catalog"]).lower())
         self.assertEqual(workspace["catalog"]["componentStyles"][0]["label"], "Feature card")
         self.assertTrue(workspace["catalog"]["layouts"])
@@ -484,7 +495,10 @@ class DesignerThemeApiTests(TestCase):
                 widget for widget in workspace["catalog"]["widgetParts"] if widget["widgetType"] == widget_type
             )
             column_part = next(part for part in column_parts["parts"] if part["part"] == part_name)
-            self.assertEqual(column_part["editableSpacingProperties"], ["gap"])
+            self.assertEqual(
+                column_part["editableSpacingProperties"],
+                ["gap", "paddingBottom", "paddingLeft", "paddingRight", "paddingTop"],
+            )
         self.assertIn('class="main-layout-container"', main_layout["previewTemplate"])
         self.assertIn("__DESIGNER_SLOT_main__", main_layout["previewTemplate"])
         self.assertTrue(main_layout["layoutCss"])
@@ -500,6 +514,10 @@ class DesignerThemeApiTests(TestCase):
             self.theme.design_groups["groups"][0]["elements"],
         )
         self.assertEqual(workspace["description"], "Theme for editorial sites")
+        self.assertEqual(
+            workspace["constraints"]["editableWidgetFrameSpacingProperties"],
+            ["margin", "marginBottom", "marginLeft", "marginRight", "marginTop"],
+        )
         self.assertEqual(
             {asset["assetKey"] for asset in workspace["assets"] if asset["kind"] in {"preview", "site-icon"}},
             {"preview", "site-icon"},

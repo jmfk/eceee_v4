@@ -241,7 +241,7 @@ const BioWidget = memo(({
     if (mode === 'editor') {
         return (
             <div
-                className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget relative group`}
+                className={`bio-widget bio-widget--${textLayout} relative group`}
                 {...(anchor && { id: anchor })}
             >
                 <div className="bio-widget__container">
@@ -316,7 +316,7 @@ const BioWidget = memo(({
 
     return (
         <div
-            className={`bio-widget bio-widget--${textLayout} widget-type-easy-widgets-biowidget`}
+            className={`bio-widget bio-widget--${textLayout}`}
             {...(anchor && { id: anchor })}
         >
             <div className="bio-widget__container">

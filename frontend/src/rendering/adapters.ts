@@ -244,8 +244,8 @@ export const createDesignerRenderModel = ({
     ])
     const genericWidgetSpacing = Object.fromEntries([...renderedWidgetTypes(slots)].map((widgetType) => [
         `widget-type:${widgetType}`,
-        (workspace?.constraints?.editableSpacingProperties || [])
-            .filter((field: string) => field.startsWith('margin') || field.startsWith('padding')),
+        workspace?.constraints?.editableWidgetFrameSpacingProperties
+            || (workspace?.constraints?.editableSpacingProperties || []).filter((field: string) => field.startsWith('margin')),
     ]))
     const editableSpacingTargets = (workspace?.spacing || []).reduce((targets: Record<string, string[]>, row: any) => {
         const fields = row.scope === 'layoutSlot'
