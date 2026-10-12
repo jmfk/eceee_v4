@@ -1086,6 +1086,7 @@ describe('DesignerThemeWorkspacePage', () => {
         const configurationSpacingTargets = [0, 1, 2].map((groupIndex) => ({
             id: `group:${groupIndex}:part:content-widget`, kind: 'part', label: 'Content widget container',
             widgetId: 'content-1', widgetType: 'easy_widgets.ContentWidget',
+            cascadePriority: groupIndex === 0 ? [0, 3, 0, 0] : [0, 2, 0, groupIndex],
             computedStyles: { paddingTop: '30px', paddingRight: '60px', paddingBottom: '30px', paddingLeft: '60px' },
         }))
 
@@ -1170,12 +1171,15 @@ describe('DesignerThemeWorkspacePage', () => {
         fireEvent.change(within(reopenedPanel).getByLabelText('widget Padding top'), { target: { value: '42px' } })
         fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
         await waitFor(() => expect(mocks.save).toHaveBeenCalled())
-        expect(mocks.save.mock.calls[0][1].spacing).toEqual(expect.arrayContaining([0, 1, 2].map((groupIndex) => (
-            expect.objectContaining({
-                scope: 'layout', groupIndex, part: 'content-widget', breakpoint: 'xl',
-                values: expect.objectContaining({ paddingTop: '42px' }),
-            })
-        ))))
+        const savedSpacing = mocks.save.mock.calls[0][1].spacing
+        expect(savedSpacing.find((row) => row.groupIndex === 0 && row.part === 'content-widget')).toEqual(expect.objectContaining({
+            scope: 'layout', breakpoint: 'xl', values: expect.objectContaining({ paddingTop: '42px' }),
+        }))
+        ;[1, 2].forEach((groupIndex) => {
+            expect(savedSpacing.find((row) => row.groupIndex === groupIndex && row.part === 'content-widget')).toEqual(expect.objectContaining({
+                scope: 'layout', breakpoint: 'xl', values: expect.objectContaining({ paddingTop: '30px' }),
+            }))
+        })
     })
 
     it('shows design-group properties directly below a selected element row', async () => {

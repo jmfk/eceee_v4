@@ -163,6 +163,23 @@ const selectionKind = (target: any): 'slot' | 'widget' | 'element' => target?.ki
         ? 'widget'
         : 'element'
 
+const cascadePriorityForGroupPart = (group: any) => [
+    0,
+    Number((group.widgetTypes || []).length > 0) + Number((group.slots || []).length > 0) + 1,
+    0,
+    Number(group.groupIndex) || 0,
+]
+
+const compareCascadePriority = (left: any, right: any) => {
+    const leftPriority = Array.isArray(left?.cascadePriority) ? left.cascadePriority : [0, 0, 0, -1]
+    const rightPriority = Array.isArray(right?.cascadePriority) ? right.cascadePriority : [0, 0, 0, -1]
+    for (let index = 0; index < Math.max(leftPriority.length, rightPriority.length); index += 1) {
+        const difference = Number(leftPriority[index] || 0) - Number(rightPriority[index] || 0)
+        if (difference) return difference
+    }
+    return 0
+}
+
 const widgetSpacingConfigurationTargets = (
     node: HTMLElement,
     designer: RenderPageModel['designer'],
@@ -493,7 +510,8 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             const property = propertyOverride || (spacing === 'gap' ? 'gap' : `${spacing}${side ? side[0].toUpperCase() + side.slice(1) : ''}`)
             const spacingDescription = propertyOverride || (spacing === 'gap' ? 'column gap' : `${spacing} ${side}`)
             const editNode = spacing === 'gap' && columnGrid ? columnGrid : node
-            const directTargetIds = nodeTargets(editNode).flatMap((target: any) => [target.id, target.styleTargetId]).filter(Boolean)
+            const directTargets = nodeTargets(editNode)
+            const directTargetIds = directTargets.flatMap((target: any) => [target.id, target.styleTargetId]).filter(Boolean)
             const targetIds: string[] = []
             let targetNode: HTMLElement | null = editNode
             while (targetNode && root.contains(targetNode)) {
@@ -503,9 +521,12 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                 })
                 targetNode = targetNode.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
             }
-            const editableTargetIds = [...new Set(directTargetIds.filter((targetId: string) => (
-                designer.editableSpacingTargets?.[targetId]?.includes(property)
-            )))]
+            const editableTargets = directTargets.flatMap((target: any) => (
+                [target.id, target.styleTargetId].filter(Boolean).flatMap((targetId) => (
+                    designer.editableSpacingTargets?.[targetId]?.includes(property) ? [{ ...target, targetId }] : []
+                ))
+            )).sort(compareCascadePriority).reverse()
+            const editableTargetIds = editableTargets.length ? [editableTargets[0].targetId] : []
             const spacingTargetId = editableTargetIds[0] || ''
             const editable = Boolean(spacingTargetId)
             label.setAttribute('aria-hidden', editable ? 'false' : 'true')
@@ -829,6 +850,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                     kind: widgetLevel ? 'part' : 'element',
                     label: part.label,
                     isWidgetSurface: part.isWidgetSurface === true,
+                    cascadePriority: cascadePriorityForGroupPart(group),
                     editable: false,
                 }, widgetLevel)
             }))

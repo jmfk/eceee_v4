@@ -416,14 +416,24 @@ describe('RenderFrameRuntime designer overlay', () => {
         duplicatedWorkspace.constraints.editableSpacingProperties = ['paddingTop']
         const sourceModel = createPageRenderModel({
             layout: 'main_layout',
-            widgets: { main: [{ id: 'content-1', type: 'easy_widgets.ContentWidget', config: { content: '<h2>Duplicated content</h2>' } }] },
+            widgets: {
+                main: [{ id: 'content-1', type: 'easy_widgets.ContentWidget', config: { content: '<h2>Main content</h2>' } }],
+                hero: [{ id: 'content-2', type: 'easy_widgets.ContentWidget', config: { content: '<h2>Other-slot content</h2>' } }],
+            },
         })
         const postMessage = vi.spyOn(window, 'postMessage')
         render(<RenderFrameRuntime />)
         sendModel(createDesignerRenderModel({ workspace: duplicatedWorkspace, sourceModel, contentEditable: false }))
 
-        const heading = await screen.findByRole('heading', { name: 'Duplicated content' })
+        const heading = await screen.findByRole('heading', { name: 'Main content' })
+        expect(screen.getByRole('heading', { name: 'Other-slot content' })).toBeInTheDocument()
         const widgetRoot = heading.closest<HTMLElement>('[data-widget-id="content-1"]')!
+        const content = widgetRoot.querySelector<HTMLElement>('.content-widget')!
+        content.style.paddingTop = '30px'
+        vi.spyOn(content, 'getBoundingClientRect').mockReturnValue({
+            x: 40, y: 40, left: 40, top: 40, right: 440, bottom: 240, width: 400, height: 200,
+            toJSON: () => ({}),
+        })
         fireEvent.click(widgetRoot)
 
         const selection = postMessage.mock.calls
@@ -433,6 +443,18 @@ describe('RenderFrameRuntime designer overlay', () => {
             'group:1:part:content-widget',
             'group:0:part:content-widget',
         ])
+        expect(selection?.configurationSpacingTargets?.map((target: any) => target.cascadePriority)).toEqual([
+            [0, 2, 0, 1],
+            [0, 3, 0, 0],
+        ])
+
+        postMessage.mockClear()
+        fireEvent.click(screen.getByRole('button', { name: 'Select padding top' }))
+        fireEvent.keyDown(document, { key: 'ArrowDown' })
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview', action: 'spacingChange',
+            targetId: 'group:0:part:content-widget', property: 'paddingTop', value: '31px',
+        }), '*')
         postMessage.mockRestore()
     })
 
