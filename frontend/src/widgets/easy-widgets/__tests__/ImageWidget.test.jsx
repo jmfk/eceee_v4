@@ -1,9 +1,10 @@
 import React from 'react'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let externalChangeCallbacks = []
 const imgproxyApi = vi.hoisted(() => ({ getUrl: vi.fn() }))
+const mediaCollectionsApi = vi.hoisted(() => ({ getFiles: vi.fn() }))
 
 vi.mock('../../../hooks/useTheme', () => ({
     useTheme: () => ({ currentTheme: null })
@@ -25,6 +26,10 @@ vi.mock('../../../contexts/unified-data/hooks', () => ({
 
 vi.mock('../../../utils/imgproxySecure', () => ({
     getImgproxyUrl: imgproxyApi.getUrl,
+}))
+
+vi.mock('../../../api/media', () => ({
+    mediaCollectionsApi,
 }))
 
 import ImageWidget from '../ImageWidget'
@@ -56,6 +61,7 @@ describe('ImageWidget', () => {
         vi.useFakeTimers()
         vi.clearAllMocks()
         imgproxyApi.getUrl.mockImplementation(sourceUrl => Promise.resolve(`/imgproxy/resize:fit/${sourceUrl}`))
+        mediaCollectionsApi.getFiles.mockImplementation(() => () => Promise.resolve({ results: [] }))
     })
 
     it('keeps randomized images in the same order across unrelated re-renders', async () => {
@@ -179,5 +185,64 @@ describe('ImageWidget', () => {
         )
 
         expect(await screen.findByRole('img', { name: 'Error page illustration' })).toHaveAttribute('src', inlineSvg)
+    })
+
+    it('does not refetch collection files when unrelated widget config changes', async () => {
+        const collectionConfig = {
+            displayType: 'gallery',
+            image: {
+                id: 'collection-1',
+                type: 'collection',
+                namespace: 'default',
+            },
+        }
+
+        render(
+            <ImageWidget
+                mode="editor"
+                widgetId="image-1"
+                slotName="main"
+                config={collectionConfig}
+            />
+        )
+
+        await waitFor(() => expect(mediaCollectionsApi.getFiles).toHaveBeenCalledTimes(1))
+
+        const subscription = externalChangeCallbacks.find(
+            item => item.componentId === 'imagewidget-image-1'
+        )
+        await act(async () => {
+            subscription.callback(stateWithConfig({
+                ...collectionConfig,
+                showCaptions: true,
+                image: { ...collectionConfig.image },
+            }))
+            await Promise.resolve()
+        })
+
+        expect(mediaCollectionsApi.getFiles).toHaveBeenCalledTimes(1)
+    })
+
+    it('uses preview-resolved collection files without fetching them again', async () => {
+        render(
+            <ImageWidget
+                mode="editor"
+                widgetId="image-1"
+                slotName="main"
+                config={{
+                    displayType: 'gallery',
+                    image: {
+                        id: 'collection-1',
+                        type: 'collection',
+                        namespace: 'default',
+                    },
+                    mediaItems: [],
+                }}
+            />
+        )
+
+        await act(async () => Promise.resolve())
+
+        expect(mediaCollectionsApi.getFiles).not.toHaveBeenCalled()
     })
 })

@@ -1,6 +1,7 @@
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import connection
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -41,6 +42,13 @@ class CeleryScheduleTest(TestCase):
         task = app.conf.beat_schedule["refresh-scheduled-publication-caches"]
 
         self.assertEqual(task["task"], "webpages.tasks.refresh_scheduled_publication_caches")
+
+
+class RedisChannelLayerConfigurationTest(SimpleTestCase):
+    def test_idle_channel_receives_have_no_socket_timeout(self):
+        host = settings.CHANNEL_LAYERS["default"]["CONFIG"]["hosts"][0]
+
+        self.assertIsNone(host["socket_timeout"])
 
 
 class TenantAccessPermissionTest(TestCase):

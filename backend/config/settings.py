@@ -240,7 +240,15 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [config("REDIS_URL", default="redis://redis:6379/0")],
+            # redis-py 8 defaults socket_timeout to five seconds, which matches
+            # channels-redis' blocking BZPOPMIN window and tears down idle
+            # WebSockets. Channel receives must be allowed to block normally.
+            "hosts": [
+                {
+                    "address": config("REDIS_URL", default="redis://redis:6379/0"),
+                    "socket_timeout": None,
+                }
+            ],
             "prefix": REDIS_KEY_PREFIX,
         },
     },

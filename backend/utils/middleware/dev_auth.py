@@ -5,10 +5,32 @@ SECURITY WARNING: This middleware is ONLY active when DEBUG=True
 Never deploy to production with DEBUG=True!
 """
 
-from django.contrib.auth import get_user_model
+from channels.db import database_sync_to_async
 from django.conf import settings
+from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+
+def get_or_create_dev_user():
+    """Return the development user shared by HTTP and WebSocket auth."""
+    try:
+        return User.objects.get(username="dev_auto_user")
+    except User.DoesNotExist:
+        try:
+            return User.objects.create_user(
+                username="dev_auto_user",
+                email="dev@localhost.local",
+                password="dev123",
+                first_name="Dev",
+                last_name="User",
+                is_staff=True,
+                is_superuser=True,
+            )
+        except Exception:
+            return None
+    except Exception:
+        return None
 
 
 class DevAutoLoginMiddleware:
@@ -50,22 +72,22 @@ class DevAutoLoginMiddleware:
         Returns:
             User object or None if creation fails
         """
-        try:
-            user = User.objects.get(username="dev_auto_user")
-            return user
-        except User.DoesNotExist:
-            try:
-                user = User.objects.create_user(
-                    username="dev_auto_user",
-                    email="dev@localhost.local",
-                    password="dev123",
-                    first_name="Dev",
-                    last_name="User",
-                    is_staff=True,
-                    is_superuser=True,
-                )
-                return user
-            except Exception as e:
-                return None
-        except Exception as e:
-            return None
+        return get_or_create_dev_user()
+
+
+class DevAutoLoginASGIMiddleware:
+    """Apply the same DEBUG-only development identity to WebSocket scopes."""
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        if settings.DEBUG and scope.get("type") == "websocket":
+            user = scope.get("user")
+            if not user or not user.is_authenticated:
+                dev_user = await database_sync_to_async(get_or_create_dev_user)()
+                if dev_user:
+                    scope = dict(scope)
+                    scope["user"] = dev_user
+
+        return await self.inner(scope, receive, send)

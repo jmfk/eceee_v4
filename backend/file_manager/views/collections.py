@@ -8,7 +8,7 @@ import tempfile
 from django.db import models
 from django.db.models import Count
 from django.conf import settings
-from django.http import HttpResponse, FileResponse
+from django.http import FileResponse, Http404, HttpResponse
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -409,6 +409,8 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
                 files, many=True, context={"request": request}
             )
             return Response(serializer.data)
+        except Http404:
+            raise
         except Exception as e:
             logger.error(f"Error fetching collection files: {str(e)}", exc_info=True)
             return Response(
