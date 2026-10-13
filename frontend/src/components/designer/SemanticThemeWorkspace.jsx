@@ -2002,6 +2002,10 @@ const SemanticThemeWorkspace = ({
             paths[targetSelectionKind(target)].push(target)
             return paths
         }, { slot: [], widget: [], element: [] })
+    const retainedElementPath = levelSelections.element?.selectionPaths?.element?.length
+        ? levelSelections.element.selectionPaths.element
+        : (levelSelections.element?.path || []).filter((target) => targetSelectionKind(target) === 'element')
+    const visibleElementPath = selectionPaths.element.length ? selectionPaths.element : retainedElementPath
     const targetAssetAlternatives = targetAlternatives.filter((alternative) => assetsByTargetId.has(alternative.id))
     const richTextToolClass = 'inline-flex h-8 min-w-8 items-center justify-center rounded border border-gray-300 bg-white px-2 text-xs text-gray-700 hover:bg-gray-50'
     const selectedTargetKind = targetSelectionKind(selectedTarget)
@@ -2084,6 +2088,15 @@ const SemanticThemeWorkspace = ({
                 selectedTarget={selectedTarget}
                 onSelect={chooseTrailTarget}
             />
+            {visibleElementPath.length > 0 && <section aria-label="Element selection context" className="shrink-0 px-3 py-2">
+                <SelectionPath
+                    kind="element"
+                    label="Element"
+                    targets={visibleElementPath}
+                    selectedTarget={selectedTarget}
+                    onSelect={chooseTargetAlternative}
+                />
+            </section>}
             {(() => {
                 const panels = (['slot', 'widget', 'element']).map((kind) => {
                 const target = levelSelections[kind]
@@ -2392,7 +2405,7 @@ const SemanticThemeWorkspace = ({
                     <section aria-label="Selection context" className="shrink-0 space-y-1.5">
                         <SelectionPath kind="slot" label="Slot" targets={selectionPaths.slot} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
                         <SelectionPath kind="widget" label="Widget" targets={selectionPaths.widget} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
-                        <SelectionPath kind="element" label="Element" targets={selectionPaths.element} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
+                        <SelectionPath kind="element" label="Element" targets={visibleElementPath} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
                     </section>
                     {(() => {
                         const fields = <>
