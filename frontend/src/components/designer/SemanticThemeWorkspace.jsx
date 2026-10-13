@@ -512,6 +512,7 @@ const effectiveSpacingEntries = (entries, activeBreakpoint, breakpoints, fields)
 }
 
 const isZeroCssValue = (value) => /^0(?:\.0+)?(?:px|rem|em|%|vh|vw)?$/i.test(String(value || '').trim())
+const isCalculatedCssValue = (value) => /\b(?:calc|min|max|clamp|var)\s*\(/i.test(String(value || ''))
 const isCollapsibleSpacingField = (field) => /^(?:margin|padding)(?:Top|Right|Bottom|Left)?$/.test(field) || field === 'gap'
 
 const spacingEntryForField = (entries, field) => (
@@ -541,7 +542,7 @@ const spacingSectionIsAllZero = ({ computed, declared, fields, entries }) => {
     const spacingFields = fields.filter(isCollapsibleSpacingField)
     return spacingFields.length > 0 && spacingFields.every((field) => {
         const entry = spacingEntryForField(entries, field)
-        if (hasThemeValue(declared?.[field])) return false
+        if (hasThemeValue(declared?.[field]) && !isZeroCssValue(declared[field])) return false
         return isZeroCssValue(entry?.row.values[field] || computed[field] || '')
     })
 }
@@ -2208,12 +2209,17 @@ const SemanticThemeWorkspace = ({
                                     const directValue = sourceEntry?.row.values[field]
                                     const shorthandValue = shorthand ? sourceEntry?.row.values[shorthand] : ''
                                     const isAuthored = hasThemeValue(directValue) || hasThemeValue(shorthandValue)
+                                    const surfacedDeclaredValue = isZeroCssValue(declaredValue) ? '' : declaredValue
                                     const definedValue = hasThemeValue(sourceEntry?.row.values[field])
                                         ? sourceEntry.row.values[field]
                                         : shorthand && hasThemeValue(sourceEntry?.row.values[shorthand]) ? calculatedValue
-                                            : declaredValue
+                                            : surfacedDeclaredValue
+                                    const isCalculatedValue = isCalculatedCssValue(definedValue)
+                                    const inputValue = isCalculatedValue ? calculatedValue : definedValue
                                     const showCalculatedValue = hasThemeValue(calculatedValue)
+                                        && !isCalculatedValue
                                         && (!hasThemeValue(definedValue) || String(definedValue).trim() !== String(calculatedValue).trim())
+                                        && (hasThemeValue(definedValue) || !isZeroCssValue(calculatedValue))
                                     const targetQualifier = spacingSections.length > 1 ? ` ${spacingTargetLabel}` : ''
                                     const fieldLabel = `${kind}${targetQualifier} ${spacingLabels[field]}`
                                     return <div key={field} className={`block min-w-0 text-xs font-medium text-gray-700 ${className}`} data-spacing-side={field.match(/(Top|Right|Bottom|Left)$/)?.[1]?.toLowerCase()}>
@@ -2226,7 +2232,9 @@ const SemanticThemeWorkspace = ({
                                                 title={isAuthored ? 'Use default value' : 'Override default value'}
                                                 onClick={() => isAuthored
                                                     ? removeLevelSpacing(spacingTarget, field, sourceEntry, computed)
-                                                    : updateLevelSpacing(spacingTarget, field, declaredValue || calculatedValue || '0px')}
+                                                    : updateLevelSpacing(spacingTarget, field, isCalculatedCssValue(declaredValue)
+                                                        ? calculatedValue || '0px'
+                                                        : declaredValue || calculatedValue || '0px')}
                                                 disabled={disabled}
                                                 className={`rounded p-1 disabled:cursor-not-allowed disabled:opacity-40 ${isAuthored ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'text-gray-400 hover:bg-gray-200 hover:text-gray-700'}`}
                                             >{isAuthored ? <RotateCcw className="h-3.5 w-3.5" /> : <Settings2 className="h-3.5 w-3.5" />}</button>}
@@ -2235,12 +2243,13 @@ const SemanticThemeWorkspace = ({
                                             <input
                                                 id={`${targetFocusKey(spacingTarget)}-${field}`}
                                                 aria-label={fieldLabel}
-                                                value={definedValue}
+                                                value={inputValue}
                                                 placeholder="Not set"
                                                 onChange={(event) => updateLevelSpacing(spacingTarget, field, event.target.value)}
-                                                disabled={disabled || !entry || !isAuthored && !hasThemeValue(declaredValue)}
+                                                disabled={disabled || isCalculatedValue || !entry || !isAuthored && !hasThemeValue(surfacedDeclaredValue)}
                                                 className="w-28 max-w-full rounded border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
                                             />
+                                            {isCalculatedValue && <span className="max-w-full break-all text-[10px] font-normal text-gray-500">{definedValue}</span>}
                                             {showCalculatedValue && <span className="text-[10px] font-normal text-gray-500">Calculated: {calculatedValue}</span>}
                                         </span>
                                     </div>
@@ -2263,7 +2272,7 @@ const SemanticThemeWorkspace = ({
                                     {fieldGroups.map((group) => {
                                         const authoredGroupFields = group.fields.filter((field) => authoredSpacingEntryForField(entries, field))
                                         const groupHasDefinedValue = authoredGroupFields.length > 0
-                                            || group.fields.some((field) => hasThemeValue(declared[field]))
+                                            || group.fields.some((field) => hasThemeValue(declared[field]) && !isZeroCssValue(declared[field]))
                                         const groupStateKey = `${kind}:${spacingTarget.styleTargetId || spacingTarget.id}:${group.label}`
                                         const groupIsOpen = spacingGroupExpansion[groupStateKey] ?? groupHasDefinedValue
                                         return <details
