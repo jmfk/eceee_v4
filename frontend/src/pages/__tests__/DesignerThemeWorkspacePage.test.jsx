@@ -1022,6 +1022,9 @@ describe('DesignerThemeWorkspacePage', () => {
                     width: '790px', height: '256px', marginTop: '0px', marginRight: '0px',
                     marginBottom: '0px', marginLeft: '0px', paddingTop: '16px',
                 },
+                declaredStyles: {
+                    marginTop: '0px', marginRight: '0px', marginBottom: '0px', marginLeft: '0px',
+                },
             },
             source: iframe.contentWindow,
         }))
@@ -1050,6 +1053,51 @@ describe('DesignerThemeWorkspacePage', () => {
                 values: { width: '760px' },
             }),
         ]))
+    })
+
+    it('shows resolved placement values in read-only fields and keeps expressions secondary', async () => {
+        const widgetWorkspace = structuredClone(workspace)
+        widgetWorkspace.spacing = [{
+            targetId: 'widget-type:easy_widgets.HeroWidget', scope: 'widget',
+            widgetType: 'easy_widgets.HeroWidget', breakpoint: 'xl', values: { width: '100%' },
+        }]
+        widgetWorkspace.constraints.editableSpacingProperties = [
+            'marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'width', 'height',
+        ]
+        widgetWorkspace.constraints.editableWidgetFrameSpacingProperties = ['width']
+        mocks.workspace.mockResolvedValue(widgetWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const { iframe } = await readyPreview()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'widget:hero-1', styleTargetId: 'widget-type:easy_widgets.HeroWidget',
+                kind: 'widget', widgetType: 'easy_widgets.HeroWidget', label: 'Hero widget',
+                computedStyles: {
+                    width: '790px', height: '256px', marginTop: '0px', marginRight: '0px',
+                    marginBottom: '0px', marginLeft: '0px',
+                },
+                declaredStyles: {
+                    marginTop: 'calc(var(--spacing) * 0)', marginRight: '0px',
+                    marginBottom: 'calc(var(--spacing) * 0)', marginLeft: '0px',
+                },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        const marginTop = await screen.findByLabelText('widget Margin top')
+        expect(marginTop).toHaveValue('0px')
+        expect(marginTop).toBeDisabled()
+        expect(within(marginTop.closest('[data-spacing-side]')).getByText('calc(var(--spacing) * 0)')).toBeInTheDocument()
+        expect(within(marginTop.closest('[data-spacing-side]')).queryByText('Calculated: 0px')).not.toBeInTheDocument()
+
+        const marginLeft = screen.getByLabelText('widget Margin left')
+        expect(marginLeft).toHaveValue('')
+        expect(marginLeft).toBeDisabled()
+        expect(within(marginLeft.closest('[data-spacing-side]')).queryByText('Calculated: 0px')).not.toBeInTheDocument()
+        expect(marginTop.closest('details')).toHaveAttribute('open')
     })
 
     it('groups zero-valued widget spacing without hiding editable dimensions', async () => {
