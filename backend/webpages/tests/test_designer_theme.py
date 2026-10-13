@@ -115,7 +115,7 @@ class DesignerStructuralSpacingTests(SimpleTestCase):
                     {
                         "scope": "widgetPart",
                         "widget_type": "easy_widgets.HeroWidget",
-                        "part": "hero-content",
+                        "part": "hero-widget",
                         "breakpoint": "xl",
                         "values": {"paddingTop": "32px"},
                     },
@@ -138,7 +138,7 @@ class DesignerStructuralSpacingTests(SimpleTestCase):
         self.assertIn('[data-widget-id][data-widget-type="easy_widgets.ContentWidget"]', css)
         self.assertIn("width: 80%", css)
         self.assertIn('[data-widget-slot="left"][data-owner-widget-type="easy_widgets.TwoColumnsWidget"]', css)
-        self.assertIn('[data-widget-id][data-widget-type="easy_widgets.HeroWidget"] .hero-content', css)
+        self.assertIn('[data-widget-id][data-widget-type="easy_widgets.HeroWidget"] .hero-widget', css)
         self.assertIn("padding-top: 32px", css)
         self.assertIn('[data-widget-id][data-widget-type="easy_widgets.TwoColumnsWidget"] .two-columns-widget', css)
         self.assertIn("gap: 36px", css)
@@ -488,13 +488,10 @@ class DesignerThemeApiTests(TestCase):
             for widget in workspace["catalog"]["widgetParts"]
             if widget["widgetType"] == "easy_widgets.HeroWidget"
         )
-        self.assertIn("hero-content", {part["part"] for part in hero_parts["parts"]})
         hero_surface = next(part for part in hero_parts["parts"] if part["part"] == "hero-widget")
-        hero_content = next(part for part in hero_parts["parts"] if part["part"] == "hero-content")
         self.assertEqual(hero_surface["designerLevel"], "widget")
         self.assertTrue(hero_surface["isWidgetSurface"])
-        self.assertEqual(hero_content["designerLevel"], "element")
-        self.assertFalse(hero_content["isWidgetSurface"])
+        self.assertNotIn("hero-content", {part["part"] for part in hero_parts["parts"]})
         banner_parts = next(
             widget
             for widget in workspace["catalog"]["widgetParts"]
@@ -624,7 +621,7 @@ class DesignerThemeApiTests(TestCase):
 
         self.assertEqual(
             {part["part"] for part in hero["parts"]},
-            {"hero-widget", "hero-content", "hero-header", "hero-before-text", "hero-after-text"},
+            {"hero-widget", "hero-header", "hero-before-text", "hero-after-text"},
         )
         self.assertTrue(all(part["breakpoints"] == [] for part in hero["parts"]))
 

@@ -101,6 +101,12 @@ describe('compileEditorCSS', () => {
 })
 
 describe('buildEditorThemeCSS', () => {
+    it('keeps Hero layout declarations on the widget content surface', () => {
+        expect(editorWidgetBaseCSS).toMatch(/\.hero-widget\s*\{[^}]*display:\s*grid;/)
+        expect(editorWidgetBaseCSS).toMatch(/\.hero-widget\s*\{[^}]*padding:\s*30px;/)
+        expect(editorWidgetBaseCSS).not.toMatch(/\.hero-content\s*\{/)
+    })
+
     it('keeps the frontend widget baseline aligned with backend widget definitions', () => {
         const normalizedBaseline = normalizeCSS(editorWidgetBaseCSS)
         let widgetCSSCount = 0

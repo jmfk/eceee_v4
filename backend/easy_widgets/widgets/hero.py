@@ -116,7 +116,7 @@ class HeroWidget(BaseWidget):
 
     layout_parts = {
         "hero-widget": {
-            "label": "Main hero container",
+            "label": "Hero content",
             "selector": ".hero-widget",
             "properties": [
                 "width",
@@ -126,18 +126,7 @@ class HeroWidget(BaseWidget):
                 "margin",
                 "backgroundColor",
                 "color",
-            ],
-        },
-        "hero-content": {
-            "label": "Text content overlay",
-            "selector": ".hero-content",
-            "properties": [
-                "padding",
-                "margin",
-                "backgroundColor",
-                "color",
                 "textAlign",
-                "maxWidth",
             ],
         },
         "hero-header": {
@@ -182,7 +171,11 @@ class HeroWidget(BaseWidget):
     .hero-widget {
         box-sizing: border-box;
         position: relative;
-        padding: 0;
+        display: grid;
+        grid-template-columns: minmax(0, min(100%, 1140px));
+        align-content: center;
+        justify-content: center;
+        padding: 30px;
         overflow: hidden;
         height: 310px;
         min-height: 310px;
@@ -193,23 +186,12 @@ class HeroWidget(BaseWidget):
         background-position: center;
         background-repeat: no-repeat;
         color: var(--hero-text-color, #ffffff);
+        text-align: center;
         margin-bottom: 30px;
         flex-shrink: 0;
     }
     .hero-widget:last-child {
         margin-bottom: 0;
-    }
-
-    .hero-content {
-        position: relative;
-        max-width: 1200px;
-        margin: 0 auto;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        height: 100%;
-        padding: 30px;
     }
 
     .hero-widget h1 {
@@ -242,10 +224,6 @@ class HeroWidget(BaseWidget):
     }
 
     @media (max-width: 768px) {
-        .hero-widget {
-            padding: 0;
-        }
-
         .hero-widget h1 {
             font-size: 32px;
             line-height: 36px;
@@ -403,7 +381,6 @@ class HeroWidget(BaseWidget):
                     # Note: Layout properties can be applied via CSS from design groups
                     # This is just for awareness - actual application happens in rendering
 
-                # Could extract other hero parts if needed in the future
-                # e.g., hero-content, hero-header, etc.
+                # Could extract semantic hero parts such as hero-header if needed in the future.
 
         return template_config

@@ -749,7 +749,11 @@
 .hero-widget {
         box-sizing: border-box;
         position: relative;
-        padding: 0;
+        display: grid;
+        grid-template-columns: minmax(0, min(100%, 1140px));
+        align-content: center;
+        justify-content: center;
+        padding: 30px;
         overflow: hidden;
         height: 310px;
         min-height: 310px;
@@ -760,23 +764,12 @@
         background-position: center;
         background-repeat: no-repeat;
         color: var(--hero-text-color, #ffffff);
+        text-align: center;
         margin-bottom: 30px;
         flex-shrink: 0;
     }
     .hero-widget:last-child {
         margin-bottom: 0;
-    }
-
-    .hero-content {
-        position: relative;
-        max-width: 1200px;
-        margin: 0 auto;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        height: 100%;
-        padding: 30px;
     }
 
     .hero-widget h1 {
@@ -809,10 +802,6 @@
     }
 
     @media (max-width: 768px) {
-        .hero-widget {
-            padding: 0;
-        }
-
         .hero-widget h1 {
             font-size: 32px;
             line-height: 36px;
