@@ -1073,9 +1073,11 @@ const SemanticThemeWorkspace = ({
                 inspectorRootRef.current = target
                 setInspectorRoot(target)
             }
-            if (event.data.action !== 'contentChange') {
+            if (event.data.action !== 'contentChange' || !targetBelongsToCurrentRoot) {
                 setHighlightedTargetId('')
-                setOpenTargetId(targetBelongsToCurrentRoot && targetFocusKey(currentRoot) !== targetFocusKey(target) ? targetFocusKey(target) : '')
+                setOpenTargetId(targetSelectionKind(target) === 'element'
+                    ? targetFocusKey(target)
+                    : targetBelongsToCurrentRoot && targetFocusKey(currentRoot) !== targetFocusKey(target) ? targetFocusKey(target) : '')
                 setSelectionFocusVersion((current) => current + 1)
             }
             setThemeDefaults((current) => ({
@@ -1630,7 +1632,7 @@ const SemanticThemeWorkspace = ({
         setLevelSelections(nextLevelSelections)
         setHighlightedTargetId('')
         setSelectionExpanded(true)
-        setOpenTargetId(replaceInspectorRoot || targetFocusKey(target) === targetFocusKey(inspectorRootRef.current) ? '' : targetFocusKey(target))
+        setOpenTargetId(selectionLevel === 'element' ? targetFocusKey(target) : '')
         setSelectionFocusVersion((current) => current + 1)
         iframeRef.current?.contentWindow?.postMessage({
             source: 'eceee-render-host',
@@ -2010,26 +2012,32 @@ const SemanticThemeWorkspace = ({
             ? 'Selected widget'
             : 'Selected element'
     const selectedTargetLabel = selectedTarget?.displayLabel || selectedTarget?.label
-    const selectionChildTree = childTargets.length > 0 && (
+    const inspectorRootIsElement = targetSelectionKind(inspectorRoot) === 'element'
+    const renderSelectionChildTree = (elementValues = null) => (inspectorRootIsElement || childTargets.length > 0) && (
         <section className="flex shrink-0 flex-col border-t border-gray-200 px-3 py-3">
             <h3 className="mb-2 shrink-0 text-sm font-medium text-gray-900">Elements inside</h3>
             <div className="overflow-x-hidden border-y border-gray-200" role="tree" aria-label="Element hierarchy">
                 {(() => {
-                    const renderTargetTree = (parentKey, level = 1) => (childTargetsByParent.get(parentKey) || []).map((child) => {
+                    const renderTarget = (child, level) => {
                         const childKey = targetFocusKey(child)
                         const isSelected = targetFocusKey(selectedTarget) === childKey
+                        const isOpen = openTargetId === childKey
                         const isHighlighted = highlightedTargetId === childKey
                         const childLabel = child.displayLabel || child.label
+                        const panelId = `element-values-${childKey.replace(/[^a-zA-Z0-9_-]/g, '-')}`
                         const nestedTargets = childTargetsByParent.get(childKey) || []
                         return <div key={childKey} role="treeitem" aria-label={childLabel} aria-level={level} aria-selected={isSelected} className="min-w-0 border-b border-gray-200 last:border-b-0">
                             <div className={`flex min-w-0 items-stretch ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
                                 <button
                                     type="button"
+                                    aria-expanded={isOpen}
+                                    aria-controls={panelId}
                                     aria-pressed={isSelected}
                                     aria-label={`Edit ${childLabel}`}
-                                    onClick={() => selectTargetFromInspector(child)}
+                                    onClick={() => toggleTargetAccordion(child)}
                                     className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-sm transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${isSelected ? 'font-medium text-blue-800' : 'text-gray-800 hover:bg-gray-50 hover:text-gray-950'}`}
                                 >
+                                    <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                                     <span className="min-w-0 flex-1 truncate" title={childLabel}>{childLabel}</span>
                                     {isSelected && <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-blue-700">Selected</span>}
                                 </button>
@@ -2044,10 +2052,19 @@ const SemanticThemeWorkspace = ({
                                     <Focus className="h-4 w-4" />
                                 </button>
                             </div>
-                            {nestedTargets.length > 0 && <div role="group" className="ml-4 border-l border-gray-300 pl-2">{renderTargetTree(childKey, level + 1)}</div>}
+                            {isOpen && isSelected && elementValues && <div
+                                key={`${childKey}-${selectionFocusVersion}`}
+                                id={panelId}
+                                role="region"
+                                aria-label={`${childLabel} values`}
+                                className="designer-inspector-focus border-t border-blue-100 bg-blue-50/30"
+                            >{elementValues}</div>}
+                            {nestedTargets.length > 0 && <div role="group" className="ml-4 border-l border-gray-300 pl-2">{nestedTargets.map((nestedTarget) => renderTarget(nestedTarget, level + 1))}</div>}
                         </div>
-                    })
-                    return renderTargetTree(targetFocusKey(inspectorRoot))
+                    }
+                    return inspectorRootIsElement
+                        ? renderTarget(inspectorRoot, 1)
+                        : (childTargetsByParent.get(targetFocusKey(inspectorRoot)) || []).map((child) => renderTarget(child, 1))
                 })()}
             </div>
         </section>
@@ -2067,19 +2084,12 @@ const SemanticThemeWorkspace = ({
                 selectedTarget={selectedTarget}
                 onSelect={chooseTrailTarget}
             />
-            {(['slot', 'widget', 'element']).map((kind) => {
+            {(() => {
+                const panels = (['slot', 'widget', 'element']).map((kind) => {
                 const target = levelSelections[kind]
                 const tone = selectionTones[kind]
                 if (!target) {
-                    if (kind !== 'element' || !levelSelections.widget) return null
-                    return <section key={kind} className={`shrink-0 border-b ${tone.border}`}>
-                        <div className={`flex w-full items-center gap-2 px-3 py-2 text-left ${tone.header}`}>
-                            <div className="min-w-0 flex-1">
-                                <p className={`text-[10px] font-semibold uppercase tracking-wide ${tone.label}`}>Selected element</p>
-                                <h2 className="truncate text-sm font-semibold text-gray-900">Widget</h2>
-                            </div>
-                        </div>
-                    </section>
+                    return null
                 }
                 const panelId = `selected-${kind}-spacing`
                 const label = target.displayLabel || target.label
@@ -2152,8 +2162,8 @@ const SemanticThemeWorkspace = ({
                     && levelAssets.length === 0
                     && levelColors.length === 0
                 const collapseSpacingPanel = collapseZeroSpacing || collapseReadOnlySpacing || collapseComputedOnlySpacing
-                const expanded = expandedSelectionLevels.has(kind)
-                    && (!collapseSpacingPanel || expandedZeroSpacingTargets.has(expansionKey))
+                const expanded = kind === 'element' || (expandedSelectionLevels.has(kind)
+                    && (!collapseSpacingPanel || expandedZeroSpacingTargets.has(expansionKey)))
                 const panelIsCollapsible = kind === 'widget' || hasEditableProperties
                 const headerContent = <>
                     <div className="min-w-0 flex-1">
@@ -2162,8 +2172,8 @@ const SemanticThemeWorkspace = ({
                     </div>
                     {panelIsCollapsible && <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${tone.label} ${expanded ? 'rotate-180' : ''}`} />}
                 </>
-                return <section key={kind} className={`shrink-0 border-b ${tone.border}`}>
-                    {panelIsCollapsible ? <button
+                return <section key={kind} className={kind === 'element' ? 'shrink-0' : `shrink-0 border-b ${tone.border}`}>
+                    {kind !== 'element' && (panelIsCollapsible ? <button
                             type="button"
                             aria-expanded={expanded}
                             aria-controls={panelId}
@@ -2191,7 +2201,7 @@ const SemanticThemeWorkspace = ({
                             onMouseEnter={() => previewSelectionLevel(kind)}
                             onMouseLeave={() => previewSelectionLevel(null)}
                             className={`flex w-full items-center gap-2 px-3 py-2 text-left ${tone.header}`}
-                        >{headerContent}</div>}
+                        >{headerContent}</div>)}
                     {hasEditableProperties && expanded && <div id={panelId} className="space-y-3 px-3 py-3">
                         {hasEditableSpacing && <p className="text-xs text-gray-500">Select one or more measurements in the preview. Left/right changes horizontal values; up/down changes vertical values. Hold Shift for 10 px steps.</p>}
                         {spacingSections.map(({ target: spacingTarget, configuration, computed, declared, fields, entries }, sectionIndex) => {
@@ -2326,8 +2336,13 @@ const SemanticThemeWorkspace = ({
                         </section>}
                     </div>}
                 </section>
-            })}
-            {selectionChildTree}
+                })
+                const elementValues = panels[2]
+                return <>
+                    {panels.slice(0, 2)}
+                    {renderSelectionChildTree(elementValues)}
+                </>
+            })()}
         </section>
     )
 
@@ -2356,7 +2371,7 @@ const SemanticThemeWorkspace = ({
     const selectedEditor = selectedTarget && (<>
         {selectedEditorAncestorHeaders}
         <section className="flex min-h-0 flex-1 flex-col border-b border-gray-200 bg-white">
-            <button
+            {selectedTargetKind !== 'element' && <button
                 type="button"
                 aria-expanded={selectionExpanded}
                 aria-controls="selected-element-editor"
@@ -2371,9 +2386,9 @@ const SemanticThemeWorkspace = ({
                     <h2 className="truncate text-base font-semibold text-gray-900">{selectedTargetLabel}</h2>
                 </div>
                 <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${selectedTargetTone.label} ${selectionExpanded ? 'rotate-180' : ''}`} />
-            </button>
-            {selectionExpanded && (
-                <div id="selected-element-editor" className={`flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto overscroll-contain border-t p-2 ${selectedTargetTone.border}`}>
+            </button>}
+            {(selectedTargetKind === 'element' || selectionExpanded) && (
+                <div id="selected-element-editor" className={`flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto overscroll-contain p-2 ${selectedTargetKind === 'element' ? '' : `border-t ${selectedTargetTone.border}`}`}>
                     <section aria-label="Selection context" className="shrink-0 space-y-1.5">
                         <SelectionPath kind="slot" label="Slot" targets={selectionPaths.slot} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
                         <SelectionPath kind="widget" label="Widget" targets={selectionPaths.widget} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
@@ -2458,57 +2473,9 @@ const SemanticThemeWorkspace = ({
                     {relevantColors.length > 0 && <section className="space-y-3 border-t border-gray-200 pt-4"><h3 className="font-medium text-gray-900">Colors used here</h3><p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global values.</strong> Colors are the same at every breakpoint.</p>{relevantColors.map(({ name, index }) => <label key={name} className="flex items-center gap-3"><input type="color" value={/^#[0-9a-f]{6}$/i.test(workspace.colors[index].value) ? workspace.colors[index].value : '#000000'} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="h-10 w-12 rounded border border-gray-300" /><span className="min-w-0 flex-1 text-sm font-medium">{name}</span><input aria-label={`${name} value`} value={workspace.colors[index].value} onChange={(event) => updateWorkspace((next) => { next.colors[index].value = event.target.value; return next })} className="w-28 rounded-md border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>)}</section>}
                     {!targetTypography.length && !editableTargetSpacing.length && !relevantColors.length && !selectedLayoutParameters.length && selectedTarget.kind !== 'element' && selectedTarget.kind !== 'asset' && <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500">Choose a more specific text or image inside this area to edit its details.</p>}
                         </>
-                        return <>
-                            {targetFocusKey(selectedTarget) === targetFocusKey(inspectorRoot) && <div key={`root-${selectionFocusVersion}`} className="designer-inspector-focus shrink-0 space-y-3">{fields}</div>}
-                            {childTargets.length > 0 && <section className="flex shrink-0 flex-col border-t border-gray-200 pt-3">
-                                <h3 className="mb-2 shrink-0 text-sm font-medium text-gray-900">Elements inside</h3>
-                                <div className="overflow-x-hidden border-y border-gray-200" role="tree" aria-label="Element hierarchy">
-                                    {(() => {
-                                        const renderTargetTree = (parentKey, level = 1) => (childTargetsByParent.get(parentKey) || []).map((child) => {
-                                        const childKey = targetFocusKey(child)
-                                        const isSelected = targetFocusKey(selectedTarget) === childKey
-                                        const isOpen = openTargetId === childKey
-                                        const isHighlighted = highlightedTargetId === childKey
-                                        const childLabel = child.displayLabel || child.label
-                                        const panelId = `element-editor-${childKey.replace(/[^a-zA-Z0-9_-]/g, '-')}`
-                                        const nestedTargets = childTargetsByParent.get(childKey) || []
-                                        return <div key={childKey} role="treeitem" aria-label={childLabel} aria-level={level} aria-selected={isSelected} className="min-w-0 border-b border-gray-200 last:border-b-0">
-                                            <article className="min-w-0">
-                                                <div className={`flex min-w-0 items-stretch ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
-                                                    <button
-                                                        type="button"
-                                                        aria-expanded={isOpen}
-                                                        aria-controls={panelId}
-                                                        aria-pressed={isSelected}
-                                                        aria-label={`Edit ${childLabel}`}
-                                                        onClick={() => toggleTargetAccordion(child)}
-                                                        className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-sm transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${isSelected ? 'font-medium text-blue-800' : 'text-gray-800 hover:bg-gray-50 hover:text-gray-950'}`}
-                                                    >
-                                                        <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                                                        <span className="min-w-0 flex-1 truncate" title={childLabel}>{childLabel}</span>
-                                                        {isSelected && <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-blue-700">Selected</span>}
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        aria-label={`${isHighlighted ? 'Stop highlighting' : 'Highlight'} ${childLabel}`}
-                                                        aria-pressed={isHighlighted}
-                                                        title={`${isHighlighted ? 'Stop highlighting' : 'Highlight'} in preview`}
-                                                        onClick={() => toggleTargetHighlight(child)}
-                                                        className={`my-1.5 mr-1.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${isHighlighted ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 bg-white text-gray-500 hover:border-amber-400 hover:text-amber-700'}`}
-                                                    >
-                                                        <Focus className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                                {isOpen && isSelected && <div key={`${childKey}-${selectionFocusVersion}`} id={panelId} role="region" aria-label={`${child.label} settings`} className="designer-inspector-focus space-y-3 border-t border-blue-100 bg-blue-50/30 px-2 py-3">{fields}</div>}
-                                            </article>
-                                            {nestedTargets.length > 0 && <div role="group" className="ml-4 border-l border-gray-300 pl-2">{renderTargetTree(childKey, level + 1)}</div>}
-                                        </div>
-                                        })
-                                        return renderTargetTree(targetFocusKey(inspectorRoot))
-                                    })()}
-                                </div>
-                            </section>}
-                        </>
+                        return selectedTargetKind === 'element'
+                            ? renderSelectionChildTree(<div className="space-y-3 px-2 py-3">{fields}</div>)
+                            : <div key={`root-${selectionFocusVersion}`} className="designer-inspector-focus shrink-0 space-y-3">{fields}</div>
                     })()}
                 </div>
             )}
