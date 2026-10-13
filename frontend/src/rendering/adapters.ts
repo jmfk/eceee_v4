@@ -182,6 +182,7 @@ export const createPageRenderModel = ({
 
 export const createDesignerRenderModel = ({
     workspace, viewId, themeCss = '', fontUrl = '', sourceModel = null, guidesEnabled = true, contentEditable = false,
+    guideVisibility = undefined,
     viewportWidth = undefined,
 }: any): RenderPageModel => {
     const views = workspace?.previewContent?.views || workspace?.catalog?.previewViews || []
@@ -324,16 +325,20 @@ export const createDesignerRenderModel = ({
                 cssModifier: themeGroup.cssModifier || themeGroup.css_modifier || '',
             }]
     }))
-    const activeSpacingPropertiesByTarget = Object.fromEntries(
-        (workspace?.catalog?.designGroups || []).flatMap((group: any) => (group.parts || []).map((part: any) => [
-            part.id,
-            activeSpacingProperties(
-                (workspace?.spacing || []).filter((row: any) => row.targetId === part.id),
-                workspace?.breakpoints || {},
-                viewportWidth,
-            ),
-        ])),
-    )
+    const spacingTargetIds = new Set([
+        ...(workspace?.spacing || []).map((row: any) => row.targetId).filter(Boolean),
+        ...(workspace?.catalog?.designGroups || []).flatMap((group: any) => (
+            (group.parts || []).map((part: any) => part.id)
+        )),
+    ])
+    const activeSpacingPropertiesByTarget = Object.fromEntries([...spacingTargetIds].map((targetId: string) => [
+        targetId,
+        activeSpacingProperties(
+            (workspace?.spacing || []).filter((row: any) => row.targetId === targetId),
+            workspace?.breakpoints || {},
+            viewportWidth,
+        ),
+    ]))
 
     return {
         layout,
@@ -368,6 +373,7 @@ export const createDesignerRenderModel = ({
             previewImageReferences: sourceModel ? [] : imageReferenceCollection.references,
             contentEditable,
             guidesEnabled,
+            guideVisibility,
         },
     }
 }

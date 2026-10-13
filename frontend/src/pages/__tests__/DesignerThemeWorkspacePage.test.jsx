@@ -644,14 +644,34 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByTitle('Live theme preview')).not.toBeInTheDocument()
     })
 
-    it('toggles Designer support guides without changing the content source', async () => {
+    it('toggles individual WYSIWYG measurements and all Designer support guides', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const { postMessage } = await readyPreview()
 
+        expect(screen.getByRole('button', { name: 'Toggle width & height guides' })).toHaveAttribute('aria-pressed', 'false')
+        const marginToggle = screen.getByRole('button', { name: 'Toggle margins guides' })
+        expect(marginToggle).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByRole('button', { name: 'Toggle padding guides' })).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByRole('button', { name: 'Toggle gaps guides' })).toHaveAttribute('aria-pressed', 'true')
+        fireEvent.click(marginToggle)
+        expect(marginToggle).toHaveAttribute('aria-pressed', 'false')
+        await waitFor(() => expect(postMessage).toHaveBeenCalledWith(
+            expect.objectContaining({
+                source: 'eceee-render-host',
+                action: 'render',
+                model: expect.objectContaining({ designer: expect.objectContaining({
+                    guidesEnabled: true,
+                    guideVisibility: { size: false, margin: false, padding: true, gap: true },
+                }) }),
+            }),
+            '*',
+        ))
+
         expect(screen.getByRole('button', { name: 'Hide guides' })).toHaveAttribute('aria-pressed', 'true')
         fireEvent.click(screen.getByRole('button', { name: 'Hide guides' }))
         expect(screen.getByRole('button', { name: 'Show guides' })).toHaveAttribute('aria-pressed', 'false')
+        expect(marginToggle).toBeDisabled()
         await waitFor(() => expect(postMessage).toHaveBeenCalledWith(
             expect.objectContaining({
                 source: 'eceee-render-host',
@@ -954,7 +974,8 @@ describe('DesignerThemeWorkspacePage', () => {
             source: iframe.contentWindow,
         }))
         await waitFor(() => {
-            expect(screen.getByLabelText('slot Inner spacing')).toHaveValue('0px')
+            expect(screen.getByLabelText('slot Inner spacing')).toHaveValue('')
+            expect(screen.getByLabelText('slot Inner spacing')).toBeDisabled()
         }, { timeout: 3000 })
         expect(screen.queryByRole('button', { name: '+ Add spacing' })).not.toBeInTheDocument()
 
@@ -977,10 +998,16 @@ describe('DesignerThemeWorkspacePage', () => {
         ]))
     })
 
-    it('shows and creates the first responsive margin override for any selected widget', async () => {
+    it('keeps computed widget height and margins read-only and collapsed by default', async () => {
         const widgetWorkspace = structuredClone(workspace)
-        widgetWorkspace.spacing = []
-        widgetWorkspace.constraints.editableSpacingProperties = ['marginTop', 'paddingTop']
+        widgetWorkspace.spacing = [{
+            targetId: 'widget-type:easy_widgets.HeaderWidget', scope: 'widget',
+            widgetType: 'easy_widgets.HeaderWidget', breakpoint: 'xl', values: { width: '100%' },
+        }]
+        widgetWorkspace.constraints.editableSpacingProperties = [
+            'marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'paddingTop', 'width', 'height',
+        ]
+        widgetWorkspace.constraints.editableWidgetFrameSpacingProperties = ['width']
         mocks.workspace.mockResolvedValue(widgetWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
@@ -991,23 +1018,28 @@ describe('DesignerThemeWorkspacePage', () => {
                 source: 'eceee-designer-preview', action: 'select',
                 targetId: 'widget:header-1', styleTargetId: 'widget-type:easy_widgets.HeaderWidget',
                 kind: 'widget', widgetType: 'easy_widgets.HeaderWidget', label: 'Header widget',
-                computedStyles: { marginTop: '30px', paddingTop: '16px' },
+                computedStyles: {
+                    width: '790px', height: '256px', marginTop: '0px', marginRight: '0px',
+                    marginBottom: '0px', marginLeft: '0px', paddingTop: '16px',
+                },
             },
             source: iframe.contentWindow,
         }))
-        expect(await screen.findByLabelText('widget Margin top')).toHaveValue('30px')
+        expect(await screen.findByLabelText('widget Width')).toHaveValue('100%')
+        expect(screen.getByLabelText('widget Width')).not.toBeDisabled()
+        expect(screen.getByLabelText('widget Height')).toBeDisabled()
+        expect(screen.getByLabelText('widget Height')).toHaveValue('')
+        expect(screen.getByLabelText('widget Height')).toHaveAttribute('placeholder', 'Not set')
+        expect(screen.getByLabelText('widget Margin top')).toBeDisabled()
+        expect(screen.getByLabelText('widget Margin right')).toBeDisabled()
+        expect(screen.getByLabelText('widget Margin bottom')).toBeDisabled()
+        expect(screen.getByLabelText('widget Margin left')).toBeDisabled()
         expect(screen.queryByLabelText('widget Padding top')).not.toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Widget placement' })).toBeInTheDocument()
+        expect(screen.getByText('Width & height', { selector: 'span' }).closest('details')).toHaveAttribute('open')
+        expect(screen.getByText('Margins', { selector: 'span' }).closest('details')).not.toHaveAttribute('open')
 
-        fireEvent(window, new MessageEvent('message', {
-            data: {
-                source: 'eceee-designer-preview', action: 'spacingChange',
-                targetId: 'widget-type:easy_widgets.HeaderWidget',
-                targetIds: ['widget:header-1', 'widget-type:easy_widgets.HeaderWidget'],
-                property: 'marginTop', value: '36px',
-            },
-            source: iframe.contentWindow,
-        }))
+        fireEvent.change(screen.getByLabelText('widget Width'), { target: { value: '760px' } })
         fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
 
         await waitFor(() => expect(mocks.save).toHaveBeenCalled())
@@ -1015,12 +1047,12 @@ describe('DesignerThemeWorkspacePage', () => {
             expect.objectContaining({
                 scope: 'widget',
                 widgetType: 'easy_widgets.HeaderWidget', breakpoint: 'xl',
-                values: { marginTop: '36px' },
+                values: { width: '760px' },
             }),
         ]))
     })
 
-    it('collapses a selected widget when all editable spacing values are zero', async () => {
+    it('groups zero-valued widget spacing without hiding editable dimensions', async () => {
         const zeroSpacingWorkspace = structuredClone(workspace)
         zeroSpacingWorkspace.spacing = []
         zeroSpacingWorkspace.constraints.editableSpacingProperties = [
@@ -1029,7 +1061,7 @@ describe('DesignerThemeWorkspacePage', () => {
             'gap', 'width', 'height',
         ]
         zeroSpacingWorkspace.constraints.editableWidgetFrameSpacingProperties = [
-            'marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'width', 'height',
+            'width',
         ]
         zeroSpacingWorkspace.constraints.editableWidgetSurfaceSpacingProperties = [
             'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'gap', 'width', 'height',
@@ -1069,17 +1101,24 @@ describe('DesignerThemeWorkspacePage', () => {
             source: iframe.contentWindow,
         }))
 
-        const collapsedPanel = await screen.findByRole('button', { name: 'Expand selected widget Hero widget' })
-        expect(collapsedPanel).toHaveAttribute('aria-expanded', 'false')
-        expect(screen.queryByLabelText('widget Margin top')).not.toBeInTheDocument()
-
-        fireEvent.click(collapsedPanel)
-
+        const collapsedWidget = await screen.findByRole('button', { name: 'Expand selected widget Hero widget' })
+        expect(collapsedWidget).toHaveAttribute('aria-expanded', 'false')
+        fireEvent.click(collapsedWidget)
         expect(screen.getByRole('button', { name: 'Collapse selected widget Hero widget' })).toHaveAttribute('aria-expanded', 'true')
-        expect(screen.getByLabelText('widget Widget placement Margin top')).toHaveValue('0px')
+        expect(screen.getByLabelText('widget Widget placement Margin top')).toHaveValue('')
+        const paddingBottom = screen.getByLabelText('widget Widget content · Hero content Padding bottom')
+        expect(paddingBottom).toHaveValue('')
+        expect(paddingBottom).toBeDisabled()
+        fireEvent.click(screen.getByRole('button', { name: 'Override widget Widget content · Hero content Padding bottom' }))
         expect(screen.getByLabelText('widget Widget content · Hero content Padding bottom')).toHaveValue('0px')
+        expect(screen.getByLabelText('widget Widget content · Hero content Padding bottom')).not.toBeDisabled()
+        fireEvent.click(screen.getByRole('button', { name: 'Use default for widget Widget content · Hero content Padding bottom' }))
+        expect(screen.getByLabelText('widget Widget content · Hero content Padding bottom')).toHaveValue('')
+        expect(screen.getByLabelText('widget Widget content · Hero content Padding bottom')).toBeDisabled()
         expect(screen.getByRole('heading', { name: 'Widget placement' })).toBeInTheDocument()
-        expect(screen.getByLabelText('widget Widget placement Width')).toHaveValue('960px')
+        expect(screen.getByLabelText('widget Widget placement Width')).toHaveValue('')
+        expect(screen.getByLabelText('widget Widget placement Width')).toBeDisabled()
+        expect(screen.getByLabelText('widget Widget placement Height')).toBeDisabled()
     })
 
     it('shows one widget-content section and hides zero-valued widget placement spacing', async () => {
@@ -1092,7 +1131,9 @@ describe('DesignerThemeWorkspacePage', () => {
         contentSpacingWorkspace.constraints.editableSpacingProperties = [
             'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
             'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+            'width', 'height',
         ]
+        contentSpacingWorkspace.constraints.editableWidgetFrameSpacingProperties = ['width']
         mocks.workspace.mockResolvedValue(contentSpacingWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
@@ -1110,6 +1151,7 @@ describe('DesignerThemeWorkspacePage', () => {
                 targetId: 'widget:content-1', styleTargetId: 'widget-type:easy_widgets.ContentWidget',
                 kind: 'widget', widgetType: 'easy_widgets.ContentWidget', widgetId: 'content-1', label: 'Content widget',
                 computedStyles: {
+                    width: '790px', height: '256px',
                     marginTop: '0px', marginRight: '0px', marginBottom: '0px', marginLeft: '0px',
                     paddingTop: '0px', paddingRight: '0px', paddingBottom: '0px', paddingLeft: '0px',
                 },
@@ -1120,10 +1162,19 @@ describe('DesignerThemeWorkspacePage', () => {
 
         const panelButton = await screen.findByRole('button', { name: 'Collapse selected widget Content widget' })
         const panel = document.getElementById(panelButton.getAttribute('aria-controls'))
-        expect(within(panel).getAllByRole('heading', { name: 'Widget content · Content area' })).toHaveLength(1)
+        expect(within(panel).getByLabelText('widget Widget placement Width')).toBeDisabled()
+        expect(within(panel).getByLabelText('widget Widget placement Height')).toBeDisabled()
+        expect(within(panel).getByLabelText('widget Widget placement Margin top')).toBeDisabled()
+        expect(within(panel).getByText('Width & height', { selector: 'span' }).closest('details')).not.toHaveAttribute('open')
+        expect(within(panel).getByText('Margins', { selector: 'span' }).closest('details')).not.toHaveAttribute('open')
+        expect(within(panel).getByText('Padding', { selector: 'span' }).closest('details')).toHaveAttribute('open')
+        const placementHeading = within(panel).getByRole('heading', { name: 'Widget placement' })
+        const contentHeading = within(panel).getByRole('heading', { name: 'Widget content · Content area' })
+        expect(placementHeading.closest('details')).toBeNull()
+        expect(contentHeading.closest('details')).toBeNull()
         expect(within(panel).queryByLabelText('widget Margin top')).not.toBeInTheDocument()
-        expect(within(panel).getByLabelText('widget Padding top')).toHaveValue('30px')
-        expect(within(panel).getByLabelText('widget Padding left')).toHaveValue('60px')
+        expect(within(panel).getByLabelText(/widget .*Padding top$/, { selector: 'input' })).toHaveValue('30px')
+        expect(within(panel).getByLabelText(/widget .*Padding left$/, { selector: 'input' })).toHaveValue('60px')
 
         postMessage.mockClear()
         fireEvent.mouseEnter(panelButton)
@@ -1162,6 +1213,8 @@ describe('DesignerThemeWorkspacePage', () => {
 
         expect(await screen.findByRole('toolbar', { name: 'Rich text formatting' })).toBeInTheDocument()
         expect(screen.queryByRole('heading', { name: 'Content area' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('heading', { name: 'Widget placement' })).not.toBeInTheDocument()
+        expect(screen.queryByText('Computed values')).not.toBeInTheDocument()
         expect(screen.getByText('Selected slot')).toBeInTheDocument()
         expect(screen.getByText('Selected widget')).toBeInTheDocument()
         expect(screen.getByText('Selected element')).toBeInTheDocument()
@@ -1182,7 +1235,7 @@ describe('DesignerThemeWorkspacePage', () => {
         const reopenedPanel = document.getElementById(reopenedPanelButton.getAttribute('aria-controls'))
         expect(within(reopenedPanel).getAllByRole('heading', { name: 'Widget content · Content area' })).toHaveLength(1)
 
-        fireEvent.change(within(reopenedPanel).getByLabelText('widget Padding top'), { target: { value: '42px' } })
+        fireEvent.change(within(reopenedPanel).getByLabelText(/widget .*Padding top$/, { selector: 'input' }), { target: { value: '42px' } })
         fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
         await waitFor(() => expect(mocks.save).toHaveBeenCalled())
         const savedSpacing = mocks.save.mock.calls[0][1].spacing
@@ -1304,12 +1357,13 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByLabelText('widget Padding right')).toHaveValue('30px')
         expect(screen.getByLabelText('widget Padding bottom')).toHaveValue('30px')
         expect(screen.getByLabelText('widget Padding left')).toHaveValue('30px')
-        expect(screen.getByLabelText('widget Padding top').parentElement).toHaveClass('col-start-2', 'row-start-1')
-        expect(screen.getByLabelText('widget Padding right').parentElement).toHaveClass('col-start-3', 'row-start-2')
-        expect(screen.getByLabelText('widget Padding bottom').parentElement).toHaveClass('col-start-2', 'row-start-3')
-        expect(screen.getByLabelText('widget Padding left').parentElement).toHaveClass('col-start-1', 'row-start-2')
-        expect(screen.getByLabelText('widget Margin right').parentElement).toHaveClass('col-start-3', 'row-start-2')
-        expect(screen.getByLabelText('widget Margin left').parentElement).toHaveClass('col-start-1', 'row-start-2')
+        expect(within(screen.getByLabelText('widget Padding top').closest('[data-spacing-side]')).queryByText('Calculated: 30px')).not.toBeInTheDocument()
+        expect(screen.getByLabelText('widget Padding top').closest('[data-spacing-side]')).toHaveClass('col-start-2', 'row-start-1')
+        expect(screen.getByLabelText('widget Padding right').closest('[data-spacing-side]')).toHaveClass('col-start-3', 'row-start-2')
+        expect(screen.getByLabelText('widget Padding bottom').closest('[data-spacing-side]')).toHaveClass('col-start-2', 'row-start-3')
+        expect(screen.getByLabelText('widget Padding left').closest('[data-spacing-side]')).toHaveClass('col-start-1', 'row-start-2')
+        expect(screen.getByLabelText('widget Margin right').closest('[data-spacing-side]')).toHaveClass('col-start-3', 'row-start-2')
+        expect(screen.getByLabelText('widget Margin left').closest('[data-spacing-side]')).toHaveClass('col-start-1', 'row-start-2')
         expect(screen.queryByLabelText('widget Outer spacing')).not.toBeInTheDocument()
         expect(screen.queryByLabelText('widget Inner spacing')).not.toBeInTheDocument()
         expect(screen.queryByLabelText('widget Margin top')).not.toBeInTheDocument()
@@ -1368,7 +1422,11 @@ describe('DesignerThemeWorkspacePage', () => {
             source: iframe.contentWindow,
         }))
 
-        expect(await screen.findByLabelText('widget Column gap')).toHaveValue('30px')
+        fireEvent.click(await screen.findByRole('button', { name: `Expand selected widget ${widgetName} widget` }))
+        expect(await screen.findByLabelText('widget Column gap')).toHaveValue('')
+        expect(screen.getByLabelText('widget Column gap')).toBeDisabled()
+        fireEvent.click(screen.getByRole('button', { name: 'Override widget Column gap' }))
+        expect(screen.getByLabelText('widget Column gap')).toHaveValue('30px')
         fireEvent.change(screen.getByLabelText('widget Column gap'), { target: { value: '36px' } })
         fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
         await waitFor(() => expect(mocks.save).toHaveBeenCalled())
@@ -2235,10 +2293,11 @@ describe('DesignerThemeWorkspacePage', () => {
             widgetType: 'easy_widgets.HeroWidget', label: 'Hero',
             parts: [{
                 id: 'widget-part:easy_widgets.HeroWidget:hero-content', part: 'hero-content',
-                label: 'Text content overlay', designerLevel: 'widget', editableSpacingProperties: ['paddingTop'],
+                label: 'Text content overlay', designerLevel: 'widget',
+                editableSpacingProperties: ['marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'paddingTop'],
             }],
         }]
-        heroWorkspace.constraints.editableSpacingProperties = ['paddingTop']
+        heroWorkspace.constraints.editableSpacingProperties = ['marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'paddingTop']
         mocks.workspace.mockResolvedValue(heroWorkspace)
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
@@ -2249,7 +2308,8 @@ describe('DesignerThemeWorkspacePage', () => {
                 source: 'eceee-designer-preview', action: 'select',
                 targetId: 'widget-part:easy_widgets.HeroWidget:hero-content', kind: 'part',
                 label: 'Text content overlay', widgetId: 'hero-1', widgetType: 'easy_widgets.HeroWidget',
-                computedStyles: { paddingTop: '30px' },
+                computedStyles: { marginTop: '0px', marginRight: '40px', marginBottom: '0px', marginLeft: '40px', paddingTop: '30px' },
+                declaredStyles: { marginTop: '0px', marginRight: 'auto', marginBottom: '0px', marginLeft: 'auto', paddingTop: '30px' },
                 selectionPaths: {
                     slot: [],
                     widget: [{
@@ -2259,7 +2319,9 @@ describe('DesignerThemeWorkspacePage', () => {
                             id: 'widget-part:easy_widgets.HeroWidget:hero-content',
                             styleTargetId: 'widget-part:easy_widgets.HeroWidget:hero-content',
                             kind: 'part', label: 'Text content overlay', widgetId: 'hero-1',
-                            widgetType: 'easy_widgets.HeroWidget', computedStyles: { paddingTop: '30px' },
+                            widgetType: 'easy_widgets.HeroWidget',
+                            computedStyles: { marginTop: '0px', marginRight: '40px', marginBottom: '0px', marginLeft: '40px', paddingTop: '30px' },
+                            declaredStyles: { marginTop: '0px', marginRight: 'auto', marginBottom: '0px', marginLeft: 'auto', paddingTop: '30px' },
                         }],
                     }],
                     element: [],
@@ -2268,7 +2330,18 @@ describe('DesignerThemeWorkspacePage', () => {
             source: iframe.contentWindow,
         }))
 
-        expect(await screen.findByLabelText('widget Padding top')).toHaveValue('30px')
+        const paddingTop = await screen.findByLabelText('widget Padding top')
+        expect(paddingTop).toHaveValue('30px')
+        expect(paddingTop).toBeEnabled()
+        expect(within(paddingTop.closest('[data-spacing-side]')).queryByText(/Calculated:/)).not.toBeInTheDocument()
+        const marginRight = screen.getByLabelText('widget Margin right')
+        expect(marginRight).toHaveValue('auto')
+        expect(marginRight).toBeEnabled()
+        expect(within(marginRight.closest('[data-spacing-side]')).getByText('Calculated: 40px')).toBeInTheDocument()
+        const marginsGroup = marginRight.closest('details')
+        expect(marginsGroup).toHaveAttribute('open')
+        fireEvent.click(within(marginsGroup).getByText('Margins'))
+        expect(marginsGroup).not.toHaveAttribute('open')
         await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-render-host', action: 'readTargetStyles',
             targetId: 'widget-part:easy_widgets.HeroWidget:hero-content', widgetId: 'hero-1',
@@ -2276,6 +2349,7 @@ describe('DesignerThemeWorkspacePage', () => {
         postMessage.mockClear()
 
         fireEvent.click(screen.getByRole('button', { name: 'Medium (Tablet) preview at 768px' }))
+        expect(marginsGroup).not.toHaveAttribute('open')
         await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-render-host', action: 'readTargetStyles',
             targetId: 'widget-part:easy_widgets.HeroWidget:hero-content', widgetId: 'hero-1',
@@ -2285,10 +2359,12 @@ describe('DesignerThemeWorkspacePage', () => {
                 source: 'eceee-designer-preview', action: 'targetStyles',
                 targetId: 'widget-part:easy_widgets.HeroWidget:hero-content',
                 computedStyles: { paddingTop: '12px' },
+                declaredStyles: { paddingTop: '12px' },
             },
             source: iframe.contentWindow,
         }))
         expect(screen.getByLabelText('widget Padding top')).toHaveValue('12px')
+        expect(within(screen.getByLabelText('widget Padding top').closest('[data-spacing-side]')).queryByText(/Calculated:/)).not.toBeInTheDocument()
     })
 
     it('keeps the preview visible while editing images in the right inspector', async () => {

@@ -58,12 +58,6 @@ SPACING_PROPERTIES = {
     "width",
 }
 WIDGET_FRAME_SPACING_PROPERTIES = {
-    "height",
-    "margin",
-    "marginTop",
-    "marginRight",
-    "marginBottom",
-    "marginLeft",
     "width",
 }
 WIDGET_SURFACE_SPACING_PROPERTIES = {

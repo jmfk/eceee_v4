@@ -350,6 +350,88 @@ const selectorSpecificity = (selector: string): SelectorSpecificity => {
     return specificity
 }
 
+type DeclaredStyleCandidate = {
+    value: string
+    important: boolean
+    inline: boolean
+    specificity: SelectorSpecificity
+    sourceOrder: number
+}
+
+const declaredThemeValues = (node: HTMLElement) => {
+    const candidates = new Map<string, DeclaredStyleCandidate>()
+    let sourceOrder = 0
+    const candidateWins = (candidate: DeclaredStyleCandidate, current?: DeclaredStyleCandidate) => (
+        !current
+        || Number(candidate.important) > Number(current.important)
+        || candidate.important === current.important && (
+            Number(candidate.inline) > Number(current.inline)
+            || candidate.inline === current.inline && (
+                compareSelectorSpecificity(candidate.specificity, current.specificity) > 0
+                || compareSelectorSpecificity(candidate.specificity, current.specificity) === 0
+                    && candidate.sourceOrder >= current.sourceOrder
+            )
+        )
+    )
+    const collectDeclaration = (declaration: CSSStyleDeclaration, specificity: SelectorSpecificity, inline = false) => {
+        sourceOrder += 1
+        Object.entries(DESIGNER_STYLE_PROPERTIES).forEach(([name, cssName]) => {
+            let value = declaration.getPropertyValue(cssName).trim()
+            let priorityName = cssName
+            if (!value && /^(?:margin|padding)-/.test(cssName)) {
+                const shorthand = cssName.split('-')[0]
+                const shorthandValue = declaration.getPropertyValue(shorthand).trim()
+                if (shorthandValue) {
+                    const expansion = document.createElement('div').style
+                    expansion.setProperty(shorthand, shorthandValue)
+                    value = expansion.getPropertyValue(cssName).trim()
+                    priorityName = shorthand
+                }
+            }
+            if (!value) return
+            const candidate = {
+                value,
+                important: declaration.getPropertyPriority(priorityName) === 'important',
+                inline,
+                specificity,
+                sourceOrder,
+            }
+            if (candidateWins(candidate, candidates.get(name))) candidates.set(name, candidate)
+        })
+    }
+    const collectRules = (rules: CSSRuleList) => {
+        ;[...rules].forEach((rule) => {
+            const media = (rule as CSSMediaRule).media?.mediaText
+            if (media && !window.matchMedia(media).matches) return
+            const condition = (rule as CSSSupportsRule).conditionText
+            if (condition && rule.constructor?.name === 'CSSSupportsRule' && !CSS.supports(condition)) return
+            const styleRule = rule as CSSStyleRule
+            if (styleRule.selectorText && styleRule.style) {
+                const specificity = splitSelectorList(styleRule.selectorText)
+                    .filter((selector) => {
+                        try { return node.matches(selector) } catch { return false }
+                    })
+                    .map(selectorSpecificity)
+                    .sort(compareSelectorSpecificity)
+                    .at(-1)
+                if (specificity) collectDeclaration(styleRule.style, specificity)
+            }
+            const nested = (rule as CSSGroupingRule).cssRules
+            if (nested?.length) collectRules(nested)
+        })
+    }
+    ;[...document.styleSheets].forEach((sheet) => {
+        try { collectRules(sheet.cssRules) } catch { /* Cross-origin stylesheets are not inspectable. */ }
+    })
+    collectDeclaration(node.style, [0, 0, 0], true)
+    return Object.fromEntries([...candidates].map(([name, candidate]) => [name, candidate.value]))
+}
+
+const inspectedThemeValues = (node: HTMLElement) => ({
+    computedStyles: computedThemeValues(node),
+    declaredStyles: declaredThemeValues(node),
+})
+
 const fallbackCascadeWinner = (node: HTMLElement, targets: any[]) => [...targets]
     .map((target) => {
         const specificity = (target.cascadeSelectors || [])
@@ -420,7 +502,7 @@ const widgetSpacingConfigurationTargets = (
                 _cascadeNode: configurationNode,
                 widgetId: candidate.widgetId || widgetRoot.dataset.widgetId || '',
                 widgetType: candidate.widgetType || widgetRoot.dataset.widgetType || '',
-                computedStyles: computedThemeValues(configurationNode),
+                ...inspectedThemeValues(configurationNode),
             }]
         })
     })
@@ -472,7 +554,7 @@ const selectionPaths = (node: HTMLElement, preferredTarget?: any, designer?: Ren
                 ...target,
                 widgetType: target.widgetType || widgetNode?.dataset.widgetType || '',
                 widgetId,
-                computedStyles: computedThemeValues(current),
+                ...inspectedThemeValues(current),
                 ...(target.kind === 'widget' ? {
                     configurationSpacingTargets: widgetSpacingConfigurationTargets(current, designer, target),
                 } : {}),
@@ -520,7 +602,7 @@ const ancestorTargets = (node: HTMLElement, designer: NonNullable<RenderPageMode
             const spacingTarget = Boolean(designer.editableSpacingTargets?.[target.styleTargetId || target.id])
             if (!target.id || seen.has(target.id) || (!typographyTarget || foundTypography) && (!spacingTarget || foundSpacing)) return
             seen.add(target.id)
-            ancestors.push({ ...target, computedStyles: computedThemeValues(ancestor) })
+            ancestors.push({ ...target, ...inspectedThemeValues(ancestor) })
             if (typographyTarget) foundTypography = true
             if (spacingTarget) foundSpacing = true
         })
@@ -536,6 +618,7 @@ const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['design
     if (!primary) return
     const richText = Boolean(primary.richText || isRichTextNode(node))
     const widgetNode = node.closest<HTMLElement>('[data-widget-id]')
+    const styleInspection = inspectedThemeValues(node)
     window.parent.postMessage({
         source: 'eceee-designer-preview', action, targetId: primary.id, styleTargetId: primary.styleTargetId || '', kind: primary.kind,
         label: primary.label, text: editableValue(node, richText), editable: primary.editable, richText,
@@ -548,7 +631,7 @@ const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['design
         sourcePath: primary.sourcePath || [],
         sourceMatchIndex: primary.sourceMatchIndex ?? 0,
         targetInstanceId: primary.instanceId || designerInstanceId(node),
-        computedStyles: computedThemeValues(node),
+        ...styleInspection,
         ...(primary.kind === 'widget' ? {
             configurationSpacingTargets: widgetSpacingConfigurationTargets(node, designer, primary),
         } : {}),
@@ -558,7 +641,7 @@ const postDesignerEvent = (node: HTMLElement, designer?: RenderPageModel['design
             widgetId: target.widgetId || widgetNode?.dataset.widgetId || '',
             text: editableValue(node, Boolean(target.richText || richText)),
             richText: Boolean(target.richText || richText),
-            computedStyles: computedThemeValues(node),
+            ...styleInspection,
         })),
         path: targetPath(node, primary),
         selectionPaths: selectionPaths(node, primary, designer),
@@ -657,6 +740,9 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             node.classList.add('designer-hovered')
         }
         if (designer.guidesEnabled === false) return
+        const guideIsVisible = (spacing?: 'margin' | 'padding' | 'gap' | 'size') => (
+            !spacing || designer.guideVisibility?.[spacing] !== false
+        )
         const rect = node.getBoundingClientRect()
         const style = getComputedStyle(node)
         const number = (name: string) => Number.parseFloat(style.getPropertyValue(name)) || 0
@@ -680,6 +766,24 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             value?: number,
             propertyOverride?: 'width' | 'height',
         ) => {
+            if (!guideIsVisible(spacing)) return
+            const property = propertyOverride || (spacing === 'gap' ? 'gap' : `${spacing}${side ? side[0].toUpperCase() + side.slice(1) : ''}`)
+            const editNode = spacing === 'gap' && columnGrid ? columnGrid : node
+            const directTargets = nodeTargets(editNode)
+            const directTargetIds = directTargets.flatMap((target: any) => [target.id, target.styleTargetId]).filter(Boolean)
+            const targetIds: string[] = []
+            let targetNode: HTMLElement | null = editNode
+            while (targetNode && root.contains(targetNode)) {
+                nodeTargets(targetNode).forEach((target: any) => {
+                    if (target.id && !targetIds.includes(target.id)) targetIds.push(target.id)
+                    if (target.styleTargetId && !targetIds.includes(target.styleTargetId)) targetIds.push(target.styleTargetId)
+                })
+                targetNode = targetNode.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
+            }
+            const explicitlyConfigured = targetIds.some((targetId) => (
+                designer.activeSpacingPropertiesByTarget?.[targetId]?.includes(property)
+            ))
+            if (spacing && value === 0 && !explicitlyConfigured) return
             if (width <= 0 || height <= 0) {
                 if (!spacing || value !== 0) return
                 width = Math.max(1, width)
@@ -747,20 +851,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                 left: `${labelLeft}px`,
                 top: `${labelTop}px`,
             })
-            const property = propertyOverride || (spacing === 'gap' ? 'gap' : `${spacing}${side ? side[0].toUpperCase() + side.slice(1) : ''}`)
             const spacingDescription = propertyOverride || (spacing === 'gap' ? 'column gap' : `${spacing} ${side}`)
-            const editNode = spacing === 'gap' && columnGrid ? columnGrid : node
-            const directTargets = nodeTargets(editNode)
-            const directTargetIds = directTargets.flatMap((target: any) => [target.id, target.styleTargetId]).filter(Boolean)
-            const targetIds: string[] = []
-            let targetNode: HTMLElement | null = editNode
-            while (targetNode && root.contains(targetNode)) {
-                nodeTargets(targetNode).forEach((target: any) => {
-                    if (target.id && !targetIds.includes(target.id)) targetIds.push(target.id)
-                    if (target.styleTargetId && !targetIds.includes(target.styleTargetId)) targetIds.push(target.styleTargetId)
-                })
-                targetNode = targetNode.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
-            }
             const editableTargets = directTargets.flatMap((target: any) => (
                 [target.id, target.styleTargetId].filter(Boolean).flatMap((targetId) => (
                     designer.editableSpacingTargets?.[targetId]?.includes(property) ? [{ ...target, targetId }] : []
@@ -1600,7 +1691,7 @@ export const RenderFrameRuntime = () => {
                 const match = findTargetNode(document, event.data.targetId, event.data.widgetId, event.data.targetInstanceId)
                 if (match) window.parent.postMessage({
                     source: 'eceee-designer-preview', action: 'targetStyles', targetId: event.data.targetId,
-                    computedStyles: computedThemeValues(match),
+                    ...inspectedThemeValues(match),
                 }, '*')
             }
             if (event.data.action === 'updateText' && event.data.targetId && typeof event.data.text === 'string') {

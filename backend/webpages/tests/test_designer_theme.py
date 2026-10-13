@@ -557,7 +557,7 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(workspace["description"], "Theme for editorial sites")
         self.assertEqual(
             workspace["constraints"]["editableWidgetFrameSpacingProperties"],
-            ["height", "margin", "marginBottom", "marginLeft", "marginRight", "marginTop", "width"],
+            ["width"],
         )
         self.assertEqual(
             workspace["constraints"]["editableWidgetSurfaceSpacingProperties"],

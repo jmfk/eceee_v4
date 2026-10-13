@@ -62,6 +62,12 @@ export interface DesignerRenderOptions {
     previewImageReferences?: DesignerPreviewImageReference[]
     contentEditable?: boolean
     guidesEnabled?: boolean
+    guideVisibility?: {
+        size?: boolean
+        margin?: boolean
+        padding?: boolean
+        gap?: boolean
+    }
     layoutCanvas?: boolean
 }
 

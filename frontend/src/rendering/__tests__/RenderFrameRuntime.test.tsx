@@ -272,6 +272,12 @@ describe('RenderFrameRuntime designer overlay', () => {
     })
 
     it('keeps declared internal widget parts editable under the canonical widget selection', async () => {
+        const style = document.createElement('style')
+        style.textContent = '.hero-content { margin: 0 auto; padding: 30px; }'
+        document.head.append(style)
+        // Chromium exposes an empty cssRules list on style rules for CSS nesting.
+        // The declarations on the rule must still be inspected before nested rules.
+        Object.defineProperty(style.sheet!.cssRules[0], 'cssRules', { configurable: true, value: [] })
         const structuralWorkspace = structuredClone(workspace)
         structuralWorkspace.catalog.designGroups = []
         structuralWorkspace.catalog.widgetParts = [{
@@ -336,6 +342,17 @@ describe('RenderFrameRuntime designer overlay', () => {
             source: 'eceee-designer-preview', action: 'spacingChange', property: 'paddingTop', value: '40px',
             targetIds: expect.arrayContaining(['widget-part:easy_widgets.HeroWidget:hero-widget']),
         }), '*')
+        const heroContent = heading.closest('.hero-content') as HTMLElement
+        fireEvent.click(heroContent)
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+            source: 'eceee-designer-preview',
+            action: 'select',
+            declaredStyles: expect.objectContaining({
+                marginTop: '0px', marginRight: 'auto', marginBottom: '0px', marginLeft: 'auto',
+                paddingTop: '30px', paddingRight: '30px', paddingBottom: '30px', paddingLeft: '30px',
+            }),
+        }), '*')
+        style.remove()
         postMessage.mockRestore()
     })
 
@@ -960,6 +977,24 @@ describe('RenderFrameRuntime designer overlay', () => {
             rect(10 + index * slotWidth, 10, slotWidth, 160),
         ))
         fireEvent.scroll(window)
+        expect([...document.querySelectorAll('.designer-spacing-gap-value')]
+            .filter((spacing) => spacing.textContent === '0px')).toHaveLength(0)
+
+        columnWorkspace.spacing = [{
+            targetId: 'columns-container', scope: 'layout', groupIndex: 0, part, values: { gap: '0px' },
+        }]
+        sendModel(createDesignerRenderModel({ workspace: columnWorkspace, sourceModel, contentEditable: false }))
+        await waitFor(() => expect(document.querySelector(cssClass)).toBeInTheDocument())
+        const updatedColumns = document.querySelector(cssClass) as HTMLElement
+        const updatedWidgetRoot = updatedColumns.closest<HTMLElement>('[data-widget-id]') as HTMLElement
+        const updatedSlots = [...updatedColumns.querySelectorAll<HTMLElement>(':scope > [data-slot]')]
+        vi.spyOn(updatedWidgetRoot, 'getBoundingClientRect').mockReturnValue(rect(10, 10, 430, 160))
+        vi.spyOn(updatedColumns, 'getBoundingClientRect').mockReturnValue(rect(10, 10, 430, 160))
+        updatedSlots.forEach((slot, index) => vi.spyOn(slot, 'getBoundingClientRect').mockReturnValue(
+            rect(10 + index * slotWidth, 10, slotWidth, 160),
+        ))
+        updatedColumns.style.gap = '0px'
+        fireEvent.click(updatedWidgetRoot)
         expect([...document.querySelectorAll('.designer-spacing-gap-value')]
             .filter((spacing) => spacing.textContent === '0px')).toHaveLength(slotNames.length - 1)
         postMessage.mockRestore()
@@ -1732,6 +1767,30 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(document.querySelector('.designer-spacing-padding[data-side="left"]')).toHaveStyle({
             left: '0px', top: '130px', width: '40px', height: '340px',
         })
+    })
+
+    it('honors per-category WYSIWYG measurement visibility', async () => {
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({
+            workspace,
+            viewId: 'page-main',
+            guideVisibility: { size: true, margin: true, padding: false, gap: true },
+        }))
+        await screen.findByRole('heading', { name: 'Overridden heading' })
+        const grid = document.querySelector<HTMLElement>('.main-layout-grid')!
+        grid.style.marginTop = '12px'
+        grid.style.padding = '30px 40px'
+        vi.spyOn(grid, 'getBoundingClientRect').mockReturnValue({
+            x: 0, y: 100, left: 0, top: 100, right: 600, bottom: 500, width: 600, height: 400,
+            toJSON: () => ({}),
+        })
+
+        fireEvent.mouseOver(grid)
+
+        expect(document.querySelector('.designer-spacing-padding')).toBeNull()
+        expect(document.querySelector('.designer-spacing-padding-value')).toBeNull()
+        expect(document.querySelector('.designer-spacing-margin')).toBeInTheDocument()
+        expect(document.querySelector('.designer-spacing-size')).toBeInTheDocument()
     })
 
     it('centers a spacing value in the visible part of an offscreen region', async () => {
