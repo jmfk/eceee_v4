@@ -1986,7 +1986,8 @@ describe('DesignerThemeWorkspacePage', () => {
 
         const elementPath = screen.getByRole('navigation', { name: 'Element path' })
         expect(within(elementPath).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Bullet list', 'List item', 'Link'])
-        expect(within(elementPath).getByText('Link')).toHaveAttribute('aria-current', 'page')
+        expect(within(elementPath).getByRole('button', { name: 'Link' })).toHaveAttribute('aria-current', 'page')
+        expect(within(elementPath).getByRole('button', { name: 'Link' })).toBeDisabled()
         expect(within(elementPath).getByRole('button', { name: 'List item' })).toBeInTheDocument()
         fireEvent.click(within(elementPath).getByRole('button', { name: 'Bullet list' }))
         expect(screen.getByRole('button', { name: 'Edit Bullet list' })).toHaveAttribute('aria-expanded', 'true')
@@ -2098,6 +2099,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(within(screen.getByRole('navigation', { name: 'Element path' })).getByRole('button', { name: 'Heading' })).toBeInTheDocument()
         expect(within(trail).getByRole('button', { name: 'Headline widget' })).toHaveAttribute('aria-current', 'page')
         expect(within(trail).getByRole('button', { name: 'Two columns widget' })).toHaveAttribute('aria-pressed', 'true')
+        expect(within(trail).getByRole('button', { name: 'Two columns widget' })).toBeDisabled()
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-render-host', action: 'selectTarget', targetId: 'widget:columns-1',
             selectionLevel: 'widget',

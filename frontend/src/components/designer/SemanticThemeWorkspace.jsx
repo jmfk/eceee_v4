@@ -192,9 +192,14 @@ const SelectionPath = ({ kind, label, targets, selectedTarget, onSelect }) => {
                 const targetLabel = target.displayLabel || target.label
                 return <li key={`${kind}:${targetFocusKey(target)}`} className="flex min-w-0 items-center">
                     {index > 0 && <ChevronRight aria-hidden="true" className="mx-1 h-3.5 w-3.5 shrink-0 text-gray-400" />}
-                    {isActiveEditor
-                        ? <span aria-current={isCurrent ? 'page' : undefined} className={`max-w-48 truncate font-semibold ${tone.current}`} title={targetLabel}>{targetLabel}</span>
-                        : <button type="button" aria-current={isCurrent ? 'page' : undefined} onClick={() => onSelect(target)} className={`min-h-6 max-w-48 truncate rounded px-1 py-0.5 text-left text-gray-600 hover:bg-white hover:text-gray-950 focus-visible:outline-none focus-visible:ring-2 ${tone.focus}`} title={`Select ${targetLabel}`}>{targetLabel}</button>}
+                    <button
+                        type="button"
+                        aria-current={isCurrent ? 'page' : undefined}
+                        disabled={isActiveEditor}
+                        onClick={() => onSelect(target)}
+                        className={`min-h-6 max-w-48 truncate rounded px-1 py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 ${tone.focus} ${isActiveEditor ? `cursor-default font-semibold ${tone.current}` : 'text-gray-600 hover:bg-white hover:text-gray-950'}`}
+                        title={isActiveEditor ? `Selected ${targetLabel}` : `Select ${targetLabel}`}
+                    >{targetLabel}</button>
                 </li>
             })}
         </ol>
@@ -218,9 +223,10 @@ const WidgetSlotTrail = ({ targets, originKey, selectedTarget, onSelect }) => {
                         type="button"
                         aria-current={isOrigin ? 'page' : undefined}
                         aria-pressed={isActive}
+                        disabled={isActive}
                         onClick={() => onSelect(target)}
-                        title={`${isOrigin ? 'Original selection: ' : 'Select '}${label}`}
-                        className={`min-h-6 max-w-44 truncate rounded border-l-2 px-1.5 py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 ${tone.border} ${tone.focus} ${isActive ? tone.header : 'bg-white text-gray-700 hover:bg-gray-100'} ${isOrigin ? 'font-semibold ring-1 ring-inset ring-gray-400' : ''}`}
+                        title={isActive ? `Selected ${label}` : `${isOrigin ? 'Original selection: ' : 'Select '}${label}`}
+                        className={`min-h-6 max-w-44 truncate rounded border-l-2 px-1.5 py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 ${tone.border} ${tone.focus} ${isActive ? `${tone.header} cursor-default` : 'bg-white text-gray-700 hover:bg-gray-100'} ${isOrigin ? 'font-semibold ring-1 ring-inset ring-gray-400' : ''}`}
                     >{label}</button>
                 </li>
             })}
