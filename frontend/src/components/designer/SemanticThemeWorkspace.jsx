@@ -25,8 +25,16 @@ const directionalSpacingFields = [
     'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
 ]
 const visibleSpacingFields = [...directionalSpacingFields, 'gap', 'width', 'height']
+const guideVisibilityOptions = [
+    ['size', 'Width & height'],
+    ['margin', 'Margins'],
+    ['padding', 'Padding'],
+    ['gap', 'Gaps'],
+]
 const widgetFrameSpacingProperties = (constraints) => constraints.editableWidgetFrameSpacingProperties
-    || constraints.editableSpacingProperties.filter((field) => field.startsWith('margin') || ['width', 'height'].includes(field))
+    || constraints.editableSpacingProperties.filter((field) => field === 'width')
+const widgetFrameComputedProperties = (constraints) => constraints.editableSpacingProperties
+    .filter((field) => field.startsWith('margin') || ['width', 'height'].includes(field))
 const spacingDirections = {
     margin: ['marginTop', 'marginRight', 'marginBottom', 'marginLeft'],
     padding: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'],
@@ -514,13 +522,26 @@ const spacingEntryForField = (entries, field) => (
                 : '',
     ))
     || entries.find((entry) => entry.fields?.includes(field))
-    || entries[0]
 )
 
-const spacingSectionIsAllZero = ({ computed, fields, entries }) => {
+const authoredSpacingEntryForField = (entries, field) => {
+    const shorthand = field.startsWith('margin') && field !== 'margin'
+        ? 'margin'
+        : field.startsWith('padding') && field !== 'padding'
+            ? 'padding'
+            : ''
+    const hasAuthoredValue = (entry) => (
+        hasThemeValue(entry.row.values[field]) || shorthand && hasThemeValue(entry.row.values[shorthand])
+    )
+    return entries.find((entry) => entry.row.breakpoint && hasAuthoredValue(entry))
+        || entries.find(hasAuthoredValue)
+}
+
+const spacingSectionIsAllZero = ({ computed, declared, fields, entries }) => {
     const spacingFields = fields.filter(isCollapsibleSpacingField)
     return spacingFields.length > 0 && spacingFields.every((field) => {
         const entry = spacingEntryForField(entries, field)
+        if (hasThemeValue(declared?.[field])) return false
         return isZeroCssValue(entry?.row.values[field] || computed[field] || '')
     })
 }
@@ -624,6 +645,8 @@ const SemanticThemeWorkspace = ({
     const [addedThemeValues, setAddedThemeValues] = useState(() => new Set())
     const [editableInheritedSpacing, setEditableInheritedSpacing] = useState(() => new Set())
     const [themeDefaults, setThemeDefaults] = useState({})
+    const [themeDeclarations, setThemeDeclarations] = useState({})
+    const [spacingGroupExpansion, setSpacingGroupExpansion] = useState({})
     const [selectionExpanded, setSelectionExpanded] = useState(true)
     const [workspaceView, setWorkspaceView] = useState('preview')
     const [selectedImageAspectKey, setSelectedImageAspectKey] = useState('')
@@ -632,6 +655,7 @@ const SemanticThemeWorkspace = ({
     const [sourceContentModel, setSourceContentModel] = useState(null)
     const [loadingContent, setLoadingContent] = useState(false)
     const [guidesEnabled, setGuidesEnabled] = useState(true)
+    const [guideVisibility, setGuideVisibility] = useState({ size: false, margin: true, padding: true, gap: true })
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
     const [inspectorCollapsed, setInspectorCollapsed] = useState(false)
     const [sidebarWidth, setSidebarWidth] = useState(defaultSidebarWidth)
@@ -860,6 +884,7 @@ const SemanticThemeWorkspace = ({
             if (event.source !== iframeRef.current?.contentWindow || event.data?.source !== 'eceee-designer-preview') return
             if (event.data.action === 'targetStyles') {
                 setThemeDefaults((current) => ({ ...current, [event.data.targetId]: event.data.computedStyles || {} }))
+                setThemeDeclarations((current) => ({ ...current, [event.data.targetId]: event.data.declaredStyles || {} }))
                 return
             }
             if (event.data.action === 'spacingChange' || event.data.action === 'spacingChanges') {
@@ -930,6 +955,7 @@ const SemanticThemeWorkspace = ({
                     sourcePath: Array.isArray(option.sourcePath) ? option.sourcePath : [],
                     sourceMatchIndex: option.sourceMatchIndex ?? 0,
                     computedStyles: option.computedStyles || {},
+                    declaredStyles: option.declaredStyles || {},
                     isWidgetSurface: option.isWidgetSurface === true,
                     cascadePriority: Array.isArray(option.cascadePriority) ? option.cascadePriority : [],
                     activeSpacingProperties: Array.isArray(option.activeSpacingProperties) ? option.activeSpacingProperties : [],
@@ -975,6 +1001,7 @@ const SemanticThemeWorkspace = ({
                 sourcePath: Array.isArray(event.data.sourcePath) ? event.data.sourcePath : [],
                 sourceMatchIndex: event.data.sourceMatchIndex ?? 0,
                 computedStyles: event.data.computedStyles || {},
+                declaredStyles: event.data.declaredStyles || {},
                 configurationSpacingTargets: Array.isArray(event.data.configurationSpacingTargets)
                     ? event.data.configurationSpacingTargets.filter((option) => option?.id && option?.label).map(normalizeTarget)
                     : [],
@@ -1065,6 +1092,23 @@ const SemanticThemeWorkspace = ({
                 // instance must win over another matching heading/widget collected as context.
                 [target.id]: target.computedStyles,
                 ...(target.styleTargetId ? { [target.styleTargetId]: target.computedStyles } : {}),
+            }))
+            setThemeDeclarations((current) => ({
+                ...current,
+                ...Object.fromEntries(alternatives.flatMap((alternative) => [
+                    [alternative.id, alternative.declaredStyles],
+                    ...(alternative.styleTargetId ? [[alternative.styleTargetId, alternative.declaredStyles]] : []),
+                ])),
+                ...Object.fromEntries(ancestors.flatMap((ancestor) => [
+                    [ancestor.id, ancestor.declaredStyles],
+                    ...(ancestor.styleTargetId ? [[ancestor.styleTargetId, ancestor.declaredStyles]] : []),
+                ])),
+                ...Object.fromEntries(Object.values(normalizedSelectionPaths).flat().flatMap((pathTarget) => [
+                    [pathTarget.id, pathTarget.declaredStyles],
+                    ...(pathTarget.styleTargetId ? [[pathTarget.styleTargetId, pathTarget.declaredStyles]] : []),
+                ])),
+                [target.id]: target.declaredStyles,
+                ...(target.styleTargetId ? { [target.styleTargetId]: target.declaredStyles } : {}),
             }))
             setAddedThemeValues(new Set())
             if (event.data.action === 'contextAction' || event.data.action === 'editText') {
@@ -1178,9 +1222,10 @@ const SemanticThemeWorkspace = ({
             sourceModel: contentMode === 'content' ? sourceContentModel : null,
             contentEditable: contentMode === 'demo',
             guidesEnabled,
+            guideVisibility,
             viewportWidth: designerPreviewWidth(viewport, getBreakpoints(previewWorkspace)),
         })
-    }, [contentMode, guidesEnabled, pendingPreviewTextsRef, previewContent, preview, sourceContentModel, viewId, viewport, workspace])
+    }, [contentMode, guideVisibility, guidesEnabled, pendingPreviewTextsRef, previewContent, preview, sourceContentModel, viewId, viewport, workspace])
     const [renderPreviewModel, setRenderPreviewModel] = useState(previewModel)
 
     useEffect(() => {
@@ -1343,10 +1388,11 @@ const SemanticThemeWorkspace = ({
                 .filter((row) => row.targetId === structural.targetId)
                 .flatMap((row) => configuredSpacingFields(row.values))
                 .filter((field) => workspace.constraints.editableSpacingProperties.includes(field))
-            const defaults = structural.scope === 'widget'
-                ? widgetFrameSpacingProperties(workspace.constraints)
-                : []
-            return [...new Set([...declared, ...configured, ...defaults])]
+            const editableConfigured = structural.scope === 'widget'
+                ? configured.filter((field) => field !== 'height' && field !== 'margin' && !field.startsWith('margin'))
+                : configured
+            const defaults = structural.scope === 'widget' ? widgetFrameSpacingProperties(workspace.constraints) : []
+            return [...new Set([...declared, ...editableConfigured, ...defaults])]
         }
         if (target?.kind !== 'layoutSlot' && target?.kind !== 'slot') return workspace.constraints.editableSpacingProperties
         const layoutMatch = target.id.match(/^layout:(.+):slot:([^:]+)$/)
@@ -1357,7 +1403,7 @@ const SemanticThemeWorkspace = ({
             .filter((field) => workspace.constraints.editableSpacingProperties.includes(field))
     }
     const spacingForLevelTarget = (target) => {
-        if (!target) return { computed: {}, fields: [], entries: [], structural: null }
+        if (!target) return { computed: {}, declared: {}, fields: [], entries: [], structural: null }
         const configurationTargets = target.configurationSpacingTargets || []
         const targetIds = [...new Set([
             target.id,
@@ -1377,6 +1423,9 @@ const SemanticThemeWorkspace = ({
                 editableSpacingFieldsForTarget(configurationTarget, configurationStructural)
             )),
         ])]
+        const displayFields = structural?.scope === 'widget'
+            ? [...new Set([...editableFields, ...widgetFrameComputedProperties(workspace.constraints)])]
+            : editableFields
         const computed = {
             ...(target.computedStyles || {}),
             ...(themeDefaults[target.id] || {}),
@@ -1387,8 +1436,22 @@ const SemanticThemeWorkspace = ({
                 ...(configurationTarget.styleTargetId ? themeDefaults[configurationTarget.styleTargetId] || {} : {}),
             }))),
         }
+        const declarationsForTarget = (declarationTarget) => {
+            if (declarationTarget.styleTargetId
+                && Object.prototype.hasOwnProperty.call(themeDeclarations, declarationTarget.styleTargetId)) {
+                return themeDeclarations[declarationTarget.styleTargetId]
+            }
+            if (Object.prototype.hasOwnProperty.call(themeDeclarations, declarationTarget.id)) {
+                return themeDeclarations[declarationTarget.id]
+            }
+            return declarationTarget.declaredStyles || {}
+        }
+        const declared = {
+            ...declarationsForTarget(target),
+            ...Object.assign({}, ...configurationTargets.map(declarationsForTarget)),
+        }
         if (['layoutSlot', 'slot'].includes(target.kind) && !editableFields.length) {
-            return { computed, fields: [], entries: [], structural }
+            return { computed, declared, fields: [], entries: [], structural }
         }
         const matching = workspace.spacing
             .map((row, index) => ({ row, index, breakpoint: row.breakpoint }))
@@ -1414,10 +1477,14 @@ const SemanticThemeWorkspace = ({
             })
         })
         const visibleFieldsForTarget = ['layoutSlot', 'slot'].includes(target.kind)
-            ? [...directionalSpacingFields, 'margin', 'padding'].filter((field) => editableFields.includes(field))
+            ? [...directionalSpacingFields, 'margin', 'padding'].filter((field) => displayFields.includes(field))
             : visibleSpacingFields
         const fields = visibleFieldsForTarget.filter((field) => {
             if (['layoutSlot', 'slot'].includes(target.kind)) return true
+            if (structural?.scope === 'widget' && displayFields.includes(field)) {
+                const value = Number.parseFloat(computed[field])
+                return Number.isFinite(value)
+            }
             const shorthand = field.startsWith('margin') ? 'margin' : field.startsWith('padding') ? 'padding' : field
             const explicitlyConfigured = entries.some((entry) => (
                 hasThemeValue(entry.row.values[field]) || hasThemeValue(entry.row.values[shorthand])
@@ -1427,7 +1494,7 @@ const SemanticThemeWorkspace = ({
             const value = Number.parseFloat(computed[field])
             return Number.isFinite(value)
         })
-        return { computed, fields, entries, structural }
+        return { computed, declared, fields, entries, structural }
     }
     const updateLevelSpacing = (target, field, value) => {
         const representedTargets = [target, ...(target.configurationSpacingTargets || [])]
@@ -1469,6 +1536,30 @@ const SemanticThemeWorkspace = ({
             })
             return
         }
+    }
+    const removeLevelSpacing = (target, field, sourceEntry, computed) => {
+        if (!sourceEntry || sourceEntry.index < 0) return
+        updateWorkspace((next) => {
+            const row = next.spacing[sourceEntry.index]
+            if (!row) return next
+            const shorthand = field.startsWith('margin') && field !== 'margin'
+                ? 'margin'
+                : field.startsWith('padding') && field !== 'padding'
+                    ? 'padding'
+                    : ''
+            if (hasThemeValue(row.values[field])) delete row.values[field]
+            else if (shorthand && hasThemeValue(row.values[shorthand])) {
+                spacingDirections[shorthand].forEach((direction) => {
+                    if (direction !== field && hasThemeValue(computed[direction])) row.values[direction] = computed[direction]
+                })
+                delete row.values[shorthand]
+            }
+            if (!Object.values(row.values || {}).some(hasThemeValue)) next.spacing.splice(sourceEntry.index, 1)
+            return next
+        })
+        window.setTimeout(() => iframeRef.current?.contentWindow?.postMessage({
+            source: 'eceee-render-host', action: 'readTargetStyles', targetId: target.styleTargetId || target.id,
+        }, '*'), 0)
     }
     const addableThemeValues = selectedTarget ? [] : [
         ...targetTypography.flatMap(({ row, index }) => workspace.constraints.editableTypographyProperties
@@ -2015,7 +2106,15 @@ const SemanticThemeWorkspace = ({
                     section.configuration || !hasConfigurationSpacing || !spacingSectionIsAllZero(section)
                     || section.fields.some((field) => ['width', 'height'].includes(field))
                 ))
-                const hasEditableSpacing = spacingSections.length > 0
+                const hasInspectableSpacing = spacingSections.length > 0
+                const hasEditableSpacing = spacingSections.some(({ fields: sectionFields, entries }) => (
+                    sectionFields.some((field) => Boolean(spacingEntryForField(entries, field)))
+                ))
+                const hasDefinedSpacing = spacingSections.some(({ declared, fields: sectionFields, entries }) => (
+                    sectionFields.some((field) => (
+                        Boolean(authoredSpacingEntryForField(entries, field)) || hasThemeValue(declared[field])
+                    ))
+                ))
                 const isActiveTargetPanel = targetFocusKey(target) === targetFocusKey(selectedTarget)
                     || (kind === 'widget' && targetSelectionKind(selectedTarget) === 'widget'
                         && target.widgetId && target.widgetId === selectedTarget?.widgetId)
@@ -2026,16 +2125,31 @@ const SemanticThemeWorkspace = ({
                 })).filter((entry) => entry.fields.length > 0) : []
                 const levelAssets = isActiveTargetPanel ? targetAssetAlternatives : []
                 const levelColors = isActiveTargetPanel ? relevantColors : []
-                const hasEditableProperties = hasEditableSpacing || levelTypography.length > 0 || levelAssets.length > 0 || levelColors.length > 0
+                const hasEditableProperties = hasInspectableSpacing || levelTypography.length > 0 || levelAssets.length > 0 || levelColors.length > 0
                 const expansionKey = `${kind}:${targetFocusKey(target)}`
                 const collapseZeroSpacing = kind === 'widget'
-                    && hasEditableSpacing
+                    && hasInspectableSpacing
+                    && !spacingSections.some(({ fields: sectionFields, entries }) => sectionFields.some((field) => (
+                        !isCollapsibleSpacingField(field) && spacingEntryForField(entries, field)
+                    )))
                     && levelTypography.length === 0
                     && levelAssets.length === 0
                     && levelColors.length === 0
                     && spacingSectionsAreAllZero(spacingSections)
+                const collapseReadOnlySpacing = hasInspectableSpacing
+                    && !hasEditableSpacing
+                    && levelTypography.length === 0
+                    && levelAssets.length === 0
+                    && levelColors.length === 0
+                const collapseComputedOnlySpacing = kind === 'widget'
+                    && hasInspectableSpacing
+                    && !hasDefinedSpacing
+                    && levelTypography.length === 0
+                    && levelAssets.length === 0
+                    && levelColors.length === 0
+                const collapseSpacingPanel = collapseZeroSpacing || collapseReadOnlySpacing || collapseComputedOnlySpacing
                 const expanded = expandedSelectionLevels.has(kind)
-                    && (!collapseZeroSpacing || expandedZeroSpacingTargets.has(expansionKey))
+                    && (!collapseSpacingPanel || expandedZeroSpacingTargets.has(expansionKey))
                 const headerContent = <>
                     <div className="min-w-0 flex-1">
                         <p className={`text-[10px] font-semibold uppercase tracking-wide ${tone.label}`}>Selected {kind}</p>
@@ -2059,7 +2173,7 @@ const SemanticThemeWorkspace = ({
                                 })
                                 setExpandedZeroSpacingTargets((current) => {
                                     const next = new Set(current)
-                                    if (nextExpanded && collapseZeroSpacing) next.add(expansionKey)
+                                    if (nextExpanded && collapseSpacingPanel) next.add(expansionKey)
                                     else next.delete(expansionKey)
                                     return next
                                 })
@@ -2075,29 +2189,102 @@ const SemanticThemeWorkspace = ({
                         >{headerContent}</div>}
                     {hasEditableProperties && expanded && <div id={panelId} className="space-y-3 px-3 py-3">
                         {hasEditableSpacing && <p className="text-xs text-gray-500">Select one or more measurements in the preview. Left/right changes horizontal values; up/down changes vertical values. Hold Shift for 10 px steps.</p>}
-                        {spacingSections.map(({ target: spacingTarget, configuration, computed, fields, entries }, sectionIndex) => {
+                        {spacingSections.map(({ target: spacingTarget, configuration, computed, declared, fields, entries }, sectionIndex) => {
                             const spacingTargetLabel = !configuration && kind === 'widget'
                                 ? 'Widget placement'
                                 : configuration && kind === 'widget'
                                     ? `Widget content · ${spacingTarget.displayLabel || spacingTarget.label}`
                                     : spacingTarget.displayLabel || spacingTarget.label
-                            return <section key={targetFocusKey(spacingTarget)} className={sectionIndex > 0 ? 'border-t border-gray-200 pt-3' : ''}>
-                                {(kind === 'widget' || configuration || spacingSections.length > 1) && <h3 className="mb-2 text-sm font-medium text-gray-900">{spacingTargetLabel}</h3>}
-                                <FieldLayout fields={fields} renderField={(field, className) => {
+                            const renderSpacingField = (field, className) => {
                                     const entry = spacingEntryForField(entries, field)
-                                    const value = entry?.row.values[field] || computed[field] || ''
+                                    const shorthand = field.startsWith('margin') && field !== 'margin'
+                                        ? 'margin'
+                                        : field.startsWith('padding') && field !== 'padding'
+                                            ? 'padding'
+                                            : ''
+                                    const calculatedValue = computed[field] || ''
+                                    const declaredValue = declared[field] || ''
+                                    const sourceEntry = authoredSpacingEntryForField(entries, field)
+                                    const directValue = sourceEntry?.row.values[field]
+                                    const shorthandValue = shorthand ? sourceEntry?.row.values[shorthand] : ''
+                                    const isAuthored = hasThemeValue(directValue) || hasThemeValue(shorthandValue)
+                                    const definedValue = hasThemeValue(sourceEntry?.row.values[field])
+                                        ? sourceEntry.row.values[field]
+                                        : shorthand && hasThemeValue(sourceEntry?.row.values[shorthand]) ? calculatedValue
+                                            : declaredValue
+                                    const showCalculatedValue = hasThemeValue(calculatedValue)
+                                        && (!hasThemeValue(definedValue) || String(definedValue).trim() !== String(calculatedValue).trim())
                                     const targetQualifier = spacingSections.length > 1 ? ` ${spacingTargetLabel}` : ''
-                                    return <label key={field} className={`block min-w-0 text-xs font-medium text-gray-700 ${className}`} data-spacing-side={field.match(/(Top|Right|Bottom|Left)$/)?.[1]?.toLowerCase()}>
-                                        {spacingLabels[field]}
-                                        <input
-                                            aria-label={`${kind}${targetQualifier} ${spacingLabels[field]}`}
-                                            value={value}
-                                            onChange={(event) => updateLevelSpacing(spacingTarget, field, event.target.value)}
-                                            disabled={disabled || !entry}
-                                            className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50"
-                                        />
-                                    </label>
-                                }} />
+                                    const fieldLabel = `${kind}${targetQualifier} ${spacingLabels[field]}`
+                                    return <div key={field} className={`block min-w-0 text-xs font-medium text-gray-700 ${className}`} data-spacing-side={field.match(/(Top|Right|Bottom|Left)$/)?.[1]?.toLowerCase()}>
+                                        <span className="flex items-center justify-between gap-1">
+                                            <label htmlFor={`${targetFocusKey(spacingTarget)}-${field}`}>{spacingLabels[field]}</label>
+                                            {entry && <button
+                                                type="button"
+                                                aria-label={isAuthored ? `Use default for ${fieldLabel}` : `Override ${fieldLabel}`}
+                                                aria-pressed={isAuthored}
+                                                title={isAuthored ? 'Use default value' : 'Override default value'}
+                                                onClick={() => isAuthored
+                                                    ? removeLevelSpacing(spacingTarget, field, sourceEntry, computed)
+                                                    : updateLevelSpacing(spacingTarget, field, declaredValue || calculatedValue || '0px')}
+                                                disabled={disabled}
+                                                className={`rounded p-1 disabled:cursor-not-allowed disabled:opacity-40 ${isAuthored ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'text-gray-400 hover:bg-gray-200 hover:text-gray-700'}`}
+                                            >{isAuthored ? <RotateCcw className="h-3.5 w-3.5" /> : <Settings2 className="h-3.5 w-3.5" />}</button>}
+                                        </span>
+                                        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                            <input
+                                                id={`${targetFocusKey(spacingTarget)}-${field}`}
+                                                aria-label={fieldLabel}
+                                                value={definedValue}
+                                                placeholder="Not set"
+                                                onChange={(event) => updateLevelSpacing(spacingTarget, field, event.target.value)}
+                                                disabled={disabled || !entry || !isAuthored && !hasThemeValue(declaredValue)}
+                                                className="w-28 max-w-full rounded border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
+                                            />
+                                            {showCalculatedValue && <span className="text-[10px] font-normal text-gray-500">Calculated: {calculatedValue}</span>}
+                                        </span>
+                                    </div>
+                                }
+                            const sectionClass = sectionIndex > 0 ? 'border-t border-gray-200 pt-3' : ''
+                            const fieldGroups = [
+                                { label: 'Width & height', fields: fields.filter((field) => ['width', 'height'].includes(field)) },
+                                { label: 'Margins', fields: fields.filter((field) => field === 'margin' || field.startsWith('margin')) },
+                                { label: 'Padding', fields: fields.filter((field) => field === 'padding' || field.startsWith('padding')) },
+                                { label: 'Gap', fields: fields.filter((field) => field === 'gap') },
+                            ].filter((group) => group.fields.length > 0)
+                            return <section
+                                key={targetFocusKey(spacingTarget)}
+                                className={`space-y-2 ${sectionClass}`}
+                            >
+                                {(kind === 'widget' || configuration)
+                                    ? <h3 className="text-sm font-medium text-gray-900">{spacingTargetLabel}</h3>
+                                    : <p className="text-sm font-medium text-gray-900">{spacingTargetLabel}</p>}
+                                <div className="space-y-2">
+                                    {fieldGroups.map((group) => {
+                                        const authoredGroupFields = group.fields.filter((field) => authoredSpacingEntryForField(entries, field))
+                                        const groupHasDefinedValue = authoredGroupFields.length > 0
+                                            || group.fields.some((field) => hasThemeValue(declared[field]))
+                                        const groupStateKey = `${kind}:${spacingTarget.styleTargetId || spacingTarget.id}:${group.label}`
+                                        const groupIsOpen = spacingGroupExpansion[groupStateKey] ?? groupHasDefinedValue
+                                        return <details
+                                            key={group.label}
+                                            open={groupIsOpen}
+                                            onToggle={(event) => {
+                                                const open = event.currentTarget.open
+                                                setSpacingGroupExpansion((current) => current[groupStateKey] === open
+                                                    ? current
+                                                    : { ...current, [groupStateKey]: open })
+                                            }}
+                                            className="rounded border border-gray-200 bg-gray-50/60 px-2 py-1.5"
+                                        >
+                                            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-medium text-gray-700 marker:hidden">
+                                                <span>{group.label}</span>
+                                                {!groupHasDefinedValue && <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Defaults</span>}
+                                            </summary>
+                                            <div className="mt-2"><FieldLayout fields={group.fields} renderField={renderSpacingField} /></div>
+                                        </details>
+                                    })}
+                                </div>
                             </section>
                         })}
                         {levelTypography.map(({ row, index, fields: typographyFields }) => <section key={`level-type-${index}`} className="space-y-2 border-t border-gray-200 pt-3">
@@ -2387,7 +2574,18 @@ const SemanticThemeWorkspace = ({
                         <button type="button" aria-label={sidebarCollapsed ? 'Expand preview navigation' : 'Collapse preview navigation'} aria-pressed={sidebarCollapsed} onClick={() => setSidebarCollapsed((current) => !current)} className="hidden rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 xl:inline-flex">{sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</button>
                         <button type="button" aria-label={inspectorCollapsed ? 'Expand theme inspector' : 'Collapse theme inspector'} aria-pressed={inspectorCollapsed} onClick={() => setInspectorCollapsed((current) => !current)} className="hidden rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 xl:inline-flex">{inspectorCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                    {contentMode === 'demo' && <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Visible WYSIWYG measurement guides">
+                        {guideVisibilityOptions.map(([key, label]) => <button
+                            key={key}
+                            type="button"
+                            aria-label={`Toggle ${label.toLowerCase()} guides`}
+                            aria-pressed={guideVisibility[key]}
+                            disabled={!guidesEnabled}
+                            onClick={() => setGuideVisibility((current) => ({ ...current, [key]: !current[key] }))}
+                            className={`rounded-md border px-2 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-45 ${guideVisibility[key] ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'}`}
+                        >{label}</button>)}
+                    </div>}
                     {contentMode !== 'none' && <button type="button" aria-pressed={guidesEnabled} onClick={() => setGuidesEnabled((current) => !current)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{guidesEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{guidesEnabled ? 'Hide guides' : 'Show guides'}</button>}
                     <span className="text-xs text-gray-500">{themeBreakpointDefinition(viewport)?.label || viewport} · {previewCanvasWidth}px</span>
                     </div>
