@@ -271,9 +271,9 @@ describe('RenderFrameRuntime designer overlay', () => {
         postMessage.mockRestore()
     })
 
-    it('keeps declared internal widget parts editable under the canonical widget selection', async () => {
+    it('keeps the Hero layout on its widget content surface', async () => {
         const style = document.createElement('style')
-        style.textContent = '.hero-content { margin: 0 auto; padding: 30px; }'
+        style.textContent = '.hero-widget { padding: 30px; }'
         document.head.append(style)
         // Chromium exposes an empty cssRules list on style rules for CSS nesting.
         // The declarations on the rule must still be inspected before nested rules.
@@ -284,8 +284,7 @@ describe('RenderFrameRuntime designer overlay', () => {
             widgetType: 'easy_widgets.HeroWidget',
             label: 'Hero',
             parts: [
-                { id: 'widget-part:easy_widgets.HeroWidget:hero-widget', part: 'hero-widget', label: 'Hero background', designerLevel: 'widget', isWidgetSurface: true, editableSpacingProperties: ['paddingTop', 'width', 'height'] },
-                { id: 'widget-part:easy_widgets.HeroWidget:hero-content', part: 'hero-content', label: 'Hero content area', designerLevel: 'element' },
+                { id: 'widget-part:easy_widgets.HeroWidget:hero-widget', part: 'hero-widget', label: 'Hero content', designerLevel: 'widget', isWidgetSurface: true, editableSpacingProperties: ['paddingTop', 'width', 'height'] },
             ],
         }]
         structuralWorkspace.spacing = [{
@@ -343,13 +342,14 @@ describe('RenderFrameRuntime designer overlay', () => {
             targetIds: expect.arrayContaining(['widget-part:easy_widgets.HeroWidget:hero-widget']),
         }), '*')
         const heroContent = heading.closest('.hero-content') as HTMLElement
+        expect(heroContent).not.toHaveAttribute('data-designer-target')
         fireEvent.click(heroContent)
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview',
             action: 'select',
-            declaredStyles: expect.objectContaining({
-                marginTop: '0px', marginRight: 'auto', marginBottom: '0px', marginLeft: 'auto',
-                paddingTop: '30px', paddingRight: '30px', paddingBottom: '30px', paddingLeft: '30px',
+            kind: 'widget',
+            selectionPaths: expect.objectContaining({
+                element: [],
             }),
         }), '*')
         style.remove()
