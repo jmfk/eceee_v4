@@ -922,7 +922,8 @@ describe('DesignerThemeWorkspacePage', () => {
             expect(screen.getByText('Selected widget')).toBeInTheDocument()
         })
         expect(screen.getByRole('heading', { name: 'Banner widget' })).toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: /selected widget Banner widget/i })).not.toBeInTheDocument()
+        const widgetHeader = screen.getByRole('button', { name: 'Collapse selected widget Banner widget' })
+        expect(widgetHeader.querySelector('svg')).toBeInTheDocument()
     })
 
     it('creates responsive spacing for a selected nested widget slot', async () => {
@@ -1057,10 +1058,7 @@ describe('DesignerThemeWorkspacePage', () => {
 
     it('shows resolved placement values in read-only fields and keeps expressions secondary', async () => {
         const widgetWorkspace = structuredClone(workspace)
-        widgetWorkspace.spacing = [{
-            targetId: 'widget-type:easy_widgets.HeroWidget', scope: 'widget',
-            widgetType: 'easy_widgets.HeroWidget', breakpoint: 'xl', values: { width: '100%' },
-        }]
+        widgetWorkspace.spacing = []
         widgetWorkspace.constraints.editableSpacingProperties = [
             'marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'width', 'height',
         ]
@@ -1087,17 +1085,26 @@ describe('DesignerThemeWorkspacePage', () => {
             source: iframe.contentWindow,
         }))
 
-        const marginTop = await screen.findByLabelText('widget Margin top')
+        const widgetHeader = await screen.findByRole('button', { name: 'Expand selected widget Hero widget' })
+        expect(widgetHeader).toHaveAttribute('aria-expanded', 'false')
+        fireEvent.click(widgetHeader)
+
+        const marginsSummary = screen.getByText('Margins', { selector: 'span' })
+        const marginsGroup = marginsSummary.closest('details')
+        expect(marginsGroup).not.toHaveAttribute('open')
+        fireEvent.click(marginsSummary)
+
+        const marginTop = screen.getByLabelText('widget Margin top')
         expect(marginTop).toHaveValue('0px')
         expect(marginTop).toBeDisabled()
-        expect(within(marginTop.closest('[data-spacing-side]')).getByText('calc(var(--spacing) * 0)')).toBeInTheDocument()
+        expect(within(marginTop.closest('[data-spacing-side]')).getByText('calc(var(--spacing) * 0)')).toHaveClass('break-words')
         expect(within(marginTop.closest('[data-spacing-side]')).queryByText('Calculated: 0px')).not.toBeInTheDocument()
 
         const marginLeft = screen.getByLabelText('widget Margin left')
         expect(marginLeft).toHaveValue('')
         expect(marginLeft).toBeDisabled()
         expect(within(marginLeft.closest('[data-spacing-side]')).queryByText('Calculated: 0px')).not.toBeInTheDocument()
-        expect(marginTop.closest('details')).toHaveAttribute('open')
+        expect(marginsGroup).toHaveAttribute('open')
     })
 
     it('groups zero-valued widget spacing without hiding editable dimensions', async () => {
@@ -2080,7 +2087,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('heading', { name: 'Headline widget' })).toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Heading' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Collapse selected slot Left slot' })).not.toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: 'Collapse selected widget Headline widget' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Collapse selected widget Headline widget' }).querySelector('svg')).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Collapse selected element Heading' })).toHaveAttribute('aria-expanded', 'true')
         fireEvent.click(within(trail).getByRole('button', { name: 'Two columns widget' }))
         expect(within(trail).getByRole('button', { name: 'Headline widget' })).toHaveAttribute('aria-current', 'page')

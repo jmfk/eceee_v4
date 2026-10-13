@@ -513,6 +513,9 @@ const effectiveSpacingEntries = (entries, activeBreakpoint, breakpoints, fields)
 
 const isZeroCssValue = (value) => /^0(?:\.0+)?(?:px|rem|em|%|vh|vw)?$/i.test(String(value || '').trim())
 const isCalculatedCssValue = (value) => /\b(?:calc|min|max|clamp|var)\s*\(/i.test(String(value || ''))
+const isDefinedSpacingValue = (value) => hasThemeValue(value)
+    && !isZeroCssValue(value)
+    && !isCalculatedCssValue(value)
 const isCollapsibleSpacingField = (field) => /^(?:margin|padding)(?:Top|Right|Bottom|Left)?$/.test(field) || field === 'gap'
 
 const spacingEntryForField = (entries, field) => (
@@ -542,7 +545,7 @@ const spacingSectionIsAllZero = ({ computed, declared, fields, entries }) => {
     const spacingFields = fields.filter(isCollapsibleSpacingField)
     return spacingFields.length > 0 && spacingFields.every((field) => {
         const entry = spacingEntryForField(entries, field)
-        if (hasThemeValue(declared?.[field]) && !isZeroCssValue(declared[field])) return false
+        if (isDefinedSpacingValue(declared?.[field])) return false
         return isZeroCssValue(entry?.row.values[field] || computed[field] || '')
     })
 }
@@ -592,7 +595,7 @@ const FieldLayout = ({ fields, renderField }) => {
             {regularFields.map((field) => renderField(field, ''))}
         </div>}
         {directionalGroups.map((group) => (
-            <div key={group[0].replace(/(Top|Right|Bottom|Left)$/, '')} className="grid grid-cols-3 grid-rows-3 gap-2" aria-label={`${group[0].startsWith('margin') ? 'Margin' : 'Padding'} sides`}>
+            <div key={group[0].replace(/(Top|Right|Bottom|Left)$/, '')} className="grid grid-cols-[minmax(0,0.8fr)_minmax(8.5rem,1.4fr)_minmax(0,0.8fr)] grid-rows-3 gap-2" aria-label={`${group[0].startsWith('margin') ? 'Margin' : 'Padding'} sides`}>
                 {group.map((field) => renderField(field, directionalFieldPosition[field.match(/(Top|Right|Bottom|Left)$/)[1]]))}
             </div>
         ))}
@@ -2113,7 +2116,7 @@ const SemanticThemeWorkspace = ({
                 ))
                 const hasDefinedSpacing = spacingSections.some(({ declared, fields: sectionFields, entries }) => (
                     sectionFields.some((field) => (
-                        Boolean(authoredSpacingEntryForField(entries, field)) || hasThemeValue(declared[field])
+                        Boolean(authoredSpacingEntryForField(entries, field)) || isDefinedSpacingValue(declared[field])
                     ))
                 ))
                 const isActiveTargetPanel = targetFocusKey(target) === targetFocusKey(selectedTarget)
@@ -2151,15 +2154,16 @@ const SemanticThemeWorkspace = ({
                 const collapseSpacingPanel = collapseZeroSpacing || collapseReadOnlySpacing || collapseComputedOnlySpacing
                 const expanded = expandedSelectionLevels.has(kind)
                     && (!collapseSpacingPanel || expandedZeroSpacingTargets.has(expansionKey))
+                const panelIsCollapsible = kind === 'widget' || hasEditableProperties
                 const headerContent = <>
                     <div className="min-w-0 flex-1">
                         <p className={`text-[10px] font-semibold uppercase tracking-wide ${tone.label}`}>Selected {kind}</p>
                         <h2 className="truncate text-sm font-semibold text-gray-900">{label}</h2>
                     </div>
-                    {hasEditableProperties && <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${tone.label} ${expanded ? 'rotate-180' : ''}`} />}
+                    {panelIsCollapsible && <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${tone.label} ${expanded ? 'rotate-180' : ''}`} />}
                 </>
                 return <section key={kind} className={`shrink-0 border-b ${tone.border}`}>
-                    {hasEditableProperties ? <button
+                    {panelIsCollapsible ? <button
                             type="button"
                             aria-expanded={expanded}
                             aria-controls={panelId}
@@ -2249,7 +2253,7 @@ const SemanticThemeWorkspace = ({
                                                 disabled={disabled || isCalculatedValue || !entry || !isAuthored && !hasThemeValue(surfacedDeclaredValue)}
                                                 className="w-28 max-w-full rounded border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
                                             />
-                                            {isCalculatedValue && <span className="max-w-full break-all text-[10px] font-normal text-gray-500">{definedValue}</span>}
+                                            {isCalculatedValue && <span className="max-w-full break-words text-[10px] font-normal text-gray-500">{definedValue}</span>}
                                             {showCalculatedValue && <span className="text-[10px] font-normal text-gray-500">Calculated: {calculatedValue}</span>}
                                         </span>
                                     </div>
@@ -2272,7 +2276,7 @@ const SemanticThemeWorkspace = ({
                                     {fieldGroups.map((group) => {
                                         const authoredGroupFields = group.fields.filter((field) => authoredSpacingEntryForField(entries, field))
                                         const groupHasDefinedValue = authoredGroupFields.length > 0
-                                            || group.fields.some((field) => hasThemeValue(declared[field]) && !isZeroCssValue(declared[field]))
+                                            || group.fields.some((field) => isDefinedSpacingValue(declared[field]))
                                         const groupStateKey = `${kind}:${spacingTarget.styleTargetId || spacingTarget.id}:${group.label}`
                                         const groupIsOpen = spacingGroupExpansion[groupStateKey] ?? groupHasDefinedValue
                                         return <details
