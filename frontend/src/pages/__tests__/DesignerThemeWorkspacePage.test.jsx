@@ -2085,11 +2085,17 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(within(trail).getByRole('button', { name: 'Headline widget' })).toHaveAttribute('aria-current', 'page')
         expect(screen.getByRole('heading', { name: 'Left slot' })).toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Headline widget' })).toBeInTheDocument()
+        const elementPath = screen.getByRole('navigation', { name: 'Element path' })
+        expect(within(elementPath).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+            'Article', 'Heading',
+        ])
         expect(screen.getByRole('button', { name: 'Edit Heading' })).toHaveAttribute('aria-expanded', 'true')
         expect(screen.queryByRole('button', { name: 'Collapse selected slot Left slot' })).not.toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Collapse selected widget Headline widget' }).querySelector('svg')).toBeInTheDocument()
         expect(screen.getByRole('region', { name: 'Heading values' })).toBeInTheDocument()
         fireEvent.click(within(trail).getByRole('button', { name: 'Two columns widget' }))
+        expect(screen.getByRole('navigation', { name: 'Element path' })).toBeInTheDocument()
+        expect(within(screen.getByRole('navigation', { name: 'Element path' })).getByRole('button', { name: 'Heading' })).toBeInTheDocument()
         expect(within(trail).getByRole('button', { name: 'Headline widget' })).toHaveAttribute('aria-current', 'page')
         expect(within(trail).getByRole('button', { name: 'Two columns widget' })).toHaveAttribute('aria-pressed', 'true')
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
