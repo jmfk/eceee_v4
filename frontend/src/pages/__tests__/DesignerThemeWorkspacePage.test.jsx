@@ -138,7 +138,7 @@ const selectHeading = async () => {
         data: { source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:h1', kind: 'element', label: 'Heading 1', text: 'A heading with a realistic length' },
         source: iframe.contentWindow,
     }))
-    expect(await screen.findByRole('heading', { name: 'Heading 1' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Edit Heading 1' })).toHaveAttribute('aria-expanded', 'true')
 }
 
 const readyPreview = async () => {
@@ -287,7 +287,7 @@ describe('DesignerThemeWorkspacePage', () => {
                 },
                 source: iframe.contentWindow,
             }))
-            expect(screen.getByRole('heading', { name: 'Content grid' })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Edit Content grid' })).toHaveAttribute('aria-expanded', 'true')
         })
 
         const gap = await screen.findByLabelText('Content grid Gap')
@@ -739,7 +739,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(elementHierarchy.closest('section')).toHaveClass('shrink-0', 'flex-col')
         expect(document.getElementById('selected-element-editor')).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto', 'overscroll-contain')
         expect(screen.getByRole('button', { name: 'Edit Paragraph: “More copy”' })).toHaveAttribute('aria-expanded', 'false')
-        expect(screen.getByRole('treeitem', { name: /Paragraph: “More copy”/ })).toHaveAttribute('aria-level', '2')
+        expect(screen.getByRole('treeitem', { name: /Paragraph: “More copy”/ })).toHaveAttribute('aria-level', '3')
         const highlightButton = screen.getByRole('button', { name: 'Highlight Heading 1: “Editable copy”' })
         expect(highlightButton.querySelector('.lucide-focus')).toBeInTheDocument()
         fireEvent.click(highlightButton)
@@ -753,11 +753,11 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('button', { name: 'Stop highlighting Heading 1: “Editable copy”' })).toHaveAttribute('aria-pressed', 'true')
         expect(screen.getByRole('button', { name: 'Stop highlighting Heading 1: “Editable copy”' }).querySelector('.lucide-focus')).toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' }))
-        expect(screen.getByRole('heading', { name: 'Heading 1: “Editable copy”' })).toBeInTheDocument()
+        expect(screen.queryByText('Selected element')).not.toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-expanded', 'true')
         expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-pressed', 'true')
         expect(screen.getByRole('button', { name: 'Highlight Heading 1: “Editable copy”' })).toHaveAttribute('aria-pressed', 'false')
-        expect(screen.getByRole('region', { name: 'Heading 1 settings' })).toHaveClass('designer-inspector-focus')
+        expect(screen.getByRole('region', { name: 'Heading 1: “Editable copy” values' })).toHaveClass('designer-inspector-focus')
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-render-host',
             action: 'selectTarget',
@@ -767,10 +767,10 @@ describe('DesignerThemeWorkspacePage', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' }))
         expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-expanded', 'false')
         expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-pressed', 'true')
-        expect(screen.queryByRole('region', { name: 'Heading 1 settings' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('region', { name: 'Heading 1: “Editable copy” values' })).not.toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' }))
         expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-expanded', 'true')
-        expect(screen.getByRole('region', { name: 'Heading 1 settings' })).toBeInTheDocument()
+        expect(screen.getByRole('region', { name: 'Heading 1: “Editable copy” values' })).toBeInTheDocument()
         fireEvent(window, new MessageEvent('message', {
             data: {
                 source: 'eceee-designer-preview', action: 'select', targetId: 'group:0:element:h1',
@@ -791,7 +791,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('button', { name: 'Edit Heading 1: “Editable copy”' })).toHaveAttribute('aria-expanded', 'false')
         expect(screen.getByRole('button', { name: 'Edit Paragraph: “More copy”' })).toHaveAttribute('aria-expanded', 'true')
         expect(screen.getByRole('button', { name: 'Edit Paragraph: “More copy”' })).toHaveAttribute('aria-pressed', 'true')
-        const firstParagraphPanel = screen.getByRole('region', { name: 'Paragraph settings' })
+        const firstParagraphPanel = screen.getByRole('region', { name: 'Paragraph: “More copy” values' })
 
         fireEvent(window, new MessageEvent('message', {
             data: {
@@ -800,8 +800,8 @@ describe('DesignerThemeWorkspacePage', () => {
             },
             source: iframe.contentWindow,
         }))
-        expect(screen.getByRole('region', { name: 'Paragraph settings' })).not.toBe(firstParagraphPanel)
-        expect(screen.getByRole('heading', { name: 'Paragraph' })).toBeInTheDocument()
+        expect(screen.getByRole('region', { name: 'Paragraph: “More copy” values' })).not.toBe(firstParagraphPanel)
+        expect(screen.queryByText('Selected element')).not.toBeInTheDocument()
     })
 
     it('keeps repeated element targets separate for each widget instance', async () => {
@@ -880,9 +880,9 @@ describe('DesignerThemeWorkspacePage', () => {
             source: iframe.contentWindow,
         }))
 
-        expect(screen.getByText('Selected element')).toBeInTheDocument()
-        expect(screen.getByRole('heading', { name: 'Heading 1' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Collapse selected element Heading 1' })).toBeInTheDocument()
+        expect(screen.queryByText('Selected element')).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Edit Heading 1/ })).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByRole('region', { name: /Heading 1.*values/ })).toBeInTheDocument()
     })
 
     it('keeps layout slots informative when the layout exposes no editable spacing', async () => {
@@ -1272,7 +1272,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByText('Computed values')).not.toBeInTheDocument()
         expect(screen.getByText('Selected slot')).toBeInTheDocument()
         expect(screen.getByText('Selected widget')).toBeInTheDocument()
-        expect(screen.getByText('Selected element')).toBeInTheDocument()
+        expect(screen.queryByText('Selected element')).not.toBeInTheDocument()
 
         const richWidgetHeader = screen.getByText('Selected widget').closest('section')?.firstElementChild
         postMessage.mockClear()
@@ -1318,7 +1318,7 @@ describe('DesignerThemeWorkspacePage', () => {
             source: iframe.contentWindow,
         }))
 
-        const selectedPanel = await screen.findByRole('button', { name: 'Collapse selected element Heading 1' })
+        const selectedPanel = await screen.findByRole('button', { name: 'Edit Heading 1' })
         const panel = document.getElementById(selectedPanel.getAttribute('aria-controls'))
         expect(within(panel).getByRole('heading', { name: 'Typography · Heading 1' })).toBeInTheDocument()
         expect(within(panel).getByDisplayValue('Inter')).toBeInTheDocument()
@@ -1878,7 +1878,7 @@ describe('DesignerThemeWorkspacePage', () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         await selectHeading()
-        expect(screen.getByRole('heading', { name: 'Heading 1' })).toBeInTheDocument()
+        expect(screen.queryByText('Selected element')).not.toBeInTheDocument()
         expect(screen.queryByLabelText('Preview text')).not.toBeInTheDocument()
         expect(screen.getByDisplayValue('32px')).toBeInTheDocument()
         expect(screen.getByDisplayValue('16px')).toBeInTheDocument()
@@ -1886,11 +1886,11 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByRole('heading', { name: 'Choose what to edit' })).not.toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Preview content source' })).toBeInTheDocument()
 
-        const accordion = screen.getByRole('button', { name: 'Collapse Heading 1 settings' })
+        const accordion = screen.getByRole('button', { name: 'Edit Heading 1' })
         expect(accordion).toHaveAttribute('aria-expanded', 'true')
         fireEvent.click(accordion)
         expect(screen.queryByLabelText('Preview text')).not.toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Expand Heading 1 settings' })).toHaveAttribute('aria-expanded', 'false')
+        expect(screen.getByRole('button', { name: 'Edit Heading 1' })).toHaveAttribute('aria-expanded', 'false')
 
         const { iframe } = await readyPreview()
         await waitFor(() => {
@@ -1898,9 +1898,9 @@ describe('DesignerThemeWorkspacePage', () => {
                 data: { source: 'eceee-designer-preview', action: 'contentChange', targetId: 'group:0:element:li', kind: 'element', label: 'List item', text: 'Changed nested text' },
                 source: iframe.contentWindow,
             }))
-            expect(screen.getByRole('heading', { name: 'List item' })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Edit List item' })).toHaveAttribute('aria-expanded', 'true')
         })
-        expect(screen.getByRole('button', { name: 'Collapse List item settings' })).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByRole('region', { name: 'List item values' })).toBeInTheDocument()
         expect(screen.getByLabelText('Example text')).toHaveValue('Changed nested text')
         expect(screen.getByRole('heading', { name: 'Preview content source' })).toBeInTheDocument()
     })
@@ -1989,7 +1989,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(within(elementPath).getByText('Link')).toHaveAttribute('aria-current', 'page')
         expect(within(elementPath).getByRole('button', { name: 'List item' })).toBeInTheDocument()
         fireEvent.click(within(elementPath).getByRole('button', { name: 'Bullet list' }))
-        expect(screen.getByRole('heading', { name: 'Bullet list' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Edit Bullet list' })).toHaveAttribute('aria-expanded', 'true')
         expect(screen.queryByLabelText('Preview text')).not.toBeInTheDocument()
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-render-host',
@@ -2085,10 +2085,10 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(within(trail).getByRole('button', { name: 'Headline widget' })).toHaveAttribute('aria-current', 'page')
         expect(screen.getByRole('heading', { name: 'Left slot' })).toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Headline widget' })).toBeInTheDocument()
-        expect(screen.getByRole('heading', { name: 'Heading' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Edit Heading' })).toHaveAttribute('aria-expanded', 'true')
         expect(screen.queryByRole('button', { name: 'Collapse selected slot Left slot' })).not.toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Collapse selected widget Headline widget' }).querySelector('svg')).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Collapse selected element Heading' })).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByRole('region', { name: 'Heading values' })).toBeInTheDocument()
         fireEvent.click(within(trail).getByRole('button', { name: 'Two columns widget' }))
         expect(within(trail).getByRole('button', { name: 'Headline widget' })).toHaveAttribute('aria-current', 'page')
         expect(within(trail).getByRole('button', { name: 'Two columns widget' })).toHaveAttribute('aria-pressed', 'true')
@@ -2121,8 +2121,7 @@ describe('DesignerThemeWorkspacePage', () => {
 
         expect(screen.getByRole('heading', { name: 'Navigation Bar' })).toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Navbar widget container' })).toBeInTheDocument()
-        const elementFallback = screen.getByText('Selected element').closest('section')
-        expect(within(elementFallback).getByRole('heading', { name: 'Widget' })).toBeInTheDocument()
+        expect(screen.queryByText('Selected element')).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Collapse selected element Heading' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Expand selected element Heading' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Expand selected slot Navigation Bar' })).not.toBeInTheDocument()
@@ -2331,7 +2330,8 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByLabelText('widget Widget content · Main hero container Padding top')).toHaveValue('12px')
         expect(screen.getByLabelText('element Padding top')).toHaveValue('30px')
         expect(screen.getByLabelText('element Padding right')).toHaveValue('40px')
-        expect(screen.getByRole('heading', { name: 'Text content overlay' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Edit Text content overlay' })).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByRole('region', { name: 'Text content overlay values' })).toBeInTheDocument()
 
         fireEvent.change(screen.getByLabelText('element Padding right'), { target: { value: '48px' } })
         fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
@@ -2518,7 +2518,7 @@ describe('DesignerThemeWorkspacePage', () => {
                 },
                 source: iframe.contentWindow,
         }))
-        await screen.findByRole('heading', { name: 'Article hero mobile' })
+        expect(await screen.findByRole('button', { name: 'Edit Article hero mobile' })).toHaveAttribute('aria-expanded', 'true')
 
         expect(screen.getByTitle('Live theme preview')).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Theme images' })).toHaveClass('text-gray-700')
@@ -2690,7 +2690,7 @@ describe('DesignerThemeWorkspacePage', () => {
             source: iframe.contentWindow,
         }))
 
-        expect(await screen.findByRole('heading', { name: 'Article hero' })).toBeInTheDocument()
+        expect(await screen.findByRole('button', { name: 'Edit Article hero' })).toHaveAttribute('aria-expanded', 'true')
         expect(mocks.replaceAsset).not.toHaveBeenCalled()
     })
 
