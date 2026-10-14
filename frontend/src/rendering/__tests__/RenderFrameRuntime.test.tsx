@@ -1265,8 +1265,11 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(spacingLabel('.designer-spacing-margin-value[data-side="left"]', '12px')).toHaveClass('designer-spacing-level-widget')
         expect(spacingLabel('.designer-spacing-padding-value[data-side="bottom"]', '13px')).toHaveClass('designer-spacing-level-element')
         expect(document.querySelector('.designer-spacing-content.designer-spacing-level-slot')).toHaveStyle({ left: '10px' })
-        expect(document.querySelector('.designer-spacing-content.designer-spacing-level-widget')).toHaveStyle({ left: '43px' })
-        expect(document.querySelector('.designer-spacing-content.designer-spacing-level-element')).toHaveStyle({ left: '81px' })
+        expect(document.querySelector('.designer-spacing-content.designer-spacing-level-widget')).toHaveStyle({ left: '40px' })
+        expect(document.querySelector('.designer-spacing-content.designer-spacing-level-element')).toHaveStyle({ left: '80px' })
+        expect(getComputedStyle(document.querySelector('.designer-spacing-content.designer-spacing-level-slot')!).borderStyle).toBe('solid')
+        expect(getComputedStyle(document.querySelector('.designer-spacing-content.designer-spacing-level-widget')!).borderStyle).toBe('dashed')
+        expect(getComputedStyle(document.querySelector('.designer-spacing-content.designer-spacing-level-element')!).borderStyle).toBe('dotted')
 
         fireEvent.click(slotPaddingLabel!)
         fireEvent.keyDown(document, { key: 'ArrowDown' })
@@ -1711,7 +1714,7 @@ describe('RenderFrameRuntime designer overlay', () => {
             left: '82px', top: '107px', width: '9px', height: '184px',
         })
         expect(document.querySelector('.designer-spacing-content')).toHaveStyle({
-            left: '91px', top: '107px', width: '281px', height: '184px',
+            left: '80px', top: '100px', width: '300px', height: '200px',
         })
         fireEvent.click(heading)
         const selectedMarginLabel = document.querySelector('.designer-spacing-margin-value[data-side="top"]')
@@ -1795,18 +1798,18 @@ describe('RenderFrameRuntime designer overlay', () => {
         const heightLabel = document.querySelector<HTMLElement>('.designer-spacing-size-value[data-property="height"]')
         const widthMeasure = document.querySelector<HTMLElement>('.designer-spacing-size-measure[data-property="width"]')
         const heightMeasure = document.querySelector<HTMLElement>('.designer-spacing-size-measure[data-property="height"]')
-        expect(widthLabel).toHaveStyle({ left: '252px', top: '268px' })
-        expect(heightLabel).toHaveStyle({ left: '348px', top: '332px' })
-        expect(widthMeasure).toHaveStyle({ top: '268px' })
-        expect(heightMeasure).toHaveStyle({ left: '348px' })
-        expect(Math.abs(Number.parseFloat(widthLabel!.style.top) - Number.parseFloat(heightLabel!.style.top))).toBeGreaterThanOrEqual(60)
-        expect(Math.abs(Number.parseFloat(widthLabel!.style.left) - Number.parseFloat(heightLabel!.style.left))).toBeGreaterThanOrEqual(90)
+        expect(widthLabel).toHaveStyle({ left: '248px', top: '300px' })
+        expect(heightLabel).toHaveStyle({ left: '300px', top: '352px' })
+        expect(widthMeasure).toHaveStyle({ top: '300px' })
+        expect(heightMeasure).toHaveStyle({ left: '300px' })
+        expect(Math.abs(Number.parseFloat(widthLabel!.style.top) - Number.parseFloat(heightLabel!.style.top))).toBeGreaterThanOrEqual(50)
+        expect(Math.abs(Number.parseFloat(widthLabel!.style.left) - Number.parseFloat(heightLabel!.style.left))).toBeGreaterThanOrEqual(50)
         expect(widthLabel).toHaveAttribute('data-editable', 'false')
         expect(widthLabel).not.toHaveAttribute('role')
         expect(getComputedStyle(widthLabel!).color).toBe('rgb(55, 65, 81)')
     })
 
-    it('distributes centered size labels across selected hierarchy levels without overlap', async () => {
+    it('distributes size guides by descending value, alternating evenly around the midline', async () => {
         render(<RenderFrameRuntime />)
         sendModel(createDesignerRenderModel({
             workspace,
@@ -1816,24 +1819,30 @@ describe('RenderFrameRuntime designer overlay', () => {
         const heading = await screen.findByRole('heading', { name: 'Overridden heading' })
         const widget = heading.closest<HTMLElement>('[data-widget-id]')!
         const slot = heading.closest<HTMLElement>('[data-slot-name]')!
-        const rect = {
-            x: 0, y: 100, left: 0, top: 100, right: 600, bottom: 500, width: 600, height: 400,
+        const rect = (left: number, top: number, width: number, height: number) => ({
+            x: left, y: top, left, top, right: left + width, bottom: top + height, width, height,
             toJSON: () => ({}),
-        }
-        ;[slot, widget, heading].forEach((node) => vi.spyOn(node, 'getBoundingClientRect').mockReturnValue(rect))
+        })
+        vi.spyOn(slot, 'getBoundingClientRect').mockReturnValue(rect(0, 100, 600, 400))
+        vi.spyOn(widget, 'getBoundingClientRect').mockReturnValue(rect(50, 150, 500, 300))
+        vi.spyOn(heading, 'getBoundingClientRect').mockReturnValue(rect(150, 260, 300, 80))
 
         fireEvent.click(heading)
 
         const labels = [...document.querySelectorAll<HTMLElement>('.designer-spacing-size-value')]
         expect(labels).toHaveLength(6)
-        expect(new Set(labels.map((label) => label.style.left)).size).toBeGreaterThan(1)
-        expect(new Set(labels.map((label) => label.style.top)).size).toBeGreaterThan(1)
         const widthLabels = labels.filter((label) => label.dataset.property === 'width')
         const heightLabels = labels.filter((label) => label.dataset.property === 'height')
-        expect(Math.max(...widthLabels.map((label) => Number.parseFloat(label.style.top))))
-            .toBeLessThan(Math.min(...heightLabels.map((label) => Number.parseFloat(label.style.top))))
-        expect(Math.max(...widthLabels.map((label) => Number.parseFloat(label.style.left))))
-            .toBeLessThan(Math.min(...heightLabels.map((label) => Number.parseFloat(label.style.left))))
+        expect(Object.fromEntries(widthLabels.map((label) => [label.textContent, label.style.top]))).toEqual({
+            '600px': '300px',
+            '500px': '248px',
+            '300px': '352px',
+        })
+        expect(Object.fromEntries(heightLabels.map((label) => [label.textContent, label.style.left]))).toEqual({
+            '400px': '300px',
+            '300px': '248px',
+            '80px': '352px',
+        })
         const bounds = labels.map((label) => {
             const halfWidth = Math.max(20, (label.textContent || '').length * 6) / 2 + 3
             const left = Number.parseFloat(label.style.left)

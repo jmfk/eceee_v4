@@ -30,7 +30,7 @@ const editableTextLabel = (node: HTMLElement) => {
 const DESIGNER_CSS = `.designer-preview [data-designer-target]{cursor:pointer}.designer-selection-outline{position:fixed!important;z-index:2147483646!important;box-sizing:border-box!important;border:1px solid!important;background:transparent!important;pointer-events:none!important}.designer-selection-outline-slot{border-color:#eab308!important}.designer-selection-outline-widget{border-color:#16a34a!important}.designer-selection-outline-element{border-color:#2563eb!important}[data-designer-target].designer-highlighted{outline:3px dashed #d97706!important;outline-offset:2px!important;box-shadow:0 0 0 3px rgba(245,158,11,.2)!important}.designer-guides .designer-hovered:not(.designer-selected):not(.designer-highlighted){outline:2px dotted #2563eb!important;outline-offset:-2px!important}
 .designer-context-menu{position:fixed!important;z-index:2147483647!important;min-width:180px!important;max-width:260px!important;padding:6px!important;border:1px solid #d1d5db!important;border-radius:8px!important;background:#fff!important;box-shadow:0 10px 24px rgba(15,23,42,.2)!important;color:#111827!important;font:500 13px/1.35 system-ui,sans-serif!important}.designer-context-menu-title{overflow:hidden!important;padding:5px 8px 7px!important;color:#6b7280!important;font-size:11px!important;font-weight:600!important;text-overflow:ellipsis!important;white-space:nowrap!important}.designer-context-menu button{display:block!important;width:100%!important;padding:7px 8px!important;border:0!important;border-radius:5px!important;background:transparent!important;color:#111827!important;font:inherit!important;text-align:left!important;cursor:pointer!important}.designer-context-menu button:hover,.designer-context-menu button:focus-visible{background:#eff6ff!important;color:#1d4ed8!important;outline:none!important}
 .designer-spacing-guide{position:fixed!important;pointer-events:none!important;z-index:2147483644!important}.designer-spacing-margin{background:rgba(245,158,11,.22)!important}.designer-spacing-padding{background:rgba(6,182,212,.2)!important}.designer-spacing-size{background:transparent!important}.designer-spacing-content{border:1px dashed rgba(8,145,178,.8)!important}.designer-spacing-measure{position:fixed!important;z-index:2147483645!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important;pointer-events:none!important}.designer-spacing-measure::before,.designer-spacing-measure::after{content:""!important;position:absolute!important;background:#fff!important;box-shadow:0 0 0 1px rgba(0,0,0,.9)!important}.designer-spacing-measure-horizontal{height:1px!important}.designer-spacing-measure-horizontal::before,.designer-spacing-measure-horizontal::after{top:50%!important;width:1px!important;height:7px!important;transform:translateY(-50%)}.designer-spacing-measure-horizontal::before{left:0!important}.designer-spacing-measure-horizontal::after{right:0!important}.designer-spacing-measure-vertical{width:1px!important}.designer-spacing-measure-vertical::before,.designer-spacing-measure-vertical::after{left:50%!important;width:7px!important;height:1px!important;transform:translateX(-50%)}.designer-spacing-measure-vertical::before{top:0!important}.designer-spacing-measure-vertical::after{bottom:0!important}.designer-spacing-value{position:fixed!important;z-index:2147483645!important;transform:translate(-50%,-50%);padding:2px 3px!important;border:0!important;border-radius:3px!important;background:#fff!important;font:700 10px/1 system-ui,sans-serif;white-space:nowrap;pointer-events:none!important;box-shadow:0 0 0 1px rgba(255,255,255,.9)!important}.designer-spacing-value[data-editable="true"]{pointer-events:auto!important;cursor:pointer!important;box-shadow:0 0 0 1px currentColor!important}.designer-spacing-value[data-editable="true"]:hover,.designer-spacing-value[data-editable="true"]:focus-visible,.designer-spacing-value[data-selected="true"]{outline:2px solid #2563eb!important;outline-offset:2px!important}.designer-spacing-value[data-selected="true"]{background:#dbeafe!important;color:#1e3a8a!important}.designer-spacing-margin-value{color:#92400e}.designer-spacing-padding-value{color:#0e7490}.designer-spacing-size-value{color:#4338ca}
-.designer-spacing-guide.designer-spacing-level-slot.designer-spacing-margin{background:rgba(234,179,8,.2)!important}.designer-spacing-guide.designer-spacing-level-slot.designer-spacing-padding{background:rgba(234,179,8,.32)!important}.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-margin{background:rgba(22,163,74,.18)!important}.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-padding,.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-gap{background:rgba(22,163,74,.3)!important}.designer-spacing-guide.designer-spacing-level-element.designer-spacing-margin{background:rgba(37,99,235,.18)!important}.designer-spacing-guide.designer-spacing-level-element.designer-spacing-padding{background:rgba(37,99,235,.3)!important}.designer-spacing-content.designer-spacing-level-slot,.designer-spacing-content.designer-spacing-level-widget,.designer-spacing-content.designer-spacing-level-element{box-sizing:border-box!important;border-style:solid!important;border-width:2px!important}.designer-spacing-content.designer-spacing-level-slot{border-color:#ca8a04!important}.designer-spacing-content.designer-spacing-level-widget{border-color:#16a34a!important}.designer-spacing-content.designer-spacing-level-element{border-color:#2563eb!important}.designer-column-slot-guide{box-sizing:border-box!important;border:2px solid #eab308!important;background:rgba(234,179,8,.06)!important}.designer-spacing-value.designer-spacing-level-slot{background:#fefce8!important;color:#854d0e!important}.designer-spacing-value.designer-spacing-level-widget{background:#f0fdf4!important;color:#166534!important}.designer-spacing-value.designer-spacing-level-element{background:#eff6ff!important;color:#1d4ed8!important}.designer-spacing-measure.designer-spacing-level-slot,.designer-spacing-measure.designer-spacing-level-slot::before,.designer-spacing-measure.designer-spacing-level-slot::after{background:#eab308!important;box-shadow:0 0 0 1px #854d0e!important}.designer-spacing-measure.designer-spacing-level-widget,.designer-spacing-measure.designer-spacing-level-widget::before,.designer-spacing-measure.designer-spacing-level-widget::after{background:#16a34a!important;box-shadow:0 0 0 1px #166534!important}.designer-spacing-measure.designer-spacing-level-element,.designer-spacing-measure.designer-spacing-level-element::before,.designer-spacing-measure.designer-spacing-level-element::after{background:#2563eb!important;box-shadow:0 0 0 1px #1d4ed8!important}.designer-spacing-guide[data-editable="false"]{background:rgba(107,114,128,.14)!important}.designer-spacing-measure[data-editable="false"],.designer-spacing-measure[data-editable="false"]::before,.designer-spacing-measure[data-editable="false"]::after{background:#fff!important;box-shadow:0 0 0 1px #6b7280!important}.designer-spacing-value[data-editable="false"]{background:#fff!important;color:#374151!important;box-shadow:0 0 0 1px #9ca3af!important}
+.designer-spacing-guide.designer-spacing-level-slot.designer-spacing-margin{background:rgba(234,179,8,.2)!important}.designer-spacing-guide.designer-spacing-level-slot.designer-spacing-padding{background:rgba(234,179,8,.32)!important}.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-margin{background:rgba(22,163,74,.18)!important}.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-padding,.designer-spacing-guide.designer-spacing-level-widget.designer-spacing-gap{background:rgba(22,163,74,.3)!important}.designer-spacing-guide.designer-spacing-level-element.designer-spacing-margin{background:rgba(37,99,235,.18)!important}.designer-spacing-guide.designer-spacing-level-element.designer-spacing-padding{background:rgba(37,99,235,.3)!important}.designer-spacing-content.designer-spacing-level-slot,.designer-spacing-content.designer-spacing-level-widget,.designer-spacing-content.designer-spacing-level-element{box-sizing:border-box!important;border-width:2px!important}.designer-spacing-content.designer-spacing-level-slot{border-color:#ca8a04!important;border-style:solid!important}.designer-spacing-content.designer-spacing-level-widget{border-color:#16a34a!important;border-style:dashed!important}.designer-spacing-content.designer-spacing-level-element{border-color:#2563eb!important;border-style:dotted!important}.designer-column-slot-guide{box-sizing:border-box!important;border:2px solid #eab308!important;background:rgba(234,179,8,.06)!important}.designer-spacing-value.designer-spacing-level-slot{background:#fefce8!important;color:#854d0e!important}.designer-spacing-value.designer-spacing-level-widget{background:#f0fdf4!important;color:#166534!important}.designer-spacing-value.designer-spacing-level-element{background:#eff6ff!important;color:#1d4ed8!important}.designer-spacing-measure.designer-spacing-level-slot,.designer-spacing-measure.designer-spacing-level-slot::before,.designer-spacing-measure.designer-spacing-level-slot::after{background:#eab308!important;box-shadow:0 0 0 1px #854d0e!important}.designer-spacing-measure.designer-spacing-level-widget,.designer-spacing-measure.designer-spacing-level-widget::before,.designer-spacing-measure.designer-spacing-level-widget::after{background:#16a34a!important;box-shadow:0 0 0 1px #166534!important}.designer-spacing-measure.designer-spacing-level-element,.designer-spacing-measure.designer-spacing-level-element::before,.designer-spacing-measure.designer-spacing-level-element::after{background:#2563eb!important;box-shadow:0 0 0 1px #1d4ed8!important}.designer-spacing-guide[data-editable="false"]{background:rgba(107,114,128,.14)!important}.designer-spacing-measure[data-editable="false"],.designer-spacing-measure[data-editable="false"]::before,.designer-spacing-measure[data-editable="false"]::after{background:#fff!important;box-shadow:0 0 0 1px #6b7280!important}.designer-spacing-value[data-editable="false"]{background:#fff!important;color:#374151!important;box-shadow:0 0 0 1px #9ca3af!important}
 .layout-designer-preview [data-layout-node-id]{position:relative!important;box-shadow:inset 0 0 0 1px rgba(30,64,175,.42)!important}.layout-designer-preview [data-layout-node-id]::before{content:attr(data-layout-node-type) " · " attr(data-layout-node-size)!important;display:none;position:absolute!important;z-index:20!important;top:3px!important;right:3px!important;max-width:calc(100% - 6px)!important;overflow:hidden!important;padding:2px 5px!important;border:1px solid rgba(255,255,255,.8)!important;border-radius:4px!important;background:rgba(15,23,42,.82)!important;color:#fff!important;font:600 10px/1.2 system-ui,sans-serif!important;text-overflow:ellipsis!important;text-transform:capitalize!important;white-space:nowrap!important;pointer-events:none!important}.layout-designer-preview [data-layout-node-type="slot"]::before,.layout-designer-preview [data-layout-node-id].designer-selected::before,.layout-designer-preview [data-layout-node-id].designer-highlighted::before,.layout-designer-preview [data-layout-node-id].designer-hovered::before{display:block}.layout-designer-preview [data-layout-node-type="container"]{background-color:rgba(59,130,246,.10)!important}.layout-designer-preview [data-layout-node-type="section"]{background-color:rgba(6,182,212,.12)!important}.layout-designer-preview [data-layout-node-type="grid"]{background-color:rgba(168,85,247,.12)!important}.layout-designer-preview [data-layout-node-type="row"]{background-color:rgba(99,102,241,.12)!important}.layout-designer-preview [data-layout-node-type="column"]{background-color:rgba(34,197,94,.12)!important}.layout-designer-preview [data-layout-node-type="semantic"]{background-color:rgba(245,158,11,.14)!important}.layout-designer-preview [data-layout-node-type="slot"]{min-height:40px;background-color:rgba(244,63,94,.13)!important;color:#881337!important;text-align:center!important}.layout-designer-preview [data-layout-node-type="slot"]::after{content:attr(data-layout-node-label)!important;position:absolute!important;z-index:10!important;inset:0!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:5px 9px!important;color:#881337!important;font:600 13px/1.25 system-ui,sans-serif!important;text-align:center!important;pointer-events:none!important}.layout-designer-preview [data-layout-presentation-color]{background-color:color-mix(in srgb,var(--layout-presentation-color) 16%,transparent)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--layout-presentation-color) 62%,transparent)!important}
 `
 
@@ -682,7 +682,6 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     const cleanups: Array<() => void> = []
     let guides: HTMLElement[] = []
     let selectionOutlines: HTMLElement[] = []
-    let measurementLabelRects: Array<{ left: number, right: number, top: number, bottom: number }> = []
     let hoveredNode: HTMLElement | null = null
     let selectedNode: HTMLElement | null = null
     let selectedNodes: Record<'slot' | 'widget' | 'element', HTMLElement | null> = { slot: null, widget: null, element: null }
@@ -725,7 +724,6 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     const removeGuides = () => {
         guides.forEach((guide) => guide.remove())
         guides = []
-        measurementLabelRects = []
         measurementTargets.clear()
     }
     const clearGuides = () => {
@@ -734,7 +732,21 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         hoveredNode = null
     }
     let showSelectedSpacing: () => void = () => undefined
-    const showSpacing = (node: HTMLElement, append = false, selectionLevel?: 'slot' | 'widget' | 'element', includeDescendantGrid = true) => {
+    type SizeGuideLayout = {
+        centerLeft: number
+        centerTop: number
+        widthLane: number
+        heightLane: number
+        widthMaxLane: number
+        heightMaxLane: number
+    }
+    const showSpacing = (
+        node: HTMLElement,
+        append = false,
+        selectionLevel?: 'slot' | 'widget' | 'element',
+        includeDescendantGrid = true,
+        sizeGuideLayout?: SizeGuideLayout,
+    ) => {
         if (!append) {
             removeGuides()
             hoveredNode?.classList.remove('designer-hovered')
@@ -854,51 +866,6 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             labelLeft = Math.min(viewportWidth - halfWidth, Math.max(halfWidth, labelLeft))
             labelTop = Math.min(viewportHeight - halfHeight, Math.max(halfHeight, labelTop))
             if (spacing === 'size') {
-                const labelSpacing = 10
-                const collisionHalfWidth = halfWidth + 3
-                const overlapsPlacedLabel = (candidateLeft: number, candidateTop: number) => {
-                    const candidate = {
-                        left: candidateLeft - collisionHalfWidth,
-                        right: candidateLeft + collisionHalfWidth,
-                        top: candidateTop - halfHeight,
-                        bottom: candidateTop + halfHeight,
-                    }
-                    return measurementLabelRects.some((placed) => !(
-                        candidate.right + labelSpacing <= placed.left
-                        || candidate.left >= placed.right + labelSpacing
-                        || candidate.bottom + labelSpacing <= placed.top
-                        || candidate.top >= placed.bottom + labelSpacing
-                    ))
-                }
-                const horizontalStep = collisionHalfWidth * 2 + labelSpacing
-                const verticalStep = labelHeight + labelSpacing
-                const offsets = Array.from({ length: 9 }, (_, yIndex) => yIndex - 4)
-                    .flatMap((y) => Array.from({ length: 9 }, (_, xIndex) => ({ x: xIndex - 4, y })))
-                    .sort((left, right) => (
-                        Math.abs(left.x) + Math.abs(left.y) - Math.abs(right.x) - Math.abs(right.y)
-                        || Math.abs(left.y) - Math.abs(right.y)
-                        || right.x - left.x
-                        || right.y - left.y
-                    ))
-                const orientationOffsets = property === 'width'
-                    ? offsets.filter(({ x, y }) => x <= 0 && y <= 0)
-                    : offsets.filter(({ x, y }) => x >= 0 && y >= 0)
-                const distributedPosition = [...orientationOffsets, ...offsets.filter((offset) => !orientationOffsets.includes(offset))]
-                    .map(({ x, y }) => ({
-                        left: Math.min(viewportWidth - collisionHalfWidth, Math.max(collisionHalfWidth, labelLeft + x * horizontalStep)),
-                        top: Math.min(viewportHeight - halfHeight, Math.max(halfHeight, labelTop + y * verticalStep)),
-                    }))
-                    .find((candidate) => !overlapsPlacedLabel(candidate.left, candidate.top))
-                if (distributedPosition) {
-                    labelLeft = distributedPosition.left
-                    labelTop = distributedPosition.top
-                }
-                measurementLabelRects.push({
-                    left: labelLeft - collisionHalfWidth,
-                    right: labelLeft + collisionHalfWidth,
-                    top: labelTop - halfHeight,
-                    bottom: labelTop + halfHeight,
-                })
                 if (property === 'width') {
                     guide.style.top = `${labelTop - 0.5}px`
                     measure.style.top = `${labelTop}px`
@@ -989,26 +956,31 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         addGuide('designer-spacing-padding', contentLeft + contentWidth, contentTop, Math.max(0, padding.right), contentHeight, 'right', 'padding', Math.max(0, padding.right))
         addGuide('designer-spacing-padding', innerLeft, contentTop + contentHeight, innerWidth, Math.max(0, padding.bottom), 'bottom', 'padding', Math.max(0, padding.bottom))
         addGuide('designer-spacing-padding', innerLeft, contentTop, Math.max(0, padding.left), contentHeight, 'left', 'padding', Math.max(0, padding.left))
-        const sizeLabelCenter = { left: rect.left + rect.width / 2, top: rect.top + rect.height / 2 }
-        const sizeLabelOffset = {
-            x: Math.min(48, Math.max(28, rect.width * 0.08)),
-            y: Math.min(32, Math.max(20, rect.height * 0.08)),
+        const sizeLabelCenter = {
+            left: sizeGuideLayout?.centerLeft ?? rect.left + rect.width / 2,
+            top: sizeGuideLayout?.centerTop ?? rect.top + rect.height / 2,
         }
-        addGuide('designer-spacing-size', rect.left, sizeLabelCenter.top - sizeLabelOffset.y - 0.5, rect.width, 1, 'right', 'size', Math.round(rect.width), 'width', {
-            left: sizeLabelCenter.left - sizeLabelOffset.x,
-            top: sizeLabelCenter.top - sizeLabelOffset.y,
+        const sizeLaneGap = 52
+        const widthLane = sizeGuideLayout?.widthLane ?? 0
+        const heightLane = sizeGuideLayout?.heightLane ?? 0
+        const widthMeasureTop = sizeLabelCenter.top + widthLane * sizeLaneGap
+        const heightMeasureLeft = sizeLabelCenter.left + heightLane * sizeLaneGap
+        const widthLabelOffset = ((sizeGuideLayout?.heightMaxLane ?? 0) + 1) * sizeLaneGap
+        const heightLabelOffset = ((sizeGuideLayout?.widthMaxLane ?? 0) + 1) * sizeLaneGap
+        addGuide('designer-spacing-size', rect.left, widthMeasureTop - 0.5, rect.width, 1, 'right', 'size', Math.round(rect.width), 'width', {
+            left: sizeLabelCenter.left - widthLabelOffset,
+            top: widthMeasureTop,
         })
-        addGuide('designer-spacing-size', sizeLabelCenter.left + sizeLabelOffset.x - 0.5, rect.top, 1, rect.height, 'bottom', 'size', Math.round(rect.height), 'height', {
-            left: sizeLabelCenter.left + sizeLabelOffset.x,
-            top: sizeLabelCenter.top + sizeLabelOffset.y,
+        addGuide('designer-spacing-size', heightMeasureLeft - 0.5, rect.top, 1, rect.height, 'bottom', 'size', Math.round(rect.height), 'height', {
+            left: heightMeasureLeft,
+            top: sizeLabelCenter.top + heightLabelOffset,
         })
-        const contentOutlineInset = selectionLevel === 'widget' ? 3 : selectionLevel === 'element' ? 1 : 0
         addGuide(
             'designer-spacing-content',
-            contentLeft + contentOutlineInset,
-            contentTop + contentOutlineInset,
-            Math.max(0, contentWidth - contentOutlineInset * 2),
-            Math.max(0, contentHeight - contentOutlineInset * 2),
+            rect.left,
+            rect.top,
+            rect.width,
+            rect.height,
         )
         if (columnGrid && (selectionLevel === 'widget' || columnGrid === node)) {
             const slots = [...columnGrid.children]
@@ -1110,17 +1082,48 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                 if (hasEditableWidgetTarget && !levelByNode.has(configurationNode)) widgetConfigurationNodes.push(configurationNode)
             })
         }
-        levelByNode.forEach((kind, node) => showSpacing(
+        const spacingEntries = [...levelByNode].map(([node, kind]) => ({
             node,
-            true,
             kind,
-            node !== selectedWidgetRoot || widgetConfigurationNodes.length === 0,
-        ))
-        widgetConfigurationNodes.forEach((configurationNode) => showSpacing(configurationNode, true, 'widget'))
+            includeDescendantGrid: node !== selectedWidgetRoot || widgetConfigurationNodes.length === 0,
+        }))
+        widgetConfigurationNodes.forEach((node) => spacingEntries.push({ node, kind: 'widget', includeDescendantGrid: true }))
         if (selectedNode?.matches('.two-columns-widget,.three-columns-widget')
             && !levelByNode.has(selectedNode) && !widgetConfigurationNodes.includes(selectedNode)) {
-            showSpacing(selectedNode, true, 'widget')
+            spacingEntries.push({ node: selectedNode, kind: 'widget', includeDescendantGrid: true })
         }
+        const centerRect = (entries.at(-1)?.[1] || spacingEntries.at(-1)?.node)?.getBoundingClientRect()
+        const centerLeft = centerRect ? centerRect.left + centerRect.width / 2 : 0
+        const centerTop = centerRect ? centerRect.top + centerRect.height / 2 : 0
+        const alternatingLane = (rank: number) => rank === 0 ? 0 : Math.ceil(rank / 2) * (rank % 2 ? -1 : 1)
+        const lanes = new Map<HTMLElement, { widthLane: number, heightLane: number }>(
+            spacingEntries.map(({ node }) => [node, { widthLane: 0, heightLane: 0 }]),
+        )
+        const assignLanes = (dimension: 'width' | 'height') => {
+            spacingEntries
+                .map((entry, index) => ({ ...entry, index, value: entry.node.getBoundingClientRect()[dimension] }))
+                .sort((left, right) => right.value - left.value || left.index - right.index)
+                .forEach(({ node }, rank) => {
+                    const lane = lanes.get(node)!
+                    if (dimension === 'width') lane.widthLane = alternatingLane(rank)
+                    else lane.heightLane = alternatingLane(rank)
+                })
+        }
+        assignLanes('width')
+        assignLanes('height')
+        const widthMaxLane = Math.max(0, ...[...lanes.values()].map(({ widthLane }) => Math.abs(widthLane)))
+        const heightMaxLane = Math.max(0, ...[...lanes.values()].map(({ heightLane }) => Math.abs(heightLane)))
+        spacingEntries.forEach(({ node, kind, includeDescendantGrid }) => {
+            const lane = lanes.get(node)!
+            showSpacing(node, true, kind, includeDescendantGrid, {
+                centerLeft,
+                centerTop,
+                widthLane: lane.widthLane,
+                heightLane: lane.heightLane,
+                widthMaxLane,
+                heightMaxLane,
+            })
+        })
     }
     const setSelectedNodesFromPaths = (paths: ReturnType<typeof selectionPaths>) => {
         ;(['slot', 'widget', 'element'] as const).forEach((kind) => {
