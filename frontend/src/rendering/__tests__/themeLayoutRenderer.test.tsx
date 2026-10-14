@@ -152,9 +152,9 @@ describe('theme layout rendering', () => {
         }} />)
 
         expect(container.querySelector('[data-slot-name="main"] > .widget-item')).toHaveClass('layout-preview-placeholder-item')
-        expect(container.querySelector('[data-layout-preview-placeholder="true"]')).toHaveStyle({ flex: '1 1 auto', height: '100%' })
+        expect(container.querySelector('[data-layout-preview-placeholder="true"]')).toHaveStyle({ flex: '1 1 auto', height: '100%', minHeight: 0 })
         expect(PUBLIC_RENDER_CSS).not.toContain('.layout-slot:has(>.layout-preview-placeholder-item){height:100%}')
-        expect(PUBLIC_RENDER_CSS).toContain('.site-renderer .layout-slot>.layout-preview-placeholder-item{display:flex;flex:1 1 auto;min-height:0}')
+        expect(PUBLIC_RENDER_CSS).toContain('.site-renderer .layout-slot>.layout-preview-placeholder-item{display:flex;flex:1 1 auto;flex-direction:column;min-height:0}')
     })
 
     it('rejects a slot that is not declared', () => {
