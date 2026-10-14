@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 
 from content.models import Namespace
 from core.models import Tenant
-from data_connections.credentials import resolved_connection_config
+from data_connections.credentials import encrypt_connection_secrets, resolved_connection_config
 from data_connections.models import DataConnection
 from tenant_plugins.models import TenantPluginActivation
 
@@ -148,6 +148,16 @@ class TenantPluginApiTests(TestCase):
             },
             format="json",
         )
+        invalid_key = self.client.post(
+            endpoint,
+            {
+                **common,
+                "connectionType": "LEGACY_API",
+                "config": {"baseUrl": "https://legacy.example/api/migration/v1"},
+                "secretConfig": {"token": 123},
+            },
+            format="json",
+        )
         deprecated = self.client.post(
             endpoint,
             {**common, "connectionType": "LEGACY_POSTGRES", "config": {}},
@@ -156,8 +166,59 @@ class TenantPluginApiTests(TestCase):
 
         self.assertEqual(insecure.status_code, 400)
         self.assertEqual(missing_key.status_code, 400)
+        self.assertEqual(invalid_key.status_code, 400)
         self.assertEqual(deprecated.status_code, 400)
         self.assertEqual(DataConnection.objects.filter(tenant=self.tenant).count(), 0)
+
+    def test_legacy_api_connection_requires_a_token_secret_and_object_config(self):
+        connection = DataConnection.objects.create(
+            tenant=self.tenant,
+            name="REST source",
+            connection_type="EXTERNAL_REST",
+            config={"baseUrl": "https://legacy.example/api/migration/v1"},
+            encrypted_secrets=encrypt_connection_secrets({"password": "not-a-token"}),
+            created_by=self.owner,
+        )
+        endpoint = f"/api/v1/data-connections/connections/{connection.id}/"
+
+        converted = self.client.patch(endpoint, {"connectionType": "LEGACY_API"}, format="json")
+        malformed = self.client.patch(endpoint, {"config": ["not", "an", "object"]}, format="json")
+
+        self.assertEqual(converted.status_code, 400)
+        self.assertEqual(malformed.status_code, 400)
+
+    def test_existing_legacy_api_key_is_reused_and_deprecated_connection_can_be_deactivated(self):
+        legacy_api = DataConnection.objects.create(
+            tenant=self.tenant,
+            name="Legacy API",
+            connection_type="LEGACY_API",
+            config={"baseUrl": "https://legacy.example/api/migration/v1"},
+            encrypted_secrets=encrypt_connection_secrets({"token": "saved-token"}),
+            created_by=self.owner,
+        )
+        deprecated = DataConnection.objects.create(
+            tenant=self.tenant,
+            name="Deprecated PostgreSQL",
+            connection_type="LEGACY_POSTGRES",
+            config={},
+            created_by=self.owner,
+        )
+
+        api_response = self.client.patch(
+            f"/api/v1/data-connections/connections/{legacy_api.id}/",
+            {"description": "Updated without resubmitting the key"},
+            format="json",
+        )
+        deprecated_response = self.client.patch(
+            f"/api/v1/data-connections/connections/{deprecated.id}/",
+            {"isActive": False},
+            format="json",
+        )
+
+        self.assertEqual(api_response.status_code, 200)
+        self.assertEqual(deprecated_response.status_code, 200)
+        deprecated.refresh_from_db()
+        self.assertFalse(deprecated.is_active)
 
     @patch("content_migration.views.run_plugin_import_job.delay")
     def test_job_creation_is_idempotent(self, delay):

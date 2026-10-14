@@ -21,6 +21,8 @@ class LegacyNewsApiTests(SimpleTestCase):
             LegacyNewsApi(base_url="http://legacy.example/api/migration/v1", token="secret")
         with self.assertRaises(LegacyMigrationApiError):
             LegacyNewsApi(base_url="https://legacy.example/api/migration/v1", token="")
+        with self.assertRaises(LegacyMigrationApiError):
+            LegacyNewsApi(base_url="https://legacy.example/api/migration/v1", token=123)
 
     @patch("content_migration.legacy_news.api.get_public_json")
     def test_summary_normalizes_the_source_contract(self, get):
@@ -96,3 +98,24 @@ class LegacyNewsApiTests(SimpleTestCase):
         ]
         with self.assertRaises(LegacyMigrationApiError):
             list(api.iter_published())
+
+    def test_rejects_invalid_news_field_types(self):
+        valid = {
+            "legacyId": 42,
+            "title": "News",
+            "slug": "news",
+            "featured": False,
+            "taxonomy": {},
+        }
+
+        for invalid in (
+            {**valid, "legacyId": True},
+            {key: value for key, value in valid.items() if key != "slug"},
+            {**valid, "title": None},
+            {**valid, "featured": "false"},
+            {**valid, "presentationalPublishingDate": 123},
+            {**valid, "taxonomy": {"types": "Type"}},
+        ):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(LegacyMigrationApiError):
+                    LegacyNewsApi._news(invalid)
