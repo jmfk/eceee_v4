@@ -13,7 +13,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
 
-from ..error_page_defaults import LEGACY_ERROR_PAGE_SLUGS
+from ..error_page_defaults import exclude_legacy_error_subtrees
 from ..filters import WebPageFilter
 from ..models import PageVersion, WebPage
 from ..serializers import PageHierarchySerializer, PageThemeSerializer, WebPageListSerializer, WebPageSimpleSerializer
@@ -99,11 +99,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         # Error pages are theme-owned special pages. Keep pre-migration rows as
         # dormant rollback data, but never expose them in the Pages product UI.
-        queryset = queryset.exclude(
-            parent__isnull=False,
-            parent__parent__isnull=True,
-            slug__in=LEGACY_ERROR_PAGE_SLUGS,
-        )
+        queryset = exclude_legacy_error_subtrees(queryset)
 
         # Optimize queries for list action by prefetching version data
         if self.action == "list":
@@ -269,10 +265,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 {"detail": "Site not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        queryset = WebPage.objects.filter(tenant=site.tenant, is_deleted=False).exclude(
-            parent=site,
-            slug__in=LEGACY_ERROR_PAGE_SLUGS,
-        )
+        queryset = exclude_legacy_error_subtrees(WebPage.objects.filter(tenant=site.tenant, is_deleted=False))
 
         requested_segments = [segment for segment in slug_path.split("/") if segment]
         if any(segment in {".", ".."} for segment in requested_segments):

@@ -6,7 +6,7 @@ import json
 
 from django import template
 
-from webpages.error_page_defaults import LEGACY_ERROR_PAGE_SLUGS
+from webpages.error_page_defaults import exclude_legacy_error_subtrees
 
 register = template.Library()
 
@@ -99,11 +99,7 @@ def page_hierarchy(context, root_only=True):
         )
         cache.set(cache_key, published_page_ids, 300)  # 5 minutes
 
-    queryset = (
-        WebPage.objects.filter(id__in=published_page_ids)
-        .select_related("parent")
-        .exclude(parent__isnull=False, parent__parent__isnull=True, slug__in=LEGACY_ERROR_PAGE_SLUGS)
-    )
+    queryset = exclude_legacy_error_subtrees(WebPage.objects.filter(id__in=published_page_ids)).select_related("parent")
     if root_only:
         queryset = queryset.filter(parent__isnull=True)
 
@@ -139,10 +135,8 @@ def child_pages_nav(page, limit=None):
         .distinct()
     )
 
-    children = (
-        page.children.filter(id__in=published_page_ids)
-        .exclude(parent__parent__isnull=True, slug__in=LEGACY_ERROR_PAGE_SLUGS)
-        .order_by("sort_order", "id")
+    children = exclude_legacy_error_subtrees(page.children.filter(id__in=published_page_ids)).order_by(
+        "sort_order", "id"
     )
 
     if limit:

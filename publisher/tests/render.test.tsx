@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { PublishedPage } from '../src/render';
+import { PublishedPage, publicFormResult } from '../src/render';
 import type { PublishedPageModel } from '../src/model';
 
 const model: PublishedPageModel = {
@@ -32,5 +32,13 @@ describe('public renderer', () => {
     expect(html).toContain('action="/api/forms/2/form"');
     expect(html).toContain('name="__page_path" value="/"');
     expect(html).toContain('type="submit"');
+  });
+
+  it('derives form feedback from the browser query for every published page kind', () => {
+    expect(publicFormResult('?form_status=success&form_widget=contact-form')).toEqual({
+      widgetId: 'contact-form', status: 'success',
+    });
+    expect(publicFormResult('?form_status=invalid&form_widget=contact-form')).toBeUndefined();
+    expect(publicFormResult('?form_status=error')).toBeUndefined();
   });
 });

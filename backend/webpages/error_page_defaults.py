@@ -2,6 +2,8 @@
 
 import uuid
 
+from django.db.models import Q
+
 ERROR_PAGE_CONTENT = {
     403: ("Access denied", "You do not have permission to view this page."),
     404: ("Page not found", "The page may have moved, or the address may be incorrect."),
@@ -9,6 +11,19 @@ ERROR_PAGE_CONTENT = {
     503: ("Temporarily unavailable", "This site is taking a short break. Please try again soon."),
 }
 LEGACY_ERROR_PAGE_SLUGS = tuple(str(code) for code in ERROR_PAGE_CONTENT)
+
+
+def exclude_legacy_error_subtrees(queryset):
+    """Hide dormant page rows rooted at the former site-level error paths."""
+    legacy_rows = Q(
+        parent__isnull=False,
+        parent__parent__isnull=True,
+        slug__in=LEGACY_ERROR_PAGE_SLUGS,
+    )
+    for slug in LEGACY_ERROR_PAGE_SLUGS:
+        legacy_rows |= Q(cached_path__startswith=f"/{slug}/")
+    return queryset.exclude(legacy_rows)
+
 
 ERROR_ILLUSTRATION = (
     "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 360'%3E"

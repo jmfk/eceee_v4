@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, ListView
 
-from .error_page_defaults import LEGACY_ERROR_PAGE_SLUGS
+from .error_page_defaults import LEGACY_ERROR_PAGE_SLUGS, exclude_legacy_error_subtrees
 from .models import WebPage
 from .renderers import WebPageRenderer
 from .serializers import PageHierarchySerializer
@@ -279,11 +279,7 @@ def page_sitemap_view(request):
         .distinct()
     )
 
-    pages = (
-        WebPage.objects.filter(id__in=published_page_ids)
-        .exclude(parent__isnull=False, parent__parent__isnull=True, slug__in=LEGACY_ERROR_PAGE_SLUGS)
-        .order_by("sort_order")
-    )
+    pages = exclude_legacy_error_subtrees(WebPage.objects.filter(id__in=published_page_ids)).order_by("sort_order")
 
     xml_content = ['<?xml version="1.0" encoding="UTF-8"?>']
     xml_content.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
@@ -351,10 +347,12 @@ def page_search_view(request):
         .distinct()
     )
 
-    pages = WebPage.objects.filter(
-        Q(title__icontains=query) | Q(description__icontains=query),
-        id__in=published_page_ids,
-    ).exclude(parent__isnull=False, parent__parent__isnull=True, slug__in=LEGACY_ERROR_PAGE_SLUGS)[:20]
+    pages = exclude_legacy_error_subtrees(
+        WebPage.objects.filter(
+            Q(title__icontains=query) | Q(description__icontains=query),
+            id__in=published_page_ids,
+        )
+    )[:20]
 
     results = []
     for page in pages:
@@ -524,12 +522,16 @@ class HostnamePageView(View):
         if not root_page:
             raise Http404(f"No site configured for hostname: {hostname}")
 
+        root_content = root_page.get_current_published_version()
+
         # Wrap main logic in try-except to handle 404 errors with custom error pages
         try:
             # Initialize path_variables (will be populated if pattern matching occurs)
             path_variables = {}
 
-            route_page = self._get_special_page(root_page, kind="route", route="/".join(slug_parts))
+            route_page = (
+                self._get_special_page(root_page, kind="route", route="/".join(slug_parts)) if root_content else None
+            )
             if route_page:
                 response = self._render_special_page(root_page, route_page)
                 if response:
@@ -555,7 +557,7 @@ class HostnamePageView(View):
                     raise Http404(f"Page not found: {remaining_path}")
 
             # Get the published version
-            content = current_page.get_current_published_version()
+            content = root_content if current_page.id == root_page.id else current_page.get_current_published_version()
 
             # Handle case where no published version exists
             if not content:

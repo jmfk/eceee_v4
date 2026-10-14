@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 from django.core.exceptions import ValidationError
 
-from webpages.error_page_defaults import ERROR_PAGE_CONTENT, theme_error_page_widgets
+from webpages.error_page_defaults import ERROR_PAGE_CONTENT, LEGACY_ERROR_PAGE_SLUGS, theme_error_page_widgets
 
 SCHEMA_VERSION = 1
 LAYOUT_KEY = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
@@ -753,6 +753,8 @@ def validate_theme_layouts(document):
         if kind == "route":
             if not route or route in routes:
                 raise ValidationError(f"{path}.route must be present and unique.")
+            if route.split("/", 1)[0] in LEGACY_ERROR_PAGE_SLUGS:
+                raise ValidationError(f"{path}.route cannot use a reserved error path.")
             routes.add(route)
         status_code = special_page.get("status_code")
         if kind == "error":

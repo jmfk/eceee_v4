@@ -2,7 +2,6 @@ import { Pool, type PoolClient } from 'pg';
 import { normalizeHostname, type Page, type PageReader, type PublicMediaItem, type PublishedObject, type ReadDb, type Theme, type Version } from './model';
 let pool: Pool | undefined;
 type PublicMediaRow = PublicMediaItem & { file_path: string };
-const LEGACY_ERROR_PAGE_SLUGS = ['403', '404', '500', '503'];
 
 function mediaBaseUrl(): string {
   const configured = process.env.PUBLISHER_MEDIA_BASE_URL?.trim();
@@ -92,7 +91,8 @@ function reader(client: PoolClient): PageReader {
           AND page.tenant_id = $2
           AND (page.id = $3 OR page.cached_root_id = $3)
           AND page.is_deleted = false
-          AND (page.id = $3 OR page.cached_path <> '')`, [pageIds, tenantId, rootId, at]);
+          AND (page.id = $3 OR page.cached_path <> '')
+          AND NOT (page.cached_path ~ $5)`, [pageIds, tenantId, rootId, at, '^/(403|404|500|503)(/|$)']);
       return result.rows;
     },
     async publishedNavigationPages(parentIds, tenantId, rootId, at) {
@@ -124,8 +124,8 @@ function reader(client: PoolClient): PageReader {
           AND page.cached_root_id = $3
           AND page.is_deleted = false
           AND page.cached_path <> ''
-          AND NOT (page.parent_id = $3 AND page.slug = ANY($5::varchar[]))
-        ORDER BY page.parent_id, page.sort_order, page.id`, [parentIds, tenantId, rootId, at, LEGACY_ERROR_PAGE_SLUGS]);
+          AND NOT (page.cached_path ~ $5)
+        ORDER BY page.parent_id, page.sort_order, page.id`, [parentIds, tenantId, rootId, at, '^/(403|404|500|503)(/|$)']);
       return result.rows;
     },
     async publicMedia(mediaIds, collectionIds, tenantId) {

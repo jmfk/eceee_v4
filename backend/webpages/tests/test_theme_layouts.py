@@ -106,6 +106,24 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         with self.assertRaisesMessage(ValidationError, "declared layout slot"):
             validate_theme_layouts(document)
 
+    def test_special_routes_cannot_use_reserved_error_subtrees(self):
+        for route in ("403", "404/help", "500/details", "503/status"):
+            document = deepcopy(default_theme_layouts())
+            document["special_pages"].append(
+                {
+                    "id": "e34d440b-36f9-479e-880d-ef9a898cab75",
+                    "key": "reserved_route",
+                    "label": "Reserved",
+                    "kind": "route",
+                    "route": route,
+                    "layout_key": "main_layout",
+                    "widgets": {},
+                }
+            )
+
+            with self.subTest(route=route), self.assertRaisesMessage(ValidationError, "reserved error path"):
+                validate_theme_layouts(document)
+
     def test_required_theme_error_pages_cannot_be_removed(self):
         document = deepcopy(default_theme_layouts())
         document["special_pages"] = [page for page in document["special_pages"] if page["status_code"] != 503]

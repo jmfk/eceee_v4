@@ -16,4 +16,13 @@ describe('theme error route proxy', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('x-middleware-next')).toBe('1');
   });
+
+  it('blocks direct access to the internal renderer even with a spoofed dispatch header', () => {
+    const response = proxy(new NextRequest('https://example.org/theme-error-status/403', {
+      headers: { 'x-eceee-theme-error': '403' },
+    }));
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull();
+  });
 });
