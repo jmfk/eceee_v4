@@ -193,7 +193,13 @@ class DesignerRemoteConnectionSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=120)
     base_url = serializers.URLField(max_length=500)
     remote_workspace = serializers.CharField(max_length=100)
-    access_key = serializers.CharField(max_length=500, trim_whitespace=False, write_only=True, required=False)
+    access_key = serializers.CharField(
+        max_length=500,
+        trim_whitespace=False,
+        write_only=True,
+        required=False,
+        allow_blank=True,
+    )
     is_default = serializers.BooleanField(default=False)
     credential_scheme = serializers.ChoiceField(
         choices=ThemeRemoteConnection.CREDENTIAL_SCHEME_CHOICES,
