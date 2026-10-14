@@ -1,6 +1,6 @@
 import { compileThemeCss, fontImports, widgetVariantClasses } from './theme';
 import { responsiveImageSources, type ResponsiveImageOptions } from './imgproxy';
-import type { ThemeLayoutDefinition, ThemeLayoutDocument, ThemeLayoutSlot } from '../../frontend/src/rendering/types';
+import type { ThemeLayoutDefinition, ThemeLayoutDocument, ThemeLayoutSlot, ThemeSpecialPage } from '../../frontend/src/rendering/types';
 
 export type DbId = string;
 
@@ -181,6 +181,12 @@ export interface PublishedPageModel {
   description: string;
   matchedPath: string;
   remainingPath: string;
+}
+
+interface RootThemeContext {
+  root: Page;
+  rootVersion: Version | null;
+  theme: Theme | null;
 }
 
 type RawWidget = Record<string, unknown>;
@@ -819,15 +825,140 @@ async function resolvePublishedData(
   return resolved;
 }
 
+async function readRootThemeContext(reader: PageReader, host: string, at: Date): Promise<RootThemeContext | null> {
+  const root = await reader.root(host);
+  if (!root || root.parent_id !== null) return null;
+  const rootVersion = await reader.version(root.id, at);
+  if (rootVersion && rootVersion.page_id !== root.id) return null;
+  const theme = rootVersion?.theme_id
+    ? await reader.theme(rootVersion.theme_id, root.tenant_id)
+    : await reader.defaultTheme(root.tenant_id);
+  return { root, rootVersion, theme };
+}
+
+function specialRoute(theme: Theme | null, path: string): ThemeSpecialPage | null {
+  const route = path.replace(/^\/+|\/+$/g, '');
+  return theme?.layouts?.special_pages?.find(page => (
+    page.kind === 'route' && String(page.route || '').replace(/^\/+|\/+$/g, '') === route
+  )) ?? null;
+}
+
+function specialError(theme: Theme | null, statusCode: number): ThemeSpecialPage | null {
+  return theme?.layouts?.special_pages?.find(page => (
+    page.kind === 'error' && page.status_code === statusCode
+  )) ?? null;
+}
+
+async function buildSpecialPageModel(
+  reader: PageReader,
+  context: RootThemeContext,
+  specialPage: ThemeSpecialPage,
+  path: string,
+  at: Date,
+): Promise<PublishedPageModel | null> {
+  const { root, rootVersion, theme } = context;
+  const layoutKey = specialPage.layout_key || theme?.layouts?.default_layout_key || 'main_layout';
+  const layoutDefinition = theme?.layouts?.items?.find(item => item.key === layoutKey) || null;
+  if (!layoutDefinition) return null;
+  const slotNames = new Set([
+    ...Object.keys(layoutDefinition.slots || {}),
+    ...Object.keys(object(specialPage.widgets)),
+  ]);
+  const normalizedWidgets = normalizeWidgets(specialPage.widgets, at);
+  let slots = Object.fromEntries([...slotNames].map(slot => [
+    slot,
+    normalizedWidgets[slot] ?? [],
+  ]));
+  const normalizedPath = '/' + path.split('/').filter(Boolean).join('/');
+  slots = await resolvePublishedData(slots, reader, root.tenant_id, at, normalizedPath || '/', {});
+
+  const pageIds = new Set<DbId>();
+  const mediaIds = new Set<DbId>();
+  const collectionIds = new Set<DbId>();
+  collectReferences(slots, pageIds, mediaIds, collectionIds);
+  const references = await reader.publishedPageReferences([...pageIds], root.tenant_id, root.id, at);
+  const navigationPages = await reader.publishedNavigationPages([root.id], root.tenant_id, root.id, at);
+  const publicMedia = await reader.publicMedia([...mediaIds], [...collectionIds], root.tenant_id);
+  const pagePaths = new Map(references.map(reference => [String(reference.id), reference.cached_path]));
+  slots = prepareWidgets(slots, pagePaths, publicMedia.files, publicMedia.collections, theme, [root], navigationPages);
+
+  const themeOnlyPage = { ...root, enable_css_injection: false };
+  const themeOnlyVersion: Version = rootVersion
+    ? { ...rootVersion, enable_css_injection: false }
+    : {
+      id: specialPage.id,
+      page_id: root.id,
+      meta_title: '',
+      meta_description: '',
+      code_layout: layoutKey,
+      layout_key: layoutKey,
+      widgets: specialPage.widgets,
+      theme_id: theme?.id ?? null,
+      enable_css_injection: false,
+      page_css_variables: {},
+      page_custom_css: '',
+    };
+  return {
+    layout: layoutKey,
+    layoutDefinition,
+    layoutDefinitionRequired: Boolean(theme?.layouts),
+    layoutBreakpoints: theme?.breakpoints as Record<string, number> | undefined,
+    slots,
+    context: {
+      mode: 'public',
+      preview: false,
+      tenantId: root.tenant_id,
+      siteId: root.id,
+      siteHostnames: root.hostnames,
+      pageId: root.id,
+      versionId: themeOnlyVersion.id,
+      pathVariables: {},
+      simulatedPath: normalizedPath + (normalizedPath === '/' ? '' : '/'),
+      componentStyles: theme?.component_styles ?? {},
+      publicForms: {
+        endpointBase: `/api/forms/${encodeURIComponent(root.id)}`,
+        pagePath: normalizedPath,
+      },
+    },
+    fontCss: theme ? fontImports(theme.fonts) : '',
+    themeCss: compileThemeCss(theme, themeOnlyPage, themeOnlyVersion, slots),
+    title: specialPage.label,
+    description: '',
+    matchedPath: normalizedPath,
+    remainingPath: '',
+  };
+}
+
+export async function buildThemeErrorPageModel(
+  db: ReadDb,
+  hostname: string,
+  statusCode: number,
+  at = new Date(),
+): Promise<PublishedPageModel | null> {
+  const host = normalizeHostname(hostname);
+  if (!host) return null;
+  return db.withSnapshot(async reader => {
+    const context = await readRootThemeContext(reader, host, at);
+    if (!context) return null;
+    const specialPage = specialError(context.theme, statusCode);
+    return specialPage
+      ? buildSpecialPageModel(reader, context, specialPage, `/${statusCode}`, at)
+      : null;
+  });
+}
+
 export async function buildPublishedPageModel(db: ReadDb, hostname: string, path: string, at = new Date()): Promise<PublishedPageModel | null> {
   const host = normalizeHostname(hostname);
   if (!host || !path.startsWith('/') || path.includes('?') || path.includes('#')) return null;
   const segments = path.split('/').filter(Boolean);
-  if (segments.some(segment => segment === '.' || segment === '..' || !/^[\p{L}\p{N}_-]+$/u.test(segment)) || segments.length > 64) return null;
+  if (segments.some(segment => segment === '.' || segment === '..' || !/^[\p{L}\p{N}_.-]+$/u.test(segment)) || segments.length > 64) return null;
 
   return db.withSnapshot(async reader => {
-    const root = await reader.root(host);
-    if (!root || root.parent_id !== null) return null;
+    const rootContext = await readRootThemeContext(reader, host, at);
+    if (!rootContext) return null;
+    const { root, rootVersion, theme: rootTheme } = rootContext;
+    const routePage = specialRoute(rootTheme, path);
+    if (routePage) return buildSpecialPageModel(reader, rootContext, routePage, path, at);
     const pages = [root];
     let current = root;
     for (const segment of segments) {
@@ -845,8 +976,8 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
     // PageReader methods share one PostgreSQL client inside a repeatable-read
     // transaction. Keep reads sequential: node-postgres does not support
     // concurrent queries on a single client and is removing its legacy queueing.
-    const versions: Array<Version | null> = [];
-    for (const page of pages) versions.push(await reader.version(page.id, at));
+    const versions: Array<Version | null> = [rootVersion];
+    for (const page of pages.slice(1)) versions.push(await reader.version(page.id, at));
     const currentVersion = versions.at(-1);
     if (!currentVersion || currentVersion.page_id !== current.id) return null;
     const chain = pages.flatMap((page, index) => versions[index]
@@ -854,8 +985,10 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
       : []);
     const explicitThemeId = [...chain].reverse().find(item => item.version.theme_id)?.version.theme_id;
     const theme = explicitThemeId
-      ? await reader.theme(explicitThemeId, root.tenant_id)
-      : await reader.defaultTheme(root.tenant_id);
+      ? explicitThemeId === rootVersion?.theme_id
+        ? rootTheme
+        : await reader.theme(explicitThemeId, root.tenant_id)
+      : rootTheme;
     const layout = [...chain].reverse().find(item => item.version.layout_key || item.version.code_layout)?.version;
     const layoutKey = layout?.layout_key || layout?.code_layout || theme?.layouts?.default_layout_key || 'main_layout';
     const layoutDefinition = theme?.layouts?.items?.find(item => item.key === layoutKey) || null;

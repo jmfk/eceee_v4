@@ -118,7 +118,8 @@ def render_theme_layout(layout, widgets_by_slot, breakpoints=None):
     css = layout_definition_css(layout, breakpoints)
     tree = render_node(layout.get("root") or {})
     return format_html(
-        '<div class="site-renderer cms-content" data-render-layout="{}"><style data-theme-layout-css="{}">{}</style>{}</div>',
+        '<div class="site-renderer cms-content" data-render-layout="{}">'
+        '<style data-theme-layout-css="{}">{}</style>{}</div>',
         layout.get("key", ""),
         layout.get("key", ""),
         mark_safe(css),

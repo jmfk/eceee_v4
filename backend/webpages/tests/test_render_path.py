@@ -74,6 +74,21 @@ class RenderPathResolutionTest(TestCase):
         self.assertEqual(response.data["version_id"], version.id)
         self.assertEqual(response.data["slug_path"], "")
 
+    def test_does_not_resolve_a_saved_legacy_error_page(self):
+        legacy_error_page = WebPage.objects.create(
+            title="Legacy not found",
+            slug="404",
+            parent=self.site,
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        legacy_error_page.create_version(self.user, "Legacy error version")
+
+        response = self.client.get(self.url, {"site_id": self.site.id, "path": "404"})
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_child_with_same_slug_as_hosted_root_takes_precedence(self):
         child = WebPage.objects.create(
             title="Site child",

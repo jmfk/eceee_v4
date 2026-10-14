@@ -124,10 +124,22 @@ export interface ThemeLayoutDefinition {
     slots: Record<string, ThemeLayoutSlot>
 }
 
+export interface ThemeSpecialPage {
+    id: string
+    key: string
+    label: string
+    kind: 'error' | 'route'
+    status_code?: number
+    route?: string
+    layout_key: string
+    widgets: Record<string, unknown[]>
+}
+
 export interface ThemeLayoutDocument {
     schema_version: 1
     default_layout_key: string
     items: ThemeLayoutDefinition[]
+    special_pages?: ThemeSpecialPage[]
 }
 
 export interface WidgetRenderProps {
