@@ -4,6 +4,7 @@ import { FileKey, Plus, ShieldAlert, Trash2 } from 'lucide-react'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import PageContentEditor from '../../editors/page-editor/PageContentEditor'
+import { buildDesignerTheme } from '../../utils/editorThemeCSS'
 import { applyWidgetUpdateToWidgetMap } from '../../utils/pageEditorWidgetState'
 import WidgetEditorPanel from '../WidgetEditorPanel'
 
@@ -90,6 +91,7 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
     }
 
     const widgets = useMemo(() => selected?.widgets || {}, [selected?.widgets])
+    const effectiveTheme = useMemo(() => buildDesignerTheme(workspace), [workspace])
     const pageVersion = useMemo(() => selected ? ({
         id: selected.id,
         versionId: selected.id,
@@ -98,8 +100,8 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
         layoutKey: selected.layout_key,
         pageData: { title: selected.label, specialPageKey: selected.key },
         widgets,
-        effectiveTheme: workspace.themeConfig,
-    }) : null, [selected, widgets, workspace.themeConfig])
+        effectiveTheme,
+    }) : null, [effectiveTheme, selected, widgets])
     const pageData = selected ? { id: selected.id, title: selected.label } : null
 
     useEffect(() => {
@@ -144,7 +146,7 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
                         </div>
                     </fieldset>
                     <div className="min-h-[500px] overflow-hidden rounded-lg border border-gray-200">
-                        <PageContentEditor webpageData={pageData} pageVersionData={pageVersion} editable={!disabled} applyPageTheme={false} localWidgets={widgets} onLocalWidgetUpdate={(nextWidgets) => updateSelected({ widgets: nextWidgets })} onOpenWidgetEditor={(widget) => setWidgetEditor({ open: true, widget })} inheritedWidgets={{}} slotInheritanceRules={{}} context={{ pageId: selected.id, mode: 'theme-special-page', contextType: 'page' }} />
+                        <PageContentEditor webpageData={pageData} pageVersionData={pageVersion} editable={!disabled} localWidgets={widgets} onLocalWidgetUpdate={(nextWidgets) => updateSelected({ widgets: nextWidgets })} onOpenWidgetEditor={(widget) => setWidgetEditor({ open: true, widget })} inheritedWidgets={{}} slotInheritanceRules={{}} context={{ pageId: selected.id, mode: 'theme-special-page', contextType: 'page' }} />
                     </div>
                     <WidgetEditorPanel isOpen={widgetEditor.open} onClose={() => setWidgetEditor({ open: false, widget: null })} onSave={saveWidget} onRealTimeUpdate={updateWidget} widgetData={widgetEditor.widget} title={widgetEditor.widget ? `Edit ${widgetEditor.widget.name || widgetEditor.widget.type}` : 'Edit widget'} autoOpenSpecialEditor webpageData={pageData} pageVersionData={pageVersion} context={{ pageId: selected.id, versionId: selected.id, contextType: 'page' }} showPublishingFields={false} />
                 </section>}

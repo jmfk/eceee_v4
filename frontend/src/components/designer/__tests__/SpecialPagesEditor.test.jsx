@@ -3,15 +3,21 @@ import { describe, expect, it, vi } from 'vitest'
 
 import SpecialPagesEditor from '../SpecialPagesEditor'
 
+const mocks = vi.hoisted(() => ({ pageContentEditor: vi.fn() }))
+
 vi.mock('../../../contexts/unified-data/context/UnifiedDataContext', () => ({
     useUnifiedData: () => ({ publishUpdate: vi.fn().mockResolvedValue(undefined) }),
 }))
 
 vi.mock('../../../editors/page-editor/PageContentEditor', () => ({
-    default: ({ localWidgets, onLocalWidgetUpdate }) => <div>
+    default: (props) => {
+        mocks.pageContentEditor(props)
+        const { localWidgets, onLocalWidgetUpdate } = props
+        return <div>
         <span data-testid="widget-count">{Object.values(localWidgets).flat().length}</span>
         <button type="button" onClick={() => onLocalWidgetUpdate({ main: [{ id: 'new-widget', type: 'easy_widgets.ContentWidget', config: { content: 'Hello' } }] })}>Add test widget</button>
-    </div>,
+        </div>
+    },
 }))
 
 vi.mock('../../WidgetEditorPanel', () => ({ default: () => null }))
@@ -45,6 +51,24 @@ const workspaceWithLayouts = {
 }
 
 describe('SpecialPagesEditor', () => {
+    it('previews the current unsaved layouts, palette, and fonts with theme styling enabled', () => {
+        const current = structuredClone(workspace)
+        current.themeConfig = { colors: { brand: '#000000' }, fonts: { googleFonts: [] }, layouts: { items: [] } }
+        current.colors = [{ name: 'brand', value: '#123456' }]
+        current.fonts = [{ family: 'Inter', variants: ['400'], display: 'swap' }]
+        const updateWorkspace = vi.fn()
+
+        render(<SpecialPagesEditor workspace={current} updateWorkspace={updateWorkspace} disabled={false} />)
+
+        const props = mocks.pageContentEditor.mock.calls.at(-1)[0]
+        expect(props.applyPageTheme).toBeUndefined()
+        expect(props.pageVersionData.effectiveTheme).toMatchObject({
+            colors: { brand: '#123456' },
+            fonts: { googleFonts: [{ family: 'Inter', variants: ['400'], display: 'swap' }] },
+            layouts: current.layouts,
+        })
+    })
+
     it('stores visually edited widget content inside layouts.special_pages', () => {
         let current = structuredClone(workspace)
         const updateWorkspace = vi.fn((updater) => { current = updater(current) })
