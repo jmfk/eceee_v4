@@ -20,7 +20,7 @@ const defaultBreakpoints: Record<string, number> = { xs: 0, sm: 640, md: 768, lg
 const safeValue = (value: string | number) => {
     const text = String(value).trim()
     if (!text || text.length > 160 || /[;{}<>]|url\s*\(|expression\s*\(|@import/i.test(text)) return null
-    if (text.startsWith('token:')) return `var(--color-${text.slice(6).replace(/[^a-zA-Z0-9_-]/g, '')})`
+    if (text.startsWith('token:')) return `var(--${text.slice(6).replace(/[^a-zA-Z0-9_-]/g, '')})`
     return text
 }
 

@@ -39,6 +39,34 @@ const spacingDirections = {
     margin: ['marginTop', 'marginRight', 'marginBottom', 'marginLeft'],
     padding: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'],
 }
+const expandDirectionalShorthand = (value) => {
+    const tokens = []
+    let token = ''
+    let depth = 0
+    let quote = ''
+    for (const character of String(value || '').trim()) {
+        if (quote) {
+            token += character
+            if (character === quote) quote = ''
+        } else if (character === '"' || character === "'") {
+            quote = character
+            token += character
+        } else if (character === '(') {
+            depth += 1
+            token += character
+        } else if (character === ')') {
+            depth = Math.max(0, depth - 1)
+            token += character
+        } else if (/\s/.test(character) && depth === 0) {
+            if (token) tokens.push(token)
+            token = ''
+        } else token += character
+    }
+    if (token) tokens.push(token)
+    if (tokens.length < 1 || tokens.length > 4) return null
+    const [top, right = top, bottom = top, left = right] = tokens
+    return { top, right, bottom, left }
+}
 const configuredSpacingFields = (values = {}) => [...new Set(
     Object.entries(values)
         .filter(([, value]) => value !== '' && value !== null && value !== undefined)
@@ -1587,7 +1615,7 @@ const SemanticThemeWorkspace = ({
             return
         }
     }
-    const removeLevelSpacing = (target, field, sourceEntry, computed) => {
+    const removeLevelSpacing = (target, field, sourceEntry) => {
         if (!sourceEntry || sourceEntry.index < 0) return
         updateWorkspace((next) => {
             const row = next.spacing[sourceEntry.index]
@@ -1599,8 +1627,12 @@ const SemanticThemeWorkspace = ({
                     : ''
             if (hasThemeValue(row.values[field])) delete row.values[field]
             else if (shorthand && hasThemeValue(row.values[shorthand])) {
+                const expanded = expandDirectionalShorthand(row.values[shorthand])
                 spacingDirections[shorthand].forEach((direction) => {
-                    if (direction !== field && hasThemeValue(computed[direction])) row.values[direction] = computed[direction]
+                    const side = direction.slice(shorthand.length).toLowerCase()
+                    if (direction !== field && !hasThemeValue(row.values[direction]) && hasThemeValue(expanded?.[side])) {
+                        row.values[direction] = expanded[side]
+                    }
                 })
                 delete row.values[shorthand]
             }
@@ -2313,7 +2345,7 @@ const SemanticThemeWorkspace = ({
                                                 aria-pressed={isAuthored}
                                                 title={isAuthored ? 'Use default value' : 'Override default value'}
                                                 onClick={() => isAuthored
-                                                    ? removeLevelSpacing(spacingTarget, field, sourceEntry, computed)
+                                                    ? removeLevelSpacing(spacingTarget, field, sourceEntry)
                                                     : updateLevelSpacing(spacingTarget, field, isCalculatedCssValue(declaredValue)
                                                         ? calculatedValue || '0px'
                                                         : declaredValue || calculatedValue || '0px')}
@@ -2534,7 +2566,7 @@ const SemanticThemeWorkspace = ({
                             const hasOverrideControl = Boolean(inherited || (hasOverride && layoutParameterBreakpoint !== 'base'))
                             const inputId = `layout-parameter-${selectedLayoutNode.id}-${layoutParameterBreakpoint}-${field}`
                             if (['background_color', 'color'].includes(field)) return <div key={field} className="space-y-1">
-                                <ThemeColorField id={inputId} label={humanize(field)} ariaLabel={`${selectedLayoutNode.label || selectedTargetLabel} ${humanize(field)}`} value={displayedValue} colors={workspace.colors} disabled={Boolean(inherited)} onChange={(value) => updateSelectedLayoutParameter(field, value)} onAdd={addThemeColor} />
+                                <ThemeColorField id={inputId} label={humanize(field)} ariaLabel={`${selectedLayoutNode.label || selectedTargetLabel} ${humanize(field)}`} value={displayedValue} colors={workspace.colors} disabled={Boolean(inherited)} onChange={(value) => updateSelectedLayoutParameter(field, value)} onAdd={addThemeColor} formatPaletteValue={(name) => `token:${name}`} />
                                 {inherited && <button type="button" onClick={() => updateSelectedLayoutParameter(field, inherited.value)} aria-label={`Override ${humanize(field)} at ${breakpointLabel(layoutParameterBreakpoint)}`} className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"><KeyRound className="h-3.5 w-3.5" />Override at {breakpointLabel(layoutParameterBreakpoint)}</button>}
                                 {!inherited && hasOverride && layoutParameterBreakpoint !== 'base' && <button type="button" onClick={() => updateSelectedLayoutParameter(field, '')} aria-label={`Reset ${humanize(field)} override`} className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"><RotateCcw className="h-3.5 w-3.5" />Reset override</button>}
                                 {inherited && <span className="block text-[10px] text-gray-500">Inherited from {inheritedLabel}</span>}
