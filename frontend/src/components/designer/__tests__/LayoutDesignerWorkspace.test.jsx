@@ -192,6 +192,9 @@ describe('LayoutDesignerWorkspace', () => {
 
         expect(screen.getByLabelText('Element type')).toHaveValue('container')
         expect(screen.getByText('Dimensions')).toBeInTheDocument()
+        expect(screen.getByLabelText('height value')).toHaveValue('auto')
+        expect(screen.getByLabelText('max width value')).toHaveValue('none')
+        expect(screen.getAllByText('CSS default (not yet saved on this existing element)')).toHaveLength(3)
         fireEvent.change(screen.getByLabelText('Element name'), { target: { value: 'Site frame' } })
         const widthParameter = screen.getByRole('checkbox', { name: 'Expose width in Theme Designer' })
         fireEvent.click(widthParameter)
@@ -202,6 +205,37 @@ describe('LayoutDesignerWorkspace', () => {
         expect(widthParameter.closest('label')).toHaveAttribute('title', 'Expose width in the Theme Designer')
         expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-md-height', 'clamp(20rem, 60vh, 48rem)')
         expect(screen.queryByText('Designer-editable parameters')).not.toBeInTheDocument()
+    })
+
+    it('creates a useful themed layout from the selected default structure', () => {
+        render(<Harness />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Create layout' }))
+        const dialog = screen.getByRole('dialog', { name: 'Create layout' })
+        expect(dialog).toBeInTheDocument()
+        expect(screen.getByRole('radio', { name: /1 column/ })).toBeChecked()
+        expect(screen.getByRole('radio', { name: /2 columns/ })).toBeInTheDocument()
+        expect(screen.getByRole('radio', { name: /3 columns/ })).toBeInTheDocument()
+        expect(screen.getByRole('radio', { name: /Responsive grid/ })).toBeInTheDocument()
+
+        fireEvent.change(screen.getByLabelText('Layout name'), { target: { value: 'Article with sidebar' } })
+        fireEvent.click(screen.getByRole('radio', { name: /2 columns/ }))
+        fireEvent.click(screen.getAllByRole('button', { name: 'Create layout' }).at(-1))
+
+        expect(screen.getByText('Article with sidebar')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+        const savedDocument = JSON.parse(screen.getByLabelText('Canonical layout document').value)
+        const created = savedDocument.items.find((layout) => layout.label === 'Article with sidebar')
+        expect(Object.keys(created.slots)).toEqual(['header', 'navbar', 'hero', 'main', 'sidebar', 'footer'])
+        const nodes = []
+        const collect = (node) => {
+            nodes.push(node)
+            node.children.forEach(collect)
+        }
+        collect(created.root)
+        expect(nodes.map((node) => node.label)).toEqual(expect.arrayContaining(['Viewport background', 'Page surface', '2-column content', 'Main content', 'Sidebar', 'Footer wrapper']))
+        expect(nodes.every((node) => ['width', 'height', 'max_width', 'min_height'].every((field) => Object.hasOwn(node.styles.base, field)))).toBe(true)
+        expect(nodes.every((node) => ['width', 'height', 'max_width', 'min_height'].every((field) => node.editable_parameters.includes(field)))).toBe(true)
     })
 
     it('changes structural element types and persists the type in the theme layout JSON', () => {

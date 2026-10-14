@@ -16,6 +16,7 @@ import SpecialPagesEditor from './SpecialPagesEditor'
 const nodeTypes = ['container', 'section', 'grid', 'row', 'column', 'semantic', 'slot']
 const styleFields = ['display', 'width', 'height', 'max_width', 'min_height', 'grid_template_columns', 'grid_column', 'flex_direction', 'flex_wrap', 'flex_grow', 'order', 'gap', 'padding', 'margin', 'align_items', 'justify_content', 'background_color', 'background_image', 'background_position', 'background_size', 'background_repeat', 'color', 'font_family', 'border', 'border_radius']
 const dimensionStyleFields = ['width', 'height', 'max_width', 'min_height']
+const dimensionStyleDefaults = { width: 'auto', height: 'auto', max_width: 'none', min_height: 'auto' }
 const gridStyleFields = ['grid_template_columns', 'gap', 'padding', 'margin', 'align_items', 'justify_content']
 const externallyEditableNodeTypes = new Set(nodeTypes)
 const defaultPresentationColors = { container: '#3b82f6', section: '#06b6d4', grid: '#a855f7', row: '#6366f1', column: '#22c55e', semantic: '#f59e0b', slot: '#f43f5e' }
@@ -30,6 +31,24 @@ const resizeHandleWidth = 8
 const collapsedPanelWidth = 44
 const uuid = () => crypto.randomUUID()
 const clone = (value) => structuredClone(value)
+const stylesWithDimensionDefaults = (styles = {}) => ({
+    ...styles,
+    base: { ...dimensionStyleDefaults, ...(styles.base || {}) },
+})
+const layoutNode = (type, label, { children = [], styles = {}, classNames = [], tag, slotKey } = {}) => {
+    const node = {
+        id: uuid(),
+        type,
+        label,
+        children,
+        styles: stylesWithDimensionDefaults(styles),
+        class_names: classNames,
+        editable_parameters: [...dimensionStyleFields],
+    }
+    if (tag) node.tag = tag
+    if (slotKey) node.slot_key = slotKey
+    return node
+}
 const splitList = (value) => String(value || '').split(/[\n,]/).map((item) => item.trim()).filter(Boolean)
 const previewViewContentCount = (view) => {
     const widgets = view?.content?.widgets
@@ -137,6 +156,10 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
     const [canvasViewportSize, setCanvasViewportSize] = useState({ width: 0, height: 0 })
     const [imagePickerOpen, setImagePickerOpen] = useState(false)
     const [previewSource, setPreviewSource] = useState('')
+    const [createLayoutOpen, setCreateLayoutOpen] = useState(false)
+    const [newLayoutLabel, setNewLayoutLabel] = useState('')
+    const [newLayoutStructure, setNewLayoutStructure] = useState('one')
+    const [newLayoutRegions, setNewLayoutRegions] = useState({ header: true, navbar: true, hero: true, footer: true })
     const initialActionHandled = useRef(false)
     const workspaceRef = useRef(null)
     const canvasViewportRef = useRef(null)
@@ -365,19 +388,127 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         return next
     })
 
+    const openCreateLayout = () => {
+        setNewLayoutLabel('')
+        setNewLayoutStructure('one')
+        setNewLayoutRegions({ header: true, navbar: true, hero: true, footer: true })
+        setCreateLayoutOpen(true)
+    }
+
     const addLayout = () => {
-        const count = layouts.items.length + 1
-        const key = `layout_${count}`
-        const slotKey = 'main'
-        const root = { id: uuid(), type: 'container', label: 'Page container', children: [{ id: uuid(), type: 'slot', label: 'Main content', slot_key: slotKey, children: [], styles: {}, class_names: ['layout-slot', 'slot-main'] }], styles: { base: { width: '100%' } }, class_names: [`${key}-container`] }
-        const layout = { id: uuid(), key, label: `Layout ${count}`, description: '', status: 'active', root, slots: { [slotKey]: { label: 'Main', description: 'Primary content', order: 10, max_widgets: null, required: true, collapse_behavior: 'never', default_widgets: [] } } }
+        let index = layouts.items.length + 1
+        let key = `layout_${index}`
+        while (layouts.items.some((layout) => layout.key === key)) key = `layout_${++index}`
+
+        const sourceSlot = (slotKey, fallback) => {
+            for (const layout of layouts.items) {
+                if (layout.slots?.[slotKey]) return { ...fallback, ...clone(layout.slots[slotKey]) }
+            }
+            return fallback
+        }
+        const slots = {}
+        const addSlot = (slotKey, label, order, fallback = {}) => {
+            slots[slotKey] = sourceSlot(slotKey, {
+                label,
+                description: '',
+                order,
+                max_widgets: null,
+                collapse_behavior: 'never',
+                default_widgets: [],
+                ...fallback,
+            })
+            slots[slotKey].label = label
+            slots[slotKey].order = order
+            return layoutNode('slot', label, {
+                slotKey,
+                classNames: ['layout-slot', `slot-${slotKey.replaceAll('_', '-')}`],
+            })
+        }
+
+        const pageChildren = []
+        if (newLayoutRegions.header) pageChildren.push(addSlot('header', 'Header', 10, { max_widgets: 1, collapse_behavior: 'any', default_widgets: [{ type: 'header' }] }))
+        if (newLayoutRegions.navbar) pageChildren.push(addSlot('navbar', 'Navigation', 20, { max_widgets: 1, collapse_behavior: 'any', default_widgets: [{ type: 'navbar' }] }))
+        if (newLayoutRegions.hero) pageChildren.push(addSlot('hero', 'Hero', 30, { max_widgets: 1, collapse_behavior: 'any', default_widgets: [{ type: 'hero', config: {} }] }))
+
+        const contentSlotFallback = {
+            allows_inheritance: false,
+            allow_merge: false,
+            disallowed_widget_types: ['easy_widgets.FooterWidget', 'easy_widgets.NavbarWidget', 'easy_widgets.HeaderWidget'],
+        }
+        if (newLayoutStructure === 'one') {
+            pageChildren.push(layoutNode('semantic', 'Main content', {
+                tag: 'main',
+                classNames: [`${key}-main`],
+                styles: { base: { width: '100%', min_height: '300px', padding: '30px 40px' } },
+                children: [addSlot('main', 'Main content', 50, { ...contentSlotFallback, required: true })],
+            }))
+        } else if (newLayoutStructure === 'grid') {
+            const gridSlot = addSlot('content_grid', 'Content grid', 50, { ...contentSlotFallback, required: true })
+            gridSlot.styles = stylesWithDimensionDefaults({
+                base: { width: '100%', min_height: '300px', display: 'grid', grid_template_columns: '1fr', gap: '24px' },
+                md: { grid_template_columns: 'repeat(2, minmax(0, 1fr))' },
+                xl: { grid_template_columns: 'repeat(3, minmax(0, 1fr))' },
+            })
+            pageChildren.push(layoutNode('semantic', 'Main content', {
+                tag: 'main',
+                classNames: [`${key}-main`],
+                styles: { base: { width: '100%', min_height: '300px', padding: '30px 40px' } },
+                children: [gridSlot],
+            }))
+        } else {
+            const columns = newLayoutStructure === 'three'
+                ? [['main', 'Main content'], ['sidebar', 'Sidebar'], ['secondary_sidebar', 'Secondary sidebar']]
+                : [['main', 'Main content'], ['sidebar', 'Sidebar']]
+            const columnNodes = columns.map(([slotKey, label], columnIndex) => layoutNode('column', label, {
+                classNames: [`${key}-${slotKey.replaceAll('_', '-')}`],
+                children: [addSlot(slotKey, label, 50 + columnIndex * 10, { ...contentSlotFallback, required: slotKey === 'main' })],
+            }))
+            pageChildren.push(layoutNode('grid', `${columns.length}-column content`, {
+                classNames: [`${key}-content-grid`],
+                styles: {
+                    base: { width: '100%', min_height: '300px', display: 'grid', grid_template_columns: '1fr', gap: '30px', padding: '30px 40px' },
+                    lg: { grid_template_columns: `repeat(${columns.length}, minmax(0, 1fr))` },
+                },
+                children: columnNodes,
+            }))
+        }
+
+        if (newLayoutRegions.footer) {
+            pageChildren.push(layoutNode('container', 'Footer wrapper', {
+                classNames: [`${key}-footer`],
+                styles: { base: { width: '100%', display: 'flex', flex_direction: 'column' } },
+                children: [addSlot('footer', 'Footer', 1000, { max_widgets: 1, collapse_behavior: 'any', default_widgets: [{ type: 'footer' }] })],
+            }))
+        }
+
+        const surface = layoutNode('container', 'Page surface', {
+            classNames: [`${key}-surface`],
+            styles: { base: { width: '100%', max_width: '1280px', min_height: '100vh', margin: '0 auto', display: 'flex', flex_direction: 'column', flex_grow: '1' } },
+            children: pageChildren,
+        })
+        const root = layoutNode('container', 'Viewport background', {
+            classNames: [`${key}-container`],
+            styles: { base: { width: '100%', min_height: '100vh', display: 'flex', flex_direction: 'column' } },
+            children: [surface],
+        })
+        const structureLabels = { one: 'one-column', two: 'two-column', three: 'three-column', grid: 'responsive grid' }
+        const layout = {
+            id: uuid(),
+            key,
+            label: newLayoutLabel.trim() || `Layout ${index}`,
+            description: `A ${structureLabels[newLayoutStructure]} layout created in the Layout Editor.`,
+            status: 'active',
+            root,
+            slots,
+        }
         commit({ ...clone(layouts), items: [...clone(layouts.items), layout] }, { layoutId: layout.id, nodeId: root.id })
+        setCreateLayoutOpen(false)
     }
 
     useEffect(() => {
         if (initialAction !== 'create' || initialActionHandled.current || disabled) return
         initialActionHandled.current = true
-        addLayout()
+        openCreateLayout()
         onInitialActionHandled?.()
     }, [initialAction, disabled])
 
@@ -415,7 +546,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         if (placement === 'inside' && selected.node.type === 'slot') return setJsonError('Slots cannot contain child nodes.')
         if (placement !== 'inside' && !selected.parent) return setJsonError('Nodes cannot be inserted beside the root node.')
         let key
-        const node = { id: uuid(), type, label: type === 'slot' ? 'New slot' : `${type.charAt(0).toUpperCase()}${type.slice(1)}`, children: [], styles: {}, class_names: [] }
+        const node = layoutNode(type, type === 'slot' ? 'New slot' : `${type.charAt(0).toUpperCase()}${type.slice(1)}`)
         if (type === 'semantic') node.tag = 'section'
         if (type === 'slot') {
             let index = Object.keys(selectedLayout.slots).length + 1
@@ -702,7 +833,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         }
     }
 
-    if (!selectedLayout) return <main className="flex flex-1 items-center justify-center p-8"><div className="text-center"><p className="text-sm text-gray-600">No layouts are defined.</p><button type="button" onClick={addLayout} className="mt-3 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white">Create layout</button></div></main>
+    if (!selectedLayout) return <main className="flex flex-1 items-center justify-center p-8"><div className="text-center"><p className="text-sm text-gray-600">No layouts are defined.</p><button type="button" onClick={openCreateLayout} className="mt-3 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white">Create layout</button></div></main>
 
     return <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-gray-50">
         <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
@@ -745,7 +876,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                 <div className={`flex items-center ${structureCollapsed ? 'justify-center' : 'justify-between'}`}>
                     {!structureCollapsed && <h2 className="text-sm font-semibold text-gray-900">Layouts</h2>}
                     <div className="flex items-center gap-1">
-                        {!structureCollapsed && <button type="button" onClick={addLayout} disabled={disabled} className={iconButton} aria-label="Create layout"><Plus className="h-4 w-4" /></button>}
+                        {!structureCollapsed && <button type="button" onClick={openCreateLayout} disabled={disabled} className={iconButton} aria-label="Create layout"><Plus className="h-4 w-4" /></button>}
                         <button type="button" onClick={() => setStructureCollapsed((current) => !current)} className={iconButton} aria-label={structureCollapsed ? 'Expand layout structure panel' : 'Collapse layout structure panel'} aria-expanded={!structureCollapsed} title={structureCollapsed ? 'Expand layout structure panel' : 'Collapse layout structure panel'}>{structureCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}</button>
                     </div>
                 </div>
@@ -890,21 +1021,22 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                         <label className="block text-xs font-medium text-gray-700">Inheritable widget types<textarea value={(selectedLayout.slots[selected.node.slot_key]?.inheritable_types || []).join('\n')} onChange={(event) => updateSlot((slot) => ({ ...slot, inheritable_types: splitList(event.target.value) }))} placeholder="One component type per line" rows="3" className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>
                         <fieldset className="space-y-2 rounded border border-gray-200 p-2"><legend className="px-1 text-xs font-medium text-gray-700">Media target dimensions (px)</legend><p className="text-[11px] leading-4 text-gray-500">Used for responsive image sizing only. These values do not set the slot's CSS width or height.</p>{['mobile', 'tablet', 'desktop'].map((size) => <div key={size} className="grid grid-cols-[1fr_72px_72px] items-center gap-2 text-xs"><span className="capitalize text-gray-600">{size}</span>{['width', 'height'].map((dimension) => <input key={dimension} aria-label={`${size} media ${dimension} in pixels`} type="number" min="1" placeholder={dimension} value={selectedLayout.slots[selected.node.slot_key]?.dimensions?.[size]?.[dimension] ?? ''} onChange={(event) => updateSlot((slot) => { const dimensions = clone(slot.dimensions || {}); dimensions[size] = { ...(dimensions[size] || {}) }; if (event.target.value) dimensions[size][dimension] = Number(event.target.value); else delete dimensions[size][dimension]; return { ...slot, dimensions } })} className="min-w-0 rounded border border-gray-300 px-2 py-1.5 text-xs" />)}</div>)}</fieldset>
                         <details className="rounded border border-gray-200 bg-gray-50 p-2"><summary className="cursor-pointer text-xs font-medium text-gray-700">Default widgets (read-only)</summary><pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[11px] text-gray-600">{JSON.stringify(selectedLayout.slots[selected.node.slot_key]?.default_widgets || [], null, 2)}</pre></details>
-                        <p className="rounded bg-blue-50 px-2 py-1.5 text-[11px] leading-4 text-blue-800">An empty zero-height slot gets a 40px selection area only in the Layout Editor. Its real width and height remain unset until you define them under Dimensions below.</p>
+                        <p className="rounded bg-blue-50 px-2 py-1.5 text-[11px] leading-4 text-blue-800">An empty auto-height slot gets a 40px selection area only in the Layout Editor. The published slot still uses its theme-defined Dimensions.</p>
                         <p className="text-xs text-gray-500">{usage.slots?.[selected.node.slot_key] || 0} versions contain widgets in this slot.</p>
                     </div>}
                     <div className="mt-4 space-y-4">
                         {styleFieldGroups.map((group, groupIndex) => <section key={group.label} className="space-y-2">
                             <div>
                                 <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{group.label}</h4>
-                                {groupIndex === 0 && externallyEditableNodeTypes.has(selected.node.type) && <p className="mt-1 text-[11px] leading-4 text-gray-500">Saved in this theme’s layout JSON. Blank dimensions use normal CSS auto sizing. Use the checkbox to expose a property in the Theme Designer.</p>}
+                                {groupIndex === 0 && externallyEditableNodeTypes.has(selected.node.type) && <p className="mt-1 text-[11px] leading-4 text-gray-500">Saved in this theme’s layout JSON. Existing unset values show their CSS defaults; new elements save those defaults explicitly. Use the checkbox to expose a property in the Theme Designer.</p>}
                             </div>
                             {group.fields.map((field) => {
                             const fieldLabel = field.replaceAll('_', ' ')
                             const currentStyles = selected.node.styles?.[activeStyleBreakpoint] || {}
                             const hasOverride = Object.hasOwn(currentStyles, field)
                             const inherited = hasOverride ? null : inheritedLayoutStyle(selected.node, field, activeBreakpoint, workspace.breakpoints)
-                            const displayedValue = hasOverride ? currentStyles[field] : inherited?.value || ''
+                            const cssDefault = dimensionStyleDefaults[field]
+                            const displayedValue = hasOverride ? currentStyles[field] : inherited?.value || cssDefault || ''
                             const inheritedLabel = inherited?.breakpoint === 'base' ? 'Base' : themeBreakpointDefinition(inherited?.breakpoint)?.label || inherited?.breakpoint?.toUpperCase()
                             const canReset = activeStyleBreakpoint !== 'base' && hasOverride
                             const hasTrailingControl = Boolean(inherited || canReset || externallyEditableNodeTypes.has(selected.node.type))
@@ -948,7 +1080,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                                         <input type="checkbox" aria-label={`Expose ${fieldLabel} in Theme Designer`} checked={(selected.node.editable_parameters || []).includes(field)} onChange={(event) => updateNode((node) => { const parameters = new Set(node.editable_parameters || []); if (event.target.checked) parameters.add(field); else parameters.delete(field); return { ...node, editable_parameters: [...parameters] } })} />
                                     </label>}
                                     </div>
-                                    {inherited && <p className="mt-1 text-[10px] text-gray-500">Inherited from {inheritedLabel}</p>}
+                                    {inherited ? <p className="mt-1 text-[10px] text-gray-500">Inherited from {inheritedLabel}</p> : cssDefault && !hasOverride ? <p className="mt-1 text-[10px] text-gray-500">CSS default (not yet saved on this existing element)</p> : null}
                                 </div>
                             </div>
                             })}
@@ -957,6 +1089,42 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                 </div>}
                 </fieldset>}
             </aside>
+        </div>}
+        {createLayoutOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCreateLayoutOpen(false) }}>
+            <section role="dialog" aria-modal="true" aria-labelledby="create-layout-title" onKeyDown={(event) => { if (event.key === 'Escape') setCreateLayoutOpen(false) }} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
+                <div className="border-b border-gray-200 px-5 py-4">
+                    <h2 id="create-layout-title" className="text-base font-semibold text-gray-900">Create layout</h2>
+                    <p className="mt-1 text-sm text-gray-600">Start with a usable theme layout. Every element gets explicit CSS dimensions that you can change in the inspector.</p>
+                </div>
+                <div className="space-y-5 px-5 py-4">
+                    <label className="block text-sm font-medium text-gray-700">Layout name<input autoFocus value={newLayoutLabel} maxLength="100" onChange={(event) => setNewLayoutLabel(event.target.value)} placeholder={`Layout ${layouts.items.length + 1}`} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" /></label>
+                    <fieldset>
+                        <legend className="text-sm font-medium text-gray-800">Content structure</legend>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                            {[
+                                ['one', '1 column', 'A wide main content area.'],
+                                ['two', '2 columns', 'Main content and a sidebar.'],
+                                ['three', '3 columns', 'Three equal content areas.'],
+                                ['grid', 'Responsive grid', 'One widget slot that flows from one to three columns.'],
+                            ].map(([value, label, description]) => <label key={value} className={`cursor-pointer rounded border p-3 ${newLayoutStructure === value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                                <span className="flex items-start gap-2"><input type="radio" name="layout-structure" value={value} checked={newLayoutStructure === value} onChange={(event) => setNewLayoutStructure(event.target.value)} className="mt-0.5" /><span><span className="block text-sm font-medium text-gray-800">{label}</span><span className="mt-0.5 block text-xs leading-4 text-gray-500">{description}</span></span></span>
+                            </label>)}
+                        </div>
+                    </fieldset>
+                    <fieldset>
+                        <legend className="text-sm font-medium text-gray-800">Page regions</legend>
+                        <p className="mt-1 text-xs text-gray-500">These use the theme’s existing slot rules and default widgets when available.</p>
+                        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            {[["header", "Header"], ["navbar", "Navigation"], ["hero", "Hero"], ["footer", "Footer"]].map(([key, label]) => <label key={key} className="flex cursor-pointer items-center gap-2 rounded border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><input type="checkbox" checked={newLayoutRegions[key]} onChange={(event) => setNewLayoutRegions((current) => ({ ...current, [key]: event.target.checked }))} />{label}</label>)}
+                        </div>
+                    </fieldset>
+                    <div className="rounded bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-600"><strong>Default dimensions:</strong> width auto, height auto, max width none, and min height auto. Page containers and content regions add practical width and minimum-height values where needed.</div>
+                </div>
+                <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-4">
+                    <button type="button" onClick={() => setCreateLayoutOpen(false)} className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                    <button type="button" onClick={addLayout} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Create layout</button>
+                </div>
+            </section>
         </div>}
         <MediaSelectModal
             isOpen={imagePickerOpen && Boolean(workspace.mediaNamespace)}
