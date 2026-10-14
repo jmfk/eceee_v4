@@ -101,7 +101,8 @@ class DataConnectionSerializer(serializers.ModelSerializer):
                     existing_secrets = decrypt_connection_secrets(self.instance)
                 except RemoteCredentialConfigurationError as exc:
                     raise serializers.ValidationError({"secretConfig": str(exc)}) from exc
-            token = submitted_secrets.get("token") or existing_secrets.get("token")
+            submitted_token = submitted_secrets.get("token")
+            token = submitted_token if submitted_token not in (None, "") else existing_secrets.get("token")
             if not isinstance(token, str) or not token.strip():
                 raise serializers.ValidationError({"secretConfig": {"token": "Enter the migration API access key."}})
         attrs["_submitted_secrets"] = submitted_secrets

@@ -209,6 +209,11 @@ class TenantPluginApiTests(TestCase):
             {"description": "Updated without resubmitting the key"},
             format="json",
         )
+        invalid_key_response = self.client.patch(
+            f"/api/v1/data-connections/connections/{legacy_api.id}/",
+            {"secretConfig": {"token": 0}},
+            format="json",
+        )
         deprecated_response = self.client.patch(
             f"/api/v1/data-connections/connections/{deprecated.id}/",
             {"isActive": False},
@@ -216,6 +221,7 @@ class TenantPluginApiTests(TestCase):
         )
 
         self.assertEqual(api_response.status_code, 200)
+        self.assertEqual(invalid_key_response.status_code, 400)
         self.assertEqual(deprecated_response.status_code, 200)
         deprecated.refresh_from_db()
         self.assertFalse(deprecated.is_active)
