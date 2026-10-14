@@ -37,6 +37,8 @@ PROPERTY_MAP = {
 }
 SEMANTIC_TAGS = {"div", "header", "nav", "main", "aside", "section", "footer"}
 DEFAULT_BREAKPOINTS = {"xs": 0, "sm": 640, "md": 768, "lg": 1024, "xl": 1280}
+PIXEL_DIMENSION_PROPERTIES = {"width", "height", "max_width", "min_height"}
+UNITLESS_NUMBER = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$")
 
 
 def _safe_value(property_name, value):
@@ -54,6 +56,8 @@ def _safe_value(property_name, value):
     if text.startswith("token:"):
         token = re.sub(r"[^a-zA-Z0-9_-]", "", text[6:])
         return f"var(--{token})" if token else None
+    if property_name in PIXEL_DIMENSION_PROPERTIES and UNITLESS_NUMBER.fullmatch(text):
+        return f"{text}px"
     return text
 
 

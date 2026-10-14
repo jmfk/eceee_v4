@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
 from content.models import Namespace
+from core.models import Tenant
 
 
 def pytest_configure():
@@ -37,7 +38,16 @@ def api_client():
 @pytest.fixture
 def admin_user(db):
     """Return a superuser."""
-    return User.objects.create_superuser(username="admin", email="admin@example.com", password="password")
+    user, _created = User.objects.get_or_create(
+        username="admin",
+        defaults={"email": "admin@example.com", "is_staff": True, "is_superuser": True},
+    )
+    user.email = "admin@example.com"
+    user.is_staff = True
+    user.is_superuser = True
+    user.set_password("password")
+    user.save(update_fields=["email", "is_staff", "is_superuser", "password"])
+    return user
 
 
 @pytest.fixture
@@ -48,6 +58,14 @@ def auth_client(api_client, admin_user):
 
 
 @pytest.fixture
-def test_namespace(db):
+def test_namespace(db, admin_user):
     """Return a test namespace."""
-    return Namespace.objects.create(name="Test Namespace", slug="test-namespace", is_active=True)
+    tenant = Tenant.objects.create(name="Test Tenant", identifier="test-tenant", created_by=admin_user)
+    tenant.members.add(admin_user)
+    return Namespace.objects.create(
+        name="Test Namespace",
+        slug="test-namespace",
+        is_active=True,
+        created_by=admin_user,
+        tenant=tenant,
+    )

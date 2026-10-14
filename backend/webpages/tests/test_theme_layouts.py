@@ -227,6 +227,19 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         self.assertIn("height:auto", html)
         self.assertIn("height:clamp(20rem, 60vh, 48rem)", html)
 
+    def test_layout_unitless_dimensions_render_as_pixels(self):
+        document = deepcopy(default_theme_layouts())
+        root = document["items"][0]["root"]
+        root["styles"]["base"]["width"] = 960
+        root["styles"]["base"]["height"] = "112"
+        root["styles"].setdefault("md", {})["min_height"] = "240.5"
+
+        self.assertIs(validate_theme_layouts(document), document)
+        html = str(render_theme_layout(document["items"][0], {}))
+        self.assertIn("width:960px", html)
+        self.assertIn("height:112px", html)
+        self.assertIn("min-height:240.5px", html)
+
     def test_grid_nodes_can_expose_designer_parameters(self):
         document = deepcopy(default_theme_layouts())
         grid = next(node for node in document["items"][0]["root"]["children"][0]["children"] if node["type"] == "grid")

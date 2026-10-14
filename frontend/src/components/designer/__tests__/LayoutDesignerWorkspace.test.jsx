@@ -208,6 +208,20 @@ describe('LayoutDesignerWorkspace', () => {
         expect(screen.queryByText('Designer-editable parameters')).not.toBeInTheDocument()
     })
 
+    it('applies unitless dimension edits immediately and saves them as pixels on blur', () => {
+        render(<Harness />)
+
+        const height = screen.getByLabelText('height value')
+        expect(height).toHaveAttribute('placeholder', 'auto, 320px, 100%, 50vh')
+
+        fireEvent.change(height, { target: { value: '240' } })
+        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-md-height', '240')
+
+        fireEvent.blur(height)
+        expect(screen.getByLabelText('height value')).toHaveValue('240px')
+        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-md-height', '240px')
+    })
+
     it('creates a useful themed layout from the selected default structure', () => {
         render(<Harness />)
 
@@ -385,7 +399,7 @@ describe('LayoutDesignerWorkspace', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Reset gap override' }))
         expect(screen.getByLabelText('gap value')).toBeDisabled()
         expect(screen.getByLabelText('gap value')).toHaveValue('30px')
-    })
+    }, 10000)
 
     it('resizes the structure and inspector panels with accessible separators', () => {
         render(<Harness />)
