@@ -1452,6 +1452,16 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             event.stopPropagation()
             let selectionNode: HTMLElement | null = node
             let primaryTarget = primaryNodeTarget(selectionNode)
+            if (designer.layoutCanvas) {
+                const layoutNode = node.closest<HTMLElement>('[data-layout-node-id]')
+                const layoutNodeTarget = layoutNode
+                    ? applicableNodeTargets(layoutNode).find((target: any) => String(target.id || '').startsWith('layout-node:'))
+                    : null
+                if (layoutNode && layoutNodeTarget && root.contains(layoutNode)) {
+                    selectionNode = layoutNode
+                    primaryTarget = layoutNodeTarget
+                }
+            }
             while (!primaryTarget) {
                 selectionNode = selectionNode.parentElement?.closest<HTMLElement>('[data-designer-target]') || null
                 if (!selectionNode || !root.contains(selectionNode)) return
