@@ -216,9 +216,9 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('button', { name: 'Article card' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Theme images' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Theme details' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Edit layouts' })).toBeEnabled()
         expect(screen.getByRole('button', { name: 'Theme palette' })).toBeInTheDocument()
         expect(screen.queryByText('These named colors are available to every color property in the Designer.')).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Edit layouts' })).toBeEnabled()
         expect(screen.queryByRole('heading', { name: 'What to show' })).not.toBeInTheDocument()
         expect(screen.queryByRole('heading', { name: 'Page elements' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Layout default' })).not.toBeInTheDocument()
@@ -305,6 +305,8 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(background).toBeEnabled()
         expect(background).toHaveValue('')
 
+        fireEvent.change(background, { target: { value: 'brand' } })
+        expect(background).toHaveValue('brand')
         fireEvent.click(screen.getByRole('button', { name: 'Override Gap at Extra Large' }))
         expect(gap).toBeEnabled()
         fireEvent.change(gap, { target: { value: '36px' } })
@@ -315,7 +317,7 @@ describe('DesignerThemeWorkspacePage', () => {
             layouts: expect.objectContaining({
                 items: [expect.objectContaining({
                     root: expect.objectContaining({
-                        styles: expect.objectContaining({ xl: expect.objectContaining({ gap: '36px' }) }),
+                        styles: expect.objectContaining({ xl: expect.objectContaining({ background_color: 'token:brand', gap: '36px' }) }),
                     }),
                 })],
             }),
@@ -1453,6 +1455,40 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByLabelText('widget Margin top')).not.toBeInTheDocument()
         expect(screen.queryByLabelText('widget Margin bottom')).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Show all margin and padding sides' })).not.toBeInTheDocument()
+    })
+
+    it('preserves authored units when removing one side from a spacing shorthand', async () => {
+        const shorthandWorkspace = structuredClone(workspace)
+        shorthandWorkspace.constraints.editableSpacingProperties = [
+            'padding', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+        ]
+        shorthandWorkspace.spacing = [{
+            targetId: 'group:0:part:content-widget', scope: 'layout', groupIndex: 0, groupName: 'Article',
+            part: 'content-widget', breakpoint: 'xl', values: { padding: '5% 2rem', paddingRight: '3rem' },
+        }]
+        mocks.workspace.mockResolvedValue(shorthandWorkspace)
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        const { iframe } = await readyPreview()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'group:0:part:content-widget', kind: 'part', label: 'Content widget',
+                widgetId: 'content-1', widgetType: 'easy_widgets.ContentWidget',
+                computedStyles: {
+                    paddingTop: '50px', paddingRight: '32px', paddingBottom: '50px', paddingLeft: '32px',
+                },
+            },
+            source: iframe.contentWindow,
+        }))
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Use default for widget Padding left' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        expect(mocks.save.mock.calls[0][1].spacing[0].values).toEqual({
+            paddingTop: '5%', paddingRight: '3rem', paddingBottom: '5%',
+        })
     })
 
     it.each([

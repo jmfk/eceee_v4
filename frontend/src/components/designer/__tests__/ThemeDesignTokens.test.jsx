@@ -58,6 +58,52 @@ describe('ThemeFontField', () => {
 })
 
 describe('ThemeColorField', () => {
+    it('round-trips palette values through the caller format', async () => {
+        const user = userEvent.setup()
+        const onChange = vi.fn()
+        const { rerender } = render(<ThemeColorField
+            id="layout-background-color"
+            label="Background color"
+            value="token:brand"
+            colors={[{ name: 'brand', value: '#123456' }, { name: 'accent', value: '#abcdef' }]}
+            onAdd={vi.fn()}
+            onChange={onChange}
+            formatPaletteValue={(name) => `token:${name}`}
+        />)
+
+        expect(screen.getByLabelText('Background color')).toHaveValue('brand')
+        await user.selectOptions(screen.getByLabelText('Background color'), 'accent')
+        expect(onChange).toHaveBeenCalledWith('token:accent')
+
+        rerender(<ThemeColorField
+            id="layout-background-color"
+            label="Background color"
+            value="token:accent"
+            colors={[{ name: 'brand', value: '#123456' }, { name: 'accent', value: '#abcdef' }]}
+            onAdd={vi.fn()}
+            onChange={onChange}
+            formatPaletteValue={(name) => `token:${name}`}
+        />)
+        expect(screen.getByLabelText('Background color')).toHaveValue('accent')
+    })
+
+    it('keeps existing custom CSS color values editable', () => {
+        const onChange = vi.fn()
+        render(<ThemeColorField
+            id="custom-color"
+            label="Custom color"
+            value="rgba(0, 0, 0, .5)"
+            colors={[{ name: 'brand', value: '#123456' }]}
+            onAdd={vi.fn()}
+            onChange={onChange}
+        />)
+
+        const input = screen.getByLabelText('Custom color custom value')
+        expect(input).toHaveValue('rgba(0, 0, 0, .5)')
+        fireEvent.change(input, { target: { value: 'var(--brand)' } })
+        expect(onChange).toHaveBeenCalledWith('var(--brand)')
+    })
+
     it('adds a custom picker value to the theme palette and selects its new name', async () => {
         const user = userEvent.setup()
         const onAdd = vi.fn()

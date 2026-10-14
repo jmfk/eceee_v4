@@ -106,23 +106,24 @@ export const ThemePaletteEditor = ({ colors, onChange, onAdd }) => {
     </section>
 }
 
-export const ThemeColorField = ({ id, label, ariaLabel, value, colors, disabled, onChange, onAdd }) => {
+export const ThemeColorField = ({ id, label, ariaLabel, value, colors, disabled, onChange, onAdd, formatPaletteValue = (name) => name }) => {
     const [adding, setAdding] = useState(false)
-    const paletteNames = new Set(colors.map((color) => color.name))
-    const customOptionValue = paletteNames.has(value) ? '__custom__' : value
-    const selected = paletteNames.has(value) ? value : customOptionValue
-    const resolved = colors.find((color) => color.name === value)?.value || value
+    const selectedPaletteColor = colors.find((color) => formatPaletteValue(color.name) === value)
+    const customOptionValue = selectedPaletteColor ? '__custom__' : value
+    const selected = selectedPaletteColor?.name || customOptionValue
+    const resolved = selectedPaletteColor?.value || value
 
     return <div className="min-w-0">
         <label htmlFor={id} className="text-xs font-medium text-gray-700">{label}</label>
         <div className="mt-0.5 flex gap-2">
-            <select id={id} aria-label={ariaLabel} value={selected} disabled={disabled} onChange={(event) => onChange(event.target.value === '__custom__' ? '' : event.target.value)} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-2 py-1.5 text-xs disabled:bg-gray-50">
+            <select id={id} aria-label={ariaLabel} value={selected} disabled={disabled} onChange={(event) => onChange(event.target.value === '__custom__' ? '' : formatPaletteValue(event.target.value))} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-2 py-1.5 text-xs disabled:bg-gray-50">
                 {colors.map((color) => <option key={color.name} value={color.name}>{color.name}</option>)}
                 <option value={customOptionValue}>Custom color</option>
             </select>
             <input aria-label={`${label} custom color`} type="color" disabled={disabled} value={colorInputValue(resolved)} onChange={(event) => onChange(event.target.value)} className="h-[30px] w-10 rounded border border-gray-300" />
         </div>
-        {!paletteNames.has(value) && <button type="button" disabled={disabled} onClick={() => setAdding((current) => !current)} className="mt-1 text-xs font-medium text-blue-700 hover:text-blue-900 disabled:opacity-50">Add this color to theme palette</button>}
-        {adding && <div className="mt-2"><AddPaletteColor initialValue={resolved} colors={colors} onAdd={({ name, value: colorValue }) => { onAdd({ name, value: colorValue }); onChange(name) }} onDone={() => setAdding(false)} /></div>}
+        {!selectedPaletteColor && <input aria-label={`${label} custom value`} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 font-mono text-xs disabled:bg-gray-50" placeholder="CSS color value" />}
+        {!selectedPaletteColor && <button type="button" disabled={disabled} onClick={() => setAdding((current) => !current)} className="mt-1 text-xs font-medium text-blue-700 hover:text-blue-900 disabled:opacity-50">Add this color to theme palette</button>}
+        {adding && <div className="mt-2"><AddPaletteColor initialValue={resolved} colors={colors} onAdd={({ name, value: colorValue }) => { onAdd({ name, value: colorValue }); onChange(formatPaletteValue(name)) }} onDone={() => setAdding(false)} /></div>}
     </div>
 }

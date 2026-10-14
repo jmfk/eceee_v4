@@ -70,6 +70,16 @@ describe('theme layout rendering', () => {
         expect(css).toContain('gap:24px')
     })
 
+    it('compiles theme color tokens using the theme variable contract', () => {
+        const themed = structuredClone(layout)
+        themed.root.styles.base.background_color = 'token:brand'
+
+        const css = layoutDefinitionCss(themed)
+
+        expect(css).toContain('background-color:var(--brand)')
+        expect(css).not.toContain('var(--color-brand)')
+    })
+
     it('scales slot guide heights relative to the active theme viewport only in the layout canvas', () => {
         const dimensioned = structuredClone(layout)
         dimensioned.slots.main.dimensions = {
