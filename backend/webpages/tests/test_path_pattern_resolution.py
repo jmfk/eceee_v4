@@ -611,7 +611,7 @@ class PathPatternIntegrationTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_invalid_pattern_match_returns_404(self):
-        """Test that paths not matching the pattern return 404"""
+        """Paths not matching the pattern render the theme-owned 404 page."""
         from django.db import connection
         if connection.vendor == 'sqlite':
             self.skipTest("ArrayField not supported on SQLite")
@@ -620,5 +620,7 @@ class PathPatternIntegrationTests(TestCase):
         view.request = request
         view.kwargs = {"slug_path": "events/invalid path"}
 
-        with self.assertRaises(Http404):
-            view.get(request)
+        response = view.get(request)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "404 — Page not found", status_code=404)
