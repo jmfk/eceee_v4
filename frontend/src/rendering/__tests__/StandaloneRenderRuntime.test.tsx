@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPageRenderModel } from '../adapters'
 import StandaloneRenderRuntime from '../StandaloneRenderRuntime'
 
@@ -18,10 +18,21 @@ vi.mock('../PageRenderer', () => ({
     </div>,
 }))
 
+let renderReadyListener: EventListener | null = null
+
 describe('StandaloneRenderRuntime', () => {
     beforeEach(() => {
         window.history.replaceState({}, '', '/_render/85/for-authors/review-process/')
         directRender.load.mockReset()
+    })
+
+    afterEach(() => {
+        if (renderReadyListener) {
+            window.removeEventListener('eceee-standalone-render-ready', renderReadyListener)
+            renderReadyListener = null
+        }
+        const captureWindow = window as Window & { __ECEEE_CAPTURE_RENDER_MODEL__?: boolean }
+        delete captureWindow.__ECEEE_CAPTURE_RENDER_MODEL__
     })
 
     it('loads the route and renders the saved model without an iframe', async () => {
@@ -29,6 +40,7 @@ describe('StandaloneRenderRuntime', () => {
         const captureWindow = window as Window & { __ECEEE_CAPTURE_RENDER_MODEL__?: boolean }
         captureWindow.__ECEEE_CAPTURE_RENDER_MODEL__ = true
         window.addEventListener('eceee-standalone-render-ready', renderReady)
+        renderReadyListener = renderReady as EventListener
         directRender.load.mockResolvedValue(createPageRenderModel({
             widgets: {},
             context: { pageId: 92 },
@@ -43,10 +55,8 @@ describe('StandaloneRenderRuntime', () => {
             siteId: 85,
             slugPath: 'for-authors/review-process',
         })
-        expect(renderReady).toHaveBeenCalledOnce()
+        await waitFor(() => expect(renderReady).toHaveBeenCalledOnce())
         expect((renderReady.mock.calls[0][0] as CustomEvent).detail.model.context.pageId).toBe(92)
-        window.removeEventListener('eceee-standalone-render-ready', renderReady)
-        delete captureWindow.__ECEEE_CAPTURE_RENDER_MODEL__
     })
 
     it('shows a useful error when the saved route cannot be resolved', async () => {
