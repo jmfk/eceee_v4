@@ -9,6 +9,9 @@ import WidgetEditorPanel from '../WidgetEditorPanel'
 
 const newId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
 const routeKey = (route) => `route_${String(route || 'special').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').toLowerCase()}`
+const widgetTypeMatches = (widgetType, patterns) => typeof widgetType === 'string' && patterns.some((pattern) => (
+    pattern === '*' || widgetType === pattern || (pattern.endsWith('.*') && widgetType.startsWith(pattern.slice(0, -1)))
+))
 
 const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
     const layouts = workspace.layouts
@@ -49,7 +52,8 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
             const allowedTypes = policy.allowed_widget_types || []
             const disallowedTypes = policy.disallowed_widget_types || []
             let compatible = items.filter((widget) => (
-                (!allowedTypes.length || allowedTypes.includes(widget.type)) && !disallowedTypes.includes(widget.type)
+                (!allowedTypes.length || widgetTypeMatches(widget.type, allowedTypes))
+                && !widgetTypeMatches(widget.type, disallowedTypes)
             ))
             if (Number.isInteger(policy.max_widgets) && policy.max_widgets >= 0) {
                 compatible = compatible.slice(0, policy.max_widgets)

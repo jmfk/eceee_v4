@@ -1293,9 +1293,7 @@ class DesignerThemeApiTests(TestCase):
         storage.url.side_effect = lambda path: (
             second_url
             if path.endswith("second.png")
-            else first_url
-            if path.endswith("first.png")
-            else f"https://storage.test/{path}"
+            else first_url if path.endswith("first.png") else f"https://storage.test/{path}"
         )
         tag = MediaTag.objects.create(name="Designer", slug="designer", namespace=self.namespace, created_by=self.owner)
         media_files = []

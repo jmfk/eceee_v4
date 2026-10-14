@@ -179,11 +179,7 @@ describe('public resolution', () => {
         }],
       },
     };
-    const errorReader: PageReader = {
-      ...reader,
-      version: async () => null,
-      defaultTheme: async () => errorTheme,
-    };
+    const errorReader: PageReader = { ...reader, theme: async () => errorTheme };
 
     const model = await buildThemeErrorPageModel(
       { withSnapshot: async read => read(errorReader) },
@@ -196,13 +192,99 @@ describe('public resolution', () => {
       title: '404 — Page not found',
       layout: 'error_layout',
       matchedPath: '/404',
-      context: { versionId: 'error-404', simulatedPath: '/404/' },
+      context: { versionId: versions[root.id].id, simulatedPath: '/404/' },
     });
     expect(model?.slots.message[0]).toMatchObject({ id: 'error-copy', config: { content: 'Not found' } });
     expect(await buildThemeErrorPageModel(
       { withSnapshot: async read => read(errorReader) },
       'example.org',
       500,
+      new Date('2026-06-01'),
+    )).toBeNull();
+  });
+
+  it('uses manifest error defaults for themes saved before special pages existed', async () => {
+    const legacyTheme: Theme = {
+      ...theme,
+      layouts: {
+        schema_version: 1,
+        default_layout_key: 'main_layout',
+        items: [{
+          id: 'layout-error',
+          key: 'error_layout',
+          label: 'Error',
+          status: 'active',
+          root: { id: 'slot-message', type: 'slot', slot_key: 'message', children: [] },
+          slots: { visual: {}, message: {}, actions: {} },
+        }],
+      },
+    };
+    const legacyThemeReader: PageReader = { ...reader, theme: async () => legacyTheme };
+
+    const model = await buildThemeErrorPageModel(
+      { withSnapshot: async read => read(legacyThemeReader) },
+      'example.org',
+      404,
+      new Date('2026-06-01'),
+    );
+
+    expect(model).toMatchObject({ title: '404 — Page not found', layout: 'error_layout' });
+    expect(model?.slots.message.map(widget => widget.type)).toEqual([
+      'easy_widgets.HeadlineWidget',
+      'easy_widgets.ContentWidget',
+    ]);
+  });
+
+  it('never serves dormant legacy error-page children as successful CMS routes', async () => {
+    const childLookup = vi.fn(reader.child);
+    const legacyReader: PageReader = { ...reader, child: childLookup };
+
+    const model = await buildPublishedPageModel(
+      { withSnapshot: async read => read(legacyReader) },
+      'example.org',
+      '/404',
+      new Date('2026-06-01'),
+    );
+
+    expect(model).toBeNull();
+    expect(childLookup).not.toHaveBeenCalled();
+  });
+
+  it('does not expose special routes when the site root has no published version', async () => {
+    const unpublishedTheme: Theme = {
+      ...theme,
+      layouts: {
+        schema_version: 1,
+        default_layout_key: 'main_layout',
+        items: [{
+          id: 'layout-main',
+          key: 'main_layout',
+          label: 'Main',
+          status: 'active',
+          root: { id: 'slot-main', type: 'slot', slot_key: 'main', children: [] },
+          slots: { main: {} },
+        }],
+        special_pages: [{
+          id: 'special-login',
+          key: 'login',
+          label: 'Log in',
+          kind: 'route',
+          route: 'login',
+          layout_key: 'main_layout',
+          widgets: {},
+        }],
+      },
+    };
+    const unpublishedReader: PageReader = {
+      ...reader,
+      version: async () => null,
+      defaultTheme: async () => unpublishedTheme,
+    };
+
+    expect(await buildPublishedPageModel(
+      { withSnapshot: async read => read(unpublishedReader) },
+      'example.org',
+      '/login',
       new Date('2026-06-01'),
     )).toBeNull();
   });

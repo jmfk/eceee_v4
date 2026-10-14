@@ -211,6 +211,18 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         with self.assertRaisesMessage(ValidationError, "unsafe background image URL"):
             validate_theme_layouts(document)
 
+        styles["background_image"] = "https://[invalid"
+        with self.assertRaisesMessage(ValidationError, "unsafe background image URL"):
+            validate_theme_layouts(document)
+
+    def test_server_renderer_ignores_malformed_background_image_urls(self):
+        layout = deepcopy(default_theme_layouts()["items"][0])
+        layout["root"]["styles"]["base"]["background_image"] = "https://[invalid"
+
+        html = str(render_theme_layout(layout, {}))
+
+        self.assertNotIn("background-image", html)
+
     def test_server_renderer_matches_theme_layout_styles_and_slot_placement(self):
         layout = deepcopy(default_theme_layouts()["items"][0])
         layout["root"]["styles"]["base"].update(

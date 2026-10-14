@@ -9,5 +9,9 @@ class PublisherManifestTests(SimpleTestCase):
 
         self.assertEqual(manifest["formatVersion"], 1)
         self.assertIn(".container", manifest["baseCss"])
+        self.assertEqual(
+            {page["status_code"] for page in manifest["defaultSpecialPages"]},
+            {403, 404, 500, 503},
+        )
         self.assertIn("easy_widgets.HeaderWidget", manifest["widgets"])
         self.assertIn("header-widget", manifest["widgets"]["easy_widgets.HeaderWidget"]["layoutParts"])
