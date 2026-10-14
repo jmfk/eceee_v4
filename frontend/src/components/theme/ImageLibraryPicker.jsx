@@ -4,6 +4,22 @@ import { themesApi } from '../../api/themes';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import OptimizedImage from '../media/OptimizedImage';
 
+const encodePathSegment = (segment) => encodeURIComponent(decodeURIComponent(segment))
+    .replace(/[!'()*]/g, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+
+const normalizeImageUrl = (value) => {
+    if (typeof value !== 'string' || !value) return value;
+
+    try {
+        const isAbsolute = /^[a-z][a-z0-9+.-]*:/i.test(value);
+        const parsed = new URL(value, window.location.origin);
+        parsed.pathname = parsed.pathname.split('/').map(encodePathSegment).join('/');
+        return isAbsolute ? parsed.toString() : `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    } catch {
+        return value;
+    }
+};
+
 const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) => {
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -72,7 +88,7 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
     const handleConfirm = () => {
         if (selectedImage && onSelect) {
             const imageData = {
-                url: selectedImage.publicUrl || selectedImage.url,
+                url: normalizeImageUrl(selectedImage.publicUrl || selectedImage.url),
                 filename: selectedImage.filename,
                 size: selectedImage.size
             };

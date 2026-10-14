@@ -31,10 +31,10 @@ describe('ImageLibraryPicker', () => {
         mocks.listLibraryImages
             .mockResolvedValueOnce({ images: [] })
             .mockResolvedValueOnce({
-                images: [{ filename: 'hero.jpg', publicUrl: '/media/hero.jpg', size: 4096, width: 1600, height: 900 }],
+                images: [{ filename: 'hero image (1).jpg', publicUrl: '/media/hero image (1).jpg', size: 4096, width: 1600, height: 900 }],
             })
         mocks.uploadLibraryImages.mockResolvedValue({
-            uploaded: [{ filename: 'hero.jpg', publicUrl: '/media/hero.jpg', size: 4096, width: 1600, height: 900 }],
+            uploaded: [{ filename: 'hero image (1).jpg', publicUrl: '/media/hero image (1).jpg', size: 4096, width: 1600, height: 900 }],
             errors: [],
         })
     })
@@ -47,7 +47,7 @@ describe('ImageLibraryPicker', () => {
         )
 
         await screen.findByText('No images in library')
-        const file = new File(['image'], 'hero.jpg', { type: 'image/jpeg' })
+        const file = new File(['image'], 'hero image (1).jpg', { type: 'image/jpeg' })
         fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [file] } })
 
         await waitFor(() => expect(mocks.uploadLibraryImages).toHaveBeenCalledWith(42, [file]))
@@ -55,8 +55,8 @@ describe('ImageLibraryPicker', () => {
         await user.click(screen.getByRole('button', { name: 'Select Image' }))
 
         expect(onSelect).toHaveBeenCalledWith({
-            url: '/media/hero.jpg',
-            filename: 'hero.jpg',
+            url: '/media/hero%20image%20%281%29.jpg',
+            filename: 'hero image (1).jpg',
             size: 4096,
             width: 1600,
             height: 900,
