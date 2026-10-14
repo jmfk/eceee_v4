@@ -15,7 +15,7 @@ from django.db import DatabaseError, connection, connections, transaction
 from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 from rest_framework import serializers
-from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
 from content.models import Namespace
 from core.models import Tenant
@@ -59,8 +59,9 @@ from object_storage.tasks import (
 )
 from object_storage.views import upload_image
 from taxonomy.models import Tag as TaxonomyTag
-from webpages.models import PageVersion, WebPage
+from webpages.models import PageVersion, ThemeRemoteAccessKey, WebPage
 from webpages.services.theme_remote import RemoteTransportError
+from webpages.services.theme_remote_credentials import generate_access_key
 
 
 class MemoryStorage:
@@ -225,6 +226,57 @@ class ObjectTransferServiceTests(TestCase):
                         view_class().post(request)
 
                 self.assertEqual(str(raised.exception.detail["rootIds"]), str(error))
+
+    def remote_site_client(self, capabilities):
+        raw_key, key_hash, key_prefix = generate_access_key()
+        access_key = ThemeRemoteAccessKey.objects.create(
+            tenant=self.tenant,
+            name=f"Object transfer {ThemeRemoteAccessKey.objects.count()}",
+            key_hash=key_hash,
+            key_prefix=key_prefix,
+            capabilities=capabilities,
+            created_by=self.user,
+        )
+        client = APIClient()
+        client.credentials(
+            HTTP_AUTHORIZATION=f"ThemeKey {raw_key}",
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+        return client, access_key
+
+    def test_remote_site_key_requires_explicit_object_read_capability(self):
+        denied_client, _ = self.remote_site_client(["site.transfer"])
+        denied = denied_client.post("/api/v1/objects/remote-source/catalog/", {}, format="json")
+
+        allowed_client, _ = self.remote_site_client(["object.read"])
+        allowed = allowed_client.post("/api/v1/objects/remote-source/catalog/", {}, format="json")
+
+        self.assertEqual(denied.status_code, 403, denied.data)
+        self.assertEqual(allowed.status_code, 200, allowed.data)
+        self.assertIn(self.root_type.name, {item["name"] for item in allowed.data["object_types"]})
+
+    @patch("object_storage.remote_views.export_object_package.delay")
+    def test_remote_site_key_can_create_and_retrieve_its_object_export(self, delayed):
+        client, access_key = self.remote_site_client(["object.transfer"])
+
+        created = client.post(
+            "/api/v1/objects/remote-source/exports/",
+            {"rootIds": [self.root.id]},
+            format="json",
+        )
+
+        self.assertEqual(created.status_code, 202, created.data)
+        job = ObjectTransferJob.objects.get(id=created.data["id"])
+        self.assertEqual(job.options["remote_access_key_id"], str(access_key.id))
+        self.assertNotIn("machine_api_key_id", job.options)
+        delayed.assert_called_once_with(str(job.id))
+
+        detail = client.get(f"/api/v1/objects/remote-source/exports/{job.id}/")
+        self.assertEqual(detail.status_code, 200, detail.data)
+
+        other_client, _ = self.remote_site_client(["object.transfer"])
+        denied = other_client.get(f"/api/v1/objects/remote-source/exports/{job.id}/")
+        self.assertEqual(denied.status_code, 404)
 
     def test_catalog_limits_roots_and_graph_follows_children_and_references(self):
         catalog = candidate_catalog(self.tenant, [{"object_type": self.root_type.name, "limit": 1}])

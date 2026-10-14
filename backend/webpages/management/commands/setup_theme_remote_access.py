@@ -6,7 +6,12 @@ from django.db import transaction
 
 from core.models import Tenant
 from webpages.models import ThemeRemoteAccessKey
-from webpages.models.theme_remote import SITE_TRANSFER_CAPABILITY, THEME_TRANSFER_CAPABILITY
+from webpages.models.theme_remote import (
+    OBJECT_READ_CAPABILITY,
+    OBJECT_TRANSFER_CAPABILITY,
+    SITE_TRANSFER_CAPABILITY,
+    THEME_TRANSFER_CAPABILITY,
+)
 from webpages.services.theme_remote_credentials import generate_access_key
 
 
@@ -20,9 +25,14 @@ class Command(BaseCommand):
         parser.add_argument(
             "--capability",
             action="append",
-            choices=(THEME_TRANSFER_CAPABILITY, SITE_TRANSFER_CAPABILITY),
+            choices=(
+                THEME_TRANSFER_CAPABILITY,
+                SITE_TRANSFER_CAPABILITY,
+                OBJECT_READ_CAPABILITY,
+                OBJECT_TRANSFER_CAPABILITY,
+            ),
             dest="capabilities",
-            help="Allowed transfer capability. Repeat to grant both. Defaults to theme.transfer.",
+            help="Allowed transfer capability. Repeat to grant more than one. Defaults to theme.transfer.",
         )
 
     @transaction.atomic

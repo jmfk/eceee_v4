@@ -109,11 +109,9 @@ def remote_site_request(connection, method, path, payload=None, stream=False):
 
 
 def remote_object_request(connection, method, path, payload=None, stream=False):
-    """Call object-transfer endpoints using a saved general machine API key."""
+    """Call object-transfer endpoints using a saved remote-site credential."""
     from webpages.services.theme_remote_credentials import decrypt_access_key
 
-    if connection.credential_scheme != "api_key":
-        raise RemoteThemeError("Object transfer requires a saved machine API key.")
     base = validate_remote_url(connection.base_url)
     url = urljoin(base, f"api/v1/objects/remote-source/{path.lstrip('/')}")
     token = decrypt_access_key(connection.encrypted_access_key)
@@ -123,7 +121,7 @@ def remote_object_request(connection, method, path, payload=None, stream=False):
             url,
             json=payload if payload is not None else None,
             headers={
-                "Authorization": f"ApiKey {token}",
+                "Authorization": f"{'ApiKey' if connection.credential_scheme == 'api_key' else 'ThemeKey'} {token}",
                 "X-Tenant-ID": connection.remote_workspace,
                 "Accept": "application/zip" if stream else "application/json",
             },

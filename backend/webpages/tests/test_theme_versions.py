@@ -373,7 +373,13 @@ class ThemeVersionApiTests(TestCase):
             "/api/v1/webpages/remote-sites/access-keys/",
             {
                 "name": "Local development",
-                "capabilities": ["theme.transfer", "site.transfer", "site.transfer"],
+                "capabilities": [
+                    "theme.transfer",
+                    "site.transfer",
+                    "object.read",
+                    "object.transfer",
+                    "site.transfer",
+                ],
             },
             format="json",
         )
@@ -381,7 +387,10 @@ class ThemeVersionApiTests(TestCase):
         self.assertEqual(created.status_code, 201, created.data)
         self.assertEqual(created["Cache-Control"], "private, no-store")
         self.assertTrue(created.data["secret"].startswith("eceee_theme_"))
-        self.assertCountEqual(created.data["capabilities"], ["theme.transfer", "site.transfer"])
+        self.assertCountEqual(
+            created.data["capabilities"],
+            ["theme.transfer", "site.transfer", "object.read", "object.transfer"],
+        )
         access_key = ThemeRemoteAccessKey.objects.get(id=created.data["id"])
         self.assertNotEqual(access_key.key_hash, created.data["secret"])
 

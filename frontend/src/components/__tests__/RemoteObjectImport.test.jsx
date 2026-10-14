@@ -31,7 +31,7 @@ describe('RemoteObjectImport', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mocks.remoteConnections.mockResolvedValue({
-            results: [{ id: 7, name: 'Remote', credentialScheme: 'api_key', isDefault: true }],
+            results: [{ id: 7, name: 'Remote', credentialScheme: 'theme_key', isDefault: true }],
         })
         mocks.listImports.mockResolvedValue({ results: [] })
     })

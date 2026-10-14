@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase
 
-from webpages.services.theme_remote import RemoteThemeError, remote_object_request, remote_site_request
+from webpages.services.theme_remote import remote_object_request, remote_site_request
 
 
 class RemoteRequestTests(SimpleTestCase):
@@ -56,9 +56,15 @@ class RemoteRequestTests(SimpleTestCase):
         self.assertEqual(result, {"object_count": 3})
         response.close.assert_called_once()
 
+    @patch("webpages.services.theme_remote.validate_remote_url", return_value="https://remote.example/")
+    @patch("webpages.services.theme_remote_credentials.decrypt_access_key", return_value="secret")
     @patch("webpages.services.theme_remote.requests.request")
-    def test_object_request_rejects_legacy_theme_key_without_network_call(self, request):
-        with self.assertRaisesMessage(RemoteThemeError, "machine API key"):
-            remote_object_request(self.connection("theme_key"), "GET", "catalog/")
+    def test_object_request_uses_remote_site_key_scheme(self, request, _decrypt, _validate):
+        response = Mock(status_code=200)
+        response.json.return_value = {"object_types": []}
+        request.return_value = response
 
-        request.assert_not_called()
+        result = remote_object_request(self.connection("theme_key"), "POST", "catalog/")
+
+        self.assertEqual(result, {"object_types": []})
+        self.assertEqual(request.call_args.kwargs["headers"]["Authorization"], "ThemeKey secret")

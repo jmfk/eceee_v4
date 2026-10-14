@@ -8,6 +8,8 @@ from django.db.models import Q
 
 THEME_TRANSFER_CAPABILITY = "theme.transfer"
 SITE_TRANSFER_CAPABILITY = "site.transfer"
+OBJECT_READ_CAPABILITY = "object.read"
+OBJECT_TRANSFER_CAPABILITY = "object.transfer"
 
 
 def default_remote_capabilities():
