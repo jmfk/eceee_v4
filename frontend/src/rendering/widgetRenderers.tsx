@@ -51,7 +51,7 @@ const LayoutSlotPlaceholderRender: WidgetRenderComponent = ({ widget }) => {
             flex: '1 1 auto',
             height: '100%',
             justifyContent: 'center',
-            minHeight: '40px',
+            minHeight: 0,
             overflow: 'hidden',
             padding: '4px 8px',
             textAlign: 'center',
