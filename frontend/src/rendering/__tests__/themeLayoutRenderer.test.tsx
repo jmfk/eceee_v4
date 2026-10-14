@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import PageRenderer from '../PageRenderer'
+import { PUBLIC_RENDER_CSS } from '../publicRenderCss'
 import { layoutDefinitionCss, normalizeLayoutDefinition, validateLayoutDefinition } from '../themeLayoutRenderer'
 import type { RenderPageModel, ThemeLayoutDefinition } from '../types'
 
@@ -133,6 +134,27 @@ describe('theme layout rendering', () => {
         const root = canvasRender.container.querySelector('main')
         expect(root).toHaveAttribute('data-layout-presentation-color', '#14b8a6')
         expect(root).toHaveStyle({ '--layout-presentation-color': '#14b8a6' })
+    })
+
+    it('fills the available slot height with layout preview placeholder surfaces', () => {
+        const previewLayout = structuredClone(layout)
+        previewLayout.root.children[0].styles = { base: { height: '240px' } }
+        const { container } = render(<PageRenderer model={{
+            layout: previewLayout.key,
+            layoutDefinition: previewLayout,
+            slots: { main: [{
+                id: 'layout-preview-placeholder-main',
+                type: 'designer.LayoutSlotPlaceholder',
+                config: { label: 'Main content', shade: 0 },
+            }] },
+            context: { preview: true },
+            designer: { catalog: {}, texts: {}, assets: [], layoutCanvas: true },
+        }} />)
+
+        expect(container.querySelector('[data-slot-name="main"] > .widget-item')).toHaveClass('layout-preview-placeholder-item')
+        expect(container.querySelector('[data-layout-preview-placeholder="true"]')).toHaveStyle({ flex: '1 1 auto', height: '100%' })
+        expect(PUBLIC_RENDER_CSS).toContain('.site-renderer .layout-slot:has(>.layout-preview-placeholder-item){height:100%}')
+        expect(PUBLIC_RENDER_CSS).toContain('.site-renderer .layout-slot>.layout-preview-placeholder-item{display:flex;flex:1 1 auto;min-height:0}')
     })
 
     it('rejects a slot that is not declared', () => {

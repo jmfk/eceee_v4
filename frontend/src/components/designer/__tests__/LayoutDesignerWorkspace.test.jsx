@@ -222,6 +222,25 @@ describe('LayoutDesignerWorkspace', () => {
         expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-md-height', '240px')
     })
 
+    it('configures a slot to fill available height without fixing its content height', () => {
+        render(<Harness />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Slot · main' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Fill available height' }))
+        fireEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+
+        const savedDocument = JSON.parse(screen.getByLabelText('Canonical layout document').value)
+        const parent = savedDocument.items[0].root
+        const slot = parent.children[0]
+        expect(parent.styles.base).toMatchObject({ display: 'flex', flex_direction: 'column', flex_grow: '1' })
+        expect(slot.styles.base).toMatchObject({
+            width: '100%',
+            height: 'auto',
+            min_height: '0px',
+            flex_grow: '1',
+        })
+    })
+
     it('creates a useful themed layout from the selected default structure', () => {
         render(<Harness />)
 
