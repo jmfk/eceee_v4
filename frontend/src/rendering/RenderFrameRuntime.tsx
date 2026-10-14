@@ -682,6 +682,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     const cleanups: Array<() => void> = []
     let guides: HTMLElement[] = []
     let selectionOutlines: HTMLElement[] = []
+    let measurementLabelRects: Array<{ left: number, right: number, top: number, bottom: number }> = []
     let hoveredNode: HTMLElement | null = null
     let selectedNode: HTMLElement | null = null
     let selectedNodes: Record<'slot' | 'widget' | 'element', HTMLElement | null> = { slot: null, widget: null, element: null }
@@ -724,6 +725,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
     const removeGuides = () => {
         guides.forEach((guide) => guide.remove())
         guides = []
+        measurementLabelRects = []
         measurementTargets.clear()
     }
     const clearGuides = () => {
@@ -794,6 +796,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             guide.className = `designer-spacing-guide ${className}${levelClass}`
             guide.setAttribute('aria-hidden', 'true')
             if (side) guide.dataset.side = side
+            guide.dataset.property = property
             Object.assign(guide.style, { left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px` })
             document.body.append(guide)
             guides.push(guide)
@@ -811,6 +814,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             measure.className = `designer-spacing-measure designer-spacing-measure-${horizontalMeasure ? 'horizontal' : 'vertical'} designer-spacing-${spacing}-measure${levelClass}`
             measure.setAttribute('aria-hidden', 'true')
             if (side) measure.dataset.side = side
+            measure.dataset.property = property
             Object.assign(measure.style, horizontalMeasure ? {
                 left: `${visibleLeft}px`,
                 top: `${(visibleTop + visibleBottom) / 2}px`,
@@ -849,6 +853,43 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             }
             labelLeft = Math.min(viewportWidth - halfWidth, Math.max(halfWidth, labelLeft))
             labelTop = Math.min(viewportHeight - halfHeight, Math.max(halfHeight, labelTop))
+            if (spacing === 'size') {
+                const labelSpacing = 4
+                const overlapsPlacedLabel = (candidateTop: number) => {
+                    const candidate = {
+                        left: labelLeft - halfWidth,
+                        right: labelLeft + halfWidth,
+                        top: candidateTop - halfHeight,
+                        bottom: candidateTop + halfHeight,
+                    }
+                    return measurementLabelRects.some((placed) => !(
+                        candidate.right + labelSpacing <= placed.left
+                        || candidate.left >= placed.right + labelSpacing
+                        || candidate.bottom + labelSpacing <= placed.top
+                        || candidate.top >= placed.bottom + labelSpacing
+                    ))
+                }
+                const verticalStep = labelHeight + labelSpacing
+                const offsets = Array.from({ length: 12 }, (_, index) => {
+                    if (index === 0) return 0
+                    const distance = Math.ceil(index / 2) * verticalStep
+                    return index % 2 ? distance : -distance
+                })
+                const distributedTop = offsets
+                    .map((offset) => Math.min(viewportHeight - halfHeight, Math.max(halfHeight, labelTop + offset)))
+                    .find((candidateTop) => !overlapsPlacedLabel(candidateTop))
+                if (distributedTop !== undefined) labelTop = distributedTop
+                measurementLabelRects.push({
+                    left: labelLeft - halfWidth,
+                    right: labelLeft + halfWidth,
+                    top: labelTop - halfHeight,
+                    bottom: labelTop + halfHeight,
+                })
+                if (property === 'width') {
+                    guide.style.top = `${labelTop - 0.5}px`
+                    measure.style.top = `${labelTop}px`
+                }
+            }
             Object.assign(label.style, {
                 left: `${labelLeft}px`,
                 top: `${labelTop}px`,
@@ -932,13 +973,13 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         addGuide('designer-spacing-padding', innerLeft, contentTop + contentHeight, innerWidth, Math.max(0, padding.bottom), 'bottom', 'padding', Math.max(0, padding.bottom))
         addGuide('designer-spacing-padding', innerLeft, contentTop, Math.max(0, padding.left), contentHeight, 'left', 'padding', Math.max(0, padding.left))
         const sizeLabelCenter = { left: rect.left + rect.width / 2, top: rect.top + rect.height / 2 }
-        addGuide('designer-spacing-size', rect.left, rect.top + 4, rect.width, 1, 'right', 'size', Math.round(rect.width), 'width', {
+        addGuide('designer-spacing-size', rect.left, sizeLabelCenter.top - 10.5, rect.width, 1, 'right', 'size', Math.round(rect.width), 'width', {
             left: sizeLabelCenter.left,
-            top: sizeLabelCenter.top - 8,
+            top: sizeLabelCenter.top - 10,
         })
-        addGuide('designer-spacing-size', rect.right - 4, rect.top, 1, rect.height, 'bottom', 'size', Math.round(rect.height), 'height', {
+        addGuide('designer-spacing-size', sizeLabelCenter.left - 0.5, rect.top, 1, rect.height, 'bottom', 'size', Math.round(rect.height), 'height', {
             left: sizeLabelCenter.left,
-            top: sizeLabelCenter.top + 8,
+            top: sizeLabelCenter.top + 10,
         })
         const contentOutlineInset = selectionLevel === 'widget' ? 3 : selectionLevel === 'element' ? 1 : 0
         addGuide(
