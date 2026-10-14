@@ -190,6 +190,8 @@ describe('LayoutDesignerWorkspace', () => {
     it('names supported elements and chooses which parameters the Theme Designer may edit', () => {
         render(<Harness />)
 
+        expect(screen.getByLabelText('Element type')).toHaveValue('container')
+        expect(screen.getByText('Dimensions')).toBeInTheDocument()
         fireEvent.change(screen.getByLabelText('Element name'), { target: { value: 'Site frame' } })
         const widthParameter = screen.getByRole('checkbox', { name: 'Expose width in Theme Designer' })
         fireEvent.click(widthParameter)
@@ -200,6 +202,81 @@ describe('LayoutDesignerWorkspace', () => {
         expect(widthParameter.closest('label')).toHaveAttribute('title', 'Expose width in the Theme Designer')
         expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-md-height', 'clamp(20rem, 60vh, 48rem)')
         expect(screen.queryByText('Designer-editable parameters')).not.toBeInTheDocument()
+    })
+
+    it('changes structural element types and persists the type in the theme layout JSON', () => {
+        render(<Harness />)
+
+        fireEvent.change(screen.getByLabelText('Element type'), { target: { value: 'section' } })
+        expect(screen.getByLabelText('Element type')).toHaveValue('section')
+        expect(screen.getByRole('heading', { name: 'Section' })).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+        const savedDocument = JSON.parse(screen.getByLabelText('Canonical layout document').value)
+        expect(savedDocument.items[0].root.type).toBe('section')
+    })
+
+    it('converts an unused leaf slot without leaving an orphaned slot definition', () => {
+        render(<Harness />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Slot · main' }))
+        fireEvent.change(screen.getByLabelText('Element type'), { target: { value: 'column' } })
+
+        expect(screen.getByRole('heading', { name: 'Column' })).toBeInTheDocument()
+        expect(screen.queryByText('Media target dimensions (px)')).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+        const savedDocument = JSON.parse(screen.getByLabelText('Canonical layout document').value)
+        expect(savedDocument.items[0].root.children[0].type).toBe('column')
+        expect(savedDocument.items[0].slots).not.toHaveProperty('main')
+    })
+
+    it('keeps a slot type when its theme default contains widget content', () => {
+        const populatedDocument = structuredClone(document)
+        populatedDocument.items[0].slots.main.default_widgets = [{ type: 'easy_widgets.HeadlineWidget' }]
+        render(<Harness sourceDocument={populatedDocument} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Slot · main' }))
+        fireEvent.change(screen.getByLabelText('Element type'), { target: { value: 'section' } })
+
+        expect(screen.getByRole('alert')).toHaveTextContent('contains or is referenced by content')
+        expect(screen.getByLabelText('Element type')).toHaveValue('slot')
+        expect(screen.getByText('Media target dimensions (px)')).toBeInTheDocument()
+    })
+
+    it('keeps a slot type when theme preview content uses it', () => {
+        render(<Harness previewViews={[{
+            id: 'preview-page',
+            label: 'Preview page',
+            layout: 'main_layout',
+            content: { codeLayout: 'main_layout', widgets: { main: [{ type: 'easy_widgets.HeadlineWidget' }] } },
+        }]} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Slot · main' }))
+        fireEvent.change(screen.getByLabelText('Element type'), { target: { value: 'section' } })
+
+        expect(screen.getByRole('alert')).toHaveTextContent('contains or is referenced by content')
+        expect(screen.getByLabelText('Element type')).toHaveValue('slot')
+    })
+
+    it('creates a declared slot when an empty leaf becomes a slot', () => {
+        const leafDocument = structuredClone(document)
+        leafDocument.items[0].root.children[0] = {
+            ...leafDocument.items[0].root.children[0],
+            type: 'column',
+            class_names: [],
+        }
+        delete leafDocument.items[0].root.children[0].slot_key
+        leafDocument.items[0].slots = {}
+        render(<Harness sourceDocument={leafDocument} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Column' }))
+        fireEvent.change(screen.getByLabelText('Element type'), { target: { value: 'slot' } })
+
+        expect(screen.getByLabelText('Element type')).toHaveValue('slot')
+        fireEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+        const savedDocument = JSON.parse(screen.getByLabelText('Canonical layout document').value)
+        expect(savedDocument.items[0].root.children[0].slot_key).toBe('slot_1')
+        expect(savedDocument.items[0].slots).toHaveProperty('slot_1')
     })
 
     it('keeps numeric media target dimensions separate from CSS layout sizing', () => {

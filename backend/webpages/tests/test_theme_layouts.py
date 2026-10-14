@@ -234,17 +234,17 @@ class ThemeLayoutValidationTests(SimpleTestCase):
 
         self.assertIs(validate_theme_layouts(document), document)
 
-    def test_non_editable_structural_nodes_cannot_expose_designer_parameters(self):
+    def test_all_structural_nodes_can_expose_designer_parameters(self):
         document = deepcopy(default_theme_layouts())
         grid = next(node for node in document["items"][0]["root"]["children"][0]["children"] if node["type"] == "grid")
         grid["type"] = "row"
         grid["editable_parameters"] = ["gap"]
 
-        with self.assertRaisesMessage(ValidationError, "only container, grid, semantic, and slot"):
-            validate_theme_layouts(document)
+        self.assertIs(validate_theme_layouts(document), document)
 
     def test_validates_editor_only_presentation_colours(self):
         document = deepcopy(default_theme_layouts())
+        document["items"][0]["root"]["type"] = "row"
         document["items"][0]["root"]["presentation_color"] = "#14b8a6"
         self.assertIs(validate_theme_layouts(document), document)
 

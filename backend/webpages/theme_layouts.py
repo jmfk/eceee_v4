@@ -47,7 +47,7 @@ STYLE_PROPERTIES = {
     "border",
     "border_radius",
 }
-EXTERNALLY_EDITABLE_NODE_TYPES = {"container", "grid", "semantic", "slot"}
+EXTERNALLY_EDITABLE_NODE_TYPES = NODE_TYPES
 COLLAPSE_BEHAVIORS = {"never", "any", "all"}
 MAX_LAYOUTS = 50
 MAX_NODES = 250
@@ -670,15 +670,13 @@ def validate_theme_layouts(document):
                 or not re.fullmatch(r"#[0-9A-Fa-f]{6}", presentation_color)
             ):
                 raise ValidationError(
-                    f"{path}.root presentation_color must be a six-digit hex colour on a container, semantic, or slot."
+                    f"{path}.root presentation_color must be a six-digit hex colour on a layout node."
                 )
             editable_parameters = node.get("editable_parameters", [])
             if editable_parameters:
                 _validate_string_list(editable_parameters, f"{path}.root node editable_parameters")
                 if node_type not in EXTERNALLY_EDITABLE_NODE_TYPES:
-                    raise ValidationError(
-                        f"{path}.root only container, grid, semantic, and slot nodes can expose editable parameters."
-                    )
+                    raise ValidationError(f"{path}.root only supported layout nodes can expose editable parameters.")
                 if any(parameter not in STYLE_PROPERTIES for parameter in editable_parameters):
                     raise ValidationError(f"{path}.root node exposes an unsupported editable parameter.")
             class_names = node.get("class_names", [])
