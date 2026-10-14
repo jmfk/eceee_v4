@@ -35,20 +35,31 @@ class MediaSearchView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        filters = serializer.validated_data
+        tenant = getattr(request, "tenant", None)
+        include_theme_media = False
+        if filters.get("namespace"):
+            from content.models import Namespace
+
+            include_theme_media = Namespace.objects.filter(
+                slug=filters["namespace"],
+                tenant=tenant,
+                kind=Namespace.KIND_THEME_MEDIA,
+            ).exists()
+
         # Start with base queryset
         queryset = (
             filter_media_files_for_user(
                 MediaFile.objects.all(),
                 request.user,
-                tenant=getattr(request, "tenant", None),
+                tenant=tenant,
+                include_theme_media=include_theme_media,
             )
             .select_related("namespace", "created_by")
             .prefetch_related("tags", "collections")
         )
 
         # Apply filters
-        filters = serializer.validated_data
-
         # Handle legacy search (q parameter) - for backward compatibility
         if filters.get("q"):
             query = filters["q"]

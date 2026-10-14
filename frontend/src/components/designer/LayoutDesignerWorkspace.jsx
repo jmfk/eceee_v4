@@ -5,7 +5,7 @@ import RenderFrame from '../../rendering/RenderFrame'
 import { googleFontsStylesheetUrl } from '../../rendering/primitives'
 import { validateLayoutDefinition } from '../../rendering/themeLayoutRenderer'
 import { buildDesignerTheme, buildThemeCSS } from '../../utils/editorThemeCSS'
-import ImageLibraryPicker from '../theme/ImageLibraryPicker'
+import MediaSelectModal from '../media/MediaSelectModal'
 import { themeBreakpointDefinition } from '../theme/breakpointConfig'
 import { ThemeColorField, ThemeFontField, ThemeFontsEditor, ThemePaletteEditor } from './ThemeDesignTokens'
 import { inheritedLayoutStyle } from './layoutStyleInheritance'
@@ -820,7 +820,25 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                 </fieldset>}
             </aside>
         </div>}
-        {imagePickerOpen && <ImageLibraryPicker themeId={themeId} currentSelection={selected?.node.styles?.[activeStyleBreakpoint]?.background_image ? { url: selected.node.styles[activeStyleBreakpoint].background_image } : null} onCancel={() => setImagePickerOpen(false)} onSelect={(image) => { setStyleOverride('background_image', image.url); setImagePickerOpen(false) }} />}
+        <MediaSelectModal
+            isOpen={imagePickerOpen && Boolean(workspace.mediaNamespace)}
+            onClose={() => setImagePickerOpen(false)}
+            namespace={workspace.mediaNamespace}
+            mediaTypes={['image']}
+            allowCollections={false}
+            multiple={false}
+            allowRemove={false}
+            currentSelection={selected?.node.styles?.[activeStyleBreakpoint]?.background_image ? { url: selected.node.styles[activeStyleBreakpoint].background_image } : null}
+            customTitle="Choose a shared theme image"
+            onSelect={(items) => {
+                const image = Array.isArray(items) ? items[0] : null
+                const imageUrl = image?.imgproxyBaseUrl || image?.absoluteUrl || image?.url
+                if (!imageUrl) return false
+                setStyleOverride('background_image', imageUrl)
+                setImagePickerOpen(false)
+                return true
+            }}
+        />
     </main>
 }
 

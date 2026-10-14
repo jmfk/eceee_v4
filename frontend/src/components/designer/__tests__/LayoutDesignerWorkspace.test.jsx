@@ -12,8 +12,8 @@ vi.mock('../../../rendering/RenderFrame', () => ({
         return <button type="button" data-layout-canvas={String(model.designer.layoutCanvas)} data-empty-slots={String(Object.values(model.slots).every((items) => items.length === 0))} data-frame-width={style?.width} data-root-md-background={model.layoutDefinition.root.styles?.md?.background_color || ''} data-root-md-image={model.layoutDefinition.root.styles?.md?.background_image || ''} data-font-url={model.fontUrl || ''} data-root-presentation-color={model.layoutDefinition.root.presentation_color || ''} onClick={() => onMessage?.({ data: { source: 'eceee-designer-preview', action: 'select', targetId: `layout-node:${model.layoutDefinition.root.children[0].id}` } })}>Canvas · {model.layoutDefinition.label}</button>
     },
 }))
-vi.mock('../../theme/ImageLibraryPicker', () => ({
-    default: ({ onSelect }) => <button type="button" onClick={() => onSelect({ url: 'https://cdn.example.test/hero.webp', filename: 'hero.webp' })}>Pick uploaded image</button>,
+vi.mock('../../media/MediaSelectModal', () => ({
+    default: ({ isOpen, namespace, onSelect }) => isOpen ? <button type="button" data-namespace={namespace} onClick={() => onSelect([{ imgproxyBaseUrl: 'https://cdn.example.test/hero.webp', id: 'image-1' }])}>Pick uploaded image</button> : null,
 }))
 
 const document = {
@@ -65,6 +65,7 @@ const Harness = ({ disabled = false, sourceDocument = document, viewport = 'md' 
         breakpoints: { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 },
         colors: [{ name: 'surface', value: '#f8fafc', usage: [] }],
         fonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap', usage: [] }],
+        mediaNamespace: 'theme-media-tenant',
         themeConfig: { colors: { surface: '#f8fafc' }, fonts: { googleFonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap' }] } },
     })
     return <LayoutDesignerWorkspace themeId="7" workspace={workspace} viewport={viewport} updateWorkspace={(updater) => setWorkspace((current) => updater(structuredClone(current)))} disabled={disabled} />

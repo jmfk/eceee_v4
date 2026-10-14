@@ -56,6 +56,43 @@ class MediaFileAPITest(APITestCase):
         # Might be empty if tenant context is not set correctly in middleware for tests
         # but the endpoint should at least exist
 
+    def test_hidden_theme_media_requires_explicit_namespace_filter(self):
+        theme_namespace = Namespace.get_or_create_theme_media(self.tenant, created_by=self.user)
+        theme_media = MediaFile.objects.create(
+            title="Theme background",
+            slug="theme-background",
+            file_type="image",
+            file_path="themes/background.jpg",
+            file_hash="theme-background-hash",
+            file_size=2048,
+            uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
+            namespace=theme_namespace,
+            tenant=self.tenant,
+            content_type="image/jpeg",
+        )
+        url = reverse("api:file_manager:mediafile-list")
+
+        ordinary_response = self.client.get(url, HTTP_X_TENANT_ID=str(self.tenant.id))
+        theme_response = self.client.get(
+            url,
+            {"namespace": theme_namespace.slug},
+            HTTP_X_TENANT_ID=str(self.tenant.id),
+        )
+        search_url = reverse("api:file_manager:media-search")
+        ordinary_search = self.client.get(search_url, HTTP_X_TENANT_ID=str(self.tenant.id))
+        theme_search = self.client.get(
+            search_url,
+            {"namespace": theme_namespace.slug},
+            HTTP_X_TENANT_ID=str(self.tenant.id),
+        )
+
+        self.assertNotIn(str(theme_media.id), [str(item["id"]) for item in ordinary_response.data["results"]])
+        self.assertEqual([str(item["id"]) for item in theme_response.data["results"]], [str(theme_media.id)])
+        self.assertNotIn(str(theme_media.id), [str(item["id"]) for item in ordinary_search.data["results"]])
+        self.assertEqual([str(item["id"]) for item in theme_search.data["results"]], [str(theme_media.id)])
+
     def test_retrieve_media_file(self):
         """Test retrieving a specific media file"""
         url = reverse("api:file_manager:mediafile-detail", kwargs={"pk": self.media_file.id})
