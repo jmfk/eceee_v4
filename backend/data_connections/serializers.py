@@ -58,6 +58,8 @@ class DataConnectionSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         embedded_secrets = {}
         if "config" in attrs:
+            if not isinstance(attrs["config"], dict):
+                raise serializers.ValidationError({"config": "Expected an object."})
             public_config, embedded_secrets = split_sensitive_config(attrs["config"])
             attrs["config"] = public_config
         explicit_secrets = attrs.pop("secret_config", {}) or {}
@@ -66,7 +68,11 @@ class DataConnectionSerializer(serializers.ModelSerializer):
         submitted_secrets = {**embedded_secrets, **explicit_secrets}
         connection_type = attrs.get("connection_type", getattr(self.instance, "connection_type", None))
         config = attrs.get("config", getattr(self.instance, "config", {})) or {}
-        if connection_type == "LEGACY_POSTGRES":
+        if not isinstance(config, dict):
+            raise serializers.ValidationError({"config": "Expected an object."})
+        if connection_type == "LEGACY_POSTGRES" and (
+            self.instance is None or self.instance.connection_type != "LEGACY_POSTGRES"
+        ):
             raise serializers.ValidationError(
                 {
                     "connectionType": (
@@ -89,7 +95,14 @@ class DataConnectionSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"config": {"baseUrl": "Enter a public HTTPS migration API base URL without embedded credentials."}}
                 )
-            if not submitted_secrets.get("token") and not getattr(self.instance, "encrypted_secrets", ""):
+            existing_secrets = {}
+            if self.instance and self.instance.encrypted_secrets:
+                try:
+                    existing_secrets = decrypt_connection_secrets(self.instance)
+                except RemoteCredentialConfigurationError as exc:
+                    raise serializers.ValidationError({"secretConfig": str(exc)}) from exc
+            token = submitted_secrets.get("token") or existing_secrets.get("token")
+            if not isinstance(token, str) or not token.strip():
                 raise serializers.ValidationError({"secretConfig": {"token": "Enter the migration API access key."}})
         attrs["_submitted_secrets"] = submitted_secrets
         return attrs

@@ -19,8 +19,10 @@ class LegacyMigrationApiError(RuntimeError):
 
 
 def _date_time(value):
-    if not value:
+    if value in (None, ""):
         return None
+    if not isinstance(value, str):
+        raise LegacyMigrationApiError("The legacy API returned an invalid date.")
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except (TypeError, ValueError) as exc:
@@ -29,7 +31,8 @@ def _date_time(value):
 
 class LegacyNewsApi:
     def __init__(self, *, base_url: str, token: str):
-        parsed = urlsplit(str(base_url or "").strip())
+        normalized_base_url = str(base_url or "").strip()
+        parsed = urlsplit(normalized_base_url)
         if (
             parsed.scheme != "https"
             or not parsed.hostname
@@ -39,9 +42,9 @@ class LegacyNewsApi:
             or parsed.fragment
         ):
             raise LegacyMigrationApiError("The legacy API base URL must be a public HTTPS URL.")
-        if not token:
+        if not isinstance(token, str) or not token.strip():
             raise LegacyMigrationApiError("The legacy API access key is missing.")
-        self.base_url = base_url.rstrip("/") + "/"
+        self.base_url = normalized_base_url.rstrip("/") + "/"
         self.authorization = f"Bearer {token}"
 
     def close(self):
@@ -136,23 +139,40 @@ class LegacyNewsApi:
     def _news(item) -> LegacyNewsRecord:
         if not isinstance(item, dict) or not isinstance(item.get("taxonomy"), dict):
             raise LegacyMigrationApiError("The legacy API returned an invalid News item.")
+        legacy_id = item.get("legacyId")
+        if isinstance(legacy_id, bool) or not isinstance(legacy_id, int) or legacy_id <= 0:
+            raise LegacyMigrationApiError("The legacy API returned an invalid News item.")
+        strings = {}
+        for name in ("title", "slug", "summary", "content", "externalUrl"):
+            if name in ("title", "slug") and name not in item:
+                raise LegacyMigrationApiError("The legacy API returned an invalid News item.")
+            value = item.get(name, "")
+            if not isinstance(value, str):
+                raise LegacyMigrationApiError("The legacy API returned an invalid News item.")
+            strings[name] = value
+        featured = item.get("featured", False)
+        if not isinstance(featured, bool):
+            raise LegacyMigrationApiError("The legacy API returned an invalid News item.")
+        taxonomy = {}
+        for name in ("types", "categories", "sources", "topics", "keywords"):
+            values = item["taxonomy"].get(name, [])
+            if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+                raise LegacyMigrationApiError("The legacy API returned an invalid News item.")
+            taxonomy[name] = values
         try:
             return LegacyNewsRecord(
-                legacy_id=int(item["legacyId"]),
-                title=str(item["title"]),
-                slug=str(item["slug"]),
-                summary=str(item.get("summary") or ""),
-                content=str(item.get("content") or ""),
+                legacy_id=legacy_id,
+                title=strings["title"],
+                slug=strings["slug"],
+                summary=strings["summary"],
+                content=strings["content"],
                 presentational_publishing_date=_date_time(item.get("presentationalPublishingDate")),
                 source_date=_date_time(item.get("sourceDate")),
                 publish_date=_date_time(item.get("publishDate")),
                 expiry_date=_date_time(item.get("expiryDate")),
-                external_url=str(item.get("externalUrl") or ""),
-                featured=bool(item.get("featured")),
-                taxonomy={
-                    name: [str(value) for value in item["taxonomy"].get(name, [])]
-                    for name in ("types", "categories", "sources", "topics", "keywords")
-                },
+                external_url=strings["externalUrl"],
+                featured=featured,
+                taxonomy=taxonomy,
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise LegacyMigrationApiError("The legacy API returned an invalid News item.") from exc
