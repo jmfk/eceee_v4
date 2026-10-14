@@ -76,6 +76,19 @@ describe('theme layout rendering', () => {
         expect(css).toContain('height:clamp(20rem, 60vh, 48rem)')
     })
 
+    it('treats legacy and editor-entered unitless dimensions as pixels', () => {
+        const sized = structuredClone(layout)
+        sized.root.styles.base.width = 960 as any
+        sized.root.styles.base.height = '112'
+        sized.root.styles.md.min_height = '240.5'
+
+        const css = layoutDefinitionCss(sized)
+
+        expect(css).toContain('width:960px')
+        expect(css).toContain('height:112px')
+        expect(css).toContain('min-height:240.5px')
+    })
+
     it('compiles theme color tokens using the theme variable contract', () => {
         const themed = structuredClone(layout)
         themed.root.styles.base.background_color = 'token:brand'

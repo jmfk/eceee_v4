@@ -17,6 +17,7 @@ const nodeTypes = ['container', 'section', 'grid', 'row', 'column', 'semantic', 
 const styleFields = ['display', 'width', 'height', 'max_width', 'min_height', 'grid_template_columns', 'grid_column', 'flex_direction', 'flex_wrap', 'flex_grow', 'order', 'gap', 'padding', 'margin', 'align_items', 'justify_content', 'background_color', 'background_image', 'background_position', 'background_size', 'background_repeat', 'color', 'font_family', 'border', 'border_radius']
 const dimensionStyleFields = ['width', 'height', 'max_width', 'min_height']
 const dimensionStyleDefaults = { width: 'auto', height: 'auto', max_width: 'none', min_height: 'auto' }
+const unitlessNumberPattern = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/
 const gridStyleFields = ['grid_template_columns', 'gap', 'padding', 'margin', 'align_items', 'justify_content']
 const externallyEditableNodeTypes = new Set(nodeTypes)
 const defaultPresentationColors = { container: '#3b82f6', section: '#06b6d4', grid: '#a855f7', row: '#6366f1', column: '#22c55e', semantic: '#f59e0b', slot: '#f43f5e' }
@@ -368,6 +369,13 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         }
         return { ...node, styles }
     })
+
+    const normalizeDimensionOverride = (field, value) => {
+        const normalized = value.trim()
+        if (dimensionStyleFields.includes(field) && unitlessNumberPattern.test(normalized)) {
+            setStyleOverride(field, `${normalized}px`)
+        }
+    }
 
     const installThemeFont = (font) => updateWorkspace((next) => {
         next.fonts ||= []
@@ -1073,7 +1081,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                                 <div className="min-w-0">
                                     <div className="flex min-w-0">
                                     {['background_color', 'color'].includes(field) && <input type="color" aria-label={`Pick ${fieldLabel}`} value={colorPickerValue(displayedValue, field === 'color' ? '#111827' : '#ffffff')} disabled={Boolean(inherited)} onChange={(event) => setStyleOverride(field, event.target.value)} className="h-[30px] w-9 shrink-0 cursor-pointer rounded-l border border-r-0 border-gray-300 bg-white p-1 disabled:cursor-not-allowed disabled:bg-gray-100" />}
-                                    <input id={`layout-style-${selected.node.id}-${activeStyleBreakpoint}-${field}`} aria-label={`${fieldLabel} value`} value={displayedValue} disabled={Boolean(inherited)} onChange={(event) => event.target.value ? setStyleOverride(field, event.target.value) : resetStyleOverride(field)} className={`min-w-0 flex-1 border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 ${['background_color', 'color'].includes(field) ? hasTrailingControl ? '' : 'rounded-r' : hasTrailingControl ? 'rounded-l' : 'rounded'}`} />
+                                    <input id={`layout-style-${selected.node.id}-${activeStyleBreakpoint}-${field}`} aria-label={`${fieldLabel} value`} value={displayedValue} disabled={Boolean(inherited)} placeholder={dimensionStyleFields.includes(field) ? 'auto, 320px, 100%, 50vh' : undefined} onChange={(event) => event.target.value ? setStyleOverride(field, event.target.value) : resetStyleOverride(field)} onBlur={(event) => normalizeDimensionOverride(field, event.target.value)} className={`min-w-0 flex-1 border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 ${['background_color', 'color'].includes(field) ? hasTrailingControl ? '' : 'rounded-r' : hasTrailingControl ? 'rounded-l' : 'rounded'}`} />
                                     {inherited && <button type="button" onClick={() => setStyleOverride(field, inherited.value)} aria-label={`Override ${fieldLabel} at ${activeBreakpoint === 'xs' ? 'Base' : themeBreakpointDefinition(activeBreakpoint)?.label || activeBreakpoint.toUpperCase()}`} title={`Create ${activeBreakpoint.toUpperCase()} override`} className="inline-flex h-[30px] w-8 shrink-0 items-center justify-center border-y border-r border-gray-300 bg-white text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><KeyRound className="h-3.5 w-3.5" /></button>}
                                     {canReset && <button type="button" onClick={() => resetStyleOverride(field)} aria-label={`Reset ${fieldLabel} override`} title="Reset override" className="inline-flex h-[30px] w-8 shrink-0 items-center justify-center border-y border-r border-gray-300 bg-white text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><RotateCcw className="h-3.5 w-3.5" /></button>}
                                     {externallyEditableNodeTypes.has(selected.node.type) && <label title={`Expose ${fieldLabel} in the Theme Designer`} className="inline-flex w-9 shrink-0 cursor-pointer items-center justify-center rounded-r border border-l-0 border-gray-300 bg-gray-50 hover:bg-gray-100">

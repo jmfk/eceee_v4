@@ -177,6 +177,9 @@ class FileUploadService:
                 existing_pending = PendingMediaFile.objects.filter(file_hash=upload_result["file_hash"]).first()
 
                 if existing_pending:
+                    if existing_pending.namespace_id != namespace.id:
+                        self._discard_conflicting_upload(upload_result["file_path"], existing_pending.file_path)
+                        raise ValueError("This file content is already stored in another media namespace.")
                     # Update existing pending file with new metadata
                     # This preserves the S3 object reference
                     self._update_existing_pending_file(
@@ -192,6 +195,16 @@ class FileUploadService:
                     return existing_pending
 
             raise e
+
+    @staticmethod
+    def _discard_conflicting_upload(uploaded_path: str, existing_path: str) -> None:
+        """Remove only the losing upload object after a cross-namespace hash race."""
+        if not uploaded_path or uploaded_path == existing_path:
+            return
+        try:
+            storage.delete(uploaded_path)
+        except Exception:
+            logger.exception("Could not remove rejected cross-namespace upload object at %s", uploaded_path)
 
     def _update_existing_pending_file(
         self,

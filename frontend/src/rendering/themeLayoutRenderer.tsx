@@ -19,6 +19,8 @@ const keyPattern = /^[a-z][a-z0-9_]{0,63}$/
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const presentationColorPattern = /^#[0-9a-f]{6}$/i
 const defaultBreakpoints: Record<string, number> = { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 }
+const pixelDimensionProperties = new Set(['width', 'height', 'max_width', 'min_height'])
+const unitlessNumberPattern = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/
 const safeBackgroundImage = (value: string | number) => {
     const text = String(value).trim()
     if (!text || text.length > 2048 || /[\x00-\x20"'\\();{}<>]/.test(text)) return null
@@ -35,6 +37,7 @@ const safeValue = (property: string, value: string | number) => {
     const text = String(value).trim()
     if (!text || text.length > 160 || /[;{}<>]|url\s*\(|expression\s*\(|@import/i.test(text)) return null
     if (text.startsWith('token:')) return `var(--${text.slice(6).replace(/[^a-zA-Z0-9_-]/g, '')})`
+    if (pixelDimensionProperties.has(property) && unitlessNumberPattern.test(text)) return `${text}px`
     return text
 }
 
