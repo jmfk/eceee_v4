@@ -1407,6 +1407,31 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(ThemeDesignerRevision.objects.filter(theme=self.theme).count(), 1)
         self.assertFalse(published.data["hasDraftChanges"])
 
+    def test_workspace_patch_can_add_palette_color_but_cannot_remove_existing_colors(self):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+
+        added = self.client.patch(
+            self.workspace_url,
+            {
+                "draftVersion": workspace["draftVersion"],
+                "colors": {**{color["name"]: color["value"] for color in workspace["colors"]}, "accent": "#abcdef"},
+            },
+            format="json",
+        )
+
+        self.assertEqual(added.status_code, 200, added.data)
+        self.assertEqual(next(color["value"] for color in added.data["colors"] if color["name"] == "accent"), "#abcdef")
+
+        removed = self.client.patch(
+            self.workspace_url,
+            {"draftVersion": added.data["draftVersion"], "colors": {"accent": "#abcdef"}},
+            format="json",
+        )
+
+        self.assertEqual(removed.status_code, 400, removed.data)
+        self.assertIn("cannot remove or rename", str(removed.data))
+
     def test_workspace_patch_can_create_a_breakpoint_spacing_override(self):
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data

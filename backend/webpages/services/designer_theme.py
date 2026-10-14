@@ -1421,9 +1421,9 @@ def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=Tr
         if len(colors) > 200:
             raise ValidationError("The palette contains too many colors.")
         colors = {str(name): str(value).strip() for name, value in colors.items()}
-        if set(colors) != set(theme.colors or {}):
+        if not set(theme.colors or {}).issubset(colors):
             raise ValidationError(
-                "Designer access can change existing color values but cannot add, remove, or rename colors."
+                "Designer access can add colors and change values but cannot remove or rename colors."
             )
         if any(not name or len(name) > 100 or not COLOR_VALUE.fullmatch(value) for name, value in colors.items()):
             raise ValidationError(

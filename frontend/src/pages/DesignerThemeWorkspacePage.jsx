@@ -88,9 +88,11 @@ const DesignerThemeWorkspacePage = () => {
     useEffect(() => { loadWorkspace() }, [loadWorkspace])
 
     const updateWorkspace = (updater) => {
-        const next = updater(structuredClone(workspace))
-        setWorkspace(next)
-        setDirty(workspaceSignature(next) !== baselineSignatureRef.current)
+        setWorkspace((current) => {
+            const next = updater(structuredClone(current))
+            setDirty(workspaceSignature(next) !== baselineSignatureRef.current)
+            return next
+        })
     }
 
     const saveDraft = async ({ silent = false, persistPreviewTexts = true, manageSaving = true } = {}) => {

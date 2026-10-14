@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileText, Focus, Image as ImageIcon, Italic, KeyRound, Link2, List, ListOrdered, Loader2, RotateCcw, Search, Settings2, Trash2 } from 'lucide-react'
+import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileText, Focus, Image as ImageIcon, Italic, KeyRound, Link2, List, ListOrdered, Loader2, RotateCcw, Search, Settings2, Trash2, Type } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel, designerPreviewImageReferences } from '../../rendering/adapters'
@@ -8,6 +8,7 @@ import { getBreakpoints, mapBreakpointName } from '../../utils/themeUtils'
 import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
 import { designerPreviewWidth, themeBreakpointDefinition } from '../theme/breakpointConfig'
 import { inheritedLayoutStyle } from './layoutStyleInheritance'
+import { ThemeColorField, ThemeFontField, ThemeFontsEditor, ThemePaletteEditor } from './ThemeDesignTokens'
 const typographyLabels = {
     fontFamily: 'Font family', fontSize: 'Size', fontWeight: 'Weight', fontStyle: 'Style',
     lineHeight: 'Line height', letterSpacing: 'Letter spacing',
@@ -608,14 +609,14 @@ const FieldLayout = ({ fields, renderField }) => {
     </div>
 }
 
-const ValueFields = ({ idPrefix, values, defaults, fields, labels, onChange, onRemove, onOverride, overrideLabel, disabled = false }) => {
+const ValueFields = ({ idPrefix, values, defaults, fields, labels, onChange, onRemove, onOverride, overrideLabel, renderInput, disabled = false }) => {
     const renderField = (field, className = '') => (
         <div key={field} className={`min-w-0 ${className}`} data-spacing-side={field.match(/(Top|Right|Bottom|Left)$/)?.[1]?.toLowerCase()}>
                 <div className="flex items-center justify-between gap-2">
                     <label htmlFor={`${idPrefix}-${field}`} className="text-xs font-medium text-gray-700">{labels[field] || field}</label>
                     {onRemove && <button type="button" aria-label={`Remove ${labels[field] || field}`} onClick={() => onRemove(field)} disabled={disabled} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>}
                 </div>
-                <input id={`${idPrefix}-${field}`} value={values[field] || defaults?.[field] || ''} onChange={(event) => onChange(field, event.target.value)} disabled={disabled} className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500" placeholder="Theme default" />
+                {renderInput?.({ id: `${idPrefix}-${field}`, field, label: labels[field] || field, value: values[field] || defaults?.[field] || '', disabled, onChange: (value) => onChange(field, value) }) || <input id={`${idPrefix}-${field}`} value={values[field] || defaults?.[field] || ''} onChange={(event) => onChange(field, event.target.value)} disabled={disabled} className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500" placeholder="Theme default" />}
                 {onOverride && <button type="button" onClick={() => onOverride(field)} className="mt-1 w-full rounded border border-blue-300 bg-white px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50">Override {labels[field] || field} at {overrideLabel}</button>}
                 {!values[field] && defaults?.[field] && <p className="mt-0.5 text-[10px] text-gray-500">Theme default</p>}
             </div>
@@ -684,6 +685,24 @@ const SemanticThemeWorkspace = ({
     const uploadRefs = useRef({})
     const [replacementImage, setReplacementImage] = useState(null)
     const [previewFrameWidth, setPreviewFrameWidth] = useState(1280)
+
+    const installThemeFont = (font) => updateWorkspace((next) => {
+        if (!next.fonts.some((installed) => installed.family === font.family)) {
+            next.fonts.push({ family: font.family, variants: font.variants || ['400'], display: 'swap', usage: [] })
+        }
+        return next
+    })
+    const updateThemeColor = (index, value) => updateWorkspace((next) => {
+        next.colors[index].value = value
+        return next
+    })
+    const addThemeColor = (color) => updateWorkspace((next) => {
+        if (!next.colors.some((candidate) => candidate.name === color.name)) next.colors.push({ ...color, usage: [] })
+        return next
+    })
+    const renderTypographyInput = ({ id, field, value, disabled: inputDisabled, onChange }) => field === 'fontFamily'
+        ? <ThemeFontField id={id} value={value} fonts={workspace.fonts} disabled={inputDisabled} onChange={onChange} onInstall={installThemeFont} />
+        : null
 
     const clampSidebarWidth = (width) => {
         const workspaceWidth = workspaceRef.current?.getBoundingClientRect().width || window.innerWidth
@@ -1936,6 +1955,8 @@ const SemanticThemeWorkspace = ({
         </section>
     )
 
+    const themeFontsEditor = <ThemeFontsEditor fonts={workspace.fonts} onInstall={installThemeFont} />
+
     const renderTargetAssetAlternative = (alternative) => {
         const asset = assetsByTargetId.get(alternative.id)
         if (asset && !isAssetActiveAtBreakpoint(asset)) return null
@@ -2365,6 +2386,7 @@ const SemanticThemeWorkspace = ({
                                 defaults={themeDefaults[row.targetId]}
                                 fields={typographyFields}
                                 labels={typographyLabels}
+                                renderInput={renderTypographyInput}
                                 onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })}
                                 onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)}
                                 disabled={disabled}
@@ -2471,7 +2493,7 @@ const SemanticThemeWorkspace = ({
                     </section>}
                     {targetTypography.map(({ row, index }) => {
                         const fields = activeFields('typography', index, row, workspace.constraints.editableTypographyProperties)
-                        return fields.length > 0 && <section key={`type-${index}`} className="space-y-2 border-t border-gray-200 pt-3"><h3 className="text-sm font-medium text-gray-900">{sectionLabel('typography', row)}</h3><p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global value.</strong> Typography is the same at every breakpoint.</p><ValueFields idPrefix={`typography-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={typographyLabels} onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)} /></section>
+                        return fields.length > 0 && <section key={`type-${index}`} className="space-y-2 border-t border-gray-200 pt-3"><h3 className="text-sm font-medium text-gray-900">{sectionLabel('typography', row)}</h3><p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900" role="status"><strong>Global value.</strong> Typography is the same at every breakpoint.</p><ValueFields idPrefix={`typography-${index}`} values={row.values} defaults={themeDefaults[row.targetId]} fields={fields} labels={typographyLabels} renderInput={renderTypographyInput} onChange={(field, value) => updateWorkspace((next) => { next.typography[index].values[field] = value; return next })} onRemove={(field) => removeThemeValue('typography', index, row, field, typographyLabels[field] || field)} /></section>
                     })}
                     {editableTargetSpacing.map(({ row, index, fields: effectiveFields = workspace.constraints.editableSpacingProperties }) => {
                         const fields = activeFields('spacing', index, row, effectiveFields)
@@ -2511,6 +2533,12 @@ const SemanticThemeWorkspace = ({
                             const inheritedLabel = inherited ? breakpointLabel(inherited.breakpoint) : ''
                             const hasOverrideControl = Boolean(inherited || (hasOverride && layoutParameterBreakpoint !== 'base'))
                             const inputId = `layout-parameter-${selectedLayoutNode.id}-${layoutParameterBreakpoint}-${field}`
+                            if (['background_color', 'color'].includes(field)) return <div key={field} className="space-y-1">
+                                <ThemeColorField id={inputId} label={humanize(field)} ariaLabel={`${selectedLayoutNode.label || selectedTargetLabel} ${humanize(field)}`} value={displayedValue} colors={workspace.colors} disabled={Boolean(inherited)} onChange={(value) => updateSelectedLayoutParameter(field, value)} onAdd={addThemeColor} />
+                                {inherited && <button type="button" onClick={() => updateSelectedLayoutParameter(field, inherited.value)} aria-label={`Override ${humanize(field)} at ${breakpointLabel(layoutParameterBreakpoint)}`} className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"><KeyRound className="h-3.5 w-3.5" />Override at {breakpointLabel(layoutParameterBreakpoint)}</button>}
+                                {!inherited && hasOverride && layoutParameterBreakpoint !== 'base' && <button type="button" onClick={() => updateSelectedLayoutParameter(field, '')} aria-label={`Reset ${humanize(field)} override`} className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"><RotateCcw className="h-3.5 w-3.5" />Reset override</button>}
+                                {inherited && <span className="block text-[10px] text-gray-500">Inherited from {inheritedLabel}</span>}
+                            </div>
                             return <div key={field} className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,1.2fr)] items-start gap-2 text-xs text-gray-700">
                                 <label htmlFor={inputId} className="pt-1.5">{humanize(field)}</label>
                                 <span className="min-w-0">
@@ -2579,6 +2607,7 @@ const SemanticThemeWorkspace = ({
                                 </button>
                                 : contentMode === 'demo' && previewContent.views.map((view) => <button type="button" key={view.id} aria-label={view.label} onClick={() => { setWorkspaceView('preview'); setViewId(view.id); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'preview' && view.id === viewId)}>{view.kind === 'object' ? <Box className="h-4 w-4 shrink-0" /> : <FileText className="h-4 w-4 shrink-0" />}<TruncatedNavigationText value={view.label} /></button>)}
                             <button type="button" onClick={() => { setWorkspaceView('details'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'details')}><Settings2 className="h-4 w-4 shrink-0" />Theme details</button>
+                            <button type="button" onClick={() => { setWorkspaceView('fonts'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'fonts')}><Type className="h-4 w-4 shrink-0" />Theme fonts</button>
                             <button type="button" onClick={() => { setWorkspaceView('images'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'images')}><ImageIcon className="h-4 w-4 shrink-0" />Theme images</button>
                         </div>
                     </nav>
@@ -2667,11 +2696,18 @@ const SemanticThemeWorkspace = ({
             <section aria-label="Theme inspector" className={`${mobilePane === 'preview' || inspectorCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-l border-gray-200 bg-white xl:col-start-5 xl:row-start-1 xl:border-l-0`}>
                 <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Inspector</span><button type="button" aria-label="Collapse theme inspector" onClick={() => setInspectorCollapsed(true)} className="hidden rounded p-1 text-gray-500 hover:bg-gray-100 xl:block"><ChevronRight className="h-4 w-4" /></button></div>
                 <fieldset disabled={disabled} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-2">
-                    {workspaceView === 'details'
-                        ? themeDetailsEditor
-                        : workspaceView === 'images'
-                            ? <div className="space-y-6">{imageAspectNavigation}{themeImageEditor}</div>
-                            : <div className="flex min-h-0 flex-1 flex-col gap-3">{selectionSpacingPanels || selectedEditor || <div className="flex min-h-32 items-center justify-center border border-dashed border-gray-300 p-3 text-center text-sm text-gray-500">Select something in the preview to inspect its margin and padding.</div>}{exampleImageEditor}</div>}
+                    <div className="space-y-5">
+                        <ThemePaletteEditor colors={workspace.colors} onChange={updateThemeColor} onAdd={addThemeColor} />
+                        <div className="border-t border-gray-200 pt-5">
+                            {workspaceView === 'details'
+                                ? themeDetailsEditor
+                                : workspaceView === 'fonts'
+                                    ? themeFontsEditor
+                                    : workspaceView === 'images'
+                                        ? <div className="space-y-6">{imageAspectNavigation}{themeImageEditor}</div>
+                                        : <div className="flex min-h-0 flex-1 flex-col gap-3">{selectionSpacingPanels || selectedEditor || <div className="flex min-h-32 items-center justify-center border border-dashed border-gray-300 p-3 text-center text-sm text-gray-500">Select something in the preview to inspect its margin and padding.</div>}{exampleImageEditor}</div>}
+                        </div>
+                    </div>
                 </fieldset>
             </section>
             </main>
