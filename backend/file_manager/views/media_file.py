@@ -135,14 +135,29 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         tenant = getattr(self.request, "tenant", None)
         from ..security import filter_media_files_for_user
 
+        namespace_param = self.request.query_params.get("namespace")
+        include_theme_media = False
+        if namespace_param:
+            from content.models import Namespace
+
+            include_theme_media = Namespace.objects.filter(
+                slug=namespace_param,
+                tenant=tenant,
+                kind=Namespace.KIND_THEME_MEDIA,
+            ).exists()
+
         queryset = (
-            filter_media_files_for_user(queryset, user, tenant=tenant)
+            filter_media_files_for_user(
+                queryset,
+                user,
+                tenant=tenant,
+                include_theme_media=include_theme_media,
+            )
             .select_related("namespace", "created_by", "last_modified_by")
             .prefetch_related("tags", "collections")
         )
 
         # Filter by namespace if provided (slug only)
-        namespace_param = self.request.query_params.get("namespace")
         if namespace_param:
             from content.models import Namespace
 

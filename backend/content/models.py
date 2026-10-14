@@ -22,6 +22,13 @@ class Namespace(models.Model):
     Pages are not affected by namespaces and use hostname-based routing instead.
     """
 
+    KIND_CONTENT = "content"
+    KIND_THEME_MEDIA = "theme_media"
+    KIND_CHOICES = [
+        (KIND_CONTENT, "Content"),
+        (KIND_THEME_MEDIA, "Theme media"),
+    ]
+
     name = models.CharField(max_length=100, help_text="Human-readable namespace name")
     slug = models.SlugField(max_length=100, help_text="URL-safe namespace identifier")
     description = models.TextField(blank=True, help_text="Description of this namespace")
@@ -29,6 +36,13 @@ class Namespace(models.Model):
     # Namespace configuration
     is_active = models.BooleanField(default=True, help_text="Whether this namespace is active")
     is_default = models.BooleanField(default=False, help_text="Whether this is the default namespace")
+    kind = models.CharField(
+        max_length=32,
+        choices=KIND_CHOICES,
+        default=KIND_CONTENT,
+        db_index=True,
+        help_text="System purpose of this namespace",
+    )
 
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
@@ -55,6 +69,11 @@ class Namespace(models.Model):
                 condition=Q(is_default=True),
                 name="unique_default_namespace_per_tenant",
             ),
+            models.UniqueConstraint(
+                fields=["tenant"],
+                condition=Q(kind="theme_media"),
+                name="one_theme_media_namespace_per_tenant",
+            ),
         ]
 
     def __str__(self):
@@ -62,6 +81,8 @@ class Namespace(models.Model):
 
     def save(self, *args, **kwargs):
         """Ensure only one default namespace exists for this tenant."""
+        if self.kind == self.KIND_THEME_MEDIA:
+            self.is_default = False
         if self.is_default:
             Namespace.objects.filter(tenant_id=self.tenant_id, is_default=True).exclude(pk=self.pk).update(
                 is_default=False
@@ -71,7 +92,9 @@ class Namespace(models.Model):
     @classmethod
     def get_default(cls, tenant=None):
         """Get the default namespace, scoped to a tenant when provided."""
-        queryset = cls.objects.filter(tenant=tenant) if tenant is not None else cls.objects.all()
+        queryset = cls.objects.filter(kind=cls.KIND_CONTENT)
+        if tenant is not None:
+            queryset = queryset.filter(tenant=tenant)
         default = queryset.filter(is_default=True).first()
         if not default:
             if tenant is None:
@@ -120,6 +143,28 @@ class Namespace(models.Model):
         if tenant is not None:
             queryset = queryset.filter(tenant=tenant)
         return queryset.get(slug=slug)
+
+    @classmethod
+    def get_or_create_theme_media(cls, tenant, created_by=None):
+        """Return the tenant-wide, system-owned namespace used by theme editors."""
+        namespace = cls.objects.filter(tenant=tenant, kind=cls.KIND_THEME_MEDIA).first()
+        if namespace:
+            return namespace
+
+        owner = created_by or tenant.created_by
+        namespace, _created = cls.objects.get_or_create(
+            tenant=tenant,
+            kind=cls.KIND_THEME_MEDIA,
+            defaults={
+                "name": f"Theme media · {tenant.identifier}",
+                "slug": f"theme-media-{tenant.id.hex}",
+                "description": "System-owned media shared by this tenant's themes.",
+                "is_active": True,
+                "is_default": False,
+                "created_by": owner,
+            },
+        )
+        return namespace
 
     def get_content_count(self):
         """Get total count of content objects in this namespace"""

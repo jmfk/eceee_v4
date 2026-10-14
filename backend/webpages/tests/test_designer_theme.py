@@ -594,7 +594,11 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(workspace["catalog"]["previewViews"], [])
         self.assertEqual(workspace["contentObjects"], [])
         self.assertEqual(workspace["name"], "Editorial")
-        self.assertEqual(workspace["mediaNamespace"], "theme-media")
+        theme_media = Namespace.objects.get(tenant=self.tenant, kind=Namespace.KIND_THEME_MEDIA)
+        self.assertEqual(workspace["mediaNamespace"], theme_media.slug)
+        self.assertNotEqual(workspace["mediaNamespace"], self.namespace.slug)
+        namespace_slugs = [item["slug"] for item in self.client.get("/api/v1/namespaces/").data["results"]]
+        self.assertNotIn(theme_media.slug, namespace_slugs)
         self.assertEqual(workspace["themeConfig"]["colors"], self.theme.colors)
         self.assertEqual(
             workspace["themeConfig"]["design_groups"]["groups"][0]["elements"],
@@ -642,14 +646,32 @@ class DesignerThemeApiTests(TestCase):
             ],
         )
 
-    def test_workspace_does_not_fall_back_to_another_tenants_default_media_namespace(self):
+    def test_workspace_uses_hidden_theme_media_when_no_content_namespace_is_active(self):
         self.namespace.is_active = False
         self.namespace.save(update_fields=["is_active"])
         self.authenticate(self.designer)
 
         workspace = self.client.get(self.workspace_url).data
 
-        self.assertIsNone(workspace["mediaNamespace"])
+        theme_media = Namespace.objects.get(tenant=self.tenant, kind=Namespace.KIND_THEME_MEDIA)
+        self.assertEqual(workspace["mediaNamespace"], theme_media.slug)
+
+    def test_workspaces_share_one_theme_media_namespace_inside_the_tenant(self):
+        second_theme = PageTheme.objects.create(
+            tenant=self.tenant,
+            created_by=self.owner,
+            name="Campaign",
+        )
+        self.authenticate(self.owner)
+
+        first_workspace = self.client.get(self.workspace_url).data
+        second_workspace = self.client.get(f"/api/v1/webpages/designer/themes/{second_theme.id}/workspace/").data
+
+        self.assertEqual(first_workspace["mediaNamespace"], second_workspace["mediaNamespace"])
+        self.assertEqual(
+            Namespace.objects.filter(tenant=self.tenant, kind=Namespace.KIND_THEME_MEDIA).count(),
+            1,
+        )
 
     def test_workspace_places_chrome_widgets_in_natural_preview_slots(self):
         groups = self.theme.design_groups

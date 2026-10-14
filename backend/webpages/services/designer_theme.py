@@ -1371,12 +1371,9 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
 
     assets = collect_designer_assets(theme)
     catalog = build_designer_catalog(theme, assets, include_reference_previews=include_tenant_content)
-    media_namespace = (
-        theme.tenant.namespaces.filter(is_active=True)
-        .order_by("-is_default", "name")
-        .values_list("slug", flat=True)
-        .first()
-    )
+    from content.models import Namespace
+
+    media_namespace = Namespace.get_or_create_theme_media(theme.tenant, created_by=theme.created_by).slug
     return {
         "id": theme.id,
         "name": theme.name,

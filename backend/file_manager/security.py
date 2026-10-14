@@ -15,7 +15,7 @@ from rest_framework import permissions
 logger = logging.getLogger(__name__)
 
 
-def filter_media_files_for_user(queryset, user, tenant=None):
+def filter_media_files_for_user(queryset, user, tenant=None, include_theme_media=False):
     """Apply the Media Library's tenant, namespace, and access-level rules."""
     from django.db.models import Q
 
@@ -23,6 +23,8 @@ def filter_media_files_for_user(queryset, user, tenant=None):
 
     if tenant is not None:
         queryset = queryset.filter(tenant=tenant)
+    if not include_theme_media:
+        queryset = queryset.exclude(namespace__kind=Namespace.KIND_THEME_MEDIA)
     if user.is_staff:
         return queryset
 
