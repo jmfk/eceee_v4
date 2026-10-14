@@ -2618,6 +2618,7 @@ describe('DesignerThemeWorkspacePage', () => {
             draftVersion: 2,
             targetBreakpoint: 'xl',
         }))
+        await screen.findByText('Draft saved · not published')
 
         const override = new File(['xl'], 'hero-xl.png', { type: 'image/png' })
         fireEvent.change(screen.getByLabelText('New Extra Large image override for Article hero'), { target: { files: [override] } })
