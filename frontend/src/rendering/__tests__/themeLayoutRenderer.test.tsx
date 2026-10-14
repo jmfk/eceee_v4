@@ -80,6 +80,22 @@ describe('theme layout rendering', () => {
         expect(css).not.toContain('var(--color-brand)')
     })
 
+    it('compiles theme fonts and safe uploaded background images', () => {
+        const themed = structuredClone(layout)
+        themed.root.styles.base.font_family = 'Inter, sans-serif'
+        themed.root.styles.base.background_image = 'https://cdn.example.test/theme/hero.webp'
+        themed.root.styles.base.background_size = 'cover'
+
+        const css = layoutDefinitionCss(themed)
+
+        expect(css).toContain('font-family:Inter, sans-serif')
+        expect(css).toContain('background-image:url("https://cdn.example.test/theme/hero.webp")')
+        expect(css).toContain('background-size:cover')
+
+        themed.root.styles.base.background_image = 'javascript:alert(1)'
+        expect(validateLayoutDefinition(themed)).toBe(false)
+    })
+
     it('scales slot guide heights relative to the active theme viewport only in the layout canvas', () => {
         const dimensioned = structuredClone(layout)
         dimensioned.slots.main.dimensions = {

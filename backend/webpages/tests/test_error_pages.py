@@ -9,9 +9,11 @@ from django.core.exceptions import ValidationError
 from django.test import RequestFactory, SimpleTestCase, TestCase
 
 from webpages.layout_registry import layout_registry
-from webpages.models import WebPage
+from webpages.models import PageTheme, WebPage
 from webpages.public_views import HostnamePageView, custom_404_handler
-from webpages.services.error_pages import ensure_site_error_pages
+from webpages.serializers import WebPageListSerializer
+from webpages.theme_layouts import default_theme_layouts
+from webpages.views.webpage_views import WebPageViewSet
 
 User = get_user_model()
 
@@ -212,77 +214,54 @@ class ErrorPageRenderingTests(TestCase):
                 hostnames=["testsite.com"],
                 tenant=self.tenant,
             )
+        self.theme = PageTheme.objects.create(
+            name="Error theme",
+            tenant=self.tenant,
+            created_by=self.user,
+            is_default=True,
+            layouts=default_theme_layouts(),
+        )
 
     def test_custom_404_page_found(self):
-        """Test that custom 404 page is found for a site"""
+        """The standard 404 definition comes from the active theme."""
         from django.db import connection
 
         if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
-        # Create custom 404 page
-        error_404 = WebPage.objects.create(
-            title="Not Found",
-            slug="404",
-            parent=self.root_page,
-            created_by=self.user,
-            last_modified_by=self.user,
-            tenant=self.tenant,
-        )
-
-        # Publish the error page
-        from webpages.models import PageVersion
-
-        version = PageVersion.objects.create(
-            page=error_404,
-            version_number=1,
-            version_title="Not Found",
-            created_by=self.user,
-            widgets={},
-            page_data={},
-            code_layout="error_404",
-        )
-        version.publish(self.user)
-
-        # Test the _get_error_page method
         view = HostnamePageView()
         found_page = view._get_error_page(self.root_page, 404)
 
         self.assertIsNotNone(found_page)
-        self.assertEqual(found_page.id, error_404.id)
+        self.assertEqual(found_page["key"], "error_404")
+        self.assertEqual(found_page["theme"], self.theme)
 
-    def test_site_error_pages_are_seeded_with_shared_layout_and_editable_widgets(self):
-        pages = ensure_site_error_pages(self.root_page, self.user)
-
-        self.assertEqual({page.slug for page in pages}, {"403", "404", "500", "503"})
-        version = next(page for page in pages if page.slug == "404").get_current_published_version()
-        self.assertEqual(version.layout_key, "error_layout")
-        self.assertEqual(version.code_layout, "error_layout")
-        self.assertEqual(set(version.widgets), {"visual", "message", "actions"})
-        self.assertEqual(version.widgets["visual"][0]["type"], "easy_widgets.ImageWidget")
-        self.assertEqual(version.widgets["message"][0]["type"], "easy_widgets.HeadlineWidget")
+    def test_theme_error_pages_render_without_page_or_version_rows(self):
+        special_page = next(page for page in self.theme.layouts["special_pages"] if page["status_code"] == 404)
+        self.assertEqual(special_page["layout_key"], "error_layout")
+        self.assertEqual(special_page["widgets"]["visual"][0]["type"], "easy_widgets.ImageWidget")
+        self.assertEqual(special_page["widgets"]["message"][0]["type"], "easy_widgets.HeadlineWidget")
+        self.assertFalse(WebPage.objects.filter(parent=self.root_page, slug="404").exists())
 
         view = HostnamePageView()
         view.request = self.factory.get("/missing/", HTTP_HOST="testsite.com")
-        response = view._render_error_page(version.page, 404)
+        response = view._render_error_page(self.root_page, 404)
         self.assertContains(response, "404 — Page not found", status_code=404)
         self.assertContains(response, "Return to the home page", status_code=404)
 
-        repeated = ensure_site_error_pages(self.root_page, self.user)
-        self.assertEqual([page.id for page in repeated], [page.id for page in pages])
-
     def test_custom_404_page_not_found_returns_none(self):
-        """Test that None is returned when no custom 404 page exists"""
+        """A site without an effective theme has no special error page."""
         from django.db import connection
 
         if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         view = HostnamePageView()
-        found_page = view._get_error_page(self.root_page, 404)
+        root = type("Root", (), {"get_effective_theme": lambda _self: None})()
+        found_page = view._get_error_page(root, 404)
 
         self.assertIsNone(found_page)
 
     def test_unpublished_error_page_not_used(self):
-        """Test that unpublished error pages are not used"""
+        """A legacy unpublished Page row cannot override the theme error page."""
         from django.db import connection
 
         if connection.vendor == "sqlite":
@@ -300,37 +279,14 @@ class ErrorPageRenderingTests(TestCase):
         view = HostnamePageView()
         found_page = view._get_error_page(self.root_page, 404)
 
-        self.assertIsNone(found_page)
+        self.assertEqual(found_page["key"], "error_404")
 
     def test_custom_404_handler_with_valid_hostname(self):
-        """Test custom 404 handler finds error page for valid hostname"""
+        """The custom handler renders the theme-owned 404 page."""
         from django.db import connection
 
         if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
-        # Create and publish custom 404 page
-        error_404 = WebPage.objects.create(
-            title="Not Found",
-            slug="404",
-            parent=self.root_page,
-            created_by=self.user,
-            last_modified_by=self.user,
-            tenant=self.tenant,
-        )
-
-        from webpages.models import PageVersion
-
-        version = PageVersion.objects.create(
-            page=error_404,
-            version_number=1,
-            version_title="Not Found",
-            created_by=self.user,
-            widgets={},
-            page_data={},
-            code_layout="error_404",
-        )
-        version.publish(self.user)
-
         # Create request
         request = self.factory.get("/nonexistent-page/", HTTP_HOST="testsite.com")
 
@@ -440,36 +396,21 @@ class ErrorPageIntegrationTests(TestCase):
                 hostnames=["testsite.com"],
                 tenant=self.tenant,
             )
+        self.theme = PageTheme.objects.create(
+            name="Integration error theme",
+            tenant=self.tenant,
+            created_by=self.user,
+            is_default=True,
+            layouts=default_theme_layouts(),
+        )
 
-    def test_site_specific_error_pages(self):
-        """Test that different sites can have different error pages"""
+    def test_legacy_site_specific_error_pages_do_not_override_theme(self):
+        """Dormant legacy error rows remain recoverable but are not runtime content."""
         from django.db import connection
 
         if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
-        # Create another root page for a different site
-        from django.db import connection
-
-        if connection.vendor == "sqlite":
-            root_page_2 = WebPage.objects.create(
-                title="Another Site",
-                slug="home2",
-                created_by=self.user,
-                last_modified_by=self.user,
-                tenant=self.tenant,
-            )
-        else:
-            root_page_2 = WebPage.objects.create(
-                title="Another Site",
-                slug="home2",
-                created_by=self.user,
-                last_modified_by=self.user,
-                hostnames=["anothersite.com"],
-                tenant=self.tenant,
-            )
-
-        # Create different 404 pages for each site
-        error_404_site1 = WebPage.objects.create(
+        legacy_page = WebPage.objects.create(
             title="Site 1 Not Found",
             slug="404",
             parent=self.root_page,
@@ -478,20 +419,36 @@ class ErrorPageIntegrationTests(TestCase):
             tenant=self.tenant,
         )
 
-        error_404_site2 = WebPage.objects.create(
-            title="Site 2 Not Found",
+        view = HostnamePageView()
+        found = view._get_error_page(self.root_page, 404)
+
+        self.assertNotEqual(found.get("id"), legacy_page.id)
+        self.assertEqual(found["key"], "error_404")
+
+    def test_legacy_error_rows_are_hidden_from_pages_queries_and_counts(self):
+        legacy_page = WebPage.objects.create(
+            title="Legacy 404",
             slug="404",
-            parent=root_page_2,
+            parent=self.root_page,
             created_by=self.user,
             last_modified_by=self.user,
             tenant=self.tenant,
         )
+        ordinary_page = WebPage.objects.create(
+            title="About",
+            slug="about",
+            parent=self.root_page,
+            created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
+        )
+        view = WebPageViewSet()
+        view.action = "list"
+        view.request = type("Request", (), {"tenant": self.tenant, "user": self.user})()
 
-        # Both should be valid (no ValidationError)
-        error_404_site1.clean()
-        error_404_site2.clean()
+        ids = set(view.get_queryset().values_list("id", flat=True))
+        serialized_root = WebPageListSerializer(self.root_page).data
 
-        # Verify they are different pages
-        self.assertNotEqual(error_404_site1.id, error_404_site2.id)
-        self.assertEqual(error_404_site1.parent, self.root_page)
-        self.assertEqual(error_404_site2.parent, root_page_2)
+        self.assertNotIn(legacy_page.id, ids)
+        self.assertIn(ordinary_page.id, ids)
+        self.assertEqual(serialized_root["children_count"], 1)

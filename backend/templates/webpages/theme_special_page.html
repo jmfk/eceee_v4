@@ -1,0 +1,10 @@
+{% extends "easy_layouts/base.html" %}
+{% load webpages_tags %}
+
+{% block page_title %}{{ meta_title }}{% if root_page %} - {{ root_page.title }}{% endif %}{% endblock %}
+
+{% block icon_tags %}
+  {% render_site_icons root_page=root_page %}
+{% endblock %}
+
+{% block content %}{{ special_page_html|safe }}{% endblock %}

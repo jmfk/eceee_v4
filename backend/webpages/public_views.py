@@ -13,9 +13,12 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, ListView
 
+from .error_page_defaults import LEGACY_ERROR_PAGE_SLUGS
 from .models import WebPage
 from .renderers import WebPageRenderer
 from .serializers import PageHierarchySerializer
+from .theme_layout_renderer import render_theme_layout
+from .theme_layouts import theme_special_pages
 from .utils.page_resolver import get_page_safely
 
 
@@ -73,6 +76,8 @@ class PageDetailView(PublishedPageMixin, DetailView):
             current_page = get_page_safely(slug=slug, parent=parent)
             if not current_page:
                 raise Http404(f"Page not found: {'/'.join(slug_parts)}")
+            if parent and parent.parent_id is None and slug in LEGACY_ERROR_PAGE_SLUGS:
+                raise Http404("Error pages are owned by the active theme")
             parent = current_page
 
         # Check if page is published using new date-based logic
@@ -345,7 +350,7 @@ def page_search_view(request):
     pages = WebPage.objects.filter(
         Q(title__icontains=query) | Q(description__icontains=query),
         id__in=published_page_ids,
-    )[:20]
+    ).exclude(parent__isnull=False, parent__parent__isnull=True, slug__in=LEGACY_ERROR_PAGE_SLUGS)[:20]
 
     results = []
     for page in pages:
@@ -384,80 +389,100 @@ class HostnamePageView(View):
     context_object_name = "page"
 
     def _get_error_page(self, root_page, error_code):
-        """
-        Get custom error page for the given error code under root page.
+        """Return the theme-owned special page for an HTTP error code."""
+        return self._get_special_page(root_page, kind="error", status_code=error_code)
 
-        Args:
-            root_page: The root page for the current site
-            error_code: HTTP error code (e.g., 404, 500)
-
-        Returns:
-            WebPage or None if no custom error page exists
-        """
-        error_page = get_page_safely(slug=str(error_code), parent=root_page)
-        if error_page and error_page.is_published():
-            return error_page
+    def _get_special_page(self, root_page, *, kind=None, status_code=None, route=None):
+        theme = root_page.get_effective_theme()
+        if not theme:
+            return None
+        normalized_route = str(route or "").strip("/")
+        for special_page in theme_special_pages(theme.layouts):
+            if kind and special_page.get("kind") != kind:
+                continue
+            if status_code is not None and special_page.get("status_code") != status_code:
+                continue
+            if route is not None and str(special_page.get("route") or "").strip("/") != normalized_route:
+                continue
+            return {**special_page, "theme": theme}
         return None
 
-    def _render_error_page(self, error_page, status_code):
-        """
-        Render a custom error page with the appropriate HTTP status code.
+    def _render_error_page(self, root_page, status_code):
+        special_page = self._get_error_page(root_page, status_code)
+        return self._render_special_page(root_page, special_page, status_code=status_code)
 
-        Args:
-            error_page: The WebPage to render
-            status_code: HTTP status code to return
-
-        Returns:
-            HttpResponse with the rendered error page
-        """
-        from django.shortcuts import render
-
-        from .renderers import WebPageRenderer
-
-        # Get the published version
-        content = error_page.get_current_published_version()
-
-        if not content:
-            # If error page has no published content, fall back to default error
+    def _render_special_page(self, root_page, special_page, *, status_code=200):
+        """Render theme-owned widgets without creating Page or PageVersion rows."""
+        if not special_page:
             return None
-
-        effective_layout = error_page.get_effective_layout()
-
-        template_name = effective_layout.template_name if effective_layout else "webpages/page_detail.html"
-
-        # Build context for error page
-        context = {
-            "root_page": error_page.parent,  # Parent is the root page
-            "current_page": error_page,
-            "widgets": content.widgets,
-            "layout": effective_layout,
-            "theme": error_page.get_effective_theme(),
-            "parent": error_page.parent,
-            "slug_parts": [str(status_code)],
-            "request": self.request,
-            "page_data": content.page_data,
-            "version_number": content.version_number,
-            "status": content.get_publication_status(),
-            "is_current": content.is_current_published(),
-            "published_at": content.effective_date,
-            "published_by": content.created_by,
-            "effective_layout": effective_layout,
-            "effective_theme": error_page.get_effective_theme(),
-            "path_variables": {},
-            "error_code": status_code,  # Add error code to context
-        }
-
-        # Build widgets_by_slot via renderer
+        theme = special_page.get("theme") or root_page.get_effective_theme()
+        layout = next(
+            (
+                item
+                for item in (theme.layouts or {}).get("items", [])
+                if item.get("key") == special_page.get("layout_key") and item.get("status", "active") == "active"
+            ),
+            None,
+        )
+        if not layout:
+            return None
         renderer = WebPageRenderer(request=self.request)
-        base_context = renderer._build_base_context(error_page, content, {})
-        context["widgets_by_slot"] = renderer._render_widgets_by_slot(error_page, content, base_context)
-
-        if effective_layout:
-            context["slots"] = effective_layout.slot_configuration["slots"]
-        else:
-            context["slots"] = []
-
-        response = render(self.request, template_name, context)
+        widgets = special_page.get("widgets") or {}
+        page_data = {"title": special_page.get("label", ""), "special_page_key": special_page.get("key")}
+        base_context = {
+            "root_page": root_page,
+            "current_page": root_page,
+            "page": root_page,
+            "webpage_data": {
+                "id": root_page.id,
+                "title": special_page.get("label", root_page.title),
+                "slug": special_page.get("route") or special_page.get("key"),
+                "path": f"/{str(special_page.get('route') or '').strip('/')}",
+            },
+            "widgets": widgets,
+            "page_data": page_data,
+            "layout": layout,
+            "layout_name": layout.get("key", ""),
+            "theme": theme,
+            "parent": None,
+            "request": self.request,
+            "path_variables": {},
+            "error_code": special_page.get("status_code"),
+            "is_object_page": False,
+            "renderer": renderer,
+        }
+        rendered = {}
+        slot_configs = [{"name": name, **configuration} for name, configuration in (layout.get("slots") or {}).items()]
+        for slot in slot_configs:
+            slot_name = slot.get("name")
+            slot_context = {**base_context, "slot": slot, "slot_name": slot_name}
+            rendered[slot_name] = [
+                {"html": renderer.render_widget_json(widget, slot_context), "widget_data": widget}
+                for widget in widgets.get(slot_name, [])
+                if widget.get("config", {}).get("is_visible", widget.get("config", {}).get("isVisible", True))
+            ]
+        theme_css_url = None
+        if theme:
+            theme_css_url = f"/api/v1/webpages/themes/{theme.id}/styles.css?v={int(theme.updated_at.timestamp())}"
+        context = {
+            **base_context,
+            "widgets_by_slot": rendered,
+            "slots": slot_configs,
+            "effective_layout": layout,
+            "effective_theme": theme,
+            "theme_css_url": theme_css_url,
+            "slug_parts": [part for part in str(special_page.get("route") or "").split("/") if part],
+            "meta_title": special_page.get("label", root_page.title),
+            "meta_description": "",
+            "status": "theme",
+            "is_current": True,
+            "special_page_html": render_theme_layout(
+                layout,
+                rendered,
+                theme.get_breakpoints() if theme else None,
+            ),
+        }
+        response = render(self.request, "webpages/theme_special_page.html", context)
         response.status_code = status_code
         return response
 
@@ -499,6 +524,12 @@ class HostnamePageView(View):
         try:
             # Initialize path_variables (will be populated if pattern matching occurs)
             path_variables = {}
+
+            route_page = self._get_special_page(root_page, kind="route", route="/".join(slug_parts))
+            if route_page:
+                response = self._render_special_page(root_page, route_page)
+                if response:
+                    return response
 
             # If no path specified, return the root page
             if not slug_parts:
@@ -588,7 +619,7 @@ class HostnamePageView(View):
             # Try to render custom 404 error page for this site
             error_page = self._get_error_page(root_page, 404)
             if error_page:
-                error_response = self._render_error_page(error_page, 404)
+                error_response = self._render_special_page(root_page, error_page, status_code=404)
                 if error_response:
                     return error_response
             # Re-raise if no custom error page or rendering failed
@@ -630,6 +661,9 @@ class HostnamePageView(View):
                 slug = slug_parts[j]
                 temp_page = get_page_safely(slug=slug, parent=temp_page)
                 if not temp_page:
+                    found = False
+                    break
+                if temp_page.parent_id == root_page.id and slug in LEGACY_ERROR_PAGE_SLUGS:
                     found = False
                     break
 
@@ -818,15 +852,11 @@ def custom_404_handler(request, exception=None):
     try:
         root_page = WebPage.get_root_page_for_hostname(hostname)
         if root_page:
-            # Try to find custom 404 page
-            error_page = get_page_safely(slug="404", parent=root_page)
-            if error_page and error_page.is_published():
-                # Render custom 404 page
-                view = HostnamePageView()
-                view.request = request
-                error_response = view._render_error_page(error_page, 404)
-                if error_response:
-                    return error_response
+            view = HostnamePageView()
+            view.request = request
+            error_response = view._render_error_page(root_page, 404)
+            if error_response:
+                return error_response
     except Exception:
         pass
 
@@ -858,15 +888,11 @@ def custom_500_handler(request):
             # Find the root page for this hostname
             root_page = WebPage.get_root_page_for_hostname(hostname)
             if root_page:
-                # Try to find custom 500 page
-                error_page = get_page_safely(slug="500", parent=root_page)
-                if error_page and error_page.is_published():
-                    # Render custom 500 page
-                    view = HostnamePageView()
-                    view.request = request
-                    error_response = view._render_error_page(error_page, 500)
-                    if error_response:
-                        return error_response
+                view = HostnamePageView()
+                view.request = request
+                error_response = view._render_error_page(root_page, 500)
+                if error_response:
+                    return error_response
     except Exception:
         # If anything goes wrong, fall back to default handler
         pass
@@ -899,15 +925,11 @@ def custom_403_handler(request, exception=None):
             # Find the root page for this hostname
             root_page = WebPage.get_root_page_for_hostname(hostname)
             if root_page:
-                # Try to find custom 403 page
-                error_page = get_page_safely(slug="403", parent=root_page)
-                if error_page and error_page.is_published():
-                    # Render custom 403 page
-                    view = HostnamePageView()
-                    view.request = request
-                    error_response = view._render_error_page(error_page, 403)
-                    if error_response:
-                        return error_response
+                view = HostnamePageView()
+                view.request = request
+                error_response = view._render_error_page(root_page, 403)
+                if error_response:
+                    return error_response
     except Exception:
         pass
 
@@ -943,15 +965,11 @@ def custom_503_handler(request, exception=None):
             # Find the root page for this hostname
             root_page = WebPage.get_root_page_for_hostname(hostname)
             if root_page:
-                # Try to find custom 503 page
-                error_page = get_page_safely(slug="503", parent=root_page)
-                if error_page and error_page.is_published():
-                    # Render custom 503 page
-                    view = HostnamePageView()
-                    view.request = request
-                    error_response = view._render_error_page(error_page, 503)
-                    if error_response:
-                        return error_response
+                view = HostnamePageView()
+                view.request = request
+                error_response = view._render_error_page(root_page, 503)
+                if error_response:
+                    return error_response
     except Exception:
         pass
 

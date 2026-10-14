@@ -1,13 +1,18 @@
 import { createElement, useEffect, useMemo, useRef, useState } from 'react'
-import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Braces, Copy, KeyRound, Maximize2, Minus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Redo2, RotateCcw, Trash2, Undo2 } from 'lucide-react'
+import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Braces, Copy, FileKey, Image as ImageIcon, KeyRound, Maximize2, Minus, Palette, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Redo2, RotateCcw, Trash2, Type, Undo2 } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
+import { googleFontsStylesheetUrl } from '../../rendering/primitives'
 import { validateLayoutDefinition } from '../../rendering/themeLayoutRenderer'
+import { buildDesignerTheme, buildThemeCSS } from '../../utils/editorThemeCSS'
+import ImageLibraryPicker from '../theme/ImageLibraryPicker'
 import { themeBreakpointDefinition } from '../theme/breakpointConfig'
+import { ThemeColorField, ThemeFontField, ThemeFontsEditor, ThemePaletteEditor } from './ThemeDesignTokens'
 import { inheritedLayoutStyle } from './layoutStyleInheritance'
+import SpecialPagesEditor from './SpecialPagesEditor'
 
 const nodeTypes = ['container', 'section', 'grid', 'row', 'column', 'semantic', 'slot']
-const styleFields = ['display', 'width', 'max_width', 'min_height', 'grid_template_columns', 'grid_column', 'flex_direction', 'flex_wrap', 'flex_grow', 'order', 'gap', 'padding', 'margin', 'align_items', 'justify_content', 'background_color', 'color', 'border', 'border_radius']
+const styleFields = ['display', 'width', 'max_width', 'min_height', 'grid_template_columns', 'grid_column', 'flex_direction', 'flex_wrap', 'flex_grow', 'order', 'gap', 'padding', 'margin', 'align_items', 'justify_content', 'background_color', 'background_image', 'background_position', 'background_size', 'background_repeat', 'color', 'font_family', 'border', 'border_radius']
 const gridStyleFields = ['grid_template_columns', 'gap', 'padding', 'margin', 'align_items', 'justify_content']
 const externallyEditableNodeTypes = new Set(['container', 'grid', 'semantic', 'slot'])
 const defaultPresentationColors = { container: '#3b82f6', grid: '#a855f7', semantic: '#f59e0b', slot: '#f43f5e' }
@@ -96,7 +101,7 @@ const TreeNode = ({ node, selectedId, onSelect, onDragStart, onDrop, disabled = 
 
 const iconButton = 'inline-flex min-h-8 min-w-8 items-center justify-center rounded text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-35'
 
-const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disabled, initialLayoutKey = '', initialAction = '', onInitialActionHandled }) => {
+const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace, disabled, initialLayoutKey = '', initialAction = '', onInitialActionHandled }) => {
     const layouts = workspace.layouts
     const breakpointEntries = useMemo(() => Object.entries(workspace.breakpoints || {})
         .filter(([, value]) => Number.isFinite(Number(value)))
@@ -120,6 +125,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
     const [zoomMode, setZoomMode] = useState('fit')
     const [manualZoom, setManualZoom] = useState(1)
     const [canvasViewportSize, setCanvasViewportSize] = useState({ width: 0, height: 0 })
+    const [imagePickerOpen, setImagePickerOpen] = useState(false)
     const initialActionHandled = useRef(false)
     const workspaceRef = useRef(null)
     const canvasViewportRef = useRef(null)
@@ -325,6 +331,25 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
         return { ...node, styles }
     })
 
+    const installThemeFont = (font) => updateWorkspace((next) => {
+        next.fonts ||= []
+        if (!next.fonts.some((installed) => installed.family === font.family)) {
+            next.fonts.push({ family: font.family, variants: font.variants || ['400'], display: 'swap', usage: [] })
+        }
+        return next
+    })
+
+    const updateThemeColor = (index, value) => updateWorkspace((next) => {
+        next.colors[index].value = value
+        return next
+    })
+
+    const addThemeColor = (color) => updateWorkspace((next) => {
+        next.colors ||= []
+        if (!next.colors.some((candidate) => candidate.name === color.name)) next.colors.push({ ...color, usage: [] })
+        return next
+    })
+
     const addLayout = () => {
         const count = layouts.items.length + 1
         const key = `layout_${count}`
@@ -520,11 +545,19 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
         }
     }
 
+    const layoutThemePreview = useMemo(() => {
+        const theme = buildDesignerTheme(workspace)
+        return {
+            css: theme ? buildThemeCSS({ theme }) : '',
+            fontUrl: googleFontsStylesheetUrl(theme?.fonts),
+        }
+    }, [workspace])
+
     const canvasModel = useMemo(() => {
         if (!selectedLayout) return null
         const slots = Object.fromEntries(Object.keys(selectedLayout.slots).map((key) => [key, []]))
-        return { layout: selectedLayout.key, layoutDefinition: selectedLayout, layoutDefinitionRequired: true, layoutBreakpoints: workspace.breakpoints, slots, context: { preview: true }, designer: { catalog: {}, texts: {}, assets: [], guidesEnabled: false, layoutCanvas: true } }
-    }, [selectedLayout])
+        return { layout: selectedLayout.key, layoutDefinition: selectedLayout, layoutDefinitionRequired: true, layoutBreakpoints: workspace.breakpoints, slots, context: { preview: true }, themeCss: layoutThemePreview.css, fontUrl: layoutThemePreview.fontUrl, designer: { catalog: {}, texts: {}, assets: [], guidesEnabled: false, layoutCanvas: true } }
+    }, [layoutThemePreview, selectedLayout, workspace.breakpoints])
 
     const updateSlot = (updater) => updateLayout((layout) => {
         const key = selected.node.slot_key
@@ -547,8 +580,12 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
             <div className="flex items-center gap-1" role="tablist" aria-label="Layout editor mode">
                 <button type="button" role="tab" aria-selected={mode === 'visual'} onClick={() => setMode('visual')} className={`rounded px-3 py-1.5 text-sm ${mode === 'visual' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Visual</button>
                 <button type="button" role="tab" aria-selected={mode === 'json'} onClick={() => { setJsonText(JSON.stringify(layouts, null, 2)); setMode('json') }} className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${mode === 'json' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}><Braces className="h-4 w-4" />JSON</button>
+                <button type="button" role="tab" aria-selected={mode === 'palette'} onClick={() => setMode('palette')} className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${mode === 'palette' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}><Palette className="h-4 w-4" />Palette</button>
+                <button type="button" role="tab" aria-selected={mode === 'fonts'} onClick={() => setMode('fonts')} className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${mode === 'fonts' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}><Type className="h-4 w-4" />Fonts</button>
+                <button type="button" role="tab" aria-selected={mode === 'special'} onClick={() => setMode('special')} className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${mode === 'special' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}><FileKey className="h-4 w-4" />Special pages</button>
             </div>
             <div className="flex items-center gap-1">
+                <button type="button" onClick={() => setImagePickerOpen(true)} disabled={!themeId || !selected || disabled} className={iconButton} aria-label="Choose theme image for selected element" title="Choose or upload a background image"><ImageIcon className="h-4 w-4" /></button>
                 <button type="button" aria-label="Undo layout change" title="Undo · Ctrl/⌘ Z" onClick={() => restoreHistory(undoStack, setUndoStack, setRedoStack)} disabled={!undoStack.length || disabled} className={iconButton}><Undo2 className="h-4 w-4" /></button>
                 <button type="button" aria-label="Redo layout change" title="Redo · Ctrl/⌘ Shift Z" onClick={() => restoreHistory(redoStack, setRedoStack, setUndoStack)} disabled={!redoStack.length || disabled} className={iconButton}><Redo2 className="h-4 w-4" /></button>
             </div>
@@ -558,7 +595,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
             <label htmlFor="theme-layout-json" className="mb-2 text-sm font-medium text-gray-800">Canonical layout document</label>
             <textarea id="theme-layout-json" spellCheck="false" value={jsonText} disabled={disabled} onChange={(event) => { setJsonText(event.target.value); setJsonError('') }} className="min-h-0 flex-1 resize-none rounded border border-gray-300 bg-white p-4 font-mono text-xs leading-5 text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:bg-gray-100" />
             <div className="mt-3 flex justify-end"><button type="button" onClick={applyJson} disabled={disabled} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">Apply JSON</button></div>
-        </section> : <div
+        </section> : mode === 'palette' ? <section className="min-h-0 flex-1 overflow-y-auto p-6"><div className="mx-auto max-w-2xl rounded-lg border border-gray-200 bg-white p-5"><fieldset disabled={disabled}><ThemePaletteEditor colors={workspace.colors || []} onChange={updateThemeColor} onAdd={addThemeColor} /></fieldset></div></section> : mode === 'fonts' ? <section className="min-h-0 flex-1 overflow-y-auto p-6"><div className="mx-auto max-w-2xl rounded-lg border border-gray-200 bg-white p-5"><fieldset disabled={disabled}><ThemeFontsEditor fonts={workspace.fonts || []} onInstall={installThemeFont} /></fieldset></div></section> : mode === 'special' ? <SpecialPagesEditor workspace={workspace} updateWorkspace={updateWorkspace} disabled={disabled} /> : <div
             ref={workspaceRef}
             className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[var(--layout-structure-width)_var(--layout-structure-handle-width)_minmax(400px,1fr)_var(--layout-inspector-handle-width)_var(--layout-inspector-width)]"
             style={{
@@ -733,6 +770,34 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
                             const inheritedLabel = inherited?.breakpoint === 'base' ? 'Base' : themeBreakpointDefinition(inherited?.breakpoint)?.label || inherited?.breakpoint?.toUpperCase()
                             const canReset = activeStyleBreakpoint !== 'base' && hasOverride
                             const hasTrailingControl = Boolean(inherited || canReset || externallyEditableNodeTypes.has(selected.node.type))
+                            const exposeControl = externallyEditableNodeTypes.has(selected.node.type) && <label title={`Expose ${fieldLabel} in the Theme Designer`} className="inline-flex min-h-7 items-center gap-1.5 text-[11px] text-gray-600">
+                                <input type="checkbox" aria-label={`Expose ${fieldLabel} in Theme Designer`} checked={(selected.node.editable_parameters || []).includes(field)} onChange={(event) => updateNode((node) => { const parameters = new Set(node.editable_parameters || []); if (event.target.checked) parameters.add(field); else parameters.delete(field); return { ...node, editable_parameters: [...parameters] } })} />Theme Designer
+                            </label>
+                            if (['background_color', 'color'].includes(field)) return <div key={field} className="grid grid-cols-[1fr_1.2fr] items-start gap-2 text-xs text-gray-600">
+                                <span className="pt-1.5 capitalize">{fieldLabel}</span>
+                                <div className="min-w-0">
+                                    <ThemeColorField id={`layout-style-${selected.node.id}-${activeStyleBreakpoint}-${field}`} ariaLabel={`${fieldLabel} value`} value={displayedValue} colors={workspace.colors || []} disabled={Boolean(inherited)} onChange={(value) => value ? setStyleOverride(field, value) : resetStyleOverride(field)} onAdd={addThemeColor} formatPaletteValue={(name) => `token:${name}`} />
+                                    <div className="mt-1 flex flex-wrap items-center justify-between gap-2">{inherited ? <button type="button" onClick={() => setStyleOverride(field, inherited.value)} className="text-[11px] font-medium text-blue-700">Override {inheritedLabel}</button> : canReset ? <button type="button" onClick={() => resetStyleOverride(field)} className="text-[11px] font-medium text-blue-700">Reset override</button> : <span />}{exposeControl}</div>
+                                    {inherited && <p className="mt-1 text-[10px] text-gray-500">Inherited from {inheritedLabel}</p>}
+                                </div>
+                            </div>
+                            if (field === 'font_family') return <div key={field} className="grid grid-cols-[1fr_1.2fr] items-start gap-2 text-xs text-gray-600">
+                                <span className="pt-1.5 capitalize">{fieldLabel}</span>
+                                <div className="min-w-0">
+                                    <ThemeFontField id={`layout-style-${selected.node.id}-${activeStyleBreakpoint}-${field}`} ariaLabel="Font family value" value={displayedValue} fonts={workspace.fonts || []} disabled={Boolean(inherited)} onChange={(value) => value ? setStyleOverride(field, value) : resetStyleOverride(field)} onInstall={installThemeFont} />
+                                    <div className="mt-1 flex flex-wrap items-center justify-between gap-2">{inherited ? <button type="button" onClick={() => setStyleOverride(field, inherited.value)} className="text-[11px] font-medium text-blue-700">Override {inheritedLabel}</button> : canReset ? <button type="button" onClick={() => resetStyleOverride(field)} className="text-[11px] font-medium text-blue-700">Reset override</button> : <span />}{exposeControl}</div>
+                                    {inherited && <p className="mt-1 text-[10px] text-gray-500">Inherited from {inheritedLabel}</p>}
+                                </div>
+                            </div>
+                            if (field === 'background_image') return <div key={field} className="grid grid-cols-[1fr_1.2fr] items-start gap-2 text-xs text-gray-600">
+                                <span className="pt-1.5 capitalize">{fieldLabel}</span>
+                                <div className="min-w-0 space-y-1.5">
+                                    {displayedValue ? <img src={displayedValue} alt="" className="h-20 w-full rounded border border-gray-200 bg-gray-50 object-cover" /> : <div className="flex h-16 items-center justify-center rounded border border-dashed border-gray-300 bg-gray-50 text-[11px] text-gray-500">No background image</div>}
+                                    <div className="flex gap-1.5"><button type="button" disabled={Boolean(inherited)} onClick={() => setImagePickerOpen(true)} className="flex-1 rounded border border-blue-600 bg-white px-2 py-1.5 text-[11px] font-medium text-blue-700 disabled:opacity-40">Choose or upload</button>{hasOverride && <button type="button" onClick={() => resetStyleOverride(field)} className="rounded border border-gray-300 px-2 py-1.5 text-[11px] text-gray-700">Clear</button>}</div>
+                                    <div className="flex flex-wrap items-center justify-between gap-2">{inherited ? <button type="button" onClick={() => setStyleOverride(field, inherited.value)} className="text-[11px] font-medium text-blue-700">Override {inheritedLabel}</button> : <span />}{exposeControl}</div>
+                                    {inherited && <p className="text-[10px] text-gray-500">Inherited from {inheritedLabel}</p>}
+                                </div>
+                            </div>
                             return <div key={field} className="grid grid-cols-[1fr_1.2fr] items-start gap-2 text-xs text-gray-600">
                                 <label htmlFor={`layout-style-${selected.node.id}-${activeStyleBreakpoint}-${field}`} className="pt-1.5 capitalize">{fieldLabel}</label>
                                 <div className="min-w-0">
@@ -755,6 +820,7 @@ const LayoutDesignerWorkspace = ({ workspace, viewport, updateWorkspace, disable
                 </fieldset>}
             </aside>
         </div>}
+        {imagePickerOpen && <ImageLibraryPicker themeId={themeId} currentSelection={selected?.node.styles?.[activeStyleBreakpoint]?.background_image ? { url: selected.node.styles[activeStyleBreakpoint].background_image } : null} onCancel={() => setImagePickerOpen(false)} onSelect={(image) => { setStyleOverride('background_image', image.url); setImagePickerOpen(false) }} />}
     </main>
 }
 

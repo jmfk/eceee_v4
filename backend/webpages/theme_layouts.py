@@ -5,11 +5,18 @@ from __future__ import annotations
 import copy
 import re
 import uuid
+from urllib.parse import urlparse
 
 from django.core.exceptions import ValidationError
 
+from webpages.error_page_defaults import ERROR_PAGE_CONTENT, theme_error_page_widgets
+
 SCHEMA_VERSION = 1
 LAYOUT_KEY = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+WIDGET_ID = re.compile(
+    r"^(?:widget-)?[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
 NODE_TYPES = {"container", "section", "grid", "row", "column", "semantic", "slot"}
 SEMANTIC_TAGS = {"div", "header", "nav", "main", "aside", "section", "footer"}
 BREAKPOINTS = {"base", "xs", "sm", "md", "lg", "xl"}
@@ -30,7 +37,12 @@ STYLE_PROPERTIES = {
     "align_items",
     "justify_content",
     "background_color",
+    "background_image",
+    "background_position",
+    "background_repeat",
+    "background_size",
     "color",
+    "font_family",
     "border",
     "border_radius",
 }
@@ -39,7 +51,18 @@ COLLAPSE_BEHAVIORS = {"never", "any", "all"}
 MAX_LAYOUTS = 50
 MAX_NODES = 250
 MAX_DEPTH = 12
+MAX_SPECIAL_PAGES = 50
+MAX_SPECIAL_PAGE_WIDGETS = 100
 REQUIRED_LAYOUT_KEYS = {"main_layout", "landing_page", "error_layout"}
+
+
+def _valid_background_image(value):
+    if not isinstance(value, str) or not value or len(value) > 2048:
+        return False
+    if re.search(r"[\x00-\x20\"'\\();{}<>]", value):
+        return False
+    parsed = urlparse(value)
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
 def _stable_uuid(name: str) -> str:
@@ -462,7 +485,31 @@ def default_theme_layouts():
         "schema_version": SCHEMA_VERSION,
         "default_layout_key": "main_layout",
         "items": [_main_layout(), _landing_layout(), _error_layout()],
+        "special_pages": default_special_pages(),
     }
+
+
+def default_special_pages():
+    """Return portable, theme-owned defaults for the standard HTTP error pages."""
+    return [
+        {
+            "id": _stable_uuid(f"special-page/error-{status_code}"),
+            "key": f"error_{status_code}",
+            "label": f"{status_code} — {title}",
+            "kind": "error",
+            "status_code": status_code,
+            "layout_key": "error_layout",
+            "route": "",
+            "widgets": theme_error_page_widgets(status_code),
+        }
+        for status_code, (title, _explanation) in ERROR_PAGE_CONTENT.items()
+    ]
+
+
+def theme_special_pages(document):
+    """Read special pages while supplying defaults for pre-feature theme documents."""
+    pages = document.get("special_pages") if isinstance(document, dict) else None
+    return copy.deepcopy(pages if isinstance(pages, list) else default_special_pages())
 
 
 def legacy_compatibility_layout(key, slot_keys=None):
@@ -627,7 +674,11 @@ def validate_theme_layouts(document):
                     raise ValidationError(f"{path}.root styles at {breakpoint} contain unsupported properties.")
                 if any(not isinstance(value, (str, int, float)) for value in values.values()):
                     raise ValidationError(f"{path}.root style values must be strings or numbers.")
-                for value in values.values():
+                for property_name, value in values.items():
+                    if property_name == "background_image":
+                        if not _valid_background_image(value):
+                            raise ValidationError(f"{path}.root contains an unsafe background image URL.")
+                        continue
                     text = str(value).strip()
                     if len(text) > 160 or re.search(r"[;{}<>]|url\s*\(|expression\s*\(|@import", text, re.IGNORECASE):
                         raise ValidationError(f"{path}.root contains an unsafe structured style value.")
@@ -660,6 +711,89 @@ def validate_theme_layouts(document):
     default_key = document.get("default_layout_key")
     if default_key not in active_keys:
         raise ValidationError("layouts.default_layout_key must reference an active layout.")
+
+    special_pages = document.get("special_pages", default_special_pages())
+    if not isinstance(special_pages, list) or len(special_pages) > MAX_SPECIAL_PAGES:
+        raise ValidationError(f"layouts.special_pages must be a list with at most {MAX_SPECIAL_PAGES} entries.")
+    special_ids = set()
+    special_keys = set()
+    routes = set()
+    error_codes = set()
+    for index, special_page in enumerate(special_pages):
+        path = f"layouts.special_pages[{index}]"
+        if not isinstance(special_page, dict):
+            raise ValidationError(f"{path} must be an object.")
+        try:
+            special_id = str(uuid.UUID(str(special_page.get("id"))))
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise ValidationError(f"{path}.id must be a UUID.") from exc
+        if special_id in special_ids:
+            raise ValidationError(f"Duplicate special page id: {special_id}.")
+        special_ids.add(special_id)
+        key = special_page.get("key")
+        if not isinstance(key, str) or not LAYOUT_KEY.fullmatch(key) or key in special_keys:
+            raise ValidationError(f"{path}.key must be a unique lowercase identifier.")
+        special_keys.add(key)
+        if not isinstance(special_page.get("label", ""), str):
+            raise ValidationError(f"{path}.label must be text.")
+        if special_page.get("layout_key") not in active_keys:
+            raise ValidationError(f"{path}.layout_key must reference an active layout.")
+        kind = special_page.get("kind")
+        if kind not in {"error", "route"}:
+            raise ValidationError(f"{path}.kind must be error or route.")
+        route = special_page.get("route", "")
+        if not isinstance(route, str):
+            raise ValidationError(f"{path}.route must be text.")
+        route = route.strip("/")
+        if route and (len(route) > 200 or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_./-]*", route)):
+            raise ValidationError(f"{path}.route is invalid.")
+        if kind == "route":
+            if not route or route in routes:
+                raise ValidationError(f"{path}.route must be present and unique.")
+            routes.add(route)
+        status_code = special_page.get("status_code")
+        if kind == "error":
+            if status_code not in ERROR_PAGE_CONTENT or status_code in error_codes:
+                raise ValidationError(f"{path}.status_code must be a unique supported HTTP error code.")
+            error_codes.add(status_code)
+        widgets = special_page.get("widgets", {})
+        if not isinstance(widgets, dict):
+            raise ValidationError(f"{path}.widgets must be an object keyed by layout slot.")
+        widget_count = sum(len(items) for items in widgets.values() if isinstance(items, list))
+        if widget_count > MAX_SPECIAL_PAGE_WIDGETS:
+            raise ValidationError(f"{path}.widgets exceeds the maximum of {MAX_SPECIAL_PAGE_WIDGETS} widgets.")
+        layout = next(item for item in items if item.get("key") == special_page.get("layout_key"))
+        slots = layout.get("slots", {})
+        for slot_key, slot_widgets in widgets.items():
+            if slot_key not in slots or not isinstance(slot_widgets, list):
+                raise ValidationError(f"{path}.widgets.{slot_key} must be a list for a declared layout slot.")
+            maximum = slots[slot_key].get("max_widgets")
+            if maximum is not None and len(slot_widgets) > maximum:
+                raise ValidationError(f"{path}.widgets.{slot_key} allows at most {maximum} widgets.")
+            allowed = slots[slot_key].get("allowed_widget_types")
+            disallowed = slots[slot_key].get("disallowed_widget_types") or []
+            for widget_index, widget in enumerate(slot_widgets):
+                widget_path = f"{path}.widgets.{slot_key}[{widget_index}]"
+                if not isinstance(widget, dict):
+                    raise ValidationError(f"{widget_path} must be an object.")
+                if not WIDGET_ID.fullmatch(str(widget.get("id") or "")):
+                    raise ValidationError(f"{widget_path}.id must be a UUID or widget-prefixed UUID.")
+                widget_type = widget.get("type")
+                if not isinstance(widget_type, str) or not widget_type:
+                    raise ValidationError(f"{widget_path}.type must be text.")
+                if allowed and not _widget_type_matches(widget_type, allowed):
+                    raise ValidationError(f"Widget type '{widget_type}' is not allowed in slot '{slot_key}'.")
+                if disallowed and _widget_type_matches(widget_type, disallowed):
+                    raise ValidationError(f"Widget type '{widget_type}' is not allowed in slot '{slot_key}'.")
+                if not isinstance(widget.get("config", {}), dict):
+                    raise ValidationError(f"{widget_path}.config must be an object.")
+    missing_error_codes = set(ERROR_PAGE_CONTENT) - error_codes
+    if missing_error_codes:
+        raise ValidationError(
+            "Required error pages cannot be removed: "
+            + ", ".join(str(code) for code in sorted(missing_error_codes))
+            + "."
+        )
     return document
 
 

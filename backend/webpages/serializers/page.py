@@ -12,6 +12,8 @@ Page-related serializers for the Web Page Publishing System
 from django.utils import timezone
 from rest_framework import serializers
 
+from webpages.error_page_defaults import LEGACY_ERROR_PAGE_SLUGS
+
 from ..models import WebPage
 from .base import UserSerializer
 from .theme import PageThemeSerializer
@@ -308,7 +310,10 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
         return []
 
     def get_children_count(self, obj):
-        return obj.children.filter(is_deleted=False).count()
+        children = obj.children.filter(is_deleted=False)
+        if obj.parent_id is None:
+            children = children.exclude(slug__in=LEGACY_ERROR_PAGE_SLUGS)
+        return children.count()
 
     def get_is_deleted(self, obj):
         """Get is_deleted field (safe if migration not run)"""
@@ -688,9 +693,12 @@ class WebPageListSerializer(serializers.ModelSerializer):
         return None
 
     def get_children_count(self, obj):
-        if hasattr(obj, "children_count"):
+        if hasattr(obj, "children_count") and obj.parent_id is not None:
             return obj.children_count
-        return obj.children.filter(is_deleted=False).count()
+        children = obj.children.filter(is_deleted=False)
+        if obj.parent_id is None:
+            children = children.exclude(slug__in=LEGACY_ERROR_PAGE_SLUGS)
+        return children.count()
 
     def get_is_deleted(self, obj):
         return getattr(obj, "is_deleted", False)
@@ -837,6 +845,8 @@ class PageHierarchySerializer(serializers.ModelSerializer):
         # Filter children that are published based on their versions
         published_children = []
         for child in obj.children.order_by("sort_order"):
+            if obj.parent_id is None and child.slug in LEGACY_ERROR_PAGE_SLUGS:
+                continue
             if child.is_published():
                 published_children.append(child)
         return PageHierarchySerializer(published_children, many=True, context=self.context).data

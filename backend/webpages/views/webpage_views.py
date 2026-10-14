@@ -13,6 +13,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
 
+from ..error_page_defaults import LEGACY_ERROR_PAGE_SLUGS
 from ..filters import WebPageFilter
 from ..models import PageVersion, WebPage
 from ..serializers import PageHierarchySerializer, PageThemeSerializer, WebPageListSerializer, WebPageSimpleSerializer
@@ -96,6 +97,14 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 # is_deleted field doesn't exist yet (migration not run)
                 pass
 
+        # Error pages are theme-owned special pages. Keep pre-migration rows as
+        # dormant rollback data, but never expose them in the Pages product UI.
+        queryset = queryset.exclude(
+            parent__isnull=False,
+            parent__parent__isnull=True,
+            slug__in=LEGACY_ERROR_PAGE_SLUGS,
+        )
+
         # Optimize queries for list action by prefetching version data
         if self.action == "list":
             from django.utils import timezone
@@ -170,10 +179,6 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         # Normalize sort orders for the parent group
         page = serializer.instance
-        if page.parent_id is None:
-            from ..services.error_pages import ensure_site_error_pages
-
-            ensure_site_error_pages(page, self.request.user)
         WebPage.normalize_sort_orders(page.parent_id, tenant_id=page.tenant_id)
 
     def retrieve(self, request, pk=None):
