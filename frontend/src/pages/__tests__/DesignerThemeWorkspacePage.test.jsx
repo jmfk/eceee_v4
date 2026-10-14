@@ -644,39 +644,44 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByTitle('Live theme preview')).not.toBeInTheDocument()
     })
 
-    it('toggles individual WYSIWYG measurements and all Designer support guides', async () => {
+    it('switches WYSIWYG measurements between size, spacing, and hidden modes', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         const { postMessage } = await readyPreview()
 
-        expect(screen.getByRole('button', { name: 'Toggle width & height guides' })).toHaveAttribute('aria-pressed', 'false')
-        const marginToggle = screen.getByRole('button', { name: 'Toggle margins guides' })
-        expect(marginToggle).toHaveAttribute('aria-pressed', 'true')
-        expect(screen.getByRole('button', { name: 'Toggle padding guides' })).toHaveAttribute('aria-pressed', 'true')
-        expect(screen.getByRole('button', { name: 'Toggle gaps guides' })).toHaveAttribute('aria-pressed', 'true')
-        fireEvent.click(marginToggle)
-        expect(marginToggle).toHaveAttribute('aria-pressed', 'false')
+        const sizeMode = screen.getByRole('button', { name: 'Show width & height guides' })
+        const spacingMode = screen.getByRole('button', { name: 'Show margin, padding and gap guides' })
+        const hiddenMode = screen.getByRole('button', { name: 'Hide measurement guides' })
+        expect(sizeMode).toHaveAttribute('aria-pressed', 'false')
+        expect(spacingMode).toHaveAttribute('aria-pressed', 'true')
+        expect(hiddenMode).toHaveAttribute('aria-pressed', 'false')
+
+        fireEvent.click(sizeMode)
+        expect(sizeMode).toHaveAttribute('aria-pressed', 'true')
+        expect(spacingMode).toHaveAttribute('aria-pressed', 'false')
         await waitFor(() => expect(postMessage).toHaveBeenCalledWith(
             expect.objectContaining({
                 source: 'eceee-render-host',
                 action: 'render',
                 model: expect.objectContaining({ designer: expect.objectContaining({
                     guidesEnabled: true,
-                    guideVisibility: { size: false, margin: false, padding: true, gap: true },
+                    guideVisibility: { size: true, margin: false, padding: false, gap: false },
                 }) }),
             }),
             '*',
         ))
 
-        expect(screen.getByRole('button', { name: 'Hide guides' })).toHaveAttribute('aria-pressed', 'true')
-        fireEvent.click(screen.getByRole('button', { name: 'Hide guides' }))
-        expect(screen.getByRole('button', { name: 'Show guides' })).toHaveAttribute('aria-pressed', 'false')
-        expect(marginToggle).toBeDisabled()
+        fireEvent.click(hiddenMode)
+        expect(hiddenMode).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.queryByRole('button', { name: 'Hide guides' })).not.toBeInTheDocument()
         await waitFor(() => expect(postMessage).toHaveBeenCalledWith(
             expect.objectContaining({
                 source: 'eceee-render-host',
                 action: 'render',
-                model: expect.objectContaining({ designer: expect.objectContaining({ guidesEnabled: false }) }),
+                model: expect.objectContaining({ designer: expect.objectContaining({
+                    guidesEnabled: true,
+                    guideVisibility: { size: false, margin: false, padding: false, gap: false },
+                }) }),
             }),
             '*',
         ))

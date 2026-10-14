@@ -1769,12 +1769,12 @@ describe('RenderFrameRuntime designer overlay', () => {
         })
     })
 
-    it('honors per-category WYSIWYG measurement visibility', async () => {
+    it('shows only the active WYSIWYG measurement mode and centers size labels', async () => {
         render(<RenderFrameRuntime />)
         sendModel(createDesignerRenderModel({
             workspace,
             viewId: 'page-main',
-            guideVisibility: { size: true, margin: true, padding: false, gap: true },
+            guideVisibility: { size: true, margin: false, padding: false, gap: false },
         }))
         await screen.findByRole('heading', { name: 'Overridden heading' })
         const grid = document.querySelector<HTMLElement>('.main-layout-grid')!
@@ -1789,8 +1789,62 @@ describe('RenderFrameRuntime designer overlay', () => {
 
         expect(document.querySelector('.designer-spacing-padding')).toBeNull()
         expect(document.querySelector('.designer-spacing-padding-value')).toBeNull()
-        expect(document.querySelector('.designer-spacing-margin')).toBeInTheDocument()
+        expect(document.querySelector('.designer-spacing-margin')).toBeNull()
         expect(document.querySelector('.designer-spacing-size')).toBeInTheDocument()
+        const widthLabel = document.querySelector<HTMLElement>('.designer-spacing-size-value[data-property="width"]')
+        const heightLabel = document.querySelector<HTMLElement>('.designer-spacing-size-value[data-property="height"]')
+        expect(widthLabel).toHaveStyle({ left: '300px', top: '292px' })
+        expect(heightLabel).toHaveStyle({ left: '300px', top: '308px' })
+        expect(widthLabel).toHaveAttribute('data-editable', 'false')
+        expect(widthLabel).not.toHaveAttribute('role')
+        expect(getComputedStyle(widthLabel!).color).toBe('rgb(55, 65, 81)')
+    })
+
+    it.each([
+        {
+            mode: 'size',
+            guideVisibility: { size: true, margin: false, padding: false, gap: false },
+            selector: '.designer-spacing-size-value[data-property="width"]',
+            value: '200px',
+        },
+        {
+            mode: 'spacing',
+            guideVisibility: { size: false, margin: true, padding: true, gap: true },
+            selector: '.designer-spacing-padding-value[data-side="top"]',
+            value: '12px',
+        },
+    ])('shows $mode measurements for an empty slot as disabled', async ({ guideVisibility, selector, value }) => {
+        const sourceModel = createPageRenderModel({
+            layout: 'main_layout',
+            widgets: { main: [{
+                id: 'columns-1', type: 'easy_widgets.TwoColumnsWidget',
+                config: { slots: { left: [], right: [] } },
+            }] },
+        })
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({
+            workspace,
+            sourceModel,
+            contentEditable: false,
+            guideVisibility,
+        }))
+        await waitFor(() => expect(document.querySelector('[data-slot="left"]')).toBeInTheDocument())
+        const emptySlot = document.querySelector<HTMLElement>('[data-slot="left"]')!
+        emptySlot.style.marginLeft = '8px'
+        emptySlot.style.paddingTop = '12px'
+        vi.spyOn(emptySlot, 'getBoundingClientRect').mockReturnValue({
+            x: 40, y: 80, left: 40, top: 80, right: 240, bottom: 240, width: 200, height: 160,
+            toJSON: () => ({}),
+        })
+
+        fireEvent.mouseOver(emptySlot)
+
+        const measurement = [...document.querySelectorAll<HTMLElement>(selector)]
+            .find((label) => label.textContent === value)
+        expect(measurement).toBeInTheDocument()
+        expect(measurement).toHaveAttribute('data-editable', 'false')
+        expect(measurement).not.toHaveAttribute('role')
+        expect(measurement).not.toHaveAttribute('tabindex')
     })
 
     it('centers a spacing value in the visible part of an offscreen region', async () => {
