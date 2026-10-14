@@ -25,11 +25,10 @@ const directionalSpacingFields = [
     'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
 ]
 const visibleSpacingFields = [...directionalSpacingFields, 'gap', 'width', 'height']
-const guideVisibilityOptions = [
-    ['size', 'Width & height'],
-    ['margin', 'Margins'],
-    ['padding', 'Padding'],
-    ['gap', 'Gaps'],
+const guideVisibilityModes = [
+    ['size', 'Width & height', { size: true, margin: false, padding: false, gap: false }],
+    ['spacing', 'Spacing', { size: false, margin: true, padding: true, gap: true }],
+    ['none', 'None', { size: false, margin: false, padding: false, gap: false }],
 ]
 const widgetFrameSpacingProperties = (constraints) => constraints.editableWidgetFrameSpacingProperties
     || constraints.editableSpacingProperties.filter((field) => field === 'width')
@@ -1268,6 +1267,13 @@ const SemanticThemeWorkspace = ({
     const previewCanvasWidth = designerPreviewWidth(viewport, configuredBreakpoints)
     const previewScale = Math.min(1, previewFrameWidth / previewCanvasWidth)
     const previewOffset = Math.max(0, (previewFrameWidth - previewCanvasWidth * previewScale) / 2)
+    const guideVisibilityMode = !guidesEnabled
+        ? 'none'
+        : guideVisibility.size
+            ? 'size'
+            : guideVisibility.margin || guideVisibility.padding || guideVisibility.gap
+                ? 'spacing'
+                : 'none'
 
     const selectedTargetIds = [...new Set([
         selectedTarget?.id,
@@ -2604,18 +2610,22 @@ const SemanticThemeWorkspace = ({
                         <button type="button" aria-label={inspectorCollapsed ? 'Expand theme inspector' : 'Collapse theme inspector'} aria-pressed={inspectorCollapsed} onClick={() => setInspectorCollapsed((current) => !current)} className="hidden rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 xl:inline-flex">{inspectorCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-2">
-                    {contentMode === 'demo' && <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Visible WYSIWYG measurement guides">
-                        {guideVisibilityOptions.map(([key, label]) => <button
+                    {contentMode === 'demo' && <div className="flex flex-wrap items-center gap-1" role="group" aria-label="WYSIWYG measurement guides">
+                        {guideVisibilityModes.map(([key, label, visibility]) => <button
                             key={key}
                             type="button"
-                            aria-label={`Toggle ${label.toLowerCase()} guides`}
-                            aria-pressed={guideVisibility[key]}
-                            disabled={!guidesEnabled}
-                            onClick={() => setGuideVisibility((current) => ({ ...current, [key]: !current[key] }))}
-                            className={`rounded-md border px-2 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-45 ${guideVisibility[key] ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'}`}
+                            aria-label={key === 'none'
+                                ? 'Hide measurement guides'
+                                : `Show ${key === 'spacing' ? 'margin, padding and gap' : label.toLowerCase()} guides`}
+                            aria-pressed={guideVisibilityMode === key}
+                            onClick={() => {
+                                setGuidesEnabled(true)
+                                setGuideVisibility(visibility)
+                            }}
+                            className={`rounded-md border px-2 py-1.5 text-xs font-medium ${guideVisibilityMode === key ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'}`}
                         >{label}</button>)}
                     </div>}
-                    {contentMode !== 'none' && <button type="button" aria-pressed={guidesEnabled} onClick={() => setGuidesEnabled((current) => !current)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{guidesEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{guidesEnabled ? 'Hide guides' : 'Show guides'}</button>}
+                    {contentMode === 'content' && <button type="button" aria-pressed={guidesEnabled} onClick={() => setGuidesEnabled((current) => !current)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{guidesEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{guidesEnabled ? 'Hide guides' : 'Show guides'}</button>}
                     <span className="text-xs text-gray-500">{themeBreakpointDefinition(viewport)?.label || viewport} · {previewCanvasWidth}px</span>
                     </div>
                 </div>
