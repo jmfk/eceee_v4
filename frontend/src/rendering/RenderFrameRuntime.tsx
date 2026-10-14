@@ -1003,10 +1003,10 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         })
         addGuide(
             'designer-spacing-content',
-            rect.left,
-            rect.top,
-            rect.width,
-            rect.height,
+            rect.left - 1,
+            rect.top - 1,
+            rect.width + 2,
+            rect.height + 2,
         )
         if (columnGrid && (selectionLevel === 'widget' || columnGrid === node)) {
             const slots = [...columnGrid.children]

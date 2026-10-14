@@ -1264,9 +1264,11 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(slotPaddingLabel).toHaveAttribute('data-editable', 'true')
         expect(spacingLabel('.designer-spacing-margin-value[data-side="left"]', '12px')).toHaveClass('designer-spacing-level-widget')
         expect(spacingLabel('.designer-spacing-padding-value[data-side="bottom"]', '13px')).toHaveClass('designer-spacing-level-element')
-        expect(document.querySelector('.designer-spacing-content.designer-spacing-level-slot')).toHaveStyle({ left: '10px' })
-        expect(document.querySelector('.designer-spacing-content.designer-spacing-level-widget')).toHaveStyle({ left: '40px' })
-        expect(document.querySelector('.designer-spacing-content.designer-spacing-level-element')).toHaveStyle({ left: '80px' })
+        expect(document.querySelector('.designer-spacing-content.designer-spacing-level-slot')).toHaveStyle({ left: '9px' })
+        expect(document.querySelector('.designer-spacing-content.designer-spacing-level-widget')).toHaveStyle({ left: '39px' })
+        expect(document.querySelector('.designer-spacing-content.designer-spacing-level-element')).toHaveStyle({
+            left: '79px', top: '89px', width: '302px', height: '82px',
+        })
         expect(getComputedStyle(document.querySelector('.designer-spacing-content.designer-spacing-level-slot')!).borderStyle).toBe('solid')
         expect(getComputedStyle(document.querySelector('.designer-spacing-content.designer-spacing-level-widget')!).borderStyle).toBe('dashed')
         expect(getComputedStyle(document.querySelector('.designer-spacing-content.designer-spacing-level-element')!).borderStyle).toBe('dotted')
@@ -1715,7 +1717,7 @@ describe('RenderFrameRuntime designer overlay', () => {
             left: '82px', top: '107px', width: '9px', height: '184px',
         })
         expect(document.querySelector('.designer-spacing-content')).toHaveStyle({
-            left: '80px', top: '100px', width: '300px', height: '200px',
+            left: '79px', top: '99px', width: '302px', height: '202px',
         })
         fireEvent.click(heading)
         const selectedMarginLabel = document.querySelector('.designer-spacing-margin-value[data-side="top"]')
