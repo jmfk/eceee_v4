@@ -753,7 +753,7 @@ def validate_theme_layouts(document):
         if kind == "route":
             if not route or route in routes:
                 raise ValidationError(f"{path}.route must be present and unique.")
-            if route.split("/", 1)[0] in LEGACY_ERROR_PAGE_SLUGS:
+            if route.split("/", 1)[0] in (*LEGACY_ERROR_PAGE_SLUGS, "theme-error-status"):
                 raise ValidationError(f"{path}.route cannot use a reserved error path.")
             routes.add(route)
         status_code = special_page.get("status_code")

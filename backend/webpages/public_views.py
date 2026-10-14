@@ -395,7 +395,19 @@ class HostnamePageView(View):
         return self._get_special_page(root_page, kind="error", status_code=error_code)
 
     def _get_special_page(self, root_page, *, kind=None, status_code=None, route=None):
-        theme = root_page.get_effective_theme()
+        root_version = root_page.get_current_published_version()
+        if not root_version:
+            return None
+        if root_version.theme_id:
+            theme = root_version.theme
+        else:
+            from .models import PageTheme
+
+            theme = (
+                PageTheme.objects.filter(tenant=root_page.tenant, is_default=True, is_active=True)
+                .order_by("created_at", "id")
+                .first()
+            )
         if not theme:
             return None
         normalized_route = str(route or "").strip("/")
@@ -417,7 +429,9 @@ class HostnamePageView(View):
         """Render theme-owned widgets without creating Page or PageVersion rows."""
         if not special_page:
             return None
-        theme = special_page.get("theme") or root_page.get_effective_theme()
+        theme = special_page.get("theme")
+        if not theme:
+            return None
         layout = next(
             (
                 item

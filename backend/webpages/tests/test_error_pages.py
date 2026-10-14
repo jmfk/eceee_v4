@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.http import Http404
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -229,6 +230,14 @@ class ErrorPageRenderingTests(TestCase):
             is_default=True,
             layouts=default_theme_layouts(),
         )
+        self.root_version = PageVersion.objects.create(
+            page=self.root_page,
+            version_number=1,
+            version_title="Published",
+            effective_date=timezone.now(),
+            created_by=self.user,
+        )
+        self.root_page.refresh_from_db()
 
     def test_custom_404_page_found(self):
         """The standard 404 definition comes from the active theme."""
@@ -257,6 +266,8 @@ class ErrorPageRenderingTests(TestCase):
         self.assertContains(response, "Return to the home page", status_code=404)
 
     def test_special_route_is_not_exposed_when_site_root_is_unpublished(self):
+        self.root_version.delete()
+        self.root_page.refresh_from_db()
         layouts = self.theme.layouts
         layouts["special_pages"].append(
             {
@@ -276,10 +287,18 @@ class ErrorPageRenderingTests(TestCase):
         view.request = request
         view.kwargs = {"slug_path": "login"}
 
-        with patch.object(WebPage, "get_root_page_for_hostname", return_value=self.root_page):
-            response = view.get(request, slug_path="login")
+        with (
+            patch.object(WebPage, "get_root_page_for_hostname", return_value=self.root_page),
+            self.assertRaises(Http404),
+        ):
+            view.get(request, slug_path="login")
 
-        self.assertEqual(response.status_code, 404)
+    def test_error_lookup_does_not_create_a_default_theme(self):
+        self.theme.delete()
+        view = HostnamePageView()
+
+        self.assertIsNone(view._get_error_page(self.root_page, 404))
+        self.assertFalse(PageTheme.objects.filter(tenant=self.tenant).exists())
 
     def test_custom_404_page_not_found_returns_none(self):
         """A site without an effective theme has no special error page."""
@@ -288,7 +307,7 @@ class ErrorPageRenderingTests(TestCase):
         if connection.vendor == "sqlite":
             self.skipTest("ArrayField not supported on SQLite")
         view = HostnamePageView()
-        root = type("Root", (), {"get_effective_theme": lambda _self: None})()
+        root = type("Root", (), {"get_current_published_version": lambda _self: None})()
         found_page = view._get_error_page(root, 404)
 
         self.assertIsNone(found_page)
@@ -465,6 +484,14 @@ class ErrorPageIntegrationTests(TestCase):
             last_modified_by=self.user,
             tenant=self.tenant,
         )
+        PageVersion.objects.create(
+            page=self.root_page,
+            version_number=1,
+            version_title="Published",
+            effective_date=timezone.now(),
+            created_by=self.user,
+        )
+        self.root_page.refresh_from_db()
 
         view = HostnamePageView()
         found = view._get_error_page(self.root_page, 404)
