@@ -959,7 +959,11 @@ def apply_designer_snapshot(theme, snapshot):
     theme.fonts = copy.deepcopy(snapshot.get("fonts", {}))
     theme.design_groups = copy.deepcopy(snapshot.get("design_groups", {}))
     theme.designer_preview = copy.deepcopy(snapshot.get("designer_preview", theme.designer_preview))
-    theme.layouts = copy.deepcopy(snapshot.get("layouts", theme.layouts))
+    layouts = copy.deepcopy(snapshot.get("layouts", theme.layouts))
+    theme.layouts = {
+        **layouts,
+        "special_pages": theme_special_pages(layouts),
+    }
     theme.image.name = snapshot.get("image") or ""
     theme.site_icon.name = snapshot.get("site_icon") or ""
     return theme
@@ -1770,16 +1774,17 @@ def publish_layout_draft(theme_id, tenant, user, draft_version):
 
         workspace_fields = ("layouts", "colors", "fonts")
         live_snapshot = theme_designer_snapshot(theme)
-        draft_layouts = copy.deepcopy(draft.snapshot.get("layouts", theme.layouts))
+        draft_snapshot = theme_designer_snapshot(theme_from_designer_draft(theme, draft))
+        draft_layouts = copy.deepcopy(draft_snapshot["layouts"])
         validate_theme_layouts(draft_layouts)
         validate_layout_compatibility(theme, draft_layouts)
-        if all(draft.snapshot.get(key, live_snapshot.get(key)) == live_snapshot.get(key) for key in workspace_fields):
+        if all(draft_snapshot.get(key) == live_snapshot.get(key) for key in workspace_fields):
             raise DesignerDraftConflict("There are no layout workspace changes to publish.")
 
         create_revision(theme, user, "Publish layout workspace draft")
         theme.layouts = draft_layouts
-        theme.colors = copy.deepcopy(draft.snapshot.get("colors", theme.colors))
-        theme.fonts = copy.deepcopy(draft.snapshot.get("fonts", theme.fonts))
+        theme.colors = copy.deepcopy(draft_snapshot["colors"])
+        theme.fonts = copy.deepcopy(draft_snapshot["fonts"])
         theme.sync_source = "web"
         theme.save(update_fields=["layouts", "colors", "fonts", "sync_source", "sync_version", "updated_at"])
 

@@ -13,6 +13,7 @@ from ..services.designer_theme import (
     publish_layout_draft,
     save_designer_draft,
     theme_designer_snapshot,
+    theme_from_designer_draft,
     user_can_design_theme,
 )
 from .designer_theme_views import DesignerJSONParser, DesignerJSONRenderer
@@ -22,15 +23,12 @@ def _workspace(request, theme, draft):
     workspace = build_draft_workspace(theme, draft, include_tenant_content=False)
     workspace_fields = ("layouts", "colors", "fonts")
     live_snapshot = theme_designer_snapshot(theme)
-    has_workspace_changes = any(
-        draft.snapshot.get(key, live_snapshot.get(key)) != live_snapshot.get(key) for key in workspace_fields
-    )
-    workspace["hasLayoutDraftChanges"] = (
-        draft.snapshot.get("layouts", live_snapshot["layouts"]) != live_snapshot["layouts"]
-    )
+    draft_snapshot = theme_designer_snapshot(theme_from_designer_draft(theme, draft))
+    has_workspace_changes = any(draft_snapshot.get(key) != live_snapshot.get(key) for key in workspace_fields)
+    workspace["hasLayoutDraftChanges"] = draft_snapshot["layouts"] != live_snapshot["layouts"]
     workspace["hasLayoutWorkspaceDraftChanges"] = has_workspace_changes
     workspace["hasOtherDraftChanges"] = {
-        key: value for key, value in draft.snapshot.items() if key not in workspace_fields
+        key: value for key, value in draft_snapshot.items() if key not in workspace_fields
     } != {key: value for key, value in live_snapshot.items() if key not in workspace_fields}
     return workspace
 

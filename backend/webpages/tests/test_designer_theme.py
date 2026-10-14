@@ -24,6 +24,7 @@ from webpages.models import (
     PageTheme,
     PageVersion,
     ThemeDesignerAssignment,
+    ThemeDesignerDraft,
     ThemeDesignerExportJob,
     ThemeDesignerRevision,
     WebPage,
@@ -488,6 +489,38 @@ class DesignerThemeApiTests(TestCase):
         self.assertTrue(response.data["hasOtherDraftChanges"])
         self.assertFalse(response.data["hasLayoutDraftChanges"])
         self.assertFalse(response.data["hasLayoutWorkspaceDraftChanges"])
+
+    def test_layout_workspace_upgrades_legacy_draft_special_pages(self):
+        self.authenticate(self.designer)
+        layout_url = f"/api/v1/webpages/layout-editor/themes/{self.theme.id}/workspace/"
+        self.client.get(layout_url)
+        draft = ThemeDesignerDraft.objects.get(theme=self.theme)
+        draft.snapshot["layouts"].pop("special_pages", None)
+        draft.snapshot["colors"]["brandColor"] = "#abcdef"
+        draft.has_changes = True
+        draft.save(update_fields=["snapshot", "has_changes", "updated_at"])
+
+        workspace = self.client.get(layout_url).data
+
+        self.assertEqual(
+            [page["status_code"] for page in workspace["layouts"]["special_pages"]],
+            [403, 404, 500, 503],
+        )
+        self.assertFalse(workspace["hasLayoutDraftChanges"])
+        self.assertTrue(workspace["hasLayoutWorkspaceDraftChanges"])
+
+        response = self.client.post(
+            f"/api/v1/webpages/layout-editor/themes/{self.theme.id}/publish/",
+            {"draftVersion": workspace["draftVersion"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.theme.refresh_from_db()
+        self.assertEqual(
+            [page["status_code"] for page in self.theme.layouts["special_pages"]],
+            [403, 404, 500, 503],
+        )
 
     def test_workspace_exposes_semantic_catalog_without_selectors(self):
         self.authenticate(self.designer)
@@ -1293,7 +1326,9 @@ class DesignerThemeApiTests(TestCase):
         storage.url.side_effect = lambda path: (
             second_url
             if path.endswith("second.png")
-            else first_url if path.endswith("first.png") else f"https://storage.test/{path}"
+            else first_url
+            if path.endswith("first.png")
+            else f"https://storage.test/{path}"
         )
         tag = MediaTag.objects.create(name="Designer", slug="designer", namespace=self.namespace, created_by=self.owner)
         media_files = []
