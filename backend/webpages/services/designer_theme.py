@@ -1067,6 +1067,41 @@ def _walk_usage(value, needle, path=""):
     return usages
 
 
+def _font_usage_references(theme, family):
+    if not family:
+        return []
+
+    references = []
+    for group_index, group in enumerate((theme.design_groups or {}).get("groups", [])):
+        matching_elements = []
+        for element, styles in (group.get("elements") or {}).items():
+            if not isinstance(styles, dict):
+                continue
+            value = styles.get("fontFamily") or styles.get("font_family")
+            stack = [item.strip().strip("\"'") for item in str(value or "").split(",")]
+            if family in stack:
+                matching_elements.append(element)
+
+        if not matching_elements:
+            continue
+
+        selector_map = theme.calculate_selectors_for_group(group).get("element_selectors", {})
+        classes = []
+        for element in matching_elements:
+            for selector in selector_map.get(element, []):
+                for class_name in re.findall(r"\.[A-Za-z_][A-Za-z0-9_-]*", selector):
+                    if class_name not in classes:
+                        classes.append(class_name)
+
+        references.append(
+            {
+                "definition": group.get("name") or f"Group {group_index + 1}",
+                "classes": classes,
+            }
+        )
+    return references
+
+
 def _field_dimensions(field):
     try:
         return field.width, field.height
@@ -1313,6 +1348,7 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
     fonts = font_data.get("google_fonts") or font_data.get("googleFonts") or []
     for font in fonts:
         font["usage"] = _walk_usage(theme.design_groups or {}, font.get("family"))
+        font["references"] = _font_usage_references(theme, font.get("family"))
 
     assets = collect_designer_assets(theme)
     catalog = build_designer_catalog(theme, assets, include_reference_previews=include_tenant_content)

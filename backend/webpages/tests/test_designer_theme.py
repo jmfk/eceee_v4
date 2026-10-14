@@ -565,6 +565,34 @@ class DesignerThemeApiTests(TestCase):
             {"preview", "site-icon"},
         )
 
+    def test_workspace_exposes_font_references_as_theme_definitions_and_target_classes(self):
+        groups = self.theme.design_groups
+        groups["groups"].append(
+            {
+                "name": "Footer copy",
+                "widgetTypes": ["easy_widgets.ContentWidget"],
+                "slots": ["footer"],
+                "elements": {"p": {"font_family": '"Inter", Arial, sans-serif'}},
+            }
+        )
+        self.theme.design_groups = groups
+        self.theme.save(update_fields=["design_groups"])
+        self.authenticate(self.designer)
+
+        workspace = self.client.get(self.workspace_url).data
+
+        inter = next(font for font in workspace["fonts"] if font["family"] == "Inter")
+        self.assertEqual(
+            inter["references"],
+            [
+                {"definition": "Article", "classes": []},
+                {
+                    "definition": "Footer copy",
+                    "classes": [".slot-footer", ".widget-type-easy-widgets-contentwidget"],
+                },
+            ],
+        )
+
     def test_workspace_does_not_fall_back_to_another_tenants_default_media_namespace(self):
         self.namespace.is_active = False
         self.namespace.save(update_fields=["is_active"])

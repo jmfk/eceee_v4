@@ -60,7 +60,15 @@ export const ThemeFontsEditor = ({ fonts, onInstall }) => {
             {fonts.map((font) => <article key={font.family} className="rounded-md border border-gray-200 bg-white p-3">
                 <p className="text-sm font-semibold text-gray-900">{font.family}</p>
                 <p className="mt-1 text-xs text-gray-500">Weights: {(font.variants || ['400']).join(', ')}</p>
-                {font.usage?.length > 0 && <p className="mt-1 text-xs text-gray-500">Used by {font.usage.join(', ')}</p>}
+                {font.references?.length > 0 && <details className="mt-2 text-xs text-gray-600">
+                    <summary className="cursor-pointer font-medium text-gray-700">References ({font.references.length})</summary>
+                    <ul className="mt-2 space-y-2 pl-3">
+                        {font.references.map((reference, index) => <li key={`${reference.definition}:${index}`}>
+                            <p className="font-medium text-gray-800">{reference.definition}</p>
+                            <p className="mt-0.5 break-words font-mono text-[11px] text-gray-500">{reference.classes.length > 0 ? reference.classes.join(', ') : 'Global theme definition'}</p>
+                        </li>)}
+                    </ul>
+                </details>}
             </article>)}
             {fonts.length === 0 && <p className="rounded-md border border-dashed border-gray-300 p-4 text-sm text-gray-500">No fonts are installed in this theme.</p>}
         </div>

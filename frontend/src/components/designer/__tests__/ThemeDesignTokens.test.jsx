@@ -2,7 +2,38 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import { ThemeColorField, ThemeFontField } from '../ThemeDesignTokens'
+import { ThemeColorField, ThemeFontField, ThemeFontsEditor } from '../ThemeDesignTokens'
+
+describe('ThemeFontsEditor', () => {
+    it('keeps concise theme references collapsed until requested', async () => {
+        const user = userEvent.setup()
+        render(<ThemeFontsEditor
+            fonts={[{
+                family: 'Inter',
+                variants: ['400', '700'],
+                references: [
+                    { definition: 'Article', classes: [] },
+                    {
+                        definition: 'Footer copy',
+                        classes: ['.slot-footer', '.widget-type-easy-widgets-contentwidget'],
+                    },
+                ],
+            }]}
+            onInstall={vi.fn()}
+        />)
+
+        const summary = screen.getByText('References (2)')
+        const references = summary.closest('details')
+        expect(references).not.toHaveAttribute('open')
+
+        await user.click(summary)
+
+        expect(references).toHaveAttribute('open')
+        expect(screen.getByText('Article')).toBeInTheDocument()
+        expect(screen.getByText('Global theme definition')).toBeInTheDocument()
+        expect(screen.getByText('.slot-footer, .widget-type-easy-widgets-contentwidget')).toBeInTheDocument()
+    })
+})
 
 describe('ThemeFontField', () => {
     it('preserves the existing fallback stack when changing the primary family', async () => {
