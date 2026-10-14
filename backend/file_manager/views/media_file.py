@@ -66,6 +66,11 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         except MediaFile.DoesNotExist:
             raise Http404
 
+        tenant = getattr(request, "tenant", None)
+        if tenant is not None and instance.tenant_id != tenant.pk:
+            raise Http404
+        self.check_object_permissions(request, instance)
+
         if not instance.is_deleted:
             return Response({"error": "File is not deleted"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -90,16 +95,26 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         except MediaFile.DoesNotExist:
             raise Http404
 
+        tenant = getattr(request, "tenant", None)
+        if tenant is not None and instance.tenant_id != tenant.pk:
+            raise Http404
+
+        from content.models import Namespace
+
+        from ..security import user_can_access_namespace
+
+        if instance.namespace.kind == Namespace.KIND_THEME_MEDIA and not user_can_access_namespace(
+            request.user, instance.namespace
+        ):
+            raise Http404
+
         instance.delete(user=request.user, force=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["get"])
     def references(self, request, pk=None):
         """Get all references to this file."""
-        try:
-            instance = MediaFile.objects.with_deleted().get(pk=pk)
-        except MediaFile.DoesNotExist:
-            raise Http404
+        instance = self.get_object()
 
         return Response(
             {
@@ -137,20 +152,41 @@ class MediaFileViewSet(viewsets.ModelViewSet):
 
         namespace_param = self.request.query_params.get("namespace")
         include_theme_media = False
+        filter_tenant = tenant
         if namespace_param:
             from content.models import Namespace
 
-            include_theme_media = Namespace.objects.filter(
+            from ..security import user_can_access_theme_media
+
+            theme_namespace = Namespace.objects.filter(
                 slug=namespace_param,
                 tenant=tenant,
                 kind=Namespace.KIND_THEME_MEDIA,
-            ).exists()
+            ).first()
+            include_theme_media = bool(theme_namespace and user_can_access_theme_media(user, theme_namespace.tenant))
+        elif self.kwargs.get(self.lookup_field):
+            from content.models import Namespace
+
+            from ..security import user_can_access_theme_media
+
+            theme_media = (
+                queryset.filter(
+                    pk=self.kwargs[self.lookup_field],
+                    namespace__kind=Namespace.KIND_THEME_MEDIA,
+                )
+                .select_related("tenant")
+                .first()
+            )
+            if theme_media and (tenant is None or theme_media.tenant_id == tenant.pk):
+                include_theme_media = user_can_access_theme_media(user, theme_media.tenant)
+                if include_theme_media:
+                    filter_tenant = theme_media.tenant
 
         queryset = (
             filter_media_files_for_user(
                 queryset,
                 user,
-                tenant=tenant,
+                tenant=filter_tenant,
                 include_theme_media=include_theme_media,
             )
             .select_related("namespace", "created_by", "last_modified_by")

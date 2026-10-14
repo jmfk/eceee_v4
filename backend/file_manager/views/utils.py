@@ -163,6 +163,7 @@ class BulkMediaOperationsView(APIView):
     def post(self, request):
         """Execute bulk operation on multiple files."""
         from ..security import SecurityAuditLogger
+        from ..serializers import BulkOperationSerializer
 
         serializer = BulkOperationSerializer(data=request.data)
         if not serializer.is_valid():
@@ -175,15 +176,36 @@ class BulkMediaOperationsView(APIView):
         # Get files that user has permission to modify
         files = MediaFile.objects.filter(id__in=file_ids)
 
+        # System-owned theme media is shared only inside its tenant's Designer.
+        # Staff status alone must not cross that tenant boundary.
+        from content.models import Namespace
+
+        from ..security import user_can_access_namespace
+
+        selected_tenant = getattr(request, "tenant", None)
+        accessible_theme_file_ids = [
+            file_obj.id
+            for file_obj in files.filter(namespace__kind=Namespace.KIND_THEME_MEDIA).select_related(
+                "namespace", "namespace__tenant"
+            )
+            if (selected_tenant is None or file_obj.namespace.tenant_id == selected_tenant.id)
+            and user_can_access_namespace(request.user, file_obj.namespace)
+        ]
+        files = files.filter(
+            ~models.Q(namespace__kind=Namespace.KIND_THEME_MEDIA) | models.Q(id__in=accessible_theme_file_ids)
+        )
+
         # Filter by permissions
         if not request.user.is_staff:
             # Regular users can only modify their own files or files in accessible namespaces
-            from content.models import Namespace
-
             accessible_namespaces = Namespace.objects.filter(
                 models.Q(created_by=request.user) | models.Q(is_active=True)
             )
-            files = files.filter(models.Q(created_by=request.user) | models.Q(namespace__in=accessible_namespaces))
+            files = files.filter(
+                models.Q(created_by=request.user)
+                | models.Q(namespace__in=accessible_namespaces)
+                | models.Q(id__in=accessible_theme_file_ids)
+            )
 
         results = []
         successful_count = 0

@@ -5,10 +5,11 @@ Service for handling duplicate file detection and resolution.
 import hashlib
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
-from django.utils import timezone
 from datetime import timedelta
+from typing import List, Optional
+
 from django.db import IntegrityError
+from django.utils import timezone
 
 from ..models import MediaFile, PendingMediaFile
 from ..security import SecurityAuditLogger
@@ -51,14 +52,12 @@ class DuplicateFileHandler:
             file_hash = hashlib.sha256(file_content).hexdigest()
 
             # Check for existing files with same hash in MediaFile (including deleted)
-            existing_media_file = (
-                MediaFile.objects.with_deleted().filter(file_hash=file_hash).first()
-            )
+            existing_media_file = MediaFile.objects.with_deleted().filter(file_hash=file_hash).first()
 
             if existing_media_file:
-                return self._handle_existing_media_file(
-                    existing_media_file, file, namespace, user
-                )
+                if existing_media_file.namespace_id != namespace.id:
+                    return self._handle_foreign_namespace_duplicate(file)
+                return self._handle_existing_media_file(existing_media_file, file, namespace, user)
 
             # Check for existing files with same hash in PendingMediaFile
             existing_pending_file = PendingMediaFile.objects.filter(
@@ -67,9 +66,9 @@ class DuplicateFileHandler:
             ).first()
 
             if existing_pending_file:
-                return self._handle_existing_pending_file(
-                    existing_pending_file, file, namespace, user
-                )
+                if existing_pending_file.namespace_id != namespace.id:
+                    return self._handle_foreign_namespace_duplicate(file)
+                return self._handle_existing_pending_file(existing_pending_file, file, namespace, user)
 
             # No duplicates found
             return DuplicateCheckResult(
@@ -79,22 +78,19 @@ class DuplicateFileHandler:
             )
 
         except Exception as e:
-            logger.error(
-                f"Error checking duplicates for {file.name}: {e}", exc_info=True
-            )
+            logger.error(f"Error checking duplicates for {file.name}: {e}", exc_info=True)
 
             # Try filename-based fallback matching
             try:
                 # Check MediaFile by filename
                 existing_by_name = (
-                    MediaFile.objects.with_deleted()
-                    .filter(original_filename=file.name)
-                    .first()
+                    MediaFile.objects.with_deleted().filter(original_filename=file.name, namespace=namespace).first()
                 )
 
                 # Check PendingMediaFile by filename
                 pending_by_name = PendingMediaFile.objects.filter(
                     original_filename=file.name,
+                    namespace=namespace,
                     status__in=["pending", "approved"],
                 ).first()
 
@@ -150,6 +146,21 @@ class DuplicateFileHandler:
                 ],
                 pending_files=[],
             )
+
+    def _handle_foreign_namespace_duplicate(self, uploaded_file):
+        """Reject a global hash collision without exposing another namespace."""
+        return DuplicateCheckResult(
+            has_duplicates=True,
+            errors=[
+                {
+                    "filename": uploaded_file.name,
+                    "error": "This file content is already stored in another media namespace.",
+                    "status": "error",
+                    "reason": "duplicate_other_namespace",
+                }
+            ],
+            pending_files=[],
+        )
 
     def _handle_existing_media_file(
         self, existing_file: MediaFile, uploaded_file, namespace, user
@@ -320,7 +331,7 @@ class DuplicateFileHandler:
                 # Hash already exists in pending, fetch and update instead
                 if "file_hash" in str(e) and pending_data.get("file_hash"):
                     existing = PendingMediaFile.objects.filter(
-                        file_hash=pending_data.get("file_hash")
+                        file_hash=pending_data.get("file_hash"), namespace=namespace
                     ).first()
                     if existing:
                         for key, value in pending_data.items():

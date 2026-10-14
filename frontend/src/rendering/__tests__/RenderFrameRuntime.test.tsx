@@ -118,6 +118,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         const slot = container.querySelector<HTMLElement>('[data-layout-node-type="slot"]')
         expect(preview).toBeInTheDocument()
         expect(slot).toHaveAttribute('data-layout-node-label', 'Main content')
+        expect(slot).toHaveClass('designer-collapsed-slot')
         await waitFor(() => expect(slot?.dataset.layoutNodeSize).toMatch(/^\d+ × \d+$/))
 
         fireEvent.click(slot!)

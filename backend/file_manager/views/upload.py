@@ -167,13 +167,26 @@ class MediaUploadView(APIView):
                     if existing_file_id:
                         try:
                             # Delete or archive the existing file
-                            existing_file = MediaFile.objects.with_deleted().filter(id=existing_file_id).first()
-                            if existing_file:
-                                existing_file.delete(request.user)
+                            existing_file = (
+                                MediaFile.objects.with_deleted()
+                                .filter(id=existing_file_id, namespace=namespace)
+                                .first()
+                            )
+                            if not existing_file:
+                                errors.append(
+                                    {
+                                        "filename": uploaded_file.name,
+                                        "error": "Replacement target not found in this namespace",
+                                        "status": "error",
+                                    }
+                                )
+                                continue
+                            existing_file.delete(request.user)
 
                             # Also check for pending file with same hash and delete it
                             existing_pending = PendingMediaFile.objects.filter(
-                                id=file_action.get("pending_file_id")
+                                id=file_action.get("pending_file_id"),
+                                namespace=namespace,
                             ).first()
                             if existing_pending:
                                 existing_pending.delete()

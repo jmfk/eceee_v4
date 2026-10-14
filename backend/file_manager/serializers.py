@@ -12,6 +12,7 @@ from content.models import Namespace
 from utils.serializers import UserSerializer
 
 from .models import MediaCollection, MediaFile, MediaTag, MediaUsage, PendingMediaFile
+from .security import get_pending_preview_url
 
 
 def convert_tag_names_to_ids(tag_items, namespace, user):
@@ -795,6 +796,7 @@ class PendingMediaFileListSerializer(serializers.ModelSerializer):
     uploaded_by_name = serializers.CharField(source="uploaded_by.username", read_only=True)
     namespace = serializers.CharField(source="namespace.slug", read_only=True)
     file_size_human = serializers.SerializerMethodField()
+    preview_url = serializers.SerializerMethodField()
 
     class Meta:
         model = PendingMediaFile
@@ -812,6 +814,7 @@ class PendingMediaFileListSerializer(serializers.ModelSerializer):
             "uploaded_by_name",
             "namespace",
             "ai_suggested_title",
+            "preview_url",
         ]
 
     def get_file_size_human(self, obj):
@@ -822,6 +825,9 @@ class PendingMediaFileListSerializer(serializers.ModelSerializer):
             obj.file_size /= 1024.0
         return f"{obj.file_size:.1f} PB"
 
+    def get_preview_url(self, obj):
+        return get_pending_preview_url(obj)
+
 
 class PendingMediaFileDetailSerializer(serializers.ModelSerializer):
     """Serializer for pending media file detail view."""
@@ -830,6 +836,7 @@ class PendingMediaFileDetailSerializer(serializers.ModelSerializer):
     namespace = serializers.CharField(source="namespace.slug", read_only=True)
     file_size_human = serializers.SerializerMethodField()
     thumbnail_url = serializers.SerializerMethodField()
+    preview_url = serializers.SerializerMethodField()
 
     class Meta:
         model = PendingMediaFile
@@ -856,6 +863,7 @@ class PendingMediaFileDetailSerializer(serializers.ModelSerializer):
             "uploaded_by",
             "uploaded_by_name",
             "thumbnail_url",
+            "preview_url",
         ]
 
     def get_file_size_human(self, obj):
@@ -874,6 +882,9 @@ class PendingMediaFileDetailSerializer(serializers.ModelSerializer):
             storage = S3MediaStorage()
             return storage.get_public_url(obj.get_thumbnail_path())
         return None
+
+    def get_preview_url(self, obj):
+        return get_pending_preview_url(obj)
 
 
 class MediaFileApprovalSerializer(serializers.Serializer):

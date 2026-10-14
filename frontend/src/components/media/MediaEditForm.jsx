@@ -372,7 +372,7 @@ const MediaEditForm = ({
                         {(file.fileType === 'image' || file.file_type === 'image') ? (
                             <OptimizedImage
                                 src={mode === 'approve'
-                                    ? `/api/v1/media/pending-files/${file.id}/preview/`
+                                    ? file.previewUrl || `/api/v1/media/pending-files/${file.id}/preview/`
                                     : file.imgproxyBaseUrl || file.fileUrl
                                 }
                                 alt={file.title || file.originalFilename}

@@ -152,11 +152,17 @@ class Namespace(models.Model):
             return namespace
 
         owner = created_by or tenant.created_by
+        name_prefix = "Theme media · "
+        name_suffix = f" · {tenant.id.hex}"
+        name = f"{name_prefix}{tenant.identifier}"
+        if len(name) > 100:
+            identifier_length = 100 - len(name_prefix) - len(name_suffix)
+            name = f"{name_prefix}{tenant.identifier[:identifier_length]}{name_suffix}"
         namespace, _created = cls.objects.get_or_create(
             tenant=tenant,
             kind=cls.KIND_THEME_MEDIA,
             defaults={
-                "name": f"Theme media · {tenant.identifier}",
+                "name": name,
                 "slug": f"theme-media-{tenant.id.hex}",
                 "description": "System-owned media shared by this tenant's themes.",
                 "is_active": True,

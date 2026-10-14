@@ -9,10 +9,42 @@ import re
 from typing import Dict
 
 import magic
+from django.core import signing
 from django.core.files.uploadedfile import UploadedFile
 from rest_framework import permissions
 
 logger = logging.getLogger(__name__)
+
+PENDING_PREVIEW_SIGNING_SALT = "file-manager.pending-preview"
+PENDING_PREVIEW_MAX_AGE_SECONDS = 24 * 60 * 60
+
+
+def get_pending_preview_token(pending_file):
+    """Create a short-lived capability token for a pending-file preview."""
+    return signing.dumps(str(pending_file.pk), salt=PENDING_PREVIEW_SIGNING_SALT)
+
+
+def pending_preview_token_is_valid(pending_file, token):
+    """Validate that a preview token belongs to this pending file."""
+    if not token:
+        return False
+    try:
+        signed_id = signing.loads(
+            token,
+            salt=PENDING_PREVIEW_SIGNING_SALT,
+            max_age=PENDING_PREVIEW_MAX_AGE_SECONDS,
+        )
+    except signing.BadSignature:
+        return False
+    return signed_id == str(pending_file.pk)
+
+
+def get_pending_preview_url(pending_file):
+    """Return the API URL used by image tags to preview a pending file."""
+    from urllib.parse import urlencode
+
+    query = urlencode({"preview_token": get_pending_preview_token(pending_file)})
+    return f"/api/v1/media/pending-files/{pending_file.pk}/preview/?{query}"
 
 
 def user_can_access_theme_media(user, tenant):
@@ -83,6 +115,15 @@ class MediaFilePermission(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
         """Check if user has permission to access specific media file."""
+        from content.models import Namespace
+
+        if obj.namespace.kind == Namespace.KIND_THEME_MEDIA and not self._has_namespace_access(
+            user=request.user, namespace=obj.namespace
+        ):
+            return False
+        if obj.namespace.kind == Namespace.KIND_THEME_MEDIA:
+            return True
+
         # Staff users have full access
         if request.user.is_staff:
             return True
