@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { findPublishedForm, submitPublishedForm, type FormSubmissionStore } from '../src/forms';
-import type { Page, PageReader, ReadDb, Version, Widget } from '../src/model';
+import type { Page, PageReader, ReadDb, Theme, Version, Widget } from '../src/model';
 
 const root: Page = {
   id: '42',
@@ -202,6 +202,61 @@ describe('public form submissions', () => {
       readDb: dynamicReadDb,
       pagePath: '//dynamic-story/',
     })).resolves.toEqual({ status: 'success', redirectPath: '/dynamic-story' });
+  });
+
+  it('accepts a form rendered on a theme-owned error page', async () => {
+    const errorTheme: Theme = {
+      id: 'error-theme',
+      tenant_id: root.tenant_id,
+      name: 'Error theme',
+      fonts: {},
+      colors: {},
+      css_variables: {},
+      breakpoints: {},
+      component_styles: {},
+      image_styles: {},
+      gallery_styles: {},
+      carousel_styles: {},
+      custom_css: '',
+      design_groups: {},
+      html_elements: {},
+      sync_version: 1,
+      updated_at: '2026-09-29T00:00:00Z',
+      layouts: {
+        schema_version: 1,
+        default_layout_key: 'main_layout',
+        items: [{
+          id: 'layout-error',
+          key: 'error_layout',
+          label: 'Error',
+          status: 'active',
+          root: { id: 'slot-actions', type: 'slot', slot_key: 'actions', children: [] },
+          slots: { actions: {} },
+        }],
+        special_pages: [{
+          id: 'error-404',
+          key: 'error_404',
+          label: 'Not found',
+          kind: 'error',
+          status_code: 404,
+          layout_key: 'error_layout',
+          widgets: { actions: [formWidget] },
+        }],
+      },
+    };
+    const errorReadDb: ReadDb = {
+      withSnapshot: async read => read({
+        ...reader,
+        defaultTheme: async () => errorTheme,
+      }),
+    };
+
+    await expect(submitPublishedForm({
+      ...validInput(),
+      readDb: errorReadDb,
+      pagePath: '/404',
+    })).resolves.toEqual({ status: 'success', redirectPath: '/404' });
+    expect(insert).toHaveBeenCalledOnce();
   });
 });
 

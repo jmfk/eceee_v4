@@ -516,13 +516,27 @@ class WebPageSimpleSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """Validate WebPage data"""
+        attrs = super().validate(attrs)
         if self.instance is not None:
             direct_updates = self.VERSION_CONTROLLED_FIELDS.intersection(attrs)
             if direct_updates:
                 raise serializers.ValidationError(
                     {field: "Change this field through the page working copy." for field in sorted(direct_updates)}
                 )
-        return super().validate(attrs)
+
+        slug = attrs.get("slug", self.instance.slug if self.instance is not None else None)
+        if slug in LEGACY_ERROR_PAGE_SLUGS:
+            if "parent_id" in attrs:
+                parent_id = attrs["parent_id"]
+                parent = self._get_parent(parent_id) if parent_id else None
+            else:
+                parent = self.instance.parent if self.instance is not None else None
+            if parent is not None and parent.parent_id is None:
+                raise serializers.ValidationError(
+                    {"slug": "Define HTTP error pages in the Layout Editor instead of creating Pages entries."}
+                )
+
+        return attrs
 
     def _get_parent(self, parent_id):
         """Resolve a parent only inside the selected tenant."""

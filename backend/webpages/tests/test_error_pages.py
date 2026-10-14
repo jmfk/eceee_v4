@@ -7,6 +7,9 @@ Tests error page creation, validation, rendering, and fallback behavior.
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APIClient
 
 from webpages.layout_registry import layout_registry
 from webpages.models import PageTheme, WebPage
@@ -371,6 +374,7 @@ class ErrorPageIntegrationTests(TestCase):
         from core.models import Tenant
 
         self.factory = RequestFactory()
+        self.client = APIClient()
         self.user = User.objects.create_user(
             username="testuser_error_int", email="test@example.com", password="testpass123"
         )
@@ -403,6 +407,19 @@ class ErrorPageIntegrationTests(TestCase):
             is_default=True,
             layouts=default_theme_layouts(),
         )
+        self.client.force_authenticate(self.user)
+        self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
+
+    def test_pages_api_rejects_new_legacy_error_page_rows(self):
+        response = self.client.post(
+            reverse("api:webpage-list"),
+            {"title": "Legacy 404", "slug": "404", "parentId": self.root_page.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Layout Editor", str(response.data["slug"]))
+        self.assertFalse(WebPage.objects.filter(parent=self.root_page, slug="404").exists())
 
     def test_legacy_site_specific_error_pages_do_not_override_theme(self):
         """Dormant legacy error rows remain recoverable but are not runtime content."""
