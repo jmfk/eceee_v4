@@ -2,7 +2,7 @@ import { createElement, useEffect, useMemo, useRef, useState } from 'react'
 import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Braces, Copy, Eye, FileKey, Image as ImageIcon, KeyRound, Maximize2, Minus, Palette, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Redo2, RotateCcw, Trash2, Type, Undo2 } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
-import { createDesignerRenderModel, createPageRenderModel } from '../../rendering/adapters'
+import { createDesignerRenderModel, createPageRenderModel, withLayoutPreviewPlaceholders } from '../../rendering/adapters'
 import { googleFontsStylesheetUrl } from '../../rendering/primitives'
 import { validateLayoutDefinition } from '../../rendering/themeLayoutRenderer'
 import { buildDesignerTheme, buildThemeCSS } from '../../utils/editorThemeCSS'
@@ -30,6 +30,13 @@ const collapsedPanelWidth = 44
 const uuid = () => crypto.randomUUID()
 const clone = (value) => structuredClone(value)
 const splitList = (value) => String(value || '').split(/[\n,]/).map((item) => item.trim()).filter(Boolean)
+const previewViewContentCount = (view) => {
+    const widgets = view?.content?.widgets
+    const widgetCount = widgets && typeof widgets === 'object'
+        ? Object.values(widgets).reduce((count, items) => count + (Array.isArray(items) ? items.length : 0), 0)
+        : 0
+    return widgetCount + Object.keys(view?.images || {}).length + Object.keys(view?.texts || {}).length
+}
 const colorPickerValue = (value, fallback) => /^#[0-9a-f]{6}$/i.test(String(value || '').trim()) ? String(value).trim() : fallback
 const breakpointCanvasWidth = (entries, key) => {
     const index = entries.findIndex(([breakpoint]) => breakpoint === key)
@@ -380,13 +387,19 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
 
     const archiveLayout = () => {
         if (['main_layout', 'landing_page', 'error_layout'].includes(selectedLayout.key)) return setJsonError('Main, Landing Page, and Error Page must always remain active.')
+        const specialPageReferences = (layouts.special_pages || []).filter((page) => page.layout_key === selectedLayout.key)
+        if (selectedLayout.status !== 'archived' && specialPageReferences.length) {
+            return setJsonError(`This layout is used by ${specialPageReferences.length} special page${specialPageReferences.length === 1 ? '' : 's'} and cannot be archived.`)
+        }
         updateLayout((layout) => ({ ...layout, status: layout.status === 'archived' ? 'active' : 'archived' }))
     }
 
     const deleteLayout = () => {
         const references = Number(usage.versionCount || 0) + Number(usage.schemaCount || 0)
+        const specialPageReferences = (layouts.special_pages || []).filter((page) => page.layout_key === selectedLayout.key)
         if (['main_layout', 'landing_page', 'error_layout'].includes(selectedLayout.key)) return setJsonError('Main, Landing Page, and Error Page are required and cannot be deleted.')
         if (selectedLayout.key === layouts.default_layout_key) return setJsonError('The default layout cannot be deleted.')
+        if (specialPageReferences.length) return setJsonError(`This layout is used by ${specialPageReferences.length} special page${specialPageReferences.length === 1 ? '' : 's'} and cannot be deleted.`)
         if (references) return setJsonError(`This layout has ${references} version or schema references and cannot be deleted.`)
         const items = layouts.items.filter((item) => item.id !== selectedLayout.id)
         commit({ ...clone(layouts), items }, { layoutId: items[0]?.id, nodeId: items[0]?.root?.id })
@@ -569,6 +582,9 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
             .map((page) => ({ key: `special:${page.id}`, label: page.label, kind: 'special', page }))
         const previewViews = (workspace.previewContent?.views || [])
             .filter((view) => (view.content?.codeLayout || view.layout || layouts.default_layout_key) === selectedLayout.key)
+            .map((view, index) => ({ view, index, contentCount: previewViewContentCount(view) }))
+            .sort((left, right) => right.contentCount - left.contentCount || left.index - right.index)
+            .map(({ view }) => view)
             .map((view) => ({ key: `view:${view.id}`, label: view.label, kind: 'view', view }))
         return [...previewViews, ...specialPages, { key: 'layout', label: 'Layout defaults', kind: 'layout' }]
     }, [layouts.default_layout_key, layouts.special_pages, selectedLayout, workspace.previewContent?.views])
@@ -581,18 +597,18 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         if (!selectedLayout) return null
         const source = layoutPreviewSources.find((candidate) => candidate.key === previewSource) || layoutPreviewSources[0]
         if (source?.kind === 'view') {
-            return createDesignerRenderModel({
+            return withLayoutPreviewPlaceholders(createDesignerRenderModel({
                 workspace,
                 viewId: source.view.id,
                 themeCss: layoutThemePreview.css,
                 fontUrl: layoutThemePreview.fontUrl,
                 guidesEnabled: false,
-            })
+            }), selectedLayout)
         }
         const widgets = source?.kind === 'special'
             ? source.page.widgets || {}
             : Object.fromEntries(Object.entries(selectedLayout.slots || {}).map(([slot, policy]) => [slot, policy.default_widgets || []]))
-        return createPageRenderModel({
+        return withLayoutPreviewPlaceholders(createPageRenderModel({
             layout: selectedLayout.key,
             layoutDefinition: selectedLayout,
             layoutDefinitionRequired: true,
@@ -601,7 +617,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
             context: { mode: 'preview', specialPageKey: source?.page?.key },
             themeCss: layoutThemePreview.css,
             fontUrl: layoutThemePreview.fontUrl,
-        })
+        }), selectedLayout)
     }, [layoutPreviewSources, layoutThemePreview, previewSource, selectedLayout, workspace, workspace.breakpoints])
 
     const updateSlot = (updater) => updateLayout((layout) => {

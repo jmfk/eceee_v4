@@ -37,6 +37,26 @@ const ObjectDataPreviewRender: WidgetRenderComponent = ({ context }) => {
     </div>)}</dl>
 }
 
+const LayoutSlotPlaceholderRender: WidgetRenderComponent = ({ widget }) => {
+    const shades = ['#e5e7eb', '#d1d5db', '#f3f4f6', '#cbd5e1']
+    const shade = Math.max(0, Math.min(shades.length - 1, Number(widget.config.shade) || 0))
+    return <div
+        data-layout-preview-placeholder="true"
+        style={{
+            alignItems: 'center',
+            backgroundColor: shades[shade],
+            boxSizing: 'border-box',
+            color: '#374151',
+            display: 'flex',
+            justifyContent: 'center',
+            minHeight: 'clamp(110px, 18vh, 220px)',
+            padding: '24px',
+            textAlign: 'center',
+            width: '100%',
+        }}
+    ><h1 style={{ font: '600 24px/1.2 system-ui, sans-serif', margin: 0 }}>{widget.config.label || 'Slot'}</h1></div>
+}
+
 const HeadlineRender: WidgetRenderComponent = ({ widget }) => {
     const requested = String(value(widget.config, 'headerLevel', 'header_level', 'headingLevel', 'level') || 'h1').toLowerCase()
     const Tag = (/^h[1-6]$/.test(requested) ? requested : `h${Math.min(6, Math.max(1, Number(requested) || 1))}`) as React.ElementType
@@ -815,4 +835,5 @@ export const PUBLIC_DATA_WIDGET_COMPONENTS: Record<string, WidgetRenderComponent
 
 export const DESIGNER_RENDER_WIDGET_COMPONENTS: Record<string, WidgetRenderComponent> = {
     'designer.ObjectDataPreview': ObjectDataPreviewRender,
+    'designer.LayoutSlotPlaceholder': LayoutSlotPlaceholderRender,
 }

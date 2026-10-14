@@ -10,7 +10,7 @@ from rest_framework.response import Response
 
 from content.models import Namespace
 
-from ..security import SecurityAuditLogger
+from ..security import SecurityAuditLogger, user_can_access_namespace
 
 logger = logging.getLogger(__name__)
 
@@ -103,17 +103,7 @@ class NamespaceAccessService:
         Returns:
             bool: True if access is allowed, False otherwise
         """
-        # Staff users have access to all namespaces
-        if user.is_staff:
-            return True
-
-        # Users have access to namespaces they created
-        if namespace.created_by == user:
-            return True
-
-        # Allow access to active namespaces for authenticated users
-        # This can be extended with more granular permissions later
-        return namespace.is_active
+        return user_can_access_namespace(user, namespace)
 
     def validate_namespace_access(self, user, namespace: Namespace) -> NamespaceResult:
         """

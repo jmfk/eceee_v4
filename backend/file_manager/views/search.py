@@ -41,11 +41,16 @@ class MediaSearchView(APIView):
         if filters.get("namespace"):
             from content.models import Namespace
 
-            include_theme_media = Namespace.objects.filter(
+            from ..security import user_can_access_theme_media
+
+            theme_namespace = Namespace.objects.filter(
                 slug=filters["namespace"],
                 tenant=tenant,
                 kind=Namespace.KIND_THEME_MEDIA,
-            ).exists()
+            ).first()
+            include_theme_media = bool(
+                theme_namespace and user_can_access_theme_media(request.user, theme_namespace.tenant)
+            )
 
         # Start with base queryset
         queryset = (

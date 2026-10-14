@@ -1,6 +1,6 @@
 import { getSlotWidgetsForMode } from '../utils/widgetMerging'
 import { getRenderFixture } from './fixtures'
-import type { DesignerPreviewImageReference, RenderPageModel, RenderWidgetModel } from './types'
+import type { DesignerPreviewImageReference, RenderPageModel, RenderWidgetModel, ThemeLayoutDefinition, ThemeLayoutNode } from './types'
 
 const previewImagePattern = /(?:https?:\/\/[^\s"'()<>]+|s3:\/\/[^\s"'()<>]+|\/(?:theme_images|uploads|media|files|site-package)\/[^\s"'()<>]+)\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^\s"'()<>]*)?/gi
 
@@ -178,6 +178,47 @@ export const createPageRenderModel = ({
         slots.landingPage = slots.landing_page
     }
     return { layout, layoutDefinition, layoutDefinitionRequired, layoutBreakpoints, slots, context: { ...context, preview: true }, themeCss, fontUrl }
+}
+
+const layoutSlotNodeLabels = (root?: ThemeLayoutNode) => {
+    const labels: Record<string, string> = {}
+    const visit = (node: ThemeLayoutNode) => {
+        if (node.type === 'slot' && node.slot_key) labels[node.slot_key] = node.label || ''
+        ;(node.children || []).forEach(visit)
+    }
+    if (root) visit(root)
+    return labels
+}
+
+export const withLayoutPreviewPlaceholders = (
+    model: RenderPageModel,
+    layoutDefinition?: ThemeLayoutDefinition | null,
+): RenderPageModel => {
+    if (!layoutDefinition) return model
+    const nodeLabels = layoutSlotNodeLabels(layoutDefinition.root)
+    const slots = { ...model.slots }
+    Object.entries(layoutDefinition.slots || {}).forEach(([slotKey, policy], index) => {
+        if (slots[slotKey]?.length) return
+        slots[slotKey] = [{
+            id: `layout-preview-placeholder-${layoutDefinition.id}-${slotKey}`,
+            type: 'designer.LayoutSlotPlaceholder',
+            config: {
+                label: nodeLabels[slotKey] || policy.label || slotKey,
+                shade: index % 4,
+            },
+        }]
+    })
+    return {
+        ...model,
+        slots,
+        designer: model.designer || {
+            catalog: {},
+            texts: {},
+            assets: [],
+            guidesEnabled: false,
+            layoutCanvas: false,
+        },
+    }
 }
 
 export const createDesignerRenderModel = ({

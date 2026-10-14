@@ -58,7 +58,7 @@ const document = {
     }],
 }
 
-const Harness = ({ disabled = false, sourceDocument = document, viewport = 'md' }) => {
+const Harness = ({ disabled = false, sourceDocument = document, viewport = 'md', previewViews = [] }) => {
     const [workspace, setWorkspace] = useState({
         layouts: structuredClone(sourceDocument),
         layoutUsage: {},
@@ -66,6 +66,7 @@ const Harness = ({ disabled = false, sourceDocument = document, viewport = 'md' 
         colors: [{ name: 'surface', value: '#f8fafc', usage: [] }],
         fonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap', usage: [] }],
         mediaNamespace: 'theme-media-tenant',
+        previewContent: { views: previewViews },
         themeConfig: { colors: { surface: '#f8fafc' }, fonts: { googleFonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap' }] } },
     })
     return <LayoutDesignerWorkspace themeId="7" workspace={workspace} viewport={viewport} updateWorkspace={(updater) => setWorkspace((current) => updater(structuredClone(current)))} disabled={disabled} />
@@ -95,6 +96,17 @@ describe('LayoutDesignerWorkspace', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Preview at mobile width' }))
         expect(screen.getByRole('button', { name: 'Preview at mobile width' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('prefers matching preview pages that already contain content', () => {
+        render(<Harness previewViews={[
+            { id: 'empty-page', label: 'Empty page', layout: 'main_layout', content: { codeLayout: 'main_layout', widgets: {} } },
+            { id: 'filled-page', label: 'Filled page', layout: 'main_layout', content: { codeLayout: 'main_layout', widgets: { main: [{ id: 'heading', type: 'easy_widgets.HeadlineWidget', config: { content: 'Hello' } }] } } },
+        ]} />)
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+
+        expect(screen.getByLabelText('Content')).toHaveValue('view:filled-page')
     })
 
     it('switches the inspector between layouts and selected canvas elements', () => {
@@ -137,6 +149,42 @@ describe('LayoutDesignerWorkspace', () => {
         fireEvent.change(screen.getByLabelText('Canonical layout document'), { target: { value: '{' } })
         fireEvent.click(screen.getByRole('button', { name: 'Apply JSON' }))
         expect(screen.getByRole('alert')).toHaveTextContent('JSON could not be parsed')
+    })
+
+    it('keeps layouts referenced by special pages active and available', () => {
+        const specialDocument = structuredClone(document)
+        specialDocument.items.push({
+            ...structuredClone(document.items[0]),
+            id: '5d160d8c-f96b-4ebf-ae92-148f2be1c4e8',
+            key: 'login_layout',
+            label: 'Login layout',
+            root: {
+                ...structuredClone(document.items[0].root),
+                id: '098b1b0e-cd80-4df8-8105-f9c85933970c',
+                children: [{
+                    ...structuredClone(document.items[0].root.children[0]),
+                    id: 'd0d98c10-6268-41da-84f0-f7c8067807be',
+                }],
+            },
+        })
+        specialDocument.special_pages = [{
+            id: '5876e33e-c9ae-4bc7-9c54-c3e745d05552',
+            key: 'route_login',
+            label: 'Login',
+            kind: 'route',
+            route: 'login',
+            layout_key: 'login_layout',
+            widgets: {},
+        }]
+        render(<Harness sourceDocument={specialDocument} />)
+
+        fireEvent.click(screen.getByRole('button', { name: /Login layout login_layout/ }))
+        fireEvent.click(screen.getByRole('button', { name: 'Archive layout' }))
+        expect(screen.getByRole('alert')).toHaveTextContent('used by 1 special page and cannot be archived')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Delete unused layout' }))
+        expect(screen.getByRole('alert')).toHaveTextContent('used by 1 special page and cannot be deleted')
+        expect(screen.getByRole('button', { name: /Login layout login_layout/ })).toBeInTheDocument()
     })
 
     it('names supported elements and chooses which parameters the Theme Designer may edit', () => {
