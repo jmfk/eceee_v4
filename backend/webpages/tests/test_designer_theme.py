@@ -1423,6 +1423,21 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(added.status_code, 200, added.data)
         self.assertEqual(next(color["value"] for color in added.data["colors"] if color["name"] == "accent"), "#abcdef")
 
+        invalid_name = self.client.patch(
+            self.workspace_url,
+            {
+                "draftVersion": added.data["draftVersion"],
+                "colors": {
+                    **{color["name"]: color["value"] for color in added.data["colors"]},
+                    "invalid color": "#123456",
+                },
+            },
+            format="json",
+        )
+
+        self.assertEqual(invalid_name.status_code, 400, invalid_name.data)
+        self.assertIn("must begin with a letter", str(invalid_name.data))
+
         removed = self.client.patch(
             self.workspace_url,
             {"draftVersion": added.data["draftVersion"], "colors": {"accent": "#abcdef"}},
