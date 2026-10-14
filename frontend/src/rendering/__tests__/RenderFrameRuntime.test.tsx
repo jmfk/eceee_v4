@@ -1836,13 +1836,15 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(Object.fromEntries(widthLabels.map((label) => [label.textContent, label.style.top]))).toEqual({
             '600px': '300px',
             '500px': '248px',
-            '300px': '352px',
+            '300px': '331px',
         })
         expect(Object.fromEntries(heightLabels.map((label) => [label.textContent, label.style.left]))).toEqual({
             '400px': '300px',
             '300px': '248px',
             '80px': '352px',
         })
+        expect(widthLabels.find((label) => label.textContent === '300px')).toHaveStyle({ left: '196px', top: '331px' })
+        expect(heightLabels.find((label) => label.textContent === '80px')).toHaveStyle({ left: '352px', top: '331px' })
         const bounds = labels.map((label) => {
             const halfWidth = Math.max(20, (label.textContent || '').length * 6) / 2 + 3
             const left = Number.parseFloat(label.style.left)
