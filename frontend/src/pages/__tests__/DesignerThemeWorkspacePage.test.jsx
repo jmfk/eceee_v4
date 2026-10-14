@@ -1274,6 +1274,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByText('Selected widget')).toBeInTheDocument()
         expect(screen.queryByText('Selected element')).not.toBeInTheDocument()
         const richTextTrail = screen.getByRole('navigation', { name: 'Widget and slot path' })
+        expect(screen.getByRole('region', { name: 'Selected target editor' })).toHaveClass('flex', 'flex-col')
         expect(within(richTextTrail).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
             'Main Content', 'Content widget',
         ])
