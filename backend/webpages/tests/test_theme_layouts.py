@@ -107,7 +107,7 @@ class ThemeLayoutValidationTests(SimpleTestCase):
             validate_theme_layouts(document)
 
     def test_special_routes_cannot_use_reserved_error_subtrees(self):
-        for route in ("403", "404/help", "500/details", "503/status"):
+        for route in ("403", "404/help", "500/details", "503/status", "theme-error-status/403"):
             document = deepcopy(default_theme_layouts())
             document["special_pages"].append(
                 {
@@ -145,7 +145,9 @@ class ThemeLayoutValidationTests(SimpleTestCase):
             }
         )
         theme = SimpleNamespace(layouts=document)
-        root = SimpleNamespace(get_effective_theme=lambda: theme)
+        root = SimpleNamespace(
+            get_current_published_version=lambda: SimpleNamespace(theme_id=1, theme=theme),
+        )
         view = HostnamePageView()
 
         self.assertEqual(view._get_error_page(root, 404)["key"], "error_404")

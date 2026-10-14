@@ -9,8 +9,9 @@ from django.contrib.auth.models import User
 from django.http import Http404
 from django.test import RequestFactory, TestCase
 
-from webpages.models import WebPage
+from webpages.models import PageTheme, WebPage
 from webpages.public_views import HostnamePageView
+from webpages.theme_layouts import default_theme_layouts
 
 
 class PathPatternModelTests(TestCase):
@@ -139,7 +140,13 @@ class PathResolutionTests(TestCase):
         root_version = self.root_page.create_version(self.user, "Root version")
         root_version.effective_date = "2024-01-01T00:00:00Z"
         root_version.save()
-
+        PageTheme.objects.create(
+            name="Path resolution theme",
+            tenant=self.tenant,
+            created_by=self.user,
+            is_default=True,
+            layouts=default_theme_layouts(),
+        )
         # Create news page with pattern
         self.news_page = WebPage.objects.create(
             slug="news",
@@ -552,6 +559,13 @@ class PathPatternIntegrationTests(TestCase):
         root_version = self.root_page.create_version(self.user, "Root")
         root_version.effective_date = "2024-01-01T00:00:00Z"
         root_version.save()
+        PageTheme.objects.create(
+            name="Path test theme",
+            tenant=self.tenant,
+            created_by=self.user,
+            is_default=True,
+            layouts=default_theme_layouts(),
+        )
 
         # Create events page with pattern
         self.events_page = WebPage.objects.create(
