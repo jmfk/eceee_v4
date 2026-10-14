@@ -1,8 +1,12 @@
-from celery import shared_task
-from .models import MigrationJob, MigrationPlan
-from .services.engine import MigrationEngine
-from django.utils import timezone
 import logging
+
+from celery import shared_task
+from django.utils import timezone
+
+from data_connections.credentials import resolved_connection_config
+
+from .models import MigrationJob
+from .services.engine import MigrationEngine
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +32,8 @@ def run_plugin_import_job(self, job_id):
         return job.result
     try:
         plugin, importer = registry.importer(job.importer_id)
+        if not plugin.supports_tenant(job.tenant):
+            raise ValueError("The importer is not available for this workspace.")
         active = TenantPluginActivation.objects.filter(
             tenant=job.tenant,
             plugin_id=plugin.id,
@@ -85,7 +91,7 @@ def run_migration_job(job_id):
         engine = get_engine(connection.connection_type)
 
         query_dsl = job.plan.query_dsl
-        items = engine.execute(query_dsl, connection.config)
+        items = engine.execute(query_dsl, resolved_connection_config(connection))
 
         if not items:
             job.status = "COMPLETED"

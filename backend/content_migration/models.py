@@ -1,9 +1,11 @@
-from django.db import models
+import uuid
+
 from django.contrib.auth.models import User
+from django.db import models
+
+from core.models import Tenant
 from data_connections.models import DataConnection
 from object_storage.models import ObjectTypeDefinition
-from core.models import Tenant
-import uuid
 
 
 class MigrationPlan(models.Model):

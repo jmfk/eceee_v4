@@ -1,7 +1,9 @@
 from rest_framework import serializers
-from .models import MigrationPlan, MigrationJob, MigrationTask, PluginImportJob
+
 from data_connections.serializers import DataConnectionSerializer
 from object_storage.serializers import ObjectTypeDefinitionSerializer
+
+from .models import MigrationJob, MigrationPlan, MigrationTask, PluginImportJob
 
 
 class MigrationPlanSerializer(serializers.ModelSerializer):

@@ -38,3 +38,31 @@ class DataConnectionCredentialTests(SimpleTestCase):
                 "token": "server-only-token",
             },
         )
+
+    @patch("data_connections.services.engine.get_engine")
+    @patch("content_migration.tasks.MigrationJob.objects")
+    def test_migration_job_resolves_write_only_credentials(self, migration_jobs, get_engine):
+        from content_migration.tasks import run_migration_job
+
+        engine = Mock()
+        engine.execute.return_value = []
+        get_engine.return_value = engine
+        connection = SimpleNamespace(
+            connection_type="EXTERNAL_REST",
+            config={"baseUrl": "https://example.test", "authType": "bearer"},
+            encrypted_secrets=encrypt_connection_secrets({"token": "server-only-token"}),
+        )
+        plan = SimpleNamespace(source_connection=connection, query_dsl="/items", config={})
+        job = SimpleNamespace(plan=plan, status="PENDING", started_at=None, save=Mock())
+        migration_jobs.select_related.return_value.get.return_value = job
+
+        run_migration_job.run("job-id")
+
+        engine.execute.assert_called_once_with(
+            "/items",
+            {
+                "baseUrl": "https://example.test",
+                "authType": "bearer",
+                "token": "server-only-token",
+            },
+        )

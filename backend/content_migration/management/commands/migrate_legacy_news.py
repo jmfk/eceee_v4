@@ -23,10 +23,7 @@ from content_migration.legacy_news.links import LegacyNewsLinkRewriter
 from content_migration.legacy_news.locking import LegacyNewsImportAlreadyRunning, legacy_news_import_lock
 from content_migration.legacy_news.media import LegacyMediaImporter
 from content_migration.legacy_news.preview import ensure_news_preview_page
-from content_migration.legacy_news.repository import (
-    LegacyNewsDefinitionError,
-    LegacyNewsRepository,
-)
+from content_migration.legacy_news.repository import LegacyNewsDefinitionError, LegacyNewsRepository
 from content_migration.legacy_news.transformer import build_payload
 from core.models import Tenant
 from object_storage.models import ObjectTypeDefinition
