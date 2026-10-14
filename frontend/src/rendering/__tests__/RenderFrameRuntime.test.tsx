@@ -1795,11 +1795,12 @@ describe('RenderFrameRuntime designer overlay', () => {
         const heightLabel = document.querySelector<HTMLElement>('.designer-spacing-size-value[data-property="height"]')
         const widthMeasure = document.querySelector<HTMLElement>('.designer-spacing-size-measure[data-property="width"]')
         const heightMeasure = document.querySelector<HTMLElement>('.designer-spacing-size-measure[data-property="height"]')
-        expect(widthLabel).toHaveStyle({ left: '300px', top: '290px' })
-        expect(heightLabel).toHaveStyle({ left: '300px', top: '310px' })
-        expect(widthMeasure).toHaveStyle({ top: '290px' })
-        expect(heightMeasure).toHaveStyle({ left: '300px' })
-        expect(Math.abs(Number.parseFloat(widthLabel!.style.top) - Number.parseFloat(heightLabel!.style.top))).toBeGreaterThanOrEqual(18)
+        expect(widthLabel).toHaveStyle({ left: '252px', top: '268px' })
+        expect(heightLabel).toHaveStyle({ left: '348px', top: '332px' })
+        expect(widthMeasure).toHaveStyle({ top: '268px' })
+        expect(heightMeasure).toHaveStyle({ left: '348px' })
+        expect(Math.abs(Number.parseFloat(widthLabel!.style.top) - Number.parseFloat(heightLabel!.style.top))).toBeGreaterThanOrEqual(60)
+        expect(Math.abs(Number.parseFloat(widthLabel!.style.left) - Number.parseFloat(heightLabel!.style.left))).toBeGreaterThanOrEqual(90)
         expect(widthLabel).toHaveAttribute('data-editable', 'false')
         expect(widthLabel).not.toHaveAttribute('role')
         expect(getComputedStyle(widthLabel!).color).toBe('rgb(55, 65, 81)')
@@ -1827,6 +1828,12 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(labels).toHaveLength(6)
         expect(new Set(labels.map((label) => label.style.left)).size).toBeGreaterThan(1)
         expect(new Set(labels.map((label) => label.style.top)).size).toBeGreaterThan(1)
+        const widthLabels = labels.filter((label) => label.dataset.property === 'width')
+        const heightLabels = labels.filter((label) => label.dataset.property === 'height')
+        expect(Math.max(...widthLabels.map((label) => Number.parseFloat(label.style.top))))
+            .toBeLessThan(Math.min(...heightLabels.map((label) => Number.parseFloat(label.style.top))))
+        expect(Math.max(...widthLabels.map((label) => Number.parseFloat(label.style.left))))
+            .toBeLessThan(Math.min(...heightLabels.map((label) => Number.parseFloat(label.style.left))))
         const bounds = labels.map((label) => {
             const halfWidth = Math.max(20, (label.textContent || '').length * 6) / 2 + 3
             const left = Number.parseFloat(label.style.left)
@@ -1835,10 +1842,10 @@ describe('RenderFrameRuntime designer overlay', () => {
         })
         bounds.forEach((current, index) => bounds.slice(index + 1).forEach((other) => {
             expect(
-                current.right + 4 <= other.left
-                || current.left >= other.right + 4
-                || current.bottom + 4 <= other.top
-                || current.top >= other.bottom + 4,
+                current.right + 10 <= other.left
+                || current.left >= other.right + 10
+                || current.bottom + 10 <= other.top
+                || current.top >= other.bottom + 10,
             ).toBe(true)
         }))
         const widthLabelTops = labels

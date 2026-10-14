@@ -854,7 +854,7 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             labelLeft = Math.min(viewportWidth - halfWidth, Math.max(halfWidth, labelLeft))
             labelTop = Math.min(viewportHeight - halfHeight, Math.max(halfHeight, labelTop))
             if (spacing === 'size') {
-                const labelSpacing = 4
+                const labelSpacing = 10
                 const collisionHalfWidth = halfWidth + 3
                 const overlapsPlacedLabel = (candidateLeft: number, candidateTop: number) => {
                     const candidate = {
@@ -872,15 +872,18 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                 }
                 const horizontalStep = collisionHalfWidth * 2 + labelSpacing
                 const verticalStep = labelHeight + labelSpacing
-                const offsets = Array.from({ length: 7 }, (_, yIndex) => yIndex - 3)
-                    .flatMap((y) => Array.from({ length: 7 }, (_, xIndex) => ({ x: xIndex - 3, y })))
+                const offsets = Array.from({ length: 9 }, (_, yIndex) => yIndex - 4)
+                    .flatMap((y) => Array.from({ length: 9 }, (_, xIndex) => ({ x: xIndex - 4, y })))
                     .sort((left, right) => (
                         Math.abs(left.x) + Math.abs(left.y) - Math.abs(right.x) - Math.abs(right.y)
                         || Math.abs(left.y) - Math.abs(right.y)
                         || right.x - left.x
                         || right.y - left.y
                     ))
-                const distributedPosition = offsets
+                const orientationOffsets = property === 'width'
+                    ? offsets.filter(({ x, y }) => x <= 0 && y <= 0)
+                    : offsets.filter(({ x, y }) => x >= 0 && y >= 0)
+                const distributedPosition = [...orientationOffsets, ...offsets.filter((offset) => !orientationOffsets.includes(offset))]
                     .map(({ x, y }) => ({
                         left: Math.min(viewportWidth - collisionHalfWidth, Math.max(collisionHalfWidth, labelLeft + x * horizontalStep)),
                         top: Math.min(viewportHeight - halfHeight, Math.max(halfHeight, labelTop + y * verticalStep)),
@@ -987,13 +990,17 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
         addGuide('designer-spacing-padding', innerLeft, contentTop + contentHeight, innerWidth, Math.max(0, padding.bottom), 'bottom', 'padding', Math.max(0, padding.bottom))
         addGuide('designer-spacing-padding', innerLeft, contentTop, Math.max(0, padding.left), contentHeight, 'left', 'padding', Math.max(0, padding.left))
         const sizeLabelCenter = { left: rect.left + rect.width / 2, top: rect.top + rect.height / 2 }
-        addGuide('designer-spacing-size', rect.left, sizeLabelCenter.top - 10.5, rect.width, 1, 'right', 'size', Math.round(rect.width), 'width', {
-            left: sizeLabelCenter.left,
-            top: sizeLabelCenter.top - 10,
+        const sizeLabelOffset = {
+            x: Math.min(48, Math.max(28, rect.width * 0.08)),
+            y: Math.min(32, Math.max(20, rect.height * 0.08)),
+        }
+        addGuide('designer-spacing-size', rect.left, sizeLabelCenter.top - sizeLabelOffset.y - 0.5, rect.width, 1, 'right', 'size', Math.round(rect.width), 'width', {
+            left: sizeLabelCenter.left - sizeLabelOffset.x,
+            top: sizeLabelCenter.top - sizeLabelOffset.y,
         })
-        addGuide('designer-spacing-size', sizeLabelCenter.left - 0.5, rect.top, 1, rect.height, 'bottom', 'size', Math.round(rect.height), 'height', {
-            left: sizeLabelCenter.left,
-            top: sizeLabelCenter.top + 10,
+        addGuide('designer-spacing-size', sizeLabelCenter.left + sizeLabelOffset.x - 0.5, rect.top, 1, rect.height, 'bottom', 'size', Math.round(rect.height), 'height', {
+            left: sizeLabelCenter.left + sizeLabelOffset.x,
+            top: sizeLabelCenter.top + sizeLabelOffset.y,
         })
         const contentOutlineInset = selectionLevel === 'widget' ? 3 : selectionLevel === 'element' ? 1 : 0
         addGuide(
