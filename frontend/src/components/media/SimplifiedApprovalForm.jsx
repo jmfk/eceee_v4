@@ -238,7 +238,7 @@ const SimplifiedApprovalForm = ({
         // For pending files, use direct preview URL (bypass imgproxy)
         // Pending files don't have fileUrl yet, and their preview endpoint
         // serves the raw file directly - no need for imgproxy optimization
-        const previewUrl = file.fileUrl || `/api/v1/media/pending-files/${file.id}/preview/`;
+        const previewUrl = file.fileUrl || file.previewUrl || `/api/v1/media/pending-files/${file.id}/preview/`;
         const isPendingFile = !file.fileUrl; // If no fileUrl, it's a pending file
 
         if (file.fileType === 'image') {
@@ -472,4 +472,3 @@ const SimplifiedApprovalForm = ({
 };
 
 export default SimplifiedApprovalForm;
-

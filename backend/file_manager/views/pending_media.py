@@ -4,12 +4,14 @@ ViewSet for managing pending media files awaiting approval.
 
 import logging
 
+from django.db.models import Q
 from django.http import Http404, HttpResponse
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from ..models import MediaCollection, MediaFile, PendingMediaFile
+from ..security import pending_preview_token_is_valid
 from ..serializers import (
     BulkApprovalSerializer,
     MediaFileApprovalSerializer,
@@ -20,6 +22,19 @@ from ..serializers import (
 from ..storage import storage
 
 logger = logging.getLogger(__name__)
+
+
+def _can_access_theme_pending(pending_file, user, tenant=None):
+    """Keep pending theme uploads inside their tenant's Designer boundary."""
+    from content.models import Namespace
+
+    from ..security import user_can_access_namespace
+
+    if pending_file.namespace.kind != Namespace.KIND_THEME_MEDIA:
+        return True
+    return (tenant is None or tenant.pk == pending_file.namespace.tenant_id) and user_can_access_namespace(
+        user, pending_file.namespace
+    )
 
 
 class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
@@ -86,6 +101,23 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
         if self.action == "preview":
             return queryset
 
+        from content.models import Namespace
+        from core.permissions import user_can_switch_tenant
+
+        tenant = getattr(self.request, "tenant", None)
+        theme_media = Q(namespace__kind=Namespace.KIND_THEME_MEDIA)
+        if user_can_switch_tenant(self.request.user):
+            allowed_theme_media = theme_media
+        else:
+            allowed_theme_media = theme_media & (
+                Q(namespace__tenant__created_by=self.request.user)
+                | Q(namespace__tenant__members=self.request.user)
+                | Q(namespace__tenant__theme_designer_assignments__user=self.request.user)
+            )
+        if tenant is not None:
+            allowed_theme_media &= Q(namespace__tenant=tenant)
+        queryset = queryset.filter(~theme_media | allowed_theme_media).distinct()
+
         # Users can only see their own pending files unless they're staff
         if self.request.user.is_authenticated and not self.request.user.is_staff:
             queryset = queryset.filter(uploaded_by=self.request.user)
@@ -103,37 +135,39 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
         """
         Get preview/thumbnail of pending media file.
 
-        Public endpoint since <img> tags can't send auth headers.
-        File access is secured by UUID (hard to guess).
+        Public endpoint since <img> tags can't send auth headers. Theme-media
+        previews additionally require the signed capability URL returned by the
+        authenticated pending-file APIs.
         """
         try:
-
             pending_file = self.get_object()
+        except PendingMediaFile.DoesNotExist:
+            raise Http404("Pending file not found")
 
-            # For images, serve the actual file
-            if pending_file.file_type == "image":
-                try:
-                    # Get file from storage
-                    file_content = storage.get_file_content(pending_file.file_path)
+        from content.models import Namespace
 
-                    response = HttpResponse(file_content, content_type=pending_file.content_type)
-                    response["Content-Disposition"] = f'inline; filename="{pending_file.original_filename}"'
-                    return response
+        if pending_file.namespace.kind == Namespace.KIND_THEME_MEDIA and not pending_preview_token_is_valid(
+            pending_file, request.query_params.get("preview_token")
+        ):
+            raise Http404("Pending file not found")
 
-                except Exception as e:
-                    logger.error(f"Error serving pending file preview: {str(e)}", exc_info=True)
-                    return Response({"error": "File not found"}, status=status.HTTP_404_NOT_FOUND)
-            else:
-                return Response(
-                    {"error": "Preview not available for this file type"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        # For images, serve the actual file
+        if pending_file.file_type == "image":
+            try:
+                # Get file from storage
+                file_content = storage.get_file_content(pending_file.file_path)
 
-        except Exception as e:
-            logger.error(f"Error in preview action: {str(e)}", exc_info=True)
+                response = HttpResponse(file_content, content_type=pending_file.content_type)
+                response["Content-Disposition"] = f'inline; filename="{pending_file.original_filename}"'
+                return response
+
+            except Exception as e:
+                logger.error(f"Error serving pending file preview: {str(e)}", exc_info=True)
+                return Response({"error": "File not found"}, status=status.HTTP_404_NOT_FOUND)
+        else:
             return Response(
-                {"error": "Internal server error"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {"error": "Preview not available for this file type"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
     @action(detail=True, methods=["post"])
@@ -315,6 +349,15 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 pending_file = PendingMediaFile.objects.get(id=approval_data["pending_file_id"], status="pending")
 
                 # Check permissions
+                if not _can_access_theme_pending(pending_file, request.user, getattr(request, "tenant", None)):
+                    results.append(
+                        {
+                            "pending_file_id": approval_data["pending_file_id"],
+                            "status": "error",
+                            "error": "Permission denied",
+                        }
+                    )
+                    continue
                 if not request.user.is_staff and pending_file.uploaded_by != request.user:
                     results.append(
                         {
@@ -396,6 +439,15 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 pending_file = PendingMediaFile.objects.get(id=file_id, status="pending")
 
                 # Check permissions
+                if not _can_access_theme_pending(pending_file, request.user, getattr(request, "tenant", None)):
+                    results.append(
+                        {
+                            "file_id": file_id,
+                            "status": "error",
+                            "error": "Permission denied",
+                        }
+                    )
+                    continue
                 if not request.user.is_staff and pending_file.uploaded_by != request.user:
                     results.append(
                         {

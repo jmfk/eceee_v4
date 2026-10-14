@@ -4,14 +4,16 @@ Service class for handling file uploads with comprehensive error handling and cl
 
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
-from django.utils import timezone
 from datetime import timedelta
-from django.db import IntegrityError
+from typing import List, Optional
 
-from ..models import PendingMediaFile
-from ..storage import storage
+from django.db import IntegrityError
+from django.utils import timezone
+
 from ..ai_services import ai_service
+from ..models import PendingMediaFile
+from ..security import get_pending_preview_url
+from ..storage import storage
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +32,7 @@ class UploadResult:
 class FileUploadService:
     """Service class to handle the core file upload logic."""
 
-    def upload(
-        self, file, folder_path: str, namespace, user, skip_ai_analysis: bool = False
-    ) -> UploadResult:
+    def upload(self, file, folder_path: str, namespace, user, skip_ai_analysis: bool = False) -> UploadResult:
         """
         Handle the upload of a single file, including storage and pending file creation.
 
@@ -54,9 +54,7 @@ class FileUploadService:
             file_type = self._determine_file_type(upload_result["content_type"])
 
             # Get AI analysis (skip if already done elsewhere, e.g., content import)
-            ai_analysis = (
-                {} if skip_ai_analysis else self._get_ai_analysis(file, upload_result)
-            )
+            ai_analysis = {} if skip_ai_analysis else self._get_ai_analysis(file, upload_result)
 
             # Create pending file
             pending_file = self._create_pending_file(
@@ -78,12 +76,11 @@ class FileUploadService:
                         "file_size": pending_file.file_size,
                         "width": pending_file.width,
                         "height": pending_file.height,
+                        "preview_url": get_pending_preview_url(pending_file),
                         "ai_suggestions": {
                             "tags": ai_analysis.get("suggested_tags", []),
                             "title": ai_analysis.get("suggested_title", ""),
-                            "confidence_score": ai_analysis.get(
-                                "confidence_score", 0.0
-                            ),
+                            "confidence_score": ai_analysis.get("confidence_score", 0.0),
                             "extracted_text": ai_analysis.get("extracted_text", ""),
                         },
                         "status": "pending_approval",
@@ -117,9 +114,7 @@ class FileUploadService:
     def _get_ai_analysis(self, file, upload_result: dict) -> dict:
         """Get AI analysis for the uploaded file."""
         try:
-            analysis = ai_service.analyze_media_file(
-                file.read(), file.name, upload_result["content_type"]
-            )
+            analysis = ai_service.analyze_media_file(file.read(), file.name, upload_result["content_type"])
             file.seek(0)  # Reset file pointer
             return analysis
         except Exception as e:
@@ -168,7 +163,7 @@ class FileUploadService:
 
                 # Trigger background processing for documents
                 if file_type == "document":
-                    from ..tasks import process_document_text, generate_document_thumbnail
+                    from ..tasks import generate_document_thumbnail, process_document_text
 
                     # Trigger tasks asynchronously
                     generate_document_thumbnail.delay(str(pending_file.id), is_pending=True)
@@ -179,9 +174,7 @@ class FileUploadService:
             # Handle duplicate file hash constraint OUTSIDE atomic block
             # This happens when the same file (same hash) is uploaded again
             if "file_hash" in str(e) and "uniq" in str(e):
-                existing_pending = PendingMediaFile.objects.filter(
-                    file_hash=upload_result["file_hash"]
-                ).first()
+                existing_pending = PendingMediaFile.objects.filter(file_hash=upload_result["file_hash"]).first()
 
                 if existing_pending:
                     # Update existing pending file with new metadata

@@ -2,15 +2,16 @@
 Tests for the DuplicateFileHandler class.
 """
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import Mock, patch
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 
-from file_manager.services import DuplicateFileHandler
-from file_manager.models import MediaFile, PendingMediaFile
 from content.models import Namespace
+from file_manager.models import MediaFile, PendingMediaFile
+from file_manager.services import DuplicateFileHandler
 
 User = get_user_model()
 
@@ -22,9 +23,7 @@ def user():
 
 @pytest.fixture
 def namespace():
-    return Namespace.objects.create(
-        name="Test Namespace", slug="test-namespace", is_active=True
-    )
+    return Namespace.objects.create(name="Test Namespace", slug="test-namespace", is_active=True)
 
 
 @pytest.fixture
@@ -85,9 +84,7 @@ class TestDuplicateFileHandler:
             assert result.existing_file is None
             assert result.existing_pending is None
 
-    def test_existing_active_file(
-        self, user, namespace, upload_file, existing_media_file
-    ):
+    def test_existing_active_file(self, user, namespace, upload_file, existing_media_file):
         """Test when file exists and is active."""
         with patch("hashlib.sha256") as mock_hash:
             mock_hash.return_value.hexdigest.return_value = "testhash123"
@@ -105,9 +102,7 @@ class TestDuplicateFileHandler:
             assert pending_file is not None
             assert pending_file.file_hash == "testhash123"
 
-    def test_existing_deleted_file(
-        self, user, namespace, upload_file, existing_media_file
-    ):
+    def test_existing_deleted_file(self, user, namespace, upload_file, existing_media_file):
         """Test when file exists but is deleted."""
         # Delete the existing file
         existing_media_file.soft_delete(user)
@@ -132,9 +127,7 @@ class TestDuplicateFileHandler:
             assert pending_file is not None
             assert pending_file.file_hash == "testhash123"
 
-    def test_existing_pending_file_update(
-        self, user, namespace, upload_file, existing_pending_file
-    ):
+    def test_existing_pending_file_update(self, user, namespace, upload_file, existing_pending_file):
         """Test updating an existing pending file."""
         with patch("hashlib.sha256") as mock_hash:
             mock_hash.return_value.hexdigest.return_value = "pendinghash123"
@@ -182,19 +175,13 @@ class TestDuplicateFileHandler:
 
             # Should update the first pending file found
             assert PendingMediaFile.objects.count() == 2
-            updated_file = PendingMediaFile.objects.filter(
-                original_filename=upload_file.name
-            ).first()
+            updated_file = PendingMediaFile.objects.filter(original_filename=upload_file.name).first()
             assert updated_file is not None
 
-    def test_pending_file_different_namespace(
-        self, user, namespace, upload_file, existing_pending_file
-    ):
-        """Test handling pending file in different namespace."""
+    def test_pending_file_different_namespace(self, user, namespace, upload_file, existing_pending_file):
+        """A hash collision must not expose or move a file from another namespace."""
         # Create new namespace
-        other_namespace = Namespace.objects.create(
-            name="Other Namespace", slug="other-namespace", is_active=True
-        )
+        other_namespace = Namespace.objects.create(name="Other Namespace", slug="other-namespace", is_active=True)
 
         with patch("hashlib.sha256") as mock_hash:
             mock_hash.return_value.hexdigest.return_value = "pendinghash123"
@@ -204,10 +191,13 @@ class TestDuplicateFileHandler:
 
             assert result.has_duplicates
             assert len(result.errors) == 1
-            assert result.errors[0]["reason"] == "duplicate_pending"
+            assert result.errors[0]["reason"] == "duplicate_other_namespace"
+            assert "existing_file" not in result.errors[0]
 
-            # Should create new pending file in other namespace
-            assert PendingMediaFile.objects.filter(namespace=other_namespace).exists()
+            existing_pending_file.refresh_from_db()
+            assert existing_pending_file.namespace == namespace
+            assert existing_pending_file.uploaded_by == user
+            assert not PendingMediaFile.objects.filter(namespace=other_namespace).exists()
 
     def test_error_handling(self, user, namespace, upload_file):
         """Test handling of errors during duplicate check."""
@@ -219,16 +209,11 @@ class TestDuplicateFileHandler:
 
             assert result.has_duplicates  # Treated as duplicate for safety
             assert len(result.errors) == 1
-            assert (
-                "error occurred while checking for duplicates"
-                in result.errors[0]["error"]
-            )
+            assert "error occurred while checking for duplicates" in result.errors[0]["error"]
             assert "Hash error" in result.errors[0]["technical_details"]
             assert not result.pending_files
 
-    def test_user_friendly_error_messages(
-        self, user, namespace, upload_file, existing_media_file
-    ):
+    def test_user_friendly_error_messages(self, user, namespace, upload_file, existing_media_file):
         """Test user-friendly error messages."""
         with patch("hashlib.sha256") as mock_hash:
             mock_hash.return_value.hexdigest.return_value = "testhash123"

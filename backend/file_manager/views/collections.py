@@ -14,11 +14,13 @@ from django.http import FileResponse, Http404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from ..models import MediaCollection, MediaFile, MediaTag
+from ..security import filter_media_files_for_user, user_can_access_namespace
 from ..serializers import (
     MediaCollectionSerializer,
     MediaFileDetailSerializer,
@@ -29,6 +31,27 @@ from ..services import FileUploadService, FileValidationService
 from ..storage import storage
 
 logger = logging.getLogger(__name__)
+
+
+def _namespace_visible_to_request(namespace, request):
+    """Keep system-owned namespaces inside their owning product boundary."""
+    from content.models import Namespace
+
+    if namespace.kind != Namespace.KIND_THEME_MEDIA:
+        return True
+    tenant = getattr(request, "tenant", None)
+    return (tenant is None or tenant.pk == namespace.tenant_id) and user_can_access_namespace(request.user, namespace)
+
+
+def _validate_create_namespace(serializer, request):
+    """Reject writes to a hidden namespace before the serializer mutates it."""
+    from content.models import Namespace
+
+    namespace_data = serializer.validated_data.get("namespace") or {}
+    namespace_slug = namespace_data.get("slug")
+    namespace = Namespace.objects.filter(slug=namespace_slug).first() if namespace_slug else Namespace.get_default()
+    if namespace and not _namespace_visible_to_request(namespace, request):
+        raise PermissionDenied("Access denied to specified namespace.")
 
 
 class MediaTagViewSet(viewsets.ModelViewSet):
@@ -65,6 +88,8 @@ class MediaTagViewSet(viewsets.ModelViewSet):
                 if tenant is not None:
                     namespaces = namespaces.filter(tenant=tenant)
                 namespace = get_object_or_404(namespaces, slug=namespace_param)
+            if not _namespace_visible_to_request(namespace, self.request):
+                return queryset.none()
             queryset = queryset.filter(namespace=namespace)
         else:
             # Use default namespace if none specified
@@ -75,6 +100,7 @@ class MediaTagViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """Set created_by when creating tag."""
+        _validate_create_namespace(serializer, self.request)
         serializer.save(created_by=self.request.user)
 
     @action(detail=True, methods=["get"])
@@ -84,26 +110,15 @@ class MediaTagViewSet(viewsets.ModelViewSet):
 
         # Get files with this tag
         files = (
-            MediaFile.objects.filter(tags=tag, namespace=tag.namespace)
+            filter_media_files_for_user(
+                MediaFile.objects.filter(tags=tag, namespace=tag.namespace),
+                request.user,
+                tenant=tag.namespace.tenant,
+                include_theme_media=True,
+            )
             .select_related("namespace", "created_by", "last_modified_by")
             .prefetch_related("tags", "collections")
         )
-
-        # Apply user permissions (same logic as MediaFileViewSet)
-        user = request.user
-        if not user.is_staff:
-            from content.models import Namespace
-
-            # Get namespaces the user can access
-            accessible_namespaces = Namespace.objects.filter(models.Q(created_by=user) | models.Q(is_active=True))
-            files = files.filter(namespace__in=accessible_namespaces)
-
-            # Further filter by access level
-            from django.db.models import Q
-
-            files = files.filter(
-                Q(access_level="public") | Q(access_level="members") | Q(access_level="private", created_by=user)
-            )
 
         # Apply search if provided
         search = request.query_params.get("search")
@@ -167,13 +182,14 @@ class MediaTagViewSet(viewsets.ModelViewSet):
             )
 
         # Get target tag
+        accessible_tags = self.get_queryset()
         try:
-            target_tag = MediaTag.objects.get(id=target_tag_id)
+            target_tag = accessible_tags.get(id=target_tag_id)
         except MediaTag.DoesNotExist:
             return Response({"error": "Target tag not found"}, status=status.HTTP_404_NOT_FOUND)
 
         # Get source tags
-        source_tags = MediaTag.objects.filter(id__in=source_tag_ids)
+        source_tags = accessible_tags.filter(id__in=source_tag_ids)
         if source_tags.count() != len(source_tag_ids):
             return Response(
                 {"error": "One or more source tags not found"},
@@ -300,12 +316,20 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
 
         namespace_slug = self.request.query_params.get("namespace")
         if namespace_slug:
-            return queryset.filter(namespace__slug=namespace_slug)
+            namespace = Namespace.objects.filter(slug=namespace_slug).first()
+            if not namespace or not _namespace_visible_to_request(namespace, self.request):
+                return queryset.none()
+            return queryset.filter(namespace=namespace)
 
         if lookup_value:
             # Detail/action lookup by ID — do not restrict by namespace so
             # that callers without a ``namespace`` param can still resolve
             # collections in non-default namespaces.
+            namespace = queryset.filter(pk=lookup_value).values_list("namespace", flat=True).first()
+            if namespace:
+                namespace = Namespace.objects.filter(pk=namespace).first()
+                if namespace and not _namespace_visible_to_request(namespace, self.request):
+                    return queryset.none()
             return queryset
 
         # List-style request without an explicit namespace: fall back to the
@@ -331,6 +355,7 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """Set user fields when creating collection."""
+        _validate_create_namespace(serializer, self.request)
         serializer.save(created_by=self.request.user, last_modified_by=self.request.user)
 
     def perform_update(self, serializer):
@@ -345,26 +370,15 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
 
             # Get files in this collection with proper permissions
             files = (
-                MediaFile.objects.filter(collections=collection, namespace=collection.namespace)
+                filter_media_files_for_user(
+                    MediaFile.objects.filter(collections=collection, namespace=collection.namespace),
+                    request.user,
+                    tenant=collection.namespace.tenant,
+                    include_theme_media=True,
+                )
                 .select_related("namespace", "created_by", "last_modified_by")
                 .prefetch_related("tags", "collections")
             )
-
-            # Apply user permissions (same logic as MediaFileViewSet)
-            user = request.user
-            if not user.is_staff:
-                from content.models import Namespace
-
-                # Get namespaces the user can access
-                accessible_namespaces = Namespace.objects.filter(models.Q(created_by=user) | models.Q(is_active=True))
-                files = files.filter(namespace__in=accessible_namespaces)
-
-                # Further filter by access level
-                from django.db.models import Q
-
-                files = files.filter(
-                    Q(access_level="public") | Q(access_level="members") | Q(access_level="private", created_by=user)
-                )
 
             # Apply search if provided
             search = request.query_params.get("search")

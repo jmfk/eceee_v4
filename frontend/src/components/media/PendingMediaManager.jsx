@@ -967,7 +967,7 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                     <div className="w-24 h-24 bg-gray-200 rounded overflow-hidden border border-gray-300">
                                                         {file.fileType === 'image' ? (
                                                             <img
-                                                                src={`/api/v1/media/pending-files/${file.id}/preview/`}
+                                                                src={file.previewUrl || `/api/v1/media/pending-files/${file.id}/preview/`}
                                                                 alt={formData?.title || file.originalFilename}
                                                                 className="w-full h-full object-contain"
                                                                 style={{
@@ -1235,7 +1235,7 @@ const PendingMediaManager = ({ namespace, onFilesProcessed }) => {
                                                                     <div className="w-64 h-64 bg-gray-200 rounded-lg overflow-hidden border border-gray-300">
                                                                         {file.fileType === 'image' ? (
                                                                             <img
-                                                                                src={`/api/v1/media/pending-files/${file.id}/preview/`}
+                                                                                src={file.previewUrl || `/api/v1/media/pending-files/${file.id}/preview/`}
                                                                                 alt={file.originalFilename}
                                                                                 className="w-full h-full object-contain"
                                                                                 style={{
