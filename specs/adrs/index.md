@@ -26,6 +26,13 @@
 | ADR-0022 | [Serialize legacy News imports and use replayable media keys](active/0022-replayable-legacy-news-media-imports.md) | accepted | PRD-0012 |
 | ADR-0023 | [Reconcile legacy News links and retain disabled link evidence](active/0023-reconcilable-legacy-news-links.md) | accepted | PRD-0012 |
 | ADR-0024 | [Deployment-installed tenant plugins with typed extension points](active/0024-deployment-installed-tenant-plugins.md) | accepted | PRD-0020 |
+| ADR-0025 | [One agent runtime with capability-scoped profiles](active/0025-capability-scoped-agent-profiles.md) | accepted | PRD-0021, PRD-0022, PRD-0023 |
+| ADR-0026 | [Domain tools preserve canonical CMS workflows](active/0026-domain-tools-preserve-canonical-workflows.md) | accepted | PRD-0021, PRD-0022, PRD-0023 |
+| ADR-0027 | [Durable PostgreSQL runs with cooperative steering](active/0027-durable-runs-and-cooperative-steering.md) | accepted | PRD-0021, PRD-0022, PRD-0023 |
+| ADR-0028 | [Provider-neutral context packs and public reasoning summaries](active/0028-provider-neutral-context-and-transparency.md) | accepted | PRD-0021, PRD-0022, PRD-0023 |
+| ADR-0029 | [Tenant BYOK through capability-aware provider adapters](active/0029-tenant-byok-provider-adapters.md) | accepted | PRD-0021, PRD-0022, PRD-0023 |
+| ADR-0030 | [Human-controlled publication and recoverable mutations](active/0030-human-controlled-publication.md) | accepted | PRD-0021, PRD-0022, PRD-0023 |
+| ADR-0031 | [Eval-first prompt optimization](active/0031-eval-first-prompt-optimization.md) | accepted | PRD-0021, PRD-0022, PRD-0023 |
 
 ## Archived Decisions
 
