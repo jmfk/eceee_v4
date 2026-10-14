@@ -261,7 +261,9 @@ class ErrorPageRenderingTests(TestCase):
 
         view = HostnamePageView()
         view.request = self.factory.get("/missing/", HTTP_HOST="testsite.com")
-        response = view._render_error_page(self.root_page, 404)
+        with patch("webpages.theme_service.ThemeService.resolve_theme_for_page") as resolve_theme:
+            response = view._render_error_page(self.root_page, 404)
+        resolve_theme.assert_not_called()
         self.assertContains(response, "404 — Page not found", status_code=404)
         self.assertContains(response, "Return to the home page", status_code=404)
 
@@ -524,6 +526,26 @@ class ErrorPageIntegrationTests(TestCase):
             last_modified_by=self.user,
             tenant=self.tenant,
         )
+        hostless_root = WebPage.objects.create(
+            title="A legitimate status site",
+            slug="404",
+            cached_path="/404/",
+            created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
+        )
+        hostless_root.cached_root_id = hostless_root.id
+        hostless_root.save(update_fields=["cached_root_id"])
+        hostless_child = WebPage.objects.create(
+            title="Legitimate child",
+            slug="about",
+            parent=hostless_root,
+            cached_path="/404/about/",
+            cached_root_id=hostless_root.id,
+            created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
+        )
         view = WebPageViewSet()
         view.action = "list"
         view.request = type("Request", (), {"tenant": self.tenant, "user": self.user})()
@@ -534,6 +556,8 @@ class ErrorPageIntegrationTests(TestCase):
         self.assertNotIn(legacy_page.id, ids)
         self.assertNotIn(legacy_child.id, ids)
         self.assertIn(ordinary_page.id, ids)
+        self.assertIn(hostless_root.id, ids)
+        self.assertIn(hostless_child.id, ids)
         self.assertEqual(serialized_root["children_count"], 1)
 
     def test_legacy_error_rows_are_hidden_from_public_sitemap_and_navigation(self):

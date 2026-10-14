@@ -37,6 +37,7 @@ from webpages.services.designer_theme import (
     _safe_reference_preview_html,
     apply_designer_patch,
     collect_designer_assets,
+    designer_page_sources,
     generate_placeholder_png,
     replace_designer_preview_image,
     validate_image_upload,
@@ -756,6 +757,54 @@ class DesignerThemeApiTests(TestCase):
         self.assertEqual(object_response.status_code, 403)
         self.assertEqual(site_response.status_code, 403)
 
+    def test_legacy_error_subtree_is_not_a_designer_content_source(self):
+        root = WebPage.objects.create(
+            title="Conference site",
+            slug="conference",
+            tenant=self.tenant,
+            created_by=self.owner,
+            last_modified_by=self.owner,
+        )
+        root.cached_root_id = root.id
+        root.save(update_fields=["cached_root_id"])
+        legacy_page = WebPage.objects.create(
+            title="Legacy 404",
+            slug="404",
+            parent=root,
+            cached_path="/404/",
+            cached_root_id=root.id,
+            tenant=self.tenant,
+            created_by=self.owner,
+            last_modified_by=self.owner,
+        )
+        legacy_child = WebPage.objects.create(
+            title="Legacy help",
+            slug="help",
+            parent=legacy_page,
+            cached_path="/404/help/",
+            cached_root_id=root.id,
+            tenant=self.tenant,
+            created_by=self.owner,
+            last_modified_by=self.owner,
+        )
+        ordinary_page = WebPage.objects.create(
+            title="About",
+            slug="about",
+            parent=root,
+            cached_path="/about/",
+            cached_root_id=root.id,
+            tenant=self.tenant,
+            created_by=self.owner,
+            last_modified_by=self.owner,
+        )
+
+        source_ids = {source["id"] for source in designer_page_sources(self.theme)}
+
+        self.assertIn(root.id, source_ids)
+        self.assertIn(ordinary_page.id, source_ids)
+        self.assertNotIn(legacy_page.id, source_ids)
+        self.assertNotIn(legacy_child.id, source_ids)
+
     def test_preview_content_can_be_copied_from_a_site_using_the_theme(self):
         root = WebPage.objects.create(
             title="Conference site",
@@ -1326,9 +1375,7 @@ class DesignerThemeApiTests(TestCase):
         storage.url.side_effect = lambda path: (
             second_url
             if path.endswith("second.png")
-            else first_url
-            if path.endswith("first.png")
-            else f"https://storage.test/{path}"
+            else first_url if path.endswith("first.png") else f"https://storage.test/{path}"
         )
         tag = MediaTag.objects.create(name="Designer", slug="designer", namespace=self.namespace, created_by=self.owner)
         media_files = []

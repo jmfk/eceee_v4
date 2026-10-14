@@ -7,6 +7,7 @@ from rest_framework.test import APIClient
 
 from core.models import Tenant
 from webpages.models import WebPage
+from webpages.services.link_resolver import get_link_display_info, resolve_link
 
 
 class PageLookupTest(TestCase):
@@ -87,6 +88,18 @@ class PageLookupTest(TestCase):
         result = response.data["results"][0]
         self.assertEqual(result["site_id"], self.other_site.id)
         self.assertEqual(result["site"]["title"], "Other site")
+
+    def test_legacy_error_subtree_is_not_linkable(self):
+        legacy_page = self.create_page(title="Legacy 404", slug="404", parent=self.site)
+        legacy_child = self.create_page(title="Legacy help", slug="help", parent=legacy_page)
+
+        response = self.client.post(self.url, {"ids": [legacy_page.id, legacy_child.id]}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["results"], [])
+        link = {"type": "internal", "pageId": legacy_child.id}
+        self.assertEqual(resolve_link(link), "#")
+        self.assertEqual(get_link_display_info(link)["error"], "Page not found")
 
     def test_batch_lookup_is_tenant_scoped(self):
         other_tenant = Tenant.objects.create(

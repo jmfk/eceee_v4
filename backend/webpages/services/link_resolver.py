@@ -9,7 +9,7 @@ import json
 import logging
 import re
 from typing import Any, Dict, Optional, Union
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 
 from bs4 import BeautifulSoup
 
@@ -68,7 +68,7 @@ def parse_link_string(value: str) -> Optional[Dict[str, Any]]:
         parsed = json.loads(value)
         if is_link_object(parsed):
             return parsed
-    except (json.JSONDecodeError, TypeError) as e:
+    except (json.JSONDecodeError, TypeError):
         # Check if it might be double-encoded or escaped
         if "&quot;" in value or "&#34;" in value:
             try:
@@ -134,6 +134,7 @@ def resolve_link(link_value: Union[str, Dict[str, Any]], request=None) -> str:
 
 def _resolve_internal_link(link_obj: Dict[str, Any], request=None) -> str:
     """Resolve internal page link to URL."""
+    from webpages.error_page_defaults import exclude_legacy_error_subtrees
     from webpages.models import WebPage
 
     # Support both camelCase and snake_case
@@ -143,7 +144,7 @@ def _resolve_internal_link(link_obj: Dict[str, Any], request=None) -> str:
         return "#"
 
     try:
-        page = WebPage.objects.get(id=page_id, is_deleted=False)
+        page = exclude_legacy_error_subtrees(WebPage.objects.filter(id=page_id, is_deleted=False)).get()
         url = page.get_absolute_url()
 
         # Add anchor if specified
@@ -292,9 +293,7 @@ def resolve_links_in_config(
     for key, value in config.items():
         # Check direct URL fields
         if key in url_fields:
-            if is_link_object(value) or (
-                isinstance(value, str) and parse_link_string(value)
-            ):
+            if is_link_object(value) or (isinstance(value, str) and parse_link_string(value)):
                 result[key] = resolve_link(value, request)
 
         # Recursively process nested dicts - BUT don't automatically resolve them
@@ -315,11 +314,7 @@ def resolve_links_in_config(
         # Process lists (e.g., menu_items)
         elif isinstance(value, list):
             result[key] = [
-                (
-                    resolve_links_in_config(item, request, url_fields)
-                    if isinstance(item, dict)
-                    else item
-                )
+                (resolve_links_in_config(item, request, url_fields) if isinstance(item, dict) else item)
                 for item in value
             ]
 
@@ -357,11 +352,12 @@ def get_link_display_info(link_value: Union[str, Dict[str, Any]]) -> Dict[str, A
     info = {"type": link_type, "resolvedUrl": resolved_url}
 
     if link_type == "internal":
+        from webpages.error_page_defaults import exclude_legacy_error_subtrees
         from webpages.models import WebPage
 
         page_id = link_value.get("pageId")
         try:
-            page = WebPage.objects.get(id=page_id, is_deleted=False)
+            page = exclude_legacy_error_subtrees(WebPage.objects.filter(id=page_id, is_deleted=False)).get()
             info["label"] = page.title
             info["pageTitle"] = page.title
             info["pagePath"] = page.cached_path or page.get_absolute_url()

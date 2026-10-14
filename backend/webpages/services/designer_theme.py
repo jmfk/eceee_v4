@@ -23,6 +23,7 @@ from file_manager.security import filter_media_files_for_user
 from file_manager.storage import system_storage
 from object_storage.models import ObjectInstance
 from utils.templatetags.security_filters import sanitize_html
+from webpages.error_page_defaults import exclude_legacy_error_subtrees
 from webpages.models import (
     PageTheme,
     ThemeDesignerAssignment,
@@ -580,9 +581,11 @@ def designer_page_sources(theme):
             is_deleted=False,
         ).order_by("title", "id")
     }
-    pages_query = WebPage.objects.filter(
-        tenant=theme.tenant,
-        is_deleted=False,
+    pages_query = exclude_legacy_error_subtrees(
+        WebPage.objects.filter(
+            tenant=theme.tenant,
+            is_deleted=False,
+        )
     )
     pages = list(
         pages_query.select_related("current_published_version", "latest_version", "parent").order_by(
@@ -679,11 +682,13 @@ def _designer_reference_previews(theme, views):
         return views
 
     pages = list(
-        WebPage.objects.filter(
-            Q(id=root.id) | Q(cached_root_id=root.id),
-            tenant=theme.tenant,
-            is_deleted=False,
-            current_published_version__isnull=False,
+        exclude_legacy_error_subtrees(
+            WebPage.objects.filter(
+                Q(id=root.id) | Q(cached_root_id=root.id),
+                tenant=theme.tenant,
+                is_deleted=False,
+                current_published_version__isnull=False,
+            )
         )
         .select_related("current_published_version__theme", "parent")
         .order_by("cached_path", "sort_order", "id")[:100]
@@ -804,11 +809,13 @@ def import_designer_preview_from_site(theme_id, tenant, user, source_site_id, dr
 
         root = WebPage.objects.get(id=source_site_id, tenant=tenant, parent__isnull=True, is_deleted=False)
         pages = list(
-            WebPage.objects.filter(
-                Q(id=root.id) | Q(cached_root_id=root.id),
-                tenant=tenant,
-                is_deleted=False,
-                current_published_version__isnull=False,
+            exclude_legacy_error_subtrees(
+                WebPage.objects.filter(
+                    Q(id=root.id) | Q(cached_root_id=root.id),
+                    tenant=tenant,
+                    is_deleted=False,
+                    current_published_version__isnull=False,
+                )
             )
             .select_related("current_published_version__theme", "parent")
             .order_by("cached_path", "sort_order", "id")[:100]

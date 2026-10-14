@@ -152,9 +152,14 @@ def _page_lookup_data(page, roots_by_id, current_site_id=None):
 
 
 def _lookup_pages(page_ids, tenant):
+    from ..error_page_defaults import exclude_legacy_error_subtrees
     from ..models import WebPage
 
-    pages = list(WebPage.objects.filter(id__in=page_ids, tenant=tenant, is_deleted=False).order_by("id"))
+    pages = list(
+        exclude_legacy_error_subtrees(
+            WebPage.objects.filter(id__in=page_ids, tenant=tenant, is_deleted=False)
+        ).order_by("id")
+    )
     root_ids = {page.cached_root_id or page.id for page in pages if page.cached_root_id or page.parent_id is None}
     roots_by_id = WebPage.objects.filter(
         id__in=root_ids,
