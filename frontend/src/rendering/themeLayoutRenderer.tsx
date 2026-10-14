@@ -10,14 +10,28 @@ const propertyMap: Record<string, string> = {
     flex_direction: 'flex-direction', flex_wrap: 'flex-wrap', flex_grow: 'flex-grow', order: 'order',
     gap: 'gap', padding: 'padding', margin: 'margin', align_items: 'align-items',
     justify_content: 'justify-content', background_color: 'background-color', color: 'color',
-    border: 'border', border_radius: 'border-radius',
+    background_image: 'background-image', background_position: 'background-position',
+    background_repeat: 'background-repeat', background_size: 'background-size',
+    font_family: 'font-family', border: 'border', border_radius: 'border-radius',
 }
 const allowedBreakpoints = new Set(['base', 'xs', 'sm', 'md', 'lg', 'xl'])
 const keyPattern = /^[a-z][a-z0-9_]{0,63}$/
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const presentationColorPattern = /^#[0-9a-f]{6}$/i
 const defaultBreakpoints: Record<string, number> = { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 }
-const safeValue = (value: string | number) => {
+const safeBackgroundImage = (value: string | number) => {
+    const text = String(value).trim()
+    if (!text || text.length > 2048 || /[\x00-\x20"'\\();{}<>]/.test(text)) return null
+    try {
+        const url = new URL(text)
+        if (!['http:', 'https:'].includes(url.protocol)) return null
+    } catch {
+        return null
+    }
+    return `url("${text}")`
+}
+const safeValue = (property: string, value: string | number) => {
+    if (property === 'background_image') return safeBackgroundImage(value)
     const text = String(value).trim()
     if (!text || text.length > 160 || /[;{}<>]|url\s*\(|expression\s*\(|@import/i.test(text)) return null
     if (text.startsWith('token:')) return `var(--${text.slice(6).replace(/[^a-zA-Z0-9_-]/g, '')})`
@@ -96,7 +110,7 @@ export const validateLayoutDefinition = (layout: unknown): layout is ThemeLayout
         if (Object.entries(node.styles || {}).some(([breakpoint, values]) => (
             !allowedBreakpoints.has(breakpoint)
             || !values || typeof values !== 'object'
-            || Object.entries(values).some(([property, styleValue]) => !propertyMap[property] || safeValue(styleValue) === null)
+            || Object.entries(values).some(([property, styleValue]) => !propertyMap[property] || safeValue(property, styleValue) === null)
         ))) return false
         if (node.type === 'slot') {
             if (node.children.length || !node.slot_key || !value.slots[node.slot_key]) return false
@@ -117,7 +131,7 @@ export const layoutDefinitionCss = (layout: ThemeLayoutDefinition, breakpoints: 
         Object.entries(node.styles || {}).forEach(([breakpoint, values]) => {
             const declarations = Object.entries(values || {}).flatMap(([property, value]) => {
                 const cssProperty = propertyMap[property]
-                const cssValue = cssProperty && safeValue(value)
+                const cssValue = cssProperty && safeValue(property, value)
                 return cssValue ? [`${cssProperty}:${cssValue}`] : []
             })
             if (declarations.length) (rules[breakpoint] ||= []).push(`[data-layout-node-id="${node.id}"]{${declarations.join(';')}}`)

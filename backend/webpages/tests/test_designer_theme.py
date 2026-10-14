@@ -429,7 +429,7 @@ class DesignerThemeApiTests(TestCase):
         self.authenticate(self.other)
         self.assertEqual(self.client.get(self.workspace_url).status_code, 403)
 
-    def test_layout_workspace_rejects_non_layout_fields(self):
+    def test_layout_workspace_rejects_fields_outside_layout_resources(self):
         self.authenticate(self.designer)
         url = f"/api/v1/webpages/layout-editor/themes/{self.theme.id}/workspace/"
         workspace = self.client.get(url).data
@@ -450,9 +450,21 @@ class DesignerThemeApiTests(TestCase):
         workspace = self.client.get(layout_url).data
         changed_layouts = workspace["layouts"]
         changed_layouts["items"][0]["description"] = "Published layout description"
+        colors = {color["name"]: color["value"] for color in workspace["colors"]}
+        colors["accent"] = "#abcdef"
+        fonts = [
+            {"family": font["family"], "variants": font["variants"], "display": font["display"]}
+            for font in workspace["fonts"]
+        ]
+        fonts.append({"family": "Roboto", "variants": ["400", "700"], "display": "swap"})
         saved = self.client.patch(
             layout_url,
-            {"draftVersion": workspace["draftVersion"], "layouts": changed_layouts},
+            {
+                "draftVersion": workspace["draftVersion"],
+                "layouts": changed_layouts,
+                "colors": colors,
+                "fonts": fonts,
+            },
             format="json",
         ).data
         designer_saved = self.client.patch(
@@ -471,8 +483,11 @@ class DesignerThemeApiTests(TestCase):
         self.theme.refresh_from_db()
         self.assertEqual(self.theme.description, "Theme for editorial sites")
         self.assertEqual(self.theme.layouts["items"][0]["description"], "Published layout description")
+        self.assertEqual(self.theme.colors["accent"], "#abcdef")
+        self.assertEqual([font["family"] for font in self.theme.fonts["google_fonts"]], ["Inter", "Roboto"])
         self.assertTrue(response.data["hasOtherDraftChanges"])
         self.assertFalse(response.data["hasLayoutDraftChanges"])
+        self.assertFalse(response.data["hasLayoutWorkspaceDraftChanges"])
 
     def test_workspace_exposes_semantic_catalog_without_selectors(self):
         self.authenticate(self.designer)
@@ -1278,7 +1293,9 @@ class DesignerThemeApiTests(TestCase):
         storage.url.side_effect = lambda path: (
             second_url
             if path.endswith("second.png")
-            else first_url if path.endswith("first.png") else f"https://storage.test/{path}"
+            else first_url
+            if path.endswith("first.png")
+            else f"https://storage.test/{path}"
         )
         tag = MediaTag.objects.create(name="Designer", slug="designer", namespace=self.namespace, created_by=self.owner)
         media_files = []

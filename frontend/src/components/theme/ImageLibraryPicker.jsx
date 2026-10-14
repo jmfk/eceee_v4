@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Search, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, Filter } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Search, Image as ImageIcon, Loader2, CheckCircle, AlertCircle, Filter, Upload } from 'lucide-react';
 import { themesApi } from '../../api/themes';
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext';
 import OptimizedImage from '../media/OptimizedImage';
@@ -14,13 +14,11 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
     const [minHeight, setMinHeight] = useState('');
     const [maxHeight, setMaxHeight] = useState('');
     const [use2x, setUse2x] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const uploadRef = useRef(null);
     const { addNotification } = useGlobalNotifications();
 
-    useEffect(() => {
-        loadImages();
-    }, [themeId]);
-
-    const loadImages = async () => {
+    const loadImages = useCallback(async () => {
         setLoading(true);
         try {
             const result = await themesApi.listLibraryImages(themeId);
@@ -38,7 +36,11 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
         } finally {
             setLoading(false);
         }
-    };
+    }, [addNotification, themeId]);
+
+    useEffect(() => {
+        void loadImages();
+    }, [loadImages]);
 
     const filteredImages = images.filter(image => {
         // Text search
@@ -70,7 +72,7 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
     const handleConfirm = () => {
         if (selectedImage && onSelect) {
             const imageData = {
-                url: selectedImage.url,
+                url: selectedImage.publicUrl || selectedImage.url,
                 filename: selectedImage.filename,
                 size: selectedImage.size
             };
@@ -82,6 +84,32 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
             }
             
             onSelect(imageData);
+        }
+    };
+
+    const handleUpload = async (files) => {
+        const selectedFiles = Array.from(files || []);
+        if (selectedFiles.length === 0) return;
+        setUploading(true);
+        try {
+            const result = await themesApi.uploadLibraryImages(themeId, selectedFiles);
+            const uploaded = result.uploaded || [];
+            if (uploaded.length > 0) {
+                addNotification({
+                    type: 'success',
+                    message: `${uploaded.length} ${uploaded.length === 1 ? 'image' : 'images'} uploaded to the theme library`,
+                });
+                await loadImages();
+                setSelectedImage(uploaded[0]);
+            }
+            if (result.errors?.length) {
+                addNotification({ type: 'error', message: result.errors.map((error) => `${error.filename}: ${error.error}`).join(' · ') });
+            }
+        } catch (error) {
+            addNotification({ type: 'error', message: error.message || 'Images could not be uploaded' });
+        } finally {
+            setUploading(false);
+            if (uploadRef.current) uploadRef.current.value = '';
         }
     };
 
@@ -110,6 +138,14 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
                             className="text-gray-400 hover:text-gray-600 transition"
                         >
                             <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2">
+                        <p className="text-xs text-blue-900">Uploads are saved directly in this theme’s shared image library.</p>
+                        <input ref={uploadRef} type="file" multiple accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={(event) => handleUpload(event.target.files)} className="sr-only" />
+                        <button type="button" disabled={uploading} onClick={() => uploadRef.current?.click()} className="inline-flex min-h-9 items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                            {uploading ? 'Uploading…' : 'Upload images'}
                         </button>
                     </div>
                     
@@ -320,4 +356,3 @@ const ImageLibraryPicker = ({ themeId, onSelect, onCancel, currentSelection }) =
 };
 
 export default ImageLibraryPicker;
-

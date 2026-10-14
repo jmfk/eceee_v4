@@ -20,12 +20,18 @@ from .designer_theme_views import DesignerJSONParser, DesignerJSONRenderer
 
 def _workspace(request, theme, draft):
     workspace = build_draft_workspace(theme, draft, include_tenant_content=False)
-    draft_layouts = draft.snapshot.get("layouts", theme.layouts)
-    workspace["hasLayoutDraftChanges"] = draft_layouts != theme.layouts
+    workspace_fields = ("layouts", "colors", "fonts")
     live_snapshot = theme_designer_snapshot(theme)
-    workspace["hasOtherDraftChanges"] = {key: value for key, value in draft.snapshot.items() if key != "layouts"} != {
-        key: value for key, value in live_snapshot.items() if key != "layouts"
-    }
+    has_workspace_changes = any(
+        draft.snapshot.get(key, live_snapshot.get(key)) != live_snapshot.get(key) for key in workspace_fields
+    )
+    workspace["hasLayoutDraftChanges"] = (
+        draft.snapshot.get("layouts", live_snapshot["layouts"]) != live_snapshot["layouts"]
+    )
+    workspace["hasLayoutWorkspaceDraftChanges"] = has_workspace_changes
+    workspace["hasOtherDraftChanges"] = {
+        key: value for key, value in draft.snapshot.items() if key not in workspace_fields
+    } != {key: value for key, value in live_snapshot.items() if key not in workspace_fields}
     return workspace
 
 
@@ -50,10 +56,11 @@ class LayoutWorkspaceView(APIView):
         return Response(_workspace(request, theme, get_or_create_designer_draft(theme, request.user)))
 
     def patch(self, request, theme_id):
-        unexpected = set(request.data) - {"draft_version", "layouts"}
+        unexpected = set(request.data) - {"draft_version", "layouts", "colors", "fonts"}
         if unexpected:
             return Response(
-                {"error": "The Layout Editor only accepts layout changes."}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "The Layout Editor only accepts layouts, palette colors, and fonts."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
         try:
             theme, draft = save_designer_draft(theme_id, request.tenant, request.user, request.data)

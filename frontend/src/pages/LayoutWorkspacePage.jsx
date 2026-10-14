@@ -7,7 +7,16 @@ import LayoutDesignerWorkspace from '../components/designer/LayoutDesignerWorksp
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
-const signature = (workspace) => JSON.stringify(workspace?.layouts || null)
+const editableWorkspace = (workspace) => workspace ? ({
+    layouts: workspace.layouts,
+    colors: Object.fromEntries((workspace.colors || []).map((color) => [color.name, color.value])),
+    fonts: (workspace.fonts || []).filter((font) => font.family?.trim()).map((font) => ({
+        family: font.family,
+        variants: font.variants || ['400'],
+        display: font.display || 'swap',
+    })),
+}) : null
+const signature = (workspace) => JSON.stringify(editableWorkspace(workspace))
 
 const LayoutWorkspacePage = ({
     backPath = null,
@@ -60,7 +69,7 @@ const LayoutWorkspacePage = ({
         if (!dirty) return workspace
         setSaving(true)
         try {
-            const result = await layoutWorkspacesApi.save(themeId, workspace.draftVersion, workspace.layouts)
+            const result = await layoutWorkspacesApi.save(themeId, workspace.draftVersion, editableWorkspace(workspace))
             acceptWorkspace(result)
             if (!silent) addNotification({ type: 'success', message: 'Layout draft saved' })
             return result
@@ -74,8 +83,8 @@ const LayoutWorkspacePage = ({
 
     const publish = async () => {
         const current = dirty ? await saveDraft({ silent: true }) : workspace
-        if (!current?.hasLayoutDraftChanges) return
-        if (!window.confirm('Publish the saved layout changes? Theme Designer changes will not be published.')) return
+        if (!current?.hasLayoutWorkspaceDraftChanges) return
+        if (!window.confirm('Publish the saved layout, palette, and font changes? Other Theme Designer changes will not be published.')) return
         setPublishing(true)
         try {
             acceptWorkspace(await layoutWorkspacesApi.publish(themeId, current.draftVersion))
@@ -88,7 +97,7 @@ const LayoutWorkspacePage = ({
     }
 
     const discard = async () => {
-        if (!window.confirm('Discard only the saved and unsaved layout changes?')) return
+        if (!window.confirm('Discard only the saved and unsaved layout, palette, and font changes?')) return
         try {
             acceptWorkspace(await layoutWorkspacesApi.discard(themeId, workspace.draftVersion))
             addNotification({ type: 'success', message: 'Layout changes discarded' })
@@ -113,15 +122,15 @@ const LayoutWorkspacePage = ({
 
     const controlsDisabled = saving || publishing
     const editorDisabled = controlsDisabled || workspace.draftIsStale
-    const hasLayoutChanges = dirty || workspace.hasLayoutDraftChanges
+    const hasLayoutChanges = dirty || workspace.hasLayoutWorkspaceDraftChanges
     return <div className={`flex min-h-[640px] flex-col overflow-hidden bg-white ${fillAvailableSpace ? 'h-full' : 'h-[calc(100vh-12rem)] rounded-lg border border-gray-200 shadow-sm'}`}>
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 sm:px-5">
             <div className="flex items-center gap-3"><button type="button" onClick={returnToParent} disabled={controlsDisabled} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40"><ArrowLeft className="h-4 w-4" />{backLabel}</button><div><h1 className="font-semibold text-gray-900">Layout Editor</h1><p className="text-xs text-gray-500">{workspace.name} · theme-owned layout draft</p></div></div>
-            <div className="flex flex-wrap gap-2"><button type="button" onClick={discard} disabled={!hasLayoutChanges || controlsDisabled} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm disabled:opacity-40"><RotateCcw className="h-4 w-4" />Discard layout changes</button><button type="button" onClick={() => saveDraft()} disabled={!dirty || editorDisabled} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-blue-600 px-3 py-2 text-sm font-medium text-blue-700 disabled:opacity-40">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save layout draft</button><button type="button" onClick={publish} disabled={!hasLayoutChanges || editorDisabled} className="inline-flex min-h-9 items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Publish layouts</button></div>
+            <div className="flex flex-wrap gap-2"><button type="button" onClick={discard} disabled={!hasLayoutChanges || controlsDisabled} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm disabled:opacity-40"><RotateCcw className="h-4 w-4" />Discard workspace changes</button><button type="button" onClick={() => saveDraft()} disabled={!dirty || editorDisabled} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-blue-600 px-3 py-2 text-sm font-medium text-blue-700 disabled:opacity-40">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save workspace draft</button><button type="button" onClick={publish} disabled={!hasLayoutChanges || editorDisabled} className="inline-flex min-h-9 items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Publish workspace</button></div>
         </header>
-        {workspace.hasOtherDraftChanges && <div className="border-b border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-900">This theme also has separate Theme Designer changes. Saving, publishing, or discarding here affects layouts only.</div>}
-        {workspace.draftIsStale && <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">The live theme changed after this layout draft started. Discard layout changes here, then resolve the separate Theme Designer draft before continuing.</div>}
-        <LayoutDesignerWorkspace workspace={workspace} viewport="xl" updateWorkspace={updateWorkspace} disabled={editorDisabled} initialLayoutKey={searchParams.get('layout') || ''} initialAction={searchParams.get('action') || ''} onInitialActionHandled={handleInitialAction} />
+        {workspace.hasOtherDraftChanges && <div className="border-b border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-900">This theme also has separate Theme Designer changes. This workspace only affects layouts, special pages, palette colors, and fonts.</div>}
+        {workspace.draftIsStale && <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">The live theme changed after this workspace draft started. Discard workspace changes here, then resolve the separate Theme Designer draft before continuing.</div>}
+        <LayoutDesignerWorkspace themeId={themeId} workspace={workspace} viewport="xl" updateWorkspace={updateWorkspace} disabled={editorDisabled} initialLayoutKey={searchParams.get('layout') || ''} initialAction={searchParams.get('action') || ''} onInitialActionHandled={handleInitialAction} />
     </div>
 }
 

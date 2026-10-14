@@ -32,7 +32,12 @@ from webpages.models import (
     WebPage,
 )
 from webpages.serializers.theme import PageThemeSerializer
-from webpages.theme_layouts import theme_layout_usage, validate_layout_compatibility, validate_theme_layouts
+from webpages.theme_layouts import (
+    theme_layout_usage,
+    theme_special_pages,
+    validate_layout_compatibility,
+    validate_theme_layouts,
+)
 
 TYPE_PROPERTIES = {
     "fontFamily",
@@ -881,7 +886,10 @@ def theme_designer_snapshot(theme):
         "fonts": copy.deepcopy(theme.fonts),
         "design_groups": copy.deepcopy(theme.design_groups),
         "designer_preview": copy.deepcopy(theme.designer_preview),
-        "layouts": copy.deepcopy(theme.layouts),
+        "layouts": {
+            **copy.deepcopy(theme.layouts),
+            "special_pages": theme_special_pages(theme.layouts),
+        },
         "image": theme.image.name if theme.image else None,
         "site_icon": theme.site_icon.name if theme.site_icon else None,
     }
@@ -1746,7 +1754,7 @@ def publish_designer_draft(theme_id, tenant, user, draft_version):
 
 
 def publish_layout_draft(theme_id, tenant, user, draft_version):
-    """Publish only the layout document without applying unrelated Designer draft fields."""
+    """Publish layouts and their shared palette/font resources without unrelated Designer fields."""
     with transaction.atomic():
         Tenant.objects.select_for_update().get(pk=tenant.pk)
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
@@ -1760,18 +1768,24 @@ def publish_layout_draft(theme_id, tenant, user, draft_version):
         if draft.base_sync_version != theme.sync_version:
             raise DesignerDraftConflict("The live theme changed after this layout draft was started.")
 
+        workspace_fields = ("layouts", "colors", "fonts")
+        live_snapshot = theme_designer_snapshot(theme)
         draft_layouts = copy.deepcopy(draft.snapshot.get("layouts", theme.layouts))
         validate_theme_layouts(draft_layouts)
         validate_layout_compatibility(theme, draft_layouts)
-        if draft_layouts == theme.layouts:
-            raise DesignerDraftConflict("There are no layout changes to publish.")
+        if all(draft.snapshot.get(key, live_snapshot.get(key)) == live_snapshot.get(key) for key in workspace_fields):
+            raise DesignerDraftConflict("There are no layout workspace changes to publish.")
 
-        create_revision(theme, user, "Publish layout draft")
+        create_revision(theme, user, "Publish layout workspace draft")
         theme.layouts = draft_layouts
+        theme.colors = copy.deepcopy(draft.snapshot.get("colors", theme.colors))
+        theme.fonts = copy.deepcopy(draft.snapshot.get("fonts", theme.fonts))
         theme.sync_source = "web"
-        theme.save(update_fields=["layouts", "sync_source", "sync_version", "updated_at"])
+        theme.save(update_fields=["layouts", "colors", "fonts", "sync_source", "sync_version", "updated_at"])
 
-        draft.snapshot["layouts"] = copy.deepcopy(theme.layouts)
+        refreshed_snapshot = theme_designer_snapshot(theme)
+        for key in workspace_fields:
+            draft.snapshot[key] = copy.deepcopy(refreshed_snapshot[key])
         draft.base_sync_version = theme.sync_version
         draft.version += 1
         draft.has_changes = draft.snapshot != theme_designer_snapshot(theme)
@@ -1783,7 +1797,7 @@ def publish_layout_draft(theme_id, tenant, user, draft_version):
 
 
 def discard_layout_draft(theme_id, tenant, user, draft_version):
-    """Discard only staged layout edits while preserving other Designer draft work."""
+    """Discard layout, palette, and font edits while preserving other Designer draft work."""
     with transaction.atomic():
         theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
         if not user_can_design_theme(user, theme):
@@ -1792,7 +1806,9 @@ def discard_layout_draft(theme_id, tenant, user, draft_version):
         draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
         if draft.version != _integer(draft_version, "draftVersion"):
             raise DesignerDraftConflict("The layout draft changed after you opened it.")
-        draft.snapshot["layouts"] = copy.deepcopy(theme.layouts)
+        live_snapshot = theme_designer_snapshot(theme)
+        for key in ("layouts", "colors", "fonts"):
+            draft.snapshot[key] = copy.deepcopy(live_snapshot[key])
         draft.version += 1
         draft.has_changes = draft.snapshot != theme_designer_snapshot(theme)
         draft.updated_by = user

@@ -8,6 +8,7 @@ ERROR_PAGE_CONTENT = {
     500: ("Something went wrong", "We could not complete your request. Please try again in a moment."),
     503: ("Temporarily unavailable", "This site is taking a short break. Please try again soon."),
 }
+LEGACY_ERROR_PAGE_SLUGS = tuple(str(code) for code in ERROR_PAGE_CONTENT)
 
 ERROR_ILLUSTRATION = (
     "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 360'%3E"
@@ -20,21 +21,31 @@ ERROR_ILLUSTRATION = (
 )
 
 
-def _widget_id(root_page_id: int, status_code: int, name: str) -> str:
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"https://eceee.org/site/{root_page_id}/error/{status_code}/{name}"))
+def _widget_id(owner_key: str, status_code: int, name: str) -> str:
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"https://eceee.org/{owner_key}/error/{status_code}/{name}"))
 
 
 def error_page_widgets(root_page_id: int, status_code: int) -> dict:
+    """Legacy site-page defaults kept for existing installations."""
+    return _error_page_widgets(f"site/{root_page_id}", status_code)
+
+
+def theme_error_page_widgets(status_code: int) -> dict:
+    """Portable defaults for error pages stored in a theme layout document."""
+    return _error_page_widgets("theme", status_code)
+
+
+def _error_page_widgets(owner_key: str, status_code: int) -> dict:
     title, explanation = ERROR_PAGE_CONTENT[status_code]
     return {
         "visual": [
             {
-                "id": _widget_id(root_page_id, status_code, "illustration"),
+                "id": _widget_id(owner_key, status_code, "illustration"),
                 "type": "easy_widgets.ImageWidget",
                 "config": {
                     "mediaItems": [
                         {
-                            "id": _widget_id(root_page_id, status_code, "illustration-media"),
+                            "id": _widget_id(owner_key, status_code, "illustration-media"),
                             "url": ERROR_ILLUSTRATION,
                             "type": "image",
                             "altText": "Abstract illustration for an error page",
@@ -50,12 +61,12 @@ def error_page_widgets(root_page_id: int, status_code: int) -> dict:
         ],
         "message": [
             {
-                "id": _widget_id(root_page_id, status_code, "headline"),
+                "id": _widget_id(owner_key, status_code, "headline"),
                 "type": "easy_widgets.HeadlineWidget",
                 "config": {"content": f"{status_code} — {title}", "headerLevel": "h1", "showBorder": False},
             },
             {
-                "id": _widget_id(root_page_id, status_code, "explanation"),
+                "id": _widget_id(owner_key, status_code, "explanation"),
                 "type": "easy_widgets.ContentWidget",
                 "config": {
                     "content": f"<p>{explanation}</p>",
@@ -67,7 +78,7 @@ def error_page_widgets(root_page_id: int, status_code: int) -> dict:
         ],
         "actions": [
             {
-                "id": _widget_id(root_page_id, status_code, "actions"),
+                "id": _widget_id(owner_key, status_code, "actions"),
                 "type": "easy_widgets.ContentWidget",
                 "config": {
                     "content": '<p><a href="/">Return to the home page</a></p>',

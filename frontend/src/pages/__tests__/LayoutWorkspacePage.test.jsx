@@ -42,8 +42,11 @@ const workspace = {
     draftIsStale: false,
     draftVersion: 2,
     hasLayoutDraftChanges: false,
+    hasLayoutWorkspaceDraftChanges: false,
     hasOtherDraftChanges: false,
     layouts: { schema_version: 1, default_layout_key: 'main_layout', items: [] },
+    colors: [{ name: 'brand', value: '#123456' }],
+    fonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap' }],
     name: 'Editorial',
 }
 
@@ -51,11 +54,12 @@ describe('LayoutWorkspacePage', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mocks.workspace.mockResolvedValue(structuredClone(workspace))
-        mocks.save.mockImplementation(async (_themeId, draftVersion, layouts) => ({
+        mocks.save.mockImplementation(async (_themeId, draftVersion, editableWorkspace) => ({
             ...structuredClone(workspace),
             draftVersion: draftVersion + 1,
             hasLayoutDraftChanges: true,
-            layouts: structuredClone(layouts),
+            hasLayoutWorkspaceDraftChanges: true,
+            layouts: structuredClone(editableWorkspace.layouts),
         }))
     })
 
@@ -67,9 +71,13 @@ describe('LayoutWorkspacePage', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Theme Designer' }))
 
         await waitFor(() => expect(mocks.save).toHaveBeenCalledWith('7', 2, {
-            schema_version: 1,
-            default_layout_key: 'landing_page',
-            items: [],
+            layouts: {
+                schema_version: 1,
+                default_layout_key: 'landing_page',
+                items: [],
+            },
+            colors: { brand: '#123456' },
+            fonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap' }],
         }))
         expect(mocks.navigate).toHaveBeenCalledWith('/designer/themes/7')
     })

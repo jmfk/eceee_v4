@@ -9,8 +9,11 @@ const framePostMessage = vi.fn()
 vi.mock('../../../rendering/RenderFrame', () => ({
     default: ({ model, onMessage, style, frameRef }) => {
         if (frameRef) frameRef.current = { contentWindow: { postMessage: framePostMessage } }
-        return <button type="button" data-layout-canvas={String(model.designer.layoutCanvas)} data-empty-slots={String(Object.values(model.slots).every((items) => items.length === 0))} data-frame-width={style?.width} data-root-md-background={model.layoutDefinition.root.styles?.md?.background_color || ''} data-root-presentation-color={model.layoutDefinition.root.presentation_color || ''} onClick={() => onMessage?.({ data: { source: 'eceee-designer-preview', action: 'select', targetId: `layout-node:${model.layoutDefinition.root.children[0].id}` } })}>Canvas · {model.layoutDefinition.label}</button>
+        return <button type="button" data-layout-canvas={String(model.designer.layoutCanvas)} data-empty-slots={String(Object.values(model.slots).every((items) => items.length === 0))} data-frame-width={style?.width} data-root-md-background={model.layoutDefinition.root.styles?.md?.background_color || ''} data-root-md-image={model.layoutDefinition.root.styles?.md?.background_image || ''} data-font-url={model.fontUrl || ''} data-root-presentation-color={model.layoutDefinition.root.presentation_color || ''} onClick={() => onMessage?.({ data: { source: 'eceee-designer-preview', action: 'select', targetId: `layout-node:${model.layoutDefinition.root.children[0].id}` } })}>Canvas · {model.layoutDefinition.label}</button>
     },
+}))
+vi.mock('../../theme/ImageLibraryPicker', () => ({
+    default: ({ onSelect }) => <button type="button" onClick={() => onSelect({ url: 'https://cdn.example.test/hero.webp', filename: 'hero.webp' })}>Pick uploaded image</button>,
 }))
 
 const document = {
@@ -56,8 +59,15 @@ const document = {
 }
 
 const Harness = ({ disabled = false, sourceDocument = document, viewport = 'md' }) => {
-    const [workspace, setWorkspace] = useState({ layouts: structuredClone(sourceDocument), layoutUsage: {}, breakpoints: { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 } })
-    return <LayoutDesignerWorkspace workspace={workspace} viewport={viewport} updateWorkspace={(updater) => setWorkspace((current) => updater(structuredClone(current)))} disabled={disabled} />
+    const [workspace, setWorkspace] = useState({
+        layouts: structuredClone(sourceDocument),
+        layoutUsage: {},
+        breakpoints: { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 },
+        colors: [{ name: 'surface', value: '#f8fafc', usage: [] }],
+        fonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap', usage: [] }],
+        themeConfig: { colors: { surface: '#f8fafc' }, fonts: { googleFonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap' }] } },
+    })
+    return <LayoutDesignerWorkspace themeId="7" workspace={workspace} viewport={viewport} updateWorkspace={(updater) => setWorkspace((current) => updater(structuredClone(current)))} disabled={disabled} />
 }
 
 describe('LayoutDesignerWorkspace', () => {
@@ -227,13 +237,31 @@ describe('LayoutDesignerWorkspace', () => {
 
         const canvas = screen.getByRole('button', { name: 'Canvas · Main layout' })
         expect(canvas).toHaveAttribute('data-root-md-background', '')
-        fireEvent.change(screen.getByLabelText('Pick background color'), { target: { value: '#22c55e' } })
+        fireEvent.change(screen.getByLabelText('background color value custom color'), { target: { value: '#22c55e' } })
 
-        expect(screen.getByLabelText('background color value')).toHaveValue('#22c55e')
+        expect(screen.getByLabelText('background color value custom value')).toHaveValue('#22c55e')
         expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-md-background', '#22c55e')
 
-        fireEvent.change(screen.getByLabelText('background color value'), { target: { value: 'token:surface' } })
-        expect(screen.getByLabelText('background color value')).toHaveValue('token:surface')
+        fireEvent.change(screen.getByLabelText('background color value'), { target: { value: 'surface' } })
+        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-md-background', 'token:surface')
+    })
+
+    it('edits shared palette and fonts and applies theme resources to layout styles', () => {
+        render(<Harness />)
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Palette' }))
+        fireEvent.change(screen.getByLabelText('surface palette value'), { target: { value: '#0f172a' } })
+        fireEvent.click(screen.getByRole('tab', { name: 'Fonts' }))
+        expect(screen.getByText('Installed font families')).toBeInTheDocument()
+        expect(screen.getByText('Inter')).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Visual' }))
+        fireEvent.change(screen.getByLabelText('Font family value'), { target: { value: 'Inter' } })
+        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-font-url', expect.stringContaining('family=Inter'))
+
+        fireEvent.click(screen.getByRole('button', { name: 'Choose or upload' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Pick uploaded image' }))
+        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-md-image', 'https://cdn.example.test/hero.webp')
     })
 
     it('sets and clears an editor-only presentation colour on the selected element', () => {

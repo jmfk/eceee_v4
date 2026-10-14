@@ -8,11 +8,13 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase
+from django.utils.safestring import mark_safe
 from djangorestframework_camel_case.parser import CamelCaseJSONParser
 
 from core.models import Tenant
 from webpages.inheritance_tree import InheritanceTreeBuilder
 from webpages.models import PageTheme, WebPage
+from webpages.public_views import HostnamePageView
 from webpages.serializers import PageDataSchemaSerializer, PageVersionSerializer
 from webpages.theme_layouts import (
     default_theme_layouts,
@@ -22,6 +24,7 @@ from webpages.theme_layouts import (
     validate_layout_widgets,
     validate_theme_layouts,
 )
+from webpages.theme_layout_renderer import render_theme_layout
 
 
 class ThemeLayoutValidationTests(SimpleTestCase):
@@ -66,6 +69,69 @@ class ThemeLayoutValidationTests(SimpleTestCase):
 
         self.assertEqual(set(layout["slots"]), {"visual", "message", "actions"})
         self.assertEqual(layout["root"]["tag"], "main")
+
+    def test_default_error_pages_are_theme_owned_and_contain_editable_widgets(self):
+        document = default_theme_layouts()
+        error_pages = {page["status_code"]: page for page in document["special_pages"]}
+
+        self.assertEqual(set(error_pages), {403, 404, 500, 503})
+        self.assertEqual(error_pages[404]["layout_key"], "error_layout")
+        self.assertEqual(error_pages[404]["widgets"]["message"][0]["type"], "easy_widgets.HeadlineWidget")
+
+    def test_special_route_pages_validate_layout_slots_and_widget_limits(self):
+        document = deepcopy(default_theme_layouts())
+        document["special_pages"].append(
+            {
+                "id": "e34d440b-36f9-479e-880d-ef9a898cab75",
+                "key": "login",
+                "label": "Log in",
+                "kind": "route",
+                "route": "login",
+                "layout_key": "main_layout",
+                "widgets": {
+                    "main": [
+                        {
+                            "id": "widget-79dbecbb-087b-4fbf-a818-782a0238991d",
+                            "type": "easy_widgets.ContentWidget",
+                            "config": {"content": "<p>Log in</p>"},
+                        }
+                    ]
+                },
+            }
+        )
+
+        self.assertIs(validate_theme_layouts(document), document)
+
+        document["special_pages"][-1]["widgets"] = {"missing": []}
+        with self.assertRaisesMessage(ValidationError, "declared layout slot"):
+            validate_theme_layouts(document)
+
+    def test_required_theme_error_pages_cannot_be_removed(self):
+        document = deepcopy(default_theme_layouts())
+        document["special_pages"] = [page for page in document["special_pages"] if page["status_code"] != 503]
+
+        with self.assertRaisesMessage(ValidationError, "Required error pages cannot be removed: 503"):
+            validate_theme_layouts(document)
+
+    def test_public_error_and_route_lookup_uses_theme_special_pages(self):
+        document = default_theme_layouts()
+        document["special_pages"].append(
+            {
+                "id": "3f288deb-5487-47c4-84da-3d69a65b7384",
+                "key": "login",
+                "label": "Log in",
+                "kind": "route",
+                "route": "account/login",
+                "layout_key": "main_layout",
+                "widgets": {},
+            }
+        )
+        theme = SimpleNamespace(layouts=document)
+        root = SimpleNamespace(get_effective_theme=lambda: theme)
+        view = HostnamePageView()
+
+        self.assertEqual(view._get_error_page(root, 404)["key"], "error_404")
+        self.assertEqual(view._get_special_page(root, kind="route", route="/account/login/")["key"], "login")
 
     def test_nodes_containing_slots_cannot_be_hidden(self):
         document = deepcopy(default_theme_layouts())
@@ -124,6 +190,49 @@ class ThemeLayoutValidationTests(SimpleTestCase):
 
         with self.assertRaisesMessage(ValidationError, "unsafe structured style"):
             validate_theme_layouts(document)
+
+    def test_layouts_accept_theme_fonts_palette_tokens_and_https_background_images(self):
+        document = deepcopy(default_theme_layouts())
+        styles = document["items"][0]["root"]["styles"]["base"]
+        styles.update(
+            {
+                "background_color": "token:surface",
+                "background_image": "https://cdn.example.test/theme/hero.webp",
+                "background_position": "center center",
+                "background_repeat": "no-repeat",
+                "background_size": "cover",
+                "font_family": "Inter, sans-serif",
+            }
+        )
+
+        self.assertIs(validate_theme_layouts(document), document)
+
+        styles["background_image"] = "javascript:alert(1)"
+        with self.assertRaisesMessage(ValidationError, "unsafe background image URL"):
+            validate_theme_layouts(document)
+
+    def test_server_renderer_matches_theme_layout_styles_and_slot_placement(self):
+        layout = deepcopy(default_theme_layouts()["items"][0])
+        layout["root"]["styles"]["base"].update(
+            {
+                "background_color": "token:surface",
+                "background_image": "https://cdn.example.test/hero.webp",
+                "font_family": "Inter, sans-serif",
+            }
+        )
+        html = str(
+            render_theme_layout(
+                layout,
+                {"main": [{"html": mark_safe('<div data-widget-id="widget-1">Hello</div>')}]},
+                {"sm": 700},
+            )
+        )
+
+        self.assertIn("background-color:var(--surface)", html)
+        self.assertIn('background-image:url("https://cdn.example.test/hero.webp")', html)
+        self.assertIn("font-family:Inter, sans-serif", html)
+        self.assertIn('data-slot-name="main"', html)
+        self.assertIn('data-widget-id="widget-1"', html)
 
     @patch("webpages.theme_layouts.theme_layout_usage", return_value={})
     def test_existing_layout_id_is_immutable(self, _usage):

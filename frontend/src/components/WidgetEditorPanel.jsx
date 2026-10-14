@@ -33,7 +33,8 @@ const WidgetEditorPanel = forwardRef(({
     pageVersionData = null,
     onSpecialEditorStateChange = null,
     onSave = null,
-    onRealTimeUpdate = null
+    onRealTimeUpdate = null,
+    showPublishingFields = true,
 }, ref) => {
     const [hasChanges, setHasChanges] = useState(false)
     const [widgetTypeName, setWidgetTypeName] = useState(null)
@@ -573,12 +574,12 @@ const WidgetEditorPanel = forwardRef(({
                                     onWidgetChange={handleFormWidgetChange}
                                     publishChanges={false}
                                 />
-                                <WidgetPublishingInheritanceFields
+                                {showPublishingFields && <WidgetPublishingInheritanceFields
                                     widgetData={widgetData}
                                     widgetType={widgetTypeValidation}
                                     contextType={context?.contextType}
                                     componentId={`widget-editor-${widgetData?.id}`}
-                                />
+                                />}
                             </>
                         ) : (
                             <div className="text-center text-gray-500 py-8 p-4">
