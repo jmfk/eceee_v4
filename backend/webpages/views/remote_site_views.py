@@ -9,10 +9,20 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from webpages.models import ThemeRemoteAccessKey
-from webpages.models.theme_remote import SITE_TRANSFER_CAPABILITY, THEME_TRANSFER_CAPABILITY
+from webpages.models.theme_remote import (
+    OBJECT_READ_CAPABILITY,
+    OBJECT_TRANSFER_CAPABILITY,
+    SITE_TRANSFER_CAPABILITY,
+    THEME_TRANSFER_CAPABILITY,
+)
 from webpages.services.theme_remote_credentials import generate_access_key
 
-REMOTE_CAPABILITIES = (THEME_TRANSFER_CAPABILITY, SITE_TRANSFER_CAPABILITY)
+REMOTE_CAPABILITIES = (
+    THEME_TRANSFER_CAPABILITY,
+    SITE_TRANSFER_CAPABILITY,
+    OBJECT_READ_CAPABILITY,
+    OBJECT_TRANSFER_CAPABILITY,
+)
 
 
 def _workspace_admin(request):

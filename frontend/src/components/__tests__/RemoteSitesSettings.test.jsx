@@ -33,7 +33,7 @@ const accessKey = {
     id: 'key-1',
     name: 'Local development',
     keyPrefix: 'eceee_theme_',
-    capabilities: ['theme.transfer', 'site.transfer'],
+    capabilities: ['theme.transfer', 'site.transfer', 'object.read', 'object.transfer'],
     isActive: true,
     createdAt: '2026-10-09T08:00:00Z',
     lastUsedAt: null,
@@ -205,15 +205,15 @@ describe('RemoteSitesSettings', () => {
         fireEvent.change(screen.getByLabelText('Connection name'), { target: { value: 'Staging' } })
         fireEvent.change(screen.getByLabelText('Site URL'), { target: { value: 'https://staging.example' } })
         fireEvent.change(screen.getByLabelText('Remote workspace'), { target: { value: 'staging' } })
-        fireEvent.change(screen.getByLabelText('Credential type'), { target: { value: 'api_key' } })
-        fireEvent.change(screen.getByLabelText('Access key'), { target: { value: 'write-only-value' } })
+        expect(screen.queryByLabelText('Credential type')).not.toBeInTheDocument()
+        fireEvent.change(screen.getByLabelText('Remote site key'), { target: { value: 'write-only-value' } })
         fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
 
         await waitFor(() => expect(mocks.createRemoteConnection).toHaveBeenCalledWith(expect.objectContaining({
             name: 'Staging',
             remoteWorkspace: 'staging',
             accessKey: 'write-only-value',
-            credentialScheme: 'api_key',
+            credentialScheme: 'theme_key',
         })))
     })
 
@@ -222,19 +222,20 @@ describe('RemoteSitesSettings', () => {
             id: 'key-2',
             name: 'Migration host',
             secret: 'eceee_theme_one-time-value',
-            capabilities: ['theme.transfer', 'site.transfer'],
+            capabilities: ['theme.transfer', 'site.transfer', 'object.read', 'object.transfer'],
         })
         renderWithStateProviders(<RemoteSitesSettings />)
         await screen.findByText('Local development')
 
-        fireEvent.click(screen.getByRole('button', { name: 'Create access key' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Create remote site key' }))
         fireEvent.change(screen.getByLabelText('Key name'), { target: { value: 'Migration host' } })
-        fireEvent.click(screen.getAllByRole('button', { name: 'Create access key' })[1])
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Objects and media' }))
+        fireEvent.click(screen.getAllByRole('button', { name: 'Create remote site key' })[1])
 
         expect(await screen.findByText('eceee_theme_one-time-value')).toBeInTheDocument()
         expect(mocks.createRemoteAccessKey).toHaveBeenCalledWith({
             name: 'Migration host',
-            capabilities: ['theme.transfer', 'site.transfer'],
+            capabilities: ['theme.transfer', 'site.transfer', 'object.read', 'object.transfer'],
         })
 
         fireEvent.click(screen.getByRole('button', { name: 'Copy key' }))
@@ -284,9 +285,9 @@ describe('RemoteSitesSettings', () => {
         renderWithStateProviders(<RemoteSitesSettings />)
         await screen.findByText('Local development')
 
-        fireEvent.click(screen.getByRole('button', { name: 'Create access key' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Create remote site key' }))
         fireEvent.change(screen.getByLabelText('Key name'), { target: { value: 'Migration host' } })
-        fireEvent.click(screen.getAllByRole('button', { name: 'Create access key' })[1])
+        fireEvent.click(screen.getAllByRole('button', { name: 'Create remote site key' })[1])
 
         expect(await screen.findByText('eceee_theme_one-time-value')).toBeInTheDocument()
         expect(screen.getByRole('alert')).toHaveTextContent('The access key was created, but the settings list could not be refreshed.')

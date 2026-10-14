@@ -31,9 +31,13 @@ from object_storage.services.object_transfer import (
     type_is_compatible,
 )
 from object_storage.tasks import export_object_package, import_remote_object_package, restore_object_transfer_checkpoint
-from webpages.models import ThemeRemoteConnection
+from webpages.models import ThemeRemoteAccessKey, ThemeRemoteConnection
+from webpages.models.theme_remote import OBJECT_READ_CAPABILITY, OBJECT_TRANSFER_CAPABILITY
 from webpages.services.theme_remote import RemoteThemeError, remote_object_request
-from webpages.services.theme_remote_credentials import RemoteCredentialConfigurationError
+from webpages.services.theme_remote_credentials import (
+    RemoteCredentialConfigurationError,
+    ThemeRemoteAccessKeyAuthentication,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +66,6 @@ def _connection(request):
         tenant=request.tenant,
         is_active=True,
     )
-    if connection.credential_scheme != ThemeRemoteConnection.CREDENTIAL_API_KEY:
-        raise serializers.ValidationError({"connectionId": "Object transfer requires a machine API key connection."})
     return connection
 
 
@@ -77,6 +79,14 @@ def _job_data(job):
         "createdAt": job.created_at,
         "updatedAt": job.updated_at,
     }
+
+
+def _remote_object_owner_options(request):
+    if isinstance(request.auth, ThemeRemoteAccessKey):
+        return {"remote_access_key_id": str(request.auth.id)}
+    if isinstance(request.auth, MachineAPIKey):
+        return {"machine_api_key_id": str(request.auth.id)}
+    return {}
 
 
 def _checkpoint_data(checkpoint):
@@ -175,19 +185,32 @@ def _validate_type_resolutions(conflicts, resolutions):
 
 
 class RemoteObjectSourceMixin:
-    authentication_classes = [MachineAPIKeyAuthentication, authentication.SessionAuthentication]
+    authentication_classes = [
+        MachineAPIKeyAuthentication,
+        ThemeRemoteAccessKeyAuthentication,
+        authentication.SessionAuthentication,
+    ]
     permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
     renderer_classes = [ObjectTransferJSONRenderer]
+    remote_access_capability = None
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
+        if isinstance(request.auth, ThemeRemoteAccessKey):
+            if self.remote_access_capability not in set(request.auth.capabilities or []):
+                from rest_framework.exceptions import PermissionDenied
+
+                raise PermissionDenied("This remote site key is not permitted for this object transfer operation.")
+            return
         if not isinstance(request.auth, MachineAPIKey):
             from rest_framework.exceptions import PermissionDenied
 
-            raise PermissionDenied("A scoped machine API key is required for object transfer.")
+            raise PermissionDenied("A scoped remote site key is required for object transfer.")
 
 
 class RemoteObjectSourceCatalogView(RemoteObjectSourceMixin, APIView):
+    remote_access_capability = OBJECT_READ_CAPABILITY
+
     def post(self, request):
         selections = request.data.get("selections") or []
         type_ids = ObjectInstance.objects.filter(tenant=request.tenant, parent__isnull=True).values("object_type_id")
@@ -206,6 +229,8 @@ class RemoteObjectSourceCatalogView(RemoteObjectSourceMixin, APIView):
 
 
 class RemoteObjectSourcePreflightView(RemoteObjectSourceMixin, APIView):
+    remote_access_capability = OBJECT_READ_CAPABILITY
+
     def post(self, request):
         root_ids = request.data.get("root_ids") or request.data.get("rootIds") or []
         if not root_ids:
@@ -218,6 +243,8 @@ class RemoteObjectSourcePreflightView(RemoteObjectSourceMixin, APIView):
 
 
 class RemoteObjectSourceExportListView(RemoteObjectSourceMixin, APIView):
+    remote_access_capability = OBJECT_TRANSFER_CAPABILITY
+
     def post(self, request):
         root_ids = request.data.get("root_ids") or request.data.get("rootIds") or []
         try:
@@ -230,7 +257,7 @@ class RemoteObjectSourceExportListView(RemoteObjectSourceMixin, APIView):
             tenant=request.tenant,
             kind=ObjectTransferJob.KIND_EXPORT,
             created_by=request.user,
-            options={"root_ids": root_ids, "machine_api_key_id": str(request.auth.id)},
+            options={"root_ids": root_ids, **_remote_object_owner_options(request)},
             expires_at=timezone.now() + timedelta(hours=24),
         )
         export_object_package.delay(str(job.id))
@@ -242,20 +269,25 @@ def _remote_job(request, job_id, completed=False):
         "id": job_id,
         "tenant": request.tenant,
         "kind": ObjectTransferJob.KIND_EXPORT,
-        "options__machine_api_key_id": str(request.auth.id),
         "expires_at__gte": timezone.now(),
     }
+    owner_options = _remote_object_owner_options(request)
+    filters.update({f"options__{key}": value for key, value in owner_options.items()})
     if completed:
         filters["status"] = ObjectTransferJob.STATUS_COMPLETED
     return get_object_or_404(ObjectTransferJob, **filters)
 
 
 class RemoteObjectSourceExportDetailView(RemoteObjectSourceMixin, APIView):
+    remote_access_capability = OBJECT_TRANSFER_CAPABILITY
+
     def get(self, request, job_id):
         return Response(_job_data(_remote_job(request, job_id)))
 
 
 class RemoteObjectSourceExportDownloadView(RemoteObjectSourceMixin, APIView):
+    remote_access_capability = OBJECT_TRANSFER_CAPABILITY
+
     def get(self, request, job_id):
         job = _remote_job(request, job_id, completed=True)
         return FileResponse(

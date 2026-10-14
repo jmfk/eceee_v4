@@ -5,7 +5,21 @@ import { designerThemesApi } from '../api/designerThemes'
 import { objectTransfersApi } from '../api/objectTransfers'
 
 const emptyConnection = { name: '', baseUrl: '', remoteWorkspace: '', accessKey: '', credentialScheme: 'theme_key', isDefault: false }
+const objectCapabilities = ['object.read', 'object.transfer']
 const defaultCapabilities = ['theme.transfer', 'site.transfer']
+
+const capabilityLabels = (capabilities) => {
+    const labels = []
+    if (capabilities.includes('theme.transfer')) labels.push('Themes')
+    if (capabilities.includes('site.transfer')) labels.push('Sites')
+    if (objectCapabilities.every((capability) => capabilities.includes(capability))) {
+        labels.push('Objects and media')
+    } else {
+        if (capabilities.includes('object.read')) labels.push('Browse objects')
+        if (capabilities.includes('object.transfer')) labels.push('Export objects and media')
+    }
+    return labels.join(', ')
+}
 
 const formatDate = (value) => value
     ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
@@ -108,10 +122,16 @@ export default function RemoteSitesSettings() {
         setBusy('connection')
         setError('')
         try {
+            const payload = {
+                ...connectionForm,
+                // New credentials created through this screen are remote-site keys.
+                // Keep an existing legacy machine-key scheme only when its secret is unchanged.
+                credentialScheme: connectionForm.accessKey ? 'theme_key' : connectionForm.credentialScheme,
+            }
             if (editingConnectionId) {
-                await designerThemesApi.updateRemoteConnection(editingConnectionId, connectionForm)
+                await designerThemesApi.updateRemoteConnection(editingConnectionId, payload)
             } else {
-                await designerThemesApi.createRemoteConnection(connectionForm)
+                await designerThemesApi.createRemoteConnection(payload)
             }
             setConnectionForm(emptyConnection)
             setEditingConnectionId(null)
@@ -156,6 +176,12 @@ export default function RemoteSitesSettings() {
         setKeyCapabilities((current) => current.includes(capability)
             ? current.filter((item) => item !== capability)
             : [...current, capability])
+    }
+
+    const toggleObjectCapabilities = () => {
+        setKeyCapabilities((current) => objectCapabilities.every((capability) => current.includes(capability))
+            ? current.filter((capability) => !objectCapabilities.includes(capability))
+            : Array.from(new Set([...current, ...objectCapabilities])))
     }
 
     const issueKey = async () => {
@@ -240,11 +266,11 @@ export default function RemoteSitesSettings() {
             {error && <div role="alert" className="mt-6 border-l-4 border-red-500 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
             {!syncEnabled && <div className="mt-6 border-l-4 border-amber-500 bg-amber-50 px-4 py-3 text-sm text-amber-900">Remote sync is disabled on this installation. Saved keys cannot be used until an operator enables it.</div>}
 
-            {issuedSecret && <section aria-label="New access key" className="mt-8 border-l-4 border-green-500 bg-green-50 px-5 py-4">
+            {issuedSecret && <section aria-label="New remote site key" className="mt-8 border-l-4 border-green-500 bg-green-50 px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
                     <div>
                         <h2 className="font-semibold text-green-950">Copy {issuedSecret.name} now</h2>
-                        <p className="mt-1 text-sm text-green-900">This access key is shown once and cannot be recovered later.</p>
+                        <p className="mt-1 text-sm text-green-900">This remote site key is shown once and cannot be recovered later.</p>
                     </div>
                     <button type="button" aria-label="Dismiss access key" onClick={() => { setIssuedSecret(null); setCopied(false) }} className="min-h-8 min-w-8 text-green-900"><X className="h-5 w-5" /></button>
                 </div>
@@ -260,7 +286,7 @@ export default function RemoteSitesSettings() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h2 id="outgoing-connections-heading" className="text-lg font-semibold text-gray-900">Connections to other sites</h2>
-                        <p className="mt-1 text-sm text-gray-600">Used when importing sites or transferring themes from this workspace.</p>
+                        <p className="mt-1 text-sm text-gray-600">Used when importing themes, sites, objects, and media from another workspace.</p>
                     </div>
                     <button type="button" onClick={() => { setConnectionForm(emptyConnection); setEditingConnectionId(null); setShowConnectionForm(true) }} className="inline-flex min-h-10 items-center gap-2 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white"><Plus className="h-4 w-4" />Add connection</button>
                 </div>
@@ -270,8 +296,7 @@ export default function RemoteSitesSettings() {
                         <label className="text-sm font-medium text-gray-700">Name<input aria-label="Connection name" value={connectionForm.name} onChange={(event) => setConnectionForm({ ...connectionForm, name: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
                         <label className="text-sm font-medium text-gray-700">Site URL<input aria-label="Site URL" type="url" placeholder="https://example.org" value={connectionForm.baseUrl} onChange={(event) => setConnectionForm({ ...connectionForm, baseUrl: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
                         <label className="text-sm font-medium text-gray-700">Remote workspace<input aria-label="Remote workspace" value={connectionForm.remoteWorkspace} onChange={(event) => setConnectionForm({ ...connectionForm, remoteWorkspace: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
-                        <label className="text-sm font-medium text-gray-700">Credential type<select aria-label="Credential type" value={connectionForm.credentialScheme} onChange={(event) => setConnectionForm({ ...connectionForm, credentialScheme: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal"><option value="theme_key">Remote access key</option><option value="api_key">Machine API key</option></select></label>
-                        <label className="text-sm font-medium text-gray-700">Access key{editingConnectionId && <span className="font-normal text-gray-500"> · leave blank to keep current</span>}<input aria-label="Access key" type="password" autoComplete="new-password" value={connectionForm.accessKey} onChange={(event) => setConnectionForm({ ...connectionForm, accessKey: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
+                        <label className="text-sm font-medium text-gray-700">Remote site key{editingConnectionId && <span className="font-normal text-gray-500"> · leave blank to keep current</span>}<input aria-label="Remote site key" type="password" autoComplete="new-password" value={connectionForm.accessKey} onChange={(event) => setConnectionForm({ ...connectionForm, accessKey: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" /></label>
                     </div>
                     <label className="mt-4 flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={connectionForm.isDefault} onChange={(event) => setConnectionForm({ ...connectionForm, isDefault: event.target.checked })} />Use as default</label>
                     <div className="mt-5 flex gap-3">
@@ -283,7 +308,7 @@ export default function RemoteSitesSettings() {
                 {connections.length === 0 ? <div className="mt-6 py-6 text-sm text-gray-600">No remote connections. <button type="button" onClick={() => setShowConnectionForm(true)} className="font-medium text-blue-700">Add the first connection</button>.</div> : <div className="mt-6 divide-y divide-gray-200 border-y border-gray-200">{connections.map((connection) => <div key={connection.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
                     <div className="min-w-0">
                         <div className="flex items-center gap-2"><Link2 className="h-4 w-4 text-gray-400" /><p className="font-medium text-gray-900">{connection.name}</p>{connection.isDefault && <span className="text-xs text-gray-500">Default</span>}</div>
-                        <p className="mt-1 truncate text-sm text-gray-600">{connection.baseUrl} · {connection.remoteWorkspace} · {connection.credentialScheme === 'api_key' ? 'Machine API key' : 'Remote access key'}</p>
+                        <p className="mt-1 truncate text-sm text-gray-600">{connection.baseUrl} · {connection.remoteWorkspace}</p>
                     </div>
                     {confirmingConnectionId === connection.id ? <div className="flex items-center gap-2 text-sm"><span className="text-gray-700">Remove connection?</span><button type="button" onClick={() => removeConnection(connection.id)} className="min-h-9 rounded bg-red-600 px-3 text-white">Remove</button><button type="button" onClick={() => setConfirmingConnectionId(null)} className="min-h-9 rounded border border-gray-300 px-3">Cancel</button></div> : <div className="flex gap-2">
                         <button type="button" onClick={() => editConnection(connection)} className="inline-flex min-h-9 items-center gap-1.5 rounded border border-gray-300 px-3 text-sm text-gray-700"><Pencil className="h-4 w-4" />Edit</button>
@@ -296,9 +321,9 @@ export default function RemoteSitesSettings() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h2 id="incoming-access-heading" className="text-lg font-semibold text-gray-900">Access to this site</h2>
-                        <p className="mt-1 text-sm text-gray-600">Create scoped keys for other ECEEE installations. Keys belong to the current workspace.</p>
+                        <p className="mt-1 text-sm text-gray-600">Create scoped remote site keys for other ECEEE installations. Keys belong to the current workspace.</p>
                     </div>
-                    <button type="button" onClick={() => setShowKeyForm(true)} className="inline-flex min-h-10 items-center gap-2 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white"><KeyRound className="h-4 w-4" />Create access key</button>
+                    <button type="button" onClick={() => setShowKeyForm(true)} className="inline-flex min-h-10 items-center gap-2 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white"><KeyRound className="h-4 w-4" />Create remote site key</button>
                 </div>
 
                 {showKeyForm && <div className="mt-6 border-y border-gray-200 py-6">
@@ -306,17 +331,18 @@ export default function RemoteSitesSettings() {
                     <fieldset className="mt-4"><legend className="text-sm font-medium text-gray-700">Allowed transfers</legend><div className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
                         <label className="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={keyCapabilities.includes('theme.transfer')} onChange={() => toggleCapability('theme.transfer')} />Themes</label>
                         <label className="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={keyCapabilities.includes('site.transfer')} onChange={() => toggleCapability('site.transfer')} />Sites</label>
+                        <label className="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={objectCapabilities.every((capability) => keyCapabilities.includes(capability))} onChange={toggleObjectCapabilities} />Objects and media</label>
                     </div></fieldset>
                     <div className="mt-5 flex gap-3">
-                        <button type="button" disabled={!keyName.trim() || keyCapabilities.length === 0 || busy === 'key'} onClick={issueKey} className="min-h-10 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Create access key</button>
+                        <button type="button" disabled={!keyName.trim() || keyCapabilities.length === 0 || busy === 'key'} onClick={issueKey} className="min-h-10 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Create remote site key</button>
                         <button type="button" onClick={() => setShowKeyForm(false)} className="min-h-10 rounded border border-gray-300 px-4 py-2 text-sm text-gray-700">Cancel</button>
                     </div>
                 </div>}
 
-                {accessKeys.length === 0 ? <div className="mt-6 py-6 text-sm text-gray-600">No access keys. <button type="button" onClick={() => setShowKeyForm(true)} className="font-medium text-blue-700">Create the first key</button>.</div> : <div className="mt-6 divide-y divide-gray-200 border-y border-gray-200">{accessKeys.map((accessKey) => <div key={accessKey.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
+                {accessKeys.length === 0 ? <div className="mt-6 py-6 text-sm text-gray-600">No remote site keys. <button type="button" onClick={() => setShowKeyForm(true)} className="font-medium text-blue-700">Create the first key</button>.</div> : <div className="mt-6 divide-y divide-gray-200 border-y border-gray-200">{accessKeys.map((accessKey) => <div key={accessKey.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
                     <div>
                         <div className="flex flex-wrap items-center gap-2"><p className="font-medium text-gray-900">{accessKey.name}</p><span className={`text-xs ${accessKey.isActive ? 'text-green-700' : 'text-gray-500'}`}>{accessKey.isActive ? 'Active' : 'Revoked'}</span></div>
-                        <p className="mt-1 text-sm text-gray-600">{accessKey.keyPrefix}… · {accessKey.capabilities.map((capability) => capability === 'theme.transfer' ? 'Themes' : 'Sites').join(', ')}</p>
+                        <p className="mt-1 text-sm text-gray-600">{accessKey.keyPrefix}… · {capabilityLabels(accessKey.capabilities)}</p>
                         <p className="mt-1 text-xs text-gray-500">Created {formatDate(accessKey.createdAt)} · Last used {formatDate(accessKey.lastUsedAt)}</p>
                     </div>
                     <div className="flex gap-2">

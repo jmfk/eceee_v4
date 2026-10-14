@@ -212,6 +212,6 @@ describe('ObjectBrowser grouped type list', () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Import remote objects' }))
 
         expect(await screen.findByRole('dialog', { name: 'Import remote objects' })).toBeInTheDocument()
-        expect(await screen.findByText(/No remote site has a machine API key/)).toBeInTheDocument()
+        expect(await screen.findByText(/No remote site connection is configured/)).toBeInTheDocument()
     })
 })
