@@ -54,6 +54,22 @@ MAX_DEPTH = 12
 MAX_SPECIAL_PAGES = 50
 MAX_SPECIAL_PAGE_WIDGETS = 100
 REQUIRED_LAYOUT_KEYS = {"main_layout", "landing_page", "error_layout"}
+RESERVED_SPECIAL_ROUTE_PREFIXES = {
+    "accounts",
+    "admin",
+    "api",
+    "csrf-token",
+    "files",
+    "health",
+    "htmx",
+    "icon.svg",
+    "imgproxy",
+    "lb",
+    "media",
+    "metrics",
+    "static",
+    "webpages",
+}
 
 
 def _valid_background_image(value):
@@ -755,8 +771,11 @@ def validate_theme_layouts(document):
         if kind == "route":
             if not route or route in routes:
                 raise ValidationError(f"{path}.route must be present and unique.")
-            if route.split("/", 1)[0] in (*LEGACY_ERROR_PAGE_SLUGS, "theme-error-status"):
+            route_prefix = route.split("/", 1)[0]
+            if route_prefix in (*LEGACY_ERROR_PAGE_SLUGS, "theme-error-status"):
                 raise ValidationError(f"{path}.route cannot use a reserved error path.")
+            if route_prefix in RESERVED_SPECIAL_ROUTE_PREFIXES:
+                raise ValidationError(f"{path}.route cannot use a reserved system path.")
             routes.add(route)
         status_code = special_page.get("status_code")
         if kind == "error":
