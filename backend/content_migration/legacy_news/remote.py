@@ -137,3 +137,44 @@ def get_public_url(url: str, *, timeout: float = 20.0, max_bytes: int) -> GetRes
                 connection.close()
 
     raise ValueError("unreachable-image-host") from last_error
+
+
+def get_public_json(url: str, *, authorization: str, timeout: float = 30.0, max_bytes: int) -> GetResponse:
+    """GET bounded JSON over pinned HTTPS without forwarding credentials."""
+
+    parsed = urlsplit(url)
+    if parsed.scheme != "https":
+        raise ValueError("unsupported-api-url")
+    addresses = validate_public_http_url(url, subject="api")
+    hostname = _ascii_hostname(parsed.hostname or "", subject="api")
+    port = parsed.port or 443
+    authority_host = f"[{hostname}]" if ":" in hostname else hostname
+    authority = f"{authority_host}:{parsed.port}" if parsed.port else authority_host
+    target = urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
+    last_error: Exception | None = None
+
+    for address in addresses:
+        connection = None
+        try:
+            connection = _PinnedHTTPSConnection(address, hostname=hostname, port=port, timeout=timeout)
+            connection.request(
+                "GET",
+                target,
+                headers={
+                    "Host": authority,
+                    "User-Agent": USER_AGENT,
+                    "Accept": "application/json",
+                    "Authorization": authorization,
+                },
+            )
+            response = connection.getresponse()
+            headers = {name.lower(): value for name, value in response.getheaders()}
+            content = response.read(max_bytes + 1)
+            return GetResponse(status_code=response.status, headers=headers, content=content)
+        except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
+            last_error = exc
+        finally:
+            if connection is not None:
+                connection.close()
+
+    raise ValueError("unreachable-api-host") from last_error

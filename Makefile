@@ -31,7 +31,6 @@ ECEEE_PLAYWRIGHT_PORT ?= 10107
 ECEEE_FRONTEND_E2E_PORT ?= 10108
 ECEEE_FRONTEND_PREVIEW_PORT ?= 10109
 PUBLISHER_PORT ?= 10115
-LEGACY_DB_TUNNEL_PORT ?= 10110
 SHARED_POSTGRES_PORT ?= 10300
 SHARED_REDIS_PORT ?= 10301
 SHARED_MINIO_API_PORT ?= 10302
@@ -61,7 +60,7 @@ endef
 .PHONY: migrate-to-camelcase-dry migrate-to-camelcase migrate-schemas-only
 .PHONY: migrate-pagedata-only migrate-widgets-only migrate-widget-images-dry migrate-widget-images
 .PHONY: import-schemas import-schemas-dry import-schemas-force import-schema
-.PHONY: legacy-db-tunnel legacy-news-sample-dry legacy-news-database-dry fix-minio-permissions
+.PHONY: legacy-news-sample-dry legacy-news-api-dry fix-minio-permissions
 .PHONY: create-api-token get-jwt-token list-api-tokens test-api-auth
 .PHONY: create-tenant list-tenants show-tenant activate-tenant deactivate-tenant tenant-themes delete-tenant
 .PHONY: test test-build test-parallel backend-test backend-news-test backend-test-parallel frontend-test
@@ -161,9 +160,8 @@ help: ## Show this help message (use: make help-TARGET for one target)
 		echo "  migrate-widgets-only      Migrate widgets only"; \
 		echo "  migrate-widget-images-dry Dry run widget image migration (preview)"; \
 		echo "  migrate-widget-images     Migrate widget images to full MediaFile objects"; \
-		echo "  legacy-db-tunnel          Open read-only legacy PostgreSQL tunnel on 10110"; \
+		echo "  legacy-news-api-dry       Validate legacy News through the read-only migration API"; \
 		echo "  legacy-news-sample-dry    Validate the bounded News golden sample"; \
-		echo "  legacy-news-database-dry  Report legacy News counts through the tunnel"; \
 		echo ""; \
 		echo "Object Type Schemas:"; \
 		echo "  import-schemas            Import all JSON schemas to ObjectTypes"; \
@@ -587,14 +585,11 @@ import-schema: ## Import single schema file (use: make import-schema FILE=news.j
 		--file scripts/migration/schemas/$(FILE) \
 		--name $(NAME)
 
-legacy-db-tunnel: ## Open loopback-only legacy PostgreSQL tunnel on reserved port 10110
-	@LEGACY_ENV_FILE="$${LEGACY_ENV_FILE:-.env.local}" python3 scripts/legacy_db_tunnel.py
-
 legacy-news-sample-dry: ## Validate the bounded golden News sample (TENANT=identifier)
 	@cd backend && python manage.py migrate_legacy_news --sample-manifest --tenant "$(TENANT)" --dry-run
 
-legacy-news-database-dry: ## Read legacy News counts through the tunnel without importing (TENANT=identifier)
-	@cd backend && python manage.py migrate_legacy_news --database --tenant "$(TENANT)" --dry-run --env-file ../.env.local
+legacy-news-api-dry: ## Read legacy News through the migration API without importing (TENANT=identifier)
+	@cd backend && python manage.py migrate_legacy_news --api --tenant "$(TENANT)" --dry-run --env-file ../.env.local
 
 fix-minio-permissions: ## Fix permissions on all MinIO assets (local)
 	$(COMPOSE_DEV) exec backend python manage.py fix_minio_permissions

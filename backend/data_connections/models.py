@@ -10,7 +10,8 @@ class DataConnection(models.Model):
         ("INTERNAL", "Internal System"),
         ("EXTERNAL_REST", "External REST API"),
         ("EXTERNAL_DB", "External Database"),
-        ("LEGACY_POSTGRES", "Legacy PostgreSQL"),
+        ("LEGACY_POSTGRES", "Legacy PostgreSQL (unsupported)"),
+        ("LEGACY_API", "Legacy Migration API"),
         ("FILEMAKER", "FileMaker Data API"),
     ]
 

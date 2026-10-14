@@ -337,7 +337,7 @@ const DataConnectionsManager = () => {
                                         { value: 'INTERNAL', label: 'Internal System' },
                                         { value: 'EXTERNAL_REST', label: 'External REST API' },
                                         { value: 'EXTERNAL_DB', label: 'External Database', disabled: true, description: 'Coming soon' },
-                                        { value: 'LEGACY_POSTGRES', label: 'Legacy PostgreSQL (SSH tunnel)' },
+                                        { value: 'LEGACY_API', label: 'Legacy Migration API' },
                                         {
                                             value: 'FILEMAKER',
                                             label: 'FileMaker Data API',
@@ -412,14 +412,37 @@ const DataConnectionsManager = () => {
                             </div>
                         )}
 
-                        {['EXTERNAL_DB', 'LEGACY_POSTGRES'].includes(connectionFormData.connectionType) && (
+                        {connectionFormData.connectionType === 'LEGACY_API' && (
+                            <div className="mt-8 pt-8 border-t border-gray-200">
+                                <div className="flex items-center space-x-2 mb-6">
+                                    <Globe className="w-5 h-5 text-blue-600" />
+                                    <h3 className="text-lg font-semibold">Legacy Migration API</h3>
+                                </div>
+                                <TextInput
+                                    label="Base URL"
+                                    description="The versioned HTTPS endpoint installed in the legacy environment"
+                                    value={connectionFormData.config.baseUrl || ''}
+                                    onChange={(val) => setConnectionFormData(prev => ({
+                                        ...prev,
+                                        config: { ...prev.config, baseUrl: val }
+                                    }))}
+                                    placeholder="https://www.eceee.org/api/migration/v1"
+                                    required
+                                />
+                                <div className="mt-4 rounded-md bg-blue-50 p-4 text-sm text-blue-900">
+                                    The API exposes only allowlisted, read-only migration resources. No database or SSH credentials are shared with this server.
+                                </div>
+                            </div>
+                        )}
+
+                        {connectionFormData.connectionType === 'EXTERNAL_DB' && (
                             <div className="mt-8 pt-8 border-t border-gray-200">
                                 <div className="flex items-center space-x-2 mb-6">
                                     <Database className="w-5 h-5 text-blue-600" />
                                     <h3 className="text-lg font-semibold">Database Configuration</h3>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {connectionFormData.connectionType === 'EXTERNAL_DB' && <ComboboxInput
+                                    <ComboboxInput
                                         label="Database Type"
                                         value={connectionFormData.config.dbType || 'postgresql'} 
                                         onChange={(val) => setConnectionFormData(prev => ({ 
@@ -430,7 +453,7 @@ const DataConnectionsManager = () => {
                                             { value: 'postgresql', label: 'PostgreSQL' },
                                             { value: 'mysql', label: 'MySQL' },
                                         ]}
-                                    />}
+                                    />
                                     <TextInput 
                                         label="Host"
                                         value={connectionFormData.config.host} 
@@ -479,11 +502,6 @@ const DataConnectionsManager = () => {
                                         placeholder="••••••••"
                                     />
                                 </div>
-                                {connectionFormData.connectionType === 'LEGACY_POSTGRES' && (
-                                    <div className="mt-4 rounded-md bg-blue-50 p-4 text-sm text-blue-900">
-                                        Use <code>127.0.0.1:10110</code> with the server-managed, read-only SSH tunnel. The SSH key remains outside this application.
-                                    </div>
-                                )}
                             </div>
                         )}
 
@@ -491,6 +509,7 @@ const DataConnectionsManager = () => {
                             connectionType={connectionFormData.connectionType}
                             config={connectionFormData.config}
                             secretConfig={connectionFormData.secretConfig}
+                            hasSecrets={connectionFormData.hasSecrets}
                             onChange={(newConfig) => setConnectionFormData(prev => ({
                                 ...prev,
                                 config: newConfig
@@ -501,7 +520,7 @@ const DataConnectionsManager = () => {
                             }))}
                         />
 
-                        {selectedConnection && connectionFormData.connectionType === 'LEGACY_POSTGRES' && (
+                        {selectedConnection && connectionFormData.connectionType === 'LEGACY_API' && (
                             <div className="mt-6 flex items-start gap-4">
                                 <button
                                     onClick={handleTestConnection}
@@ -520,7 +539,7 @@ const DataConnectionsManager = () => {
                         )}
                     </div>
                     
-                    {selectedConnection && !['LEGACY_POSTGRES', 'FILEMAKER'].includes(connectionFormData.connectionType) && (
+                    {selectedConnection && !['LEGACY_API', 'FILEMAKER'].includes(connectionFormData.connectionType) && (
                         <div className="p-8 bg-gray-50/50">
                             <div className="flex items-center justify-between mb-6">
                                 <div>

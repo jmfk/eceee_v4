@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 from rest_framework import serializers
 
 from webpages.services.theme_remote_credentials import RemoteCredentialConfigurationError
@@ -61,7 +63,35 @@ class DataConnectionSerializer(serializers.ModelSerializer):
         explicit_secrets = attrs.pop("secret_config", {}) or {}
         if not isinstance(explicit_secrets, dict):
             raise serializers.ValidationError({"secretConfig": "Expected an object."})
-        attrs["_submitted_secrets"] = {**embedded_secrets, **explicit_secrets}
+        submitted_secrets = {**embedded_secrets, **explicit_secrets}
+        connection_type = attrs.get("connection_type", getattr(self.instance, "connection_type", None))
+        config = attrs.get("config", getattr(self.instance, "config", {})) or {}
+        if connection_type == "LEGACY_POSTGRES":
+            raise serializers.ValidationError(
+                {
+                    "connectionType": (
+                        "Legacy PostgreSQL connections are no longer supported. "
+                        "Create a Legacy Migration API connection."
+                    )
+                }
+            )
+        if connection_type == "LEGACY_API":
+            base_url = str(config.get("baseUrl") or config.get("base_url") or "").strip()
+            parsed = urlsplit(base_url)
+            if (
+                parsed.scheme != "https"
+                or not parsed.hostname
+                or parsed.username
+                or parsed.password
+                or parsed.query
+                or parsed.fragment
+            ):
+                raise serializers.ValidationError(
+                    {"config": {"baseUrl": "Enter a public HTTPS migration API base URL without embedded credentials."}}
+                )
+            if not submitted_secrets.get("token") and not getattr(self.instance, "encrypted_secrets", ""):
+                raise serializers.ValidationError({"secretConfig": {"token": "Enter the migration API access key."}})
+        attrs["_submitted_secrets"] = submitted_secrets
         return attrs
 
     @staticmethod

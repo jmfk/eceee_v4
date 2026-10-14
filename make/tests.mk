@@ -48,8 +48,8 @@ backend-news-test: prepare-test-infra refresh-db-collation ## Run focused News m
 		-e AWS_S3_INTERNAL_ENDPOINT_URL=http://test-minio:9000 \
 		backend pytest \
 			content_migration/tests/test_migrate_legacy_news_command.py \
+			content_migration/tests/test_legacy_news_api.py \
 			content_migration/tests/test_legacy_news_ai_tags.py \
-			content_migration/tests/test_legacy_news_database.py \
 			content_migration/tests/test_legacy_news_extractor.py \
 			content_migration/tests/test_legacy_news_fetcher.py \
 			content_migration/tests/test_legacy_news_links.py \

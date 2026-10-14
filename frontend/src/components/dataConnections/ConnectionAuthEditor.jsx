@@ -4,7 +4,7 @@ import TextInput from '../form-fields/TextInput'
 import PasswordInput from '../form-fields/PasswordInput'
 import SelectInput from '../form-fields/SelectInput'
 
-const ConnectionAuthEditor = ({ connectionType, config, secretConfig = {}, onChange, onSecretChange = () => {} }) => {
+const ConnectionAuthEditor = ({ connectionType, config, secretConfig = {}, hasSecrets = false, onChange, onSecretChange = () => {} }) => {
     const handleConfigChange = (field, value) => {
         onChange({ ...config, [field]: value })
     }
@@ -13,7 +13,7 @@ const ConnectionAuthEditor = ({ connectionType, config, secretConfig = {}, onCha
         onSecretChange({ ...secretConfig, [field]: value })
     }
 
-    if (!['EXTERNAL_REST', 'EXTERNAL_DB'].includes(connectionType)) {
+    if (!['EXTERNAL_REST', 'EXTERNAL_DB', 'LEGACY_API'].includes(connectionType)) {
         return null
     }
 
@@ -120,6 +120,22 @@ const ConnectionAuthEditor = ({ connectionType, config, secretConfig = {}, onCha
                             icon={<Lock className="w-4 h-4" />}
                         />
                     </div>
+                </div>
+            )}
+
+            {connectionType === 'LEGACY_API' && (
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                    <PasswordInput
+                        label={hasSecrets ? 'Replace saved access key' : 'Access key'}
+                        description={hasSecrets
+                            ? 'Leave blank to keep the encrypted access key.'
+                            : 'Stored encrypted and never returned by the API.'}
+                        value={secretConfig.token || ''}
+                        onChange={(val) => handleSecretChange('token', val)}
+                        placeholder="••••••••"
+                        icon={<Key className="w-4 h-4" />}
+                        required={!hasSecrets}
+                    />
                 </div>
             )}
         </div>
