@@ -8,12 +8,14 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from easy_widgets.widgets.navigation import NavigationWidget
 from webpages.layout_registry import layout_registry
-from webpages.models import PageTheme, WebPage
-from webpages.public_views import HostnamePageView, custom_404_handler
+from webpages.models import PageTheme, PageVersion, WebPage
+from webpages.public_views import HostnamePageView, custom_404_handler, page_sitemap_view
 from webpages.serializers import WebPageListSerializer
 from webpages.theme_layouts import default_theme_layouts
 from webpages.views.webpage_views import WebPageViewSet
@@ -469,3 +471,46 @@ class ErrorPageIntegrationTests(TestCase):
         self.assertNotIn(legacy_page.id, ids)
         self.assertIn(ordinary_page.id, ids)
         self.assertEqual(serialized_root["children_count"], 1)
+
+    def test_legacy_error_rows_are_hidden_from_public_sitemap_and_navigation(self):
+        legacy_page = WebPage.objects.create(
+            title="Legacy 404",
+            slug="404",
+            parent=self.root_page,
+            created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
+        )
+        ordinary_page = WebPage.objects.create(
+            title="About",
+            slug="about",
+            parent=self.root_page,
+            created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
+        )
+        for page in (legacy_page, ordinary_page):
+            PageVersion.objects.create(
+                page=page,
+                version_number=1,
+                version_title="Published",
+                effective_date=timezone.now(),
+                created_by=self.user,
+            )
+
+        request = self.factory.get("/sitemap.xml", HTTP_HOST="testsite.com")
+        sitemap = page_sitemap_view(request).content.decode()
+        navigation = NavigationWidget()._get_page_hierarchy_context(
+            {
+                "webpage_data": {
+                    "id": self.root_page.id,
+                    "title": self.root_page.title,
+                    "slug": self.root_page.slug,
+                    "cached_path": "/",
+                }
+            }
+        )
+
+        self.assertNotIn("/404/", sitemap)
+        self.assertIn("/about/", sitemap)
+        self.assertEqual([item["id"] for item in navigation["currentChildren"]], [ordinary_page.id])

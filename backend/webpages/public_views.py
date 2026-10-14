@@ -279,7 +279,11 @@ def page_sitemap_view(request):
         .distinct()
     )
 
-    pages = WebPage.objects.filter(id__in=published_page_ids).order_by("sort_order")
+    pages = (
+        WebPage.objects.filter(id__in=published_page_ids)
+        .exclude(parent__isnull=False, parent__parent__isnull=True, slug__in=LEGACY_ERROR_PAGE_SLUGS)
+        .order_by("sort_order")
+    )
 
     xml_content = ['<?xml version="1.0" encoding="UTF-8"?>']
     xml_content.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')

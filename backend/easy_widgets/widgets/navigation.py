@@ -2,12 +2,14 @@
 Navigation widget implementation.
 """
 
-from typing import Type, Optional, List, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Optional, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
-from webpages.widget_registry import BaseWidget, register_widget_type
 from easy_widgets.models import LinkData
+from webpages.error_page_defaults import LEGACY_ERROR_PAGE_SLUGS
+from webpages.widget_registry import BaseWidget, register_widget_type
 
 
 class NavigationItem(BaseModel):
@@ -171,9 +173,7 @@ class NavigationWidget(BaseWidget):
         template_config["widgetTypeCssClass"] = self.css_class_name
 
         # Add nav container height
-        template_config["navContainerHeight"] = config.get(
-            "nav_container_height", "auto"
-        )
+        template_config["navContainerHeight"] = config.get("nav_container_height", "auto")
 
         # Add page hierarchy context for component style templates
         hierarchy_context = self._get_page_hierarchy_context(context)
@@ -224,6 +224,7 @@ class NavigationWidget(BaseWidget):
                     parent_id=current_page_id,
                     is_deleted=False,
                 )
+                .exclude(parent__parent__isnull=True, slug__in=LEGACY_ERROR_PAGE_SLUGS)
                 .select_related("latest_version")
                 .order_by("sort_order", "id")
             )
@@ -239,9 +240,7 @@ class NavigationWidget(BaseWidget):
                 title = page.title
                 if page.latest_version and page.latest_version.page_data:
                     page_data = page.latest_version.page_data
-                    short_title = page_data.get("shortTitle") or page_data.get(
-                        "short_title"
-                    )
+                    short_title = page_data.get("shortTitle") or page_data.get("short_title")
                     # Guard against responsive breakpoint objects
                     if short_title and isinstance(short_title, str):
                         title = short_title
@@ -263,11 +262,7 @@ class NavigationWidget(BaseWidget):
         if parent:
             # Try to get shortTitle from parent's page_data
             parent_label = parent.title
-            if (
-                hasattr(parent, "latest_version")
-                and parent.latest_version
-                and parent.latest_version.page_data
-            ):
+            if hasattr(parent, "latest_version") and parent.latest_version and parent.latest_version.page_data:
                 page_data = parent.latest_version.page_data
                 short_title = page_data.get("short_title")
                 # Guard against responsive breakpoint objects
@@ -288,6 +283,7 @@ class NavigationWidget(BaseWidget):
                     parent_id=parent.id,
                     is_deleted=False,
                 )
+                .exclude(parent__parent__isnull=True, slug__in=LEGACY_ERROR_PAGE_SLUGS)
                 .select_related("latest_version")
                 .order_by("sort_order", "id")
             )
@@ -320,9 +316,7 @@ class NavigationWidget(BaseWidget):
 
         # Check inheritance context
         # The renderer adds this as 'widget_inherited_from' in enhanced_context
-        inherited_from = context.get("widget_inherited_from") or context.get(
-            "inherited_from"
-        )
+        inherited_from = context.get("widget_inherited_from") or context.get("inherited_from")
         is_inherited = bool(inherited_from)
 
         # Calculate inheritance depth from webpage_data
@@ -499,13 +493,14 @@ class NavigationWidget(BaseWidget):
                 processed_items.append(processed)
             elif link_data.type == "media":
                 from webpages.services.link_resolver import resolve_link
+
                 # Create a link object for the resolver
                 link_obj = {
                     "type": "media",
                     "mediaId": link_data.media_id,
                     "url": link_data.url,
                     "title": link_data.title,
-                    "mimeType": link_data.mime_type
+                    "mimeType": link_data.mime_type,
                 }
                 processed["url"] = resolve_link(link_obj, context.get("request"))
                 processed_items.append(processed)
@@ -533,9 +528,7 @@ class NavigationWidget(BaseWidget):
                 if path:
                     for idx in indices:
                         anchor = processed_items[idx].get("anchor")
-                        processed_items[idx]["url"] = (
-                            f"{path}#{anchor}" if anchor else path
-                        )
+                        processed_items[idx]["url"] = f"{path}#{anchor}" if anchor else path
                         valid_indices.add(idx)
 
             # Filter out unresolved internal links
@@ -559,10 +552,7 @@ class NavigationWidget(BaseWidget):
         Returns:
             Tuple of (html, css) - always returns Mustache-rendered output
         """
-        from webpages.utils.mustache_renderer import (
-            render_mustache,
-            load_mustache_template,
-        )
+        from webpages.utils.mustache_renderer import load_mustache_template, render_mustache
 
         # Get navigation style
         style_name = config.get("navigation_style")
