@@ -377,10 +377,10 @@ def render_mustache(context, template_name, config):
 
 
 @register.simple_tag(takes_context=True)
-def render_site_icons(context, root_page=None):
+def render_site_icons(context, root_page=None, theme=None):
     """
     Generate favicon and app icon tags using imgproxy to resize site_icon from theme.
-    Usage: {% render_site_icons root_page=root_page %}
+    Usage: {% render_site_icons root_page=root_page %} or {% render_site_icons theme=theme %}
     """
     from django.utils.safestring import mark_safe
 
@@ -388,15 +388,13 @@ def render_site_icons(context, root_page=None):
 
     from ..theme_service import ThemeService
 
-    # Get theme from root_page or context
-    theme = None
-    if root_page:
-        theme = ThemeService.resolve_theme_for_page(root_page)
-    else:
-        # Try to get from context
-        page = context.get("current_page") or context.get("page")
-        if page:
-            theme = ThemeService.resolve_theme_for_page(page)
+    if theme is None:
+        if root_page:
+            theme = ThemeService.resolve_theme_for_page(root_page)
+        else:
+            page = context.get("current_page") or context.get("page")
+            if page:
+                theme = ThemeService.resolve_theme_for_page(page)
 
     if not theme or not theme.site_icon:
         return mark_safe("")

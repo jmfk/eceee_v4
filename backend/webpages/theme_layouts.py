@@ -750,6 +750,8 @@ def validate_theme_layouts(document):
         route = route.strip("/")
         if route and (len(route) > 200 or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_./-]*", route)):
             raise ValidationError(f"{path}.route is invalid.")
+        if route and any(segment in {"", ".", ".."} for segment in route.split("/")):
+            raise ValidationError(f"{path}.route is invalid.")
         if kind == "route":
             if not route or route in routes:
                 raise ValidationError(f"{path}.route must be present and unique.")

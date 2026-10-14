@@ -15,13 +15,17 @@ LEGACY_ERROR_PAGE_SLUGS = tuple(str(code) for code in ERROR_PAGE_CONTENT)
 
 def exclude_legacy_error_subtrees(queryset):
     """Hide dormant page rows rooted at the former site-level error paths."""
-    legacy_rows = Q(
+    legacy_roots = queryset.model._base_manager.filter(
         parent__isnull=False,
         parent__parent__isnull=True,
         slug__in=LEGACY_ERROR_PAGE_SLUGS,
-    )
-    for slug in LEGACY_ERROR_PAGE_SLUGS:
-        legacy_rows |= Q(cached_path__startswith=f"/{slug}/")
+    ).values_list("id", "parent_id", "cached_root_id", "cached_path")
+    legacy_rows = Q(pk__in=[])
+    for page_id, parent_id, cached_root_id, cached_path in legacy_roots:
+        legacy_rows |= Q(pk=page_id)
+        root_id = cached_root_id or parent_id
+        if root_id and cached_path:
+            legacy_rows |= Q(cached_root_id=root_id, cached_path__startswith=cached_path)
     return queryset.exclude(legacy_rows)
 
 

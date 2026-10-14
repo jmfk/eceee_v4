@@ -124,6 +124,24 @@ class ThemeLayoutValidationTests(SimpleTestCase):
             with self.subTest(route=route), self.assertRaisesMessage(ValidationError, "reserved error path"):
                 validate_theme_layouts(document)
 
+    def test_special_routes_reject_ambiguous_path_segments(self):
+        for route in ("account//login", "account/./login", "account/../login"):
+            document = deepcopy(default_theme_layouts())
+            document["special_pages"].append(
+                {
+                    "id": "e34d440b-36f9-479e-880d-ef9a898cab75",
+                    "key": "ambiguous_route",
+                    "label": "Ambiguous",
+                    "kind": "route",
+                    "route": route,
+                    "layout_key": "main_layout",
+                    "widgets": {},
+                }
+            )
+
+            with self.subTest(route=route), self.assertRaisesMessage(ValidationError, ".route is invalid"):
+                validate_theme_layouts(document)
+
     def test_required_theme_error_pages_cannot_be_removed(self):
         document = deepcopy(default_theme_layouts())
         document["special_pages"] = [page for page in document["special_pages"] if page["status_code"] != 503]
