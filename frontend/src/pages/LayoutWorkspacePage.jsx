@@ -26,6 +26,7 @@ const LayoutWorkspacePage = ({
     const [saving, setSaving] = useState(false)
     const [publishing, setPublishing] = useState(false)
     const baselineRef = useRef('')
+    const resolvedBackPath = backPath || `/settings/themes/${themeId}/layouts`
     useDocumentTitle(documentTitle)
 
     const acceptWorkspace = useCallback((next) => {
@@ -97,16 +98,20 @@ const LayoutWorkspacePage = ({
         setSearchParams(next, { replace: true })
     }, [searchParams, setSearchParams])
 
+    const returnToParent = async () => {
+        const current = dirty ? await saveDraft({ silent: true }) : workspace
+        if (current) navigate(resolvedBackPath)
+    }
+
     if (loading) return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /><span className="ml-3 text-gray-600">Loading Layout Editor…</span></div>
     if (error || !workspace) return <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-5 text-red-800"><h1 className="font-semibold">Layout Editor unavailable</h1><p className="mt-1 text-sm">{error}</p></div>
 
     const controlsDisabled = saving || publishing
     const editorDisabled = controlsDisabled || workspace.draftIsStale
     const hasLayoutChanges = dirty || workspace.hasLayoutDraftChanges
-    const resolvedBackPath = backPath || `/settings/themes/${themeId}/layouts`
     return <div className={`flex min-h-[640px] flex-col overflow-hidden bg-white ${fillAvailableSpace ? 'h-full' : 'h-[calc(100vh-12rem)] rounded-lg border border-gray-200 shadow-sm'}`}>
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 sm:px-5">
-            <div className="flex items-center gap-3"><button type="button" onClick={() => navigate(resolvedBackPath)} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><ArrowLeft className="h-4 w-4" />{backLabel}</button><div><h1 className="font-semibold text-gray-900">Layout Editor</h1><p className="text-xs text-gray-500">{workspace.name} · theme-owned layout draft</p></div></div>
+            <div className="flex items-center gap-3"><button type="button" onClick={returnToParent} disabled={controlsDisabled} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40"><ArrowLeft className="h-4 w-4" />{backLabel}</button><div><h1 className="font-semibold text-gray-900">Layout Editor</h1><p className="text-xs text-gray-500">{workspace.name} · theme-owned layout draft</p></div></div>
             <div className="flex flex-wrap gap-2"><button type="button" onClick={discard} disabled={!hasLayoutChanges || controlsDisabled} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm disabled:opacity-40"><RotateCcw className="h-4 w-4" />Discard layout changes</button><button type="button" onClick={() => saveDraft()} disabled={!dirty || editorDisabled} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-blue-600 px-3 py-2 text-sm font-medium text-blue-700 disabled:opacity-40">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save layout draft</button><button type="button" onClick={publish} disabled={!hasLayoutChanges || editorDisabled} className="inline-flex min-h-9 items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Publish layouts</button></div>
         </header>
         {workspace.hasOtherDraftChanges && <div className="border-b border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-900">This theme also has separate Theme Designer changes. Saving, publishing, or discarding here affects layouts only.</div>}
