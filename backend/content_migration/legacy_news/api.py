@@ -10,7 +10,6 @@ from urllib.parse import urlencode, urljoin, urlsplit
 from .remote import get_public_json
 from .source import LegacyNewsRecord
 
-
 MAX_RESPONSE_BYTES = 32 * 1024 * 1024
 MAX_PAGE_SIZE = 500
 
