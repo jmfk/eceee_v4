@@ -1825,12 +1825,22 @@ describe('RenderFrameRuntime designer overlay', () => {
 
         const labels = [...document.querySelectorAll<HTMLElement>('.designer-spacing-size-value')]
         expect(labels).toHaveLength(6)
-        const verticalBounds = labels
-            .map((label) => Number.parseFloat(label.style.top))
-            .sort((left, right) => left - right)
-        verticalBounds.slice(1).forEach((top, index) => {
-            expect(top - verticalBounds[index]).toBeGreaterThanOrEqual(18)
+        expect(new Set(labels.map((label) => label.style.left)).size).toBeGreaterThan(1)
+        expect(new Set(labels.map((label) => label.style.top)).size).toBeGreaterThan(1)
+        const bounds = labels.map((label) => {
+            const halfWidth = Math.max(20, (label.textContent || '').length * 6) / 2 + 3
+            const left = Number.parseFloat(label.style.left)
+            const top = Number.parseFloat(label.style.top)
+            return { left: left - halfWidth, right: left + halfWidth, top: top - 7, bottom: top + 7 }
         })
+        bounds.forEach((current, index) => bounds.slice(index + 1).forEach((other) => {
+            expect(
+                current.right + 4 <= other.left
+                || current.left >= other.right + 4
+                || current.bottom + 4 <= other.top
+                || current.top >= other.bottom + 4,
+            ).toBe(true)
+        }))
         const widthLabelTops = labels
             .filter((label) => label.dataset.property === 'width')
             .map((label) => label.style.top)
@@ -1839,6 +1849,14 @@ describe('RenderFrameRuntime designer overlay', () => {
             .map((measure) => measure.style.top)
             .sort()
         expect(widthMeasureTops).toEqual(widthLabelTops)
+        const heightLabelLefts = labels
+            .filter((label) => label.dataset.property === 'height')
+            .map((label) => label.style.left)
+            .sort()
+        const heightMeasureLefts = [...document.querySelectorAll<HTMLElement>('.designer-spacing-size-measure[data-property="height"]')]
+            .map((measure) => measure.style.left)
+            .sort()
+        expect(heightMeasureLefts).toEqual(heightLabelLefts)
     })
 
     it.each([
