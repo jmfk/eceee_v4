@@ -2283,6 +2283,47 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(mocks.save.mock.calls[0][1].colors).toEqual(expect.objectContaining({ brand: '#abcdef' }))
     })
 
+    it('adds colors to the theme palette from the Designer inspector', async () => {
+        const user = userEvent.setup()
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+
+        expect(screen.getByText('Theme palette')).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Add color' }))
+        await user.type(screen.getByLabelText('New theme color name'), 'accent')
+        fireEvent.change(screen.getByLabelText('New theme color value'), { target: { value: '#abcdef' } })
+        await user.click(screen.getByRole('button', { name: 'Add to theme' }))
+        await user.click(screen.getByRole('button', { name: /save draft/i }))
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        expect(mocks.save.mock.calls[0][1].colors).toEqual(expect.objectContaining({ brand: '#123456', accent: '#abcdef' }))
+    })
+
+    it('installs a searched Google Font when it is selected for typography', async () => {
+        const user = userEvent.setup()
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        await user.click(screen.getByRole('button', { name: 'Theme fonts' }))
+        expect(screen.getByRole('heading', { name: 'Installed font families' })).toBeInTheDocument()
+        expect(screen.getByText('Weights: 400, 700')).toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Article page' }))
+        await readyPreview()
+        await selectHeading()
+
+        expect(screen.getByLabelText('Font family')).toHaveValue('Inter')
+        await user.click(screen.getByRole('button', { name: 'Add from Google Fonts' }))
+        await user.type(screen.getByPlaceholderText('Search Google Fonts'), 'Lora')
+        await user.click(screen.getByRole('button', { name: /Lora.*Install and use/i }))
+        expect(screen.getByLabelText('Font family')).toHaveValue('Lora')
+        await user.click(screen.getByRole('button', { name: /save draft/i }))
+
+        await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+        expect(mocks.save.mock.calls[0][1].fonts).toEqual(expect.arrayContaining([
+            expect.objectContaining({ family: 'Lora' }),
+        ]))
+        expect(mocks.save.mock.calls[0][1].typography[0].values.fontFamily).toBe('Lora')
+    })
+
     it('keeps semantic widget images and colors in the canonical widget panel', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
