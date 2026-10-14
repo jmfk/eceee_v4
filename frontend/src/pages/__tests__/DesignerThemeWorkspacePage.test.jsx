@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
     replaceAsset: vi.fn(), createPlaceholder: vi.fn(), savePreviewContent: vi.fn(),
     importPreviewSource: vi.fn(), deletePreviewContent: vi.fn(), replacePreviewImage: vi.fn(),
     loadPreviewPage: vi.fn(), loadPreviewObject: vi.fn(), buildResolvedRenderModel: vi.fn(),
-    createExport: vi.fn(), getExport: vi.fn(), getExportDownload: vi.fn(),
+    createExport: vi.fn(), getExport: vi.fn(), getExportDownload: vi.fn(), navigate: vi.fn(),
 }))
 
 vi.mock('../../api/designerThemes', () => ({ designerThemesApi: mocks }))
@@ -22,7 +22,7 @@ vi.mock('../../components/media/MediaSelectModal', () => ({
 }))
 vi.mock('react-router-dom', async () => {
     const actual = await vi.importActual('react-router-dom')
-    return { ...actual, useParams: () => ({ themeId: '7' }) }
+    return { ...actual, useNavigate: () => mocks.navigate, useParams: () => ({ themeId: '7' }) }
 })
 
 const previewViews = [
@@ -213,6 +213,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('button', { name: 'Article card' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Theme images' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Theme details' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Edit layouts' })).toBeEnabled()
         expect(screen.queryByRole('heading', { name: 'What to show' })).not.toBeInTheDocument()
         expect(screen.queryByRole('heading', { name: 'Page elements' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Layout default' })).not.toBeInTheDocument()
@@ -226,6 +227,19 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByTitle('Live theme preview')).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin')
         expect(screen.getByTitle('Live theme preview')).toHaveAttribute('src', '/__render-frame')
         expect(screen.getByTitle('Live theme preview')).not.toHaveAttribute('srcdoc')
+    })
+
+    it('opens the dedicated layout mode after local Designer changes are settled', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        const editLayouts = await screen.findByRole('button', { name: 'Edit layouts' })
+
+        fireEvent.click(editLayouts)
+        expect(mocks.navigate).toHaveBeenCalledWith('/designer/themes/7/layouts')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Theme details' }))
+        fireEvent.change(screen.getByRole('textbox', { name: /^Name/ }), { target: { value: 'Editorial revised' } })
+        expect(editLayouts).toBeDisabled()
+        expect(editLayouts).toHaveAttribute('title', 'Save or discard local Designer changes before editing layout structure')
     })
 
     it('edits inherited parameters explicitly exposed by a grid layout element', async () => {
