@@ -37,24 +37,30 @@ const ObjectDataPreviewRender: WidgetRenderComponent = ({ context }) => {
     </div>)}</dl>
 }
 
-const LayoutSlotPlaceholderRender: WidgetRenderComponent = ({ widget }) => {
+const LayoutSlotPlaceholderRender: WidgetRenderComponent = ({ widget, context }) => {
     const shades = ['#e5e7eb', '#d1d5db', '#f3f4f6', '#cbd5e1']
     const shade = Math.max(0, Math.min(shades.length - 1, Number(widget.config.shade) || 0))
+    const viewport = context.previewViewport || 'desktop'
+    const configuredHeight = Number(widget.config.dimensions?.[viewport]?.height)
+    const height = Number.isFinite(configuredHeight) && configuredHeight > 0 ? `${configuredHeight}px` : undefined
     return <div
         data-layout-preview-placeholder="true"
+        data-preview-viewport={viewport}
         style={{
             alignItems: 'center',
             backgroundColor: shades[shade],
             boxSizing: 'border-box',
             color: '#374151',
             display: 'flex',
+            height,
             justifyContent: 'center',
-            minHeight: 'clamp(110px, 18vh, 220px)',
-            padding: '24px',
+            minHeight: height || '40px',
+            overflow: 'hidden',
+            padding: '4px 8px',
             textAlign: 'center',
             width: '100%',
         }}
-    ><h1 style={{ font: '600 24px/1.2 system-ui, sans-serif', margin: 0 }}>{widget.config.label || 'Slot'}</h1></div>
+    ><h1 style={{ font: '600 14px/1.2 system-ui, sans-serif', margin: 0 }}>{widget.config.label || 'Slot'}</h1></div>
 }
 
 const HeadlineRender: WidgetRenderComponent = ({ widget }) => {
