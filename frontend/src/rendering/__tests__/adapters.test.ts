@@ -13,7 +13,7 @@ describe('render adapters', () => {
             key: 'main_layout',
             label: 'Main',
             status: 'active' as const,
-            slots: { main: { label: 'Main content' }, sidebar: { label: 'Sidebar policy' } },
+            slots: { main: { label: 'Main content' }, sidebar: { label: 'Sidebar policy', dimensions: { mobile: { width: 375, height: 72 } } } },
             root: {
                 id: '2d1ee676-3624-4ec8-aaf4-8874bea037f4',
                 type: 'container' as const,
@@ -33,7 +33,7 @@ describe('render adapters', () => {
         expect(preview.slots.main[0].type).toBe('easy_widgets.HeadlineWidget')
         expect(preview.slots.sidebar[0]).toMatchObject({
             type: 'designer.LayoutSlotPlaceholder',
-            config: { label: 'Related' },
+            config: { label: 'Related', dimensions: { mobile: { width: 375, height: 72 } } },
         })
         expect(preview.designer?.guidesEnabled).toBe(false)
     })

@@ -205,6 +205,7 @@ export const withLayoutPreviewPlaceholders = (
             config: {
                 label: nodeLabels[slotKey] || policy.label || slotKey,
                 shade: index % 4,
+                dimensions: policy.dimensions || {},
             },
         }]
     })
