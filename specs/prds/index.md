@@ -21,3 +21,4 @@
 | PRD-0015 | [Unified remote site settings](0015-remote-site-settings.md) | completed | [ADR-0008](../adrs/active/0008-encrypted-workspace-remote-connections.md), [ADR-0017](../adrs/active/0017-browser-managed-remote-access-keys.md) |
 | PRD-0016 | [Assessed site imports with selectable dependencies](0016-assessed-site-imports.md) | completed | [ADR-0018](../adrs/active/0018-assessed-import-plans.md) |
 | PRD-0018 | [Remote object structure import](0018-remote-object-structure-import.md) | started | [ADR-0020](../adrs/active/0020-bounded-remote-object-packages.md) |
+| PRD-0020 | [Tenant integration plugins and guided imports](0020-tenant-integration-plugins.md) | started | [ADR-0024](../adrs/active/0024-deployment-installed-tenant-plugins.md) |

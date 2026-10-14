@@ -200,6 +200,7 @@ LOCAL_APPS = [
     "object_storage",  # Non-hierarchical object storage system
     "data_connections",  # Data connection and transformation system
     "content_migration",  # Background content migration system
+    "tenant_plugins",  # Deployment-installed tenant extensions
     "utils",  # Utility features like value lists and schema system
     "ai_tracking",  # AI usage and cost tracking
     "site_statistics",  # Integrated statistics and analytics system

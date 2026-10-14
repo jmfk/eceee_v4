@@ -1,0 +1,138 @@
+from unittest.mock import patch
+from uuid import uuid4
+
+from cryptography.fernet import Fernet
+from django.contrib.auth.models import User
+from django.test import TestCase, override_settings
+from rest_framework.test import APIClient
+
+from content.models import Namespace
+from core.models import Tenant
+from data_connections.credentials import resolved_connection_config
+from data_connections.models import DataConnection
+from tenant_plugins.models import TenantPluginActivation
+
+
+@override_settings(THEME_REMOTE_CREDENTIAL_KEYS=[Fernet.generate_key().decode()])
+class TenantPluginApiTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user("eceee-owner", password="test")
+        self.other_owner = User.objects.create_user("other-owner", password="test")
+        self.tenant = Tenant.objects.create(name="ECEEE", identifier="eceee", created_by=self.owner)
+        self.other_tenant = Tenant.objects.create(name="Other", identifier="other", created_by=self.other_owner)
+        self.namespace = Namespace.objects.create(
+            name="ECEEE content",
+            slug="eceee-content",
+            tenant=self.tenant,
+            created_by=self.owner,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.owner)
+        self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
+
+    def test_catalog_lists_separate_legacy_and_proceedings_plugins(self):
+        response = self.client.get("/api/v1/content-migration/plugins/")
+
+        self.assertEqual(response.status_code, 200)
+        plugins = {item["id"]: item for item in response.data["results"]}
+        self.assertEqual(plugins["org.eceee.legacy_import"]["kind"], "import")
+        self.assertEqual(plugins["org.eceee.proceedings"]["kind"], "feature")
+        self.assertEqual(plugins["org.eceee.proceedings"]["status"], "foundation")
+
+    def test_activation_is_tenant_scoped_and_exposes_registered_importer(self):
+        response = self.client.post("/api/v1/content-migration/plugins/org.eceee.legacy_import/activation/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            TenantPluginActivation.objects.filter(
+                tenant=self.tenant,
+                plugin_id="org.eceee.legacy_import",
+                is_active=True,
+            ).exists()
+        )
+        importers = self.client.get("/api/v1/content-migration/importers/")
+        self.assertEqual(importers.status_code, 200)
+        self.assertEqual(importers.data["results"][0]["id"], "org.eceee.legacy_import.news")
+        namespace_field = next(
+            field for field in importers.data["results"][0]["fields"] if field["name"] == "namespace"
+        )
+        self.assertEqual(namespace_field["options"], [{"value": self.namespace.slug, "label": self.namespace.name}])
+
+    def test_eceee_plugin_cannot_be_activated_for_another_tenant(self):
+        self.client.force_authenticate(self.other_owner)
+        self.client.credentials(HTTP_X_TENANT_ID=self.other_tenant.identifier)
+
+        response = self.client.post("/api/v1/content-migration/plugins/org.eceee.legacy_import/activation/")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(TenantPluginActivation.objects.filter(tenant=self.other_tenant).exists())
+
+    def test_connection_secrets_are_write_only_and_connections_are_tenant_scoped(self):
+        response = self.client.post(
+            "/api/v1/data-connections/connections/",
+            {
+                "name": "Legacy source",
+                "connectionType": "LEGACY_POSTGRES",
+                "pluginId": "org.eceee.legacy_import",
+                "config": {
+                    "host": "127.0.0.1",
+                    "port": 10110,
+                    "databaseName": "legacy",
+                    "username": "reader",
+                },
+                "secretConfig": {"password": "never-return-this"},
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertNotContains(response, "never-return-this")
+        connection = DataConnection.objects.get(id=response.data["id"])
+        self.assertEqual(connection.tenant, self.tenant)
+        self.assertEqual(resolved_connection_config(connection)["password"], "never-return-this")
+
+        self.client.force_authenticate(self.other_owner)
+        self.client.credentials(HTTP_X_TENANT_ID=self.other_tenant.identifier)
+        self.assertEqual(self.client.get("/api/v1/data-connections/connections/").data["results"], [])
+        self.assertEqual(
+            self.client.get(f"/api/v1/data-connections/connections/{connection.id}/").status_code,
+            404,
+        )
+
+    @patch("content_migration.views.run_plugin_import_job.delay")
+    def test_job_creation_is_idempotent(self, delay):
+        TenantPluginActivation.objects.create(
+            tenant=self.tenant,
+            plugin_id="org.eceee.legacy_import",
+            plugin_version="1",
+            activated_by=self.owner,
+        )
+        connection = DataConnection.objects.create(
+            tenant=self.tenant,
+            name="Legacy source",
+            connection_type="LEGACY_POSTGRES",
+            created_by=self.owner,
+        )
+        key = str(uuid4())
+        payload = {
+            "importerId": "org.eceee.legacy_import.news",
+            "connectionId": connection.id,
+            "idempotencyKey": key,
+            "options": {"namespace": self.namespace.slug, "limit": 100, "newestFirst": False, "resume": True},
+        }
+
+        with self.captureOnCommitCallbacks(execute=True):
+            first = self.client.post("/api/v1/content-migration/plugin-jobs/", payload, format="json")
+            second = self.client.post("/api/v1/content-migration/plugin-jobs/", payload, format="json")
+            conflicting = self.client.post(
+                "/api/v1/content-migration/plugin-jobs/",
+                {**payload, "options": {**payload["options"], "limit": 2}},
+                format="json",
+            )
+
+        self.assertEqual(first.status_code, 202)
+        self.assertEqual(second.status_code, 202)
+        self.assertEqual(first.data["id"], second.data["id"])
+        self.assertEqual(first.data["options"]["newest_first"], False)
+        self.assertEqual(conflicting.status_code, 409)
+        delay.assert_called_once()

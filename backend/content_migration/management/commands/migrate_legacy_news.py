@@ -199,7 +199,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Golden sample result: " + json.dumps(counts, sort_keys=True)))
 
     def _import_database(self, tenant, namespace, user, options):
-        config = self._legacy_config(Path(options["env_file"]))
+        config = options.get("database_config") or self._legacy_config(Path(options["env_file"]))
         database = LegacyNewsDatabase(**config)
         try:
             summary = database.summary()
@@ -248,6 +248,7 @@ class Command(BaseCommand):
                     )
                     counts["created" if created else "updated" if changed else "unchanged"] += 1
             self.stdout.write(self.style.SUCCESS("Database import result: " + json.dumps(counts, sort_keys=True)))
+            return counts
         finally:
             database.close()
 
