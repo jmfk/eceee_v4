@@ -4,6 +4,11 @@ import { Plus, Search } from 'lucide-react'
 import { searchFonts } from '../../utils/googleFonts'
 
 const fontFamilyName = (value = '') => value.split(',')[0].replace(/["']/g, '').trim()
+const replaceFontFamilyName = (value = '', family = '') => {
+    if (!family) return ''
+    const fallbackStart = value.indexOf(',')
+    return fallbackStart >= 0 ? `${family}${value.slice(fallbackStart)}` : family
+}
 const colorInputValue = (value = '') => /^#[0-9a-f]{6}$/i.test(value) ? value : '#000000'
 
 const GoogleFontSearch = ({ installedFonts, onChoose, chooseLabel = 'Install' }) => {
@@ -36,13 +41,13 @@ export const ThemeFontField = ({ id, label, value, fonts, disabled, onChange, on
 
     const content = <>
         {label && <label htmlFor={id} className="text-xs font-medium text-gray-700">{label}</label>}
-        <select id={id} value={currentFamily} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="mt-0.5 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50">
+        <select id={id} value={currentFamily} disabled={disabled} onChange={(event) => onChange(replaceFontFamilyName(value, event.target.value))} className="mt-0.5 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-gray-50">
             <option value="">Theme default</option>
             {currentFamily && !installedFamilies.has(currentFamily) && <option value={currentFamily}>{currentFamily} (not installed)</option>}
             {fonts.map((font) => <option key={font.family} value={font.family}>{font.family}</option>)}
         </select>
         <button type="button" disabled={disabled} onClick={() => setBrowsing((current) => !current)} className="mt-1 text-xs font-medium text-blue-700 hover:text-blue-900 disabled:opacity-50">{browsing ? 'Close Google Fonts' : 'Add from Google Fonts'}</button>
-        {browsing && <div className="mt-2"><GoogleFontSearch installedFonts={fonts} chooseLabel="Install and use" onChoose={(font) => { onInstall(font); onChange(font.family); setBrowsing(false) }} /></div>}
+        {browsing && <div className="mt-2"><GoogleFontSearch installedFonts={fonts} chooseLabel="Install and use" onChoose={(font) => { onInstall(font); onChange(replaceFontFamilyName(value, font.family)); setBrowsing(false) }} /></div>}
     </>
     return label ? <div className="min-w-0">{content}</div> : content
 }
@@ -68,10 +73,12 @@ const AddPaletteColor = ({ initialValue = '#000000', colors, onAdd, onDone }) =>
     const [name, setName] = useState('')
     const [value, setValue] = useState(colorInputValue(initialValue))
     const trimmedName = name.trim()
-    const validName = /^[A-Za-z][A-Za-z0-9_-]*$/.test(trimmedName) && !colors.some((color) => color.name === trimmedName)
+    const validName = trimmedName.length <= 100
+        && /^[A-Za-z][A-Za-z0-9_-]*$/.test(trimmedName)
+        && !colors.some((color) => color.name === trimmedName)
 
     return <div className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-3">
-        <label className="block text-xs font-medium text-gray-700">Color name<input aria-label="New theme color name" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. accent" className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm" /></label>
+        <label className="block text-xs font-medium text-gray-700">Color name<input aria-label="New theme color name" value={name} maxLength={100} onChange={(event) => setName(event.target.value)} placeholder="e.g. accent" className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm" /></label>
         <label className="flex items-center gap-2 text-xs font-medium text-gray-700">Color<input aria-label="New theme color value" type="color" value={value} onChange={(event) => setValue(event.target.value)} className="h-9 w-12 rounded border border-gray-300" /><input value={value} onChange={(event) => setValue(event.target.value)} className="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-2 py-1.5 font-mono text-xs" /></label>
         {trimmedName && !validName && <p className="text-xs text-red-600">Use a unique name beginning with a letter; letters, numbers, dashes and underscores are supported.</p>}
         <div className="flex gap-2"><button type="button" disabled={!validName || !/^#[0-9a-f]{6}$/i.test(value)} onClick={() => { onAdd({ name: trimmedName, value }); onDone?.() }} className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">Add to theme</button>{onDone && <button type="button" onClick={onDone} className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700">Cancel</button>}</div>
