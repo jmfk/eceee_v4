@@ -1,4 +1,4 @@
-import { buildPublishedPageModel, type DbId, type ReadDb, type Widget } from './model';
+import { buildPublishedPageModel, buildThemeErrorPageModel, type DbId, type ReadDb, type Widget } from './model';
 import { RE2JS } from 're2js';
 
 const FORM_WIDGET_TYPE = 'easy_widgets.FormsWidget';
@@ -8,6 +8,7 @@ const MAX_OPTIONS = 100;
 const MAX_PATTERN_LENGTH = 512;
 const MAX_VALUE_LENGTH = 10_000;
 const CONTROL_FIELDS = new Set(['__page_path', '__website']);
+const THEME_ERROR_PATH = /^\/(403|404|500|503)\/?$/;
 
 type SubmittedValues = Record<string, string[]>;
 
@@ -171,7 +172,11 @@ export async function submitPublishedForm(input: {
   honeypot: string;
   at?: Date;
 }): Promise<FormSubmissionResult> {
-  const model = await buildPublishedPageModel(input.readDb, input.hostname, input.pagePath, input.at);
+  let model = await buildPublishedPageModel(input.readDb, input.hostname, input.pagePath, input.at);
+  const errorMatch = input.pagePath.match(THEME_ERROR_PATH);
+  if (!model && errorMatch) {
+    model = await buildThemeErrorPageModel(input.readDb, input.hostname, Number(errorMatch[1]), input.at);
+  }
   if (!model || model.context.pageId !== input.pageId) return { status: 'not_found' };
   const widget = findPublishedForm(model.slots, input.widgetId);
   if (!widget || configured(widget.config, 'storeSubmissions', 'store_submissions') === false) return { status: 'not_found' };
