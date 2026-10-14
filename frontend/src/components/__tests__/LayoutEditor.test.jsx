@@ -102,6 +102,8 @@ describe('LayoutEditor', () => {
         mocks.workspace.mockResolvedValue({
             draftVersion: 4,
             layouts: { ...layouts, items: [layouts.items[0], layouts.items[1], errorLayout] },
+            colors: [{ name: 'brand', value: '#123456' }],
+            fonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap', usage: ['body'] }],
         })
         renderWithProviders(<LayoutEditor />)
 
@@ -110,9 +112,12 @@ describe('LayoutEditor', () => {
 
         await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce())
         const [themeId, draftVersion, savedDocument] = mocks.save.mock.calls[0]
-        const updated = savedDocument.items.find((layout) => layout.key === 'error_layout')
+        const updated = savedDocument.layouts.items.find((layout) => layout.key === 'error_layout')
         expect(themeId).toBe(18)
         expect(draftVersion).toBe(4)
+        expect(Object.keys(savedDocument).sort()).toEqual(['colors', 'fonts', 'layouts'])
+        expect(savedDocument.colors).toEqual({ brand: '#123456' })
+        expect(savedDocument.fonts).toEqual([{ family: 'Inter', variants: ['400', '700'], display: 'swap' }])
         expect(updated.id).toBe('error-id')
         expect(updated.root).toEqual(errorLayout.root)
         expect(updated.slots.visual).toMatchObject({
@@ -150,7 +155,7 @@ describe('LayoutEditor', () => {
         await user.click(screen.getByRole('button', { name: 'Update main_layout' }))
 
         await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce())
-        const updated = mocks.save.mock.calls[0][2].items.find((layout) => layout.key === 'main_layout')
+        const updated = mocks.save.mock.calls[0][2].layouts.items.find((layout) => layout.key === 'main_layout')
         expect(updated.root).toMatchObject({
             type: 'container',
             children: [mainRoot, { type: 'slot', slot_key: 'sidebar', children: [] }],

@@ -10,6 +10,16 @@ import ContextualHelpLink from './help/ContextualHelpLink'
 
 const uuid = () => crypto.randomUUID()
 
+const editableWorkspace = (workspace, layouts) => ({
+    layouts,
+    colors: Object.fromEntries((workspace.colors || []).map((color) => [color.name, color.value])),
+    fonts: (workspace.fonts || []).filter((font) => font.family?.trim()).map(({ family, variants, display }) => ({
+        family,
+        variants: variants || ['400'],
+        display: display || 'swap',
+    })),
+})
+
 const slotNode = (slotKey) => ({
     id: uuid(),
     type: 'slot',
@@ -125,7 +135,8 @@ const LayoutEditor = ({ className = '', themeId = null }) => {
             const items = existingLayout
                 ? workspace.layouts.items.map((item) => item.key === codeLayout.name ? layout : item)
                 : [...workspace.layouts.items, layout]
-            await layoutWorkspacesApi.save(theme.id, workspace.draftVersion, { ...workspace.layouts, items })
+            const nextLayouts = { ...workspace.layouts, items }
+            await layoutWorkspacesApi.save(theme.id, workspace.draftVersion, editableWorkspace(workspace, nextLayouts))
             return layout.key
         },
         onSuccess: (layoutKey) => openDesigner(layoutKey),

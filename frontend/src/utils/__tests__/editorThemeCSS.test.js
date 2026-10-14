@@ -283,6 +283,7 @@ describe('shared TypeScript theme CSS', () => {
             typography: [{ groupIndex: 0, element: 'h1', values: { fontSize: '40px' } }],
             spacing: [{ scope: 'layout', groupIndex: 0, part: 'main', breakpoint: 'md', values: { padding: '24px' } }],
             breakpoints: { md: 800 },
+            layouts: { schema_version: 1, default_layout_key: 'main_layout', items: [{ key: 'main_layout' }] },
         })
 
         expect(theme.colors.brand).toBe('#123456')
@@ -290,6 +291,7 @@ describe('shared TypeScript theme CSS', () => {
         expect(theme.designGroups.groups[0].elements.h1.fontSize).toBe('40px')
         expect(theme.designGroups.groups[0].layoutProperties.main.md.padding).toBe('24px')
         expect(theme.breakpoints.md).toBe(800)
+        expect(theme.layouts.items).toEqual([{ key: 'main_layout' }])
     })
 
     it('preserves the theme image density without backend image rendering', () => {
