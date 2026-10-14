@@ -13,6 +13,7 @@ from rest_framework.test import APITestCase
 from content.models import Namespace
 from core.models import Tenant
 from file_manager.models import MediaFile, MediaTag
+from file_manager.services import NamespaceAccessService
 
 
 class MediaFileAPITest(APITestCase):
@@ -92,6 +93,43 @@ class MediaFileAPITest(APITestCase):
         self.assertEqual([str(item["id"]) for item in theme_response.data["results"]], [str(theme_media.id)])
         self.assertNotIn(str(theme_media.id), [str(item["id"]) for item in ordinary_search.data["results"]])
         self.assertEqual([str(item["id"]) for item in theme_search.data["results"]], [str(theme_media.id)])
+
+    def test_hidden_theme_media_rejects_users_without_designer_access(self):
+        theme_namespace = Namespace.get_or_create_theme_media(self.tenant, created_by=self.user)
+        MediaFile.objects.create(
+            title="Restricted theme background",
+            slug="restricted-theme-background",
+            file_type="image",
+            file_path="themes/restricted-background.jpg",
+            file_hash="restricted-theme-background-hash",
+            file_size=2048,
+            uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
+            namespace=theme_namespace,
+            tenant=self.tenant,
+            content_type="image/jpeg",
+        )
+        outsider = User.objects.create_user(username="theme_media_outsider", password="testpass123")
+        outsider_token = Token.objects.create(user=outsider)
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + outsider_token.key)
+
+        list_response = self.client.get(
+            reverse("api:file_manager:mediafile-list"),
+            {"namespace": theme_namespace.slug},
+            HTTP_X_TENANT_ID=str(self.tenant.id),
+        )
+        search_response = self.client.get(
+            reverse("api:file_manager:media-search"),
+            {"namespace": theme_namespace.slug},
+            HTTP_X_TENANT_ID=str(self.tenant.id),
+        )
+
+        namespace_result = NamespaceAccessService().get_and_validate_namespace(outsider, theme_namespace.slug)
+
+        self.assertEqual(list_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(search_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(namespace_result.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_retrieve_media_file(self):
         """Test retrieving a specific media file"""

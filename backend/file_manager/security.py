@@ -15,6 +15,29 @@ from rest_framework import permissions
 logger = logging.getLogger(__name__)
 
 
+def user_can_access_theme_media(user, tenant):
+    """Return whether a user may use the tenant's Designer-owned media."""
+    if not user or not user.is_authenticated or tenant is None:
+        return False
+    if tenant.user_has_access(user):
+        return True
+
+    from webpages.models import ThemeDesignerAssignment
+
+    return ThemeDesignerAssignment.objects.filter(tenant=tenant, user=user).exists()
+
+
+def user_can_access_namespace(user, namespace):
+    """Apply the stricter access boundary used by system-owned namespaces."""
+    from content.models import Namespace
+
+    if namespace.kind == Namespace.KIND_THEME_MEDIA:
+        return user_can_access_theme_media(user, namespace.tenant)
+    if user.is_staff or namespace.created_by == user:
+        return True
+    return namespace.is_active
+
+
 def filter_media_files_for_user(queryset, user, tenant=None, include_theme_media=False):
     """Apply the Media Library's tenant, namespace, and access-level rules."""
     from django.db.models import Q
@@ -23,6 +46,8 @@ def filter_media_files_for_user(queryset, user, tenant=None, include_theme_media
 
     if tenant is not None:
         queryset = queryset.filter(tenant=tenant)
+    if include_theme_media and not user_can_access_theme_media(user, tenant):
+        include_theme_media = False
     if not include_theme_media:
         queryset = queryset.exclude(namespace__kind=Namespace.KIND_THEME_MEDIA)
     if user.is_staff:
@@ -92,17 +117,7 @@ class MediaFilePermission(permissions.BasePermission):
         Returns:
             bool: True if user has access, False otherwise
         """
-        # Staff users have access to all namespaces
-        if user.is_staff:
-            return True
-
-        # Users have access to namespaces they created
-        if namespace.created_by == user:
-            return True
-
-        # For now, allow access to active namespaces for authenticated users
-        # This can be extended with more granular permissions later
-        return namespace.is_active
+        return user_can_access_namespace(user, namespace)
 
 
 class FileUploadValidator:

@@ -4,7 +4,7 @@ import { Eye, FileKey, Pencil, Plus, ShieldAlert, Trash2 } from 'lucide-react'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import PageContentEditor from '../../editors/page-editor/PageContentEditor'
-import { createPageRenderModel } from '../../rendering/adapters'
+import { createPageRenderModel, withLayoutPreviewPlaceholders } from '../../rendering/adapters'
 import { googleFontsStylesheetUrl } from '../../rendering/primitives'
 import { buildDesignerTheme, buildThemeCSS } from '../../utils/editorThemeCSS'
 import { applyWidgetUpdateToWidgetMap } from '../../utils/pageEditorWidgetState'
@@ -115,7 +115,7 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
     const previewModel = useMemo(() => {
         if (!selected) return null
         const layoutDefinition = layouts.items.find((layout) => layout.key === selected.layout_key) || null
-        return createPageRenderModel({
+        return withLayoutPreviewPlaceholders(createPageRenderModel({
             layout: selected.layout_key,
             layoutDefinition,
             layoutDefinitionRequired: true,
@@ -124,7 +124,7 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
             context: { mode: 'preview', specialPageKey: selected.key, statusCode: selected.status_code },
             themeCss: buildThemeCSS({ theme: effectiveTheme }),
             fontUrl: googleFontsStylesheetUrl(effectiveTheme?.fonts),
-        })
+        }), layoutDefinition)
     }, [effectiveTheme, layouts.items, selected, widgets, workspace.breakpoints])
 
     useEffect(() => {

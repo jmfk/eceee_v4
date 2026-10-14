@@ -1,10 +1,41 @@
 import { describe, expect, it } from 'vitest'
-import { createDesignerRenderModel, createPageRenderModel, designerPreviewImageReferences } from '../adapters'
+import { createDesignerRenderModel, createPageRenderModel, designerPreviewImageReferences, withLayoutPreviewPlaceholders } from '../adapters'
 
 describe('render adapters', () => {
     it('uses the current in-memory widgets for page previews', () => {
         const model = createPageRenderModel({ widgets: { main: [{ id: 'draft', type: 'easy_widgets.HeadlineWidget', config: { content: 'Unsaved heading' } }] } })
         expect(model.slots.main[0].config.content).toBe('Unsaved heading')
+    })
+
+    it('fills only empty layout slots with labelled preview placeholders', () => {
+        const layout = {
+            id: '8ac4db5a-492f-4977-bf00-d21b8d72f08e',
+            key: 'main_layout',
+            label: 'Main',
+            status: 'active' as const,
+            slots: { main: { label: 'Main content' }, sidebar: { label: 'Sidebar policy' } },
+            root: {
+                id: '2d1ee676-3624-4ec8-aaf4-8874bea037f4',
+                type: 'container' as const,
+                children: [
+                    { id: '114eff0f-f86f-4a10-8df5-27925804fc73', type: 'slot' as const, slot_key: 'main', label: 'Article', children: [] },
+                    { id: 'dc79689c-c2e2-4c11-8ac4-ae67cc395e97', type: 'slot' as const, slot_key: 'sidebar', label: 'Related', children: [] },
+                ],
+            },
+        }
+        const model = createPageRenderModel({
+            layoutDefinition: layout,
+            widgets: { main: [{ id: 'heading', type: 'easy_widgets.HeadlineWidget', config: { content: 'Real content' } }] },
+        })
+
+        const preview = withLayoutPreviewPlaceholders(model, layout)
+
+        expect(preview.slots.main[0].type).toBe('easy_widgets.HeadlineWidget')
+        expect(preview.slots.sidebar[0]).toMatchObject({
+            type: 'designer.LayoutSlotPlaceholder',
+            config: { label: 'Related' },
+        })
+        expect(preview.designer?.guidesEnabled).toBe(false)
     })
 
     it('preserves sidebar section descriptors instead of normalizing them as widgets', () => {
