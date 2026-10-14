@@ -9,7 +9,7 @@ const framePostMessage = vi.fn()
 vi.mock('../../../rendering/RenderFrame', () => ({
     default: ({ model, onMessage, style, frameRef }) => {
         if (frameRef) frameRef.current = { contentWindow: { postMessage: framePostMessage } }
-        return <button type="button" data-layout-canvas={String(Boolean(model.designer?.layoutCanvas))} data-empty-slots={String(Object.values(model.slots).every((items) => items.length === 0))} data-frame-width={style?.width} data-root-md-background={model.layoutDefinition.root.styles?.md?.background_color || ''} data-root-md-image={model.layoutDefinition.root.styles?.md?.background_image || ''} data-font-url={model.fontUrl || ''} data-root-presentation-color={model.layoutDefinition.root.presentation_color || ''} onClick={() => onMessage?.({ data: { source: 'eceee-designer-preview', action: 'select', targetId: `layout-node:${model.layoutDefinition.root.children[0].id}` } })}>Canvas · {model.layoutDefinition.label}</button>
+        return <button type="button" data-layout-canvas={String(Boolean(model.designer?.layoutCanvas))} data-empty-slots={String(Object.values(model.slots).every((items) => items.length === 0))} data-frame-width={style?.width} data-root-md-height={model.layoutDefinition.root.styles?.md?.height || ''} data-root-md-background={model.layoutDefinition.root.styles?.md?.background_color || ''} data-root-md-image={model.layoutDefinition.root.styles?.md?.background_image || ''} data-font-url={model.fontUrl || ''} data-root-presentation-color={model.layoutDefinition.root.presentation_color || ''} onClick={() => onMessage?.({ data: { source: 'eceee-designer-preview', action: 'select', targetId: `layout-node:${model.layoutDefinition.root.children[0].id}` } })}>Canvas · {model.layoutDefinition.label}</button>
     },
 }))
 vi.mock('../../media/MediaSelectModal', () => ({
@@ -193,11 +193,24 @@ describe('LayoutDesignerWorkspace', () => {
         fireEvent.change(screen.getByLabelText('Element name'), { target: { value: 'Site frame' } })
         const widthParameter = screen.getByRole('checkbox', { name: 'Expose width in Theme Designer' })
         fireEvent.click(widthParameter)
+        fireEvent.change(screen.getByLabelText('height value'), { target: { value: 'clamp(20rem, 60vh, 48rem)' } })
 
         expect(screen.getAllByText('Site frame')).toHaveLength(2)
         expect(widthParameter).toBeChecked()
         expect(widthParameter.closest('label')).toHaveAttribute('title', 'Expose width in the Theme Designer')
+        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-root-md-height', 'clamp(20rem, 60vh, 48rem)')
         expect(screen.queryByText('Designer-editable parameters')).not.toBeInTheDocument()
+    })
+
+    it('keeps numeric media target dimensions separate from CSS layout sizing', () => {
+        render(<Harness />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Slot · main' }))
+
+        expect(screen.getByText('Media target dimensions (px)')).toBeInTheDocument()
+        expect(screen.getByText(/Used for responsive image sizing only/)).toBeInTheDocument()
+        expect(screen.getByLabelText('mobile media height in pixels')).toHaveAttribute('type', 'number')
+        expect(screen.getByLabelText('height value')).not.toHaveAttribute('type', 'number')
     })
 
     it('names semantic nodes from their HTML element and qualifies custom names with the tag', () => {

@@ -33,7 +33,7 @@ describe('render adapters', () => {
         expect(preview.slots.main[0].type).toBe('easy_widgets.HeadlineWidget')
         expect(preview.slots.sidebar[0]).toMatchObject({
             type: 'designer.LayoutSlotPlaceholder',
-            config: { label: 'Related', dimensions: { mobile: { width: 375, height: 72 } } },
+            config: { label: 'Related' },
         })
         expect(preview.designer?.guidesEnabled).toBe(false)
     })

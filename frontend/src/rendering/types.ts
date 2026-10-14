@@ -49,7 +49,6 @@ export interface RenderContext {
     }
     mode?: 'preview' | 'public'
     preview: boolean
-    previewViewport?: 'mobile' | 'tablet' | 'desktop'
 }
 
 export interface DesignerRenderOptions {

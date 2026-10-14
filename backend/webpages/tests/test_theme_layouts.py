@@ -215,6 +215,18 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         with self.assertRaisesMessage(ValidationError, "unsupported editable parameter"):
             validate_theme_layouts(document)
 
+    def test_layout_height_accepts_safe_css_values(self):
+        document = deepcopy(default_theme_layouts())
+        root = document["items"][0]["root"]
+        root["editable_parameters"] = ["height"]
+        root["styles"]["base"]["height"] = "auto"
+        root["styles"].setdefault("md", {})["height"] = "clamp(20rem, 60vh, 48rem)"
+
+        self.assertIs(validate_theme_layouts(document), document)
+        html = str(render_theme_layout(document["items"][0], {}))
+        self.assertIn("height:auto", html)
+        self.assertIn("height:clamp(20rem, 60vh, 48rem)", html)
+
     def test_grid_nodes_can_expose_designer_parameters(self):
         document = deepcopy(default_theme_layouts())
         grid = next(node for node in document["items"][0]["root"]["children"][0]["children"] if node["type"] == "grid")

@@ -11,6 +11,7 @@ from django.utils.safestring import mark_safe
 PROPERTY_MAP = {
     "display": "display",
     "width": "width",
+    "height": "height",
     "max_width": "max-width",
     "min_height": "min-height",
     "grid_template_columns": "grid-template-columns",
