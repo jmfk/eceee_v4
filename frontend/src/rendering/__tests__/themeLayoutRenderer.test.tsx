@@ -53,11 +53,12 @@ describe('theme layout rendering', () => {
         }))
     })
 
-    it('allows grid nodes to expose selected Theme Designer parameters', () => {
+    it('allows every structural node type to expose Theme Designer parameters and presentation colours', () => {
         const editableGrid = structuredClone(layout)
-        editableGrid.root.type = 'grid'
+        editableGrid.root.type = 'row'
         delete editableGrid.root.tag
         editableGrid.root.editable_parameters = ['grid_template_columns', 'gap', 'padding']
+        editableGrid.root.presentation_color = '#6366f1'
 
         expect(validateLayoutDefinition(editableGrid)).toBe(true)
     })

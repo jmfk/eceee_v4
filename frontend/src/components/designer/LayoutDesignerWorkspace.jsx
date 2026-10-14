@@ -15,9 +15,10 @@ import SpecialPagesEditor from './SpecialPagesEditor'
 
 const nodeTypes = ['container', 'section', 'grid', 'row', 'column', 'semantic', 'slot']
 const styleFields = ['display', 'width', 'height', 'max_width', 'min_height', 'grid_template_columns', 'grid_column', 'flex_direction', 'flex_wrap', 'flex_grow', 'order', 'gap', 'padding', 'margin', 'align_items', 'justify_content', 'background_color', 'background_image', 'background_position', 'background_size', 'background_repeat', 'color', 'font_family', 'border', 'border_radius']
+const dimensionStyleFields = ['width', 'height', 'max_width', 'min_height']
 const gridStyleFields = ['grid_template_columns', 'gap', 'padding', 'margin', 'align_items', 'justify_content']
-const externallyEditableNodeTypes = new Set(['container', 'grid', 'semantic', 'slot'])
-const defaultPresentationColors = { container: '#3b82f6', grid: '#a855f7', semantic: '#f59e0b', slot: '#f43f5e' }
+const externallyEditableNodeTypes = new Set(nodeTypes)
+const defaultPresentationColors = { container: '#3b82f6', section: '#06b6d4', grid: '#a855f7', row: '#6366f1', column: '#22c55e', semantic: '#f59e0b', slot: '#f43f5e' }
 const defaultStructureWidth = 300
 const minStructureWidth = 220
 const maxStructureWidth = 520
@@ -147,12 +148,16 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
     const selected = selectedLayout ? findNode(selectedLayout.root, selectedNodeId) : null
     const usage = workspace.layoutUsage?.[selectedLayout?.key] || { pageCount: 0, pageIds: [], versionCount: 0, schemaCount: 0, slots: {} }
     const activeStyleBreakpoint = activeBreakpoint === 'xs' ? 'base' : activeBreakpoint
-    const styleFieldGroups = selected?.node.type === 'grid'
-        ? [
-            { label: 'Grid layout', fields: gridStyleFields },
-            { label: 'Other styles', fields: styleFields.filter((field) => !gridStyleFields.includes(field)) },
-        ]
-        : [{ label: 'Responsive styles', fields: styleFields }]
+    const nonDimensionStyleFields = styleFields.filter((field) => !dimensionStyleFields.includes(field))
+    const styleFieldGroups = [
+        { label: 'Dimensions', fields: dimensionStyleFields },
+        ...(selected?.node.type === 'grid'
+            ? [
+                { label: 'Grid layout', fields: gridStyleFields },
+                { label: 'Other styles', fields: nonDimensionStyleFields.filter((field) => !gridStyleFields.includes(field)) },
+            ]
+            : [{ label: 'Other styles', fields: nonDimensionStyleFields }]),
+    ]
     const canvasWidth = breakpointCanvasWidth(breakpointEntries, activeBreakpoint)
     const fitZoom = canvasViewportSize.width ? Math.min(1, Math.max(0.25, (canvasViewportSize.width - 24) / canvasWidth)) : 1
     const canvasZoom = zoomMode === 'fit' ? fitZoom : manualZoom
@@ -431,6 +436,69 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
             })
             return layout
         }, { nodeId: node.id })
+    }
+
+    const changeNodeType = (nextType) => {
+        if (!selected || nextType === selected.node.type || !nodeTypes.includes(nextType)) return
+        const currentType = selected.node.type
+        const currentSlotKey = selected.node.slot_key
+        if (nextType === 'slot' && (!selected.parent || selected.node.children.length)) {
+            setJsonError(selected.parent
+                ? 'A slot must be empty before its element type can be changed to Slot.'
+                : 'The root element cannot be changed to a Slot.')
+            return
+        }
+        if (currentType === 'slot') {
+            const versionReferences = Number(usage.slots?.[currentSlotKey] || 0)
+            const defaultWidgets = selectedLayout.slots[currentSlotKey]?.default_widgets || []
+            const specialPageReferences = (layouts.special_pages || []).reduce(
+                (count, page) => count + (Array.isArray(page.widgets?.[currentSlotKey]) ? page.widgets[currentSlotKey].length : 0),
+                0,
+            )
+            const previewReferences = (workspace.previewContent?.views || []).reduce((count, view) => {
+                const viewLayout = view.content?.codeLayout || view.layout || layouts.default_layout_key
+                const widgets = viewLayout === selectedLayout.key ? view.content?.widgets?.[currentSlotKey] : []
+                return count + (Array.isArray(widgets) ? widgets.length : 0)
+            }, 0)
+            if (versionReferences || defaultWidgets.length || specialPageReferences || previewReferences) {
+                setJsonError(`Slot “${selected.node.label || currentSlotKey}” contains or is referenced by content and cannot be changed to another element type.`)
+                return
+            }
+        }
+        updateLayout((layout) => {
+            let newSlotKey = ''
+            if (nextType === 'slot') {
+                let index = Object.keys(layout.slots).length + 1
+                newSlotKey = `slot_${index}`
+                while (layout.slots[newSlotKey]) newSlotKey = `slot_${++index}`
+                layout.slots[newSlotKey] = {
+                    label: selected.node.label || `Slot ${index}`,
+                    description: '',
+                    order: Object.keys(layout.slots).length * 10 + 10,
+                    max_widgets: null,
+                    collapse_behavior: 'never',
+                    default_widgets: [],
+                }
+            } else if (currentType === 'slot') {
+                delete layout.slots[currentSlotKey]
+            }
+            layout.root = mapNode(layout.root, selectedNodeId, (node) => {
+                const next = { ...node, type: nextType }
+                if (nextType === 'semantic') next.tag ||= 'section'
+                else delete next.tag
+                if (nextType === 'slot') {
+                    next.slot_key = newSlotKey
+                    next.children = []
+                    next.class_names = [...new Set([...(next.class_names || []), 'layout-slot', `slot-${newSlotKey}`])]
+                } else {
+                    delete next.slot_key
+                    next.class_names = (next.class_names || []).filter((name) => name !== 'layout-slot' && name !== `slot-${currentSlotKey}`)
+                }
+                return next
+            })
+            return layout
+        })
+        setJsonError('')
     }
 
     const move = (direction) => {
@@ -793,6 +861,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                 {!inspectingLayout && selected && <div className="mt-4">
                     <div className="flex items-center justify-between"><span className="rounded bg-gray-100 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-gray-500">{selected.node.type}</span><span className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Editing {activeBreakpoint.toUpperCase()}</span></div>
                     {externallyEditableNodeTypes.has(selected.node.type) && <div className="mt-3 space-y-3">
+                        <label className="block text-xs font-medium text-gray-700">Element type<select aria-label="Element type" value={selected.node.type} onChange={(event) => changeNodeType(event.target.value)} className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm">{nodeTypes.map((type) => <option key={type} value={type} disabled={type === 'slot' && (!selected.parent || selected.node.children.length > 0)}>{type}</option>)}</select></label>
                         <label className="block text-xs font-medium text-gray-700">Element name<input value={selected.node.label || ''} maxLength="100" onChange={(event) => updateNode((node) => ({ ...node, label: event.target.value }))} placeholder="Descriptive name in the Designer" className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm" /></label>
                         <div>
                             <span className="block text-xs font-medium text-gray-700">Presentation color</span>
@@ -821,13 +890,14 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                         <label className="block text-xs font-medium text-gray-700">Inheritable widget types<textarea value={(selectedLayout.slots[selected.node.slot_key]?.inheritable_types || []).join('\n')} onChange={(event) => updateSlot((slot) => ({ ...slot, inheritable_types: splitList(event.target.value) }))} placeholder="One component type per line" rows="3" className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>
                         <fieldset className="space-y-2 rounded border border-gray-200 p-2"><legend className="px-1 text-xs font-medium text-gray-700">Media target dimensions (px)</legend><p className="text-[11px] leading-4 text-gray-500">Used for responsive image sizing only. These values do not set the slot's CSS width or height.</p>{['mobile', 'tablet', 'desktop'].map((size) => <div key={size} className="grid grid-cols-[1fr_72px_72px] items-center gap-2 text-xs"><span className="capitalize text-gray-600">{size}</span>{['width', 'height'].map((dimension) => <input key={dimension} aria-label={`${size} media ${dimension} in pixels`} type="number" min="1" placeholder={dimension} value={selectedLayout.slots[selected.node.slot_key]?.dimensions?.[size]?.[dimension] ?? ''} onChange={(event) => updateSlot((slot) => { const dimensions = clone(slot.dimensions || {}); dimensions[size] = { ...(dimensions[size] || {}) }; if (event.target.value) dimensions[size][dimension] = Number(event.target.value); else delete dimensions[size][dimension]; return { ...slot, dimensions } })} className="min-w-0 rounded border border-gray-300 px-2 py-1.5 text-xs" />)}</div>)}</fieldset>
                         <details className="rounded border border-gray-200 bg-gray-50 p-2"><summary className="cursor-pointer text-xs font-medium text-gray-700">Default widgets (read-only)</summary><pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[11px] text-gray-600">{JSON.stringify(selectedLayout.slots[selected.node.slot_key]?.default_widgets || [], null, 2)}</pre></details>
+                        <p className="rounded bg-blue-50 px-2 py-1.5 text-[11px] leading-4 text-blue-800">An empty zero-height slot gets a 40px selection area only in the Layout Editor. Its real width and height remain unset until you define them under Dimensions below.</p>
                         <p className="text-xs text-gray-500">{usage.slots?.[selected.node.slot_key] || 0} versions contain widgets in this slot.</p>
                     </div>}
                     <div className="mt-4 space-y-4">
                         {styleFieldGroups.map((group, groupIndex) => <section key={group.label} className="space-y-2">
                             <div>
                                 <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{group.label}</h4>
-                                {groupIndex === 0 && externallyEditableNodeTypes.has(selected.node.type) && <p className="mt-1 text-[11px] leading-4 text-gray-500">Use the checkbox to expose a property in the Theme Designer.</p>}
+                                {groupIndex === 0 && externallyEditableNodeTypes.has(selected.node.type) && <p className="mt-1 text-[11px] leading-4 text-gray-500">Saved in this theme’s layout JSON. Blank dimensions use normal CSS auto sizing. Use the checkbox to expose a property in the Theme Designer.</p>}
                             </div>
                             {group.fields.map((field) => {
                             const fieldLabel = field.replaceAll('_', ' ')
