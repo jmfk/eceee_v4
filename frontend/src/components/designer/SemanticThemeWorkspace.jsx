@@ -2399,7 +2399,7 @@ const SemanticThemeWorkspace = ({
         </section>
     })
 
-    const selectedEditor = selectedTarget && (<>
+    const selectedEditor = selectedTarget && (<section aria-label="Selected target editor" className="flex min-h-0 flex-1 flex-col">
         <WidgetSlotTrail
             targets={selectionTrail}
             originKey={selectionTrailOriginKey}
@@ -2515,7 +2515,7 @@ const SemanticThemeWorkspace = ({
                 </div>
             )}
         </section>
-    </>)
+    </section>)
 
     const exampleImageEditor = contentMode === 'demo' && selectedView && selectedElementImages.length > 0 && (
         <section className="space-y-2 border-t border-gray-200 pt-3">
