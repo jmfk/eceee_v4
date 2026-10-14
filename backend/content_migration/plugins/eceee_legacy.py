@@ -1,60 +1,45 @@
 import io
 
-import psycopg2
 from django.core.management.base import CommandError
 from rest_framework import status
 
 from content.models import Namespace
-from content_migration.legacy_news.database import LegacyNewsDatabase
+from content_migration.legacy_news.api import LegacyMigrationApiError, LegacyNewsApi
 from content_migration.legacy_news.locking import LegacyNewsImportAlreadyRunning, legacy_news_import_lock
 from content_migration.legacy_news.repository import LegacyNewsDefinitionError, LegacyNewsRepository
 from content_migration.management.commands.migrate_legacy_news import Command as LegacyNewsCommand
 from data_connections.credentials import resolved_connection_config
 
 
-def _database_config(connection):
+def _api_config(connection):
     config = resolved_connection_config(connection)
     return {
-        "host": config.get("host", "127.0.0.1"),
-        "port": int(config.get("port", 10110)),
-        "dbname": config.get("databaseName") or config.get("dbname") or "",
-        "user": config.get("username") or config.get("user") or "",
-        "password": config.get("password") or "",
-        "sslmode": config.get("sslmode", "prefer"),
+        "base_url": config.get("baseUrl") or config.get("base_url") or "",
+        "token": config.get("token") or "",
     }
 
 
 def _missing_fields(config):
-    return [name for name in ("dbname", "user", "password") if not config.get(name)]
+    return [name for name in ("base_url", "token") if not config.get(name)]
 
 
-def _connection_failure(exc, connection):
-    config = connection.config or {}
-    host = config.get("host", "127.0.0.1")
-    port = config.get("port", 10110)
-    if host in {"127.0.0.1", "localhost"}:
-        instruction = (
-            f"The legacy database tunnel is not reachable at {host}:{port}. "
-            "Start the server-managed legacy SSH tunnel and test the connection again."
-        )
-    else:
-        instruction = "Verify the database network allowlist, TLS mode, and read-only credentials."
+def _connection_failure(exc):
     return {
         "status": "unavailable",
-        "error": "The legacy PostgreSQL connection could not be established.",
-        "instruction": instruction,
+        "error": "The legacy migration API could not be reached or authenticated.",
+        "instruction": "Verify the HTTPS base URL and replace the saved access key if it has expired.",
         "category": exc.__class__.__name__,
     }
 
 
-def test_legacy_postgres_connection(connection):
+def test_legacy_api_connection(connection):
     try:
-        config = _database_config(connection)
+        config = _api_config(connection)
     except Exception as exc:
         return {
             "status": "misconfigured",
             "error": str(exc),
-            "instruction": "Replace the saved database credential and test again.",
+            "instruction": "Replace the saved migration API access key and test again.",
         }, status.HTTP_503_SERVICE_UNAVAILABLE
     missing = _missing_fields(config)
     if missing:
@@ -62,17 +47,20 @@ def test_legacy_postgres_connection(connection):
             "status": "misconfigured",
             "error": "Required connection settings are missing.",
             "missing": missing,
-            "instruction": "Enter the database name, read-only username, and password.",
+            "instruction": "Enter the legacy migration API base URL and access key.",
         }, status.HTTP_400_BAD_REQUEST
-    database = None
+    api = None
     try:
-        database = LegacyNewsDatabase(**config)
-        return {"status": "ready", "summary": database.summary()}, status.HTTP_200_OK
-    except (psycopg2.Error, ValueError, TypeError) as exc:
-        return _connection_failure(exc, connection), status.HTTP_400_BAD_REQUEST
+        api = LegacyNewsApi(**config)
+        health = api.health()
+        if "news" not in health.get("resources", []):
+            raise LegacyMigrationApiError("The legacy API does not expose News.")
+        return {"status": "ready", "summary": api.summary()}, status.HTTP_200_OK
+    except (LegacyMigrationApiError, ValueError, TypeError) as exc:
+        return _connection_failure(exc), status.HTTP_400_BAD_REQUEST
     finally:
-        if database:
-            database.close()
+        if api:
+            api.close()
 
 
 class LegacyNewsImporter:
@@ -105,7 +93,7 @@ class LegacyNewsImporter:
             raise CommandError(str(exc)) from exc
         command = LegacyNewsCommand()
         command._require_sample_acceptance(tenant)
-        result, _response_status = test_legacy_postgres_connection(connection)
+        result, _response_status = test_legacy_api_connection(connection)
         if result["status"] != "ready":
             raise CommandError(result.get("instruction") or result.get("error"))
         return {
@@ -137,7 +125,8 @@ class LegacyNewsImporter:
             raise CommandError("The import operator no longer has access to this workspace.")
         try:
             with legacy_news_import_lock():
-                result = command._import_database(
+                source = LegacyNewsApi(**_api_config(job.connection))
+                result = command._import_source(
                     job.tenant,
                     namespace,
                     user,
@@ -146,7 +135,7 @@ class LegacyNewsImporter:
                         "limit": validated["limit"],
                         "newest_first": validated["newest_first"],
                         "resume": validated["resume"],
-                        "database_config": _database_config(job.connection),
+                        "source": source,
                     },
                 )
         except LegacyNewsImportAlreadyRunning as exc:

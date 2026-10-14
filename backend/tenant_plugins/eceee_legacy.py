@@ -4,7 +4,7 @@ from .registry import ImporterDefinition, PluginDefinition
 
 PLUGIN = PluginDefinition(
     id="org.eceee.legacy_import",
-    version="1",
+    version="2",
     label="ECEEE Legacy Import",
     description="Guided, resumable migrations from the deprecated ECEEE CMS.",
     kind="import",
@@ -14,10 +14,10 @@ PLUGIN = PluginDefinition(
     importers=(
         ImporterDefinition(
             id="org.eceee.legacy_import.news",
-            version="1",
+            version="2",
             label="Legacy News",
             description="Import published News objects with taxonomy, media, and reconciled links.",
-            connection_kinds=("LEGACY_POSTGRES",),
+            connection_kinds=("LEGACY_API",),
             capabilities=("includes_media", "rewrites_links", "resumable"),
             fields=(
                 {"name": "namespace", "type": "namespace", "label": "Target namespace", "required": True},

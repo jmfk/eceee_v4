@@ -1,12 +1,13 @@
 ---
 id: ADR-0024
 title: Deployment-installed tenant plugins with typed extension points
-status: accepted
+status: superseded
 date: 2026-10-14
 related_prds:
   - PRD-0020
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0025
 ---
 
 # ADR-0024: Deployment-Installed Tenant Plugins with Typed Extension Points

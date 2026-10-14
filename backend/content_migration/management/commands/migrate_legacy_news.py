@@ -1,4 +1,4 @@
-"""Import legacy News from the approved sample manifest or read-only database."""
+"""Import legacy News from the approved sample manifest or migration API."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from content.models import Namespace
-from content_migration.legacy_news.database import LegacyNewsDatabase
+from content_migration.legacy_news.api import LegacyNewsApi
 from content_migration.legacy_news.extractor import extract_news_html
 from content_migration.legacy_news.fetcher import ManifestFetcher
 from content_migration.legacy_news.links import LegacyNewsLinkRewriter
@@ -32,12 +32,12 @@ DEFAULT_MANIFEST = Path(__file__).parents[2] / "legacy_news" / "samples" / "mani
 
 
 class Command(BaseCommand):
-    help = "Idempotently migrate legacy News using the golden sample or read-only legacy PostgreSQL"
+    help = "Idempotently migrate legacy News using the golden sample or read-only legacy migration API"
 
     def add_arguments(self, parser):
         source = parser.add_mutually_exclusive_group(required=True)
         source.add_argument("--sample-manifest", nargs="?", const=str(DEFAULT_MANIFEST))
-        source.add_argument("--database", action="store_true")
+        source.add_argument("--api", action="store_true")
         parser.add_argument("--tenant", required=True, help="Target Tenant identifier")
         parser.add_argument(
             "--namespace",
@@ -54,7 +54,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--newest-first",
             action="store_true",
-            help="Select database rows by newest presentational publishing date first",
+            help="Select API records by newest presentational publishing date first",
         )
         parser.add_argument("--env-file", default=".env.local")
         parser.add_argument(
@@ -65,13 +65,13 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if options["sample_manifest"] and options["newest_first"]:
-            raise CommandError("--newest-first is only valid with --database")
+            raise CommandError("--newest-first is only valid with --api")
         if options["dry_run"]:
             if options["accept_golden_sample"]:
                 raise CommandError("Cannot accept the golden sample during a dry run")
             if options["sample_manifest"]:
                 return self._import_manifest(Path(options["sample_manifest"]), None, None, None, options)
-            return self._import_database(None, None, None, options)
+            return self._import_source(None, None, None, options)
         tenant = self._tenant(options["tenant"])
         namespace = self._namespace(tenant, options.get("namespace"))
         user = self._user(tenant, options.get("user"))
@@ -84,7 +84,7 @@ class Command(BaseCommand):
                 if options["accept_golden_sample"]:
                     raise CommandError("--accept-golden-sample is only valid with --sample-manifest")
                 self._require_sample_acceptance(tenant)
-                return self._import_database(tenant, namespace, user, options)
+                return self._import_source(tenant, namespace, user, options)
         except LegacyNewsImportAlreadyRunning as exc:
             raise CommandError(str(exc)) from exc
 
@@ -195,22 +195,24 @@ class Command(BaseCommand):
             news_type.save(update_fields=["metadata", "updated_at"])
         self.stdout.write(self.style.SUCCESS("Golden sample result: " + json.dumps(counts, sort_keys=True)))
 
-    def _import_database(self, tenant, namespace, user, options):
-        config = options.get("database_config") or self._legacy_config(Path(options["env_file"]))
-        database = LegacyNewsDatabase(**config)
+    def _import_source(self, tenant, namespace, user, options):
+        source = options.get("source")
+        if source is None:
+            config = options.get("api_config") or self._legacy_api_config(Path(options["env_file"]))
+            source = LegacyNewsApi(**config)
         try:
-            summary = database.summary()
+            summary = source.summary()
             self.stdout.write("Legacy read-only summary: " + json.dumps(summary, default=str, sort_keys=True))
             if options["dry_run"]:
-                return self._reconcile_database_rows(
-                    database,
+                return self._reconcile_source_rows(
+                    source,
                     summary,
                     limit=options.get("limit"),
                     newest_first=options["newest_first"],
                 )
             repository = self._repository(tenant=tenant, namespace=namespace, user=user)
             counts = {"created": 0, "updated": 0, "unchanged": 0}
-            rows = database.iter_published(
+            rows = source.iter_published(
                 limit=options.get("limit"),
                 newest_first=options["newest_first"],
             )
@@ -220,7 +222,7 @@ class Command(BaseCommand):
                     tenant=tenant,
                     news_object_type=repository.object_types["news"],
                 )
-                articles = link_rewriter.rewrite_many(self._article_from_database_row(row) for row in row_batch)
+                articles = link_rewriter.rewrite_many(self._article_from_source_record(row) for row in row_batch)
                 for row, article in zip(row_batch, articles):
                     media_by_url = {
                         image_url: media_importer.import_image(
@@ -231,7 +233,7 @@ class Command(BaseCommand):
                         for image_url in article.image_urls
                     }
                     payload = build_payload(article, media_by_url=media_by_url, taxonomy=row.taxonomy)
-                    data = self._database_payload_data(payload, row)
+                    data = self._source_payload_data(payload, row)
                     payload = replace(
                         payload,
                         data=data,
@@ -244,12 +246,12 @@ class Command(BaseCommand):
                         featured=row.featured,
                     )
                     counts["created" if created else "updated" if changed else "unchanged"] += 1
-            self.stdout.write(self.style.SUCCESS("Database import result: " + json.dumps(counts, sort_keys=True)))
+            self.stdout.write(self.style.SUCCESS("Legacy API import result: " + json.dumps(counts, sort_keys=True)))
             return counts
         finally:
-            database.close()
+            source.close()
 
-    def _reconcile_database_rows(self, database, summary, *, limit=None, newest_first=False):
+    def _reconcile_source_rows(self, source, summary, *, limit=None, newest_first=False):
         taxonomy_counts = {field_name: 0 for field_name in ("types", "categories", "sources", "topics", "keywords")}
         observed = {
             "eligible": 0,
@@ -265,7 +267,7 @@ class Command(BaseCommand):
             "errors": [],
         }
         media_urls = set()
-        for row in database.iter_published(limit=limit, newest_first=newest_first):
+        for row in source.iter_published(limit=limit, newest_first=newest_first):
             observed["eligible"] += 1
             observed["with_expiry"] += int(row.expiry_date is not None)
             observed["featured"] += int(row.featured)
@@ -274,9 +276,9 @@ class Command(BaseCommand):
             for field_name in taxonomy_counts:
                 taxonomy_counts[field_name] += len(row.taxonomy.get(field_name, []))
             try:
-                article = self._article_from_database_row(row)
+                article = self._article_from_source_record(row)
                 payload = build_payload(article, media_by_url={}, taxonomy=row.taxonomy)
-                self._database_payload_data(payload, row)
+                self._source_payload_data(payload, row)
                 observed["transformed"] += 1
                 observed["with_images"] += int(bool(article.image_urls))
                 observed["media_references"] += len(article.image_urls)
@@ -326,11 +328,11 @@ class Command(BaseCommand):
         }
         self.stdout.write("Legacy dry-run reconciliation: " + json.dumps(result, default=str, sort_keys=True))
         if observed["errors"] or mismatches:
-            raise CommandError("Legacy database dry-run found transformation errors or count mismatches")
-        self.stdout.write(self.style.SUCCESS("Legacy database dry-run passed without writes"))
+            raise CommandError("Legacy API dry-run found transformation errors or count mismatches")
+        self.stdout.write(self.style.SUCCESS("Legacy API dry-run passed without writes"))
 
     @staticmethod
-    def _database_payload_data(payload, row):
+    def _source_payload_data(payload, row):
         return {
             **payload.data,
             "presentationalPublishingDate": (
@@ -339,7 +341,7 @@ class Command(BaseCommand):
             "sourceDate": row.source_date.date().isoformat() if row.source_date else None,
         }
 
-    def _article_from_database_row(self, row):
+    def _article_from_source_record(self, row):
         source_url = self._legacy_source_url(row.slug, row.presentational_publishing_date)
         source_names = row.taxonomy.get("sources", [])
         date_value = row.source_date or row.presentational_publishing_date
@@ -387,23 +389,19 @@ class Command(BaseCommand):
                 raise CommandError(f"Sample {article.slug} retained forbidden {forbidden!r} attributes")
 
     @staticmethod
-    def _legacy_config(env_path: Path):
+    def _legacy_api_config(env_path: Path):
         if not env_path.exists():
-            raise CommandError(f"Legacy database environment file is missing: {env_path}")
+            raise CommandError(f"Legacy API environment file is missing: {env_path}")
         if stat.S_IMODE(env_path.stat().st_mode) & 0o077:
-            raise CommandError(f"Legacy database environment file must have mode 600: {env_path}")
+            raise CommandError(f"Legacy API environment file must have mode 600: {env_path}")
         config = Config(RepositoryEnv(str(env_path)))
         try:
             return {
-                "host": config("LEGACY_DB_HOST", default="127.0.0.1"),
-                "port": config("LEGACY_DB_PORT", cast=int, default=10110),
-                "dbname": config("LEGACY_DB_NAME"),
-                "user": config("LEGACY_DB_USER"),
-                "password": config("LEGACY_DB_PASSWORD"),
-                "sslmode": config("LEGACY_DB_SSLMODE", default="prefer"),
+                "base_url": config("LEGACY_API_BASE_URL"),
+                "token": config("LEGACY_API_ACCESS_KEY"),
             }
         except UndefinedValueError as exc:
-            raise CommandError("Required LEGACY_DB_* configuration is missing") from exc
+            raise CommandError("Required LEGACY_API_* configuration is missing") from exc
 
     @staticmethod
     def _legacy_source_url(slug, publishing_date):

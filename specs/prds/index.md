@@ -13,7 +13,7 @@
 | PRD-0009 | [Named theme versions](0009-named-theme-versions.md) | completed | [ADR-0010](../adrs/active/0010-named-theme-version-checkpoints.md) |
 | PRD-0010 | [Public form submissions](0010-public-form-submissions.md) | completed | [ADR-0011](../adrs/active/0011-public-form-write-boundary.md), [ADR-0012](../adrs/archive/0012-isolated-publisher-test-host.md), [ADR-0014](../adrs/active/0014-cms-root-hostname-aliases.md) |
 | PRD-0011 | [Parallel publisher test deployment](0011-parallel-publisher-test-deployment.md) | started | [ADR-0011](../adrs/active/0011-public-form-write-boundary.md), [ADR-0012](../adrs/archive/0012-isolated-publisher-test-host.md), [ADR-0014](../adrs/active/0014-cms-root-hostname-aliases.md) |
-| PRD-0012 | [Legacy News golden samples and migration](0012-legacy-news-migration.md) | started | [ADR-0013](../adrs/active/0013-legacy-news-golden-sample-gate.md), [ADR-0022](../adrs/active/0022-replayable-legacy-news-media-imports.md), [ADR-0023](../adrs/active/0023-reconcilable-legacy-news-links.md) |
+| PRD-0012 | [Legacy News golden samples and migration](0012-legacy-news-migration.md) | started | [ADR-0013](../adrs/archive/0013-legacy-news-golden-sample-gate.md), [ADR-0022](../adrs/active/0022-replayable-legacy-news-media-imports.md), [ADR-0023](../adrs/active/0023-reconcilable-legacy-news-links.md), [ADR-0025](../adrs/active/0025-authenticated-legacy-migration-api.md) |
 | PRD-0013 | [Robust concurrent page editing](0013-robust-concurrent-page-editing.md) | completed | [ADR-0015](../adrs/active/0015-revision-based-page-collaboration.md) |
 | PRD-0014 | [Server-wide machine API access](0014-server-wide-machine-api-access.md) | started | [ADR-0016](../adrs/active/0016-scoped-machine-api-keys.md) |
 | PRD-0017 | [Public Next publisher cutover](0017-public-publisher-cutover.md) | in-progress | [ADR-0019](../adrs/active/0019-public-host-next-publisher.md) |
@@ -21,4 +21,5 @@
 | PRD-0015 | [Unified remote site settings](0015-remote-site-settings.md) | completed | [ADR-0008](../adrs/active/0008-encrypted-workspace-remote-connections.md), [ADR-0017](../adrs/active/0017-browser-managed-remote-access-keys.md) |
 | PRD-0016 | [Assessed site imports with selectable dependencies](0016-assessed-site-imports.md) | completed | [ADR-0018](../adrs/active/0018-assessed-import-plans.md) |
 | PRD-0018 | [Remote object structure import](0018-remote-object-structure-import.md) | started | [ADR-0020](../adrs/active/0020-bounded-remote-object-packages.md) |
-| PRD-0020 | [Tenant integration plugins and guided imports](0020-tenant-integration-plugins.md) | started | [ADR-0024](../adrs/active/0024-deployment-installed-tenant-plugins.md) |
+| PRD-0020 | [Tenant integration plugins and guided imports](0020-tenant-integration-plugins.md) | started | [ADR-0024](../adrs/archive/0024-deployment-installed-tenant-plugins.md), [ADR-0025](../adrs/active/0025-authenticated-legacy-migration-api.md) |
+| PRD-0021 | [Read-only legacy migration API](0021-legacy-migration-api.md) | started | [ADR-0025](../adrs/active/0025-authenticated-legacy-migration-api.md) |

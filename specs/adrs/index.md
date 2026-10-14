@@ -14,7 +14,6 @@
 | ADR-0009 | [Store preview documents in the theme snapshot](active/0009-theme-preview-documents.md) | accepted | PRD-0008 |
 | ADR-0010 | [Numbered snapshots with mutable display names](active/0010-named-theme-version-checkpoints.md) | accepted | PRD-0009 |
 | ADR-0011 | [Validate published forms and write through a dedicated PostgreSQL role](active/0011-public-form-write-boundary.md) | accepted | PRD-0010 |
-| ADR-0013 | [Gate the legacy News migration through canonical golden samples](active/0013-legacy-news-golden-sample-gate.md) | accepted | PRD-0012 |
 | ADR-0014 | [Resolve publisher test hosts through CMS root aliases](active/0014-cms-root-hostname-aliases.md) | accepted | PRD-0010, PRD-0011 |
 | ADR-0015 | [Revision-based optimistic page collaboration](active/0015-revision-based-page-collaboration.md) | accepted | PRD-0013 |
 | ADR-0016 | [Scoped machine API keys across the supported CMS API](active/0016-scoped-machine-api-keys.md) | accepted | PRD-0014 |
@@ -25,7 +24,7 @@
 | ADR-0021 | [Destination-owned transfer checkpoints](active/0021-destination-owned-transfer-checkpoints.md) | accepted | PRD-0019 |
 | ADR-0022 | [Serialize legacy News imports and use replayable media keys](active/0022-replayable-legacy-news-media-imports.md) | accepted | PRD-0012 |
 | ADR-0023 | [Reconcile legacy News links and retain disabled link evidence](active/0023-reconcilable-legacy-news-links.md) | accepted | PRD-0012 |
-| ADR-0024 | [Deployment-installed tenant plugins with typed extension points](active/0024-deployment-installed-tenant-plugins.md) | accepted | PRD-0020 |
+| ADR-0025 | [Authenticated legacy migration API for tenant import plugins](active/0025-authenticated-legacy-migration-api.md) | accepted | PRD-0012, PRD-0020, PRD-0021 |
 
 ## Archived Decisions
 
@@ -33,3 +32,5 @@
 | --- | --- | --- | --- |
 | ADR-0006 | [Immutable theme snapshots with request-scoped remote credentials](archive/0006-theme-version-lineage.md) | superseded | PRD-0005 |
 | ADR-0012 | [Validate the publisher through an isolated hostname alias](archive/0012-isolated-publisher-test-host.md) | superseded | PRD-0010, PRD-0011 |
+| ADR-0013 | [Gate the legacy News migration through canonical golden samples](archive/0013-legacy-news-golden-sample-gate.md) | superseded | PRD-0012 |
+| ADR-0024 | [Deployment-installed tenant plugins with typed extension points](archive/0024-deployment-installed-tenant-plugins.md) | superseded | PRD-0020 |

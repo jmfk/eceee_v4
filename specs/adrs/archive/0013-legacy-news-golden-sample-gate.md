@@ -1,12 +1,13 @@
 ---
 id: ADR-0013
 title: Gate the legacy News migration through canonical golden samples
-status: accepted
+status: superseded
 date: 2026-09-30
 related_prds:
   - PRD-0012
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0025
 ---
 
 # ADR-0013: Gate the Legacy News Migration through Canonical Golden Samples

@@ -30,10 +30,10 @@ class DataConnectionViewSet(viewsets.ModelViewSet):
     def test(self, request, pk=None):
         """Test a connection without serializing its stored credential."""
         connection = self.get_object()
-        if connection.connection_type == "LEGACY_POSTGRES":
-            from content_migration.plugins.eceee_legacy import test_legacy_postgres_connection
+        if connection.connection_type == "LEGACY_API":
+            from content_migration.plugins.eceee_legacy import test_legacy_api_connection
 
-            result, response_status = test_legacy_postgres_connection(connection)
+            result, response_status = test_legacy_api_connection(connection)
             return Response(result, status=response_status)
         stream = connection.streams.first()
         if not stream:

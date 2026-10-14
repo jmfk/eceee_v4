@@ -1,6 +1,6 @@
 # Legacy News migration runbook
 
-The golden sample is the release gate for the legacy News migration. Do not run the database import until the sample pages have been reviewed at `/migration-preview/news/<slug>/` in Django, the standalone renderer, and the editor preview.
+The golden sample is the release gate for the legacy News migration. Do not run the API import until the sample pages have been reviewed at `/migration-preview/news/<slug>/` in Django, the standalone renderer, and the editor preview.
 
 ## Golden sample
 
@@ -40,7 +40,7 @@ cd backend
 python manage.py migrate_legacy_news --sample-manifest --tenant eceee --resume --accept-golden-sample
 ```
 
-Database mode refuses to import while this gate is absent or pending review. Any later sample content change invalidates the gate until it is accepted again.
+API mode refuses to import while this gate is absent or pending review. Any later sample content change invalidates the gate until it is accepted again.
 
 With the Django and React development servers running, capture every sample at mobile and desktop sizes. `NEWS_MIGRATION_SITE_ID` is the numeric ID of the dedicated `migration-preview-site` root page (the page whose hostname is `migration-preview.localhost`):
 
@@ -51,51 +51,45 @@ NEWS_MIGRATION_SITE_ID=<page-id> npm run legacy-news:capture
 
 The command writes 40 ignored images under `artifacts/legacy-news-migration/`: Django public, standalone React, the shared editor render frame, and Designer preview for five samples at two viewports.
 
-## Read-only legacy role
+## Read-only legacy migration API
 
-The legacy database administrator must provision a new role. Replace the role and database identifiers through the approved secret channel; do not paste the generated password into tickets, chat, shell history, or repository files.
+Deploy the fixed migration API in the legacy application behind public HTTPS. Set a
+dedicated `ECEEE_LEGACY_MIGRATION_API_KEY` in that application's protected runtime
+environment. The legacy application keeps its own database credentials; neither the
+database port nor an SSH forward is shared with v4.
 
-```sql
-CREATE ROLE eceee_v4_news_reader LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD '<generated>';
-GRANT CONNECT ON DATABASE <legacy_database> TO eceee_v4_news_reader;
-GRANT USAGE ON SCHEMA public TO eceee_v4_news_reader;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO eceee_v4_news_reader;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO eceee_v4_news_reader;
-ALTER ROLE eceee_v4_news_reader SET default_transaction_read_only = on;
-```
+In v4, create a **Legacy Migration API** Data Connection containing the API base URL
+and matching access key. The browser never receives the saved key. The plugin UI is
+the preferred way to test the connection, preflight the import, and run it.
 
-Copy `.env.local.example` to the ignored `.env.local`, fill it outside agent-visible output, and run `chmod 600 .env.local`. The importer refuses missing database settings; the tunnel helper refuses group/world-readable files.
-
-```sh
-make legacy-db-tunnel
-```
-
-The tunnel binds only `127.0.0.1:10110`. In another terminal, inspect the source counts without writing locally:
+For an operator CLI dry run, put `LEGACY_API_BASE_URL` and
+`LEGACY_API_ACCESS_KEY` in the ignored mode-0600 `.env.local` using the approved
+secret channel. Then inspect source counts and transformations without writing:
 
 ```sh
-make legacy-news-database-dry TENANT=eceee
+make legacy-news-api-dry TENANT=eceee
 ```
 
 Only after reconciling that report against the golden samples should an operator run:
 
 ```sh
 cd backend
-python manage.py migrate_legacy_news --database --tenant eceee --env-file ../.env.local --resume
+python manage.py migrate_legacy_news --api --tenant eceee --env-file ../.env.local --resume
 ```
 
 For a bounded development dataset containing the 100 most recent published News
 items, use the same selection for the dry run and import:
 
 ```sh
-python manage.py migrate_legacy_news --database --tenant eceee --env-file ../.env.local --dry-run --limit 100 --newest-first
-python manage.py migrate_legacy_news --database --tenant eceee --env-file ../.env.local --resume --limit 100 --newest-first
+python manage.py migrate_legacy_news --api --tenant eceee --env-file ../.env.local --dry-run --limit 100 --newest-first
+python manage.py migrate_legacy_news --api --tenant eceee --env-file ../.env.local --resume --limit 100 --newest-first
 ```
 
 `--newest-first` orders by the legacy presentational publishing date, then by
 legacy ID for deterministic ties. Without it, the established ascending legacy-ID
 order remains unchanged.
 
-The source connection uses a read-only PostgreSQL transaction and imports only `status=2`. Local v4 writes remain transactional per article.
+The API returns only published legacy records (`status=2`). Local v4 writes remain transactional per article. The v4 client requires public HTTPS, rejects redirects, bounds responses, and validates API version 1 before transforming records.
 
 ## Media policy
 

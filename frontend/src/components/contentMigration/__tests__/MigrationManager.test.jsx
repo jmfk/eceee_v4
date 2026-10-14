@@ -41,7 +41,7 @@ const importers = [{
     pluginId: 'org.eceee.legacy_import',
     label: 'Legacy News',
     description: 'Import news and media',
-    connectionKinds: ['LEGACY_POSTGRES'],
+    connectionKinds: ['LEGACY_API'],
     fields: [
         { name: 'namespace', type: 'namespace', label: 'Target namespace', options: [{ value: 'eceee', label: 'ECEEE' }] },
         { name: 'limit', type: 'integer', label: 'Latest published items', default: 100 },
@@ -74,7 +74,7 @@ describe('MigrationManager plugin workflow', () => {
         expect(await screen.findByText(/A compatible connection is required/)).toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'Create connection' })).toHaveAttribute(
             'href',
-            '/settings/data-connections/new?type=LEGACY_POSTGRES&plugin=org.eceee.legacy_import',
+            '/settings/data-connections/new?type=LEGACY_API&plugin=org.eceee.legacy_import',
         )
         expect(screen.getByRole('button', { name: 'Start import' })).toBeDisabled()
     })

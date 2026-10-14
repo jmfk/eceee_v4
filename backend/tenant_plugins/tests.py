@@ -101,15 +101,12 @@ class TenantPluginApiTests(TestCase):
             "/api/v1/data-connections/connections/",
             {
                 "name": "Legacy source",
-                "connectionType": "LEGACY_POSTGRES",
+                "connectionType": "LEGACY_API",
                 "pluginId": "org.eceee.legacy_import",
                 "config": {
-                    "host": "127.0.0.1",
-                    "port": 10110,
-                    "databaseName": "legacy",
-                    "username": "reader",
+                    "baseUrl": "https://www.eceee.org/api/migration/v1",
                 },
-                "secretConfig": {"password": "never-return-this"},
+                "secretConfig": {"token": "never-return-this"},
             },
             format="json",
         )
@@ -118,7 +115,7 @@ class TenantPluginApiTests(TestCase):
         self.assertNotContains(response, "never-return-this", status_code=201)
         connection = DataConnection.objects.get(id=response.data["id"])
         self.assertEqual(connection.tenant, self.tenant)
-        self.assertEqual(resolved_connection_config(connection)["password"], "never-return-this")
+        self.assertEqual(resolved_connection_config(connection)["token"], "never-return-this")
 
         self.client.force_authenticate(self.other_owner)
         self.client.credentials(HTTP_X_TENANT_ID=self.other_tenant.identifier)
@@ -128,18 +125,52 @@ class TenantPluginApiTests(TestCase):
             404,
         )
 
+    def test_legacy_api_connection_requires_https_key_and_rejects_postgres(self):
+        endpoint = "/api/v1/data-connections/connections/"
+        common = {"name": "Legacy source", "pluginId": "org.eceee.legacy_import"}
+
+        insecure = self.client.post(
+            endpoint,
+            {
+                **common,
+                "connectionType": "LEGACY_API",
+                "config": {"baseUrl": "http://legacy.example/api/migration/v1"},
+                "secretConfig": {"token": "test-token"},
+            },
+            format="json",
+        )
+        missing_key = self.client.post(
+            endpoint,
+            {
+                **common,
+                "connectionType": "LEGACY_API",
+                "config": {"baseUrl": "https://legacy.example/api/migration/v1"},
+            },
+            format="json",
+        )
+        deprecated = self.client.post(
+            endpoint,
+            {**common, "connectionType": "LEGACY_POSTGRES", "config": {}},
+            format="json",
+        )
+
+        self.assertEqual(insecure.status_code, 400)
+        self.assertEqual(missing_key.status_code, 400)
+        self.assertEqual(deprecated.status_code, 400)
+        self.assertEqual(DataConnection.objects.filter(tenant=self.tenant).count(), 0)
+
     @patch("content_migration.views.run_plugin_import_job.delay")
     def test_job_creation_is_idempotent(self, delay):
         TenantPluginActivation.objects.create(
             tenant=self.tenant,
             plugin_id="org.eceee.legacy_import",
-            plugin_version="1",
+            plugin_version="2",
             activated_by=self.owner,
         )
         connection = DataConnection.objects.create(
             tenant=self.tenant,
             name="Legacy source",
-            connection_type="LEGACY_POSTGRES",
+            connection_type="LEGACY_API",
             created_by=self.owner,
         )
         key = str(uuid4())

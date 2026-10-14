@@ -6,6 +6,7 @@ locked: true
 created: 2026-10-14
 related_adrs:
   - ADR-0024
+  - ADR-0025
 ---
 
 # PRD-0020: Tenant Integration Plugins and Guided Imports
@@ -75,10 +76,12 @@ ECEEE has tenant-specific integrations that do not belong in the generic CMS pro
 - 2026-10-14: Implementation started on `codex/tenant-import-plugins`.
 - 2026-10-14: Added the deployment-installed registry, separate Legacy Import and Proceedings definitions, tenant activations, tenant-owned encrypted connections, the guided Legacy News form, preflight, idempotent background jobs, and recent-job status.
 - 2026-10-14: Kept Proceedings at an explicit foundation state; no unfinished FileMaker behavior is exposed as operational.
+- 2026-10-14: PRD-0021 and ADR-0025 supersede the locked PostgreSQL/SSH connection requirements with a tenant-owned `LEGACY_API` connection. The deployment-installed plugin model remains in force.
 
 ## Linked ADRs
 
-- [ADR-0024: Deployment-installed tenant plugins with typed extension points](../adrs/active/0024-deployment-installed-tenant-plugins.md)
+- [ADR-0024: Deployment-installed tenant plugins with typed extension points](../adrs/archive/0024-deployment-installed-tenant-plugins.md) (superseded)
+- [ADR-0025: Authenticated legacy migration API for tenant import plugins](../adrs/active/0025-authenticated-legacy-migration-api.md)
 
 ## Completion Evidence
 
