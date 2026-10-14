@@ -1,235 +1,302 @@
-import React, { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { 
-    Plus, 
-    Search, 
-    Trash2, 
-    Edit3, 
-    Play, 
-    RefreshCw,
-    ClipboardList,
-    Activity,
-    History,
-    CheckCircle2,
-    XCircle,
-    Clock,
-    AlertCircle
-} from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertCircle, CheckCircle2, Download, Package, Play, RefreshCw } from 'lucide-react'
+
 import { api } from '../../api/client'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
-import MigrationPlanEditor from './MigrationPlanEditor'
-import MigrationJobDashboard from './MigrationJobDashboard'
+
+const endpoint = '/api/v1/content-migration'
 
 const MigrationManager = () => {
-    const [currentView, setCurrentView] = useState('list') // 'list', 'edit-plan', 'job-dashboard'
-    const [selectedPlan, setSelectedPlan] = useState(null)
-    const [selectedJob, setSelectedJob] = useState(null)
-    const [searchTerm, setSearchTerm] = useState('')
-    
     const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
+    const [selectedImporterId, setSelectedImporterId] = useState('')
+    const [connectionId, setConnectionId] = useState('')
+    const [options, setOptions] = useState({})
+    const [preflight, setPreflight] = useState(null)
 
-    // Fetch Plans
-    const { data: plans = [], isLoading: plansLoading } = useQuery({
-        queryKey: ['migration-plans'],
-        queryFn: async () => {
-            const response = await api.get('/api/v1/content-migration/plans/')
-            return response.data.results || response.data
-        }
+    const { data: pluginData, isLoading: pluginsLoading } = useQuery({
+        queryKey: ['tenant-plugins'],
+        queryFn: async () => (await api.get(`${endpoint}/plugins/`)).data,
     })
-
-    // Fetch Jobs (latest 10)
-    const { data: recentJobs = [] } = useQuery({
-        queryKey: ['migration-jobs-recent'],
+    const { data: importerData } = useQuery({
+        queryKey: ['tenant-importers'],
+        queryFn: async () => (await api.get(`${endpoint}/importers/`)).data,
+    })
+    const { data: connections = [] } = useQuery({
+        queryKey: ['data-connections'],
         queryFn: async () => {
-            const response = await api.get('/api/v1/content-migration/jobs/?limit=10')
+            const response = await api.get('/api/v1/data-connections/connections/')
             return response.data.results || response.data
         },
-        refetchInterval: 5000 // Poll for updates
+    })
+    const { data: jobs = [] } = useQuery({
+        queryKey: ['plugin-import-jobs'],
+        queryFn: async () => (await api.get(`${endpoint}/plugin-jobs/`)).data.results,
+        refetchInterval: (query) => {
+            const current = query.state.data || []
+            return current.some((job) => ['pending', 'running'].includes(job.status)) ? 2000 : false
+        },
     })
 
-    const runPlanMutation = useMutation({
-        mutationFn: async (planId) => await api.post(`/api/v1/content-migration/plans/${planId}/run/`),
-        onSuccess: (data) => {
-            addNotification('Migration job started', 'success')
-            setSelectedJob(data.data)
-            setCurrentView('job-dashboard')
-        }
-    })
-
-    const deletePlanMutation = useMutation({
-        mutationFn: async (id) => await api.delete(`/api/v1/content-migration/plans/${id}/`),
-        onSuccess: () => {
-            queryClient.invalidateQueries(['migration-plans'])
-            addNotification('Plan deleted', 'success')
-        }
-    })
-
-    if (plansLoading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
-            </div>
-        )
-    }
-
-    if (currentView === 'edit-plan') {
-        return <MigrationPlanEditor plan={selectedPlan} onBack={() => { setCurrentView('list'); queryClient.invalidateQueries(['migration-plans']); }} />
-    }
-
-    if (currentView === 'job-dashboard') {
-        return <MigrationJobDashboard job={selectedJob} onBack={() => { setCurrentView('list'); queryClient.invalidateQueries(['migration-jobs-recent']); }} />
-    }
-
-    const filteredPlans = plans.filter(p => 
-        p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const plugins = pluginData?.results || []
+    const importers = importerData?.results || []
+    const selectedImporter = importers.find((item) => item.id === selectedImporterId) || null
+    const compatibleConnections = useMemo(
+        () => connections.filter((item) => selectedImporter?.connectionKinds.includes(item.connectionType) && item.isActive),
+        [connections, selectedImporter],
     )
 
+    useEffect(() => {
+        if (!selectedImporter && importers.length) setSelectedImporterId(importers[0].id)
+    }, [importers, selectedImporter])
+
+    useEffect(() => {
+        if (!selectedImporter) return
+        setOptions(Object.fromEntries(selectedImporter.fields.map((field) => [field.name, field.default ?? ''])))
+        setConnectionId('')
+        setPreflight(null)
+    }, [selectedImporter?.id])
+
+    const activationMutation = useMutation({
+        mutationFn: async ({ plugin, active }) => active
+            ? api.delete(`${endpoint}/plugins/${plugin.id}/activation/`)
+            : api.post(`${endpoint}/plugins/${plugin.id}/activation/`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tenant-plugins'] })
+            queryClient.invalidateQueries({ queryKey: ['tenant-importers'] })
+        },
+        onError: (error) => addNotification(error.response?.data?.pluginId || 'Could not update plugin', 'error'),
+    })
+
+    const preflightMutation = useMutation({
+        mutationFn: async () => (await api.post(
+            `${endpoint}/importers/${selectedImporter.id}/preflight/`,
+            { connectionId, options },
+        )).data,
+        onSuccess: setPreflight,
+        onError: (error) => setPreflight({
+            status: 'blocked',
+            error: error.response?.data?.error || 'Preflight failed',
+        }),
+    })
+
+    const runMutation = useMutation({
+        mutationFn: async () => (await api.post(`${endpoint}/plugin-jobs/`, {
+            importerId: selectedImporter.id,
+            connectionId,
+            options,
+            idempotencyKey: crypto.randomUUID(),
+        })).data,
+        onSuccess: () => {
+            addNotification('Import job queued', 'success')
+            setPreflight(null)
+            queryClient.invalidateQueries({ queryKey: ['plugin-import-jobs'] })
+        },
+        onError: (error) => addNotification(error.response?.data?.error || 'Could not start import', 'error'),
+    })
+
+    if (pluginsLoading) {
+        return <div className="flex h-64 items-center justify-center"><RefreshCw className="h-8 w-8 animate-spin text-blue-600" /></div>
+    }
+
     return (
-        <div className="p-6 max-w-7xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Content Migrations</h1>
-                    <p className="text-gray-600">Batch import content from external systems into object storage</p>
-                </div>
-                <button 
-                    onClick={() => {
-                        setSelectedPlan(null)
-                        setCurrentView('edit-plan')
-                    }}
-                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm"
-                >
-                    <Plus className="w-4 h-4" />
-                    <span>New Migration Plan</span>
-                </button>
+        <div className="mx-auto max-w-7xl space-y-8 p-6">
+            <div>
+                <h1 className="text-2xl font-bold text-gray-900">Content Migrations</h1>
+                <p className="text-gray-600">Run trusted, tenant-specific importers installed with this deployment.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Plans List */}
-                <div className="lg:col-span-2">
-                    <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                        <div className="p-4 border-b border-gray-200">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                <input 
-                                    type="text"
-                                    placeholder="Search plans..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
+            <section>
+                <div className="mb-3 flex items-center gap-2">
+                    <Package className="h-5 w-5 text-gray-500" />
+                    <h2 className="text-lg font-semibold text-gray-900">Installed plugins</h2>
+                </div>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    {plugins.map((plugin) => (
+                        <div key={plugin.id} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="font-semibold text-gray-900">{plugin.label}</h3>
+                                        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs uppercase text-gray-600">{plugin.kind}</span>
+                                    </div>
+                                    <p className="mt-1 text-sm text-gray-600">{plugin.description}</p>
+                                    <p className="mt-2 text-xs text-gray-400">{plugin.id} · version {plugin.version}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={!plugin.compatible || activationMutation.isPending}
+                                    onClick={() => activationMutation.mutate({ plugin, active: plugin.active })}
+                                    className={`rounded-md px-3 py-2 text-sm font-medium disabled:opacity-50 ${plugin.active ? 'border border-gray-300 text-gray-700 hover:bg-gray-50' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                                >
+                                    {plugin.active ? 'Deactivate' : 'Activate'}
+                                </button>
                             </div>
                         </div>
-                        <div className="divide-y divide-gray-200">
-                            {filteredPlans.length === 0 ? (
-                                <div className="p-12 text-center text-gray-500">
-                                    <ClipboardList className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                                    <p>No migration plans found</p>
-                                </div>
-                            ) : (
-                                filteredPlans.map(plan => (
-                                    <div key={plan.id} className="p-4 hover:bg-gray-50 flex items-center justify-between group">
-                                        <div className="flex-1 min-w-0 pr-4 cursor-pointer" onClick={() => { setSelectedPlan(plan); setCurrentView('edit-plan'); }}>
-                                            <h3 className="font-semibold text-gray-900 truncate">{plan.name}</h3>
-                                            <p className="text-sm text-gray-500 truncate">{plan.description || 'No description'}</p>
-                                            <div className="flex items-center mt-1 space-x-4 text-xs text-gray-400 font-medium uppercase tracking-wider">
-                                                <span className="flex items-center"><Activity className="w-3 h-3 mr-1" /> {plan.sourceConnectionDetails?.name}</span>
-                                                <span className="flex items-center"><History className="w-3 h-3 mr-1" /> {plan.targetObjectTypeDetails?.label}</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <button 
-                                                onClick={() => runPlanMutation.mutate(plan.id)}
-                                                disabled={runPlanMutation.isPending}
-                                                className="p-2 text-green-600 hover:bg-green-50 rounded-full transition-colors"
-                                                title="Run Migration"
-                                            >
-                                                <Play className="w-5 h-5 fill-current" />
-                                            </button>
-                                            <button 
-                                                onClick={() => { setSelectedPlan(plan); setCurrentView('edit-plan'); }}
-                                                className="p-2 text-gray-400 hover:text-blue-600 rounded-full transition-colors"
-                                                title="Edit"
-                                            >
-                                                <Edit3 className="w-5 h-5" />
-                                            </button>
-                                            <button 
-                                                onClick={() => {
-                                                    if (window.confirm('Are you sure you want to delete this plan?')) {
-                                                        deletePlanMutation.mutate(plan.id)
-                                                    }
-                                                }}
-                                                className="p-2 text-gray-400 hover:text-red-600 rounded-full transition-colors"
-                                                title="Delete"
-                                            >
-                                                <Trash2 className="w-5 h-5" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
+                    ))}
                 </div>
+            </section>
 
-                {/* Recent Jobs */}
-                <div className="lg:col-span-1">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                        <History className="w-5 h-5 mr-2 text-gray-400" />
-                        Recent Jobs
-                    </h2>
-                    <div className="bg-white border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200">
-                        {recentJobs.length === 0 ? (
-                            <div className="p-8 text-center text-gray-500 text-sm italic">
-                                No jobs recorded yet
+            <section className="grid grid-cols-1 gap-8 xl:grid-cols-3">
+                <div className="space-y-5 xl:col-span-2">
+                    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                        <div className="mb-5 flex items-center gap-2">
+                            <Download className="h-5 w-5 text-blue-600" />
+                            <h2 className="text-lg font-semibold text-gray-900">Configure import</h2>
+                        </div>
+                        {!importers.length ? (
+                            <div className="rounded-md bg-amber-50 p-4 text-sm text-amber-900">
+                                Activate an import plugin above to make its import scripts available.
                             </div>
                         ) : (
-                            recentJobs.map(job => (
-                                <div key={job.id} 
-                                     className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                                     onClick={() => { setSelectedJob(job); setCurrentView('job-dashboard'); }}>
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="font-medium text-sm text-gray-900 truncate pr-2">{job.planName}</span>
-                                        <JobStatusBadge status={job.status} />
+                            <div className="space-y-5">
+                                <FormField label="Import script">
+                                    <select value={selectedImporterId} onChange={(event) => setSelectedImporterId(event.target.value)} className="w-full rounded-md border-gray-300">
+                                        {importers.map((importer) => <option key={importer.id} value={importer.id}>{importer.label}</option>)}
+                                    </select>
+                                </FormField>
+                                {selectedImporter && <p className="text-sm text-gray-600">{selectedImporter.description}</p>}
+
+                                <FormField label="Source connection">
+                                    <select value={connectionId} onChange={(event) => { setConnectionId(event.target.value); setPreflight(null) }} className="w-full rounded-md border-gray-300">
+                                        <option value="">Choose a connection</option>
+                                        {compatibleConnections.map((connection) => <option key={connection.id} value={connection.id}>{connection.name}</option>)}
+                                    </select>
+                                </FormField>
+                                {selectedImporter && compatibleConnections.length === 0 && (
+                                    <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                        A compatible connection is required before this import can run.{' '}
+                                        <a className="font-semibold underline" href={`/settings/data-connections/new?type=${selectedImporter.connectionKinds[0]}&plugin=${selectedImporter.pluginId}`}>Create connection</a>
                                     </div>
-                                    <div className="flex items-center justify-between text-xs text-gray-500">
-                                        <span>{new Date(job.createdAt).toLocaleString()}</span>
-                                        <div className="flex space-x-2">
-                                            <span className="text-green-600 font-semibold">{job.processedItems}</span>
-                                            <span className="text-red-600 font-semibold">{job.failedItems}</span>
-                                            <span className="text-gray-400">{job.totalItems} total</span>
-                                        </div>
-                                    </div>
-                                    {job.status === 'RUNNING' && (
-                                        <div className="mt-2 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                                            <div className="bg-blue-600 h-full transition-all duration-500" 
-                                                 style={{ width: `${(job.processedItems + job.failedItems + job.skippedItems) / (job.totalItems || 1) * 100}%` }}></div>
-                                        </div>
-                                    )}
+                                )}
+
+                                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                    {(selectedImporter?.fields || []).map((field) => (
+                                        <DynamicField key={field.name} field={field} value={options[field.name]} onChange={(value) => {
+                                            setOptions((current) => ({ ...current, [field.name]: value }))
+                                            setPreflight(null)
+                                        }} />
+                                    ))}
                                 </div>
-                            ))
+
+                                <div className="flex flex-wrap gap-2 border-t border-gray-200 pt-5">
+                                    <button
+                                        type="button"
+                                        disabled={!connectionId || preflightMutation.isPending}
+                                        onClick={() => preflightMutation.mutate()}
+                                        className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                    >
+                                        {preflightMutation.isPending ? 'Checking…' : 'Run preflight'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={preflight?.status !== 'ready' || runMutation.isPending}
+                                        onClick={() => runMutation.mutate()}
+                                        className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                                    >
+                                        <Play className="h-4 w-4" /> Start import
+                                    </button>
+                                </div>
+                            </div>
                         )}
                     </div>
+
+                    {preflight && <PreflightResult result={preflight} />}
                 </div>
-            </div>
+
+                <div>
+                    <h2 className="mb-3 text-lg font-semibold text-gray-900">Recent import jobs</h2>
+                    <div className="divide-y divide-gray-200 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                        {!jobs.length && <div className="p-6 text-sm text-gray-500">No import jobs yet.</div>}
+                        {jobs.map((job) => <JobCard key={job.id} job={job} />)}
+                    </div>
+                </div>
+            </section>
         </div>
     )
 }
 
-const JobStatusBadge = ({ status }) => {
-    switch (status) {
-        case 'COMPLETED':
-            return <span className="flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800"><CheckCircle2 className="w-3 h-3 mr-1" /> DONE</span>
-        case 'FAILED':
-            return <span className="flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800"><XCircle className="w-3 h-3 mr-1" /> FAIL</span>
-        case 'RUNNING':
-            return <span className="flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 animate-pulse"><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> RUN</span>
-        case 'CANCELLED':
-            return <span className="flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-800"><AlertCircle className="w-3 h-3 mr-1" /> STOP</span>
-        default:
-            return <span className="flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-800"><Clock className="w-3 h-3 mr-1" /> WAIT</span>
+const FormField = ({ label, children }) => (
+    <label className="block">
+        <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
+        {children}
+    </label>
+)
+
+const DynamicField = ({ field, value, onChange }) => {
+    if (field.type === 'boolean') {
+        return (
+            <label className="flex items-center gap-2 pt-7 text-sm font-medium text-gray-700">
+                <input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} className="rounded border-gray-300 text-blue-600" />
+                {field.label}
+            </label>
+        )
     }
+    if (field.type === 'namespace') {
+        return (
+            <FormField label={field.label}>
+                <select value={value || ''} onChange={(event) => onChange(event.target.value)} className="w-full rounded-md border-gray-300">
+                    <option value="">Choose a namespace</option>
+                    {(field.options || []).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+            </FormField>
+        )
+    }
+    return (
+        <FormField label={field.label}>
+            <input
+                type={field.type === 'integer' ? 'number' : 'text'}
+                min={field.minimum}
+                max={field.maximum}
+                value={value ?? ''}
+                onChange={(event) => onChange(field.type === 'integer' ? Number(event.target.value) : event.target.value)}
+                className="w-full rounded-md border-gray-300"
+            />
+        </FormField>
+    )
+}
+
+const PreflightResult = ({ result }) => {
+    const ready = result.status === 'ready'
+    return (
+        <div className={`rounded-lg border p-5 ${ready ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+            <div className="flex items-center gap-2 font-semibold">
+                {ready ? <CheckCircle2 className="h-5 w-5 text-green-700" /> : <AlertCircle className="h-5 w-5 text-red-700" />}
+                {ready ? 'Ready to import' : 'Import is blocked'}
+            </div>
+            {result.error && <p className="mt-2 text-sm text-red-800">{result.error}</p>}
+            {ready && (
+                <>
+                    <div className="mt-3 grid grid-cols-2 gap-3 text-sm text-green-900 md:grid-cols-4">
+                        <span>Published at source: {result.sourceSummary?.published ?? '—'}</span>
+                        <span>Selected limit: {result.selection?.limit}</span>
+                        <span>Source items with images: {result.sourceSummary?.withImages ?? '—'}</span>
+                        <span>Target: {result.target?.namespace}</span>
+                    </div>
+                    <div className="mt-3 text-sm text-green-900">Media is included, links are reconciled, and the import is restartable.</div>
+                </>
+            )}
+        </div>
+    )
+}
+
+const JobCard = ({ job }) => {
+    const running = ['pending', 'running'].includes(job.status)
+    const completed = job.status === 'completed'
+    return (
+        <div className="p-4">
+            <div className="flex items-start justify-between gap-3">
+                <div>
+                    <div className="text-sm font-semibold text-gray-900">{job.importerId.split('.').pop()}</div>
+                    <div className="mt-1 text-xs text-gray-500">{job.connectionName} · {job.phase || job.status}</div>
+                </div>
+                {running ? <RefreshCw className="h-4 w-4 animate-spin text-blue-600" /> : completed ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <AlertCircle className="h-4 w-4 text-red-600" />}
+            </div>
+            {job.errors?.length > 0 && <p className="mt-2 text-xs text-red-700">{job.errors[job.errors.length - 1]}</p>}
+            <div className="mt-2 text-xs text-gray-400">{new Date(job.createdAt).toLocaleString()}</div>
+        </div>
+    )
 }
 
 export default MigrationManager
-

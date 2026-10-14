@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional
 from .engine import get_engine
 from .transformers import DataTransformerService, ConnectionCacheService
 from .workflow import WorkflowEngine
+from ..credentials import resolved_connection_config
 from ..models import DataStream
 
 class DataConnectionManager:
@@ -76,7 +77,7 @@ class DataConnectionManager:
 
         # 2. Execute Query
         engine = get_engine(connection.connection_type)
-        raw_data = engine.execute(query_dsl, connection.config)
+        raw_data = engine.execute(query_dsl, resolved_connection_config(connection))
 
         # 3. Execute Workflow Actions
         if workflow:
@@ -95,4 +96,3 @@ class DataConnectionManager:
             ConnectionCacheService.set(stream_id, transformed_data, cache_ttl, query_params)
 
         return transformed_data
-

@@ -31,6 +31,7 @@ import TextInput from './form-fields/TextInput'
 import TextareaInput from './form-fields/TextareaInput'
 import SelectInput from './form-fields/SelectInput'
 import ComboboxInput from './form-fields/ComboboxInput'
+import PasswordInput from './form-fields/PasswordInput'
 
 const DataConnectionsManager = () => {
     const location = useLocation()
@@ -49,7 +50,8 @@ const DataConnectionsManager = () => {
         connectionType: 'INTERNAL',
         description: '',
         isActive: true,
-        config: {}
+        config: {},
+        secretConfig: {}
     })
     const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
@@ -99,17 +101,22 @@ const DataConnectionsManager = () => {
                 id: source.id,
                 name: source.name || '',
                 connectionType: source.connectionType || 'INTERNAL',
+                pluginId: source.pluginId || '',
                 description: source.description || '',
                 isActive: source.isActive ?? true,
-                config: source.config || {}
+                config: source.config || {},
+                secretConfig: {},
+                hasSecrets: source.hasSecrets ?? false,
             })
         } else {
             setConnectionFormData({
                 name: '',
-                connectionType: 'INTERNAL',
+                connectionType: new URLSearchParams(location.search).get('type') || 'INTERNAL',
                 description: '',
                 isActive: true,
-                config: {}
+                config: {},
+                secretConfig: {},
+                pluginId: new URLSearchParams(location.search).get('plugin') || ''
             })
         }
     }, [selectedConnection, connectionDetail])
@@ -181,6 +188,20 @@ const DataConnectionsManager = () => {
             setTestResult({ streamId: stream.id, data: response.data })
         } catch (error) {
             addNotification('Stream execution failed', 'error')
+        } finally {
+            setTestingStreamId(null)
+        }
+    }
+
+    const handleTestConnection = async () => {
+        if (!connectionFormData.id) return
+        setTestingStreamId('connection')
+        setTestResult(null)
+        try {
+            const response = await api.post(`/api/v1/data-connections/connections/${connectionFormData.id}/test/`)
+            setTestResult({ streamId: 'connection', data: response.data })
+        } catch (error) {
+            setTestResult({ streamId: 'connection', data: error.response?.data || { error: 'Connection test failed' } })
         } finally {
             setTestingStreamId(null)
         }
@@ -316,6 +337,8 @@ const DataConnectionsManager = () => {
                                         { value: 'INTERNAL', label: 'Internal System' },
                                         { value: 'EXTERNAL_REST', label: 'External REST API' },
                                         { value: 'EXTERNAL_DB', label: 'External Database', disabled: true, description: 'Coming soon' },
+                                        { value: 'LEGACY_POSTGRES', label: 'Legacy PostgreSQL (SSH tunnel)' },
+                                        { value: 'FILEMAKER', label: 'FileMaker Data API' },
                                     ]}
                                 />
 
@@ -384,14 +407,14 @@ const DataConnectionsManager = () => {
                             </div>
                         )}
 
-                        {connectionFormData.connectionType === 'EXTERNAL_DB' && (
+                        {['EXTERNAL_DB', 'LEGACY_POSTGRES'].includes(connectionFormData.connectionType) && (
                             <div className="mt-8 pt-8 border-t border-gray-200">
                                 <div className="flex items-center space-x-2 mb-6">
                                     <Database className="w-5 h-5 text-blue-600" />
                                     <h3 className="text-lg font-semibold">Database Configuration</h3>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <ComboboxInput 
+                                    {connectionFormData.connectionType === 'EXTERNAL_DB' && <ComboboxInput
                                         label="Database Type"
                                         value={connectionFormData.config.dbType || 'postgresql'} 
                                         onChange={(val) => setConnectionFormData(prev => ({ 
@@ -402,7 +425,7 @@ const DataConnectionsManager = () => {
                                             { value: 'postgresql', label: 'PostgreSQL' },
                                             { value: 'mysql', label: 'MySQL' },
                                         ]}
-                                    />
+                                    />}
                                     <TextInput 
                                         label="Host"
                                         value={connectionFormData.config.host} 
@@ -431,21 +454,68 @@ const DataConnectionsManager = () => {
                                         }))}
                                         placeholder="my_database"
                                     />
+                                    <TextInput
+                                        label="Read-only username"
+                                        value={connectionFormData.config.username || ''}
+                                        onChange={(val) => setConnectionFormData(prev => ({
+                                            ...prev,
+                                            config: { ...prev.config, username: val }
+                                        }))}
+                                        placeholder="eceee_import"
+                                    />
+                                    <PasswordInput
+                                        label={connectionFormData.hasSecrets ? 'Replace saved password' : 'Password'}
+                                        description={connectionFormData.hasSecrets ? 'Leave blank to keep the encrypted credential.' : ''}
+                                        value={connectionFormData.secretConfig.password || ''}
+                                        onChange={(val) => setConnectionFormData(prev => ({
+                                            ...prev,
+                                            secretConfig: { ...prev.secretConfig, password: val }
+                                        }))}
+                                        placeholder="••••••••"
+                                    />
                                 </div>
+                                {connectionFormData.connectionType === 'LEGACY_POSTGRES' && (
+                                    <div className="mt-4 rounded-md bg-blue-50 p-4 text-sm text-blue-900">
+                                        Use <code>127.0.0.1:10110</code> with the server-managed, read-only SSH tunnel. The SSH key remains outside this application.
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         <ConnectionAuthEditor 
                             connectionType={connectionFormData.connectionType}
                             config={connectionFormData.config}
+                            secretConfig={connectionFormData.secretConfig}
                             onChange={(newConfig) => setConnectionFormData(prev => ({
                                 ...prev,
                                 config: newConfig
                             }))}
+                            onSecretChange={(newSecretConfig) => setConnectionFormData(prev => ({
+                                ...prev,
+                                secretConfig: newSecretConfig
+                            }))}
                         />
+
+                        {selectedConnection && connectionFormData.connectionType === 'LEGACY_POSTGRES' && (
+                            <div className="mt-6 flex items-start gap-4">
+                                <button
+                                    onClick={handleTestConnection}
+                                    disabled={testingStreamId === 'connection'}
+                                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    {testingStreamId === 'connection' ? 'Testing…' : 'Test connection'}
+                                </button>
+                                {testResult?.streamId === 'connection' && (
+                                    <div className={`flex-1 rounded-md p-3 text-sm ${testResult.data.status === 'ready' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                                        <div className="font-semibold">{testResult.data.status === 'ready' ? 'Connection ready' : testResult.data.error}</div>
+                                        {testResult.data.instruction && <div className="mt-1">{testResult.data.instruction}</div>}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                     
-                    {selectedConnection && (
+                    {selectedConnection && !['LEGACY_POSTGRES', 'FILEMAKER'].includes(connectionFormData.connectionType) && (
                         <div className="p-8 bg-gray-50/50">
                             <div className="flex items-center justify-between mb-6">
                                 <div>
@@ -561,4 +631,3 @@ const DataConnectionsManager = () => {
 }
 
 export default DataConnectionsManager
-

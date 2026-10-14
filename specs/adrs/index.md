@@ -25,6 +25,7 @@
 | ADR-0021 | [Destination-owned transfer checkpoints](active/0021-destination-owned-transfer-checkpoints.md) | accepted | PRD-0019 |
 | ADR-0022 | [Serialize legacy News imports and use replayable media keys](active/0022-replayable-legacy-news-media-imports.md) | accepted | PRD-0012 |
 | ADR-0023 | [Reconcile legacy News links and retain disabled link evidence](active/0023-reconcilable-legacy-news-links.md) | accepted | PRD-0012 |
+| ADR-0024 | [Deployment-installed tenant plugins with typed extension points](active/0024-deployment-installed-tenant-plugins.md) | accepted | PRD-0020 |
 
 ## Archived Decisions
 

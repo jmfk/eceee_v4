@@ -4,12 +4,16 @@ import TextInput from '../form-fields/TextInput'
 import PasswordInput from '../form-fields/PasswordInput'
 import SelectInput from '../form-fields/SelectInput'
 
-const ConnectionAuthEditor = ({ connectionType, config, onChange }) => {
+const ConnectionAuthEditor = ({ connectionType, config, secretConfig = {}, onChange, onSecretChange = () => {} }) => {
     const handleConfigChange = (field, value) => {
         onChange({ ...config, [field]: value })
     }
 
-    if (connectionType === 'INTERNAL') {
+    const handleSecretChange = (field, value) => {
+        onSecretChange({ ...secretConfig, [field]: value })
+    }
+
+    if (!['EXTERNAL_REST', 'EXTERNAL_DB'].includes(connectionType)) {
         return null
     }
 
@@ -51,8 +55,8 @@ const ConnectionAuthEditor = ({ connectionType, config, onChange }) => {
                                 />
                                 <PasswordInput
                                     label="Password"
-                                    value={config.password}
-                                    onChange={(val) => handleConfigChange('password', val)}
+                                    value={secretConfig.password || ''}
+                                    onChange={(val) => handleSecretChange('password', val)}
                                     placeholder="••••••••"
                                     icon={<Lock className="w-4 h-4" />}
                                 />
@@ -63,8 +67,8 @@ const ConnectionAuthEditor = ({ connectionType, config, onChange }) => {
                             <PasswordInput
                                 label="Bearer Token"
                                 description="Enter the personal access token or JWT"
-                                value={config.token}
-                                onChange={(val) => handleConfigChange('token', val)}
+                                value={secretConfig.token || ''}
+                                onChange={(val) => handleSecretChange('token', val)}
                                 placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                                 icon={<Key className="w-4 h-4" />}
                             />
@@ -81,8 +85,8 @@ const ConnectionAuthEditor = ({ connectionType, config, onChange }) => {
                                 />
                                 <PasswordInput
                                     label="API Key Value"
-                                    value={config.apiKeyValue}
-                                    onChange={(val) => handleConfigChange('apiKeyValue', val)}
+                                    value={secretConfig.apiKeyValue || ''}
+                                    onChange={(val) => handleSecretChange('apiKeyValue', val)}
                                     placeholder="Secret Key"
                                     icon={<Key className="w-4 h-4" />}
                                 />
@@ -110,8 +114,8 @@ const ConnectionAuthEditor = ({ connectionType, config, onChange }) => {
                         />
                         <PasswordInput
                             label="Password"
-                            value={config.password}
-                            onChange={(val) => handleConfigChange('password', val)}
+                            value={secretConfig.password || ''}
+                            onChange={(val) => handleSecretChange('password', val)}
                             placeholder="••••••••"
                             icon={<Lock className="w-4 h-4" />}
                         />
@@ -123,4 +127,3 @@ const ConnectionAuthEditor = ({ connectionType, config, onChange }) => {
 }
 
 export default ConnectionAuthEditor
-
