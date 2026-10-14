@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileText, Focus, Image as ImageIcon, Italic, KeyRound, Link2, List, ListOrdered, Loader2, RotateCcw, Search, Settings2, Trash2, Type } from 'lucide-react'
+import { Bold, Box, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, FileText, Focus, Image as ImageIcon, Italic, KeyRound, Link2, List, ListOrdered, Loader2, Palette, RotateCcw, Search, Settings2, Trash2, Type } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel, designerPreviewImageReferences } from '../../rendering/adapters'
@@ -2607,6 +2607,7 @@ const SemanticThemeWorkspace = ({
                                 </button>
                                 : contentMode === 'demo' && previewContent.views.map((view) => <button type="button" key={view.id} aria-label={view.label} onClick={() => { setWorkspaceView('preview'); setViewId(view.id); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'preview' && view.id === viewId)}>{view.kind === 'object' ? <Box className="h-4 w-4 shrink-0" /> : <FileText className="h-4 w-4 shrink-0" />}<TruncatedNavigationText value={view.label} /></button>)}
                             <button type="button" onClick={() => { setWorkspaceView('details'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'details')}><Settings2 className="h-4 w-4 shrink-0" />Theme details</button>
+                            <button type="button" onClick={() => { setWorkspaceView('palette'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'palette')}><Palette className="h-4 w-4 shrink-0" />Theme palette</button>
                             <button type="button" onClick={() => { setWorkspaceView('fonts'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'fonts')}><Type className="h-4 w-4 shrink-0" />Theme fonts</button>
                             <button type="button" onClick={() => { setWorkspaceView('images'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'images')}><ImageIcon className="h-4 w-4 shrink-0" />Theme images</button>
                         </div>
@@ -2696,18 +2697,15 @@ const SemanticThemeWorkspace = ({
             <section aria-label="Theme inspector" className={`${mobilePane === 'preview' || inspectorCollapsed ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col border-l border-gray-200 bg-white xl:col-start-5 xl:row-start-1 xl:border-l-0`}>
                 <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Inspector</span><button type="button" aria-label="Collapse theme inspector" onClick={() => setInspectorCollapsed(true)} className="hidden rounded p-1 text-gray-500 hover:bg-gray-100 xl:block"><ChevronRight className="h-4 w-4" /></button></div>
                 <fieldset disabled={disabled} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-2">
-                    <div className="space-y-5">
-                        <ThemePaletteEditor colors={workspace.colors} onChange={updateThemeColor} onAdd={addThemeColor} />
-                        <div className="border-t border-gray-200 pt-5">
-                            {workspaceView === 'details'
-                                ? themeDetailsEditor
-                                : workspaceView === 'fonts'
-                                    ? themeFontsEditor
-                                    : workspaceView === 'images'
-                                        ? <div className="space-y-6">{imageAspectNavigation}{themeImageEditor}</div>
-                                        : <div className="flex min-h-0 flex-1 flex-col gap-3">{selectionSpacingPanels || selectedEditor || <div className="flex min-h-32 items-center justify-center border border-dashed border-gray-300 p-3 text-center text-sm text-gray-500">Select something in the preview to inspect its margin and padding.</div>}{exampleImageEditor}</div>}
-                        </div>
-                    </div>
+                    {workspaceView === 'details'
+                        ? themeDetailsEditor
+                        : workspaceView === 'palette'
+                            ? <ThemePaletteEditor colors={workspace.colors} onChange={updateThemeColor} onAdd={addThemeColor} />
+                            : workspaceView === 'fonts'
+                                ? themeFontsEditor
+                                : workspaceView === 'images'
+                                    ? <div className="space-y-6">{imageAspectNavigation}{themeImageEditor}</div>
+                                    : <div className="flex min-h-0 flex-1 flex-col gap-3">{selectionSpacingPanels || selectedEditor || <div className="flex min-h-32 items-center justify-center border border-dashed border-gray-300 p-3 text-center text-sm text-gray-500">Select something in the preview to inspect its margin and padding.</div>}{exampleImageEditor}</div>}
                 </fieldset>
             </section>
             </main>

@@ -214,6 +214,8 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByRole('button', { name: 'Theme images' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Theme details' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Edit layouts' })).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Theme palette' })).toBeInTheDocument()
+        expect(screen.queryByText('These named colors are available to every color property in the Designer.')).not.toBeInTheDocument()
         expect(screen.queryByRole('heading', { name: 'What to show' })).not.toBeInTheDocument()
         expect(screen.queryByRole('heading', { name: 'Page elements' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Layout default' })).not.toBeInTheDocument()
@@ -2288,7 +2290,9 @@ describe('DesignerThemeWorkspacePage', () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
 
-        expect(screen.getByText('Theme palette')).toBeInTheDocument()
+        expect(screen.queryByText('These named colors are available to every color property in the Designer.')).not.toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Theme palette' }))
+        expect(screen.getByText('These named colors are available to every color property in the Designer.')).toBeInTheDocument()
         await user.click(screen.getByRole('button', { name: 'Add color' }))
         await user.type(screen.getByLabelText('New theme color name'), 'accent')
         fireEvent.change(screen.getByLabelText('New theme color value'), { target: { value: '#abcdef' } })
@@ -2299,12 +2303,35 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(mocks.save.mock.calls[0][1].colors).toEqual(expect.objectContaining({ brand: '#123456', accent: '#abcdef' }))
     })
 
+    it('temporarily replaces the selection inspector with palette and font views', async () => {
+        const user = userEvent.setup()
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('heading', { name: 'Editorial' })
+        await selectHeading()
+
+        await user.click(screen.getByRole('button', { name: 'Theme palette' }))
+        expect(screen.getByText('These named colors are available to every color property in the Designer.')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Edit Heading 1' })).not.toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Theme fonts' }))
+        expect(screen.getByRole('heading', { name: 'Installed font families' })).toBeInTheDocument()
+        expect(screen.queryByText('These named colors are available to every color property in the Designer.')).not.toBeInTheDocument()
+
+        await user.click(screen.getByRole('button', { name: 'Article page' }))
+        expect(screen.getByText('Select something in the preview to inspect its margin and padding.')).toBeInTheDocument()
+        expect(screen.queryByRole('heading', { name: 'Installed font families' })).not.toBeInTheDocument()
+
+        await selectHeading()
+        expect(screen.getByRole('button', { name: 'Edit Heading 1' })).toBeInTheDocument()
+    })
+
     it('installs a searched Google Font when it is selected for typography', async () => {
         const user = userEvent.setup()
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         await screen.findByRole('heading', { name: 'Editorial' })
         await user.click(screen.getByRole('button', { name: 'Theme fonts' }))
         expect(screen.getByRole('heading', { name: 'Installed font families' })).toBeInTheDocument()
+        expect(screen.queryByText('These named colors are available to every color property in the Designer.')).not.toBeInTheDocument()
         expect(screen.getByText('Weights: 400, 700')).toBeInTheDocument()
         await user.click(screen.getByRole('button', { name: 'Article page' }))
         await readyPreview()
