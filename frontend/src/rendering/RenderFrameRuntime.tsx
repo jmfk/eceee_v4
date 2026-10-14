@@ -855,10 +855,11 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             labelTop = Math.min(viewportHeight - halfHeight, Math.max(halfHeight, labelTop))
             if (spacing === 'size') {
                 const labelSpacing = 4
-                const overlapsPlacedLabel = (candidateTop: number) => {
+                const collisionHalfWidth = halfWidth + 3
+                const overlapsPlacedLabel = (candidateLeft: number, candidateTop: number) => {
                     const candidate = {
-                        left: labelLeft - halfWidth,
-                        right: labelLeft + halfWidth,
+                        left: candidateLeft - collisionHalfWidth,
+                        right: candidateLeft + collisionHalfWidth,
                         top: candidateTop - halfHeight,
                         bottom: candidateTop + halfHeight,
                     }
@@ -869,25 +870,38 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
                         || candidate.top >= placed.bottom + labelSpacing
                     ))
                 }
+                const horizontalStep = collisionHalfWidth * 2 + labelSpacing
                 const verticalStep = labelHeight + labelSpacing
-                const offsets = Array.from({ length: 12 }, (_, index) => {
-                    if (index === 0) return 0
-                    const distance = Math.ceil(index / 2) * verticalStep
-                    return index % 2 ? distance : -distance
-                })
-                const distributedTop = offsets
-                    .map((offset) => Math.min(viewportHeight - halfHeight, Math.max(halfHeight, labelTop + offset)))
-                    .find((candidateTop) => !overlapsPlacedLabel(candidateTop))
-                if (distributedTop !== undefined) labelTop = distributedTop
+                const offsets = Array.from({ length: 7 }, (_, yIndex) => yIndex - 3)
+                    .flatMap((y) => Array.from({ length: 7 }, (_, xIndex) => ({ x: xIndex - 3, y })))
+                    .sort((left, right) => (
+                        Math.abs(left.x) + Math.abs(left.y) - Math.abs(right.x) - Math.abs(right.y)
+                        || Math.abs(left.y) - Math.abs(right.y)
+                        || right.x - left.x
+                        || right.y - left.y
+                    ))
+                const distributedPosition = offsets
+                    .map(({ x, y }) => ({
+                        left: Math.min(viewportWidth - collisionHalfWidth, Math.max(collisionHalfWidth, labelLeft + x * horizontalStep)),
+                        top: Math.min(viewportHeight - halfHeight, Math.max(halfHeight, labelTop + y * verticalStep)),
+                    }))
+                    .find((candidate) => !overlapsPlacedLabel(candidate.left, candidate.top))
+                if (distributedPosition) {
+                    labelLeft = distributedPosition.left
+                    labelTop = distributedPosition.top
+                }
                 measurementLabelRects.push({
-                    left: labelLeft - halfWidth,
-                    right: labelLeft + halfWidth,
+                    left: labelLeft - collisionHalfWidth,
+                    right: labelLeft + collisionHalfWidth,
                     top: labelTop - halfHeight,
                     bottom: labelTop + halfHeight,
                 })
                 if (property === 'width') {
                     guide.style.top = `${labelTop - 0.5}px`
                     measure.style.top = `${labelTop}px`
+                } else if (property === 'height') {
+                    guide.style.left = `${labelLeft - 0.5}px`
+                    measure.style.left = `${labelLeft}px`
                 }
             }
             Object.assign(label.style, {
