@@ -286,8 +286,8 @@ class PathResolutionTests(TestCase):
         with self.assertRaises(Http404):
             view._resolve_page_with_pattern(self.root_page, ["nonexistent"])
 
-    def test_nonexistent_subpage_without_pattern_raises_404(self):
-        """Test that non-existent sub-pages return 404 when parent has no path_pattern_key"""
+    def test_nonexistent_subpage_without_pattern_returns_404(self):
+        """Missing sub-pages render the theme-owned 404 when the parent has no path pattern."""
         from django.db import connection
         if connection.vendor == 'sqlite':
             self.skipTest("ArrayField not supported on SQLite")
@@ -311,10 +311,10 @@ class PathResolutionTests(TestCase):
         view.request = request
         view.kwargs = {"slug_path": "about/missing"}
         
-        with self.assertRaises(Http404) as context:
-            view.get(request)
-        
-        self.assertIn("Page not found", str(context.exception))
+        response = view.get(request)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "404 — Page not found", status_code=404)
 
 
 class PathVariableSecurityTests(TestCase):
