@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import SpecialPagesEditor from '../SpecialPagesEditor'
 
-const mocks = vi.hoisted(() => ({ pageContentEditor: vi.fn() }))
+const mocks = vi.hoisted(() => ({ pageContentEditor: vi.fn(), renderFrame: vi.fn() }))
 
 vi.mock('../../../contexts/unified-data/context/UnifiedDataContext', () => ({
     useUnifiedData: () => ({ publishUpdate: vi.fn().mockResolvedValue(undefined) }),
@@ -17,6 +17,13 @@ vi.mock('../../../editors/page-editor/PageContentEditor', () => ({
         <span data-testid="widget-count">{Object.values(localWidgets).flat().length}</span>
         <button type="button" onClick={() => onLocalWidgetUpdate({ main: [{ id: 'new-widget', type: 'easy_widgets.ContentWidget', config: { content: 'Hello' } }] })}>Add test widget</button>
         </div>
+    },
+}))
+
+vi.mock('../../../rendering/RenderFrame', () => ({
+    default: (props) => {
+        mocks.renderFrame(props)
+        return <div data-testid="special-page-preview">{props.title}</div>
     },
 }))
 
@@ -67,6 +74,25 @@ describe('SpecialPagesEditor', () => {
             fonts: { googleFonts: [{ family: 'Inter', variants: ['400'], display: 'swap' }] },
             layouts: current.layouts,
         })
+    })
+
+    it('opens a responsive render preview using the current unsaved special-page widgets', () => {
+        const current = structuredClone(workspaceWithLayouts)
+        render(<SpecialPagesEditor workspace={current} updateWorkspace={vi.fn()} disabled={false} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+
+        expect(screen.getByTestId('special-page-preview')).toHaveTextContent('404 — Page not found preview')
+        expect(mocks.renderFrame.mock.calls.at(-1)[0].model).toMatchObject({
+            layout: 'main_layout',
+            layoutDefinitionRequired: true,
+            slots: {
+                main: [expect.objectContaining({ id: 'main-widget' })],
+                shared: [expect.objectContaining({ id: 'shared-widget' })],
+            },
+            context: { preview: true, mode: 'preview', specialPageKey: 'error_404', statusCode: 404 },
+        })
+        expect(screen.getByRole('button', { name: 'Preview at desktop width' })).toHaveAttribute('aria-pressed', 'true')
     })
 
     it('stores visually edited widget content inside layouts.special_pages', () => {
