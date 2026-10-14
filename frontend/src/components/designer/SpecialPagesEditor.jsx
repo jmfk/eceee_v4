@@ -36,6 +36,32 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
         if (selectedIndex < 0) return
         updatePages(pages.map((page, index) => index === selectedIndex ? { ...page, ...updates } : page))
     }
+    const changeLayout = (layoutKey) => {
+        const nextLayout = layouts.items.find((layout) => layout.key === layoutKey)
+        if (!nextLayout) return
+        let removedWidgetCount = 0
+        const nextWidgets = Object.fromEntries(Object.entries(widgets).flatMap(([slot, items]) => {
+            const policy = nextLayout.slots?.[slot]
+            if (!policy || !Array.isArray(items)) {
+                removedWidgetCount += Array.isArray(items) ? items.length : 0
+                return []
+            }
+            const allowedTypes = policy.allowed_widget_types || []
+            const disallowedTypes = policy.disallowed_widget_types || []
+            let compatible = items.filter((widget) => (
+                (!allowedTypes.length || allowedTypes.includes(widget.type)) && !disallowedTypes.includes(widget.type)
+            ))
+            if (Number.isInteger(policy.max_widgets) && policy.max_widgets >= 0) {
+                compatible = compatible.slice(0, policy.max_widgets)
+            }
+            removedWidgetCount += items.length - compatible.length
+            return compatible.length ? [[slot, compatible]] : []
+        }))
+        if (removedWidgetCount > 0 && !window.confirm(
+            `Switch layouts and remove ${removedWidgetCount} widget${removedWidgetCount === 1 ? '' : 's'} from slots that are not available in “${nextLayout.label}”?`,
+        )) return
+        updateSelected({ layout_key: layoutKey, widgets: nextWidgets })
+    }
 
     const addRoutePage = () => {
         const id = newId()
@@ -109,7 +135,7 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
                             <label className="text-xs font-medium text-gray-700">Name<input value={selected.label} onChange={(event) => updateSelected({ label: event.target.value })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" /></label>
                             <label className="text-xs font-medium text-gray-700">Key<input value={selected.key} disabled={selected.kind === 'error'} onChange={(event) => updateSelected({ key: event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-mono text-sm disabled:bg-gray-100" /></label>
                             {selected.kind === 'route' ? <label className="text-xs font-medium text-gray-700">Public route<input value={selected.route || ''} onChange={(event) => { const route = event.target.value.replace(/^\/+/, ''); updateSelected({ route, key: selected.key.startsWith('special_') ? routeKey(route) : selected.key }) }} placeholder="login" className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" /></label> : <label className="text-xs font-medium text-gray-700">HTTP status<input value={selected.status_code} disabled className="mt-1 w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 text-sm" /></label>}
-                            <label className="text-xs font-medium text-gray-700">Layout<select value={selected.layout_key} onChange={(event) => updateSelected({ layout_key: event.target.value, widgets: {} })} className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm">{layouts.items.filter((layout) => layout.status !== 'archived').map((layout) => <option key={layout.key} value={layout.key}>{layout.label}</option>)}</select></label>
+                            <label className="text-xs font-medium text-gray-700">Layout<select value={selected.layout_key} onChange={(event) => changeLayout(event.target.value)} className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm">{layouts.items.filter((layout) => layout.status !== 'archived').map((layout) => <option key={layout.key} value={layout.key}>{layout.label}</option>)}</select></label>
                             {selected.kind === 'route' && <button type="button" onClick={removeSelected} className="self-end inline-flex min-h-10 items-center justify-center gap-2 rounded border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" />Remove</button>}
                         </div>
                     </fieldset>

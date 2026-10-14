@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildPublishedPageModel, normalizeHostname, type Page, type PageReader, type PublishedObject, type ReadDb, type Theme, type Version, type Widget } from '../src/model';
+import { buildPublishedPageModel, buildThemeErrorPageModel, normalizeHostname, type Page, type PageReader, type PublishedObject, type ReadDb, type Theme, type Version, type Widget } from '../src/model';
 
 const page = (values: Partial<Page> & Pick<Page, 'id' | 'tenant_id' | 'parent_id' | 'slug' | 'title'>): Page => ({
   hostnames: [],
@@ -83,6 +83,128 @@ describe('public resolution', () => {
     expect(model?.themeCss).not.toContain('@import');
     expect(model?.themeCss).toContain('@media (min-width: 700px)');
     expect(JSON.parse(JSON.stringify(model))).toEqual(model);
+  });
+
+  it('renders an exact theme special route before a CMS page at the same path', async () => {
+    const specialTheme: Theme = {
+      ...theme,
+      layouts: {
+        schema_version: 1,
+        default_layout_key: 'main_layout',
+        items: [{
+          id: 'layout-main',
+          key: 'main_layout',
+          label: 'Main',
+          status: 'active',
+          root: { id: 'slot-main', type: 'slot', slot_key: 'main', children: [] },
+          slots: { main: {} },
+        }],
+        special_pages: [{
+          id: 'special-login',
+          key: 'login',
+          label: 'Log in',
+          kind: 'route',
+          route: 'login',
+          layout_key: 'main_layout',
+          widgets: { main: [{ id: 'login-copy', type: 'easy_widgets.ContentWidget', config: { content: '<p>Theme login</p>' } }] },
+        }],
+      },
+    };
+    const childLookup = vi.fn(reader.child);
+    const specialReader: PageReader = {
+      ...reader,
+      child: childLookup,
+      root: async () => page({
+        ...root,
+        enable_css_injection: true,
+        page_css_variables: { pageOnly: 'red' },
+        page_custom_css: '.root-only { color: red; }',
+      }),
+      version: async (id, at) => {
+        const selected = await reader.version(id, at);
+        return id === root.id && selected ? version({
+          ...selected,
+          page_css_variables: { versionOnly: 'blue' },
+          page_custom_css: '.version-only { color: blue; }',
+        }) : selected;
+      },
+      theme: async () => specialTheme,
+    };
+
+    const model = await buildPublishedPageModel(
+      { withSnapshot: async read => read(specialReader) },
+      'example.org',
+      '/login/',
+      new Date('2026-06-01'),
+    );
+
+    expect(childLookup).not.toHaveBeenCalled();
+    expect(model).toMatchObject({
+      title: 'Log in',
+      layout: 'main_layout',
+      matchedPath: '/login',
+      remainingPath: '',
+      context: { pageId: root.id, versionId: versions[root.id].id, simulatedPath: '/login/' },
+    });
+    expect(model?.slots.main[0]).toMatchObject({ id: 'login-copy', config: { content: '<p>Theme login</p>' } });
+    expect(model?.themeCss).not.toContain('--pageOnly');
+    expect(model?.themeCss).not.toContain('--versionOnly');
+    expect(model?.themeCss).not.toContain('.root-only');
+    expect(model?.themeCss).not.toContain('.version-only');
+  });
+
+  it('builds the requested theme-owned error page without a legacy CMS page', async () => {
+    const errorTheme: Theme = {
+      ...theme,
+      layouts: {
+        schema_version: 1,
+        default_layout_key: 'main_layout',
+        items: [{
+          id: 'layout-error',
+          key: 'error_layout',
+          label: 'Error',
+          status: 'active',
+          root: { id: 'slot-message', type: 'slot', slot_key: 'message', children: [] },
+          slots: { message: {} },
+        }],
+        special_pages: [{
+          id: 'error-404',
+          key: 'error_404',
+          label: '404 — Page not found',
+          kind: 'error',
+          status_code: 404,
+          route: '',
+          layout_key: 'error_layout',
+          widgets: { message: [{ id: 'error-copy', type: 'easy_widgets.HeadlineWidget', config: { content: 'Not found' } }] },
+        }],
+      },
+    };
+    const errorReader: PageReader = {
+      ...reader,
+      version: async () => null,
+      defaultTheme: async () => errorTheme,
+    };
+
+    const model = await buildThemeErrorPageModel(
+      { withSnapshot: async read => read(errorReader) },
+      'example.org',
+      404,
+      new Date('2026-06-01'),
+    );
+
+    expect(model).toMatchObject({
+      title: '404 — Page not found',
+      layout: 'error_layout',
+      matchedPath: '/404',
+      context: { versionId: 'error-404', simulatedPath: '/404/' },
+    });
+    expect(model?.slots.message[0]).toMatchObject({ id: 'error-copy', config: { content: 'Not found' } });
+    expect(await buildThemeErrorPageModel(
+      { withSnapshot: async read => read(errorReader) },
+      'example.org',
+      500,
+      new Date('2026-06-01'),
+    )).toBeNull();
   });
 
   it('reads page versions sequentially on the shared snapshot client', async () => {

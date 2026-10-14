@@ -16,6 +16,7 @@ from webpages.inheritance_tree import InheritanceTreeBuilder
 from webpages.models import PageTheme, WebPage
 from webpages.public_views import HostnamePageView
 from webpages.serializers import PageDataSchemaSerializer, PageVersionSerializer
+from webpages.theme_layout_renderer import render_theme_layout
 from webpages.theme_layouts import (
     default_theme_layouts,
     legacy_compatibility_layout,
@@ -24,7 +25,6 @@ from webpages.theme_layouts import (
     validate_layout_widgets,
     validate_theme_layouts,
 )
-from webpages.theme_layout_renderer import render_theme_layout
 
 
 class ThemeLayoutValidationTests(SimpleTestCase):

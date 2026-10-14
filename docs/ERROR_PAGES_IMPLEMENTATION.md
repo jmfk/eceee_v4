@@ -18,7 +18,9 @@ The Layout Editor validates unique routes and status codes, layout and slot refe
 
 ## Runtime behavior
 
-The hostname-aware public view resolves an exact special route before normal CMS page resolution. Error handlers resolve the matching error definition from the root page's effective theme. The server renders the same structured theme layout tree, responsive styles, palette tokens, fonts, and widget JSON used by the React renderer, while returning the correct HTTP status.
+The production Next publisher resolves an exact special route before normal CMS page resolution. Its not-found boundary renders the theme-owned 404 definition while preserving the HTTP 404 response, and its shared error-page model builder resolves the other supported status definitions for status-specific handlers. The optional Django public renderer follows the same route precedence and error lookup contract when it is enabled.
+
+Both render paths use the structured theme layout tree, responsive styles, palette tokens, fonts, and static widget JSON. Special pages deliberately exclude page- and page-version-specific CSS because their content and presentation belong to the theme.
 
 Older themes that do not yet contain `special_pages` receive the portable default error definitions when opened or rendered. The definitions are persisted on the next theme publish; no destructive data migration is required.
 

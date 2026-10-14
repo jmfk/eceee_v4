@@ -269,7 +269,10 @@ class WebPageViewSet(viewsets.ModelViewSet):
                 {"detail": "Site not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        queryset = WebPage.objects.filter(tenant=site.tenant, is_deleted=False)
+        queryset = WebPage.objects.filter(tenant=site.tenant, is_deleted=False).exclude(
+            parent=site,
+            slug__in=LEGACY_ERROR_PAGE_SLUGS,
+        )
 
         requested_segments = [segment for segment in slug_path.split("/") if segment]
         if any(segment in {".", ".."} for segment in requested_segments):
