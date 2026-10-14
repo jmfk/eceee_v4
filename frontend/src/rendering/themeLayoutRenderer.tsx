@@ -5,7 +5,7 @@ import type { LayoutRenderProps, ThemeLayoutDefinition, ThemeLayoutNode } from '
 const allowedTypes = new Set(['container', 'section', 'grid', 'row', 'column', 'semantic', 'slot'])
 const semanticTags = new Set(['div', 'header', 'nav', 'main', 'aside', 'section', 'footer'])
 const propertyMap: Record<string, string> = {
-    display: 'display', width: 'width', max_width: 'max-width', min_height: 'min-height',
+    display: 'display', width: 'width', height: 'height', max_width: 'max-width', min_height: 'min-height',
     grid_template_columns: 'grid-template-columns', grid_column: 'grid-column',
     flex_direction: 'flex-direction', flex_wrap: 'flex-wrap', flex_grow: 'flex-grow', order: 'order',
     gap: 'gap', padding: 'padding', margin: 'margin', align_items: 'align-items',
@@ -147,31 +147,6 @@ export const layoutDefinitionCss = (layout: ThemeLayoutDefinition, breakpoints: 
     return `${base}${responsive}`
 }
 
-export const layoutCanvasDimensionsCss = (layout: ThemeLayoutDefinition, breakpoints: Record<string, number> = defaultBreakpoints) => {
-    const rules: Record<'mobile' | 'tablet' | 'desktop', string[]> = { mobile: [], tablet: [], desktop: [] }
-    const visit = (node: ThemeLayoutNode) => {
-        if (node.type === 'slot' && node.slot_key) {
-            const dimensions = layout.slots[node.slot_key]?.dimensions || {}
-            ;(['mobile', 'tablet', 'desktop'] as const).forEach((size) => {
-                const width = Number(dimensions[size]?.width)
-                const height = Number(dimensions[size]?.height)
-                if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) return
-                const relativeHeight = `calc(100vw * ${height} / ${width})`
-                rules[size].push(`.layout-designer-preview [data-layout-node-id="${node.id}"]{height:${relativeHeight}!important;min-height:${relativeHeight}!important}`)
-            })
-        }
-        node.children.forEach(visit)
-    }
-    visit(layout.root)
-    const tablet = rules.tablet.join('')
-    const desktop = rules.desktop.join('')
-    return [
-        rules.mobile.join(''),
-        tablet ? `@media(min-width:${Number(breakpoints.md ?? defaultBreakpoints.md)}px){${tablet}}` : '',
-        desktop ? `@media(min-width:${Number(breakpoints.xl ?? defaultBreakpoints.xl)}px){${desktop}}` : '',
-    ].join('')
-}
-
 const LayoutNode = ({ node, slots, renderSlot, designer, layoutCanvas }: { node: ThemeLayoutNode, slots: ThemeLayoutDefinition['slots'], renderSlot: LayoutRenderProps['renderSlot'], designer: boolean, layoutCanvas: boolean }) => {
     const className = (node.class_names || []).join(' ') || undefined
     const label = node.label || (node.type === 'slot' ? String(slots[node.slot_key || '']?.label || node.slot_key || 'Slot') : node.type)
@@ -193,7 +168,6 @@ export const ThemeLayoutRender = ({ model, renderSlot }: LayoutRenderProps) => {
     if (!layout || !validateLayoutDefinition(layout)) return null
     return <>
         <style data-theme-layout-css={layout.key}>{layoutDefinitionCss(layout, model.layoutBreakpoints)}</style>
-        {model.designer?.layoutCanvas && <style data-theme-layout-canvas-dimensions={layout.key}>{layoutCanvasDimensionsCss(layout, model.layoutBreakpoints)}</style>}
         <LayoutNode node={layout.root} slots={layout.slots} renderSlot={renderSlot} designer={Boolean(model.designer)} layoutCanvas={Boolean(model.designer?.layoutCanvas)} />
     </>
 }

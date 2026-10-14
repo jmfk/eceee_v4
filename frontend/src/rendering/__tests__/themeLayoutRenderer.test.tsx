@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import PageRenderer from '../PageRenderer'
-import { layoutCanvasDimensionsCss, layoutDefinitionCss, normalizeLayoutDefinition, validateLayoutDefinition } from '../themeLayoutRenderer'
+import { layoutDefinitionCss, normalizeLayoutDefinition, validateLayoutDefinition } from '../themeLayoutRenderer'
 import type { RenderPageModel, ThemeLayoutDefinition } from '../types'
 
 const layout: ThemeLayoutDefinition = {
@@ -63,11 +63,16 @@ describe('theme layout rendering', () => {
     })
 
     it('compiles only allowlisted structured styles at configured breakpoints', () => {
-        const css = layoutDefinitionCss(layout, { xs: 0, sm: 600, md: 900, lg: 1100, xl: 1400 })
+        const sized = structuredClone(layout)
+        sized.root.styles.base.height = 'auto'
+        sized.root.styles.md.height = 'clamp(20rem, 60vh, 48rem)'
+        const css = layoutDefinitionCss(sized, { xs: 0, sm: 600, md: 900, lg: 1100, xl: 1400 })
 
         expect(css).toContain('display:grid')
+        expect(css).toContain('height:auto')
         expect(css).toContain('@media(min-width:900px)')
         expect(css).toContain('gap:24px')
+        expect(css).toContain('height:clamp(20rem, 60vh, 48rem)')
     })
 
     it('compiles theme color tokens using the theme variable contract', () => {
@@ -94,23 +99,6 @@ describe('theme layout rendering', () => {
 
         themed.root.styles.base.background_image = 'javascript:alert(1)'
         expect(validateLayoutDefinition(themed)).toBe(false)
-    })
-
-    it('scales slot guide heights relative to the active theme viewport only in the layout canvas', () => {
-        const dimensioned = structuredClone(layout)
-        dimensioned.slots.main.dimensions = {
-            mobile: { width: 640, height: 112 },
-            tablet: { width: 1024, height: 112 },
-            desktop: { width: 1280, height: 112 },
-        }
-
-        const css = layoutCanvasDimensionsCss(dimensioned, { xs: 0, sm: 600, md: 768, lg: 1000, xl: 1200 })
-
-        expect(css).toContain('calc(100vw * 112 / 640)')
-        expect(css).toContain('@media(min-width:768px)')
-        expect(css).toContain('calc(100vw * 112 / 1024)')
-        expect(css).toContain('@media(min-width:1200px)')
-        expect(css).toContain('calc(100vw * 112 / 1280)')
     })
 
     it('applies presentation colours only in the layout editor canvas', () => {

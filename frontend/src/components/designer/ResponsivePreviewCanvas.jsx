@@ -18,10 +18,6 @@ const PreviewSurface = ({ model, title, viewport }) => {
     const availableHeight = size.height || 720
     const scale = Math.min(1, Math.max(0.2, (availableWidth - 24) / canvasWidth))
     const renderedHeight = Math.max(720, Math.round((availableHeight - 24) / scale))
-    const viewportModel = {
-        ...model,
-        context: { ...model.context, previewViewport: viewport },
-    }
 
     useEffect(() => {
         const node = containerRef.current
@@ -47,7 +43,7 @@ const PreviewSurface = ({ model, title, viewport }) => {
                 transformOrigin: 'center top',
             }}
         >
-            <RenderFrame model={viewportModel} title={title} className="h-full w-full border-0" />
+            <RenderFrame model={model} title={title} className="h-full w-full border-0" />
         </div>
     </div>
 }

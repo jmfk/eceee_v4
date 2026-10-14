@@ -74,7 +74,7 @@ const configuredSpacingFields = (values = {}) => [...new Set(
 )]
 
 const layoutParameterFields = new Set([
-    'display', 'width', 'max_width', 'min_height', 'grid_template_columns', 'grid_column',
+    'display', 'width', 'height', 'max_width', 'min_height', 'grid_template_columns', 'grid_column',
     'flex_direction', 'flex_wrap', 'flex_grow', 'order', 'gap', 'padding', 'margin',
     'align_items', 'justify_content', 'background_color', 'color', 'border', 'border_radius',
 ])

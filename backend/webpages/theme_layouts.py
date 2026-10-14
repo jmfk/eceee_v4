@@ -23,6 +23,7 @@ BREAKPOINTS = {"base", "xs", "sm", "md", "lg", "xl"}
 STYLE_PROPERTIES = {
     "display",
     "width",
+    "height",
     "max_width",
     "min_height",
     "grid_template_columns",

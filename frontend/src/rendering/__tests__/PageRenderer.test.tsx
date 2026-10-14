@@ -5,31 +5,6 @@ import { createPageRenderModel } from '../adapters'
 import { getRenderFixture, RENDER_WIDGET_FIXTURES } from '../fixtures'
 
 describe('PageRenderer', () => {
-    it('uses the active preview viewport height for empty layout slot placeholders', () => {
-        const model = createPageRenderModel({
-            layoutDefinition: {
-                id: '08c564cc-7583-4bc2-9bd3-178f2d57d572', key: 'preview_layout', label: 'Preview', status: 'active',
-                slots: { main: { label: 'Main', dimensions: { mobile: { width: 375, height: 72 }, desktop: { width: 1280, height: 112 } } } },
-                root: {
-                    id: '14a715dd-567c-42dc-8340-7bfe59037d36', type: 'container', class_names: ['preview-layout'], styles: {},
-                    children: [{ id: 'c966d81c-ef31-47b5-920a-9c25ec0ff8f4', type: 'slot', slot_key: 'main', class_names: ['slot-main'], styles: {}, children: [] }],
-                },
-            },
-            layout: 'preview_layout',
-            widgets: {},
-            context: { preview: true, previewViewport: 'mobile' },
-        })
-        model.slots.main = [{
-            id: 'placeholder', type: 'designer.LayoutSlotPlaceholder',
-            config: { label: 'Main', dimensions: { mobile: { width: 375, height: 72 }, desktop: { width: 1280, height: 112 } } },
-        }]
-        model.designer = { catalog: {}, texts: {}, assets: [], guidesEnabled: false, layoutCanvas: false }
-
-        render(<PageRenderer model={model} />)
-
-        expect(screen.getByRole('heading', { name: 'Main' }).parentElement).toHaveStyle({ height: '72px', minHeight: '72px' })
-    })
-
     it.each(Object.keys(RENDER_WIDGET_FIXTURES))('renders %s without editor chrome', (type) => {
         const fixture = getRenderFixture(type)!
         const model = createPageRenderModel({ layout: 'main_layout', widgets: { main: [fixture] } })
