@@ -9,7 +9,12 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 const signature = (workspace) => JSON.stringify(workspace?.layouts || null)
 
-const LayoutWorkspacePage = () => {
+const LayoutWorkspacePage = ({
+    backPath = null,
+    backLabel = 'Theme layouts',
+    documentTitle = 'Settings - Layout Editor',
+    fillAvailableSpace = false,
+}) => {
     const { themeId } = useParams()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
@@ -21,7 +26,7 @@ const LayoutWorkspacePage = () => {
     const [saving, setSaving] = useState(false)
     const [publishing, setPublishing] = useState(false)
     const baselineRef = useRef('')
-    useDocumentTitle('Settings - Layout Editor')
+    useDocumentTitle(documentTitle)
 
     const acceptWorkspace = useCallback((next) => {
         baselineRef.current = signature(next)
@@ -98,9 +103,10 @@ const LayoutWorkspacePage = () => {
     const controlsDisabled = saving || publishing
     const editorDisabled = controlsDisabled || workspace.draftIsStale
     const hasLayoutChanges = dirty || workspace.hasLayoutDraftChanges
-    return <div className="flex h-[calc(100vh-12rem)] min-h-[640px] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+    const resolvedBackPath = backPath || `/settings/themes/${themeId}/layouts`
+    return <div className={`flex min-h-[640px] flex-col overflow-hidden bg-white ${fillAvailableSpace ? 'h-full' : 'h-[calc(100vh-12rem)] rounded-lg border border-gray-200 shadow-sm'}`}>
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 sm:px-5">
-            <div className="flex items-center gap-3"><button type="button" onClick={() => navigate(`/settings/themes/${themeId}/layouts`)} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><ArrowLeft className="h-4 w-4" />Theme layouts</button><div><h1 className="font-semibold text-gray-900">Layout Editor</h1><p className="text-xs text-gray-500">{workspace.name} · theme-owned layout draft</p></div></div>
+            <div className="flex items-center gap-3"><button type="button" onClick={() => navigate(resolvedBackPath)} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><ArrowLeft className="h-4 w-4" />{backLabel}</button><div><h1 className="font-semibold text-gray-900">Layout Editor</h1><p className="text-xs text-gray-500">{workspace.name} · theme-owned layout draft</p></div></div>
             <div className="flex flex-wrap gap-2"><button type="button" onClick={discard} disabled={!hasLayoutChanges || controlsDisabled} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm disabled:opacity-40"><RotateCcw className="h-4 w-4" />Discard layout changes</button><button type="button" onClick={() => saveDraft()} disabled={!dirty || editorDisabled} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-blue-600 px-3 py-2 text-sm font-medium text-blue-700 disabled:opacity-40">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save layout draft</button><button type="button" onClick={publish} disabled={!hasLayoutChanges || editorDisabled} className="inline-flex min-h-9 items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Publish layouts</button></div>
         </header>
         {workspace.hasOtherDraftChanges && <div className="border-b border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-900">This theme also has separate Theme Designer changes. Saving, publishing, or discarding here affects layouts only.</div>}
