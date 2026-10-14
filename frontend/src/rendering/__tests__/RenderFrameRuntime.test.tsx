@@ -125,8 +125,8 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
             source: 'eceee-designer-preview',
             action: 'select',
-            targetId: 'layout:main_layout:slot:main',
-            kind: 'layoutSlot',
+            targetId: 'layout-node:114eff0f-f86f-4a10-8df5-27925804fc73',
+            kind: 'slot',
             layoutNodeId: '114eff0f-f86f-4a10-8df5-27925804fc73',
             editableParameters: ['gap'],
         }), '*')

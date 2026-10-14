@@ -117,6 +117,7 @@ describe('LayoutDesignerWorkspace', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Canvas · Main layout' }))
         expect(screen.getByRole('heading', { name: 'Slot · main' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Slot · main' })).toHaveAttribute('aria-current', 'true')
 
         fireEvent.click(screen.getByRole('button', { name: /Main layout main_layout/ }))
         expect(screen.getByRole('heading', { name: 'Layout inspector' })).toBeInTheDocument()
