@@ -1929,6 +1929,9 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(measurement).toHaveAttribute('data-editable', 'false')
         expect(measurement).not.toHaveAttribute('role')
         expect(measurement).not.toHaveAttribute('tabindex')
+        const borderGuide = document.querySelector<HTMLElement>('.designer-spacing-content')
+        expect(borderGuide).toHaveAttribute('data-editable', 'false')
+        expect(getComputedStyle(borderGuide!).borderColor).toBe('rgb(75, 85, 99)')
     })
 
     it('centers a spacing value in the visible part of an offscreen region', async () => {
