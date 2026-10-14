@@ -368,6 +368,36 @@ class ThemeVersionApiTests(TestCase):
         connection.refresh_from_db()
         self.assertEqual(connection.credential_scheme, ThemeRemoteConnection.CREDENTIAL_API_KEY)
 
+    def test_updating_connection_with_blank_access_key_keeps_existing_legacy_credential(self):
+        connection = ThemeRemoteConnection.objects.create(
+            tenant=self.tenant,
+            name="Production",
+            base_url="https://remote.example",
+            remote_workspace="remote",
+            encrypted_access_key=encrypt_access_key("machine-secret"),
+            credential_scheme=ThemeRemoteConnection.CREDENTIAL_API_KEY,
+            is_default=True,
+            created_by=self.user,
+            updated_by=self.user,
+        )
+        encrypted_access_key = connection.encrypted_access_key
+
+        response = self.client.patch(
+            f"/api/v1/webpages/designer/remote-connections/{connection.id}/",
+            {
+                "name": "Renamed production",
+                "access_key": "",
+                "credential_scheme": ThemeRemoteConnection.CREDENTIAL_API_KEY,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        connection.refresh_from_db()
+        self.assertEqual(connection.name, "Renamed production")
+        self.assertEqual(connection.credential_scheme, ThemeRemoteConnection.CREDENTIAL_API_KEY)
+        self.assertEqual(connection.encrypted_access_key, encrypted_access_key)
+
     def test_workspace_admin_manages_remote_access_keys_without_persisting_plaintext(self):
         created = self.client.post(
             "/api/v1/webpages/remote-sites/access-keys/",

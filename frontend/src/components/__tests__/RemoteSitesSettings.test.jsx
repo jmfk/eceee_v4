@@ -217,6 +217,25 @@ describe('RemoteSitesSettings', () => {
         })))
     })
 
+    it('keeps an existing legacy machine key when editing without entering a replacement', async () => {
+        const legacyConnection = { ...connection, credentialScheme: 'api_key' }
+        mocks.remoteConnections.mockResolvedValue({ results: [legacyConnection], canManage: true })
+        mocks.updateRemoteConnection.mockResolvedValue({ ...legacyConnection, name: 'Renamed production' })
+        renderWithStateProviders(<RemoteSitesSettings />)
+        await screen.findByText('Production')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+        fireEvent.change(screen.getByLabelText('Connection name'), { target: { value: 'Renamed production' } })
+        expect(screen.getByLabelText('Remote site key')).toHaveValue('')
+        fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+
+        await waitFor(() => expect(mocks.updateRemoteConnection).toHaveBeenCalledWith('connection-1', expect.objectContaining({
+            name: 'Renamed production',
+            accessKey: '',
+            credentialScheme: 'api_key',
+        })))
+    })
+
     it('creates and displays an inbound key once with explicit capabilities', async () => {
         mocks.createRemoteAccessKey.mockResolvedValue({
             id: 'key-2',
