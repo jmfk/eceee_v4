@@ -85,6 +85,23 @@ describe('public resolution', () => {
     expect(JSON.parse(JSON.stringify(model))).toEqual(model);
   });
 
+  it('resolves a published descendant when the hostname root is not currently published', async () => {
+    const descendantReader: PageReader = {
+      ...reader,
+      version: async (id, at) => id === root.id ? null : reader.version(id, at),
+    };
+
+    const model = await buildPublishedPageModel(
+      { withSnapshot: async read => read(descendantReader) },
+      'example.org',
+      '/news',
+      new Date('2026-06-01'),
+    );
+
+    expect(model?.context).toMatchObject({ siteId: root.id, pageId: child.id, versionId: versions[child.id].id });
+    expect(model?.slots.sidebar[0]).toMatchObject({ id: 'parent-side' });
+  });
+
   it('renders an exact theme special route before a CMS page at the same path', async () => {
     const specialTheme: Theme = {
       ...theme,

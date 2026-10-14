@@ -2,8 +2,11 @@
 Custom template tags and filters for the webpages app
 """
 
-from django import template
 import json
+
+from django import template
+
+from webpages.error_page_defaults import LEGACY_ERROR_PAGE_SLUGS
 
 register = template.Library()
 
@@ -75,10 +78,11 @@ def page_hierarchy(context, root_only=True):
     """
     Get page hierarchy for navigation using date-based publishing via PageVersion.
     """
-    from ..models import WebPage, PageVersion
+    from django.core.cache import cache
     from django.db import models
     from django.utils import timezone
-    from django.core.cache import cache
+
+    from ..models import PageVersion, WebPage
 
     now = timezone.now()
 
@@ -95,8 +99,10 @@ def page_hierarchy(context, root_only=True):
         )
         cache.set(cache_key, published_page_ids, 300)  # 5 minutes
 
-    queryset = WebPage.objects.filter(id__in=published_page_ids).select_related(
-        "parent"
+    queryset = (
+        WebPage.objects.filter(id__in=published_page_ids)
+        .select_related("parent")
+        .exclude(parent__isnull=False, parent__parent__isnull=True, slug__in=LEGACY_ERROR_PAGE_SLUGS)
     )
     if root_only:
         queryset = queryset.filter(parent__isnull=True)
@@ -120,10 +126,10 @@ def child_pages_nav(page, limit=None):
     """
     Render navigation for child pages using date-based publishing via PageVersion.
     """
-    from ..models import PageVersion
     from django.db import models
     from django.utils import timezone
-    from django.db import models
+
+    from ..models import PageVersion
 
     now = timezone.now()
     published_page_ids = (
@@ -133,8 +139,10 @@ def child_pages_nav(page, limit=None):
         .distinct()
     )
 
-    children = page.children.filter(id__in=published_page_ids).order_by(
-        "sort_order", "id"
+    children = (
+        page.children.filter(id__in=published_page_ids)
+        .exclude(parent__parent__isnull=True, slug__in=LEGACY_ERROR_PAGE_SLUGS)
+        .order_by("sort_order", "id")
     )
 
     if limit:
@@ -152,8 +160,8 @@ def render_slot(context, slot_name):
     Render widgets for the specified slot wrapped in a slot container
     Usage: {% render_slot "slot_name" %}
     """
-    from django.utils.safestring import mark_safe
     from django.template.loader import render_to_string
+    from django.utils.safestring import mark_safe
 
     # Get widgets_by_slot from context - this is how page_detail.html provides widget data
     widgets_by_slot = context.get("widgets_by_slot", {})
@@ -162,9 +170,7 @@ def render_slot(context, slot_name):
     slot_widgets = widgets_by_slot.get(slot_name, [])
     if not slot_widgets:
         # No widgets for this slot - return empty slot container
-        return mark_safe(
-            f'<div class="layout-slot slot-{slot_name.lower()}" data-slot-name="{slot_name}"></div>'
-        )
+        return mark_safe(f'<div class="layout-slot slot-{slot_name.lower()}" data-slot-name="{slot_name}"></div>')
 
     # Check if we have new-style rendered widgets (from WebPageRenderer)
     if slot_widgets and isinstance(slot_widgets[0], dict) and "html" in slot_widgets[0]:
@@ -188,16 +194,14 @@ def render_slot(context, slot_name):
                     request=context.get("request"),
                 )
                 rendered_widgets.append(widget_html)
-            except Exception as e:
+            except Exception:
                 # Log error and continue with other widgets
                 continue
         widgets_html = "".join(rendered_widgets)
 
     # Wrap in slot container with slot class
     return mark_safe(
-        f'<div class="layout-slot slot-{slot_name.lower()}" data-slot-name="{slot_name}">'
-        f'{widgets_html}'
-        f'</div>'
+        f'<div class="layout-slot slot-{slot_name.lower()}" data-slot-name="{slot_name}">' f"{widgets_html}" f"</div>"
     )
 
 
@@ -208,6 +212,7 @@ def render_page_backend(context, page, version=None):
     Usage: {% render_page_backend page %}
     """
     from django.utils.safestring import mark_safe
+
     from ..renderers import WebPageRenderer
 
     try:
@@ -279,8 +284,8 @@ def render_page_seo(context, page=None, version=None, page_data=None):
     Generate SEO meta tags (title, description, OG tags, Twitter cards) from page/version data.
     Usage: {% render_page_seo page=current_page version=content page_data=page_data %}
     """
-    from django.utils.safestring import mark_safe
     from django.utils.html import escape
+    from django.utils.safestring import mark_safe
 
     meta_tags = []
 
@@ -302,9 +307,7 @@ def render_page_seo(context, page=None, version=None, page_data=None):
     # Priority: page_data > version > page
     if page_data:
         meta_title = page_data.get("meta_title") or page_data.get("metaTitle")
-        meta_description = page_data.get("meta_description") or page_data.get(
-            "metaDescription"
-        )
+        meta_description = page_data.get("meta_description") or page_data.get("metaDescription")
 
     if not meta_title and version and hasattr(version, "meta_title"):
         meta_title = version.meta_title
@@ -332,9 +335,7 @@ def render_page_seo(context, page=None, version=None, page_data=None):
         meta_tags.append(f'<meta property="og:title" content="{meta_title}">')
 
     if meta_description:
-        meta_tags.append(
-            f'<meta property="og:description" content="{meta_description}">'
-        )
+        meta_tags.append(f'<meta property="og:description" content="{meta_description}">')
 
     meta_tags.append('<meta property="og:type" content="website">')
 
@@ -349,9 +350,7 @@ def render_page_seo(context, page=None, version=None, page_data=None):
     if meta_title:
         meta_tags.append(f'<meta name="twitter:title" content="{meta_title}">')
     if meta_description:
-        meta_tags.append(
-            f'<meta name="twitter:description" content="{meta_description}">'
-        )
+        meta_tags.append(f'<meta name="twitter:description" content="{meta_description}">')
 
     return mark_safe("\n    ".join(meta_tags))
 
@@ -363,12 +362,14 @@ def render_mustache(context, template_name, config):
     Usage: {% render_mustache widget_type.mustache_template_name config %}
     """
     from django.utils.safestring import mark_safe
-    from webpages.utils.mustache_renderer import load_mustache_template, render_mustache as render_mustache_util
+
+    from webpages.utils.mustache_renderer import load_mustache_template
+    from webpages.utils.mustache_renderer import render_mustache as render_mustache_util
 
     try:
         # Load the Mustache template
         template_str = load_mustache_template(template_name)
-        
+
         # Render the template with config as context
         rendered = render_mustache_util(template_str, config)
         return mark_safe(rendered)
@@ -388,7 +389,9 @@ def render_site_icons(context, root_page=None):
     Usage: {% render_site_icons root_page=root_page %}
     """
     from django.utils.safestring import mark_safe
+
     from file_manager.imgproxy import imgproxy_service
+
     from ..theme_service import ThemeService
 
     # Get theme from root_page or context
@@ -437,16 +440,10 @@ def render_site_icons(context, root_page=None):
             )
 
             if icon_spec["rel"] == "apple-touch-icon":
-                icon_tags.append(
-                    f'<link rel="apple-touch-icon" sizes="{size}x{size}" href="{icon_url}">'
-                )
+                icon_tags.append(f'<link rel="apple-touch-icon" sizes="{size}x{size}" href="{icon_url}">')
             else:
-                type_attr = (
-                    f' type="{icon_spec["type"]}"' if "type" in icon_spec else ""
-                )
-                icon_tags.append(
-                    f'<link rel="icon"{type_attr} sizes="{size}x{size}" href="{icon_url}">'
-                )
+                type_attr = f' type="{icon_spec["type"]}"' if "type" in icon_spec else ""
+                icon_tags.append(f'<link rel="icon"{type_attr} sizes="{size}x{size}" href="{icon_url}">')
 
         # Add favicon.ico (32x32)
         favicon_url = imgproxy_service.generate_url(

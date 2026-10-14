@@ -947,11 +947,16 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
   if (segments.some(segment => segment === '.' || segment === '..' || !/^[\p{L}\p{N}_.-]+$/u.test(segment)) || segments.length > 64) return null;
 
   return db.withSnapshot(async reader => {
-    const rootContext = await readRootThemeContext(reader, host, at);
-    if (!rootContext) return null;
-    const { root, rootVersion, theme: rootTheme } = rootContext;
-    const routePage = specialRoute(rootTheme, path);
-    if (routePage) return buildSpecialPageModel(reader, rootContext, routePage, path, at);
+    const root = await reader.root(host);
+    if (!root || root.parent_id !== null) return null;
+    const rootVersion = await reader.version(root.id, at);
+    const rootTheme = rootVersion?.theme_id
+      ? await reader.theme(rootVersion.theme_id, root.tenant_id)
+      : rootVersion ? await reader.defaultTheme(root.tenant_id) : null;
+    const routePage = rootVersion ? specialRoute(rootTheme, path) : null;
+    if (rootVersion && routePage) {
+      return buildSpecialPageModel(reader, { root, rootVersion, theme: rootTheme }, routePage, path, at);
+    }
     if (segments.length && LEGACY_ERROR_ROUTES.has(segments[0])) return null;
     const pages = [root];
     let current = root;
@@ -979,10 +984,10 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
       : []);
     const explicitThemeId = [...chain].reverse().find(item => item.version.theme_id)?.version.theme_id;
     const theme = explicitThemeId
-      ? explicitThemeId === rootVersion.theme_id
+      ? explicitThemeId === rootVersion?.theme_id
         ? rootTheme
         : await reader.theme(explicitThemeId, root.tenant_id)
-      : rootTheme;
+      : rootTheme ?? await reader.defaultTheme(root.tenant_id);
     const layout = [...chain].reverse().find(item => item.version.layout_key || item.version.code_layout)?.version;
     const layoutKey = layout?.layout_key || layout?.code_layout || theme?.layouts?.default_layout_key || 'main_layout';
     const layoutDefinition = theme?.layouts?.items?.find(item => item.key === layoutKey) || null;
