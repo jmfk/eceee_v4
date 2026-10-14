@@ -1282,6 +1282,8 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByRole('navigation', { name: 'Widget path' })).not.toBeInTheDocument()
         expect(screen.getByRole('navigation', { name: 'Element path' })).toBeInTheDocument()
 
+        const inspectSelectedWidgetButton = screen.getByRole('button', { name: 'Inspect selected widget Content widget' })
+        expect(inspectSelectedWidgetButton.querySelector('svg.lucide-chevron-down')).toBeInTheDocument()
         const richWidgetHeader = screen.getByText('Selected widget').closest('section')?.firstElementChild
         postMessage.mockClear()
         fireEvent.mouseEnter(richWidgetHeader)
@@ -1293,7 +1295,16 @@ describe('DesignerThemeWorkspacePage', () => {
             source: 'eceee-render-host', action: 'previewSelectionLevel',
         }, '*')
 
-        fireEvent.click(screen.getByRole('button', { name: 'Inspect selected widget Content widget' }))
+        postMessage.mockClear()
+        fireEvent.click(inspectSelectedWidgetButton)
+        const widgetSelectionMessage = postMessage.mock.calls
+            .map(([message]) => message)
+            .find((message) => message.action === 'selectTarget')
+        expect(widgetSelectionMessage).toEqual(expect.objectContaining({
+            targetId: 'widget:content-1',
+            selectionLevel: 'widget',
+        }))
+        expect(widgetSelectionMessage.selectedTargets.map(({ selectionLevel }) => selectionLevel)).toEqual(['slot', 'widget'])
         const reopenedPanelButton = await screen.findByRole('button', { name: 'Collapse selected widget Content widget' })
         const reopenedPanel = document.getElementById(reopenedPanelButton.getAttribute('aria-controls'))
         expect(within(reopenedPanel).getAllByRole('heading', { name: 'Widget content · Content area' })).toHaveLength(1)

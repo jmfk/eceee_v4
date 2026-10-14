@@ -83,6 +83,7 @@ const targetSelectionKind = (target) => target?.kind === 'layoutSlot' || target?
     : ['widget', 'part', 'group'].includes(target?.kind)
         ? 'widget'
         : 'element'
+const selectionKindOrder = ['slot', 'widget', 'element']
 
 const widgetSlotTrail = (path = []) => path.reduce((trail, target) => {
     const kind = targetSelectionKind(target)
@@ -1631,7 +1632,11 @@ const SemanticThemeWorkspace = ({
         ;(next.layouts?.items || []).some((layout) => mutate(layout.root))
         return next
     })
-    const selectTargetFromInspector = (target, { replaceInspectorRoot = false, selectionLevel = targetSelectionKind(target) } = {}) => {
+    const selectTargetFromInspector = (target, {
+        replaceInspectorRoot = false,
+        selectionLevel = targetSelectionKind(target),
+        limitPreviewToSelectionLevel = false,
+    } = {}) => {
         const asset = assetsByTargetId.get(target.id)
         if (asset) setSelectedImageAspectKey(imageAspectKey(asset))
         const normalizedTarget = {
@@ -1657,12 +1662,17 @@ const SemanticThemeWorkspace = ({
             action: 'selectTarget',
             targetId: target.id,
             selectionLevel,
-            selectedTargets: Object.entries(nextLevelSelections).flatMap(([kind, selected]) => selected ? [{
-                targetId: selected.id,
-                selectionLevel: kind,
-                ...(selected.instanceId ? { targetInstanceId: selected.instanceId } : {}),
-                ...(selected.widgetId ? { widgetId: selected.widgetId } : {}),
-            }] : []),
+            selectedTargets: Object.entries(nextLevelSelections).flatMap(([kind, selected]) => (
+                selected && (!limitPreviewToSelectionLevel
+                    || selectionKindOrder.indexOf(kind) <= selectionKindOrder.indexOf(selectionLevel))
+                    ? [{
+                        targetId: selected.id,
+                        selectionLevel: kind,
+                        ...(selected.instanceId ? { targetInstanceId: selected.instanceId } : {}),
+                        ...(selected.widgetId ? { widgetId: selected.widgetId } : {}),
+                    }]
+                    : []
+            )),
             ...(target.instanceId ? { targetInstanceId: target.instanceId } : {}),
             ...(target.widgetId ? { widgetId: target.widgetId } : {}),
         }, '*')
@@ -2386,7 +2396,10 @@ const SemanticThemeWorkspace = ({
             <button
                 type="button"
                 aria-label={`Inspect selected ${kind} ${label}`}
-                onClick={() => selectTargetFromInspector(target, { selectionLevel: kind })}
+                onClick={() => selectTargetFromInspector(target, {
+                    selectionLevel: kind,
+                    limitPreviewToSelectionLevel: true,
+                })}
                 onMouseEnter={() => previewSelectionLevel(kind)}
                 onMouseLeave={() => previewSelectionLevel(null)}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-left ${tone.header}`}
@@ -2395,6 +2408,7 @@ const SemanticThemeWorkspace = ({
                     <p className={`text-[10px] font-semibold uppercase tracking-wide ${tone.label}`}>Selected {kind}</p>
                     <h2 className="truncate text-sm font-semibold text-gray-900">{label}</h2>
                 </div>
+                <ChevronDown className={`h-4 w-4 shrink-0 ${tone.label}`} />
             </button>
         </section>
     })
