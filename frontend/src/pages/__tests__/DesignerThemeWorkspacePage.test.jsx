@@ -39,7 +39,10 @@ const workspace = {
         designGroups: { groups: [{ name: 'Article', widgetTypes: ['easy_widgets.ContentWidget'], elements: { h1: {} }, layoutProperties: { 'content-widget': { md: {} } } }] },
     },
     colors: [{ name: 'brand', value: '#123456', usage: ['Article / h1'] }],
-    fonts: [{ family: 'Inter', variants: ['400', '700'], display: 'swap', usage: ['Article / h1'] }],
+    fonts: [{
+        family: 'Inter', variants: ['400', '700'], display: 'swap', usage: ['Article / h1'],
+        references: [{ definition: 'Article', classes: [] }],
+    }],
     typography: [{ targetId: 'group:0:element:h1', groupIndex: 0, groupName: 'Article', element: 'h1', values: { fontFamily: 'Inter', fontSize: '32px' } }],
     spacing: [
         { targetId: 'group:0:element:h1', scope: 'element', groupIndex: 0, groupName: 'Article', element: 'h1', values: { marginBottom: '16px' } },
@@ -2316,6 +2319,7 @@ describe('DesignerThemeWorkspacePage', () => {
         await user.click(screen.getByRole('button', { name: 'Theme fonts' }))
         expect(screen.getByRole('heading', { name: 'Installed font families' })).toBeInTheDocument()
         expect(screen.queryByText('These named colors are available to every color property in the Designer.')).not.toBeInTheDocument()
+        expect(screen.getByText('References (1)').closest('details')).not.toHaveAttribute('open')
 
         await user.click(screen.getByRole('button', { name: 'Article page' }))
         expect(screen.getByText('Select something in the preview to inspect its margin and padding.')).toBeInTheDocument()
