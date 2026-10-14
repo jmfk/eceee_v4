@@ -88,4 +88,15 @@ describe('LayoutWorkspacePage', () => {
         }))
         expect(mocks.navigate).not.toHaveBeenCalled()
     })
+
+    it('blocks global CMS navigation while local layout changes are unsaved', async () => {
+        const onCmsNavigationBlockedChange = vi.fn()
+        render(<LayoutWorkspacePage onCmsNavigationBlockedChange={onCmsNavigationBlockedChange} />)
+        await screen.findByRole('heading', { name: 'Layout Editor' })
+
+        expect(onCmsNavigationBlockedChange).toHaveBeenLastCalledWith(false)
+        fireEvent.click(screen.getByRole('button', { name: 'Change layout' }))
+
+        await waitFor(() => expect(onCmsNavigationBlockedChange).toHaveBeenLastCalledWith(true))
+    })
 })

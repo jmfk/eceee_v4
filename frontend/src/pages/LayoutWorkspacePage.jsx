@@ -14,6 +14,7 @@ const LayoutWorkspacePage = ({
     backLabel = 'Theme layouts',
     documentTitle = 'Settings - Layout Editor',
     fillAvailableSpace = false,
+    onCmsNavigationBlockedChange = null,
 }) => {
     const { themeId } = useParams()
     const navigate = useNavigate()
@@ -28,6 +29,10 @@ const LayoutWorkspacePage = ({
     const baselineRef = useRef('')
     const resolvedBackPath = backPath || `/settings/themes/${themeId}/layouts`
     useDocumentTitle(documentTitle)
+
+    useEffect(() => {
+        onCmsNavigationBlockedChange?.(dirty || saving || publishing)
+    }, [dirty, onCmsNavigationBlockedChange, publishing, saving])
 
     const acceptWorkspace = useCallback((next) => {
         baselineRef.current = signature(next)
