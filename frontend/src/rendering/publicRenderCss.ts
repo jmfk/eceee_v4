@@ -2,7 +2,6 @@ export const PUBLIC_RENDER_CSS = `
 html,body,#root{margin:0;min-height:100%;background:#fff}body{font-family:system-ui,sans-serif}
 *,*::before,*::after{box-sizing:border-box}.site-renderer{min-height:100vh}.widget-item{position:relative}
 .site-renderer .layout-slot{position:relative;display:flex;flex-direction:column;gap:0;min-height:0}
-.site-renderer .layout-slot:has(>.layout-preview-placeholder-item){height:100%}
 .site-renderer .layout-slot>.layout-preview-placeholder-item{display:flex;flex:1 1 auto;min-height:0}
 .site-renderer .layout-slot>.widget-item:not(:last-child)>.banner-widget{margin-bottom:30px}
 .two-columns-widget{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}.three-columns-widget{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
