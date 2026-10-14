@@ -4,6 +4,9 @@ Tests for Custom Error Pages Feature
 Tests error page creation, validation, rendering, and fallback behavior.
 """
 
+import json
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, SimpleTestCase, TestCase
@@ -15,7 +18,7 @@ from rest_framework.test import APIClient
 from easy_widgets.widgets.navigation import NavigationWidget
 from webpages.layout_registry import layout_registry
 from webpages.models import PageTheme, PageVersion, WebPage
-from webpages.public_views import HostnamePageView, custom_404_handler, page_sitemap_view
+from webpages.public_views import HostnamePageView, custom_404_handler, page_search_view, page_sitemap_view
 from webpages.serializers import WebPageListSerializer
 from webpages.theme_layouts import default_theme_layouts
 from webpages.views.webpage_views import WebPageViewSet
@@ -253,6 +256,31 @@ class ErrorPageRenderingTests(TestCase):
         self.assertContains(response, "404 — Page not found", status_code=404)
         self.assertContains(response, "Return to the home page", status_code=404)
 
+    def test_special_route_is_not_exposed_when_site_root_is_unpublished(self):
+        layouts = self.theme.layouts
+        layouts["special_pages"].append(
+            {
+                "id": "3f288deb-5487-47c4-84da-3d69a65b7384",
+                "key": "login",
+                "label": "Log in",
+                "kind": "route",
+                "route": "login",
+                "layout_key": "main_layout",
+                "widgets": {},
+            }
+        )
+        self.theme.layouts = layouts
+        self.theme.save(update_fields=["layouts"])
+        request = self.factory.get("/login/", HTTP_HOST="testsite.com")
+        view = HostnamePageView()
+        view.request = request
+        view.kwargs = {"slug_path": "login"}
+
+        with patch.object(WebPage, "get_root_page_for_hostname", return_value=self.root_page):
+            response = view.get(request, slug_path="login")
+
+        self.assertEqual(response.status_code, 404)
+
     def test_custom_404_page_not_found_returns_none(self):
         """A site without an effective theme has no special error page."""
         from django.db import connection
@@ -461,6 +489,14 @@ class ErrorPageIntegrationTests(TestCase):
             last_modified_by=self.user,
             tenant=self.tenant,
         )
+        legacy_child = WebPage.objects.create(
+            title="Hidden help",
+            slug="help",
+            parent=legacy_page,
+            created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
+        )
         view = WebPageViewSet()
         view.action = "list"
         view.request = type("Request", (), {"tenant": self.tenant, "user": self.user})()
@@ -469,6 +505,7 @@ class ErrorPageIntegrationTests(TestCase):
         serialized_root = WebPageListSerializer(self.root_page).data
 
         self.assertNotIn(legacy_page.id, ids)
+        self.assertNotIn(legacy_child.id, ids)
         self.assertIn(ordinary_page.id, ids)
         self.assertEqual(serialized_root["children_count"], 1)
 
@@ -489,7 +526,15 @@ class ErrorPageIntegrationTests(TestCase):
             last_modified_by=self.user,
             tenant=self.tenant,
         )
-        for page in (legacy_page, ordinary_page):
+        legacy_child = WebPage.objects.create(
+            title="Hidden legacy help",
+            slug="help",
+            parent=legacy_page,
+            created_by=self.user,
+            last_modified_by=self.user,
+            tenant=self.tenant,
+        )
+        for page in (legacy_page, legacy_child, ordinary_page):
             PageVersion.objects.create(
                 page=page,
                 version_number=1,
@@ -500,6 +545,8 @@ class ErrorPageIntegrationTests(TestCase):
 
         request = self.factory.get("/sitemap.xml", HTTP_HOST="testsite.com")
         sitemap = page_sitemap_view(request).content.decode()
+        search_request = self.factory.get("/search/", {"q": "Hidden"}, HTTP_HOST="testsite.com")
+        search_results = json.loads(page_search_view(search_request).content)["results"]
         navigation = NavigationWidget()._get_page_hierarchy_context(
             {
                 "webpage_data": {
@@ -512,5 +559,21 @@ class ErrorPageIntegrationTests(TestCase):
         )
 
         self.assertNotIn("/404/", sitemap)
+        self.assertNotIn("/404/help/", sitemap)
+        self.assertEqual(search_results, [])
         self.assertIn("/about/", sitemap)
         self.assertEqual([item["id"] for item in navigation["currentChildren"]], [ordinary_page.id])
+
+        explicit_items = NavigationWidget()._process_menu_items(
+            [
+                {
+                    "link_data": {
+                        "type": "internal",
+                        "page_id": legacy_child.id,
+                        "label": "Hidden help",
+                    }
+                }
+            ],
+            {},
+        )
+        self.assertEqual(explicit_items, [])

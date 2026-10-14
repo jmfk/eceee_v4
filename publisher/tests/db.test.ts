@@ -83,12 +83,13 @@ describe('database snapshot', () => {
     expect(pageSql).toContain('page.tenant_id = $2');
     expect(pageSql).toContain('page.cached_root_id = $3');
     expect(pageSql).toContain('version.effective_date <= $4');
+    expect(pageSql).toContain('NOT (page.cached_path ~ $5)');
+    expect(mocks.query.mock.calls[1][1][4]).toBe('^/(403|404|500|503)(/|$)');
     expect(navigationSql).toContain('page.parent_id = ANY($1::bigint[])');
     expect(navigationSql).toContain('page.tenant_id = $2');
     expect(navigationSql).toContain('page.cached_root_id = $3');
-    expect(navigationSql).toContain('page.parent_id = $3');
-    expect(navigationSql).toContain('page.slug = ANY($5::varchar[])');
-    expect(mocks.query.mock.calls[2][1][4]).toEqual(['403', '404', '500', '503']);
+    expect(navigationSql).toContain('NOT (page.cached_path ~ $5)');
+    expect(mocks.query.mock.calls[2][1][4]).toBe('^/(403|404|500|503)(/|$)');
     expect(navigationSql).toContain("published.page_data->'shortTitle'");
     expect(navigationSql).toContain("published.page_data->'short_title'");
     expect(fileSql).toContain("media.access_level = 'public'");

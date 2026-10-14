@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from easy_widgets.models import LinkData
-from webpages.error_page_defaults import LEGACY_ERROR_PAGE_SLUGS
+from webpages.error_page_defaults import exclude_legacy_error_subtrees
 from webpages.widget_registry import BaseWidget, register_widget_type
 
 
@@ -220,11 +220,12 @@ class NavigationWidget(BaseWidget):
         current_children = []
         if current_page_id:
             child_query = (
-                WebPage.objects.filter(
-                    parent_id=current_page_id,
-                    is_deleted=False,
+                exclude_legacy_error_subtrees(
+                    WebPage.objects.filter(
+                        parent_id=current_page_id,
+                        is_deleted=False,
+                    )
                 )
-                .exclude(parent__parent__isnull=True, slug__in=LEGACY_ERROR_PAGE_SLUGS)
                 .select_related("latest_version")
                 .order_by("sort_order", "id")
             )
@@ -279,11 +280,12 @@ class NavigationWidget(BaseWidget):
 
             # Query parent's children (siblings of current page)
             parent_child_query = (
-                WebPage.objects.filter(
-                    parent_id=parent.id,
-                    is_deleted=False,
+                exclude_legacy_error_subtrees(
+                    WebPage.objects.filter(
+                        parent_id=parent.id,
+                        is_deleted=False,
+                    )
                 )
-                .exclude(parent__parent__isnull=True, slug__in=LEGACY_ERROR_PAGE_SLUGS)
                 .select_related("latest_version")
                 .order_by("sort_order", "id")
             )
@@ -509,9 +511,11 @@ class NavigationWidget(BaseWidget):
         valid_indices = set()
 
         if internal_page_ids:
-            page_query = WebPage.objects.filter(
-                id__in=internal_page_ids.keys(),
-                is_deleted=False,
+            page_query = exclude_legacy_error_subtrees(
+                WebPage.objects.filter(
+                    id__in=internal_page_ids.keys(),
+                    is_deleted=False,
+                )
             )
 
             if hostname:
