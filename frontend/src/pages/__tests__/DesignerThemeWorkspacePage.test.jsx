@@ -1273,6 +1273,13 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByText('Selected slot')).toBeInTheDocument()
         expect(screen.getByText('Selected widget')).toBeInTheDocument()
         expect(screen.queryByText('Selected element')).not.toBeInTheDocument()
+        const richTextTrail = screen.getByRole('navigation', { name: 'Widget and slot path' })
+        expect(within(richTextTrail).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+            'Main Content', 'Content widget',
+        ])
+        expect(screen.queryByRole('navigation', { name: 'Slot path' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('navigation', { name: 'Widget path' })).not.toBeInTheDocument()
+        expect(screen.getByRole('navigation', { name: 'Element path' })).toBeInTheDocument()
 
         const richWidgetHeader = screen.getByText('Selected widget').closest('section')?.firstElementChild
         postMessage.mockClear()
@@ -2094,6 +2101,31 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByRole('button', { name: 'Collapse selected slot Left slot' })).not.toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Collapse selected widget Headline widget' }).querySelector('svg')).toBeInTheDocument()
         expect(screen.getByRole('region', { name: 'Heading values' })).toBeInTheDocument()
+
+        fireEvent(window, new MessageEvent('message', {
+            data: {
+                source: 'eceee-designer-preview', action: 'select',
+                targetId: 'group:0:element:h1', kind: 'element', label: 'Heading', widgetId: 'headline-1',
+                path: [{ id: 'group:0:element:h1', kind: 'element', label: 'Heading', widgetId: 'headline-1' }],
+                selectionPaths: {
+                    slot: [
+                        { id: 'layout:main_layout:slot:main', kind: 'layoutSlot', label: 'Main content' },
+                        { id: 'slot:columns-1:left', kind: 'slot', label: 'Left slot', widgetId: 'columns-1' },
+                    ],
+                    widget: [
+                        { id: 'widget:columns-1', kind: 'widget', label: 'Two columns widget', widgetId: 'columns-1' },
+                        { id: 'widget:headline-1', kind: 'widget', label: 'Headline widget', widgetId: 'headline-1' },
+                    ],
+                    element: [{ id: 'group:0:element:h1', kind: 'element', label: 'Heading', widgetId: 'headline-1' }],
+                },
+            },
+            source: iframe.contentWindow,
+        }))
+        expect(screen.getByRole('navigation', { name: 'Widget and slot path' })).toBeInTheDocument()
+        expect(within(screen.getByRole('navigation', { name: 'Widget and slot path' })).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+            'Main content', 'Two columns widget', 'Left slot', 'Headline widget',
+        ])
+
         fireEvent.click(within(trail).getByRole('button', { name: 'Two columns widget' }))
         expect(screen.getByRole('navigation', { name: 'Element path' })).toBeInTheDocument()
         expect(within(screen.getByRole('navigation', { name: 'Element path' })).getByRole('button', { name: 'Heading' })).toBeInTheDocument()
@@ -2207,7 +2239,9 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.queryByRole('heading', { name: 'Choose what to edit' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Content widget container' })).not.toBeInTheDocument()
         expect(screen.queryByRole('navigation', { name: 'Widget ancestors path' })).not.toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Content widget' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Content widget' })).not.toBeInTheDocument()
+        const trail = screen.getByRole('navigation', { name: 'Widget and slot path' })
+        expect(within(trail).getByRole('button', { name: 'Content area' })).toBeDisabled()
         expect(screen.queryByRole('button', { name: '+ Add spacing' })).not.toBeInTheDocument()
     })
 

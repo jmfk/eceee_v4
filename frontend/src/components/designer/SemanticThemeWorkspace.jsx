@@ -645,6 +645,7 @@ const SemanticThemeWorkspace = ({
     const [selectedTarget, setSelectedTarget] = useState(null)
     const [levelSelections, setLevelSelections] = useState({ slot: null, widget: null, element: null })
     const [selectionTrail, setSelectionTrail] = useState([])
+    const selectionTrailRef = useRef([])
     const [selectionTrailOriginKey, setSelectionTrailOriginKey] = useState('')
     const [expandedSelectionLevels, setExpandedSelectionLevels] = useState(() => new Set(['slot', 'widget', 'element']))
     const [expandedZeroSpacingTargets, setExpandedZeroSpacingTargets] = useState(() => new Set())
@@ -809,6 +810,7 @@ const SemanticThemeWorkspace = ({
         inspectorRootRef.current = null
         setInspectorRoot(null)
         setLevelSelections({ slot: null, widget: null, element: null })
+        selectionTrailRef.current = []
         setSelectionTrail([])
         setSelectionTrailOriginKey('')
         setOpenTargetId('')
@@ -1030,9 +1032,19 @@ const SemanticThemeWorkspace = ({
                 : null
             const inspectorNavigation = pendingInspectorSelectionRef.current === targetFocusKey(target)
             if (!inspectorNavigation && event.data.action !== 'contentChange') {
-                const trail = widgetSlotTrail(target.path)
-                setSelectionTrail(trail)
-                setSelectionTrailOriginKey(trail.length ? targetFocusKey(trail.at(-1)) : '')
+                const pathTrail = widgetSlotTrail(target.path)
+                const contextTrail = widgetSlotTrail([
+                    ...normalizedSelectionPaths.slot,
+                    ...normalizedSelectionPaths.widget,
+                ])
+                const retainedTrail = selectionTrailRef.current
+                const retainsCurrentWidget = target.widgetId && retainedTrail.some((item) => item.widgetId === target.widgetId)
+                const trail = pathTrail.length ? pathTrail : retainsCurrentWidget ? retainedTrail : contextTrail
+                if (trail.length || targetSelectionKind(target) !== 'element') {
+                    selectionTrailRef.current = trail
+                    setSelectionTrail(trail)
+                    setSelectionTrailOriginKey(trail.length ? targetFocusKey(trail.at(-1)) : '')
+                }
             }
             setLevelSelections((current) => {
                 const next = requestedSelectionLevel
@@ -2388,6 +2400,12 @@ const SemanticThemeWorkspace = ({
     })
 
     const selectedEditor = selectedTarget && (<>
+        <WidgetSlotTrail
+            targets={selectionTrail}
+            originKey={selectionTrailOriginKey}
+            selectedTarget={selectedTarget}
+            onSelect={chooseTrailTarget}
+        />
         {selectedEditorAncestorHeaders}
         <section className="flex min-h-0 flex-1 flex-col border-b border-gray-200 bg-white">
             {selectedTargetKind !== 'element' && <button
@@ -2409,8 +2427,6 @@ const SemanticThemeWorkspace = ({
             {(selectedTargetKind === 'element' || selectionExpanded) && (
                 <div id="selected-element-editor" className={`flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto overscroll-contain p-2 ${selectedTargetKind === 'element' ? '' : `border-t ${selectedTargetTone.border}`}`}>
                     <section aria-label="Selection context" className="shrink-0 space-y-1.5">
-                        <SelectionPath kind="slot" label="Slot" targets={selectionPaths.slot} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
-                        <SelectionPath kind="widget" label="Widget" targets={selectionPaths.widget} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
                         <SelectionPath kind="element" label="Element" targets={visibleElementPath} selectedTarget={selectedTarget} onSelect={chooseTargetAlternative} />
                     </section>
                     {(() => {
