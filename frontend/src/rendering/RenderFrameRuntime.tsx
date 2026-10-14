@@ -961,19 +961,45 @@ const applyDesignerOverlay = (model: RenderPageModel, root: HTMLElement, focusSt
             top: sizeGuideLayout?.centerTop ?? rect.top + rect.height / 2,
         }
         const sizeLaneGap = 52
+        const sizeLabelInset = 2
         const widthLane = sizeGuideLayout?.widthLane ?? 0
         const heightLane = sizeGuideLayout?.heightLane ?? 0
-        const widthMeasureTop = sizeLabelCenter.top + widthLane * sizeLaneGap
-        const heightMeasureLeft = sizeLabelCenter.left + heightLane * sizeLaneGap
+        const clampInside = (preferred: number, start: number, end: number) => (
+            start <= end ? Math.min(end, Math.max(start, preferred)) : (start + end) / 2
+        )
+        const valueHalfWidth = (value: number) => Math.max(20, `${value}px`.length * 6) / 2
+        const widthValue = Math.round(rect.width)
+        const heightValue = Math.round(rect.height)
+        const labelHalfHeight = 7
+        const widthMeasureTop = clampInside(
+            sizeLabelCenter.top + widthLane * sizeLaneGap,
+            rect.top + labelHalfHeight + sizeLabelInset,
+            rect.bottom - labelHalfHeight - sizeLabelInset,
+        )
+        const heightMeasureLeft = clampInside(
+            sizeLabelCenter.left + heightLane * sizeLaneGap,
+            rect.left + valueHalfWidth(heightValue) + sizeLabelInset,
+            rect.right - valueHalfWidth(heightValue) - sizeLabelInset,
+        )
         const widthLabelOffset = ((sizeGuideLayout?.heightMaxLane ?? 0) + 1) * sizeLaneGap
         const heightLabelOffset = ((sizeGuideLayout?.widthMaxLane ?? 0) + 1) * sizeLaneGap
-        addGuide('designer-spacing-size', rect.left, widthMeasureTop - 0.5, rect.width, 1, 'right', 'size', Math.round(rect.width), 'width', {
-            left: sizeLabelCenter.left - widthLabelOffset,
+        const widthLabelLeft = clampInside(
+            sizeLabelCenter.left - widthLabelOffset,
+            rect.left + valueHalfWidth(widthValue) + sizeLabelInset,
+            rect.right - valueHalfWidth(widthValue) - sizeLabelInset,
+        )
+        const heightLabelTop = clampInside(
+            sizeLabelCenter.top + heightLabelOffset,
+            rect.top + labelHalfHeight + sizeLabelInset,
+            rect.bottom - labelHalfHeight - sizeLabelInset,
+        )
+        addGuide('designer-spacing-size', rect.left, widthMeasureTop - 0.5, rect.width, 1, 'right', 'size', widthValue, 'width', {
+            left: widthLabelLeft,
             top: widthMeasureTop,
         })
-        addGuide('designer-spacing-size', heightMeasureLeft - 0.5, rect.top, 1, rect.height, 'bottom', 'size', Math.round(rect.height), 'height', {
+        addGuide('designer-spacing-size', heightMeasureLeft - 0.5, rect.top, 1, rect.height, 'bottom', 'size', heightValue, 'height', {
             left: heightMeasureLeft,
-            top: sizeLabelCenter.top + heightLabelOffset,
+            top: heightLabelTop,
         })
         addGuide(
             'designer-spacing-content',
