@@ -1,4 +1,4 @@
-import { compileThemeCss, fontImports, widgetVariantClasses } from './theme';
+import { compileThemeCss, defaultSpecialPages, fontImports, widgetVariantClasses } from './theme';
 import { responsiveImageSources, type ResponsiveImageOptions } from './imgproxy';
 import type { ThemeLayoutDefinition, ThemeLayoutDocument, ThemeLayoutSlot, ThemeSpecialPage } from '../../frontend/src/rendering/types';
 
@@ -185,9 +185,11 @@ export interface PublishedPageModel {
 
 interface RootThemeContext {
   root: Page;
-  rootVersion: Version | null;
+  rootVersion: Version;
   theme: Theme | null;
 }
+
+const LEGACY_ERROR_ROUTES = new Set(['403', '404', '500', '503']);
 
 type RawWidget = Record<string, unknown>;
 
@@ -829,8 +831,8 @@ async function readRootThemeContext(reader: PageReader, host: string, at: Date):
   const root = await reader.root(host);
   if (!root || root.parent_id !== null) return null;
   const rootVersion = await reader.version(root.id, at);
-  if (rootVersion && rootVersion.page_id !== root.id) return null;
-  const theme = rootVersion?.theme_id
+  if (!rootVersion || rootVersion.page_id !== root.id) return null;
+  const theme = rootVersion.theme_id
     ? await reader.theme(rootVersion.theme_id, root.tenant_id)
     : await reader.defaultTheme(root.tenant_id);
   return { root, rootVersion, theme };
@@ -838,15 +840,20 @@ async function readRootThemeContext(reader: PageReader, host: string, at: Date):
 
 function specialRoute(theme: Theme | null, path: string): ThemeSpecialPage | null {
   const route = path.replace(/^\/+|\/+$/g, '');
-  return theme?.layouts?.special_pages?.find(page => (
+  return themeSpecialPages(theme).find(page => (
     page.kind === 'route' && String(page.route || '').replace(/^\/+|\/+$/g, '') === route
   )) ?? null;
 }
 
 function specialError(theme: Theme | null, statusCode: number): ThemeSpecialPage | null {
-  return theme?.layouts?.special_pages?.find(page => (
+  return themeSpecialPages(theme).find(page => (
     page.kind === 'error' && page.status_code === statusCode
   )) ?? null;
+}
+
+function themeSpecialPages(theme: Theme | null): ThemeSpecialPage[] {
+  const pages = theme?.layouts?.special_pages;
+  return Array.isArray(pages) ? pages : defaultSpecialPages();
 }
 
 async function buildSpecialPageModel(
@@ -883,21 +890,7 @@ async function buildSpecialPageModel(
   slots = prepareWidgets(slots, pagePaths, publicMedia.files, publicMedia.collections, theme, [root], navigationPages);
 
   const themeOnlyPage = { ...root, enable_css_injection: false };
-  const themeOnlyVersion: Version = rootVersion
-    ? { ...rootVersion, enable_css_injection: false }
-    : {
-      id: specialPage.id,
-      page_id: root.id,
-      meta_title: '',
-      meta_description: '',
-      code_layout: layoutKey,
-      layout_key: layoutKey,
-      widgets: specialPage.widgets,
-      theme_id: theme?.id ?? null,
-      enable_css_injection: false,
-      page_css_variables: {},
-      page_custom_css: '',
-    };
+  const themeOnlyVersion = { ...rootVersion, enable_css_injection: false };
   return {
     layout: layoutKey,
     layoutDefinition,
@@ -959,6 +952,7 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
     const { root, rootVersion, theme: rootTheme } = rootContext;
     const routePage = specialRoute(rootTheme, path);
     if (routePage) return buildSpecialPageModel(reader, rootContext, routePage, path, at);
+    if (segments.length && LEGACY_ERROR_ROUTES.has(segments[0])) return null;
     const pages = [root];
     let current = root;
     for (const segment of segments) {
@@ -985,7 +979,7 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
       : []);
     const explicitThemeId = [...chain].reverse().find(item => item.version.theme_id)?.version.theme_id;
     const theme = explicitThemeId
-      ? explicitThemeId === rootVersion?.theme_id
+      ? explicitThemeId === rootVersion.theme_id
         ? rootTheme
         : await reader.theme(explicitThemeId, root.tenant_id)
       : rootTheme;

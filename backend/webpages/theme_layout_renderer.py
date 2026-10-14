@@ -43,7 +43,10 @@ def _safe_value(property_name, value):
     if property_name == "background_image":
         if not text or len(text) > 2048 or re.search(r"[\x00-\x20\"'\\();{}<>]", text):
             return None
-        parsed = urlparse(text)
+        try:
+            parsed = urlparse(text)
+        except ValueError:
+            return None
         return f'url("{text}")' if parsed.scheme in {"http", "https"} and parsed.netloc else None
     if not text or len(text) > 160 or re.search(r"[;{}<>]|url\s*\(|expression\s*\(|@import", text, re.IGNORECASE):
         return None

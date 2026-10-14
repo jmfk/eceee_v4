@@ -5,6 +5,7 @@ from pathlib import Path
 
 from django.conf import settings
 
+from webpages.theme_layouts import default_special_pages
 from webpages.widget_registry import widget_type_registry
 
 MANIFEST_VERSION = 1
@@ -39,6 +40,7 @@ def build_publisher_manifest():
     return {
         "formatVersion": MANIFEST_VERSION,
         "baseCss": BASE_CSS_PATH.read_text(encoding="utf-8"),
+        "defaultSpecialPages": default_special_pages(),
         "widgets": widgets,
     }
 

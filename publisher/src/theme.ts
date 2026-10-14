@@ -1,6 +1,7 @@
 import manifest from './generated/publisher-manifest.json';
 import { responsiveImageSources } from './imgproxy';
 import type { Page, Theme, Version, Widget } from './model';
+import type { ThemeSpecialPage } from '../../frontend/src/rendering/types';
 
 type JsonObject = Record<string, unknown>;
 type WidgetManifest = { css: string; cssVariables: Record<string, string>; layoutParts: Record<string, { selector: string | null; relationship: string }>; variants: Array<{ id?: string; type?: string; config_field?: string }> };
@@ -9,6 +10,10 @@ const object = (value: unknown): JsonObject => value && typeof value === 'object
 const array = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 const kebab = (value: string) => value.includes('_') ? value.replaceAll('_', '-') : value.replace(/([A-Z])/g, '-$1').toLowerCase();
 const cssName = (value: unknown) => String(value ?? '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
+
+export function defaultSpecialPages(): ThemeSpecialPage[] {
+  return manifest.defaultSpecialPages as ThemeSpecialPage[];
+}
 
 function cssRecord(input: JsonObject): string {
   return Object.entries(input)

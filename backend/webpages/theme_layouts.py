@@ -61,7 +61,10 @@ def _valid_background_image(value):
         return False
     if re.search(r"[\x00-\x20\"'\\();{}<>]", value):
         return False
-    parsed = urlparse(value)
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return False
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 

@@ -119,4 +119,19 @@ describe('SpecialPagesEditor', () => {
         expect(current.layouts.special_pages[0]).toMatchObject({ layout_key: 'compact_layout', widgets: {} })
         vi.restoreAllMocks()
     })
+
+    it('preserves widgets accepted by a target slot wildcard policy', () => {
+        let current = structuredClone(workspaceWithLayouts)
+        current.layouts.items[1].slots.shared.allowed_widget_types = ['easy_widgets.*']
+        const updateWorkspace = vi.fn((updater) => { current = updater(current) })
+        vi.spyOn(window, 'confirm').mockReturnValue(true)
+        render(<SpecialPagesEditor workspace={current} updateWorkspace={updateWorkspace} disabled={false} />)
+
+        fireEvent.change(screen.getByLabelText('Layout'), { target: { value: 'compact_layout' } })
+
+        expect(current.layouts.special_pages[0].widgets).toEqual({
+            shared: [expect.objectContaining({ id: 'shared-widget' })],
+        })
+        vi.restoreAllMocks()
+    })
 })
