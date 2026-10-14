@@ -1793,11 +1793,52 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(document.querySelector('.designer-spacing-size')).toBeInTheDocument()
         const widthLabel = document.querySelector<HTMLElement>('.designer-spacing-size-value[data-property="width"]')
         const heightLabel = document.querySelector<HTMLElement>('.designer-spacing-size-value[data-property="height"]')
-        expect(widthLabel).toHaveStyle({ left: '300px', top: '292px' })
-        expect(heightLabel).toHaveStyle({ left: '300px', top: '308px' })
+        const widthMeasure = document.querySelector<HTMLElement>('.designer-spacing-size-measure[data-property="width"]')
+        const heightMeasure = document.querySelector<HTMLElement>('.designer-spacing-size-measure[data-property="height"]')
+        expect(widthLabel).toHaveStyle({ left: '300px', top: '290px' })
+        expect(heightLabel).toHaveStyle({ left: '300px', top: '310px' })
+        expect(widthMeasure).toHaveStyle({ top: '290px' })
+        expect(heightMeasure).toHaveStyle({ left: '300px' })
+        expect(Math.abs(Number.parseFloat(widthLabel!.style.top) - Number.parseFloat(heightLabel!.style.top))).toBeGreaterThanOrEqual(18)
         expect(widthLabel).toHaveAttribute('data-editable', 'false')
         expect(widthLabel).not.toHaveAttribute('role')
         expect(getComputedStyle(widthLabel!).color).toBe('rgb(55, 65, 81)')
+    })
+
+    it('distributes centered size labels across selected hierarchy levels without overlap', async () => {
+        render(<RenderFrameRuntime />)
+        sendModel(createDesignerRenderModel({
+            workspace,
+            viewId: 'page-main',
+            guideVisibility: { size: true, margin: false, padding: false, gap: false },
+        }))
+        const heading = await screen.findByRole('heading', { name: 'Overridden heading' })
+        const widget = heading.closest<HTMLElement>('[data-widget-id]')!
+        const slot = heading.closest<HTMLElement>('[data-slot-name]')!
+        const rect = {
+            x: 0, y: 100, left: 0, top: 100, right: 600, bottom: 500, width: 600, height: 400,
+            toJSON: () => ({}),
+        }
+        ;[slot, widget, heading].forEach((node) => vi.spyOn(node, 'getBoundingClientRect').mockReturnValue(rect))
+
+        fireEvent.click(heading)
+
+        const labels = [...document.querySelectorAll<HTMLElement>('.designer-spacing-size-value')]
+        expect(labels).toHaveLength(6)
+        const verticalBounds = labels
+            .map((label) => Number.parseFloat(label.style.top))
+            .sort((left, right) => left - right)
+        verticalBounds.slice(1).forEach((top, index) => {
+            expect(top - verticalBounds[index]).toBeGreaterThanOrEqual(18)
+        })
+        const widthLabelTops = labels
+            .filter((label) => label.dataset.property === 'width')
+            .map((label) => label.style.top)
+            .sort()
+        const widthMeasureTops = [...document.querySelectorAll<HTMLElement>('.designer-spacing-size-measure[data-property="width"]')]
+            .map((measure) => measure.style.top)
+            .sort()
+        expect(widthMeasureTops).toEqual(widthLabelTops)
     })
 
     it.each([
