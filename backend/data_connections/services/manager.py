@@ -1,24 +1,29 @@
-from typing import Any, Dict, List, Optional
-from .engine import get_engine
-from .transformers import DataTransformerService, ConnectionCacheService
-from .workflow import WorkflowEngine
+from typing import Any, Dict, List
+
 from ..credentials import resolved_connection_config
 from ..models import DataStream
+from .engine import get_engine
+from .transformers import ConnectionCacheService, DataTransformerService
+from .workflow import WorkflowEngine
+
 
 class DataConnectionManager:
     """
     Orchestrates the data retrieval, workflow execution, and transformation process.
     """
+
     def __init__(self):
         self.transformer_service = DataTransformerService()
         self.workflow_engine = WorkflowEngine()
 
-    def execute_stream(self, stream_id: int, bypass_cache: bool = False, query_params: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+    def execute_stream(
+        self, stream_id: int, bypass_cache: bool = False, query_params: Dict[str, Any] = None
+    ) -> List[Dict[str, Any]]:
         try:
-            stream = DataStream.objects.select_related('connection', 'transformer').get(id=stream_id)
+            stream = DataStream.objects.select_related("connection", "transformer").get(id=stream_id)
         except DataStream.DoesNotExist:
             return []
-        
+
         return self._run_engine_workflow_transformer(
             stream.connection,
             stream.query_dsl,
@@ -27,20 +32,21 @@ class DataConnectionManager:
             stream.cache_ttl,
             stream_id,
             bypass_cache,
-            query_params
+            query_params,
         )
 
     def preview_stream(self, connection_id: int, stream_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Execute a stream with provided data, bypassing cache."""
         from ..models import DataConnection, DataTransformer
+
         try:
             connection = DataConnection.objects.get(id=connection_id)
         except DataConnection.DoesNotExist:
             return []
 
-        query_dsl = stream_data.get('query_dsl') or stream_data.get('queryDsl', '')
-        workflow = stream_data.get('workflow', [])
-        transformer_id = stream_data.get('transformer')
+        query_dsl = stream_data.get("query_dsl") or stream_data.get("queryDsl", "")
+        workflow = stream_data.get("workflow", [])
+        transformer_id = stream_data.get("transformer")
         transformer = None
         if transformer_id:
             try:
@@ -49,25 +55,19 @@ class DataConnectionManager:
                 pass
 
         return self._run_engine_workflow_transformer(
-            connection,
-            query_dsl,
-            workflow,
-            transformer,
-            cache_ttl=0,
-            stream_id=None,
-            bypass_cache=True
+            connection, query_dsl, workflow, transformer, cache_ttl=0, stream_id=None, bypass_cache=True
         )
 
     def _run_engine_workflow_transformer(
-        self, 
-        connection, 
-        query_dsl, 
-        workflow, 
-        transformer, 
-        cache_ttl, 
-        stream_id=None, 
-        bypass_cache=False, 
-        query_params=None
+        self,
+        connection,
+        query_dsl,
+        workflow,
+        transformer,
+        cache_ttl,
+        stream_id=None,
+        bypass_cache=False,
+        query_params=None,
     ) -> List[Dict[str, Any]]:
         # 1. Check Cache
         if not bypass_cache and stream_id:

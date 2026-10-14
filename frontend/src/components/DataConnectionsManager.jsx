@@ -338,7 +338,12 @@ const DataConnectionsManager = () => {
                                         { value: 'EXTERNAL_REST', label: 'External REST API' },
                                         { value: 'EXTERNAL_DB', label: 'External Database', disabled: true, description: 'Coming soon' },
                                         { value: 'LEGACY_POSTGRES', label: 'Legacy PostgreSQL (SSH tunnel)' },
-                                        { value: 'FILEMAKER', label: 'FileMaker Data API' },
+                                        {
+                                            value: 'FILEMAKER',
+                                            label: 'FileMaker Data API',
+                                            disabled: true,
+                                            description: 'Proceedings foundation only — coming later',
+                                        },
                                     ]}
                                 />
 

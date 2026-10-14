@@ -18,7 +18,7 @@ class TenantPluginApiTests(TestCase):
     def setUp(self):
         self.owner = User.objects.create_user("eceee-owner", password="test")
         self.other_owner = User.objects.create_user("other-owner", password="test")
-        self.tenant = Tenant.objects.create(name="ECEEE", identifier="eceee", created_by=self.owner)
+        self.tenant = Tenant.objects.create(name="ECEEE", identifier="eceee_org", created_by=self.owner)
         self.other_tenant = Tenant.objects.create(name="Other", identifier="other", created_by=self.other_owner)
         self.namespace = Namespace.objects.create(
             name="ECEEE content",
@@ -67,6 +67,35 @@ class TenantPluginApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(TenantPluginActivation.objects.filter(tenant=self.other_tenant).exists())
 
+    def test_stale_activation_does_not_expose_importer_to_incompatible_tenant(self):
+        TenantPluginActivation.objects.create(
+            tenant=self.other_tenant,
+            plugin_id="org.eceee.legacy_import",
+            plugin_version="1",
+            activated_by=self.other_owner,
+        )
+        self.client.force_authenticate(self.other_owner)
+        self.client.credentials(HTTP_X_TENANT_ID=self.other_tenant.identifier)
+
+        response = self.client.get("/api/v1/content-migration/importers/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"], [])
+
+    def test_eceee_plugin_is_compatible_with_production_copy_workspace(self):
+        production_copy = Tenant.objects.create(
+            name="ECEEE Production Copy",
+            identifier="eceee-production-copy",
+            created_by=self.owner,
+        )
+        self.client.credentials(HTTP_X_TENANT_ID=production_copy.identifier)
+
+        response = self.client.get("/api/v1/content-migration/plugins/")
+
+        self.assertEqual(response.status_code, 200)
+        plugins = {item["id"]: item for item in response.data["results"]}
+        self.assertTrue(plugins["org.eceee.legacy_import"]["compatible"])
+
     def test_connection_secrets_are_write_only_and_connections_are_tenant_scoped(self):
         response = self.client.post(
             "/api/v1/data-connections/connections/",
@@ -86,7 +115,7 @@ class TenantPluginApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 201)
-        self.assertNotContains(response, "never-return-this")
+        self.assertNotContains(response, "never-return-this", status_code=201)
         connection = DataConnection.objects.get(id=response.data["id"])
         self.assertEqual(connection.tenant, self.tenant)
         self.assertEqual(resolved_connection_config(connection)["password"], "never-return-this")

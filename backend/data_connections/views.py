@@ -1,17 +1,17 @@
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+from core.permissions import HasTenantAccess
+
 from .models import DataConnection, DataStream, DataTransformer
 from .serializers import (
-    DataConnectionSerializer,
     DataConnectionListSerializer,
+    DataConnectionSerializer,
     DataStreamSerializer,
     DataTransformerSerializer,
 )
-
 from .services.manager import DataConnectionManager
-
-from core.permissions import HasTenantAccess
 
 
 class DataConnectionViewSet(viewsets.ModelViewSet):

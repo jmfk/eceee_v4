@@ -9,7 +9,6 @@ from rest_framework.views import APIView
 from content.models import Namespace
 from core.permissions import HasTenantAccess
 from data_connections.models import DataConnection
-
 from tenant_plugins.models import TenantPluginActivation
 from tenant_plugins.registry import PluginRegistryError, registry
 
@@ -95,7 +94,11 @@ class ImporterCatalogView(APIView):
         results = []
         for plugin in registry.plugins():
             activation = active.get(plugin.id)
-            if not activation or activation.plugin_version != plugin.version:
+            if (
+                not plugin.supports_tenant(request.tenant)
+                or not activation
+                or activation.plugin_version != plugin.version
+            ):
                 continue
             for importer in plugin.importers:
                 data = importer.as_dict()
@@ -114,6 +117,8 @@ def _importer_context(request, importer_id):
         plugin, importer = registry.importer(importer_id)
     except PluginRegistryError as exc:
         raise serializers.ValidationError({"importerId": str(exc)}) from exc
+    if not plugin.supports_tenant(request.tenant):
+        raise serializers.ValidationError({"importerId": "This importer is not available for this workspace."})
     active = TenantPluginActivation.objects.filter(
         tenant=request.tenant,
         plugin_id=plugin.id,

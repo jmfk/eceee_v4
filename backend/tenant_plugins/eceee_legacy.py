@@ -2,14 +2,15 @@ from content_migration.plugins.eceee_legacy import LegacyNewsImporter
 
 from .registry import ImporterDefinition, PluginDefinition
 
-
 PLUGIN = PluginDefinition(
     id="org.eceee.legacy_import",
     version="1",
     label="ECEEE Legacy Import",
     description="Guided, resumable migrations from the deprecated ECEEE CMS.",
     kind="import",
-    allowed_tenants=("eceee",),
+    # Keep the installed ECEEE capability available to both the canonical
+    # workspace and the production-copy workspace used for migration testing.
+    allowed_tenants=("eceee", "eceee_org", "eceee-production-copy"),
     importers=(
         ImporterDefinition(
             id="org.eceee.legacy_import.news",
