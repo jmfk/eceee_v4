@@ -1270,6 +1270,7 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(getComputedStyle(document.querySelector('.designer-spacing-content.designer-spacing-level-slot')!).borderStyle).toBe('solid')
         expect(getComputedStyle(document.querySelector('.designer-spacing-content.designer-spacing-level-widget')!).borderStyle).toBe('dashed')
         expect(getComputedStyle(document.querySelector('.designer-spacing-content.designer-spacing-level-element')!).borderStyle).toBe('dotted')
+        expect(getComputedStyle(document.querySelector('.designer-spacing-content.designer-spacing-level-element')!).borderWidth).toBe('1px')
 
         fireEvent.click(slotPaddingLabel!)
         fireEvent.keyDown(document, { key: 'ArrowDown' })
@@ -1807,6 +1808,10 @@ describe('RenderFrameRuntime designer overlay', () => {
         expect(widthLabel).toHaveAttribute('data-editable', 'false')
         expect(widthLabel).not.toHaveAttribute('role')
         expect(getComputedStyle(widthLabel!).color).toBe('rgb(55, 65, 81)')
+        expect(getComputedStyle(widthMeasure!).height).toBe('1px')
+        expect(getComputedStyle(heightMeasure!).width).toBe('1px')
+        expect(getComputedStyle(widthMeasure!).backgroundColor).toBe('rgb(75, 85, 99)')
+        expect(getComputedStyle(widthMeasure!).boxShadow).toBe('none')
     })
 
     it('distributes size guides by descending value, alternating evenly around the midline', async () => {
