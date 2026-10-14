@@ -33,6 +33,7 @@ export const PageRenderer = ({ model }: { model: RenderPageModel }) => {
             || widget.config?.isActive === false
         if (hidden) return null
         const normalized = normalizeCssName(widget.type)
+        const isLayoutPreviewPlaceholder = widget.type === 'designer.LayoutSlotPlaceholder'
         const output = <Widget widget={widget} context={model.context} renderWidgets={renderWidgets} />
         const styleKey = widget.config?.componentStyle || widget.config?.component_style
         const componentStyle = styleKey ? model.context.componentStyles?.[styleKey] : null
@@ -46,7 +47,7 @@ export const PageRenderer = ({ model }: { model: RenderPageModel }) => {
                 console.error(`[render-layer] component style ${styleKey} failed`, error)
             }
         }
-        return <div key={widget.id} className={`widget-item widget-type-${normalized}`} data-widget-type={widget.type} data-widget-id={widget.id}>
+        return <div key={widget.id} className={`widget-item widget-type-${normalized}${isLayoutPreviewPlaceholder ? ' layout-preview-placeholder-item' : ''}`} data-widget-type={widget.type} data-widget-id={widget.id}>
             <RenderBoundary type={widget.type}>{renderedOutput}</RenderBoundary>
         </div>
     })

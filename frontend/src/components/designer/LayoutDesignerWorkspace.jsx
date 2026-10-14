@@ -833,6 +833,37 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         return layout
     })
 
+    const fillAvailableSlotHeight = () => updateLayout((layout) => {
+        const current = findNode(layout.root, selectedNodeId)
+        if (!current?.parent || current.node.type !== 'slot') return layout
+        let root = mapNode(layout.root, current.parent.id, (parent) => ({
+            ...parent,
+            styles: {
+                ...(parent.styles || {}),
+                base: {
+                    ...(parent.styles?.base || {}),
+                    display: 'flex',
+                    flex_direction: 'column',
+                    flex_grow: '1',
+                },
+            },
+        }))
+        root = mapNode(root, current.node.id, (slot) => ({
+            ...slot,
+            styles: {
+                ...(slot.styles || {}),
+                base: {
+                    ...(slot.styles?.base || {}),
+                    width: '100%',
+                    height: 'auto',
+                    min_height: '0px',
+                    flex_grow: '1',
+                },
+            },
+        }))
+        return { ...layout, root }
+    })
+
     const frameMessage = (event) => {
         if (event.data?.source !== 'eceee-designer-preview' || event.data?.action !== 'select') return
         if (event.data?.targetId?.startsWith('layout-node:')) {
@@ -1029,6 +1060,11 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
                         <label className="block text-xs font-medium text-gray-700">Inheritable widget types<textarea value={(selectedLayout.slots[selected.node.slot_key]?.inheritable_types || []).join('\n')} onChange={(event) => updateSlot((slot) => ({ ...slot, inheritable_types: splitList(event.target.value) }))} placeholder="One component type per line" rows="3" className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs" /></label>
                         <fieldset className="space-y-2 rounded border border-gray-200 p-2"><legend className="px-1 text-xs font-medium text-gray-700">Media target dimensions (px)</legend><p className="text-[11px] leading-4 text-gray-500">Used for responsive image sizing only. These values do not set the slot's CSS width or height.</p>{['mobile', 'tablet', 'desktop'].map((size) => <div key={size} className="grid grid-cols-[1fr_72px_72px] items-center gap-2 text-xs"><span className="capitalize text-gray-600">{size}</span>{['width', 'height'].map((dimension) => <input key={dimension} aria-label={`${size} media ${dimension} in pixels`} type="number" min="1" placeholder={dimension} value={selectedLayout.slots[selected.node.slot_key]?.dimensions?.[size]?.[dimension] ?? ''} onChange={(event) => updateSlot((slot) => { const dimensions = clone(slot.dimensions || {}); dimensions[size] = { ...(dimensions[size] || {}) }; if (event.target.value) dimensions[size][dimension] = Number(event.target.value); else delete dimensions[size][dimension]; return { ...slot, dimensions } })} className="min-w-0 rounded border border-gray-300 px-2 py-1.5 text-xs" />)}</div>)}</fieldset>
                         <details className="rounded border border-gray-200 bg-gray-50 p-2"><summary className="cursor-pointer text-xs font-medium text-gray-700">Default widgets (read-only)</summary><pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[11px] text-gray-600">{JSON.stringify(selectedLayout.slots[selected.node.slot_key]?.default_widgets || [], null, 2)}</pre></details>
+                        <div className="rounded border border-blue-200 bg-blue-50 p-2">
+                            <p className="text-[11px] leading-4 text-blue-900">Let this content area use the remaining page height while still growing when its content needs more room.</p>
+                            <button type="button" onClick={fillAvailableSlotHeight} className="mt-2 w-full rounded border border-blue-600 bg-white px-2 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50">Fill available height</button>
+                            <p className="mt-1 text-[10px] leading-4 text-blue-800">Applies a vertical flex container to the parent and flexible, auto-height sizing to this slot at Base.</p>
+                        </div>
                         <p className="rounded bg-blue-50 px-2 py-1.5 text-[11px] leading-4 text-blue-800">An empty auto-height slot gets a 40px selection area only in the Layout Editor. The published slot still uses its theme-defined Dimensions.</p>
                         <p className="text-xs text-gray-500">{usage.slots?.[selected.node.slot_key] || 0} versions contain widgets in this slot.</p>
                     </div>}

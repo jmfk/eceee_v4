@@ -48,6 +48,8 @@ const LayoutSlotPlaceholderRender: WidgetRenderComponent = ({ widget }) => {
             boxSizing: 'border-box',
             color: '#374151',
             display: 'flex',
+            flex: '1 1 auto',
+            height: '100%',
             justifyContent: 'center',
             minHeight: '40px',
             overflow: 'hidden',
