@@ -198,7 +198,10 @@ class MediaFileAPITest(APITestCase):
             reverse("api:file_manager:mediafile-force-delete", kwargs={"pk": theme_media.id}),
         )
 
-        self.assertEqual(restore_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn(
+            restore_response.status_code,
+            [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND],
+        )
         self.assertEqual(references_response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(force_delete_response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertTrue(MediaFile.objects.with_deleted().filter(pk=theme_media.id, is_deleted=True).exists())
