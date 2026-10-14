@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FileKey, Plus, ShieldAlert, Trash2 } from 'lucide-react'
+import { Eye, FileKey, Pencil, Plus, ShieldAlert, Trash2 } from 'lucide-react'
 
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import PageContentEditor from '../../editors/page-editor/PageContentEditor'
-import { buildDesignerTheme } from '../../utils/editorThemeCSS'
+import { createPageRenderModel } from '../../rendering/adapters'
+import { googleFontsStylesheetUrl } from '../../rendering/primitives'
+import { buildDesignerTheme, buildThemeCSS } from '../../utils/editorThemeCSS'
 import { applyWidgetUpdateToWidgetMap } from '../../utils/pageEditorWidgetState'
 import WidgetEditorPanel from '../WidgetEditorPanel'
+import ResponsivePreviewCanvas from './ResponsivePreviewCanvas'
 
 const newId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
 const routeKey = (route) => `route_${String(route || 'special').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').toLowerCase()}`
@@ -19,7 +22,9 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
     const pages = useMemo(() => layouts.special_pages || [], [layouts.special_pages])
     const [selectedId, setSelectedId] = useState(pages[0]?.id || '')
     const [widgetEditor, setWidgetEditor] = useState({ open: false, widget: null })
+    const [viewMode, setViewMode] = useState('edit')
     const pendingSelectionRef = useRef('')
+    const editorScrollRef = useRef(null)
     const { publishUpdate } = useUnifiedData()
 
     useEffect(() => {
@@ -29,6 +34,10 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
         }
         if (!pages.some((page) => page.id === selectedId)) setSelectedId(pages[0]?.id || '')
     }, [pages, selectedId])
+
+    useEffect(() => {
+        if (editorScrollRef.current) editorScrollRef.current.scrollTop = 0
+    }, [selectedId, viewMode])
 
     const selectedIndex = pages.findIndex((page) => page.id === selectedId)
     const selected = selectedIndex >= 0 ? pages[selectedIndex] : null
@@ -103,6 +112,20 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
         effectiveTheme,
     }) : null, [effectiveTheme, selected, widgets])
     const pageData = selected ? { id: selected.id, title: selected.label } : null
+    const previewModel = useMemo(() => {
+        if (!selected) return null
+        const layoutDefinition = layouts.items.find((layout) => layout.key === selected.layout_key) || null
+        return createPageRenderModel({
+            layout: selected.layout_key,
+            layoutDefinition,
+            layoutDefinitionRequired: true,
+            layoutBreakpoints: workspace.breakpoints,
+            widgets,
+            context: { mode: 'preview', specialPageKey: selected.key, statusCode: selected.status_code },
+            themeCss: buildThemeCSS({ theme: effectiveTheme }),
+            fontUrl: googleFontsStylesheetUrl(effectiveTheme?.fonts),
+        })
+    }, [effectiveTheme, layouts.items, selected, widgets, workspace.breakpoints])
 
     useEffect(() => {
         if (!selected) return
@@ -123,11 +146,11 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
         setWidgetEditor({ open: false, widget: null })
     }
 
-    return <div className="min-h-0 flex-1 overflow-auto bg-gray-50 p-4">
+    return <div ref={editorScrollRef} className="min-h-0 flex-1 overflow-auto bg-gray-50 p-4">
         <div className="mx-auto max-w-[1500px] space-y-4">
             <header className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4">
                 <div><h2 className="font-semibold text-gray-900">Special pages</h2><p className="mt-1 text-sm text-gray-600">Error and system routes live in the theme. Their widgets are static theme data and do not create page versions. An exact special route takes precedence over a CMS page at the same path.</p></div>
-                <button type="button" onClick={addRoutePage} disabled={disabled} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-40"><Plus className="h-4 w-4" />New special page</button>
+                <div className="flex flex-wrap items-center gap-2"><div className="inline-flex rounded-md border border-gray-300 bg-white p-0.5" aria-label="Special page mode"><button type="button" aria-pressed={viewMode === 'edit'} onClick={() => setViewMode('edit')} className={`inline-flex min-h-8 items-center gap-1.5 rounded px-2.5 text-xs font-medium ${viewMode === 'edit' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}><Pencil className="h-3.5 w-3.5" />Edit</button><button type="button" aria-pressed={viewMode === 'preview'} onClick={() => setViewMode('preview')} className={`inline-flex min-h-8 items-center gap-1.5 rounded px-2.5 text-xs font-medium ${viewMode === 'preview' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}><Eye className="h-3.5 w-3.5" />Preview</button></div><button type="button" onClick={addRoutePage} disabled={disabled} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-40"><Plus className="h-4 w-4" />New special page</button></div>
             </header>
 
             <div className="grid min-h-[640px] gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
@@ -145,9 +168,9 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
                             {selected.kind === 'route' && <button type="button" onClick={removeSelected} className="self-end inline-flex min-h-10 items-center justify-center gap-2 rounded border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" />Remove</button>}
                         </div>
                     </fieldset>
-                    <div className="min-h-[500px] overflow-hidden rounded-lg border border-gray-200">
+                    {viewMode === 'edit' ? <div className="min-h-[500px] overflow-hidden rounded-lg border border-gray-200">
                         <PageContentEditor webpageData={pageData} pageVersionData={pageVersion} editable={!disabled} localWidgets={widgets} onLocalWidgetUpdate={(nextWidgets) => updateSelected({ widgets: nextWidgets })} onOpenWidgetEditor={(widget) => setWidgetEditor({ open: true, widget })} inheritedWidgets={{}} slotInheritanceRules={{}} context={{ pageId: selected.id, mode: 'theme-special-page', contextType: 'page' }} />
-                    </div>
+                    </div> : previewModel && <ResponsivePreviewCanvas model={previewModel} title={`${selected.label} preview`} initialViewport="desktop" />}
                     <WidgetEditorPanel isOpen={widgetEditor.open} onClose={() => setWidgetEditor({ open: false, widget: null })} onSave={saveWidget} onRealTimeUpdate={updateWidget} widgetData={widgetEditor.widget} title={widgetEditor.widget ? `Edit ${widgetEditor.widget.name || widgetEditor.widget.type}` : 'Edit widget'} autoOpenSpecialEditor namespace={workspace.mediaNamespace} webpageData={pageData} pageVersionData={pageVersion} context={{ pageId: selected.id, versionId: selected.id, contextType: 'page', mode: 'theme-special-page' }} showPublishingFields={false} />
                 </section>}
             </div>

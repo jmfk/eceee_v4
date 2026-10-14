@@ -1,7 +1,8 @@
 import { createElement, useEffect, useMemo, useRef, useState } from 'react'
-import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Braces, Copy, FileKey, Image as ImageIcon, KeyRound, Maximize2, Minus, Palette, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Redo2, RotateCcw, Trash2, Type, Undo2 } from 'lucide-react'
+import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Braces, Copy, Eye, FileKey, Image as ImageIcon, KeyRound, Maximize2, Minus, Palette, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Redo2, RotateCcw, Trash2, Type, Undo2 } from 'lucide-react'
 
 import RenderFrame from '../../rendering/RenderFrame'
+import { createDesignerRenderModel, createPageRenderModel } from '../../rendering/adapters'
 import { googleFontsStylesheetUrl } from '../../rendering/primitives'
 import { validateLayoutDefinition } from '../../rendering/themeLayoutRenderer'
 import { buildDesignerTheme, buildThemeCSS } from '../../utils/editorThemeCSS'
@@ -9,6 +10,7 @@ import MediaSelectModal from '../media/MediaSelectModal'
 import { themeBreakpointDefinition } from '../theme/breakpointConfig'
 import { ThemeColorField, ThemeFontField, ThemeFontsEditor, ThemePaletteEditor } from './ThemeDesignTokens'
 import { inheritedLayoutStyle } from './layoutStyleInheritance'
+import ResponsivePreviewCanvas from './ResponsivePreviewCanvas'
 import SpecialPagesEditor from './SpecialPagesEditor'
 
 const nodeTypes = ['container', 'section', 'grid', 'row', 'column', 'semantic', 'slot']
@@ -126,6 +128,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
     const [manualZoom, setManualZoom] = useState(1)
     const [canvasViewportSize, setCanvasViewportSize] = useState({ width: 0, height: 0 })
     const [imagePickerOpen, setImagePickerOpen] = useState(false)
+    const [previewSource, setPreviewSource] = useState('')
     const initialActionHandled = useRef(false)
     const workspaceRef = useRef(null)
     const canvasViewportRef = useRef(null)
@@ -559,6 +562,48 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         return { layout: selectedLayout.key, layoutDefinition: selectedLayout, layoutDefinitionRequired: true, layoutBreakpoints: workspace.breakpoints, slots, context: { preview: true }, themeCss: layoutThemePreview.css, fontUrl: layoutThemePreview.fontUrl, designer: { catalog: {}, texts: {}, assets: [], guidesEnabled: false, layoutCanvas: true } }
     }, [layoutThemePreview, selectedLayout, workspace.breakpoints])
 
+    const layoutPreviewSources = useMemo(() => {
+        if (!selectedLayout) return []
+        const specialPages = (layouts.special_pages || [])
+            .filter((page) => page.layout_key === selectedLayout.key)
+            .map((page) => ({ key: `special:${page.id}`, label: page.label, kind: 'special', page }))
+        const previewViews = (workspace.previewContent?.views || [])
+            .filter((view) => (view.content?.codeLayout || view.layout || layouts.default_layout_key) === selectedLayout.key)
+            .map((view) => ({ key: `view:${view.id}`, label: view.label, kind: 'view', view }))
+        return [...previewViews, ...specialPages, { key: 'layout', label: 'Layout defaults', kind: 'layout' }]
+    }, [layouts.default_layout_key, layouts.special_pages, selectedLayout, workspace.previewContent?.views])
+
+    useEffect(() => {
+        if (!layoutPreviewSources.some((source) => source.key === previewSource)) setPreviewSource(layoutPreviewSources[0]?.key || 'layout')
+    }, [layoutPreviewSources, previewSource])
+
+    const previewModel = useMemo(() => {
+        if (!selectedLayout) return null
+        const source = layoutPreviewSources.find((candidate) => candidate.key === previewSource) || layoutPreviewSources[0]
+        if (source?.kind === 'view') {
+            return createDesignerRenderModel({
+                workspace,
+                viewId: source.view.id,
+                themeCss: layoutThemePreview.css,
+                fontUrl: layoutThemePreview.fontUrl,
+                guidesEnabled: false,
+            })
+        }
+        const widgets = source?.kind === 'special'
+            ? source.page.widgets || {}
+            : Object.fromEntries(Object.entries(selectedLayout.slots || {}).map(([slot, policy]) => [slot, policy.default_widgets || []]))
+        return createPageRenderModel({
+            layout: selectedLayout.key,
+            layoutDefinition: selectedLayout,
+            layoutDefinitionRequired: true,
+            layoutBreakpoints: workspace.breakpoints,
+            widgets,
+            context: { mode: 'preview', specialPageKey: source?.page?.key },
+            themeCss: layoutThemePreview.css,
+            fontUrl: layoutThemePreview.fontUrl,
+        })
+    }, [layoutPreviewSources, layoutThemePreview, previewSource, selectedLayout, workspace, workspace.breakpoints])
+
     const updateSlot = (updater) => updateLayout((layout) => {
         const key = selected.node.slot_key
         layout.slots[key] = updater(layout.slots[key] || {})
@@ -579,6 +624,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
             <div className="flex items-center gap-1" role="tablist" aria-label="Layout editor mode">
                 <button type="button" role="tab" aria-selected={mode === 'visual'} onClick={() => setMode('visual')} className={`rounded px-3 py-1.5 text-sm ${mode === 'visual' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Visual</button>
+                <button type="button" role="tab" aria-selected={mode === 'preview'} onClick={() => setMode('preview')} className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${mode === 'preview' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}><Eye className="h-4 w-4" />Preview</button>
                 <button type="button" role="tab" aria-selected={mode === 'json'} onClick={() => { setJsonText(JSON.stringify(layouts, null, 2)); setMode('json') }} className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${mode === 'json' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}><Braces className="h-4 w-4" />JSON</button>
                 <button type="button" role="tab" aria-selected={mode === 'palette'} onClick={() => setMode('palette')} className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${mode === 'palette' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}><Palette className="h-4 w-4" />Palette</button>
                 <button type="button" role="tab" aria-selected={mode === 'fonts'} onClick={() => setMode('fonts')} className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${mode === 'fonts' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}><Type className="h-4 w-4" />Fonts</button>
@@ -595,7 +641,13 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
             <label htmlFor="theme-layout-json" className="mb-2 text-sm font-medium text-gray-800">Canonical layout document</label>
             <textarea id="theme-layout-json" spellCheck="false" value={jsonText} disabled={disabled} onChange={(event) => { setJsonText(event.target.value); setJsonError('') }} className="min-h-0 flex-1 resize-none rounded border border-gray-300 bg-white p-4 font-mono text-xs leading-5 text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:bg-gray-100" />
             <div className="mt-3 flex justify-end"><button type="button" onClick={applyJson} disabled={disabled} className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">Apply JSON</button></div>
-        </section> : mode === 'palette' ? <section className="min-h-0 flex-1 overflow-y-auto p-6"><div className="mx-auto max-w-2xl rounded-lg border border-gray-200 bg-white p-5"><fieldset disabled={disabled}><ThemePaletteEditor colors={workspace.colors || []} onChange={updateThemeColor} onAdd={addThemeColor} /></fieldset></div></section> : mode === 'fonts' ? <section className="min-h-0 flex-1 overflow-y-auto p-6"><div className="mx-auto max-w-2xl rounded-lg border border-gray-200 bg-white p-5"><fieldset disabled={disabled}><ThemeFontsEditor fonts={workspace.fonts || []} onInstall={installThemeFont} /></fieldset></div></section> : mode === 'special' ? <SpecialPagesEditor workspace={workspace} updateWorkspace={updateWorkspace} disabled={disabled} /> : <div
+        </section> : mode === 'palette' ? <section className="min-h-0 flex-1 overflow-y-auto p-6"><div className="mx-auto max-w-2xl rounded-lg border border-gray-200 bg-white p-5"><fieldset disabled={disabled}><ThemePaletteEditor colors={workspace.colors || []} onChange={updateThemeColor} onAdd={addThemeColor} /></fieldset></div></section> : mode === 'fonts' ? <section className="min-h-0 flex-1 overflow-y-auto p-6"><div className="mx-auto max-w-2xl rounded-lg border border-gray-200 bg-white p-5"><fieldset disabled={disabled}><ThemeFontsEditor fonts={workspace.fonts || []} onInstall={installThemeFont} /></fieldset></div></section> : mode === 'special' ? <SpecialPagesEditor workspace={workspace} updateWorkspace={updateWorkspace} disabled={disabled} /> : mode === 'preview' && previewModel ? <section ref={(node) => { if (node) node.scrollTop = 0 }} className="min-h-0 flex-1 overflow-hidden p-4">
+            <ResponsivePreviewCanvas
+                model={previewModel}
+                title={`${selectedLayout.label} preview`}
+                toolbarStart={<div className="flex flex-wrap items-center gap-2"><label htmlFor="layout-preview-layout" className="text-xs font-medium text-gray-700">Layout</label><select id="layout-preview-layout" value={selectedLayout.id} onChange={(event) => inspectLayout(layouts.items.find((layout) => layout.id === event.target.value))} className="rounded border border-gray-300 bg-white px-2 py-1.5 text-xs">{layouts.items.filter((layout) => layout.status !== 'archived').map((layout) => <option key={layout.id} value={layout.id}>{layout.label}</option>)}</select><label htmlFor="layout-preview-source" className="ml-1 text-xs font-medium text-gray-700">Content</label><select id="layout-preview-source" value={previewSource} onChange={(event) => setPreviewSource(event.target.value)} className="max-w-56 rounded border border-gray-300 bg-white px-2 py-1.5 text-xs">{layoutPreviewSources.map((source) => <option key={source.key} value={source.key}>{source.label}</option>)}</select></div>}
+            />
+        </section> : <div
             ref={workspaceRef}
             className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[var(--layout-structure-width)_var(--layout-structure-handle-width)_minmax(400px,1fr)_var(--layout-inspector-handle-width)_var(--layout-inspector-width)]"
             style={{

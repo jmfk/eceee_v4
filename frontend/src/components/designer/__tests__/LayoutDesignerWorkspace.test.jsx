@@ -9,7 +9,7 @@ const framePostMessage = vi.fn()
 vi.mock('../../../rendering/RenderFrame', () => ({
     default: ({ model, onMessage, style, frameRef }) => {
         if (frameRef) frameRef.current = { contentWindow: { postMessage: framePostMessage } }
-        return <button type="button" data-layout-canvas={String(model.designer.layoutCanvas)} data-empty-slots={String(Object.values(model.slots).every((items) => items.length === 0))} data-frame-width={style?.width} data-root-md-background={model.layoutDefinition.root.styles?.md?.background_color || ''} data-root-md-image={model.layoutDefinition.root.styles?.md?.background_image || ''} data-font-url={model.fontUrl || ''} data-root-presentation-color={model.layoutDefinition.root.presentation_color || ''} onClick={() => onMessage?.({ data: { source: 'eceee-designer-preview', action: 'select', targetId: `layout-node:${model.layoutDefinition.root.children[0].id}` } })}>Canvas · {model.layoutDefinition.label}</button>
+        return <button type="button" data-layout-canvas={String(Boolean(model.designer?.layoutCanvas))} data-empty-slots={String(Object.values(model.slots).every((items) => items.length === 0))} data-frame-width={style?.width} data-root-md-background={model.layoutDefinition.root.styles?.md?.background_color || ''} data-root-md-image={model.layoutDefinition.root.styles?.md?.background_image || ''} data-font-url={model.fontUrl || ''} data-root-presentation-color={model.layoutDefinition.root.presentation_color || ''} onClick={() => onMessage?.({ data: { source: 'eceee-designer-preview', action: 'select', targetId: `layout-node:${model.layoutDefinition.root.children[0].id}` } })}>Canvas · {model.layoutDefinition.label}</button>
     },
 }))
 vi.mock('../../media/MediaSelectModal', () => ({
@@ -82,6 +82,19 @@ describe('LayoutDesignerWorkspace', () => {
         fireEvent.change(screen.getByLabelText('Layout label'), { target: { value: 'Article layout' } })
         expect(screen.getByRole('button', { name: 'Canvas · Article layout' })).toBeInTheDocument()
         expect(screen.getByText('Article layout')).toBeInTheDocument()
+    })
+
+    it('previews the current unsaved layout at responsive widths without editor guides', () => {
+        render(<Harness />)
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+
+        expect(screen.getByRole('button', { name: 'Canvas · Main layout' })).toHaveAttribute('data-layout-canvas', 'false')
+        expect(screen.getByLabelText('Layout')).toHaveValue(document.items[0].id)
+        expect(screen.getByRole('button', { name: 'Preview at desktop width' })).toHaveAttribute('aria-pressed', 'true')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Preview at mobile width' }))
+        expect(screen.getByRole('button', { name: 'Preview at mobile width' })).toHaveAttribute('aria-pressed', 'true')
     })
 
     it('switches the inspector between layouts and selected canvas elements', () => {
