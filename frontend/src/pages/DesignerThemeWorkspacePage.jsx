@@ -351,7 +351,10 @@ const DesignerThemeWorkspacePage = () => {
 
     return (
         <div className="fixed inset-0 flex flex-col bg-gray-50">
-            <DesignerNavbar />
+            <DesignerNavbar
+                cmsNavigationDisabled={hasUnsavedLocalChanges || controlsDisabled || exporting}
+                cmsNavigationDisabledReason={hasUnsavedLocalChanges ? 'Save or discard local Designer changes before returning to CMS' : 'Wait for the current Designer operation to finish'}
+            />
             <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
                 <div><h1 className="font-semibold text-gray-900">{workspace.name}</h1><p className="text-xs text-gray-500">Designer draft · live theme version {workspace.liveSyncVersion}</p></div>
                 <div className="flex flex-wrap items-center gap-2">
