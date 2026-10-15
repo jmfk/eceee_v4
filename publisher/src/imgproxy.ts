@@ -47,12 +47,20 @@ function pathToken(value: unknown, fallback = ''): string {
   return /^[a-z0-9_-]+$/.test(token) ? token : fallback;
 }
 
+export function internalImageSourceUrl(sourceUrl: string): string {
+  const publicEndpoint = (process.env.AWS_S3_ENDPOINT_URL || '').trim().replace(/\/+$/, '');
+  const internalEndpoint = (process.env.AWS_S3_INTERNAL_ENDPOINT_URL || '').trim().replace(/\/+$/, '');
+  if (!publicEndpoint || !internalEndpoint) return sourceUrl;
+  if (sourceUrl !== publicEndpoint && !sourceUrl.startsWith(`${publicEndpoint}/`)) return sourceUrl;
+  return `${internalEndpoint}${sourceUrl.slice(publicEndpoint.length)}`;
+}
+
 function signedResizeUrl(sourceUrl: string, width: number, height: number, options: ResponsiveImageOptions = {}): string | null {
   const key = hexSecret('PUBLISHER_IMGPROXY_KEY', 'IMGPROXY_KEY');
   const salt = hexSecret('PUBLISHER_IMGPROXY_SALT', 'IMGPROXY_SALT');
   if (!key || !salt) return null;
 
-  const encodedSource = Buffer.from(sourceUrl).toString('base64url');
+  const encodedSource = Buffer.from(internalImageSourceUrl(sourceUrl)).toString('base64url');
   const resizeType = pathToken(options.resizeType, 'fit');
   const gravity = pathToken(options.gravity);
   const format = pathToken(options.format);

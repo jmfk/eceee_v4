@@ -97,6 +97,7 @@ describe('database snapshot', () => {
     expect(collectionSql).toContain("collection.access_level = 'public'");
     expect(collectionSql).toContain('namespace.tenant_id = $2');
     expect(collectionSql).toContain('media.is_deleted = false');
+    expect(collectionSql).toContain('ORDER BY media.created_at DESC, media.id DESC');
   });
 
   it('derives public media URLs from file paths when the legacy URL column is empty', async () => {
