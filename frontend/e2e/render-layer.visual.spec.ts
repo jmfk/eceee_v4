@@ -42,7 +42,9 @@ const viewports = [
 ]
 
 const openRender = async (page, renderModel) => {
-  await page.goto('/__render-frame')
+  if (new URL(page.url()).pathname !== '/__render-frame') {
+    await page.goto('/__render-frame')
+  }
   await page.evaluate((nextModel) => {
     window.dispatchEvent(new MessageEvent('message', {
       source: window,
