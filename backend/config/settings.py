@@ -405,6 +405,10 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/hour",
         "user": "1000/hour",
+        # Image URL signing is intentionally public and a single rendered page can
+        # request many responsive variants. Keep it isolated from the much lower
+        # general anonymous API budget.
+        "imgproxy_sign": "5000/hour",
         "webpage_modifications": "50/hour",
     },
     "DEFAULT_RENDERER_CLASSES": [

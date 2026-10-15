@@ -9,9 +9,11 @@ from rest_framework.decorators import (
     api_view,
     permission_classes,
     authentication_classes,
+    throttle_classes,
 )
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework import status
 from django.core.cache import cache
 from file_manager.imgproxy import imgproxy_service
@@ -21,9 +23,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class ImgproxySignRateThrottle(AnonRateThrottle):
+    """Keep public image signing separate from the general anonymous API budget."""
+
+    scope = "imgproxy_sign"
+
+
 @api_view(["POST"])
 @authentication_classes([])  # No authentication required (public API)
 @permission_classes([AllowAny])  # Allow anonymous access for public images
+@throttle_classes([ImgproxySignRateThrottle])
 def sign_imgproxy_url(request):
     """
     Generate a signed imgproxy URL on the server.
@@ -53,9 +62,7 @@ def sign_imgproxy_url(request):
         # Extract parameters
         source_url = request.data.get("source_url")
         if not source_url:
-            return Response(
-                {"error": "source_url is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "source_url is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Optional parameters
         width = request.data.get("width")
@@ -154,6 +161,7 @@ def sign_imgproxy_url(request):
 @api_view(["POST"])
 @authentication_classes([])  # No authentication required (public API)
 @permission_classes([AllowAny])
+@throttle_classes([ImgproxySignRateThrottle])
 def batch_sign_imgproxy_urls(request):
     """
     Generate multiple signed imgproxy URLs in a single request.
@@ -241,6 +249,7 @@ def batch_sign_imgproxy_urls(request):
 @api_view(["POST"])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([ImgproxySignRateThrottle])
 def generate_responsive_imgproxy_urls(request):
     """
     Generate responsive imgproxy URLs for different breakpoints and pixel densities.
@@ -279,34 +288,28 @@ def generate_responsive_imgproxy_urls(request):
         # Extract parameters
         source_url = request.data.get("source_url")
         if not source_url:
-            return Response(
-                {"error": "source_url is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "source_url is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Breakpoint dimensions
-        breakpoints = request.data.get("breakpoints", {
-            "mobile": 640,
-            "tablet": 1024,
-            "desktop": 1280
-        })
-        
+        breakpoints = request.data.get("breakpoints", {"mobile": 640, "tablet": 1024, "desktop": 1280})
+
         # Original image dimensions (optional but recommended)
         original_width = request.data.get("original_width")
         original_height = request.data.get("original_height")
-        
+
         # Image processing options
         resize_type = request.data.get("resize_type", "fit")
         gravity = request.data.get("gravity", "sm")
         quality = request.data.get("quality", 85)
         format_type = request.data.get("format")
-        
+
         # Responsive options
         densities = request.data.get("densities", [1, 2])
         width_multiplier = request.data.get("width_multiplier", 1.0)
 
         # Version parameter for cache-busting
         version = request.data.get("version")
-        
+
         # Create cache key
         cache_key_parts = [
             source_url,
@@ -332,23 +335,23 @@ def generate_responsive_imgproxy_urls(request):
         # Generate URLs for each breakpoint and density
         urls = {}
         srcset_parts = []
-        
+
         for breakpoint_name, breakpoint_width in breakpoints.items():
             urls[breakpoint_name] = {}
-            
+
             # Apply width multiplier (for images that don't fill full slot)
             adjusted_width = int(breakpoint_width * width_multiplier)
-            
+
             for density in densities:
                 # Calculate dimensions for this density
                 density_width = adjusted_width * density
                 density_height = None
-                
+
                 # Calculate height maintaining aspect ratio if original dimensions provided
                 if original_width and original_height:
                     aspect_ratio = original_height / original_width
                     density_height = int(density_width * aspect_ratio)
-                    
+
                     # Don't exceed original dimensions
                     if density_width > original_width:
                         density_width = original_width
@@ -356,7 +359,7 @@ def generate_responsive_imgproxy_urls(request):
                     elif density_height and density_height > original_height:
                         density_height = original_height
                         density_width = int(density_height / aspect_ratio)
-                
+
                 # Generate URL
                 version = request.data.get("version")
                 img_url = imgproxy_service.generate_url(
@@ -369,16 +372,16 @@ def generate_responsive_imgproxy_urls(request):
                     format=format_type,
                     version=version,
                 )
-                
+
                 density_key = f"{density}x"
                 urls[breakpoint_name][density_key] = img_url
-                
+
                 # Add to srcset (using width descriptor)
                 srcset_parts.append(f"{img_url} {density_width}w")
-        
+
         # Generate srcset string
         srcset = ", ".join(srcset_parts)
-        
+
         # Generate sizes attribute
         breakpoint_list = sorted(breakpoints.items(), key=lambda x: x[1])
         sizes_parts = []
@@ -389,20 +392,22 @@ def generate_responsive_imgproxy_urls(request):
         final_width = int(breakpoint_list[-1][1] * width_multiplier)
         sizes_parts.append(f"{final_width}px")
         sizes = ", ".join(sizes_parts)
-        
+
         # Fallback URL (desktop 1x)
-        fallback = urls.get("desktop", {}).get("1x") or urls.get("tablet", {}).get("1x") or urls.get("mobile", {}).get("1x")
-        
+        fallback = (
+            urls.get("desktop", {}).get("1x") or urls.get("tablet", {}).get("1x") or urls.get("mobile", {}).get("1x")
+        )
+
         result = {
             "srcset": srcset,
             "sizes": sizes,
             "urls": urls,
             "fallback": fallback,
         }
-        
+
         # Cache for 1 hour
         cache.set(cache_key, result, 60 * 60)
-        
+
         return Response(result)
 
     except Exception as e:
