@@ -15,3 +15,4 @@ class PublisherManifestTests(SimpleTestCase):
         )
         self.assertIn("easy_widgets.HeaderWidget", manifest["widgets"])
         self.assertIn("header-widget", manifest["widgets"]["easy_widgets.HeaderWidget"]["layoutParts"])
+        self.assertIn("min-width: 0", manifest["widgets"]["easy_widgets.FormsWidget"]["css"])

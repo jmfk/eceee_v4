@@ -1,20 +1,27 @@
 import { expect, test } from '@playwright/test'
 import { RENDER_WIDGET_FIXTURES } from '../src/rendering/fixtures'
+import { compileRenderStyles } from '../src/rendering/themeCssCompiler'
 
 const widgets = Object.values(RENDER_WIDGET_FIXTURES).map((widget, index) => ({
   ...structuredClone(widget),
   id: `visual-${index}`,
 }))
 
+const themeCss = compileRenderStyles({
+  theme: {
+    customCss: `
+      body{color:#172033;background:#f8fafc}.main-layout-wrapper{padding:24px;background:white}
+      .widget-item{margin-bottom:18px}.content-widget,.content-card-widget,.banner-widget,.bio-widget,.hero-widget,.section-widget{padding:16px;border:1px solid #dbe3ef;border-radius:8px}
+      h1,h2,h3{color:#123e68}a{color:#1264a3}.news-items{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+    `,
+  },
+}).css
+
 const model = {
   layout: 'main_layout',
   slots: { header: [], navbar: [], hero: [], main: widgets, sidebar: [], footer: [] },
   context: { preview: true as const },
-  themeCss: `
-    body{color:#172033;background:#f8fafc}.main-layout-wrapper{padding:24px;background:white}
-    .widget-item{margin-bottom:18px}.content-widget,.content-card-widget,.banner-widget,.bio-widget,.hero-widget,.section-widget{padding:16px;border:1px solid #dbe3ef;border-radius:8px}
-    h1,h2,h3{color:#123e68}a{color:#1264a3}.news-items{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-  `,
+  themeCss,
 }
 
 const designerModel = {
@@ -53,6 +60,11 @@ for (const viewport of viewports) {
     await expect(page.locator('.form-description').first()).toHaveCSS('margin', '0px')
     await expect(page.locator('.news-excerpt').first()).toHaveCSS('margin', '0px')
     await expect(page.locator('.table-caption').first()).toHaveCSS('text-align', 'left')
+    const documentWidth = await page.evaluate(() => ({
+      client: document.documentElement.clientWidth,
+      scroll: document.documentElement.scrollWidth,
+    }))
+    expect(documentWidth.scroll).toBe(documentWidth.client)
     await expect(page).toHaveScreenshot(`render-editor-${viewport.name}.png`, { fullPage: true, animations: 'disabled' })
 
     await openRender(page, designerModel)

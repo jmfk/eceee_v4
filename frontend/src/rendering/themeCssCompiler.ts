@@ -1,4 +1,4 @@
-import manifest from './generated/render-manifest.json'
+import manifest from './generated/render-manifest.json' with { type: 'json' }
 import { PUBLIC_RENDER_CSS } from './publicRenderCss'
 import { generateDesignGroupsCSS, getBreakpoints } from '../utils/themeUtils'
 
