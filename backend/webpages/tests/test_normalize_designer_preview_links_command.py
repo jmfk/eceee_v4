@@ -1,4 +1,5 @@
 from io import StringIO
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.management import call_command
@@ -96,5 +97,44 @@ class NormalizeDesignerPreviewLinksCommandTests(TestCase):
             ThemeDesignerRevision.objects.filter(
                 theme=self.theme,
                 summary="Before normalizing Designer preview links",
+            ).exists()
+        )
+
+    @patch("webpages.management.commands.import_designer_preview_media.import_legacy_preview_images")
+    def test_media_import_updates_live_and_draft_with_recovery_points(self, importer):
+        legacy_preview = {"image": "/files/default/logo.png"}
+        self.theme.designer_preview = legacy_preview
+        self.theme.save(update_fields=["designer_preview", "updated_at"])
+        self.draft.snapshot = {"designer_preview": legacy_preview}
+        self.draft.save(update_fields=["snapshot", "updated_at"])
+        importer.return_value = (
+            {
+                "live": {"image": "https://storage.test/theme_images/1/library/logo.png"},
+                "draft": {"image": "https://storage.test/theme_images/1/library/logo.png"},
+            },
+            1,
+            ["theme_images/1/library/logo.png"],
+        )
+
+        call_command(
+            "import_designer_preview_media",
+            theme_id=self.theme.id,
+            source_origin="https://admin.example.test",
+            source_prefix="/files/default/",
+            apply=True,
+        )
+
+        self.theme.refresh_from_db()
+        self.draft.refresh_from_db()
+        self.assertIn("theme_images/1/library/logo.png", self.theme.designer_preview["image"])
+        self.assertIn(
+            "theme_images/1/library/logo.png",
+            self.draft.snapshot["designer_preview"]["image"],
+        )
+        self.assertTrue(self.theme.versions.filter(name="Before importing legacy Designer preview media").exists())
+        self.assertTrue(
+            ThemeDesignerRevision.objects.filter(
+                theme=self.theme,
+                summary="Before importing legacy Designer preview media",
             ).exists()
         )

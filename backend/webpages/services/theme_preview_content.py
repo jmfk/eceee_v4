@@ -6,11 +6,14 @@ import json
 import os
 import re
 import uuid
+from io import BytesIO
 from urllib.parse import urlparse
 
+import requests
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.utils.text import slugify
+from PIL import Image, UnidentifiedImageError
 
 from content.models import Namespace
 from file_manager.models import MediaCollection, MediaFile
@@ -25,6 +28,7 @@ from .designer_theme import designer_page_sources, designer_preview_layout, desi
 MAX_IMPORTED_IMAGES = 100
 MAX_IMPORTED_IMAGE_BYTES = 10 * 1024 * 1024
 IMAGE_EXTENSIONS = {".avif", ".gif", ".jpeg", ".jpg", ".png", ".svg", ".webp"}
+SAFE_REMOTE_PREVIEW_IMAGE_EXTENSIONS = {".avif", ".gif", ".jpeg", ".jpg", ".png", ".webp"}
 EMBEDDED_IMAGE_PATTERN = re.compile(
     r"(?:https?://[^\s\"'()<>]+|s3://[^\s\"'()<>]+|/?(?:theme_images|uploads|media|files|site-package)/[^\s\"'()<>]+)"
     r"\.(?:avif|gif|jpe?g|png|svg|webp)(?:\?[^\s\"'()<>]*)?",
@@ -321,6 +325,106 @@ def resolve_theme_preview_library_urls(theme, value):
         )
 
     return rewrite(value)
+
+
+def legacy_preview_image_references(value, source_prefix="/files/"):
+    """Return legacy relative image references beneath an explicit source prefix."""
+    references = set()
+
+    def collect(current):
+        if isinstance(current, dict):
+            for child in current.values():
+                collect(child)
+        elif isinstance(current, list):
+            for child in current:
+                collect(child)
+        elif isinstance(current, str):
+            for match in EMBEDDED_IMAGE_PATTERN.finditer(current):
+                reference = match.group(0)
+                extension = os.path.splitext(urlparse(reference).path)[1].lower()
+                if reference.startswith(source_prefix) and extension in SAFE_REMOTE_PREVIEW_IMAGE_EXTENSIONS:
+                    references.add(reference)
+
+    collect(value)
+    return sorted(references)
+
+
+def import_legacy_preview_images(theme, value, source_origin, source_prefix="/files/"):
+    """Copy explicitly scoped legacy preview images into the theme library."""
+    parsed_origin = urlparse(source_origin)
+    if (
+        parsed_origin.scheme != "https"
+        or not parsed_origin.hostname
+        or parsed_origin.username
+        or parsed_origin.password
+        or parsed_origin.query
+        or parsed_origin.fragment
+    ):
+        raise ValidationError("Legacy preview image origin must be a credential-free HTTPS origin.")
+    normalized_origin = f"https://{parsed_origin.netloc}"
+    if not source_prefix.startswith("/files/") or ".." in source_prefix:
+        raise ValidationError("Legacy preview image prefix must stay beneath /files/.")
+
+    references = legacy_preview_image_references(value, source_prefix)
+    replacements = {}
+    saved_paths = []
+    try:
+        for reference in references:
+            response_context = requests.get(
+                f"{normalized_origin}{reference}",
+                allow_redirects=False,
+                stream=True,
+                timeout=(5, 20),
+            )
+            with response_context as response:
+                if response.status_code != 200:
+                    raise ValidationError(f"Could not import legacy preview image {reference}.")
+                content_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
+                if not content_type.startswith("image/"):
+                    raise ValidationError(f"Legacy preview asset is not an image: {reference}.")
+                chunks = []
+                size = 0
+                for chunk in response.iter_content(64 * 1024):
+                    size += len(chunk)
+                    if size > MAX_IMPORTED_IMAGE_BYTES:
+                        raise ValidationError("Imported preview images cannot exceed 10 MB each.")
+                    chunks.append(chunk)
+                content = b"".join(chunks)
+            try:
+                with Image.open(BytesIO(content)) as image:
+                    image.verify()
+            except (UnidentifiedImageError, OSError) as exc:
+                raise ValidationError(f"Legacy preview asset is not a valid image: {reference}.") from exc
+
+            stem, extension = os.path.splitext(os.path.basename(urlparse(reference).path))
+            filename = f"{slugify(stem) or 'preview'}-{uuid.uuid4().hex[:10]}{extension.lower()}"
+            saved_path = system_storage.save(
+                f"theme_images/{theme.id}/library/{filename}",
+                ContentFile(content),
+            )
+            saved_paths.append(saved_path)
+            replacements[reference] = system_storage.url(saved_path)
+
+        def rewrite(current):
+            if isinstance(current, dict):
+                return {key: rewrite(child) for key, child in current.items()}
+            if isinstance(current, list):
+                return [rewrite(child) for child in current]
+            if not isinstance(current, str):
+                return copy.deepcopy(current)
+            rewritten = current
+            for reference, replacement in replacements.items():
+                rewritten = rewritten.replace(reference, replacement)
+            return rewritten
+
+        return rewrite(value), len(replacements), saved_paths
+    except Exception:
+        for saved_path in saved_paths:
+            try:
+                system_storage.delete(saved_path)
+            except Exception:
+                pass
+        raise
 
 
 def _materialize_media_links(theme, value):

@@ -5,6 +5,7 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase
+from PIL import Image
 from rest_framework.test import APIClient
 
 from content.models import Namespace
@@ -17,8 +18,10 @@ from webpages.services.theme_preview_content import (
     MAX_IMPORTED_IMAGE_BYTES,
     _copy_preview_images,
     _managed_storage_path,
+    import_legacy_preview_images,
     materialize_theme_preview_page_links,
     import_theme_preview_document,
+    legacy_preview_image_references,
     materialize_legacy_preview_collections,
     normalize_theme_preview_namespaces,
     resolve_theme_preview_library_urls,
@@ -27,6 +30,58 @@ from webpages.services.theme_preview_content import (
 
 
 class ThemePreviewContentUnitTests(SimpleTestCase):
+    def test_legacy_preview_image_references_stay_beneath_the_selected_prefix(self):
+        source = {
+            "logo": "/files/default/logo.png",
+            "other": "/files/another/logo.png",
+            "external": "https://example.test/logo.png",
+        }
+
+        self.assertEqual(
+            legacy_preview_image_references(source, "/files/default/"),
+            ["/files/default/logo.png"],
+        )
+
+    @patch("webpages.services.theme_preview_content.system_storage")
+    @patch("webpages.services.theme_preview_content.requests.get")
+    def test_imports_scoped_legacy_images_into_theme_library(self, get, storage):
+        png = io.BytesIO()
+        Image.new("RGB", (2, 2), color="red").save(png, format="PNG")
+        response = get.return_value
+        response.__enter__.return_value = response
+        response.status_code = 200
+        response.headers = {"Content-Type": "image/png"}
+        response.iter_content.return_value = [png.getvalue()]
+        storage.save.return_value = "theme_images/8/library/logo-copy.png"
+        storage.url.return_value = "http://localhost:10302/eceee-media/theme_images/8/library/logo-copy.png"
+
+        rewritten, count, saved_paths = import_legacy_preview_images(
+            SimpleNamespace(id=8),
+            {"url": "/files/default/logo.png", "external": "https://example.test/logo.png"},
+            "https://admin.example.test",
+            "/files/default/",
+        )
+
+        self.assertEqual(count, 1)
+        self.assertEqual(saved_paths, ["theme_images/8/library/logo-copy.png"])
+        self.assertIn("theme_images/8/library/logo-copy.png", rewritten["url"])
+        self.assertEqual(rewritten["external"], "https://example.test/logo.png")
+        get.assert_called_once_with(
+            "https://admin.example.test/files/default/logo.png",
+            allow_redirects=False,
+            stream=True,
+            timeout=(5, 20),
+        )
+
+    def test_legacy_image_import_requires_https_origin(self):
+        with self.assertRaisesMessage(ValidationError, "credential-free HTTPS origin"):
+            import_legacy_preview_images(
+                SimpleNamespace(id=8),
+                {"url": "/files/default/logo.png"},
+                "http://admin.example.test",
+                "/files/default/",
+            )
+
     def test_preview_library_urls_are_resolved_at_runtime(self):
         theme = SimpleNamespace(
             _resolve_theme_library_image_url=lambda url: url.replace(
