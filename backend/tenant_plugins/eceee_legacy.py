@@ -8,9 +8,9 @@ PLUGIN = PluginDefinition(
     label="ECEEE Legacy Import",
     description="Guided, resumable migrations from the deprecated ECEEE CMS.",
     kind="import",
-    # Keep the installed ECEEE capability available to both the canonical
-    # workspace and the production-copy workspace used for migration testing.
-    allowed_tenants=("eceee", "eceee_org", "eceee-production-copy"),
+    # Keep the installed ECEEE capability available to the existing default
+    # production workspace, canonical named workspaces, and migration testing.
+    allowed_tenants=("default", "eceee", "eceee_org", "eceee-production-copy"),
     importers=(
         ImporterDefinition(
             id="org.eceee.legacy_import.news",
