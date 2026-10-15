@@ -48,7 +48,9 @@ class MediaUploadView(APIView):
         - Proper error handling and response formatting
         """
         # Validate request data
-        serializer = MediaUploadSerializer(data=request.data)
+        serializer = MediaUploadSerializer(
+            data=request.data, context={"request": request}
+        )
         if not serializer.is_valid():
             return self.response_builder.build_validation_error_response(
                 serializer.errors
@@ -56,7 +58,9 @@ class MediaUploadView(APIView):
 
         # Get and validate namespace access
         namespace = self.namespace_service.get_and_validate_namespace(
-            request.user, serializer.validated_data["namespace"]
+            request.user,
+            serializer.validated_data["namespace"],
+            tenant=getattr(request, "tenant", None),
         )
         if isinstance(namespace, Response):
             return namespace

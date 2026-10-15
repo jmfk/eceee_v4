@@ -44,11 +44,10 @@ class ProcessImportSerializer(serializers.Serializer):
 
     def validate_namespace(self, value):
         """Validate namespace exists and user has access."""
+        request = self.context.get("request")
+        tenant = getattr(request, "tenant", None)
         try:
-            if value == "default":
-                namespace = Namespace.get_default()
-            else:
-                namespace = Namespace.objects.get(slug=value)
+            namespace = Namespace.resolve(value, tenant=tenant)
             return namespace.slug
         except Namespace.DoesNotExist:
             raise serializers.ValidationError("Invalid namespace.")

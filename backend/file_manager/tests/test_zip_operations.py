@@ -38,6 +38,7 @@ class ZipDownloadTestCase(TestCase):
             identifier="test-tenant",
             created_by=self.user
         )
+        self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
         
         # Create namespace with tenant
         self.namespace, _ = Namespace.objects.get_or_create(

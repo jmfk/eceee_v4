@@ -898,7 +898,7 @@ class MediaFile(models.Model):
         return reverse("file_manager:mediafile-detail", kwargs={"pk": str(self.id)})
 
     @classmethod
-    def get_by_slug_or_uuid(cls, identifier, namespace=None):
+    def get_by_slug_or_uuid(cls, identifier, namespace=None, tenant=None):
         """
         Get media file by slug or UUID.
 
@@ -920,15 +920,14 @@ class MediaFile(models.Model):
 
         # Try as slug (requires namespace)
         if namespace:
+            from content.models import Namespace
+
             try:
                 if hasattr(namespace, "slug"):
-                    namespace_slug = namespace.slug
+                    namespace_obj = namespace
                 else:
                     namespace_slug = str(namespace)
-
-                from content.models import Namespace
-
-                namespace_obj = Namespace.objects.get(slug=namespace_slug)
+                    namespace_obj = Namespace.resolve(namespace_slug, tenant=tenant)
                 return cls.objects.get(slug=identifier, namespace=namespace_obj)
             except (cls.DoesNotExist, Namespace.DoesNotExist):
                 pass

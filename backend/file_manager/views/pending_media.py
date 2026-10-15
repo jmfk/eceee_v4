@@ -67,11 +67,15 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
         if namespace_param:
             from content.models import Namespace
 
+            tenant = getattr(self.request, "tenant", None)
             try:
                 if namespace_param == "default":
-                    namespace = Namespace.get_default()
+                    namespace = Namespace.get_default(tenant=tenant)
                 else:
-                    namespace = Namespace.objects.get(slug=namespace_param)
+                    namespaces = Namespace.objects.all()
+                    if tenant is not None:
+                        namespaces = namespaces.filter(tenant=tenant)
+                    namespace = namespaces.get(slug=namespace_param)
                 queryset = queryset.filter(namespace=namespace)
             except Namespace.DoesNotExist:
                 # If namespace slug doesn't exist, return empty queryset

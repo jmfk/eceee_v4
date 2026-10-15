@@ -26,7 +26,7 @@ class NamespaceAccessService:
     """Service class to handle namespace resolution and access control."""
 
     def get_and_validate_namespace(
-        self, user, namespace_slug: str
+        self, user, namespace_slug: str, tenant=None
     ) -> Union[Namespace, Response]:
         """
         Get and validate access to a namespace.
@@ -40,7 +40,7 @@ class NamespaceAccessService:
         """
         try:
             # Resolve namespace
-            namespace = self._resolve_namespace(namespace_slug)
+            namespace = self._resolve_namespace(namespace_slug, tenant=tenant)
             if not namespace:
                 logger.warning(f"Namespace not found: {namespace_slug}")
                 return Response(
@@ -69,7 +69,7 @@ class NamespaceAccessService:
                 status=500,
             )
 
-    def _resolve_namespace(self, namespace_slug: str) -> Optional[Namespace]:
+    def _resolve_namespace(self, namespace_slug: str, tenant=None) -> Optional[Namespace]:
         """
         Resolve a namespace slug to a Namespace object.
 
@@ -81,8 +81,11 @@ class NamespaceAccessService:
         """
         try:
             if namespace_slug == "default":
-                return Namespace.get_default()
-            return Namespace.objects.get(slug=namespace_slug)
+                return Namespace.get_default(tenant=tenant)
+            queryset = Namespace.objects.all()
+            if tenant is not None:
+                queryset = queryset.filter(tenant=tenant)
+            return queryset.get(slug=namespace_slug)
         except Namespace.DoesNotExist:
             return None
         except Exception as e:

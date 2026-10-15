@@ -1,5 +1,17 @@
 from django.db import migrations, models
 from django.db.models import Q
+from django.db.migrations.exceptions import IrreversibleError
+
+
+def prevent_unsafe_reverse(apps, schema_editor):
+    pass
+
+
+def raise_on_reverse(apps, schema_editor):
+    raise IrreversibleError(
+        "Namespace names and slugs can repeat across tenants after this migration; "
+        "restore by roll-forward instead of reintroducing global uniqueness."
+    )
 
 
 class Migration(migrations.Migration):
@@ -40,4 +52,5 @@ class Migration(migrations.Migration):
                 name="unique_default_namespace_per_tenant",
             ),
         ),
+        migrations.RunPython(prevent_unsafe_reverse, reverse_code=raise_on_reverse),
     ]

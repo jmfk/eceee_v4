@@ -159,5 +159,7 @@ class TagSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create tag with default namespace if none provided"""
         if "namespace" not in validated_data or validated_data["namespace"] is None:
-            validated_data["namespace"] = Namespace.get_default()
+            request = self.context.get("request")
+            tenant = getattr(request, "tenant", None)
+            validated_data["namespace"] = Namespace.get_default(tenant=tenant)
         return super().create(validated_data)
