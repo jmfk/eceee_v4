@@ -25,6 +25,7 @@ class TableWidgetRenderTests(SimpleTestCase):
         self.assertIn('class="w-full border"', html)
         self.assertIn('<caption class="table-caption text-sm text-gray-600 mb-2">Canonical table</caption>', html)
         self.assertIn(".table-widget .table-caption {\n        text-align: left;\n    }", widget.widget_css)
+        self.assertIn("font-weight: 400;", widget.widget_css)
         self.assertLess(html.index("<caption"), html.index("<colgroup>"))
         self.assertIn("<colgroup>", html)
         self.assertIn('style="width: 60%;"', html)

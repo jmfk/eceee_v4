@@ -198,6 +198,7 @@ class TableWidget(BaseWidget):
     /* Font style presets */
     .table-cell-quote {
         font-style: italic;
+        font-weight: 400;
         padding-left: 1.5rem;
         border-left: 3px solid var(--quote-border-color, #d1d5db);
         color: var(--quote-color, #6b7280);

@@ -202,6 +202,11 @@ describe('page editor active/legacy boundaries', () => {
         expect(publicRenderCSS).toContain('.media-insert.img-width-half')
         expect(publicRenderCSS).toContain('border-width:0;border-style:solid')
         expect(publicRenderCSS).not.toContain('--tw-')
+        expect(publicRenderCSS).toContain('img,video{max-width:unset;height:unset}')
+        expect(publicRenderCSS).toContain('ul{list-style-type:disc}')
+        expect(publicRenderCSS).toContain('ol{list-style-type:decimal}')
+        expect(publicRenderCSS).toContain('a{color:#2563eb;text-decoration:none}')
+        expect(publicRenderCSS).toContain('.navbar-menu-list{display:flex;gap:1.5rem;list-style:none;margin:0;padding:0 0 0 20px')
     })
 
     it('finalizes cross-version cut sources only after the destination save', () => {
