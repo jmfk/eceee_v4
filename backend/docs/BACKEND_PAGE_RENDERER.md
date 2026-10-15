@@ -1,6 +1,6 @@
 # Backend WebPage Renderer (deprecated)
 
-> The Django HTML renderer is a temporary rollback-only compatibility surface. Production disables it with `DJANGO_PUBLIC_RENDERER_ENABLED=false` and `DJANGO_LEGACY_RENDER_API_ENABLED=false`. Public pages, editor previews, and page-version previews use the TypeScript renderer. The implementation is scheduled for removal after the observation period shows no legitimate calls.
+> The Django HTML renderer is retained only as source-level compatibility reference and is hard-disabled in every environment. Public pages, editor previews, and page-version previews use the TypeScript renderer. Re-enabling the Django renderer requires a deliberate reviewed code change; an environment variable cannot silently restore it.
 
 The `WebPageRenderer` class provides comprehensive server-side rendering of WebPage instances, including layouts, widgets, themes, and CSS.
 
