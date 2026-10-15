@@ -96,6 +96,20 @@ class TenantPluginApiTests(TestCase):
         plugins = {item["id"]: item for item in response.data["results"]}
         self.assertTrue(plugins["org.eceee.legacy_import"]["compatible"])
 
+    def test_eceee_plugin_is_compatible_with_default_production_workspace(self):
+        default_tenant = Tenant.objects.create(
+            name="Default Tenant",
+            identifier="default",
+            created_by=self.owner,
+        )
+        self.client.credentials(HTTP_X_TENANT_ID=default_tenant.identifier)
+
+        response = self.client.get("/api/v1/content-migration/plugins/")
+
+        self.assertEqual(response.status_code, 200)
+        plugins = {item["id"]: item for item in response.data["results"]}
+        self.assertTrue(plugins["org.eceee.legacy_import"]["compatible"])
+
     def test_connection_secrets_are_write_only_and_connections_are_tenant_scoped(self):
         response = self.client.post(
             "/api/v1/data-connections/connections/",
