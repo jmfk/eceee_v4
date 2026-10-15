@@ -164,3 +164,41 @@ class NamespaceAPITest(APITestCase):
         self.assertFalse(current_default.is_default)
         self.assertTrue(replacement.is_default)
         self.assertTrue(other_default.is_default)
+
+    def test_tag_actions_use_the_request_tenants_default_namespace(self):
+        current_default = Namespace.objects.create(
+            name="Tag Default",
+            slug="tag-default",
+            tenant=self.tenant,
+            is_default=True,
+            created_by=self.user,
+        )
+        other_default = Namespace.objects.create(
+            name="Other Tag Default",
+            slug="other-tag-default",
+            tenant=self.other_tenant,
+            is_default=True,
+            created_by=self.user,
+        )
+        Tag.objects.create(
+            name="Current Shared",
+            slug="current-shared",
+            namespace=current_default,
+            tenant=self.tenant,
+            usage_count=3,
+        )
+        Tag.objects.create(
+            name="Other Shared",
+            slug="other-shared",
+            namespace=other_default,
+            tenant=self.other_tenant,
+            usage_count=5,
+        )
+
+        popular = self.client.get("/api/v1/content/tags/popular/")
+        search = self.client.get("/api/v1/content/tags/search_tags/?q=Shared")
+
+        self.assertEqual(popular.status_code, 200)
+        self.assertEqual([tag["name"] for tag in popular.data], ["Current Shared"])
+        self.assertEqual(search.status_code, 200)
+        self.assertEqual([tag["name"] for tag in search.data], ["Current Shared"])
