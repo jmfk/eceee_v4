@@ -130,6 +130,7 @@ services:
       - ./publisher/app:/app/publisher/app
       - ./publisher/src:/app/publisher/src
       - ./publisher/next.config.ts:/app/publisher/next.config.ts:ro
+      - ./publisher/proxy.ts:/app/publisher/proxy.ts:ro
       - ./frontend/src:/app/frontend/src:ro
       - publisher_node_modules:/app/publisher/node_modules
     ports:

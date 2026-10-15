@@ -554,21 +554,9 @@ function prepareWidgets(
       }];
     });
   };
-  const mergeCollectionSamples = (items: PublicMediaItem[], selector: Record<string, unknown>): PublicMediaItem[] => {
-    const merged = [...items];
-    const identities = new Set(items.flatMap(item => [
-      String(item.id).toLowerCase(),
-      item.title.trim().toLowerCase(),
-      item.url.trim().toLowerCase(),
-    ]).filter(Boolean));
-    for (const sample of sampleMediaItems(selector)) {
-      const candidates = [String(sample.id).toLowerCase(), sample.title.trim().toLowerCase(), sample.url.trim().toLowerCase()].filter(Boolean);
-      if (candidates.some(candidate => identities.has(candidate))) continue;
-      merged.push(sample);
-      candidates.forEach(candidate => identities.add(candidate));
-    }
-    return merged;
-  };
+  const collectionItemsWithFallback = (items: PublicMediaItem[], selector: Record<string, unknown>): PublicMediaItem[] => (
+    items.length ? items : sampleMediaItems(selector)
+  );
   const shuffled = <T,>(items: T[]): T[] => {
     const result = [...items];
     for (let index = result.length - 1; index > 0; index -= 1) {
@@ -659,7 +647,7 @@ function prepareWidgets(
       };
       const collectionId = image.type === 'collection' ? image.id : (image.collectionId ?? image.collection_id ?? config.collectionId ?? config.collection_id);
       if (collectionId) {
-        let items = mergeCollectionSamples(collections[String(collectionId).toLowerCase()] ?? [], image)
+        let items = collectionItemsWithFallback(collections[String(collectionId).toLowerCase()] ?? [], image)
           .map(item => responsiveItem(item, processing));
         const collectionConfig = object(config.collectionConfig ?? config.collection_config);
         const limit = Number(collectionConfig.maxItems ?? collectionConfig.max_items ?? 0);

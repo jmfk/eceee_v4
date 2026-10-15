@@ -642,7 +642,12 @@ describe('public resolution', () => {
           { id: 'section', type: 'easy_widgets.SectionWidget', config: { slots: { content: [
             { id: 'nested-logos', type: 'easy_widgets.ImageWidget', config: { collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8' } },
             { id: 'subpages', type: 'easy_widgets.NavigationWidget', config: { navigation_style: 'sub-page-navigation', menu_items: [] } },
-            { id: 'broken-collection', type: 'easy_widgets.ImageWidget', config: { collection_id: 'not-a-uuid' } },
+            { id: 'broken-collection', type: 'easy_widgets.ImageWidget', config: {
+              collection_id: 'not-a-uuid',
+              image: { type: 'collection', id: 'not-a-uuid', sample_images: [
+                { id: 'sample-fallback', title: 'Fallback partner', imgproxy_base_url: '/fallback-logo.png', width: 200, height: 80 },
+              ] },
+            } },
           ] } } },
           { id: 'legacy-image', type: 'easy_widgets.ImageWidget', config: {
             image: { url: '/legacy.png', type: 'image', altText: 'Legacy image' }, image_style: 'cropped',
@@ -663,7 +668,6 @@ describe('public resolution', () => {
     const previousSalt = process.env.PUBLISHER_IMGPROXY_SALT;
     process.env.PUBLISHER_IMGPROXY_KEY = '00'.repeat(32);
     process.env.PUBLISHER_IMGPROXY_SALT = '11'.repeat(32);
-    const random = vi.spyOn(Math, 'random').mockReturnValue(0.999);
     try {
       const model = await buildPublishedPageModel({ withSnapshot: async read => read(enrichedReader) }, 'example.org', '/news/story', new Date('2026-06-01'));
       expect(model?.slots.main[0].config.menuItems).toEqual([
@@ -682,23 +686,13 @@ describe('public resolution', () => {
       expect(model?.slots.main[1].config.content).toContain('width="448" height="252"');
       expect(model?.slots.main[1].config.content).toContain('width="295" height="165"');
       expect(model?.slots.main[1].config.content).not.toContain('style="width:100%');
-      expect(model?.slots.main[2].config.mediaItems).toEqual([
-        expect.objectContaining({
-          url: '/logo.png',
-          src: expect.stringContaining('resize:fill:60:30/gravity:no/quality:72/format:webp'),
-          srcSet: expect.stringMatching(/resize:fill:60:30.* 1x, .*resize:fill:100:50.* 2x/),
-          displayWidth: 60,
-          displayHeight: 30,
-        }),
-        expect.objectContaining({
-          title: 'Fallback partner',
-          url: '/fallback-logo.png',
-          src: expect.stringContaining('resize:fill:60:24/gravity:no/quality:72/format:webp'),
-          displayWidth: 60,
-          displayHeight: 24,
-        }),
-      ]);
-      expect(random).toHaveBeenCalled();
+      expect(model?.slots.main[2].config.mediaItems).toEqual([expect.objectContaining({
+        url: '/logo.png',
+        src: expect.stringContaining('resize:fill:60:30/gravity:no/quality:72/format:webp'),
+        srcSet: expect.stringMatching(/resize:fill:60:30.* 1x, .*resize:fill:100:50.* 2x/),
+        displayWidth: 60,
+        displayHeight: 30,
+      })]);
       const nested = (model?.slots.main[3].config.slots as Record<string, Widget[]>).content;
       expect(nested[0].config.mediaItems).toEqual([expect.objectContaining({
         src: expect.stringContaining('resize:fit:100:50'),
@@ -710,6 +704,13 @@ describe('public resolution', () => {
         depth: 2,
         currentChildren: [expect.objectContaining({ label: 'Child', path: '/news/story/child/' })],
       });
+      expect(nested[2].config.mediaItems).toEqual([expect.objectContaining({
+        title: 'Fallback partner',
+        url: '/fallback-logo.png',
+        src: expect.stringContaining('resize:fit:200:80'),
+        displayWidth: 200,
+        displayHeight: 80,
+      })]);
       expect(model?.slots.main[4].config.mediaItems).toEqual([expect.objectContaining({
         url: '/legacy.png',
         src: expect.stringContaining('resize:fill:60:40/quality:72/format:webp'),
@@ -720,7 +721,6 @@ describe('public resolution', () => {
       expect(publishedPageReferences).toHaveBeenCalledWith([child.id, '999'], root.tenant_id, root.id, expect.any(Date));
       expect(publicMedia).toHaveBeenCalledWith([inlineMediaId], ['67d9020f-1d73-47be-bd24-1fe52d2dbef8'], root.tenant_id);
     } finally {
-      random.mockRestore();
       if (previousKey === undefined) delete process.env.PUBLISHER_IMGPROXY_KEY;
       else process.env.PUBLISHER_IMGPROXY_KEY = previousKey;
       if (previousSalt === undefined) delete process.env.PUBLISHER_IMGPROXY_SALT;
