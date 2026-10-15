@@ -14,6 +14,18 @@ THEME_READ = "theme.read"
 THEME_WRITE = "theme.write"
 THEME_VERSION = "theme.version"
 THEME_TRANSFER = "theme.transfer"
+PAGE_READ = "page.read"
+PAGE_WRITE = "page.write"
+PAGE_PUBLISH = "page.publish"
+MEDIA_READ = "media.read"
+MEDIA_WRITE = "media.write"
+OBJECT_WRITE = "object.write"
+OBJECT_PUBLISH = "object.publish"
+LAYOUT_READ = "layout.read"
+SITE_READ = "site.read"
+SITE_WRITE = "site.write"
+CONTENT_READ = "content.read"
+CONTENT_WRITE = "content.write"
 SITE_TRANSFER = "site.transfer"
 OBJECT_READ = "object.read"
 OBJECT_TRANSFER = "object.transfer"
@@ -23,11 +35,24 @@ ALLOWED_SCOPES = {
     THEME_WRITE,
     THEME_VERSION,
     THEME_TRANSFER,
+    PAGE_READ,
+    PAGE_WRITE,
+    PAGE_PUBLISH,
+    MEDIA_READ,
+    MEDIA_WRITE,
+    OBJECT_WRITE,
+    OBJECT_PUBLISH,
+    LAYOUT_READ,
+    SITE_READ,
+    SITE_WRITE,
+    CONTENT_READ,
+    CONTENT_WRITE,
     SITE_TRANSFER,
     OBJECT_READ,
     OBJECT_TRANSFER,
 }
 AUTH_SCHEME = b"ApiKey"
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 MACHINE_DENIED_PREFIXES = (
     "/api/v1/auth/",
     "/api/v1/core/machine-api-keys",
@@ -36,7 +61,25 @@ MACHINE_DENIED_PREFIXES = (
     "/api/v1/utils/current-workspace/",
     "/api/v1/utils/users/",
     "/api/v1/webpages/designer/remote-connections/",
+    "/api/v1/webpages/remote-sites/access-keys/",
 )
+
+PAGE_PUBLISH_ACTIONS = {
+    "bulk-publish",
+    "bulk-publish-explicit",
+    "bulk-schedule",
+    "bulk-schedule-explicit",
+    "bulk-unpublish",
+    "cancel-schedule",
+    "publish",
+    "publish-latest",
+    "publishing",
+    "schedule",
+    "unpublish",
+    "unpublish-all",
+    "unpublish-explicit",
+}
+OBJECT_PUBLISH_ACTIONS = {"publish", "unpublish"}
 
 
 def deployment_environment():
@@ -48,6 +91,14 @@ def generate_machine_api_key():
     return raw_key, hashlib.sha256(raw_key.encode()).hexdigest(), raw_key[:16]
 
 
+def _path_has_action(path, actions):
+    return bool(set(path.strip("/").split("/")) & actions)
+
+
+def _read_or_write_scope(request, read_scope, write_scope):
+    return read_scope if request.method in SAFE_METHODS else write_scope
+
+
 def _required_scope(request):
     if request.path.startswith(MACHINE_DENIED_PREFIXES):
         return None
@@ -57,10 +108,14 @@ def _required_scope(request):
         return THEME_TRANSFER
     if request.path.startswith("/api/v1/webpages/site-packages/remote-source/"):
         return SITE_TRANSFER
+    if request.path.startswith("/api/v1/webpages/site-packages/"):
+        return SITE_TRANSFER
     if request.path.startswith("/api/v1/objects/remote-source/exports/"):
         return OBJECT_TRANSFER
     if request.path.startswith("/api/v1/objects/remote-source/"):
         return OBJECT_READ
+    if request.path.startswith("/api/v1/objects/remote/"):
+        return OBJECT_TRANSFER
     if request.path.startswith("/api/v1/webpages/designer/theme-exports/"):
         return THEME_READ
     if request.path == "/api/v1/webpages/designer/themes/compare/" or (
@@ -71,7 +126,44 @@ def _required_scope(request):
         return THEME_VERSION
     theme_prefixes = ("/api/v1/webpages/themes/", "/api/v1/webpages/designer/themes/")
     if request.path.startswith(theme_prefixes):
-        return THEME_READ if request.method in {"GET", "HEAD", "OPTIONS"} else THEME_WRITE
+        return _read_or_write_scope(request, THEME_READ, THEME_WRITE)
+
+    if request.path.startswith("/api/v1/webpages/layouts/"):
+        if request.path == "/api/v1/webpages/layouts/reload/":
+            return SERVER_FULL_ACCESS
+        return LAYOUT_READ
+    if request.path.startswith("/api/v1/webpages/widget-types/"):
+        return LAYOUT_READ
+
+    site_configuration_prefixes = (
+        "/api/v1/webpages/page-data-schemas/",
+        "/api/v1/webpages/path-patterns/",
+        "/api/v1/webpages/preview-sizes/",
+        "/api/v1/utils/value-lists/",
+    )
+    if request.path.startswith(site_configuration_prefixes):
+        return _read_or_write_scope(request, SITE_READ, SITE_WRITE)
+
+    page_prefixes = (
+        "/api/v1/webpages/pages/",
+        "/api/v1/webpages/versions/",
+        "/api/v1/webpages/page-versions/",
+    )
+    if request.path.startswith(page_prefixes):
+        if request.method not in SAFE_METHODS and _path_has_action(request.path, PAGE_PUBLISH_ACTIONS):
+            return PAGE_PUBLISH
+        return _read_or_write_scope(request, PAGE_READ, PAGE_WRITE)
+
+    if request.path.startswith("/api/v1/media/"):
+        return _read_or_write_scope(request, MEDIA_READ, MEDIA_WRITE)
+
+    if request.path.startswith("/api/v1/objects/"):
+        if request.method not in SAFE_METHODS and _path_has_action(request.path, OBJECT_PUBLISH_ACTIONS):
+            return OBJECT_PUBLISH
+        return _read_or_write_scope(request, OBJECT_READ, OBJECT_WRITE)
+
+    if request.path.startswith("/api/v1/content/"):
+        return _read_or_write_scope(request, CONTENT_READ, CONTENT_WRITE)
     return SERVER_FULL_ACCESS
 
 
