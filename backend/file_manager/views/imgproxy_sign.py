@@ -5,20 +5,17 @@ This endpoint allows the frontend to request signed imgproxy URLs without
 exposing the secret keys in the client-side code.
 """
 
-from rest_framework.decorators import (
-    api_view,
-    permission_classes,
-    authentication_classes,
-    throttle_classes,
-)
+import hashlib
+import logging
+
+from django.core.cache import cache
+from rest_framework import status
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
-from rest_framework import status
-from django.core.cache import cache
+
 from file_manager.imgproxy import imgproxy_service
-import hashlib
-import logging
 
 logger = logging.getLogger(__name__)
 

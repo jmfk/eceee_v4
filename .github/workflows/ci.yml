@@ -318,7 +318,7 @@ jobs:
           if-no-files-found: ignore
 
   frontend-public-e2e:
-    name: Frontend public Playwright
+    name: Django public renderer disabled
     runs-on: ubuntu-latest
     needs: detect
     if: needs.detect.outputs.public_e2e == 'true'
@@ -372,13 +372,13 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
 
-      - name: Prepare public regression backend
+      - name: Prepare retired-renderer regression backend
         run: make prepare-public-e2e-backend TEST_UP_FLAGS=--no-build
 
       - name: Resolve public regression hostname
         run: echo '127.0.0.1 public-regression.test' | sudo tee -a /etc/hosts > /dev/null
 
-      - name: Run public Playwright tests
+      - name: Verify Django public rendering stays disabled
         working-directory: frontend
         env:
           PLAYWRIGHT_PUBLIC_BASE_URL: http://public-regression.test:10101

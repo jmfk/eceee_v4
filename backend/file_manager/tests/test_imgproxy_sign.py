@@ -11,7 +11,6 @@ from file_manager.views.imgproxy_sign import (
     sign_imgproxy_url,
 )
 
-
 LOC_MEM_CACHE = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",

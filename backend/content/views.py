@@ -87,6 +87,13 @@ class NamespaceViewSet(viewsets.ModelViewSet):
             ).update(is_default=False)
         serializer.save()
 
+    def perform_destroy(self, instance):
+        if instance.kind == Namespace.KIND_THEME_MEDIA:
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError("The system theme-media namespace cannot be deleted.")
+        super().perform_destroy(instance)
+
     @action(detail=True, methods=["post"])
     def set_as_default(self, request, pk=None):
         """Set this namespace as the default namespace"""

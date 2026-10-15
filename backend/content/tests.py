@@ -182,6 +182,30 @@ class NamespaceAPITest(APITestCase):
         self.assertEqual(namespace.kind, Namespace.KIND_THEME_MEDIA)
         self.assertTrue(namespace.is_hidden)
 
+    def test_theme_media_namespace_cannot_be_demoted_or_unhidden(self):
+        namespace = Namespace.get_or_create_theme_media(self.tenant, created_by=self.user)
+
+        response = self.client.patch(
+            f"/api/v1/namespaces/{namespace.id}/?include_hidden=true",
+            {"kind": Namespace.KIND_CONTENT, "isHidden": False},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("kind", response.data)
+        self.assertIn("is_hidden", response.data)
+        namespace.refresh_from_db()
+        self.assertEqual(namespace.kind, Namespace.KIND_THEME_MEDIA)
+        self.assertTrue(namespace.is_hidden)
+
+    def test_theme_media_namespace_cannot_be_deleted(self):
+        namespace = Namespace.get_or_create_theme_media(self.tenant, created_by=self.user)
+
+        response = self.client.delete(f"/api/v1/namespaces/{namespace.id}/?include_hidden=true")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(Namespace.objects.filter(pk=namespace.pk, kind=Namespace.KIND_THEME_MEDIA).exists())
+
     def test_hidden_namespace_cannot_be_default(self):
         namespace = Namespace.objects.create(
             name="Hidden",

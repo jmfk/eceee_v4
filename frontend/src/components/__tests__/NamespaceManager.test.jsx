@@ -147,4 +147,30 @@ describe('NamespaceManager', () => {
             }))
         })
     })
+
+    it('keeps the system theme-media namespace protected', async () => {
+        const user = userEvent.setup()
+        namespacesApi.list.mockResolvedValueOnce({
+            results: [{
+                id: 3,
+                name: 'Theme media',
+                slug: 'theme-media-system',
+                description: '',
+                isActive: true,
+                isDefault: false,
+                isHidden: true,
+                kind: 'theme_media',
+                contentCount: 0,
+                createdAt: '2026-01-01T00:00:00Z',
+            }],
+        })
+        renderWithProviders(<NamespaceManager />)
+
+        await screen.findByText('theme-media-system')
+        expect(screen.queryByRole('button', { name: 'Delete Theme media' })).not.toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Edit Theme media' }))
+
+        expect(screen.getByLabelText('Kind')).toBeDisabled()
+        expect(screen.getByRole('checkbox', { name: /Hidden from users/ })).toBeDisabled()
+    })
 })

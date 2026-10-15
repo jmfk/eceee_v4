@@ -110,7 +110,7 @@ frontend-admin-e2e-test: prepare-frontend-e2e
 		-e PLAYWRIGHT_BASE_URL=http://frontend:3000 \
 		frontend-e2e npm run test:e2e:admin
 
-# Start and seed the Django public renderer without installing browser dependencies.
+# Start Django only to migrate and seed the public-render regression database.
 .PHONY: prepare-public-e2e-backend
 prepare-public-e2e-backend: prepare-test-infra
 	@if [ -z "$(CI)" ] && [ -z "$(SKIP_PORT_REGISTRY_CHECK)" ]; then \
@@ -135,7 +135,7 @@ prepare-public-e2e-backend: prepare-test-infra
 	done
 	$(COMPOSE_DEV) exec -T backend python manage.py seed_public_regression_site --hostname public-regression.test
 
-# Run public browser regression tests against the Django public renderer.
+# Verify that public page requests cannot fall back to the retired Django renderer.
 frontend-public-e2e-test: prepare-public-e2e-backend prepare-frontend-e2e
 	$(COMPOSE_DEV) run --rm --no-deps -T \
 		-e CI=1 \
