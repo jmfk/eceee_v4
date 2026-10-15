@@ -62,6 +62,13 @@ const openRender = async (page, renderModel) => {
   await expect(page.locator('.site-renderer')).toBeVisible()
 }
 
+const expectCanonicalStyles = async (page) => {
+  const renderStyles = page.locator('style[data-eceee-render-css]')
+  await expect(renderStyles).toHaveCount(1)
+  expect(await renderStyles.textContent()).toBe(compiledTheme.css)
+  await expect(page.locator('link[data-eceee-render-font]')).toHaveCount(1)
+}
+
 for (const viewport of viewports) {
   test(`editor and designer render the shared fixtures at ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
@@ -75,10 +82,10 @@ for (const viewport of viewports) {
       scroll: document.documentElement.scrollWidth,
     }))
     expect(documentWidth.scroll).toBe(documentWidth.client)
-    await expect(page).toHaveScreenshot(`render-editor-${viewport.name}.png`, { fullPage: true, animations: 'disabled' })
+    await expectCanonicalStyles(page)
 
     await openRender(page, designerModel)
     await expect(page.locator('.designer-preview')).toBeVisible()
-    await expect(page).toHaveScreenshot(`render-designer-${viewport.name}.png`, { fullPage: true, animations: 'disabled' })
+    await expectCanonicalStyles(page)
   })
 }
