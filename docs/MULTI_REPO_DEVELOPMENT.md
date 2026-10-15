@@ -14,7 +14,7 @@ ECEEE is a consumer of the machine-wide services in the sibling `shared-local-in
    make dev
    ```
 
-The configuration helper reads provider-managed credentials without printing them, atomically updates the ignored repo-root `.env`, and sets mode 0600. The provider admission must create and grant the ECEEE identity access to the private `eceee-media-checkpoints` bucket before this check succeeds.
+The configuration helper reads provider-managed credentials without printing them, atomically updates the ignored repo-root `.env`, and sets mode 0600. The canonical checkout uses the existing ECEEE buckets. Additional registered checkouts ask the provider to create port-scoped media and checkpoint buckets with a separate access key, then copy the canonical public media objects into the new bucket once. Existing target objects are never replaced during later configuration runs.
 
 ## Isolation contract
 
@@ -22,15 +22,16 @@ The configuration helper reads provider-managed credentials without printing the
 |---|---|---|
 | PostgreSQL 17 | `127.0.0.1:10300` | database `eceee_v4`, role `local_eceee_v4` |
 | Redis 7.4 | `127.0.0.1:10301` | ACL user `eceee_v4`, keys/channels `eceee_v4:*` |
-| MinIO | `127.0.0.1:10302` (`10303` console) | access key `eceee-v4`, public bucket `eceee-media`, private bucket `eceee-media-checkpoints` |
+| MinIO | `127.0.0.1:10302` (`10303` console) | canonical checkout: `eceee-v4` / `eceee-media`; additional checkouts: access key and public/private buckets scoped by their registered frontend port |
 
 Do not run provider `down`, reset, or volume deletion commands from this project. `make infra-down` stops only ECEEE's imgproxy. `make clean` likewise leaves shared service containers and volumes untouched.
 
 Application ports are assigned per checkout by the machine registry. The
 configuration helper resolves the current checkout's `frontend`, `backend`,
 `imgproxy`, and `playwright-renderer` labels instead of assuming the canonical
-checkout's ports. Change the registry assignment rather than overriding ports
-ad hoc in `.env`.
+checkout's ports. The frontend port also provides the stable suffix for a
+secondary checkout's MinIO identity and buckets. Change the registry assignment
+rather than overriding ports or storage namespaces ad hoc in `.env`.
 
 `make demo-reset-site` is the only destructive shared-database workflow. It is hard-limited to the separately admitted disposable database `eceee_demo`; it cannot reset `eceee_v4` or any other consumer database.
 

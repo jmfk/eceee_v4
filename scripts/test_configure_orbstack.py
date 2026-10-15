@@ -43,6 +43,28 @@ class DotenvHelpersTests(unittest.TestCase):
             ("eceee_v4_2", "local_eceee_v4_2"),
         )
 
+    def test_canonical_checkout_keeps_legacy_minio_identity(self):
+        self.assertEqual(
+            configure_orbstack.checkout_minio_identity(10100, Path("/tmp/eceee_v4")),
+            (
+                "eceee-v4",
+                "eceee-media",
+                "eceee-media-checkpoints",
+                "eceee-v4.minio.secret-key",
+            ),
+        )
+
+    def test_secondary_checkout_gets_port_scoped_minio_identity(self):
+        self.assertEqual(
+            configure_orbstack.checkout_minio_identity(11600, Path("/tmp/eceee_v4_2")),
+            (
+                "eceee-v4-11600",
+                "eceee-media-11600",
+                "eceee-media-checkpoints-11600",
+                "eceee-v4-11600.minio.secret-key",
+            ),
+        )
+
     def test_isolated_postgres_config_is_preserved_for_this_checkout(self):
         present = {
             "POSTGRES_DB": "eceee_v4_2",

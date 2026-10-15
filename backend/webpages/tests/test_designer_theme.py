@@ -618,6 +618,47 @@ class DesignerThemeApiTests(TestCase):
             {"preview", "site-icon"},
         )
 
+    def test_workspace_normalizes_legacy_tenant_links_in_all_preview_payloads(self):
+        WebPage.objects.create(
+            tenant=self.tenant,
+            created_by=self.owner,
+            last_modified_by=self.owner,
+            title="Industry",
+            slug="industry",
+            hostnames=["industry.localhost"],
+        )
+        legacy_link = {
+            "type": "external",
+            "url": "http://industry.localhost:10101/",
+            "label": "Industry",
+        }
+        self.theme.designer_preview = {
+            "views": [
+                {
+                    "id": "landing",
+                    "label": "Landing",
+                    "kind": "page",
+                    "layout": "main_layout",
+                    "content": {
+                        "widgets": {
+                            "navbar": [{"id": "nav", "config": {"link": legacy_link}}],
+                        }
+                    },
+                }
+            ]
+        }
+        self.theme.save(update_fields=["designer_preview"])
+        self.authenticate(self.designer)
+
+        workspace = self.client.get(self.workspace_url).data
+
+        for preview in (workspace["themeConfig"]["designer_preview"], workspace["previewContent"]):
+            link = preview["views"][0]["content"]["widgets"]["navbar"][0]["config"]["link"]
+            self.assertEqual(link["type"], "internal")
+            self.assertEqual(link["path"], "/")
+            self.assertEqual(link["siteHostname"], "industry.localhost")
+            self.assertNotIn("url", link)
+
     def test_workspace_exposes_font_references_as_theme_definitions_and_target_classes(self):
         groups = self.theme.design_groups
         groups["groups"].append(

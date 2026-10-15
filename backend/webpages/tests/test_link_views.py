@@ -76,6 +76,7 @@ class PageLookupTest(TestCase):
         self.assertEqual(response.data["results"][0]["path"], "/about/")
         self.assertTrue(response.data["results"][0]["is_published"])
         self.assertEqual(response.data["results"][0]["site_id"], self.site.id)
+        self.assertEqual(response.data["results"][0]["site_hostname"], "main.example.test")
 
     def test_batch_lookup_includes_cross_site_metadata(self):
         response = self.client.post(
@@ -87,6 +88,7 @@ class PageLookupTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         result = response.data["results"][0]
         self.assertEqual(result["site_id"], self.other_site.id)
+        self.assertEqual(result["site_hostname"], "other.example.test")
         self.assertEqual(result["site"]["title"], "Other site")
 
     def test_legacy_error_subtree_is_not_linkable(self):

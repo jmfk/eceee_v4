@@ -306,7 +306,11 @@ def _render_layout_preview_template(layout):
 
 def normalized_designer_preview(theme, layouts=None):
     """Return only explicitly saved Designer preview documents."""
-    from webpages.services.theme_preview_content import materialize_legacy_preview_collections
+    from webpages.services.theme_preview_content import (
+        _materialize_page_links,
+        materialize_legacy_preview_collections,
+        resolve_theme_preview_library_urls,
+    )
 
     if layouts is None:
         from webpages.layout_autodiscovery import autodiscover_layouts
@@ -315,9 +319,15 @@ def normalized_designer_preview(theme, layouts=None):
         autodiscover_layouts()
         layouts = layout_registry.list_layouts(active_only=True)
     available = {layout.name: layout for layout in layouts}
-    preview_config = materialize_legacy_preview_collections(
-        theme.designer_preview if isinstance(theme.designer_preview, dict) else {},
-        theme.tenant,
+    preview_config = resolve_theme_preview_library_urls(
+        theme,
+        _materialize_page_links(
+            theme,
+            materialize_legacy_preview_collections(
+                theme.designer_preview if isinstance(theme.designer_preview, dict) else {},
+                theme.tenant,
+            ),
+        ),
     )
     configured = preview_config.get("views", [])
     views = []
@@ -1381,6 +1391,8 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
 
     assets = collect_designer_assets(theme)
     catalog = build_designer_catalog(theme, assets, include_reference_previews=include_tenant_content)
+    theme_config = PageThemeSerializer(theme).data
+    theme_config["designer_preview"] = normalized_designer_preview(theme)
     from content.models import Namespace
 
     media_namespace = Namespace.get_or_create_theme_media(theme.tenant, created_by=theme.created_by).slug
@@ -1389,7 +1401,7 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
         "name": theme.name,
         "description": theme.description,
         "mediaNamespace": media_namespace,
-        "themeConfig": PageThemeSerializer(theme).data,
+        "themeConfig": theme_config,
         "syncVersion": theme.sync_version,
         "colors": colors,
         "fonts": fonts,

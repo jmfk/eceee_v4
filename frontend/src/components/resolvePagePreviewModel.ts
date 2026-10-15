@@ -5,6 +5,7 @@ import { objectInstancesApi } from '../api/objectStorage'
 import type { RenderPageModel, RenderWidgetModel } from '../rendering/types'
 import { getBatchImgproxyUrls } from '../utils/imgproxySecure'
 import { IMAGE_WIDGET_DEFAULT_WIDTH, imageSourceUrl, imageWidgetMediaItems, isImageCollectionReference } from '../utils/imageWidgetMedia'
+import { portableInternalHref } from '../utils/portableLinks'
 
 const dataDrivenNewsTypes = new Set([
     'easy_widgets.NewsListWidget',
@@ -66,8 +67,11 @@ const collectInternalPageIds = (candidate: any, ids: Set<string>) => {
 const resolvedHref = (link: Record<string, any>, pageLookup: Map<string, any>) => {
     if (link.type === 'internal') {
         const page = pageLookup.get(String(link.pageId || link.page_id))
-        const path = page?.path || '#'
-        return link.anchor && path !== '#' ? `${path}${path.includes('#') ? '' : `#${link.anchor}`}` : path
+        const path = page?.path || link.path || '#'
+        return portableInternalHref({
+            ...link,
+            siteHostname: link.siteHostname || link.site_hostname || page?.siteHostname || page?.site_hostname,
+        }, path)
     }
     if (link.type === 'external' || link.type === 'media') return link.url || '#'
     if (link.type === 'email') return link.address ? `mailto:${link.address}` : '#'

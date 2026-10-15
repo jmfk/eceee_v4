@@ -130,6 +130,8 @@ def link_display_info(request):
 
 
 def _page_lookup_data(page, roots_by_id, current_site_id=None):
+    from ..models import WebPage
+
     root_id = page.cached_root_id or (page.id if page.parent_id is None else None)
     root = roots_by_id.get(root_id)
     site_page = root if root and root.hostnames else None
@@ -141,6 +143,14 @@ def _page_lookup_data(page, roots_by_id, current_site_id=None):
         "is_published": page.is_currently_published,
         "parent_id": page.parent_id,
         "site_id": site_page.id if site_page else None,
+        "site_hostname": next(
+            (
+                WebPage.normalize_hostname(hostname)
+                for hostname in (site_page.hostnames if site_page else [])
+                if WebPage.normalize_hostname(hostname) not in {"", "*", "default"}
+            ),
+            None,
+        ),
     }
     if site_page and current_site_id and str(site_page.id) != str(current_site_id):
         response_data["site"] = {
@@ -197,7 +207,7 @@ def page_lookup(request):
 
     if request.method == "POST":
         page_ids = request.data.get("ids", [])
-        current_site_id = request.data.get("current_site_id")
+        current_site_id = request.data.get("currentSiteId") or request.data.get("current_site_id")
         if not isinstance(page_ids, list):
             return Response(
                 {"error": "ids must be an array"},

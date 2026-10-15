@@ -1,6 +1,8 @@
 """Theme-owned preview documents and tenant-scoped import helpers."""
 
 import copy
+import html
+import json
 import os
 import re
 import uuid
@@ -174,6 +176,151 @@ def _strip_source_links(value):
     if isinstance(value, list):
         return [_strip_source_links(child) for child in value]
     return copy.deepcopy(value)
+
+
+def _normalized_page_path(path):
+    normalized = f"/{str(path or '').strip('/')}"
+    return "/" if normalized == "/" else f"{normalized}/"
+
+
+def _materialize_page_links(theme, value):
+    """Detach tenant page links from database IDs and development origins."""
+    pages = None
+    pages_by_id = {}
+    roots_by_id = {}
+    roots_by_hostname = {}
+    pages_by_site_path = {}
+
+    def load_pages():
+        nonlocal pages
+        if pages is not None:
+            return
+        pages = list(
+            WebPage.objects.filter(tenant=theme.tenant, is_deleted=False)
+            .only("id", "parent_id", "cached_root_id", "cached_path", "slug", "hostnames")
+            .order_by("id")
+        )
+        pages_by_id.update({page.id: page for page in pages})
+        roots_by_id.update({page.id: page for page in pages if page.parent_id is None})
+        for root in roots_by_id.values():
+            for candidate in root.hostnames or []:
+                hostname = WebPage.normalize_hostname(candidate)
+                if hostname and hostname not in {"*", "default"}:
+                    roots_by_hostname[hostname] = root
+        for page in pages:
+            root_id = page.id if page.parent_id is None else page.cached_root_id
+            path = page.cached_path or page.get_absolute_url() or "/"
+            pages_by_site_path[(root_id, _normalized_page_path(path))] = page
+
+    def portable_page_link(page, source):
+        root_id = page.id if page.parent_id is None else page.cached_root_id
+        root = roots_by_id.get(root_id)
+        hostname = next(
+            (
+                WebPage.normalize_hostname(candidate)
+                for candidate in (root.hostnames if root else [])
+                if WebPage.normalize_hostname(candidate) not in {"", "*", "default"}
+            ),
+            "",
+        )
+        result = {
+            key: copy.deepcopy(child)
+            for key, child in source.items()
+            if key not in SOURCE_LINK_KEYS and key not in {"url", "resolvedUrl", "resolved_url"}
+        }
+        result["type"] = "internal"
+        result["path"] = page.cached_path or page.get_absolute_url() or "/"
+        if hostname:
+            result["siteHostname"] = hostname
+        return result
+
+    def portable_link(link):
+        link_type = link.get("type")
+        if link_type == "internal":
+            page_id = link.get("pageId") or link.get("page_id")
+            if page_id:
+                load_pages()
+                try:
+                    page = pages_by_id.get(int(page_id))
+                except (TypeError, ValueError):
+                    page = None
+                if page:
+                    return portable_page_link(page, link)
+            return _strip_source_links(link)
+
+        if link_type != "external" or not isinstance(link.get("url"), str):
+            return {key: rewrite(child) for key, child in link.items()}
+
+        parsed = urlparse(link["url"])
+        hostname = WebPage.normalize_hostname(parsed.hostname or "")
+        if not hostname or parsed.scheme not in {"http", "https"}:
+            return {key: rewrite(child) for key, child in link.items()}
+        load_pages()
+        root = roots_by_hostname.get(hostname)
+        page = pages_by_site_path.get((root.id, _normalized_page_path(parsed.path))) if root else None
+        if not page:
+            return {key: rewrite(child) for key, child in link.items()}
+        portable = portable_page_link(page, link)
+        if parsed.fragment and not portable.get("anchor"):
+            portable["anchor"] = parsed.fragment
+        if parsed.query:
+            portable["query"] = parsed.query
+        return portable
+
+    def rewrite_string(candidate):
+        decoded = html.unescape(candidate)
+        try:
+            parsed = json.loads(decoded)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            parsed = None
+        if isinstance(parsed, dict) and parsed.get("type"):
+            rewritten = json.dumps(portable_link(parsed), separators=(",", ":"))
+            return html.escape(rewritten, quote=True) if decoded != candidate else rewritten
+
+        def replace_href(match):
+            quote, href = match.groups()
+            decoded_href = html.unescape(href)
+            try:
+                parsed_href = json.loads(decoded_href)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                return match.group(0)
+            if not isinstance(parsed_href, dict) or not parsed_href.get("type"):
+                return match.group(0)
+            rewritten_href = html.escape(json.dumps(portable_link(parsed_href), separators=(",", ":")), quote=True)
+            return f"href={quote}{rewritten_href}{quote}"
+
+        return re.sub(r"href=(['\"])(.*?)\1", replace_href, candidate, flags=re.IGNORECASE)
+
+    def rewrite(current):
+        if isinstance(current, dict):
+            if current.get("type") in {"internal", "external", "email", "phone", "anchor", "media"}:
+                return portable_link(current)
+            return {key: rewrite(child) for key, child in current.items()}
+        if isinstance(current, list):
+            return [rewrite(child) for child in current]
+        if isinstance(current, str):
+            return rewrite_string(current)
+        return copy.deepcopy(current)
+
+    return rewrite(value)
+
+
+def resolve_theme_preview_library_urls(theme, value):
+    """Resolve stored theme-library references through the active storage backend."""
+
+    def rewrite(current):
+        if isinstance(current, dict):
+            return {key: rewrite(child) for key, child in current.items()}
+        if isinstance(current, list):
+            return [rewrite(child) for child in current]
+        if not isinstance(current, str) or "theme_images/" not in current:
+            return copy.deepcopy(current)
+        return EMBEDDED_IMAGE_PATTERN.sub(
+            lambda match: theme._resolve_theme_library_image_url(match.group(0)),
+            current,
+        )
+
+    return rewrite(value)
 
 
 def _materialize_media_links(theme, value):
@@ -674,7 +821,9 @@ def import_theme_preview_document(theme, source_kind, source_id):
             {
                 "title": page.title,
                 "pageData": _strip_source_links(version.page_data or {}),
-                "widgets": _strip_source_links(_materialize_media_links(theme, version.widgets or {})),
+                "widgets": _strip_source_links(
+                    _materialize_page_links(theme, _materialize_media_links(theme, version.widgets or {}))
+                ),
                 "codeLayout": layout,
             },
         )
@@ -709,7 +858,9 @@ def import_theme_preview_document(theme, source_kind, source_id):
             {
                 "title": instance.title,
                 "data": _detach_object_references(version["data"], schema),
-                "widgets": _strip_source_links(_materialize_media_links(theme, version["widgets"])),
+                "widgets": _strip_source_links(
+                    _materialize_page_links(theme, _materialize_media_links(theme, version["widgets"]))
+                ),
             },
         )
         return {
