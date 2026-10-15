@@ -71,13 +71,18 @@ export class Analytics {
       events: eventsToFlush,
     };
 
-    fetch(this.endpoint, {
+    return fetch(this.endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Tenant-ID': tenantId,
       },
       body: JSON.stringify(payload),
+    }).then(response => {
+      if (!response.ok) {
+        throw new Error(`Analytics ingest failed with status ${response.status}`);
+      }
+      return response;
     }).catch(err => {
       console.error('ECEEE Analytics: Failed to flush events', err);
       // Never move events from one workspace into another workspace's queue.

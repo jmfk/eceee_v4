@@ -52,4 +52,18 @@ describe('Analytics tenant bootstrap', () => {
         )
         expect(analytics.queue).toEqual([])
     })
+
+    it('retains events when the ingest endpoint rejects the request', async () => {
+        analytics = new Analytics()
+        analytics.tenantId = 'production-copy'
+        analytics.track('click')
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 403 })
+
+        await analytics.flush()
+
+        expect(analytics.queue).toEqual([
+            expect.objectContaining({ eventType: 'click' }),
+        ])
+    })
 })

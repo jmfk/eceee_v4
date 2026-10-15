@@ -307,7 +307,7 @@ def _render_layout_preview_template(layout):
 def normalized_designer_preview(theme, layouts=None):
     """Return only explicitly saved Designer preview documents."""
     from webpages.services.theme_preview_content import (
-        _materialize_page_links,
+        materialize_theme_preview_page_links,
         materialize_legacy_preview_collections,
         resolve_theme_preview_library_urls,
     )
@@ -321,7 +321,7 @@ def normalized_designer_preview(theme, layouts=None):
     available = {layout.name: layout for layout in layouts}
     preview_config = resolve_theme_preview_library_urls(
         theme,
-        _materialize_page_links(
+        materialize_theme_preview_page_links(
             theme,
             materialize_legacy_preview_collections(
                 theme.designer_preview if isinstance(theme.designer_preview, dict) else {},
@@ -975,16 +975,22 @@ def _cleanup_designer_assets_after_commit(theme_id, snapshots):
 
 
 def apply_designer_snapshot(theme, snapshot):
-    from webpages.services.theme_preview_content import materialize_legacy_preview_collections
+    from webpages.services.theme_preview_content import (
+        materialize_legacy_preview_collections,
+        materialize_theme_preview_page_links,
+    )
 
     theme.name = snapshot.get("name", theme.name)
     theme.description = snapshot.get("description", theme.description)
     theme.colors = copy.deepcopy(snapshot.get("colors", {}))
     theme.fonts = copy.deepcopy(snapshot.get("fonts", {}))
     theme.design_groups = copy.deepcopy(snapshot.get("design_groups", {}))
-    theme.designer_preview = materialize_legacy_preview_collections(
-        snapshot.get("designer_preview", theme.designer_preview),
-        theme.tenant,
+    theme.designer_preview = materialize_theme_preview_page_links(
+        theme,
+        materialize_legacy_preview_collections(
+            snapshot.get("designer_preview", theme.designer_preview),
+            theme.tenant,
+        ),
     )
     layouts = copy.deepcopy(snapshot.get("layouts", theme.layouts))
     theme.layouts = {
