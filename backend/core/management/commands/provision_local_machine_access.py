@@ -1,11 +1,12 @@
 """Provision a redacted, tenant-bound machine credential for local development."""
 
 import os
-from pathlib import Path
 import re
 import stat
 import tempfile
+import uuid
 from datetime import timedelta
+from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
@@ -36,7 +37,6 @@ from core.machine_api_keys import (
     generate_machine_api_key,
 )
 from core.models import MachineAPIKey, Tenant
-
 
 DEFAULT_SCOPES = sorted(
     {
@@ -131,8 +131,13 @@ class Command(BaseCommand):
         if options["expires_days"] < 1:
             raise CommandError("expires_days=invalid")
 
+        tenant_reference = options["tenant"]
         try:
-            tenant = Tenant.objects.get(identifier=options["tenant"], is_active=True)
+            tenant_lookup = {"id": uuid.UUID(tenant_reference)}
+        except ValueError:
+            tenant_lookup = {"identifier": tenant_reference}
+        try:
+            tenant = Tenant.objects.get(**tenant_lookup, is_active=True)
         except Tenant.DoesNotExist as exc:
             raise CommandError("tenant=missing_or_inactive") from exc
 

@@ -1,3 +1,9 @@
+import os
+import stat
+import tempfile
+from io import StringIO
+from pathlib import Path
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.management import call_command
@@ -5,11 +11,6 @@ from django.core.management.base import CommandError
 from django.db import connection
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
-from io import StringIO
-import os
-from pathlib import Path
-import stat
-import tempfile
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.settings import api_settings
@@ -24,8 +25,8 @@ from core.machine_api_keys import (
     LAYOUT_READ,
     MEDIA_READ,
     MEDIA_WRITE,
-    OBJECT_READ,
     OBJECT_PUBLISH,
+    OBJECT_READ,
     OBJECT_TRANSFER,
     OBJECT_WRITE,
     PAGE_PUBLISH,
@@ -507,6 +508,19 @@ class ProvisionLocalMachineAccessTest(TestCase):
             self.assertNotEqual(first_digest, first_key.key_hash)
             self.assertEqual(stat.S_IMODE(env_file.stat().st_mode), 0o600)
             self.assertEqual(MachineAPIKey.objects.filter(name="Codex local CMS access").count(), 1)
+
+    def test_command_accepts_tenant_uuid(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / ".env.local"
+
+            call_command(
+                "provision_local_machine_access",
+                tenant=str(self.tenant.id),
+                env_file=env_file,
+            )
+
+            credential = MachineAPIKey.objects.get(name="Codex local CMS access")
+            self.assertEqual(list(credential.tenants.all()), [self.tenant])
 
     def test_command_rejects_an_unsafe_env_file_mode(self):
         with tempfile.TemporaryDirectory() as directory:
