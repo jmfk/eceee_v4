@@ -14,7 +14,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..models import MediaCollection, MediaFile, MediaTag
-from ..serializers import BulkOperationSerializer
 from ..storage import storage
 
 logger = logging.getLogger(__name__)
@@ -185,15 +184,11 @@ class BulkMediaOperationsView(APIView):
         selected_tenant = getattr(request, "tenant", None)
         accessible_theme_file_ids = [
             file_obj.id
-            for file_obj in files.filter(namespace__kind=Namespace.KIND_THEME_MEDIA).select_related(
-                "namespace", "namespace__tenant"
-            )
+            for file_obj in files.filter(namespace__is_hidden=True).select_related("namespace", "namespace__tenant")
             if (selected_tenant is None or file_obj.namespace.tenant_id == selected_tenant.id)
             and user_can_access_namespace(request.user, file_obj.namespace)
         ]
-        files = files.filter(
-            ~models.Q(namespace__kind=Namespace.KIND_THEME_MEDIA) | models.Q(id__in=accessible_theme_file_ids)
-        )
+        files = files.filter(~models.Q(namespace__is_hidden=True) | models.Q(id__in=accessible_theme_file_ids))
 
         # Filter by permissions
         if not request.user.is_staff:

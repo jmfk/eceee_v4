@@ -26,11 +26,9 @@ logger = logging.getLogger(__name__)
 
 def _can_access_theme_pending(pending_file, user, tenant=None):
     """Keep pending theme uploads inside their tenant's Designer boundary."""
-    from content.models import Namespace
-
     from ..security import user_can_access_namespace
 
-    if pending_file.namespace.kind != Namespace.KIND_THEME_MEDIA:
+    if not pending_file.namespace.is_hidden:
         return True
     return (tenant is None or tenant.pk == pending_file.namespace.tenant_id) and user_can_access_namespace(
         user, pending_file.namespace
@@ -105,7 +103,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
         from core.permissions import user_can_switch_tenant
 
         tenant = getattr(self.request, "tenant", None)
-        theme_media = Q(namespace__kind=Namespace.KIND_THEME_MEDIA)
+        theme_media = Q(namespace__is_hidden=True)
         if user_can_switch_tenant(self.request.user):
             allowed_theme_media = theme_media
         else:
@@ -144,9 +142,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
         except PendingMediaFile.DoesNotExist:
             raise Http404("Pending file not found")
 
-        from content.models import Namespace
-
-        if pending_file.namespace.kind == Namespace.KIND_THEME_MEDIA and not pending_preview_token_is_valid(
+        if pending_file.namespace.is_hidden and not pending_preview_token_is_valid(
             pending_file, request.query_params.get("preview_token")
         ):
             raise Http404("Pending file not found")

@@ -36,6 +36,11 @@ class Namespace(models.Model):
     # Namespace configuration
     is_active = models.BooleanField(default=True, help_text="Whether this namespace is active")
     is_default = models.BooleanField(default=False, help_text="Whether this is the default namespace")
+    is_hidden = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Hide this namespace from ordinary user-facing namespace and media views",
+    )
     kind = models.CharField(
         max_length=32,
         choices=KIND_CHOICES,
@@ -82,6 +87,9 @@ class Namespace(models.Model):
     def save(self, *args, **kwargs):
         """Ensure only one default namespace exists for this tenant."""
         if self.kind == self.KIND_THEME_MEDIA:
+            self.is_hidden = True
+            self.is_default = False
+        if self.is_hidden:
             self.is_default = False
         if self.is_default:
             Namespace.objects.filter(tenant_id=self.tenant_id, is_default=True).exclude(pk=self.pk).update(
@@ -167,6 +175,7 @@ class Namespace(models.Model):
                 "description": "System-owned media shared by this tenant's themes.",
                 "is_active": True,
                 "is_default": False,
+                "is_hidden": True,
                 "created_by": owner,
             },
         )

@@ -125,6 +125,24 @@ const ImageWidget = ({
     }, [localConfig.image])
     const collectionId = localConfig.image?.id
     const collectionNamespace = localConfig.image?.namespace
+    const collectionSampleMediaItems = useMemo(() => {
+        const samples = localConfig.image?.sampleImages || localConfig.image?.sample_images || []
+        return samples.map(sample => {
+            const url = sample.imgproxyBaseUrl || sample.imgproxy_base_url || sample.fileUrl || sample.file_url || sample.url || ''
+            return {
+                id: String(sample.id || url),
+                url,
+                type: sample.type === 'video' ? 'video' : 'image',
+                altText: sample.altText || sample.alt_text || sample.title || 'Image',
+                caption: sample.caption || '',
+                annotation: sample.annotation || '',
+                title: sample.title || '',
+                width: sample.width,
+                height: sample.height,
+                thumbnailUrl: sample.thumbnailUrl || sample.thumbnail_url || url,
+            }
+        }).filter(item => item.url)
+    }, [localConfig.image?.sampleImages, localConfig.image?.sample_images])
 
     // Resolve collection files when image is a collection
     useEffect(() => {
@@ -187,10 +205,10 @@ const ImageWidget = ({
 
     // Backend now provides media_items in config (resolved from image field)
     // Use media_items directly from config, or resolved collection files
-    const configuredMediaItems = useMemo(
-        () => localConfig.mediaItems || localConfig.media_items || [],
-        [localConfig.mediaItems, localConfig.media_items]
-    )
+    const configuredMediaItems = useMemo(() => {
+        const configured = localConfig.mediaItems || localConfig.media_items || []
+        return configured.length > 0 ? configured : collectionSampleMediaItems
+    }, [localConfig.mediaItems, localConfig.media_items, collectionSampleMediaItems])
 
     // If we have resolved collection files, use those instead
     const effectiveMediaItems = isCollection && collectionMediaItems.length > 0

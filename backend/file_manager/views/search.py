@@ -41,16 +41,14 @@ class MediaSearchView(APIView):
         if filters.get("namespace"):
             from content.models import Namespace
 
-            from ..security import user_can_access_theme_media
+            from ..security import user_can_access_namespace
 
             theme_namespace = Namespace.objects.filter(
                 slug=filters["namespace"],
                 tenant=tenant,
-                kind=Namespace.KIND_THEME_MEDIA,
+                is_hidden=True,
             ).first()
-            include_theme_media = bool(
-                theme_namespace and user_can_access_theme_media(request.user, theme_namespace.tenant)
-            )
+            include_theme_media = bool(theme_namespace and user_can_access_namespace(request.user, theme_namespace))
 
         # Start with base queryset
         queryset = (
@@ -118,7 +116,14 @@ class MediaSearchView(APIView):
             queryset = queryset.filter(access_level=filters["access_level"])
 
         if filters.get("namespace"):
-            queryset = queryset.filter(namespace__slug=filters["namespace"])
+            from content.models import Namespace
+
+            try:
+                namespace = Namespace.resolve(filters["namespace"], tenant=tenant)
+            except Namespace.DoesNotExist:
+                queryset = queryset.none()
+            else:
+                queryset = queryset.filter(namespace=namespace)
 
         if request.query_params.get("has_tags", "").lower() == "true":
             queryset = queryset.filter(tags__isnull=False).distinct()

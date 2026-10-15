@@ -64,6 +64,8 @@ describe('NamespaceManager', () => {
                 slug: 'imported-media',
                 description: 'Media kept separate for this import',
                 isActive: true,
+                isHidden: false,
+                kind: 'content',
             })
         })
         await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -78,7 +80,71 @@ describe('NamespaceManager', () => {
         await user.selectOptions(screen.getByLabelText('Status'), 'default')
 
         await waitFor(() => {
-            expect(namespacesApi.list).toHaveBeenLastCalledWith({ is_default: true })
+            expect(namespacesApi.list).toHaveBeenLastCalledWith({ include_hidden: true, is_default: true })
+        })
+    })
+
+    it('creates a hidden namespace for Theme Designer and system use', async () => {
+        const user = userEvent.setup()
+        renderWithProviders(<NamespaceManager />)
+
+        await screen.findByText('Default namespace for content')
+        await user.click(screen.getByRole('button', { name: 'Create Namespace' }))
+        await user.type(screen.getByLabelText('Name *'), 'Theme assets')
+        await user.click(screen.getByRole('checkbox', { name: /Hidden from users/ }))
+        await user.click(screen.getByRole('button', { name: 'Create' }))
+
+        await waitFor(() => {
+            expect(namespacesApi.create).toHaveBeenCalledWith(expect.objectContaining({
+                name: 'Theme assets',
+                isHidden: true,
+                kind: 'content',
+            }))
+        })
+    })
+
+    it('sets namespace kind and makes theme media hidden', async () => {
+        const user = userEvent.setup()
+        renderWithProviders(<NamespaceManager />)
+
+        await screen.findByText('Default namespace for content')
+        await user.click(screen.getByRole('button', { name: 'Create Namespace' }))
+        await user.type(screen.getByLabelText('Name *'), 'Theme media')
+        await user.selectOptions(screen.getByLabelText('Kind'), 'theme_media')
+
+        expect(screen.getByRole('checkbox', { name: /Hidden from users/ })).toBeChecked()
+        expect(screen.getByRole('checkbox', { name: /Hidden from users/ })).toBeDisabled()
+    })
+
+    it('updates the kind of an existing namespace', async () => {
+        const user = userEvent.setup()
+        namespacesApi.list.mockResolvedValueOnce({
+            results: [{
+                id: 2,
+                name: 'Theme assets',
+                slug: 'theme-assets',
+                description: '',
+                isActive: true,
+                isDefault: false,
+                isHidden: false,
+                kind: 'content',
+                contentCount: 0,
+                createdAt: '2026-01-01T00:00:00Z',
+            }],
+        })
+        namespacesApi.update.mockResolvedValue({})
+        renderWithProviders(<NamespaceManager />)
+
+        await screen.findByText('theme-assets')
+        await user.click(screen.getByRole('button', { name: 'Edit Theme assets' }))
+        await user.selectOptions(screen.getByLabelText('Kind'), 'theme_media')
+        await user.click(screen.getByRole('button', { name: 'Update' }))
+
+        await waitFor(() => {
+            expect(namespacesApi.update).toHaveBeenCalledWith(2, expect.objectContaining({
+                kind: 'theme_media',
+                isHidden: true,
+            }))
         })
     })
 })
