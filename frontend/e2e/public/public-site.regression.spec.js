@@ -1,31 +1,28 @@
 import { expect, test } from '@playwright/test'
 
-test.describe('public site regressions', () => {
-  test('renders the published home page through the public hostname route', async ({ page }) => {
+test.describe('retired Django public renderer', () => {
+  const expectRendererDisabled = async (response, page) => {
+    expect(response?.status()).toBe(410)
+    expect(response?.headers()['x-eceee-renderer']).toBe('django-disabled')
+    await expect(page.getByText('Public rendering is provided by Next.js.')).toBeVisible()
+    await expect(page.getByText(/Traceback|Server Error/i)).toHaveCount(0)
+  }
+
+  test('does not render the published home page through Django', async ({ page }) => {
     const response = await page.goto('/')
 
-    expect(response?.status()).toBe(200)
-    await expect(page).toHaveTitle(/Public Regression Home/)
-    await expect(page.getByRole('heading', { name: 'Public Regression Home' })).toBeVisible()
-    await expect(page.getByText('eceee-public-regression-home')).toBeVisible()
-    await expect(page.locator('.layout-slot.slot-main')).toBeVisible()
-    await expect(page.getByText(/No site configured|Page not found|Traceback|Server Error/i)).toHaveCount(0)
+    await expectRendererDisabled(response, page)
   })
 
-  test('renders a published child page without exposing the root slug', async ({ page }) => {
+  test('does not render published child pages through Django', async ({ page }) => {
     const response = await page.goto('/about/')
 
-    expect(response?.status()).toBe(200)
-    await expect(page).toHaveTitle(/Public Regression About/)
-    await expect(page.getByRole('heading', { name: 'Public Regression About' })).toBeVisible()
-    await expect(page.getByText('eceee-public-regression-about')).toBeVisible()
-    await expect(page).not.toHaveURL(/public-regression-root/)
+    await expectRendererDisabled(response, page)
   })
 
-  test('returns a real 404 for missing public pages instead of a broken render', async ({ page }) => {
+  test('blocks Django before resolving missing public pages', async ({ page }) => {
     const response = await page.goto('/missing-public-regression-page/')
 
-    expect(response?.status()).toBe(404)
-    await expect(page.getByText(/Traceback|Server Error/i)).toHaveCount(0)
+    await expectRendererDisabled(response, page)
   })
 })

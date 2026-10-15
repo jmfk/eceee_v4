@@ -398,7 +398,7 @@ const NamespaceManager = () => {
                                                 >
                                                     <Edit3 className="w-4 h-4" />
                                                 </button>
-                                                {!namespace.isDefault && namespace.contentCount === 0 && (
+                                                {!namespace.isDefault && namespace.kind !== 'theme_media' && namespace.contentCount === 0 && (
                                                     <button
                                                         type="button"
                                                         onClick={() => handleDelete(namespace)}
@@ -565,6 +565,7 @@ const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }
                                 kind: e.target.value,
                                 isHidden: e.target.value === 'theme_media' ? true : prev.isHidden,
                             }))}
+                            disabled={namespace?.kind === 'theme_media'}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             <option value="content">Content</option>

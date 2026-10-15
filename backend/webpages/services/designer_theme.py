@@ -307,8 +307,8 @@ def _render_layout_preview_template(layout):
 def normalized_designer_preview(theme, layouts=None):
     """Return only explicitly saved Designer preview documents."""
     from webpages.services.theme_preview_content import (
-        materialize_theme_preview_page_links,
         materialize_legacy_preview_collections,
+        materialize_theme_preview_page_links,
         resolve_theme_preview_library_urls,
     )
 

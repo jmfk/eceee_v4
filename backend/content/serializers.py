@@ -54,6 +54,14 @@ class NamespaceSerializer(serializers.ModelSerializer):
         is_hidden = attrs.get("is_hidden", getattr(self.instance, "is_hidden", False))
         is_default = attrs.get("is_default", getattr(self.instance, "is_default", False))
         kind = attrs.get("kind", getattr(self.instance, "kind", Namespace.KIND_CONTENT))
+        if self.instance and self.instance.kind == Namespace.KIND_THEME_MEDIA:
+            errors = {}
+            if kind != Namespace.KIND_THEME_MEDIA:
+                errors["kind"] = "The system theme-media namespace cannot change kind."
+            if not is_hidden:
+                errors["is_hidden"] = "The system theme-media namespace must remain hidden."
+            if errors:
+                raise serializers.ValidationError(errors)
         if kind == Namespace.KIND_THEME_MEDIA:
             is_hidden = True
             existing_theme_media = Namespace.objects.filter(tenant=tenant, kind=Namespace.KIND_THEME_MEDIA).exclude(
