@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import NamespaceManager from '../NamespaceManager'
 import { namespacesApi } from '../../api/namespaces'
 import { renderWithProviders } from '../../test/testUtils'
@@ -7,6 +8,10 @@ import { renderWithProviders } from '../../test/testUtils'
 vi.mock('../../api/namespaces', () => ({
     namespacesApi: {
         list: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+        setAsDefault: vi.fn(),
         getContentSummary: vi.fn(),
     },
 }))
@@ -28,26 +33,52 @@ describe('NamespaceManager', () => {
                 },
             ],
         })
+        namespacesApi.create.mockResolvedValue({
+            id: 2,
+            name: 'Imported media',
+            slug: 'imported-media',
+            isActive: true,
+            isDefault: false,
+        })
     })
 
-    it('presents namespaces as a read-only settings overview', async () => {
+    it('creates an active non-default namespace from Settings', async () => {
+        const user = userEvent.setup()
         renderWithProviders(<NamespaceManager />)
 
         expect(await screen.findByText('Default namespace for content')).toBeInTheDocument()
-        expect(screen.getByText(/default namespace is used unless a feature creates/i)).toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: /create namespace/i })).not.toBeInTheDocument()
-        expect(screen.queryByTitle('Set as default')).not.toBeInTheDocument()
-        expect(screen.queryByTitle('Edit namespace')).not.toBeInTheDocument()
-        expect(screen.queryByTitle('Delete namespace')).not.toBeInTheDocument()
-        expect(screen.queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: 'Create Namespace' }))
+
+        const dialog = screen.getByRole('dialog', { name: 'Create Namespace' })
+        expect(dialog).toBeInTheDocument()
+        expect(screen.queryByRole('checkbox', { name: 'Default' })).not.toBeInTheDocument()
+
+        await user.type(screen.getByLabelText('Name *'), 'Imported media')
+        expect(screen.getByLabelText('Slug *')).toHaveValue('imported-media')
+        await user.type(screen.getByLabelText('Description'), 'Media kept separate for this import')
+        await user.click(screen.getByRole('button', { name: 'Create' }))
+
+        await waitFor(() => {
+            expect(namespacesApi.create).toHaveBeenCalledWith({
+                name: 'Imported media',
+                slug: 'imported-media',
+                description: 'Media kept separate for this import',
+                isActive: true,
+            })
+        })
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     })
 
-    it('does not invite namespace creation when none is configured', async () => {
-        namespacesApi.list.mockResolvedValueOnce({ results: [] })
-
+    it('uses backend query parameter names for namespace status filters', async () => {
+        const user = userEvent.setup()
         renderWithProviders(<NamespaceManager />)
 
-        expect(await screen.findByText('No namespace is configured for this workspace.')).toBeInTheDocument()
-        expect(screen.queryByText(/create your first namespace/i)).not.toBeInTheDocument()
+        await screen.findByText('Default namespace for content')
+        await user.click(screen.getByRole('button', { name: 'Filters' }))
+        await user.selectOptions(screen.getByLabelText('Status'), 'default')
+
+        await waitFor(() => {
+            expect(namespacesApi.list).toHaveBeenLastCalledWith({ is_default: true })
+        })
     })
 })

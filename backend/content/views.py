@@ -68,7 +68,9 @@ class NamespaceViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         # If setting this namespace as default, unset others
         if serializer.validated_data.get("is_default", False):
-            Namespace.objects.filter(is_default=True).exclude(
+            Namespace.objects.filter(
+                tenant=serializer.instance.tenant, is_default=True
+            ).exclude(
                 pk=serializer.instance.pk
             ).update(is_default=False)
         serializer.save()
@@ -79,9 +81,9 @@ class NamespaceViewSet(viewsets.ModelViewSet):
         namespace = self.get_object()
 
         # Unset all other namespaces as default
-        Namespace.objects.filter(is_default=True).exclude(pk=namespace.pk).update(
-            is_default=False
-        )
+        Namespace.objects.filter(
+            tenant=namespace.tenant, is_default=True
+        ).exclude(pk=namespace.pk).update(is_default=False)
 
         # Set this namespace as default
         namespace.is_default = True
@@ -169,7 +171,7 @@ class TagViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(namespace_id=namespace_id)
         else:
             # Use default namespace if none specified
-            default_namespace = Namespace.get_default()
+            default_namespace = Namespace.get_default(tenant=tenant)
             queryset = queryset.filter(namespace=default_namespace)
 
         return queryset

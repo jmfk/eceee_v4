@@ -42,14 +42,41 @@ class NamespaceSerializer(serializers.ModelSerializer):
         """Get total count of content objects in this namespace"""
         return obj.get_content_count()
 
+    def validate(self, attrs):
+        request = self.context.get("request")
+        tenant = (
+            self.instance.tenant
+            if self.instance
+            else getattr(request, "tenant", None)
+        )
+        namespace_id = self.instance.pk if self.instance else None
+        for field in ("name", "slug"):
+            value = attrs.get(field, getattr(self.instance, field, None))
+            if (
+                value
+                and Namespace.objects.filter(tenant=tenant, **{field: value})
+                .exclude(pk=namespace_id)
+                .exists()
+            ):
+                raise serializers.ValidationError(
+                    {field: f"A namespace with this {field} already exists."}
+                )
+        return attrs
+
     def validate_is_default(self, value):
-        """Ensure only one default namespace can exist"""
-        if value and Namespace.objects.filter(is_default=True).exists():
+        """Ensure only one default namespace can exist per tenant."""
+        request = self.context.get("request")
+        tenant = (
+            self.instance.tenant
+            if self.instance
+            else getattr(request, "tenant", None)
+        )
+        defaults = Namespace.objects.filter(tenant=tenant, is_default=True)
+        if value and defaults.exists():
             # If this is an update, exclude the current instance
             if self.instance:
                 if (
-                    Namespace.objects.filter(is_default=True)
-                    .exclude(pk=self.instance.pk)
+                    defaults.exclude(pk=self.instance.pk)
                     .exists()
                 ):
                     raise serializers.ValidationError(

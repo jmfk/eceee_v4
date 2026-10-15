@@ -53,12 +53,12 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--namespace-slug",
-            default="demo",
+            default="default",
             help="Namespace slug for imported media/content.",
         )
         parser.add_argument(
             "--namespace-name",
-            default="Demo",
+            default="Default",
             help="Namespace name for imported media/content.",
         )
         parser.add_argument(
@@ -179,19 +179,22 @@ class Command(BaseCommand):
         return tenant
 
     def get_or_create_namespace(self, slug, name, tenant, user):
+        existing_default = Namespace.objects.filter(
+            tenant=tenant, is_default=True
+        ).first()
+        if existing_default:
+            return existing_default
+
         namespace, created = Namespace.objects.get_or_create(
+            tenant=tenant,
             slug=slug,
             defaults={
                 "name": name,
-                "tenant": tenant,
                 "is_default": True,
                 "created_by": user,
             },
         )
         updates = []
-        if namespace.tenant_id != tenant.id:
-            namespace.tenant = tenant
-            updates.append("tenant")
         if namespace.name != name:
             namespace.name = name
             updates.append("name")
