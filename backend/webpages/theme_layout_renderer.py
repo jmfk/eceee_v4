@@ -12,6 +12,7 @@ PROPERTY_MAP = {
     "display": "display",
     "width": "width",
     "height": "height",
+    "min_width": "min-width",
     "max_width": "max-width",
     "min_height": "min-height",
     "grid_template_columns": "grid-template-columns",
@@ -37,7 +38,7 @@ PROPERTY_MAP = {
 }
 SEMANTIC_TAGS = {"div", "header", "nav", "main", "aside", "section", "footer"}
 DEFAULT_BREAKPOINTS = {"xs": 0, "sm": 640, "md": 768, "lg": 1024, "xl": 1280}
-PIXEL_DIMENSION_PROPERTIES = {"width", "height", "max_width", "min_height"}
+PIXEL_DIMENSION_PROPERTIES = {"width", "height", "min_width", "max_width", "min_height"}
 UNITLESS_NUMBER = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$")
 
 

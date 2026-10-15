@@ -5,7 +5,7 @@ import type { LayoutRenderProps, ThemeLayoutDefinition, ThemeLayoutNode } from '
 const allowedTypes = new Set(['container', 'section', 'grid', 'row', 'column', 'semantic', 'slot'])
 const semanticTags = new Set(['div', 'header', 'nav', 'main', 'aside', 'section', 'footer'])
 const propertyMap: Record<string, string> = {
-    display: 'display', width: 'width', height: 'height', max_width: 'max-width', min_height: 'min-height',
+    display: 'display', width: 'width', height: 'height', min_width: 'min-width', max_width: 'max-width', min_height: 'min-height',
     grid_template_columns: 'grid-template-columns', grid_column: 'grid-column',
     flex_direction: 'flex-direction', flex_wrap: 'flex-wrap', flex_grow: 'flex-grow', order: 'order',
     gap: 'gap', padding: 'padding', margin: 'margin', align_items: 'align-items',
@@ -19,7 +19,7 @@ const keyPattern = /^[a-z][a-z0-9_]{0,63}$/
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const presentationColorPattern = /^#[0-9a-f]{6}$/i
 const defaultBreakpoints: Record<string, number> = { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 }
-const pixelDimensionProperties = new Set(['width', 'height', 'max_width', 'min_height'])
+const pixelDimensionProperties = new Set(['width', 'height', 'min_width', 'max_width', 'min_height'])
 const unitlessNumberPattern = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/
 const safeBackgroundImage = (value: string | number) => {
     const text = String(value).trim()

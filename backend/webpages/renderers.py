@@ -13,6 +13,7 @@ from .inheritance_helpers import InheritanceTreeHelpers
 from .inheritance_tree import InheritanceTreeBuilder
 
 _UNSET = object()
+LEGACY_CODE_LAYOUT_RENDERING_ENABLED = False
 
 
 class WebPageRenderer:
@@ -138,6 +139,10 @@ class WebPageRenderer:
         snapshot_page = self._page_snapshot(page, page_version)
         effective_layout = self._effective_layout(page, page_version, historical=historical)
         effective_theme = self._effective_theme(page, page_version, historical=historical)
+        theme_layout = self._theme_layout_definition(effective_theme, page_version, effective_layout)
+        if not theme_layout:
+            layout_key = page_version.code_layout or getattr(effective_layout, "name", None) or "(unset)"
+            raise ValueError(f"Theme layout '{layout_key}' is unavailable for page: {snapshot_page.title}")
 
         # Build base context
         render_context = self._build_base_context(
@@ -147,9 +152,7 @@ class WebPageRenderer:
             effective_layout=effective_layout,
             effective_theme=effective_theme,
         )
-
-        if not effective_layout:
-            raise ValueError(f"No layout found for page: {snapshot_page.title}")
+        render_context["theme_layout_definition"] = theme_layout
 
         # Render widgets by slot
         widgets_by_slot = self._render_widgets_by_slot(
@@ -160,8 +163,15 @@ class WebPageRenderer:
         )
         render_context["widgets_by_slot"] = widgets_by_slot
 
-        # Get layout template name
-        template_name = self._get_layout_template_name(effective_layout)
+        from .theme_layout_renderer import render_theme_layout
+
+        render_context["uses_theme_layout_definition"] = True
+        render_context["theme_layout_html"] = render_theme_layout(
+            theme_layout,
+            widgets_by_slot,
+            effective_theme.get_breakpoints(),
+        )
+        template_name = "webpages/theme_layout_page.html"
 
         # Render the page HTML
         page_html = render_to_string(template_name, render_context, request=self.request)
@@ -173,6 +183,7 @@ class WebPageRenderer:
             effective_layout,
             effective_theme,
             widgets_by_slot,
+            include_legacy_layout_css=False,
         )
 
         # Generate site icons (favicons) from theme
@@ -569,10 +580,16 @@ class WebPageRenderer:
             helpers = InheritanceTreeHelpers(tree)
 
             # Get effective layout for slot configuration
+            theme_layout = context.get("theme_layout_definition")
             effective_layout = context.get("layout")
-            layout_slots = []
-            if effective_layout and effective_layout.slot_configuration:
+            if theme_layout:
+                layout_slots = [
+                    {"name": name, **configuration} for name, configuration in (theme_layout.get("slots") or {}).items()
+                ]
+            elif effective_layout and effective_layout.slot_configuration:
                 layout_slots = effective_layout.slot_configuration.get("slots", [])
+            else:
+                layout_slots = []
 
             # Process each layout slot using tree queries
             for slot_config in layout_slots:
@@ -686,7 +703,33 @@ class WebPageRenderer:
             layout_name = getattr(layout, "name", "default")
             return f"webpages/layouts/{layout_name.lower()}.html"
 
-    def _collect_page_css(self, page, page_version, layout, theme, widgets_by_slot):
+    @staticmethod
+    def _theme_layout_definition(theme, page_version, layout):
+        """Resolve an active theme-owned layout without falling back to another key."""
+        if not theme or not isinstance(getattr(theme, "layouts", None), dict):
+            return None
+        layout_key = getattr(page_version, "code_layout", None) or getattr(layout, "name", None)
+        if not layout_key:
+            layout_key = theme.layouts.get("default_layout_key")
+        return next(
+            (
+                item
+                for item in theme.layouts.get("items", [])
+                if isinstance(item, dict) and item.get("key") == layout_key and item.get("status", "active") == "active"
+            ),
+            None,
+        )
+
+    def _collect_page_css(
+        self,
+        page,
+        page_version,
+        layout,
+        theme,
+        widgets_by_slot,
+        *,
+        include_legacy_layout_css=False,
+    ):
         """Collect all CSS for the page including theme, layout, and widgets."""
         from .services.theme_css_generator import ThemeCSSGenerator
 
@@ -701,7 +744,12 @@ class WebPageRenderer:
                 css_parts.append(theme_css)
 
         # Layout CSS
-        if hasattr(layout, "css_content") and layout.css_content:
+        if (
+            LEGACY_CODE_LAYOUT_RENDERING_ENABLED
+            and include_legacy_layout_css
+            and hasattr(layout, "css_content")
+            and layout.css_content
+        ):
             css_parts.append(f"/* Layout: {layout.name} */")
             css_parts.append(layout.css_content)
 

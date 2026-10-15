@@ -15,6 +15,7 @@ from core.models import Tenant
 from webpages.inheritance_tree import InheritanceTreeBuilder
 from webpages.models import PageTheme, WebPage
 from webpages.public_views import HostnamePageView
+from webpages.renderers import WebPageRenderer
 from webpages.serializers import PageDataSchemaSerializer, PageVersionSerializer
 from webpages.theme_layout_renderer import render_theme_layout
 from webpages.theme_layouts import (
@@ -49,6 +50,33 @@ class ThemeLayoutValidationTests(SimpleTestCase):
             footer = next(node for node in root["children"][0]["children"] if "Footer wrapper" == node.get("label"))
             self.assertEqual(footer["type"], "container")
             self.assertNotIn("tag", footer)
+
+    def test_default_page_layouts_own_the_structural_rules_previously_supplied_by_legacy_css(self):
+        layouts = {layout["key"]: layout for layout in default_theme_layouts()["items"]}
+        main_nodes = list(self._walk_nodes(layouts["main_layout"]["root"]))
+        main = next(node for node in main_nodes if "main-layout-main" in node.get("class_names", []))
+
+        self.assertEqual(main["styles"]["base"]["min_width"], "0")
+        self.assertEqual(main["styles"]["base"]["padding"], "0")
+        for layout in (layouts["main_layout"], layouts["landing_page"]):
+            footer = next(
+                node for node in self._walk_nodes(layout["root"]) if "slot-footer" in node.get("class_names", [])
+            )
+            self.assertEqual(
+                footer["styles"]["base"],
+                {
+                    "min_height": "310px",
+                    "display": "flex",
+                    "flex_direction": "column",
+                    "flex_grow": "1",
+                },
+            )
+
+    @staticmethod
+    def _walk_nodes(node):
+        yield node
+        for child in node.get("children", []):
+            yield from ThemeLayoutValidationTests._walk_nodes(child)
 
     def test_every_declared_slot_must_have_exactly_one_leaf(self):
         document = default_theme_layouts()
@@ -189,6 +217,43 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         self.assertEqual(view._get_error_page(root, 404)["key"], "error_404")
         self.assertEqual(view._get_special_page(root, kind="route", route="/account/login/")["key"], "login")
 
+    def test_public_renderer_resolves_theme_layout_without_injecting_python_layout_css(self):
+        document = default_theme_layouts()
+        theme = SimpleNamespace(layouts=document)
+        page_version = SimpleNamespace(code_layout="main_layout", page_custom_css="", page_css_variables={})
+        python_layout = SimpleNamespace(name="main_layout", css_content=".legacy-python-layout{height:310px}")
+        renderer = WebPageRenderer()
+
+        resolved = renderer._theme_layout_definition(theme, page_version, python_layout)
+        css = renderer._collect_page_css(
+            SimpleNamespace(),
+            page_version,
+            python_layout,
+            None,
+            {},
+            include_legacy_layout_css=False,
+        )
+
+        self.assertEqual(resolved["key"], "main_layout")
+        self.assertNotIn("legacy-python-layout", css)
+
+    def test_public_renderer_keeps_python_layout_css_disabled_even_if_requested(self):
+        theme = SimpleNamespace(layouts={"default_layout_key": "main_layout", "items": []})
+        page_version = SimpleNamespace(code_layout="main_layout", page_custom_css="", page_css_variables={})
+        python_layout = SimpleNamespace(name="main_layout", css_content=".legacy-python-layout{display:grid}")
+        renderer = WebPageRenderer()
+
+        self.assertIsNone(renderer._theme_layout_definition(theme, page_version, python_layout))
+        css = renderer._collect_page_css(
+            SimpleNamespace(),
+            page_version,
+            python_layout,
+            None,
+            {},
+            include_legacy_layout_css=True,
+        )
+        self.assertNotIn("legacy-python-layout", css)
+
     def test_nodes_containing_slots_cannot_be_hidden(self):
         document = deepcopy(default_theme_layouts())
         document["items"][0]["root"]["styles"]["sm"] = {"display": "none"}
@@ -233,12 +298,34 @@ class ThemeLayoutValidationTests(SimpleTestCase):
         root["styles"]["base"]["width"] = 960
         root["styles"]["base"]["height"] = "112"
         root["styles"].setdefault("md", {})["min_height"] = "240.5"
+        root["styles"]["base"]["min_width"] = "0"
 
         self.assertIs(validate_theme_layouts(document), document)
         html = str(render_theme_layout(document["items"][0], {}))
         self.assertIn("width:960px", html)
         self.assertIn("height:112px", html)
         self.assertIn("min-height:240.5px", html)
+        self.assertIn("min-width:0px", html)
+
+    def test_legacy_layout_style_transfer_preserves_content_growth(self):
+        migration = import_module("webpages.migrations.0085_transfer_legacy_layout_styles")
+        document = default_theme_layouts()
+        layout = next(item for item in document["items"] if item["key"] == "main_layout")
+        main_slot = next(
+            node for node in self._walk_nodes(layout["root"]) if "slot-main" in node.get("class_names", [])
+        )
+        main_slot["styles"] = {"base": {"height": "310px"}}
+
+        transferred, changed = migration.transfer_document(document)
+        transferred_layout = next(item for item in transferred["items"] if item["key"] == "main_layout")
+        transferred_main = next(
+            node for node in self._walk_nodes(transferred_layout["root"]) if "slot-main" in node.get("class_names", [])
+        )
+
+        self.assertTrue(changed)
+        self.assertNotIn("height", transferred_main["styles"]["base"])
+        self.assertEqual(transferred_main["styles"]["base"]["min_height"], "310px")
+        self.assertFalse(migration.transfer_document(transferred)[1])
 
     def test_grid_nodes_can_expose_designer_parameters(self):
         document = deepcopy(default_theme_layouts())

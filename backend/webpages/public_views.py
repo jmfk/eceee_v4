@@ -104,7 +104,23 @@ class PageDetailView(PublishedPageMixin, DetailView):
         if current_version:
             renderer = WebPageRenderer(request=self.request)
             base_context = renderer._build_base_context(page, current_version, {})
+            theme_layout = renderer._theme_layout_definition(
+                context["effective_theme"],
+                current_version,
+                context["effective_layout"],
+            )
+            if not theme_layout:
+                layout_key = current_version.code_layout or getattr(context["effective_layout"], "name", None)
+                raise RuntimeError(f"Theme layout '{layout_key or '(unset)'}' is unavailable")
+            base_context["theme_layout_definition"] = theme_layout
             context["widgets_by_slot"] = renderer._render_widgets_by_slot(page, current_version, base_context)
+            self._uses_theme_layout_definition = True
+            context["uses_theme_layout_definition"] = True
+            context["theme_layout_html"] = render_theme_layout(
+                theme_layout,
+                context["widgets_by_slot"],
+                context["effective_theme"].get_breakpoints(),
+            )
 
             # Add SEO metadata from version
             page_data = current_version.page_data or {}
@@ -144,6 +160,9 @@ class PageDetailView(PublishedPageMixin, DetailView):
         Try to find a specific template for the page layout,
         falling back to the default template.
         """
+        if getattr(self, "_uses_theme_layout_definition", False):
+            return ["webpages/theme_layout_page.html"]
+
         page = self.object
         template_names = []
 
@@ -582,6 +601,7 @@ class HostnamePageView(View):
                 raise Http404("Page not available")
 
             effective_layout = current_page.get_effective_layout()
+            effective_theme = current_page.get_effective_theme()
 
             template_name = effective_layout.template_name if effective_layout else "webpages/page_detail.html"
 
@@ -600,7 +620,7 @@ class HostnamePageView(View):
                 "current_page": current_page,
                 "widgets": widgets,
                 "layout": effective_layout,
-                "theme": current_page.get_effective_theme(),
+                "theme": effective_theme,
                 "parent": current_page.parent,
                 "slug_parts": slug_parts,
                 "request": request,
@@ -611,7 +631,7 @@ class HostnamePageView(View):
                 "published_at": content.effective_date,
                 "published_by": content.created_by,
                 "effective_layout": effective_layout,
-                "effective_theme": current_page.get_effective_theme(),
+                "effective_theme": effective_theme,
                 "path_variables": path_variables,  # NEW: Add path variables to context
                 # SEO metadata
                 "meta_title": meta_title,
@@ -621,17 +641,29 @@ class HostnamePageView(View):
 
             # Build widgets_by_slot via renderer (new system)
             renderer = WebPageRenderer(request=request)
+            theme_layout = renderer._theme_layout_definition(effective_theme, content, effective_layout)
+            if not theme_layout:
+                layout_key = content.code_layout or getattr(effective_layout, "name", None)
+                raise RuntimeError(f"Theme layout '{layout_key or '(unset)'}' is unavailable")
             # Pass path_variables in the extra context
             base_context = renderer._build_base_context(current_page, content, {"path_variables": path_variables})
+            base_context["theme_layout_definition"] = theme_layout
             context["widgets_by_slot"] = renderer._render_widgets_by_slot(current_page, content, base_context)
+
+            context["uses_theme_layout_definition"] = True
+            context["theme_layout_html"] = render_theme_layout(
+                theme_layout,
+                context["widgets_by_slot"],
+                effective_theme.get_breakpoints(),
+            )
+            template_name = "webpages/theme_layout_page.html"
 
             # Add theme_css_url from renderer context
             context["theme_css_url"] = base_context.get("theme_css_url")
 
-            if effective_layout:
-                context["slots"] = effective_layout.slot_configuration["slots"]
-            else:
-                context["slots"] = []
+            context["slots"] = [
+                {"name": name, **configuration} for name, configuration in (theme_layout.get("slots") or {}).items()
+            ]
 
             return render(request, template_name, context)
 
