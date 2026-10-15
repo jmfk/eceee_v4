@@ -180,14 +180,18 @@ export const createPageRenderModel = ({
     return { layout, layoutDefinition, layoutDefinitionRequired, layoutBreakpoints, slots, context: { ...context, preview: true }, themeCss, fontUrl }
 }
 
-const layoutSlotNodeLabels = (root?: ThemeLayoutNode) => {
+const layoutSlotNodes = (root?: ThemeLayoutNode) => {
     const labels: Record<string, string> = {}
+    const order: string[] = []
     const visit = (node: ThemeLayoutNode) => {
-        if (node.type === 'slot' && node.slot_key) labels[node.slot_key] = node.label || ''
+        if (node.type === 'slot' && node.slot_key) {
+            labels[node.slot_key] = node.label || ''
+            order.push(node.slot_key)
+        }
         ;(node.children || []).forEach(visit)
     }
     if (root) visit(root)
-    return labels
+    return { labels, order }
 }
 
 export const withLayoutPreviewPlaceholders = (
@@ -195,9 +199,17 @@ export const withLayoutPreviewPlaceholders = (
     layoutDefinition?: ThemeLayoutDefinition | null,
 ): RenderPageModel => {
     if (!layoutDefinition) return model
-    const nodeLabels = layoutSlotNodeLabels(layoutDefinition.root)
+    const { labels: nodeLabels, order: renderedSlotOrder } = layoutSlotNodes(layoutDefinition.root)
     const slots = { ...model.slots }
-    Object.entries(layoutDefinition.slots || {}).forEach(([slotKey, policy], index) => {
+    const declaredSlots = Object.entries(layoutDefinition.slots || {})
+    const orderedSlots = [
+        ...renderedSlotOrder.flatMap((slotKey) => {
+            const policy = layoutDefinition.slots?.[slotKey]
+            return policy ? [[slotKey, policy] as const] : []
+        }),
+        ...declaredSlots.filter(([slotKey]) => !renderedSlotOrder.includes(slotKey)),
+    ]
+    orderedSlots.forEach(([slotKey, policy], index) => {
         if (slots[slotKey]?.length) return
         slots[slotKey] = [{
             id: `layout-preview-placeholder-${layoutDefinition.id}-${slotKey}`,

@@ -38,6 +38,40 @@ describe('render adapters', () => {
         expect(preview.designer?.guidesEnabled).toBe(false)
     })
 
+    it('assigns placeholder shades in rendered tree order so adjacent slots differ', () => {
+        const slot = (id: string, slotKey: string) => ({ id, type: 'slot' as const, slot_key: slotKey, label: slotKey, children: [] })
+        const layout = {
+            id: 'shade-order-layout',
+            key: 'shade_order',
+            label: 'Shade order',
+            status: 'active' as const,
+            slots: {
+                header: { label: 'Header' },
+                footer: { label: 'Footer' },
+                navigation: { label: 'Navigation' },
+                hero: { label: 'Hero' },
+                main: { label: 'Main' },
+            },
+            root: {
+                id: 'shade-order-root',
+                type: 'container' as const,
+                children: [
+                    slot('header-slot', 'header'),
+                    slot('navigation-slot', 'navigation'),
+                    slot('hero-slot', 'hero'),
+                    slot('main-slot', 'main'),
+                    slot('footer-slot', 'footer'),
+                ],
+            },
+        }
+
+        const preview = withLayoutPreviewPlaceholders(createPageRenderModel({ layoutDefinition: layout }), layout)
+        const renderedShades = ['header', 'navigation', 'hero', 'main', 'footer'].map((slotKey) => preview.slots[slotKey][0].config.shade)
+
+        expect(renderedShades).toEqual([0, 1, 2, 3, 0])
+        expect(renderedShades.every((shade, index) => index === 0 || shade !== renderedShades[index - 1])).toBe(true)
+    })
+
     it('preserves sidebar section descriptors instead of normalizing them as widgets', () => {
         const section = { title: 'Related pages', type: 'list', items: [{ title: 'Programme', url: '/programme/' }] }
         const model = createPageRenderModel({

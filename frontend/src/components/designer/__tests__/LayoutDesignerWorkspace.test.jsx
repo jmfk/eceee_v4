@@ -98,7 +98,7 @@ describe('LayoutDesignerWorkspace', () => {
         expect(screen.getByRole('button', { name: 'Preview at mobile width' })).toHaveAttribute('aria-pressed', 'true')
     })
 
-    it('prefers matching preview pages that already contain content', () => {
+    it('defaults layout previews to layout defaults even when matching pages contain content', () => {
         render(<Harness previewViews={[
             { id: 'empty-page', label: 'Empty page', layout: 'main_layout', content: { codeLayout: 'main_layout', widgets: {} } },
             { id: 'filled-page', label: 'Filled page', layout: 'main_layout', content: { codeLayout: 'main_layout', widgets: { main: [{ id: 'heading', type: 'easy_widgets.HeadlineWidget', config: { content: 'Hello' } }] } } },
@@ -106,7 +106,14 @@ describe('LayoutDesignerWorkspace', () => {
 
         fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
 
+        expect(screen.getByLabelText('Content')).toHaveValue('layout')
+        expect(screen.getByLabelText('Content').querySelector('option')).toHaveTextContent('Layout defaults')
+
+        fireEvent.change(screen.getByLabelText('Content'), { target: { value: 'view:filled-page' } })
         expect(screen.getByLabelText('Content')).toHaveValue('view:filled-page')
+
+        fireEvent.change(screen.getByLabelText('Layout'), { target: { value: document.items[1].id } })
+        expect(screen.getByLabelText('Content')).toHaveValue('layout')
     })
 
     it('switches the inspector between layouts and selected canvas elements', () => {
