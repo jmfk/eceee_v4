@@ -2700,9 +2700,8 @@ const SemanticThemeWorkspace = ({
                         style={{
                             left: previewOffset,
                             width: previewCanvasWidth,
-                            height: `${100 / previewScale}%`,
-                            transform: `scale(${previewScale})`,
-                            transformOrigin: 'top left',
+                            height: '100%',
+                            zoom: previewScale,
                         }}
                     />}
                 </div>
