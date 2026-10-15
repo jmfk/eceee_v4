@@ -51,3 +51,13 @@ class NavbarWidgetTests(SimpleTestCase):
         self.assertEqual(context["hamburgerBreakpoint"], 768)
         self.assertEqual(context["menuItems"][0]["type"], "external")
         self.assertEqual(context["menuItems"][0]["url"], "/")
+
+    def test_widget_css_keeps_both_desktop_menus_inside_the_navbar(self):
+        self.assertIn("column-gap: 8px;", self.widget.widget_css)
+        self.assertIn("@media (min-width: 1024px)", self.widget.widget_css)
+        self.assertIn("column-gap: 24px;", self.widget.widget_css)
+        self.assertIn("flex: 1 0 auto;", self.widget.widget_css)
+        self.assertIn("flex: 0 1 440px;", self.widget.widget_css)
+        self.assertIn("min-width: max-content;", self.widget.widget_css)
+        self.assertIn("flex: 1 1 140px;", self.widget.widget_css)
+        self.assertIn("white-space: nowrap;", self.widget.widget_css)

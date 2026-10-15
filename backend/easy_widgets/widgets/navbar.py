@@ -194,7 +194,19 @@ class NavbarWidget(BaseWidget):
         }
 
         .navbar-primary-menu {
+            column-gap: 8px;
+            flex: 1 0 auto;
             padding: 0 0 0 20px;
+        }
+
+        @media (min-width: 1024px) {
+            .navbar-primary-menu {
+                column-gap: 24px;
+            }
+        }
+
+        .navbar-primary-menu .navbar-link {
+            white-space: nowrap;
         }
 
         .navbar-menu-item {
@@ -216,16 +228,20 @@ class NavbarWidget(BaseWidget):
 
         .navbar-secondary-menu {
             display: flex;
+            flex: 0 1 440px;
             gap: 0;
             list-style: none;
             margin: 0;
+            min-width: max-content;
             padding: 0 20px 0 0;
             align-items: flex-end;
         }
 
         .navbar-secondary-menu .navbar-menu-item {
+            flex: 1 1 140px;
+            min-width: max-content;
             text-align: left;
-            width: 140px;
+            width: auto;
             padding: 2px 11px 2px;
             margin-top: 2px;
             box-shadow: inset -1px -1px 1px rgba(0, 0, 0, 0.2);
@@ -233,6 +249,7 @@ class NavbarWidget(BaseWidget):
 
         .navbar-secondary-menu .navbar-menu-item a {
             border-radius: 0 0 0 0;
+            white-space: nowrap;
         }
 
         .navbar-link {
