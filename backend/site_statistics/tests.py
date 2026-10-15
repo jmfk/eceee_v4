@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient, APITestCase
 
 from core.models import Tenant
 from site_statistics.models import ConversionStats, EventRaw, Experiment, PageStats, Variant
@@ -135,6 +135,21 @@ class EventIngestionTests(APITestCase):
         self.assertEqual(tenant_id, str(self.tenant.id))
         self.assertEqual(payloads[0]["event_type"], "click")
         self.assertEqual(payloads[0]["metadata"]["session_id"], "session-1")
+
+    @patch("site_statistics.views.ingestion.ingest_events.delay")
+    def test_authenticated_browser_ingest_does_not_require_csrf(self, delay):
+        client = APIClient(enforce_csrf_checks=True)
+        client.force_login(self.user)
+
+        response = client.post(
+            "/api/v1/statistics/ingest/",
+            {"events": [{"eventType": "pageview", "url": "http://localhost:10100/"}]},
+            format="json",
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        delay.assert_called_once()
 
     @patch("site_statistics.views.ingestion.ingest_events.delay")
     def test_ingest_accepts_a_single_event_payload(self, delay):

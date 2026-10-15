@@ -18,6 +18,7 @@ class EventIngestionView(APIView):
     """
 
     permission_classes = [AllowAny]  # Public endpoint for tracking
+    authentication_classes = []  # Public browser events must not inherit session CSRF enforcement.
     max_batch_size = 100
 
     def post(self, request, *args, **kwargs):

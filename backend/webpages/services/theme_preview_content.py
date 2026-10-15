@@ -183,7 +183,7 @@ def _normalized_page_path(path):
     return "/" if normalized == "/" else f"{normalized}/"
 
 
-def _materialize_page_links(theme, value):
+def materialize_theme_preview_page_links(theme, value):
     """Detach tenant page links from database IDs and development origins."""
     pages = None
     pages_by_id = {}
@@ -822,7 +822,7 @@ def import_theme_preview_document(theme, source_kind, source_id):
                 "title": page.title,
                 "pageData": _strip_source_links(version.page_data or {}),
                 "widgets": _strip_source_links(
-                    _materialize_page_links(theme, _materialize_media_links(theme, version.widgets or {}))
+                    materialize_theme_preview_page_links(theme, _materialize_media_links(theme, version.widgets or {}))
                 ),
                 "codeLayout": layout,
             },
@@ -859,7 +859,7 @@ def import_theme_preview_document(theme, source_kind, source_id):
                 "title": instance.title,
                 "data": _detach_object_references(version["data"], schema),
                 "widgets": _strip_source_links(
-                    _materialize_page_links(theme, _materialize_media_links(theme, version["widgets"]))
+                    materialize_theme_preview_page_links(theme, _materialize_media_links(theme, version["widgets"]))
                 ),
             },
         )

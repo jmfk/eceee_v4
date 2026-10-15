@@ -17,7 +17,7 @@ from webpages.services.theme_preview_content import (
     MAX_IMPORTED_IMAGE_BYTES,
     _copy_preview_images,
     _managed_storage_path,
-    _materialize_page_links,
+    materialize_theme_preview_page_links,
     import_theme_preview_document,
     materialize_legacy_preview_collections,
     normalize_theme_preview_namespaces,
@@ -319,7 +319,7 @@ class ThemePreviewContentTests(TestCase):
         self.assertNotIn("resolvedUrl", link)
 
     def test_legacy_tenant_url_is_converted_to_portable_internal_link(self):
-        portable = _materialize_page_links(
+        portable = materialize_theme_preview_page_links(
             self.theme,
             {
                 "type": "external",
@@ -343,7 +343,7 @@ class ThemePreviewContentTests(TestCase):
     def test_external_url_outside_the_tenant_remains_external(self):
         source = {"type": "external", "url": "https://www.eceee.org/", "label": "eceee"}
 
-        self.assertEqual(_materialize_page_links(self.theme, source), source)
+        self.assertEqual(materialize_theme_preview_page_links(self.theme, source), source)
 
     def test_embedded_link_json_is_made_portable(self):
         source = (
@@ -351,7 +351,7 @@ class ThemePreviewContentTests(TestCase):
             f'&quot;pageId&quot;:{self.page.id}}}">Article</a></p>'
         )
 
-        portable = _materialize_page_links(self.theme, source)
+        portable = materialize_theme_preview_page_links(self.theme, source)
 
         self.assertIn("&quot;path&quot;:&quot;/article/&quot;", portable)
         self.assertIn("&quot;siteHostname&quot;:&quot;example.test&quot;", portable)
