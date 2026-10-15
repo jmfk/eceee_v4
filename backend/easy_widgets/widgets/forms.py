@@ -218,8 +218,14 @@ class FormsWidget(BaseWidget):
         padding: var(--form-padding, 2rem);
         border-radius: var(--form-radius, 0.5rem);
         border: var(--form-border, 1px solid #e5e7eb);
+        min-width: 0;
         max-width: var(--form-max-width, 600px);
         margin: var(--form-margin, 0 auto);
+    }
+
+    .forms-widget .form-fields,
+    .forms-widget .form-field {
+        min-width: 0;
     }
 
     .forms-widget .form-title {
@@ -254,6 +260,9 @@ class FormsWidget(BaseWidget):
         color: var(--form-required-color, #dc2626);
     }
 
+    .forms-widget .form-input,
+    .forms-widget .form-textarea,
+    .forms-widget .form-select,
     .forms-widget input[type="text"],
     .forms-widget input[type="email"],
     .forms-widget input[type="tel"],
@@ -261,6 +270,7 @@ class FormsWidget(BaseWidget):
     .forms-widget textarea,
     .forms-widget select {
         width: 100%;
+        max-width: 100%;
         padding: var(--form-input-padding, 0.75rem);
         border: var(--form-input-border, 1px solid #d1d5db);
         border-radius: var(--form-input-radius, 0.375rem);

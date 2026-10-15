@@ -74,6 +74,37 @@ describe('canonical render CSS compiler', () => {
         expect(fontUrl).toContain('family=Source+Sans+3:wght@400;700&display=optional')
     })
 
+    it('keeps the canonical cascade order stable', () => {
+        const { css } = compileRenderStyles({
+            theme: {
+                colors: { orderColor: '#123456' },
+                designGroups: { groups: [{
+                    targetingMode: 'css-classes',
+                    targetCssClasses: '.design-order',
+                    elements: { h6: { color: 'orderColor' } },
+                }] },
+                componentStyles: { card: { css: '.component-order {}' } },
+                imageStyles: { hero: { css: '.image-order {}' } },
+                customCss: '.theme-order {}',
+            },
+            page: { pageCustomCss: '.page-order {}' },
+        })
+        const markers = [
+            '/*! tailwindcss',
+            '.site-renderer{min-height:100vh}',
+            '/* Widget:',
+            '--orderColor: #123456',
+            '.design-order h6 {',
+            '.component-order {}',
+            '.image-order {}',
+            '.theme-order {}',
+            '.page-order {}',
+        ]
+        const positions = markers.map(marker => css.indexOf(marker))
+        expect(positions.every(position => position >= 0)).toBe(true)
+        expect(positions).toEqual([...positions].sort((left, right) => left - right))
+    })
+
     it.each([
         [{}, {}, true],
         [{ enableCssInjection: false }, {}, false],
