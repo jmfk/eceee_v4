@@ -97,6 +97,26 @@ describe('render adapters', () => {
         expect(model.designer?.contentEditable).toBe(false)
     })
 
+    it('does not inject legacy catalog layout CSS into designer previews', () => {
+        const model = createDesignerRenderModel({
+            workspace: {
+                previewContent: { views: [{ id: 'main', layout: 'main_layout', texts: {}, images: {} }] },
+                catalog: {
+                    layouts: [{
+                        key: 'main_layout',
+                        layoutCss: '.legacy-python-layout{height:310px}',
+                        slots: [{ name: 'main' }],
+                    }],
+                },
+                themeCss: '.theme-widget{color:red}',
+                assets: [],
+            },
+            viewId: 'main',
+        })
+
+        expect(model.themeCss).not.toContain('legacy-python-layout')
+    })
+
     it('renders complete theme-owned preview documents instead of generated fixtures', () => {
         const workspace = {
             previewContent: { views: [{

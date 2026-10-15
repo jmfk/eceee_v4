@@ -202,7 +202,7 @@ describe('LayoutDesignerWorkspace', () => {
         expect(screen.getByText('Dimensions')).toBeInTheDocument()
         expect(screen.getByLabelText('height value')).toHaveValue('auto')
         expect(screen.getByLabelText('max width value')).toHaveValue('none')
-        expect(screen.getAllByText('CSS default (not yet saved on this existing element)')).toHaveLength(3)
+        expect(screen.getAllByText('CSS default (not yet saved on this existing element)')).toHaveLength(4)
         fireEvent.change(screen.getByLabelText('Element name'), { target: { value: 'Site frame' } })
         const widthParameter = screen.getByRole('checkbox', { name: 'Expose width in Theme Designer' })
         fireEvent.click(widthParameter)

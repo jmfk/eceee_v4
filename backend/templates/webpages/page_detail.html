@@ -34,9 +34,10 @@
         {% endif %}
     {% endif %}
     
-    {% if effective_layout and effective_layout.css_content %}
-        <style>{{ effective_layout.css_content|safe }}</style>
-    {% endif %}
+    {% comment %}
+    Legacy code-layout CSS is intentionally disabled. Theme layout JSON owns all
+    structural CSS, and a missing definition must fail instead of falling back.
+    {% endcomment %}
 {% endblock %}
 
 {% block breadcrumbs %}

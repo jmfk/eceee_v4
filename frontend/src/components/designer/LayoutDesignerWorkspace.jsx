@@ -14,9 +14,9 @@ import ResponsivePreviewCanvas from './ResponsivePreviewCanvas'
 import SpecialPagesEditor from './SpecialPagesEditor'
 
 const nodeTypes = ['container', 'section', 'grid', 'row', 'column', 'semantic', 'slot']
-const styleFields = ['display', 'width', 'height', 'max_width', 'min_height', 'grid_template_columns', 'grid_column', 'flex_direction', 'flex_wrap', 'flex_grow', 'order', 'gap', 'padding', 'margin', 'align_items', 'justify_content', 'background_color', 'background_image', 'background_position', 'background_size', 'background_repeat', 'color', 'font_family', 'border', 'border_radius']
-const dimensionStyleFields = ['width', 'height', 'max_width', 'min_height']
-const dimensionStyleDefaults = { width: 'auto', height: 'auto', max_width: 'none', min_height: 'auto' }
+const styleFields = ['display', 'width', 'height', 'min_width', 'max_width', 'min_height', 'grid_template_columns', 'grid_column', 'flex_direction', 'flex_wrap', 'flex_grow', 'order', 'gap', 'padding', 'margin', 'align_items', 'justify_content', 'background_color', 'background_image', 'background_position', 'background_size', 'background_repeat', 'color', 'font_family', 'border', 'border_radius']
+const dimensionStyleFields = ['width', 'height', 'min_width', 'max_width', 'min_height']
+const dimensionStyleDefaults = { width: 'auto', height: 'auto', min_width: 'auto', max_width: 'none', min_height: 'auto' }
 const unitlessNumberPattern = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/
 const gridStyleFields = ['grid_template_columns', 'gap', 'padding', 'margin', 'align_items', 'justify_content']
 const externallyEditableNodeTypes = new Set(nodeTypes)

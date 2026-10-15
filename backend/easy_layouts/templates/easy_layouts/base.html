@@ -29,10 +29,11 @@
     <link rel="stylesheet" href="{{ theme_css_url }}" />
     {% endif %}
     
-    <!-- Layout CSS (from code-based layout) -->
-    {% if effective_layout and effective_layout.css_content %}
-    <style>{{ effective_layout.css_content|safe }}</style>
-    {% endif %}
+    {% comment %}
+    Legacy code-layout CSS is intentionally disabled. The Python layout definitions
+    remain in the repository for reference while theme layout JSON is the only
+    active source of structural CSS.
+    {% endcomment %}
 
     <style>
         [x-cloak] {

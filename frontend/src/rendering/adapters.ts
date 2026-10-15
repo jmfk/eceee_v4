@@ -409,7 +409,7 @@ export const createDesignerRenderModel = ({
             preview: true,
             componentStyles: Object.fromEntries((workspace?.catalog?.componentStyles || []).map((style: any) => [style.key, style])),
         },
-        themeCss: `${catalogLayout?.layoutCss || ''}\n${themeCss || ''}`,
+        themeCss: themeCss || '',
         fontUrl,
         designer: {
             catalog: workspace?.catalog || {},

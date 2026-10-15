@@ -24,6 +24,7 @@ STYLE_PROPERTIES = {
     "display",
     "width",
     "height",
+    "min_width",
     "max_width",
     "min_height",
     "grid_template_columns",
@@ -106,13 +107,14 @@ def _node(name, node_type, *, children=None, styles=None, class_names=None, tag=
     return node
 
 
-def _slot_node(layout, key, class_names=None):
+def _slot_node(layout, key, class_names=None, styles=None):
     return _node(
         f"{layout}/slot/{key}",
         "slot",
         slot_key=key,
         label=key.replace("_", " ").title(),
         class_names=class_names or ["layout-slot", f"slot-{key}"],
+        styles=styles,
     )
 
 
@@ -218,7 +220,13 @@ def _main_layout():
         label="Main content",
         class_names=["main-layout-main"],
         styles={
-            "base": {"width": "100%", "max_width": "650px", "margin": "0 auto"},
+            "base": {
+                "width": "100%",
+                "min_width": "0",
+                "max_width": "650px",
+                "margin": "0 auto",
+                "padding": "0",
+            },
             "xl": {"max_width": "790px", "margin": "0"},
         },
         children=[_slot_node("main", "main")],
@@ -263,7 +271,20 @@ def _main_layout():
         label="Footer wrapper",
         class_names=["main-layout-footer"],
         styles={"base": {"min_height": "310px", "display": "flex", "flex_direction": "column"}},
-        children=[_slot_node("main", "footer")],
+        children=[
+            _slot_node(
+                "main",
+                "footer",
+                styles={
+                    "base": {
+                        "min_height": "310px",
+                        "display": "flex",
+                        "flex_direction": "column",
+                        "flex_grow": "1",
+                    }
+                },
+            )
+        ],
     )
     wrapper = _node(
         "main/wrapper",
@@ -340,7 +361,20 @@ def _landing_layout():
         label="Footer wrapper",
         class_names=["landing-page-footer"],
         styles={"base": {"min_height": "310px", "display": "flex", "flex_direction": "column"}},
-        children=[_slot_node("landing", "footer")],
+        children=[
+            _slot_node(
+                "landing",
+                "footer",
+                styles={
+                    "base": {
+                        "min_height": "310px",
+                        "display": "flex",
+                        "flex_direction": "column",
+                        "flex_grow": "1",
+                    }
+                },
+            )
+        ],
     )
     wrapper = _node(
         "landing/wrapper",

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import PageRenderer from '../PageRenderer'
+import RenderDocument from '../RenderDocument'
 import { PUBLIC_RENDER_CSS } from '../publicRenderCss'
 import { layoutDefinitionCss, normalizeLayoutDefinition, validateLayoutDefinition } from '../themeLayoutRenderer'
 import type { RenderPageModel, ThemeLayoutDefinition } from '../types'
@@ -88,6 +89,43 @@ describe('theme layout rendering', () => {
         expect(css).toContain('width:960px')
         expect(css).toContain('height:112px')
         expect(css).toContain('min-height:240.5px')
+    })
+
+    it('supports min-width as a theme-owned dimension', () => {
+        const sized = structuredClone(layout)
+        sized.root.styles.base.min_width = '0'
+
+        const css = layoutDefinitionCss(sized)
+
+        expect(css).toContain('min-width:0px')
+        expect(validateLayoutDefinition(sized)).toBe(true)
+    })
+
+    it('does not mix legacy layout CSS into a theme-owned render', () => {
+        const model: RenderPageModel = {
+            layout: layout.key,
+            layoutDefinition: layout,
+            layoutDefinitionRequired: true,
+            slots: { main: [] },
+            context: { preview: true },
+        }
+
+        const { container } = render(<RenderDocument model={model} />)
+        const css = Array.from(container.querySelectorAll('style')).map((style) => style.textContent).join('\n')
+
+        expect(css).not.toContain('.main-layout-container,.landing-page-container')
+        expect(css).toContain('[data-layout-node-id="14a715dd-567c-42dc-8340-7bfe59037d36"]')
+    })
+
+    it('does not restore legacy layout CSS when a theme layout definition is missing', () => {
+        const { container } = render(<RenderDocument model={{
+            layout: 'main_layout',
+            slots: { main: [] },
+            context: { preview: true },
+        }} />)
+        const css = Array.from(container.querySelectorAll('style')).map((style) => style.textContent).join('\n')
+
+        expect(css).not.toContain('.main-layout-container,.landing-page-container')
     })
 
     it('compiles theme color tokens using the theme variable contract', () => {
