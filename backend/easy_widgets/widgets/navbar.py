@@ -196,7 +196,7 @@ class NavbarWidget(BaseWidget):
         .navbar-primary-menu {
             column-gap: 8px;
             flex: 1 0 auto;
-            padding: 0 0 0 20px;
+            padding: var(--navbar-primary-padding, 0);
         }
 
         @media (min-width: 1024px) {
@@ -233,7 +233,7 @@ class NavbarWidget(BaseWidget):
             list-style: none;
             margin: 0;
             min-width: max-content;
-            padding: 0 20px 0 0;
+            padding: var(--navbar-secondary-padding, 0);
             align-items: flex-end;
         }
 

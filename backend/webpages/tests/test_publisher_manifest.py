@@ -7,8 +7,8 @@ class PublisherManifestTests(SimpleTestCase):
     def test_manifest_contains_runtime_css_and_widget_metadata(self):
         manifest = build_publisher_manifest()
 
-        self.assertEqual(manifest["formatVersion"], 1)
-        self.assertIn(".container", manifest["baseCss"])
+        self.assertEqual(manifest["formatVersion"], 2)
+        self.assertNotIn("baseCss", manifest)
         self.assertEqual(
             {page["status_code"] for page in manifest["defaultSpecialPages"]},
             {403, 404, 500, 503},

@@ -140,9 +140,9 @@ export const ImageView = ({ source, alt = '', className = '' }: { source?: any, 
 export const TextWithBreaks = ({ children }: { children?: any }) => <>{String(children || '').split(/\r?\n/).map((line, index) => <React.Fragment key={index}>{index > 0 && <br />}{line}</React.Fragment>)}</>
 
 export const EmptyRender = ({ children }: React.PropsWithChildren) => (
-    <div className="render-empty-state p-4 text-center text-gray-500">{children}</div>
+    <div className="render-empty-state">{children}</div>
 )
 
 export const RenderFailure = ({ message }: { message?: string }) => (
-    <div role="alert" className="render-error-state p-4 text-center text-red-600">{message || 'Content could not be rendered.'}</div>
+    <div role="alert" className="render-error-state">{message || 'Content could not be rendered.'}</div>
 )

@@ -66,13 +66,13 @@ export const RenderDocument = ({ model, rootRef, additionalCss = '', onNavigate 
 
     return <>
         {additionalCss && <style>{additionalCss}</style>}
-        {model?.fontUrl && <link rel="stylesheet" href={model.fontUrl} />}
-        {model?.themeCss && <style>{model.themeCss}</style>}
+        {model?.fontUrl && <link data-eceee-render-font rel="stylesheet" href={model.fontUrl} />}
+        {model?.themeCss && <style data-eceee-render-css>{model.themeCss}</style>}
         <div ref={renderRootRef} className={model?.designer
             ? `designer-preview${model.designer.guidesEnabled === false ? '' : ' designer-guides'}${model.designer.layoutCanvas ? ' layout-designer-preview' : ''}`
             : ''}>{model
             ? <PageRenderer model={model} />
-            : <div className="p-4 text-gray-500">Preparing preview…</div>}</div>
+            : <div className="render-empty-state">Preparing preview…</div>}</div>
     </>
 }
 

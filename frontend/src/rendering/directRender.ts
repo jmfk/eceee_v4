@@ -5,7 +5,7 @@ import { buildPathVariablesContext } from '../utils/pathParser'
 import { transformInheritanceData } from '../utils/widgetMerging'
 import { resolvePagePreviewModel } from '../components/resolvePagePreviewModel'
 import { createPageRenderModel } from './adapters'
-import { compileRenderStyles } from './themeCssCompiler'
+import { compileBrowserRenderStyles } from './browserThemeStyles'
 import { getCurrentTenantId } from '../utils/tenant'
 import type { RenderPageModel } from './types'
 
@@ -65,7 +65,7 @@ export const buildResolvedRenderModel = async ({
     const theme = version?.effectiveTheme
         || (typeof version?.theme === 'object' ? version.theme : null)
         || page?.effectiveTheme
-    const compiledStyles = compileRenderStyles({ theme, page, version })
+    const compiledStyles = await compileBrowserRenderStyles({ theme, page, version })
     const model = createPageRenderModel({
         layout: version?.layoutKey || version?.codeLayout || page?.effectiveLayout?.name || 'main_layout',
         layoutDefinition: (() => {

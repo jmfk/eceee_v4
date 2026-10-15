@@ -190,7 +190,7 @@ export const buildEditorThemeCSS = ({
         rootSelector,
         namespace: `eceee-${scopeId.replace(/[^a-zA-Z0-9_-]/g, '-')}-`,
     })
-    return compiledStyles.fontUrl ? `@import url("${compiledStyles.fontUrl}");\n\n${compiled}` : compiled
+    return compiled
 }
 
 export const buildDesignerTheme = workspace => {

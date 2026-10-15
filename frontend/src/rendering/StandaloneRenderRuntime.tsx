@@ -52,10 +52,10 @@ export const StandaloneRenderRuntime = () => {
     }, [])
 
     if (error) {
-        return <div role="alert" className="min-h-screen bg-white p-6 text-red-700">{error}</div>
+        return <div role="alert" className="render-status render-status-error">{error}</div>
     }
     if (!model) {
-        return <div className="min-h-screen bg-white p-6 text-gray-500">Preparing preview…</div>
+        return <div className="render-status render-status-pending">Preparing preview…</div>
     }
     return <RenderDocument model={model} onNavigate={handleNavigate} />
 }

@@ -4,8 +4,10 @@ import { useContext, useEffect, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { pagesApi } from '../api'
 import UnifiedDataContext from '../contexts/unified-data/context/UnifiedDataContext'
-import { buildEditorThemeCSS } from '../utils/editorThemeCSS'
+import { compileEditorCSS } from '../utils/editorThemeCSS'
 import { themeCSSManager } from '../utils/themeCSSManager'
+import { registerRenderFont, unregisterRenderFont } from '../rendering/renderFontManager'
+import { useBrowserRenderStyles } from '../rendering/useBrowserRenderStyles'
 
 export const supportsCSSScope = () => {
     if (typeof CSSStyleSheet === 'undefined') return false
@@ -60,15 +62,15 @@ export const useEditorThemeStyles = ({
         ? new Error('This browser cannot safely isolate site CSS. Theme styling is disabled in the editor.')
         : null
 
+    const renderStylesInput = useMemo(() => ({ theme, page, version }), [page, theme, version])
+    const renderStyles = useBrowserRenderStyles(renderStylesInput)
     const { css, compileError } = useMemo(() => {
         if (!enabled || !styleKey || !scopeSupported) return { css: '', compileError: null }
         try {
             return {
-                css: buildEditorThemeCSS({
-                    theme,
-                    page,
-                    version,
-                    scopeId: styleKey,
+                css: compileEditorCSS(renderStyles.css, {
+                    rootSelector: `.eceee-theme-scope[data-eceee-theme-scope="${styleKey}"]`,
+                    namespace: `eceee-${styleKey.replace(/[^a-zA-Z0-9_-]/g, '-')}-`,
                 }),
                 compileError: null,
             }
@@ -77,12 +79,11 @@ export const useEditorThemeStyles = ({
         }
     }, [
         enabled,
-        page,
+        renderStyles.css,
         scopeSupported,
         styleKey,
-        theme,
-        version,
     ])
+    const fontUrl = renderStyles.fontUrl
 
     useEffect(() => {
         if (!enabled || !styleKey || !css || !scopeSupported) return undefined
@@ -90,6 +91,13 @@ export const useEditorThemeStyles = ({
         themeCSSManager.register(styleKey, css, '.eceee-theme-scope', componentId)
         return () => themeCSSManager.unregister(styleKey, componentId)
     }, [css, enabled, scopeSupported, styleKey])
+
+    useEffect(() => {
+        if (!enabled || !styleKey || !fontUrl || !scopeSupported) return undefined
+        const user = componentIdRef.current
+        registerRenderFont(fontUrl, user)
+        return () => unregisterRenderFont(fontUrl, user)
+    }, [enabled, fontUrl, scopeSupported, styleKey])
 
     return {
         isLoading: false,

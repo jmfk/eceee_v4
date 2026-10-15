@@ -269,7 +269,6 @@ export const compileRenderStyles = ({
         : colors
     return {
         css: [
-            manifest.baseCss,
             PUBLIC_RENDER_CSS,
             widgetCss(),
             variablesCss(variables),

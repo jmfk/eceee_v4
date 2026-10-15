@@ -7,32 +7,14 @@
  * as published by MongoDB, Inc. See the LICENSE file for details.
  */
 
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.jsx'
-import analytics from './utils/analytics'
-import { getCurrentTenantId, subscribeToCurrentTenantId } from './utils/tenant'
-import RenderFrameRuntime from './rendering/RenderFrameRuntime'
-import StandaloneRenderRuntime from './rendering/StandaloneRenderRuntime'
-import StandaloneVersionRenderRuntime from './rendering/StandaloneVersionRenderRuntime'
-
 const isRenderFrame = window.location.pathname === '/__render-frame'
 const isStandaloneRender = window.location.pathname.startsWith('/_render/')
 const isStandaloneVersionRender = window.location.pathname.startsWith('/_render-version/')
-if (!isRenderFrame && !isStandaloneRender && !isStandaloneVersionRender) {
-    const initializeAnalytics = (tenantId) => {
-        analytics.init(tenantId)
-    }
-    initializeAnalytics(getCurrentTenantId())
-    subscribeToCurrentTenantId(initializeAnalytics)
-}
 
-const RootComponent = isRenderFrame
-    ? RenderFrameRuntime
-    : isStandaloneRender
-        ? StandaloneRenderRuntime
-        : isStandaloneVersionRender
-            ? StandaloneVersionRenderRuntime
-            : App
+const bootstrap = isRenderFrame || isStandaloneRender || isStandaloneVersionRender
+    ? import('./rendering/renderBootstrap')
+    : import('./editorBootstrap')
 
-createRoot(document.getElementById('root')).render(<RootComponent />)
+bootstrap.catch((error) => {
+    console.error('Application bootstrap failed', error)
+})

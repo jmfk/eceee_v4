@@ -5,7 +5,7 @@ import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataC
 import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import PageContentEditor from '../../editors/page-editor/PageContentEditor'
 import { createPageRenderModel, withLayoutPreviewPlaceholders } from '../../rendering/adapters'
-import { compileRenderStyles } from '../../rendering/themeCssCompiler'
+import { useBrowserRenderStyles } from '../../rendering/useBrowserRenderStyles'
 import { buildDesignerTheme } from '../../utils/editorThemeCSS'
 import { applyWidgetUpdateToWidgetMap } from '../../utils/pageEditorWidgetState'
 import WidgetEditorPanel from '../WidgetEditorPanel'
@@ -112,10 +112,11 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
         effectiveTheme,
     }) : null, [effectiveTheme, selected, widgets])
     const pageData = selected ? { id: selected.id, title: selected.label } : null
+    const previewStylesInput = useMemo(() => ({ theme: effectiveTheme }), [effectiveTheme])
+    const compiledStyles = useBrowserRenderStyles(previewStylesInput)
     const previewModel = useMemo(() => {
         if (!selected) return null
         const layoutDefinition = layouts.items.find((layout) => layout.key === selected.layout_key) || null
-        const compiledStyles = compileRenderStyles({ theme: effectiveTheme })
         return withLayoutPreviewPlaceholders(createPageRenderModel({
             layout: selected.layout_key,
             layoutDefinition,
@@ -126,7 +127,7 @@ const SpecialPagesEditor = ({ workspace, updateWorkspace, disabled }) => {
             themeCss: compiledStyles.css,
             fontUrl: compiledStyles.fontUrl,
         }), layoutDefinition)
-    }, [effectiveTheme, layouts.items, selected, widgets, workspace.breakpoints])
+    }, [compiledStyles, layouts.items, selected, widgets, workspace.breakpoints])
 
     useEffect(() => {
         if (!selected) return
