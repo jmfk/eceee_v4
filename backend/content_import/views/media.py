@@ -72,10 +72,9 @@ class GenerateMediaMetadataView(APIView):
 
         # Get namespace
         try:
-            if namespace_slug == "default":
-                namespace = Namespace.get_default()
-            else:
-                namespace = Namespace.objects.get(slug=namespace_slug)
+            namespace = Namespace.resolve(
+                namespace_slug, tenant=getattr(request, "tenant", None)
+            )
         except Namespace.DoesNotExist:
             return Response(
                 {"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST
@@ -287,10 +286,9 @@ class UploadMediaFileView(APIView):
 
         # Get namespace
         try:
-            if namespace_slug == "default":
-                namespace = Namespace.get_default()
-            else:
-                namespace = Namespace.objects.get(slug=namespace_slug)
+            namespace = Namespace.resolve(
+                namespace_slug, tenant=getattr(request, "tenant", None)
+            )
         except Namespace.DoesNotExist:
             return Response(
                 {"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST

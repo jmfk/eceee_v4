@@ -82,7 +82,9 @@ class MediaSlugValidationView(APIView):
             from content.models import Namespace
 
             try:
-                namespace = Namespace.objects.get(slug=namespace_slug)
+                namespace = Namespace.resolve(
+                    namespace_slug, tenant=getattr(request, "tenant", None)
+                )
             except Namespace.DoesNotExist:
                 return Response(
                     {"error": f"Namespace '{namespace_slug}' not found"},
@@ -294,7 +296,9 @@ class MediaFileBySlugView(APIView):
         try:
             from content.models import Namespace
 
-            namespace = Namespace.objects.get(slug=namespace_slug)
+            namespace = Namespace.resolve(
+                namespace_slug, tenant=getattr(request, "tenant", None)
+            )
             media_file = MediaFile.objects.get(slug=file_slug, namespace=namespace)
 
             # Resolve replacements
@@ -342,7 +346,9 @@ class MediaFileProxyView(APIView):
             if "." in file_slug:
                 file_slug = file_slug.rsplit(".", 1)[0]
 
-            namespace = Namespace.objects.get(slug=namespace_slug)
+            namespace = Namespace.resolve(
+                namespace_slug, tenant=getattr(request, "tenant", None)
+            )
             media_file = MediaFile.objects.get(slug=file_slug, namespace=namespace)
 
             # Resolve replacements
@@ -439,7 +445,9 @@ class MediaFileDownloadView(APIView):
         try:
             from content.models import Namespace
 
-            namespace = Namespace.objects.get(slug=namespace_slug)
+            namespace = Namespace.resolve(
+                namespace_slug, tenant=getattr(request, "tenant", None)
+            )
             media_file = MediaFile.objects.get(slug=file_slug, namespace=namespace)
 
             # Resolve replacements

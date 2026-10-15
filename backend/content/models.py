@@ -133,6 +133,16 @@ class Namespace(models.Model):
                 )
         return default
 
+    @classmethod
+    def resolve(cls, slug, tenant=None):
+        """Resolve a namespace slug within a tenant boundary."""
+        if slug == "default":
+            return cls.get_default(tenant=tenant)
+        queryset = cls.objects.all()
+        if tenant is not None:
+            queryset = queryset.filter(tenant=tenant)
+        return queryset.get(slug=slug)
+
     def get_content_count(self):
         """Get total count of content objects in this namespace"""
         count = 0

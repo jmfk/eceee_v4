@@ -49,20 +49,26 @@ class MediaTagViewSet(viewsets.ModelViewSet):
         from content.models import Namespace
 
         queryset = MediaTag.objects.select_related("namespace", "created_by")
+        tenant = getattr(self.request, "tenant", None)
+        if tenant is not None:
+            queryset = queryset.filter(namespace__tenant=tenant)
 
         # Handle namespace filtering by slug only
         namespace_param = self.request.query_params.get("namespace")
         if namespace_param:
             if namespace_param == "default":
                 # Handle "default" specially to get the default namespace
-                namespace = Namespace.get_default()
+                namespace = Namespace.get_default(tenant=tenant)
             else:
                 # Handle other slugs
-                namespace = get_object_or_404(Namespace, slug=namespace_param)
+                namespaces = Namespace.objects.all()
+                if tenant is not None:
+                    namespaces = namespaces.filter(tenant=tenant)
+                namespace = get_object_or_404(namespaces, slug=namespace_param)
             queryset = queryset.filter(namespace=namespace)
         else:
             # Use default namespace if none specified
-            default_namespace = Namespace.get_default()
+            default_namespace = Namespace.get_default(tenant=tenant)
             queryset = queryset.filter(namespace=default_namespace)
 
         return queryset
@@ -282,6 +288,9 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
         queryset = MediaCollection.objects.select_related(
             "namespace", "created_by", "last_modified_by"
         ).prefetch_related("tags")
+        tenant = getattr(self.request, "tenant", None)
+        if tenant is not None:
+            queryset = queryset.filter(namespace__tenant=tenant)
 
         # Detect detail-style requests. ``self.kwargs[self.lookup_field]``
         # is populated by DRF when the URL includes the collection PK, which
@@ -301,7 +310,7 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
 
         # List-style request without an explicit namespace: fall back to the
         # default namespace to keep the browse experience scoped.
-        default_namespace = Namespace.get_default()
+        default_namespace = Namespace.get_default(tenant=tenant)
         return queryset.filter(namespace=default_namespace)
 
     def create(self, request, *args, **kwargs):

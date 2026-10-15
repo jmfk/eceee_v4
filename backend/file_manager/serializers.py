@@ -107,16 +107,20 @@ class MediaTagSerializer(serializers.ModelSerializer):
 
         # Handle namespace conversion from slug to object
         namespace_slug = validated_data.get("namespace").get("slug")
+        tenant = getattr(self.context["request"], "tenant", None)
         if namespace_slug:
             try:
-                validated_data["namespace"] = Namespace.objects.get(slug=namespace_slug)
+                namespaces = Namespace.objects.all()
+                if tenant is not None:
+                    namespaces = namespaces.filter(tenant=tenant)
+                validated_data["namespace"] = namespaces.get(slug=namespace_slug)
             except Namespace.DoesNotExist:
                 raise serializers.ValidationError(
                     f"Namespace '{namespace_slug}' not found."
                 )
         else:
             # Set default namespace if none provided
-            validated_data["namespace"] = Namespace.get_default()
+            validated_data["namespace"] = Namespace.get_default(tenant=tenant)
 
         # Check if tag with same name already exists in this namespace
         existing_tag, created = MediaTag.objects.get_or_create(
@@ -255,16 +259,20 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
 
         # Handle namespace conversion from slug to object
         namespace_slug = validated_data.get("namespace").get("slug")
+        tenant = getattr(self.context["request"], "tenant", None)
         if namespace_slug:
             try:
-                validated_data["namespace"] = Namespace.objects.get(slug=namespace_slug)
+                namespaces = Namespace.objects.all()
+                if tenant is not None:
+                    namespaces = namespaces.filter(tenant=tenant)
+                validated_data["namespace"] = namespaces.get(slug=namespace_slug)
             except Namespace.DoesNotExist:
                 raise serializers.ValidationError(
                     f"Namespace '{namespace_slug}' not found."
                 )
         else:
             # Set default namespace if none provided
-            validated_data["namespace"] = Namespace.get_default()
+            validated_data["namespace"] = Namespace.get_default(tenant=tenant)
 
         collection = super().create(validated_data)
 
@@ -639,11 +647,16 @@ class MediaUploadSerializer(serializers.Serializer):
 
     def validate_namespace(self, value):
         """Validate namespace exists and user has access."""
+        request = self.context.get("request")
+        tenant = getattr(request, "tenant", None)
         try:
             if value == "default":
-                namespace = Namespace.get_default()
+                namespace = Namespace.get_default(tenant=tenant)
             else:
-                namespace = Namespace.objects.get(slug=value)
+                namespaces = Namespace.objects.all()
+                if tenant is not None:
+                    namespaces = namespaces.filter(tenant=tenant)
+                namespace = namespaces.get(slug=value)
             # Add permission check here if needed
             return namespace.slug
         except Namespace.DoesNotExist:
@@ -745,11 +758,16 @@ class MediaSearchSerializer(serializers.Serializer):
     def validate_namespace(self, value):
         """Validate namespace exists."""
         if value:
+            request = self.context.get("request")
+            tenant = getattr(request, "tenant", None)
             try:
                 if value == "default":
-                    namespace = Namespace.get_default()
+                    namespace = Namespace.get_default(tenant=tenant)
                 else:
-                    namespace = Namespace.objects.get(slug=value)
+                    namespaces = Namespace.objects.all()
+                    if tenant is not None:
+                        namespaces = namespaces.filter(tenant=tenant)
+                    namespace = namespaces.get(slug=value)
                 return namespace.slug
             except Namespace.DoesNotExist:
                 raise serializers.ValidationError("Invalid namespace.")
