@@ -54,9 +54,7 @@ class ProcessImportView(APIView):
             }
         """
         # 1. Validate input
-        serializer = ProcessImportSerializer(
-            data=request.data, context={"request": request}
-        )
+        serializer = ProcessImportSerializer(data=request.data, context={"request": request})
         if not serializer.is_valid():
             return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -72,9 +70,7 @@ class ProcessImportView(APIView):
 
         # 2. Get namespace
         try:
-            namespace = Namespace.resolve(
-                namespace_slug, tenant=getattr(request, "tenant", None)
-            )
+            namespace = Namespace.resolve(namespace_slug, tenant=getattr(request, "tenant", None))
         except Namespace.DoesNotExist:
             return Response({"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST)
 

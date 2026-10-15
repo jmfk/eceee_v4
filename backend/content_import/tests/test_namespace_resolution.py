@@ -7,7 +7,6 @@ from content.models import Namespace
 from content_import.serializers import ProcessImportSerializer
 from core.models import Tenant
 
-
 User = get_user_model()
 
 
@@ -59,9 +58,7 @@ class ContentImportNamespaceResolutionTests(TestCase):
         )
 
     def test_default_resolves_within_the_request_tenant(self):
-        self.assertEqual(
-            Namespace.resolve("default", tenant=self.tenant), self.default
-        )
+        self.assertEqual(Namespace.resolve("default", tenant=self.tenant), self.default)
         serializer = self.serializer("default")
         self.assertTrue(serializer.is_valid(), serializer.errors)
 

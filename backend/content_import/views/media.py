@@ -2,18 +2,19 @@
 
 import hashlib
 import logging
+
 import requests
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from content.models import Namespace
 from file_manager.models import MediaFile
-from ..services.openai_service import OpenAIService
-from ..services.media_downloader import MediaDownloader
-from ..utils.image_resolution import find_highest_resolution
 
+from ..services.media_downloader import MediaDownloader
+from ..services.openai_service import OpenAIService
+from ..utils.image_resolution import find_highest_resolution
 
 logger = logging.getLogger(__name__)
 
@@ -66,19 +67,13 @@ class GenerateMediaMetadataView(APIView):
             )
 
         if not media_url:
-            return Response(
-                {"error": "URL is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "URL is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get namespace
         try:
-            namespace = Namespace.resolve(
-                namespace_slug, tenant=getattr(request, "tenant", None)
-            )
+            namespace = Namespace.resolve(namespace_slug, tenant=getattr(request, "tenant", None))
         except Namespace.DoesNotExist:
-            return Response(
-                {"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Download file and compute hash to check for duplicates
         file_hash = None
@@ -92,9 +87,7 @@ class GenerateMediaMetadataView(APIView):
             file_hash = hashlib.sha256(content).hexdigest()
 
             # Check if file already exists in this namespace
-            existing_file = MediaFile.objects.filter(
-                file_hash=file_hash, namespace=namespace, is_deleted=False
-            ).first()
+            existing_file = MediaFile.objects.filter(file_hash=file_hash, namespace=namespace, is_deleted=False).first()
 
         except Exception as e:
             logger.warning(f"Failed to download file for hash check: {e}")
@@ -112,12 +105,8 @@ class GenerateMediaMetadataView(APIView):
                         "layout": None,
                         "ai_generated": False,
                         "alreadyImported": existing_file is not None,
-                        "existingFileId": (
-                            str(existing_file.id) if existing_file else None
-                        ),
-                        "existingFileTitle": (
-                            existing_file.title if existing_file else None
-                        ),
+                        "existingFileId": (str(existing_file.id) if existing_file else None),
+                        "existingFileTitle": (existing_file.title if existing_file else None),
                         "fileHash": file_hash,
                     }
                 )
@@ -162,9 +151,7 @@ class GenerateMediaMetadataView(APIView):
                             multiplier = resolution_data.get("multiplier", 1.0)
                             resolution_info = {
                                 "multiplier": (
-                                    f"{int(multiplier)}x"
-                                    if multiplier == int(multiplier)
-                                    else f"{multiplier:.1f}x"
+                                    f"{int(multiplier)}x" if multiplier == int(multiplier) else f"{multiplier:.1f}x"
                                 ),
                                 "source": resolution_data.get("source", "original"),
                                 "dimensions": (
@@ -174,21 +161,15 @@ class GenerateMediaMetadataView(APIView):
                                 ),
                             }
                     except Exception as e:
-                        logger.debug(
-                            f"Resolution detection failed for {image_url}: {e}, using 1x"
-                        )
+                        logger.debug(f"Resolution detection failed for {image_url}: {e}, using 1x")
 
                 if metadata:
                     metadata["layout"] = layout
                     metadata["resolution"] = resolution_info
                     metadata["ai_generated"] = True
                     metadata["alreadyImported"] = existing_file is not None
-                    metadata["existingFileId"] = (
-                        str(existing_file.id) if existing_file else None
-                    )
-                    metadata["existingFileTitle"] = (
-                        existing_file.title if existing_file else None
-                    )
+                    metadata["existingFileId"] = str(existing_file.id) if existing_file else None
+                    metadata["existingFileTitle"] = existing_file.title if existing_file else None
                     metadata["fileHash"] = file_hash
                     return Response(metadata)
 
@@ -202,12 +183,8 @@ class GenerateMediaMetadataView(APIView):
                 if metadata:
                     metadata["ai_generated"] = True
                     metadata["alreadyImported"] = existing_file is not None
-                    metadata["existingFileId"] = (
-                        str(existing_file.id) if existing_file else None
-                    )
-                    metadata["existingFileTitle"] = (
-                        existing_file.title if existing_file else None
-                    )
+                    metadata["existingFileId"] = str(existing_file.id) if existing_file else None
+                    metadata["existingFileTitle"] = existing_file.title if existing_file else None
                     metadata["fileHash"] = file_hash
                     return Response(metadata)
 
@@ -235,9 +212,7 @@ class GenerateMediaMetadataView(APIView):
 
         except Exception as e:
             logger.error(f"Failed to generate metadata: {e}")
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UploadMediaFileView(APIView):
@@ -280,26 +255,18 @@ class UploadMediaFileView(APIView):
         existing_file_id = request.data.get("existingFileId")
 
         if not url:
-            return Response(
-                {"error": "URL is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "URL is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get namespace
         try:
-            namespace = Namespace.resolve(
-                namespace_slug, tenant=getattr(request, "tenant", None)
-            )
+            namespace = Namespace.resolve(namespace_slug, tenant=getattr(request, "tenant", None))
         except Namespace.DoesNotExist:
-            return Response(
-                {"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST)
 
         # If existingFileId is provided, reuse the existing file and update tags
         if existing_file_id:
             try:
-                existing_file = MediaFile.objects.get(
-                    id=existing_file_id, namespace=namespace, is_deleted=False
-                )
+                existing_file = MediaFile.objects.get(id=existing_file_id, namespace=namespace, is_deleted=False)
 
                 # Update tags by merging with existing tags
                 new_tags = metadata.get("tags", [])
@@ -307,9 +274,7 @@ class UploadMediaFileView(APIView):
                     from content.models import Tag
 
                     for tag_name in new_tags:
-                        tag, _ = Tag.objects.get_or_create(
-                            name=tag_name, namespace=namespace
-                        )
+                        tag, _ = Tag.objects.get_or_create(name=tag_name, namespace=namespace)
                         if tag not in existing_file.tags.all():
                             existing_file.tags.add(tag)
                             tag.usage_count += 1
@@ -397,6 +362,4 @@ class UploadMediaFileView(APIView):
 
         except Exception as e:
             logger.error(f"Failed to upload media file: {e}")
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

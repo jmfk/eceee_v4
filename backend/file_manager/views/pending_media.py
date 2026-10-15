@@ -3,19 +3,19 @@ ViewSet for managing pending media files awaiting approval.
 """
 
 import logging
-from django.utils import timezone
+
 from django.http import Http404, HttpResponse
-from rest_framework import viewsets, status, permissions
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from ..models import PendingMediaFile, MediaFile, MediaCollection
+from ..models import MediaCollection, MediaFile, PendingMediaFile
 from ..serializers import (
-    PendingMediaFileListSerializer,
-    PendingMediaFileDetailSerializer,
-    MediaFileDetailSerializer,
-    MediaFileApprovalSerializer,
     BulkApprovalSerializer,
+    MediaFileApprovalSerializer,
+    MediaFileDetailSerializer,
+    PendingMediaFileDetailSerializer,
+    PendingMediaFileListSerializer,
 )
 from ..storage import storage
 
@@ -116,21 +116,13 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                     # Get file from storage
                     file_content = storage.get_file_content(pending_file.file_path)
 
-                    response = HttpResponse(
-                        file_content, content_type=pending_file.content_type
-                    )
-                    response["Content-Disposition"] = (
-                        f'inline; filename="{pending_file.original_filename}"'
-                    )
+                    response = HttpResponse(file_content, content_type=pending_file.content_type)
+                    response["Content-Disposition"] = f'inline; filename="{pending_file.original_filename}"'
                     return response
 
                 except Exception as e:
-                    logger.error(
-                        f"Error serving pending file preview: {str(e)}", exc_info=True
-                    )
-                    return Response(
-                        {"error": "File not found"}, status=status.HTTP_404_NOT_FOUND
-                    )
+                    logger.error(f"Error serving pending file preview: {str(e)}", exc_info=True)
+                    return Response({"error": "File not found"}, status=status.HTTP_404_NOT_FOUND)
             else:
                 return Response(
                     {"error": "Preview not available for this file type"},
@@ -166,13 +158,13 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             if new_tag_ids:
                 # Add new tags to existing file
                 existing_file.tags.add(*new_tag_ids)
-            
+
             # Handle annotation update if provided
             annotation = request.data.get("annotation")
             if annotation:
                 existing_file.metadata = existing_file.metadata or {}
                 existing_file.metadata["annotation"] = annotation
-            
+
             existing_file.save()
 
             # Handle collection assignment if requested
@@ -201,7 +193,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             if not existing_file.tenant_id:
                 existing_file.tenant = pending_file.namespace.tenant
                 existing_file.save(update_fields=["tenant"])
-            
+
             # Ensure existing file has uploaded_by if it's missing
             if not existing_file.uploaded_by_id:
                 existing_file.uploaded_by = pending_file.uploaded_by
@@ -267,15 +259,11 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-    def _get_or_create_collection(
-        self, collection_id, collection_name, namespace, user
-    ):
+    def _get_or_create_collection(self, collection_id, collection_name, namespace, user):
         """Get existing collection or create new one."""
         if collection_id:
             try:
-                return MediaCollection.objects.get(
-                    id=collection_id, namespace=namespace
-                )
+                return MediaCollection.objects.get(id=collection_id, namespace=namespace)
             except MediaCollection.DoesNotExist:
                 return None
         elif collection_name:
@@ -324,15 +312,10 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
 
         for approval_data in approvals:
             try:
-                pending_file = PendingMediaFile.objects.get(
-                    id=approval_data["pending_file_id"], status="pending"
-                )
+                pending_file = PendingMediaFile.objects.get(id=approval_data["pending_file_id"], status="pending")
 
                 # Check permissions
-                if (
-                    not request.user.is_staff
-                    and pending_file.uploaded_by != request.user
-                ):
+                if not request.user.is_staff and pending_file.uploaded_by != request.user:
                     results.append(
                         {
                             "pending_file_id": approval_data["pending_file_id"],
@@ -404,23 +387,16 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
         file_ids = request.data.get("file_ids", [])
 
         if not file_ids:
-            return Response(
-                {"error": "No file IDs provided"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "No file IDs provided"}, status=status.HTTP_400_BAD_REQUEST)
 
         results = []
 
         for file_id in file_ids:
             try:
-                pending_file = PendingMediaFile.objects.get(
-                    id=file_id, status="pending"
-                )
+                pending_file = PendingMediaFile.objects.get(id=file_id, status="pending")
 
                 # Check permissions
-                if (
-                    not request.user.is_staff
-                    and pending_file.uploaded_by != request.user
-                ):
+                if not request.user.is_staff and pending_file.uploaded_by != request.user:
                     results.append(
                         {
                             "file_id": file_id,

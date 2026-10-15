@@ -2,16 +2,17 @@
 
 import logging
 import uuid
-from rest_framework import status, permissions
-from rest_framework.views import APIView
-from rest_framework.response import Response
+
 from django.core.cache import cache
+from rest_framework import permissions, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from content.models import Namespace
 
 from ..models import WebPage
-from content.models import Namespace
 from ..services.page_tree_importer import PageTreeImporter
 from ..services.single_page_importer import SinglePageImporter
-
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +65,7 @@ class ImportTreeView(APIView):
 
         # Validate required parameters
         if not url:
-            return Response(
-                {"error": "URL is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "URL is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Validate parent_page_id or hostname
         parent_page = None
@@ -86,13 +85,9 @@ class ImportTreeView(APIView):
 
         # Get namespace
         try:
-            namespace = Namespace.resolve(
-                namespace_slug, tenant=getattr(request, "tenant", None)
-            )
+            namespace = Namespace.resolve(namespace_slug, tenant=getattr(request, "tenant", None))
         except Namespace.DoesNotExist:
-            return Response(
-                {"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Create task ID
         task_id = str(uuid.uuid4())
@@ -156,9 +151,7 @@ class ImportStatusView(APIView):
         progress = cache.get(f"import_progress_{task_id}")
 
         if not progress:
-            return Response(
-                {"error": "Import task not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Import task not found"}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(
             {"status": progress["status"], "progress": progress},
@@ -207,16 +200,12 @@ class ImportSinglePageView(APIView):
         hostname = request.data.get("hostname")
         namespace_slug = request.data.get("namespace", "default")
         base_url = request.data.get("base_url")
-        code_layout = request.data.get(
-            "code_layout", ""
-        )  # Empty string if not provided
+        code_layout = request.data.get("code_layout", "")  # Empty string if not provided
         request_delay = request.data.get("request_delay", 2.0)
 
         # Validate
         if not url:
-            return Response(
-                {"error": "URL is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "URL is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get parent page if specified
         parent_page = None
@@ -231,13 +220,9 @@ class ImportSinglePageView(APIView):
 
         # Get namespace
         try:
-            namespace = Namespace.resolve(
-                namespace_slug, tenant=getattr(request, "tenant", None)
-            )
+            namespace = Namespace.resolve(namespace_slug, tenant=getattr(request, "tenant", None))
         except Namespace.DoesNotExist:
-            return Response(
-                {"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Import single page
         try:

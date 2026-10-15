@@ -2,9 +2,9 @@
 Tests for the Content app
 """
 
-from django.test import TestCase
 from django.contrib.auth.models import User
-from rest_framework.test import APITestCase, APIClient
+from django.test import TestCase
+from rest_framework.test import APIClient, APITestCase
 
 from content.models import Category, Namespace, Tag
 from core.models import Tenant
@@ -17,19 +17,11 @@ class ContentModelsTest(TestCase):
         self.user = User.objects.create_user(
             username="testuser_content", email="test@example.com", password="testpass123"
         )
-        self.tenant = Tenant.objects.create(
-            name="Test Tenant",
-            identifier="test-tenant",
-            created_by=self.user
-        )
+        self.tenant = Tenant.objects.create(name="Test Tenant", identifier="test-tenant", created_by=self.user)
 
     def test_category_model(self):
         """Test Category model functionality"""
-        category = Category.objects.create(
-            name="Test Category", 
-            slug="test-category",
-            tenant=self.tenant
-        )
+        category = Category.objects.create(name="Test Category", slug="test-category", tenant=self.tenant)
 
         self.assertEqual(category.name, "Test Category")
         self.assertEqual(category.slug, "test-category")
@@ -37,11 +29,7 @@ class ContentModelsTest(TestCase):
 
     def test_tag_model(self):
         """Test Tag model functionality"""
-        tag = Tag.objects.create(
-            name="Test Tag", 
-            slug="test-tag",
-            tenant=self.tenant
-        )
+        tag = Tag.objects.create(name="Test Tag", slug="test-tag", tenant=self.tenant)
 
         self.assertEqual(tag.name, "Test Tag")
         self.assertEqual(tag.slug, "test-tag")
@@ -72,20 +60,12 @@ class ContentAPITest(APITestCase):
         self.user = User.objects.create_user(
             username="testuser_content_api", email="test@example.com", password="testpass123"
         )
-        self.tenant = Tenant.objects.create(
-            name="Test Tenant API",
-            identifier="test-tenant-api",
-            created_by=self.user
-        )
+        self.tenant = Tenant.objects.create(name="Test Tenant API", identifier="test-tenant-api", created_by=self.user)
         self.client.force_authenticate(user=self.user)
 
     def test_category_api_list(self):
         """Test Category API list endpoint"""
-        Category.objects.create(
-            name="Test Category",
-            slug="test-category",
-            tenant=self.tenant
-        )
+        Category.objects.create(name="Test Category", slug="test-category", tenant=self.tenant)
 
         response = self.client.get("/api/v1/content/categories/")
         self.assertEqual(response.status_code, 200)
@@ -153,9 +133,7 @@ class NamespaceAPITest(APITestCase):
             created_by=self.user,
         )
 
-        response = self.client.post(
-            f"/api/v1/namespaces/{replacement.id}/set_as_default/"
-        )
+        response = self.client.post(f"/api/v1/namespaces/{replacement.id}/set_as_default/")
 
         self.assertEqual(response.status_code, 200)
         current_default.refresh_from_db()

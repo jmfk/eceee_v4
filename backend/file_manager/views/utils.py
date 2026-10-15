@@ -4,16 +4,18 @@ Utility views for media file management.
 
 import logging
 import re
-from django.utils import timezone
-from django.http import Http404, FileResponse
-from django.shortcuts import redirect
-from rest_framework import status, permissions
-from rest_framework.views import APIView
-from rest_framework.response import Response
 
-from ..models import MediaFile, MediaTag, MediaCollection
+from django.db import models
+from django.http import FileResponse, Http404
+from django.shortcuts import redirect
+from django.utils import timezone
+from rest_framework import permissions, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from ..models import MediaCollection, MediaFile, MediaTag
 from ..serializers import BulkOperationSerializer
-from ..storage import storage, S3MediaStorage
+from ..storage import storage
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +65,7 @@ class MediaSlugValidationView(APIView):
 
             # Either slug or title must be provided
             if not slug and not title:
-                return Response(
-                    {"error": "Either 'slug' or 'title' is required"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"error": "Either 'slug' or 'title' is required"}, status=status.HTTP_400_BAD_REQUEST)
 
             if not namespace_slug:
                 return Response(
@@ -82,9 +81,7 @@ class MediaSlugValidationView(APIView):
             from content.models import Namespace
 
             try:
-                namespace = Namespace.resolve(
-                    namespace_slug, tenant=getattr(request, "tenant", None)
-                )
+                namespace = Namespace.resolve(namespace_slug, tenant=getattr(request, "tenant", None))
             except Namespace.DoesNotExist:
                 return Response(
                     {"error": f"Namespace '{namespace_slug}' not found"},
@@ -104,11 +101,7 @@ class MediaSlugValidationView(APIView):
             is_valid = base_slug == unique_slug
             message = "Slug is available" if is_valid else f"Slug is taken. Suggestion: {unique_slug}"
 
-            return Response({
-                "slug": unique_slug,
-                "is_valid": is_valid,
-                "message": message
-            }, status=status.HTTP_200_OK)
+            return Response({"slug": unique_slug, "is_valid": is_valid, "message": message}, status=status.HTTP_200_OK)
 
         except Exception as e:
             logger.error(f"Error validating slug: {str(e)}")
@@ -132,11 +125,11 @@ class MediaSlugValidationView(APIView):
 
         # Check against existing media files in database
         queryset = MediaFile.objects.filter(namespace=namespace)
-        
+
         # Exclude the current file if file_id is provided
         if file_id:
             queryset = queryset.exclude(id=file_id)
-        
+
         db_slugs = set(queryset.values_list("slug", flat=True))
 
         # Combine database slugs with current session slugs
@@ -169,7 +162,6 @@ class BulkMediaOperationsView(APIView):
 
     def post(self, request):
         """Execute bulk operation on multiple files."""
-        from ..serializers import BulkOperationSerializer
         from ..security import SecurityAuditLogger
 
         serializer = BulkOperationSerializer(data=request.data)
@@ -191,10 +183,7 @@ class BulkMediaOperationsView(APIView):
             accessible_namespaces = Namespace.objects.filter(
                 models.Q(created_by=request.user) | models.Q(is_active=True)
             )
-            files = files.filter(
-                models.Q(created_by=request.user)
-                | models.Q(namespace__in=accessible_namespaces)
-            )
+            files = files.filter(models.Q(created_by=request.user) | models.Q(namespace__in=accessible_namespaces))
 
         results = []
         successful_count = 0
@@ -207,18 +196,14 @@ class BulkMediaOperationsView(APIView):
                 if operation == "add_tags":
                     tag_names = data.get("tag_names", [])
                     for tag_name in tag_names:
-                        tag, created = MediaTag.objects.get_or_create(
-                            name=tag_name, namespace=file_obj.namespace
-                        )
+                        tag, created = MediaTag.objects.get_or_create(name=tag_name, namespace=file_obj.namespace)
                         file_obj.tags.add(tag)
 
                 elif operation == "remove_tags":
                     tag_names = data.get("tag_names", [])
                     for tag_name in tag_names:
                         try:
-                            tag = MediaTag.objects.get(
-                                name=tag_name, namespace=file_obj.namespace
-                            )
+                            tag = MediaTag.objects.get(name=tag_name, namespace=file_obj.namespace)
                             file_obj.tags.remove(tag)
                         except MediaTag.DoesNotExist:
                             pass
@@ -296,9 +281,7 @@ class MediaFileBySlugView(APIView):
         try:
             from content.models import Namespace
 
-            namespace = Namespace.resolve(
-                namespace_slug, tenant=getattr(request, "tenant", None)
-            )
+            namespace = Namespace.resolve(namespace_slug, tenant=getattr(request, "tenant", None))
             media_file = MediaFile.objects.get(slug=file_slug, namespace=namespace)
 
             # Resolve replacements
@@ -346,9 +329,7 @@ class MediaFileProxyView(APIView):
             if "." in file_slug:
                 file_slug = file_slug.rsplit(".", 1)[0]
 
-            namespace = Namespace.resolve(
-                namespace_slug, tenant=getattr(request, "tenant", None)
-            )
+            namespace = Namespace.resolve(namespace_slug, tenant=getattr(request, "tenant", None))
             media_file = MediaFile.objects.get(slug=file_slug, namespace=namespace)
 
             # Resolve replacements
@@ -379,15 +360,15 @@ class MediaFileProxyView(APIView):
             # Create FileResponse for efficient streaming
             # It handles Content-Length and Range requests (if used correctly)
             response = FileResponse(file_body, content_type=media_file.content_type)
-            
+
             # Set Content-Disposition
             disposition = "attachment" if request.GET.get("download") == "1" else "inline"
             filename = media_file.original_filename
             response["Content-Disposition"] = f'{disposition}; filename="{filename}"'
-            
+
             # Add cache headers for better performance
             response["Cache-Control"] = "public, max-age=3600"
-            
+
             return response
 
         except (Namespace.DoesNotExist, MediaFile.DoesNotExist):
@@ -445,9 +426,7 @@ class MediaFileDownloadView(APIView):
         try:
             from content.models import Namespace
 
-            namespace = Namespace.resolve(
-                namespace_slug, tenant=getattr(request, "tenant", None)
-            )
+            namespace = Namespace.resolve(namespace_slug, tenant=getattr(request, "tenant", None))
             media_file = MediaFile.objects.get(slug=file_slug, namespace=namespace)
 
             # Resolve replacements
@@ -473,17 +452,13 @@ class MediaFileDownloadView(APIView):
             if signed_url:
                 response = redirect(signed_url)
                 # Add download headers
-                response["Content-Disposition"] = (
-                    f'attachment; filename="{media_file.original_filename}"'
-                )
+                response["Content-Disposition"] = f'attachment; filename="{media_file.original_filename}"'
                 return response
             else:
                 # Fallback to public URL
                 public_url = storage.get_public_url(media_file.file_path)
                 response = redirect(public_url)
-                response["Content-Disposition"] = (
-                    f'attachment; filename="{media_file.original_filename}"'
-                )
+                response["Content-Disposition"] = f'attachment; filename="{media_file.original_filename}"'
                 return response
 
         except (Namespace.DoesNotExist, MediaFile.DoesNotExist):

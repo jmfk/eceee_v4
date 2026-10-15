@@ -8,12 +8,10 @@ This module defines content objects that can be published as web pages:
 - Member: Organization members and staff
 """
 
+from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
-from django.contrib.auth.models import User
-from django.utils import timezone
-from django.urls import reverse
-from django.core.validators import URLValidator
 from django.utils.text import slugify
 
 
@@ -24,31 +22,19 @@ class Namespace(models.Model):
     Pages are not affected by namespaces and use hostname-based routing instead.
     """
 
-    name = models.CharField(
-        max_length=100, help_text="Human-readable namespace name"
-    )
-    slug = models.SlugField(
-        max_length=100, help_text="URL-safe namespace identifier"
-    )
-    description = models.TextField(
-        blank=True, help_text="Description of this namespace"
-    )
+    name = models.CharField(max_length=100, help_text="Human-readable namespace name")
+    slug = models.SlugField(max_length=100, help_text="URL-safe namespace identifier")
+    description = models.TextField(blank=True, help_text="Description of this namespace")
 
     # Namespace configuration
-    is_active = models.BooleanField(
-        default=True, help_text="Whether this namespace is active"
-    )
-    is_default = models.BooleanField(
-        default=False, help_text="Whether this is the default namespace"
-    )
+    is_active = models.BooleanField(default=True, help_text="Whether this namespace is active")
+    is_default = models.BooleanField(default=False, help_text="Whether this is the default namespace")
 
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="created_namespaces"
-    )
-    
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_namespaces")
+
     # Multi-tenancy support
     tenant = models.ForeignKey(
         "core.Tenant",
@@ -62,12 +48,8 @@ class Namespace(models.Model):
         verbose_name = "Namespace"
         verbose_name_plural = "Namespaces"
         constraints = [
-            models.UniqueConstraint(
-                fields=["tenant", "name"], name="unique_namespace_name_per_tenant"
-            ),
-            models.UniqueConstraint(
-                fields=["tenant", "slug"], name="unique_namespace_slug_per_tenant"
-            ),
+            models.UniqueConstraint(fields=["tenant", "name"], name="unique_namespace_name_per_tenant"),
+            models.UniqueConstraint(fields=["tenant", "slug"], name="unique_namespace_slug_per_tenant"),
             models.UniqueConstraint(
                 fields=["tenant"],
                 condition=Q(is_default=True),
@@ -81,19 +63,15 @@ class Namespace(models.Model):
     def save(self, *args, **kwargs):
         """Ensure only one default namespace exists for this tenant."""
         if self.is_default:
-            Namespace.objects.filter(
-                tenant_id=self.tenant_id, is_default=True
-            ).exclude(pk=self.pk).update(is_default=False)
+            Namespace.objects.filter(tenant_id=self.tenant_id, is_default=True).exclude(pk=self.pk).update(
+                is_default=False
+            )
         super().save(*args, **kwargs)
 
     @classmethod
     def get_default(cls, tenant=None):
         """Get the default namespace, scoped to a tenant when provided."""
-        queryset = (
-            cls.objects.filter(tenant=tenant)
-            if tenant is not None
-            else cls.objects.all()
-        )
+        queryset = cls.objects.filter(tenant=tenant) if tenant is not None else cls.objects.all()
         default = queryset.filter(is_default=True).first()
         if not default:
             if tenant is None:
@@ -168,12 +146,10 @@ class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100)
     description = models.TextField(blank=True)
-    color = models.CharField(
-        max_length=7, default="#3B82F6", help_text="Hex color code for this category"
-    )
+    color = models.CharField(max_length=7, default="#3B82F6", help_text="Hex color code for this category")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     # Multi-tenancy support
     tenant = models.ForeignKey(
         "core.Tenant",
@@ -208,13 +184,11 @@ class Tag(models.Model):
     slug = models.SlugField(max_length=50, unique=True)
 
     # Usage tracking
-    usage_count = models.PositiveIntegerField(
-        default=0, help_text="Number of times this tag has been used"
-    )
+    usage_count = models.PositiveIntegerField(default=0, help_text="Number of times this tag has been used")
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     # Multi-tenancy support
     tenant = models.ForeignKey(
         "core.Tenant",
@@ -317,8 +291,6 @@ class Tag(models.Model):
             queryset = queryset.filter(namespace=Namespace.get_default())
 
         # Search by name
-        queryset = queryset.filter(Q(name__icontains=query)).order_by(
-            "-usage_count", "name"
-        )[:limit]
+        queryset = queryset.filter(Q(name__icontains=query)).order_by("-usage_count", "name")[:limit]
 
         return queryset
