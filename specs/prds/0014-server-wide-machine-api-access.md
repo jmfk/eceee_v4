@@ -1,7 +1,7 @@
 ---
 id: PRD-0014
 title: Server-wide machine API access
-status: started
+status: in-progress
 locked: true
 created: 2026-10-05
 related_adrs:
@@ -77,6 +77,7 @@ Codex and other trusted automation can operate only selected ECEEE workflows thr
 
 - 2026-10-05: Requirements and architecture direction recorded. The repository already has JWT, DRF token, session authentication, tenant middleware, and a theme-only hashed `ThemeKey` implementation to reuse and migrate.
 - 2026-10-05: Started the API foundation with hashed environment-bound machine credentials, tenant bindings, additive principal permissions, full-access and initial theme scopes, and middleware-aware authentication.
+- 2026-10-15: Added resource-specific scopes for pages, publishing, media, objects, object publishing, layouts, site configuration, and content taxonomies, plus a credential-safe general CMS API skill and client.
 - Planned sequence: API inventory; credential model/authentication/audit foundation; theme scopes and migration; broader endpoint classification; full-access key; Codex client documentation; staged rollout and legacy-key retirement.
 
 ## Linked ADRs
@@ -88,3 +89,5 @@ Codex and other trusted automation can operate only selected ECEEE workflows thr
 - 2026-10-05: Seven focused machine-key API tests passed against PostgreSQL.
 - 2026-10-05: The complete backend suite passed: 997 tests, 12 skipped.
 - 2026-10-05: Black, Python compilation, migration consistency, skill validation, specs governance validation, and `git diff --check` passed.
+- 2026-10-15: The general CMS access skill validated, its client unit tests passed, and a locally provisioned tenant-bound key completed a redacted API acceptance request.
+- 2026-10-15: The complete backend suite passed: 1,351 tests, 12 skipped.

@@ -1062,7 +1062,7 @@ class ObjectInstance(MPTTModel):
             raise ValueError("Cannot create relationship to self")
 
         # Check if target object exists
-        if not ObjectInstance.objects.filter(id=object_id).exists():
+        if not ObjectInstance.objects.filter(id=object_id, tenant=self.tenant).exists():
             raise ValueError(f"ObjectInstance with id {object_id} does not exist")
 
         # Initialize relationships if None
@@ -1156,7 +1156,7 @@ class ObjectInstance(MPTTModel):
         for obj_id in object_ids:
             if obj_id == self.id:
                 raise ValueError("Cannot create relationship to self")
-            if not ObjectInstance.objects.filter(id=obj_id).exists():
+            if not ObjectInstance.objects.filter(id=obj_id, tenant=self.tenant).exists():
                 raise ValueError(f"ObjectInstance with id {obj_id} does not exist")
 
         # Get current relationships of this type
@@ -1207,6 +1207,8 @@ class ObjectInstance(MPTTModel):
         # Verify the IDs match
         if set(object_ids_in_order) != current_ids:
             raise ValueError("Provided object IDs must exactly match existing relationships")
+        if ObjectInstance.objects.filter(id__in=object_ids_in_order, tenant=self.tenant).count() != len(current_ids):
+            raise ValueError("Related ObjectInstances must belong to the same tenant")
 
         # Remove old relationships of this type
         self.relationships = [r for r in self.relationships if r.get("type") != relationship_type]
@@ -1245,14 +1247,14 @@ class ObjectInstance(MPTTModel):
             object_ids = [r.get("object_id") for r in rels]
             # Use Django's preserve order with case
             preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(object_ids)])
-            return ObjectInstance.objects.filter(id__in=object_ids).order_by(preserved)
+            return ObjectInstance.objects.filter(id__in=object_ids, tenant=self.tenant).order_by(preserved)
         else:
             # Return list with relationship type info
             return [
                 {
                     "type": r.get("type"),
                     "object_id": r.get("object_id"),
-                    "object": ObjectInstance.objects.filter(id=r.get("object_id")).first(),
+                    "object": ObjectInstance.objects.filter(id=r.get("object_id"), tenant=self.tenant).first(),
                 }
                 for r in rels
             ]
@@ -1284,14 +1286,14 @@ class ObjectInstance(MPTTModel):
             # Return queryset preserving order
             object_ids = [r.get("object_id") for r in rels]
             preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(object_ids)])
-            return ObjectInstance.objects.filter(id__in=object_ids).order_by(preserved)
+            return ObjectInstance.objects.filter(id__in=object_ids, tenant=self.tenant).order_by(preserved)
         else:
             # Return list with relationship type info
             return [
                 {
                     "type": r.get("type"),
                     "object_id": r.get("object_id"),
-                    "object": ObjectInstance.objects.filter(id=r.get("object_id")).first(),
+                    "object": ObjectInstance.objects.filter(id=r.get("object_id"), tenant=self.tenant).first(),
                 }
                 for r in rels
             ]
@@ -1350,7 +1352,7 @@ class ObjectInstance(MPTTModel):
             object_id: Primary key of the related ObjectInstance
         """
         try:
-            target = ObjectInstance.objects.get(id=object_id)
+            target = ObjectInstance.objects.get(id=object_id, tenant=self.tenant)
         except ObjectInstance.DoesNotExist:
             return
 
@@ -1389,7 +1391,7 @@ class ObjectInstance(MPTTModel):
         self.related_from = []
 
         # Query all objects that might have relationships to this object
-        all_objects = ObjectInstance.objects.exclude(id=self.id).exclude(relationships=[])
+        all_objects = ObjectInstance.objects.filter(tenant=self.tenant).exclude(id=self.id).exclude(relationships=[])
 
         for obj in all_objects:
             if obj.relationships:
@@ -1403,7 +1405,7 @@ class ObjectInstance(MPTTModel):
         return len(self.related_from)
 
     @classmethod
-    def rebuild_all_related_from(cls):
+    def rebuild_all_related_from(cls, tenant=None):
         """
         Rebuild related_from fields for all ObjectInstance objects.
         Useful for bulk repair of broken reverse relationships.
@@ -1411,14 +1413,18 @@ class ObjectInstance(MPTTModel):
         Returns:
             dict: Statistics about the rebuild operation
         """
-        total_objects = cls.objects.count()
+        queryset = cls.objects.all()
+        if tenant is not None:
+            queryset = queryset.filter(tenant=tenant)
+
+        total_objects = queryset.count()
         total_relationships = 0
 
         # Clear all related_from fields first
-        cls.objects.update(related_from=[])
+        queryset.update(related_from=[])
 
         # Process each object and rebuild its reverse relationships
-        for obj in cls.objects.exclude(relationships=[]):
+        for obj in queryset.exclude(relationships=[]):
             if obj.relationships:
                 for rel in obj.relationships:
                     target_id = rel.get("object_id")
@@ -1426,7 +1432,7 @@ class ObjectInstance(MPTTModel):
 
                     if target_id and rel_type:
                         try:
-                            target = cls.objects.get(id=target_id)
+                            target = cls.objects.get(id=target_id, tenant=obj.tenant)
                             if target.related_from is None:
                                 target.related_from = []
 
@@ -1451,7 +1457,7 @@ class ObjectInstance(MPTTModel):
         if self.relationships:
             for rel in self.relationships:
                 try:
-                    target = ObjectInstance.objects.get(id=rel.get("object_id"))
+                    target = ObjectInstance.objects.get(id=rel.get("object_id"), tenant=self.tenant)
                     if target.related_from:
                         target.related_from = [r for r in target.related_from if r.get("object_id") != self.id]
                         target.save(update_fields=["related_from"])
@@ -1462,7 +1468,7 @@ class ObjectInstance(MPTTModel):
         if self.related_from:
             for rel in self.related_from:
                 try:
-                    source = ObjectInstance.objects.get(id=rel.get("object_id"))
+                    source = ObjectInstance.objects.get(id=rel.get("object_id"), tenant=self.tenant)
                     if source.relationships:
                         source.relationships = [r for r in source.relationships if r.get("object_id") != self.id]
                         source.save(update_fields=["relationships"])

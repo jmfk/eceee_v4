@@ -165,6 +165,81 @@ class ObjectInstanceModelTest(ObjectStorageModelTestBase):
         self.assertEqual(instance.title, "Test News Article")
         self.assertEqual(instance.tenant, self.tenant)
 
+    def test_relationships_cannot_cross_tenant_boundaries(self):
+        source = ObjectInstance.objects.create(
+            object_type=self.obj_type,
+            title="Source",
+            created_by=self.user,
+            tenant=self.tenant,
+        )
+        other_tenant = Tenant.objects.create(
+            name="Other tenant",
+            identifier="relationship-other-tenant",
+            created_by=self.user,
+        )
+        foreign_target = ObjectInstance.objects.create(
+            object_type=self.obj_type,
+            title="Foreign target",
+            created_by=self.user,
+            tenant=other_tenant,
+        )
+
+        with self.assertRaisesMessage(ValueError, "does not exist"):
+            source.add_relationship("related", foreign_target.id)
+        with self.assertRaisesMessage(ValueError, "does not exist"):
+            source.set_relationships("related", [foreign_target.id])
+
+        source.refresh_from_db()
+        foreign_target.refresh_from_db()
+        self.assertEqual(source.relationships, [])
+        self.assertEqual(foreign_target.related_from, [])
+
+    def test_rebuild_all_related_from_only_changes_the_selected_tenant(self):
+        selected_source = ObjectInstance.objects.create(
+            object_type=self.obj_type,
+            title="Selected source",
+            relationships=[],
+            created_by=self.user,
+            tenant=self.tenant,
+        )
+        selected_target = ObjectInstance.objects.create(
+            object_type=self.obj_type,
+            title="Selected target",
+            created_by=self.user,
+            tenant=self.tenant,
+        )
+        selected_source.relationships = [{"type": "related", "object_id": selected_target.id}]
+        selected_source.save(update_fields=["relationships"])
+
+        other_tenant = Tenant.objects.create(
+            name="Other rebuild tenant",
+            identifier="other-rebuild-tenant",
+            created_by=self.user,
+        )
+        foreign_source = ObjectInstance.objects.create(
+            object_type=self.obj_type,
+            title="Foreign source",
+            created_by=self.user,
+            tenant=other_tenant,
+        )
+        foreign_target = ObjectInstance.objects.create(
+            object_type=self.obj_type,
+            title="Foreign target",
+            related_from=[{"type": "stale", "object_id": foreign_source.id}],
+            created_by=self.user,
+            tenant=other_tenant,
+        )
+        foreign_source.relationships = [{"type": "related", "object_id": foreign_target.id}]
+        foreign_source.save(update_fields=["relationships"])
+
+        stats = ObjectInstance.rebuild_all_related_from(tenant=self.tenant)
+
+        selected_target.refresh_from_db()
+        foreign_target.refresh_from_db()
+        self.assertEqual(stats, {"total_objects": 2, "total_relationships_restored": 1})
+        self.assertEqual(selected_target.related_from, [{"type": "related", "object_id": selected_source.id}])
+        self.assertEqual(foreign_target.related_from, [{"type": "stale", "object_id": foreign_source.id}])
+
 
 @override_settings(
     SKIP_HOST_VALIDATION_IN_DEBUG=True,
@@ -349,3 +424,93 @@ class ObjectStorageAPITest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual([item["id"] for item in response.data["results"]], [selected.id])
+
+    def test_object_read_surfaces_do_not_cross_the_selected_tenant(self):
+        object_type = ObjectTypeDefinition.objects.create(
+            name="tenant-readable",
+            label="Tenant readable",
+            plural_label="Tenant readable",
+            created_by=self.user,
+        )
+        selected = ObjectInstance.objects.create(
+            object_type=object_type,
+            title="Selected object",
+            slug="selected-object",
+            created_by=self.user,
+            tenant=self.tenant,
+        )
+        selected_version = selected.create_version(self.user, data={"content": "Selected"})
+        selected_version.effective_date = timezone.now()
+        selected_version.save(update_fields=["effective_date"])
+
+        other_user = User.objects.create_user(username="other-readable-user")
+        other_tenant = Tenant.objects.create(
+            name="Other Readable Tenant",
+            identifier="other-readable-tenant",
+            created_by=other_user,
+        )
+        other = ObjectInstance.objects.create(
+            object_type=object_type,
+            title="Other object",
+            slug="other-object",
+            created_by=other_user,
+            tenant=other_tenant,
+        )
+        other_version = other.create_version(other_user, data={"content": "Other"})
+        other_version.effective_date = timezone.now()
+        other_version.save(update_fields=["effective_date"])
+
+        headers = {"HTTP_X_TENANT_ID": self.tenant.identifier}
+        own_version = self.client.get(f"/api/v1/objects/versions/{selected_version.id}/", **headers)
+        foreign_version = self.client.get(f"/api/v1/objects/versions/{other_version.id}/", **headers)
+        published = self.client.get("/api/v1/objects/objects/published/", **headers)
+        type_instances = self.client.get(
+            f"/api/v1/objects/object-types/{object_type.id}/instances/",
+            **headers,
+        )
+        references = self.client.get("/api/v1/objects/objects/search_for_references/", **headers)
+
+        self.assertEqual(own_version.status_code, status.HTTP_200_OK)
+        self.assertEqual(foreign_version.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual([item["id"] for item in published.data], [selected.id])
+        self.assertEqual([item["id"] for item in type_instances.data], [selected.id])
+        self.assertEqual([item["id"] for item in references.data["results"]], [selected.id])
+
+    def test_object_moves_cannot_select_a_parent_from_another_tenant(self):
+        object_type = ObjectTypeDefinition.objects.create(
+            name="tenant-parent",
+            label="Tenant parent",
+            plural_label="Tenant parents",
+            created_by=self.user,
+        )
+        selected = ObjectInstance.objects.create(
+            object_type=object_type,
+            title="Selected object",
+            slug="selected-move-object",
+            created_by=self.user,
+            tenant=self.tenant,
+        )
+        other_user = User.objects.create_user(username="other-parent-user")
+        other_tenant = Tenant.objects.create(
+            name="Other Parent Tenant",
+            identifier="other-parent-tenant",
+            created_by=other_user,
+        )
+        foreign_parent = ObjectInstance.objects.create(
+            object_type=object_type,
+            title="Foreign parent",
+            slug="foreign-parent",
+            created_by=other_user,
+            tenant=other_tenant,
+        )
+
+        response = self.client.post(
+            f"/api/v1/objects/objects/{selected.id}/move_to/",
+            {"newParentId": foreign_parent.id},
+            format="json",
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        selected.refresh_from_db()
+        self.assertIsNone(selected.parent_id)

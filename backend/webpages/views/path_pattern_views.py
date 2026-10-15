@@ -4,10 +4,10 @@ Path Pattern ViewSet
 API endpoints for accessing path pattern registry information.
 """
 
-from rest_framework import viewsets, permissions
+from django.http import Http404
+from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.http import Http404
 
 from ..path_pattern_registry import path_pattern_registry
 
@@ -46,7 +46,11 @@ class PathPatternViewSet(viewsets.ViewSet):
             from ..models import WebPage
 
             try:
-                page = WebPage.objects.select_related("parent").get(id=page_id)
+                pages = WebPage.objects.select_related("parent")
+                tenant = getattr(request, "tenant", None)
+                if tenant is not None:
+                    pages = pages.filter(tenant=tenant)
+                page = pages.get(id=page_id)
                 patterns = self._contextualize_patterns(patterns, page, request)
             except WebPage.DoesNotExist:
                 pass  # Return patterns without contextualization

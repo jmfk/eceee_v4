@@ -348,7 +348,10 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
     def instances(self, request, pk=None):
         """Get all instances of this object type"""
         obj_type = self.get_object()
-        instances = ObjectInstance.objects.filter(object_type=obj_type).select_related("created_by", "parent")
+        instances = ObjectInstance.objects.filter(
+            object_type=obj_type,
+            tenant=getattr(request, "tenant", None),
+        ).select_related("created_by", "parent")
 
         # Apply filters
         status_filter = request.query_params.get("status")
@@ -575,7 +578,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                     # Handle parent field (can be ID or None)
                     if parent:
                         try:
-                            parent_obj = ObjectInstance.objects.get(pk=parent)
+                            parent_obj = self.get_queryset().get(pk=parent)
                             instance.parent = parent_obj
                         except ObjectInstance.DoesNotExist:
                             return Response(
@@ -740,7 +743,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         new_parent = None
         if new_parent_id:
             try:
-                new_parent = ObjectInstance.objects.get(id=new_parent_id)
+                new_parent = self.get_queryset().get(id=new_parent_id)
             except ObjectInstance.DoesNotExist:
                 return Response({"error": "New parent not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -1018,7 +1021,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         Rebuild related_from fields for ALL ObjectInstance objects.
         Admin/maintenance endpoint for bulk repair.
         """
-        stats = ObjectInstance.rebuild_all_related_from()
+        stats = ObjectInstance.rebuild_all_related_from(tenant=request.tenant)
 
         return Response(
             {
@@ -1049,7 +1052,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         page_size = min(int(request.query_params.get("page_size", 20)), 100)
 
         # Start with all objects
-        queryset = ObjectInstance.objects.select_related("object_type")
+        queryset = self.get_queryset().select_related("object_type")
 
         # Filter by object types if specified
         if object_types:
@@ -1221,8 +1224,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         now = timezone.now()
 
         # Use the published manager to get objects with published versions
-        published_instances = ObjectInstance.published.published_only(now).select_related(
-            "object_type", "current_version", "created_by"
+        tenant = getattr(request, "tenant", None)
+        published_instances = (
+            ObjectInstance.published.published_only(now)
+            .filter(tenant=tenant)
+            .select_related("object_type", "current_version", "created_by")
         )
 
         serializer = self.get_serializer(published_instances, many=True)
@@ -1410,6 +1416,13 @@ class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ["version_number", "created_at"]
     ordering = ["-version_number"]
     filterset_fields = ["object_instance", "object_instance__object_type"]
+
+    def get_queryset(self):
+        """Restrict versions to objects in the selected tenant."""
+        tenant = getattr(self.request, "tenant", None)
+        if tenant is None:
+            return super().get_queryset().none()
+        return super().get_queryset().filter(object_instance__tenant=tenant)
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""

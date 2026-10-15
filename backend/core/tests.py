@@ -1,5 +1,13 @@
+import os
+import stat
+import tempfile
+from io import StringIO
+from pathlib import Path
+
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.db import connection
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
@@ -12,9 +20,20 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from config.celery import app
 from core.machine_api_keys import (
+    CONTENT_READ,
+    CONTENT_WRITE,
+    LAYOUT_READ,
+    MEDIA_READ,
+    MEDIA_WRITE,
+    OBJECT_PUBLISH,
     OBJECT_READ,
     OBJECT_TRANSFER,
+    OBJECT_WRITE,
+    PAGE_PUBLISH,
+    PAGE_READ,
+    PAGE_WRITE,
     SERVER_FULL_ACCESS,
+    SITE_READ,
     SITE_TRANSFER,
     THEME_READ,
     THEME_TRANSFER,
@@ -23,7 +42,7 @@ from core.machine_api_keys import (
     generate_machine_api_key,
 )
 from core.models import MachineAPIKey, Tenant
-from webpages.models import PageTheme
+from webpages.models import PageTheme, WebPage
 
 
 @override_settings(APP_VERSION="build-123")
@@ -234,6 +253,87 @@ class MachineAPIKeyAuthenticationTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_page_read_key_can_list_pages_but_cannot_create_them(self):
+        raw_key, _ = self.create_key([PAGE_READ])
+        self.authorize(raw_key)
+
+        listed = self.client.get("/api/v1/webpages/pages/")
+        created = self.client.post("/api/v1/webpages/pages/", {}, format="json")
+
+        self.assertEqual(listed.status_code, status.HTTP_200_OK)
+        self.assertEqual(created.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_machine_read_routes_cannot_contextualize_another_tenant(self):
+        raw_key, api_key = self.create_key([PAGE_READ, SITE_READ])
+        api_key.tenants.add(self.other_tenant)
+        foreign_site = WebPage.objects.create(
+            title="Foreign machine site",
+            slug="foreign-machine-site",
+            hostnames=["foreign-machine.example.test"],
+            tenant=self.other_tenant,
+            created_by=self.admin,
+            last_modified_by=self.admin,
+        )
+        foreign_site.create_version(self.admin, "Foreign machine version")
+        self.authorize(raw_key, self.tenant)
+
+        resolved = self.client.get(
+            "/api/v1/webpages/pages/resolve-render-path/",
+            {"site_id": foreign_site.id, "path": ""},
+        )
+        patterns = self.client.get(
+            "/api/v1/webpages/path-patterns/",
+            {"page_id": foreign_site.id},
+        )
+
+        self.assertEqual(resolved.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(patterns.status_code, status.HTTP_200_OK)
+        self.assertTrue(all("contextualized_example" not in pattern for pattern in patterns.data["patterns"]))
+
+    def test_media_read_key_cannot_reach_pages(self):
+        raw_key, _ = self.create_key([MEDIA_READ])
+        self.authorize(raw_key)
+
+        response = self.client.get("/api/v1/webpages/pages/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_object_write_key_cannot_change_publication_state(self):
+        raw_key, _ = self.create_key([OBJECT_WRITE])
+        self.authorize(raw_key)
+
+        scheduled = self.client.post(
+            "/api/v1/objects/versions/1/schedule/",
+            {"effective_date": "2030-01-01T00:00:00Z"},
+            format="json",
+        )
+        bulk_published = self.client.post(
+            "/api/v1/objects/objects/bulk-operations/",
+            {"operation": "publish", "object_ids": [1]},
+            format="json",
+        )
+
+        self.assertEqual(scheduled.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(bulk_published.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tenant_scoped_keys_cannot_mutate_global_configuration(self):
+        raw_key, _ = self.create_key([OBJECT_WRITE, SITE_READ])
+        self.authorize(raw_key)
+
+        object_type = self.client.patch(
+            "/api/v1/objects/object-types/1/",
+            {"label": "Changed"},
+            format="json",
+        )
+        page_schema = self.client.post(
+            "/api/v1/webpages/page-data-schemas/",
+            {"scope": "system", "schema": {}},
+            format="json",
+        )
+
+        self.assertEqual(object_type.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(page_schema.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_theme_read_key_can_reach_designer_theme_list(self):
         raw_key, _ = self.create_key([THEME_READ])
         self.authorize(raw_key)
@@ -357,6 +457,7 @@ class MachineAPIKeyAuthenticationTest(TestCase):
             "/api/v1/utils/current-workspace/",
             "/api/v1/utils/users/2/reset-password/",
             "/api/v1/webpages/designer/remote-connections/",
+            "/api/v1/webpages/remote-sites/access-keys/",
         ):
             with self.subTest(path=path):
                 request.path = path
@@ -394,3 +495,128 @@ class MachineAPIKeyAuthenticationTest(TestCase):
         self.assertEqual(_required_scope(request), THEME_READ)
         request.path = "/api/v1/webpages/designer/themes/2/export/"
         self.assertEqual(_required_scope(request), THEME_READ)
+
+    def test_supported_cms_routes_have_resource_specific_scopes(self):
+        request = type("Request", (), {})()
+        cases = (
+            ("GET", "/api/v1/webpages/pages/", PAGE_READ),
+            ("POST", "/api/v1/webpages/pages/", PAGE_WRITE),
+            ("PATCH", "/api/v1/webpages/versions/2/widgets/", PAGE_WRITE),
+            ("POST", "/api/v1/webpages/versions/2/publish/", PAGE_PUBLISH),
+            ("POST", "/api/v1/webpages/pages/2/unpublish-explicit/", PAGE_PUBLISH),
+            ("GET", "/api/v1/media/files/", MEDIA_READ),
+            ("POST", "/api/v1/media/upload/", MEDIA_WRITE),
+            ("GET", "/api/v1/objects/objects/", OBJECT_READ),
+            ("PATCH", "/api/v1/objects/objects/2/", OBJECT_WRITE),
+            ("GET", "/api/v1/objects/object-types/", OBJECT_READ),
+            ("PATCH", "/api/v1/objects/object-types/2/", SERVER_FULL_ACCESS),
+            ("POST", "/api/v1/objects/versions/2/publish/", OBJECT_PUBLISH),
+            ("POST", "/api/v1/objects/versions/2/schedule/", OBJECT_PUBLISH),
+            ("POST", "/api/v1/objects/objects/bulk-operations/", SERVER_FULL_ACCESS),
+            ("GET", "/api/v1/webpages/layouts/", LAYOUT_READ),
+            ("POST", "/api/v1/webpages/widget-types/easy_widgets.ContentWidget/validate/", LAYOUT_READ),
+            ("GET", "/api/v1/webpages/page-data-schemas/", SITE_READ),
+            ("POST", "/api/v1/webpages/page-data-schemas/validate/", SITE_READ),
+            ("POST", "/api/v1/webpages/page-data-schemas/", SERVER_FULL_ACCESS),
+            ("POST", "/api/v1/webpages/preview-sizes/", SERVER_FULL_ACCESS),
+            ("POST", "/api/v1/utils/value-lists/", SERVER_FULL_ACCESS),
+            ("GET", "/api/v1/content/namespaces/", CONTENT_READ),
+            ("POST", "/api/v1/content/tags/", CONTENT_WRITE),
+        )
+        for method, path, expected in cases:
+            with self.subTest(method=method, path=path):
+                request.method = method
+                request.path = path
+                self.assertEqual(_required_scope(request), expected)
+
+    def test_operational_layout_reload_still_requires_full_access(self):
+        request = type("Request", (), {"method": "POST", "path": "/api/v1/webpages/layouts/reload/"})()
+
+        self.assertEqual(_required_scope(request), SERVER_FULL_ACCESS)
+
+
+@override_settings(DEPLOYMENT_ENVIRONMENT="test")
+class ProvisionLocalMachineAccessTest(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_superuser("local-owner", password="test")
+        self.tenant = Tenant.objects.create(name="Local tenant", identifier="local", created_by=self.owner)
+
+    def test_command_installs_and_rotates_secret_without_printing_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / ".env.local"
+            env_file.write_text("PUBLIC_SETTING=preserved\nexport ECEEE_API_KEY=old-secret\n", encoding="utf-8")
+            os.chmod(env_file, 0o600)
+            first_output = StringIO()
+
+            call_command(
+                "provision_local_machine_access",
+                tenant=self.tenant.identifier,
+                env_file=env_file,
+                stdout=first_output,
+            )
+            first_key = MachineAPIKey.objects.get(name="Codex local CMS access")
+            first_digest = first_key.key_hash
+            first_contents = env_file.read_text(encoding="utf-8")
+
+            second_output = StringIO()
+            call_command(
+                "provision_local_machine_access",
+                tenant=self.tenant.identifier,
+                env_file=env_file,
+                stdout=second_output,
+            )
+            first_key.refresh_from_db()
+            second_contents = env_file.read_text(encoding="utf-8")
+
+            self.assertIn("machine_access=created credential=installed", first_output.getvalue())
+            self.assertIn("machine_access=rotated credential=installed", second_output.getvalue())
+            self.assertNotIn("mapi_", first_output.getvalue() + second_output.getvalue())
+            self.assertIn("PUBLIC_SETTING=preserved", second_contents)
+            self.assertEqual(second_contents.count("ECEEE_API_KEY="), 1)
+            self.assertNotEqual(first_contents, second_contents)
+            self.assertNotEqual(first_digest, first_key.key_hash)
+            self.assertEqual(stat.S_IMODE(env_file.stat().st_mode), 0o600)
+            self.assertEqual(MachineAPIKey.objects.filter(name="Codex local CMS access").count(), 1)
+
+    def test_command_accepts_tenant_uuid(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / ".env.local"
+
+            call_command(
+                "provision_local_machine_access",
+                tenant=str(self.tenant.id),
+                env_file=env_file,
+            )
+
+            credential = MachineAPIKey.objects.get(name="Codex local CMS access")
+            self.assertEqual(list(credential.tenants.all()), [self.tenant])
+
+    def test_command_rejects_an_unsafe_env_file_mode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / ".env.local"
+            env_file.write_text("PUBLIC_SETTING=value\n", encoding="utf-8")
+            os.chmod(env_file, 0o644)
+
+            with self.assertRaisesMessage(CommandError, "env_file=mode_unsafe"):
+                call_command(
+                    "provision_local_machine_access",
+                    tenant=self.tenant.identifier,
+                    env_file=env_file,
+                )
+
+    def test_command_rejects_a_password_bearing_staff_principal(self):
+        User.objects.create_user(username="codex-local", password="human-password", is_staff=True)
+
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / ".env.local"
+
+            with self.assertRaisesMessage(CommandError, "principal=existing_account_incompatible"):
+                call_command(
+                    "provision_local_machine_access",
+                    tenant=self.tenant.identifier,
+                    env_file=env_file,
+                )
+
+            self.assertFalse(env_file.exists())
+            self.assertFalse(MachineAPIKey.objects.filter(name="Codex local CMS access").exists())
+            self.assertFalse(self.tenant.members.filter(username="codex-local").exists())
