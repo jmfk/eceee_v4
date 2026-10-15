@@ -97,11 +97,8 @@ class TenantPluginApiTests(TestCase):
         self.assertTrue(plugins["org.eceee.legacy_import"]["compatible"])
 
     def test_eceee_plugin_is_compatible_with_default_production_workspace(self):
-        default_tenant = Tenant.objects.create(
-            name="Default Tenant",
-            identifier="default",
-            created_by=self.owner,
-        )
+        default_tenant = Tenant.objects.get(identifier="default")
+        default_tenant.members.add(self.owner)
         self.client.credentials(HTTP_X_TENANT_ID=default_tenant.identifier)
 
         response = self.client.get("/api/v1/content-migration/plugins/")
