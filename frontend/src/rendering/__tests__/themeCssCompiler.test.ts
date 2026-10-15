@@ -78,6 +78,7 @@ describe('canonical render CSS compiler', () => {
     it('keeps the canonical cascade order stable', () => {
         const { css } = compileRenderStyles({
             theme: {
+                fonts: { googleFonts: [{ family: 'Source Sans 3', variants: ['400', '700'] }] },
                 colors: { orderColor: '#123456' },
                 designGroups: { groups: [{
                     targetingMode: 'css-classes',
@@ -105,6 +106,9 @@ describe('canonical render CSS compiler', () => {
         expect(positions.every(position => position >= 0)).toBe(true)
         expect(positions).toEqual([...positions].sort((left, right) => left - right))
         expect(css).not.toContain('/*! tailwindcss')
+        expect(css).not.toContain('--tw-')
+        expect(css).toContain('border-width:0;border-style:solid;border-color:#e5e7eb')
+        expect(css).toContain('body,.site-renderer {\n  font-family: "Source Sans 3", ui-sans-serif, system-ui, -apple-system, sans-serif;\n}')
         expect(css.match(/\.media-insert img\{/g)).toHaveLength(1)
     })
 
