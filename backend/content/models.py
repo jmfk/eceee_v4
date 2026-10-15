@@ -9,6 +9,7 @@ This module defines content objects that can be published as web pages:
 """
 
 from django.db import models
+from django.db.models import Q
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.urls import reverse
@@ -24,10 +25,10 @@ class Namespace(models.Model):
     """
 
     name = models.CharField(
-        max_length=100, unique=True, help_text="Human-readable namespace name"
+        max_length=100, help_text="Human-readable namespace name"
     )
     slug = models.SlugField(
-        max_length=100, unique=True, help_text="URL-safe namespace identifier"
+        max_length=100, help_text="URL-safe namespace identifier"
     )
     description = models.TextField(
         blank=True, help_text="Description of this namespace"
@@ -60,25 +61,48 @@ class Namespace(models.Model):
         ordering = ["name"]
         verbose_name = "Namespace"
         verbose_name_plural = "Namespaces"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "name"], name="unique_namespace_name_per_tenant"
+            ),
+            models.UniqueConstraint(
+                fields=["tenant", "slug"], name="unique_namespace_slug_per_tenant"
+            ),
+            models.UniqueConstraint(
+                fields=["tenant"],
+                condition=Q(is_default=True),
+                name="unique_default_namespace_per_tenant",
+            ),
+        ]
 
     def __str__(self):
         return self.name
 
     def save(self, *args, **kwargs):
-        """Ensure only one default namespace exists"""
+        """Ensure only one default namespace exists for this tenant."""
         if self.is_default:
-            # Set all other namespaces to not default
-            Namespace.objects.filter(is_default=True).exclude(pk=self.pk).update(
-                is_default=False
-            )
+            Namespace.objects.filter(
+                tenant_id=self.tenant_id, is_default=True
+            ).exclude(pk=self.pk).update(is_default=False)
         super().save(*args, **kwargs)
 
     @classmethod
-    def get_default(cls):
-        """Get the default namespace, creating one if none exists"""
-        default = cls.objects.filter(is_default=True).first()
+    def get_default(cls, tenant=None):
+        """Get the default namespace, scoped to a tenant when provided."""
+        queryset = (
+            cls.objects.filter(tenant=tenant)
+            if tenant is not None
+            else cls.objects.all()
+        )
+        default = queryset.filter(is_default=True).first()
         if not default:
-            default = cls.objects.filter(is_active=True).first()
+            if tenant is None:
+                default = queryset.filter(is_active=True).first()
+            else:
+                default = queryset.filter(slug="default").first()
+                if default:
+                    default.is_default = True
+                    default.save(update_fields=["is_default", "updated_at"])
             if not default:
                 user = User.objects.first()
                 if not user:
@@ -87,15 +111,16 @@ class Namespace(models.Model):
                         email="system@localhost",
                     )
 
-                from core.models import Tenant
+                if tenant is None:
+                    from core.models import Tenant
 
-                tenant, _ = Tenant.objects.get_or_create(
-                    identifier="default",
-                    defaults={
-                        "name": "Default Tenant",
-                        "created_by": user,
-                    },
-                )
+                    tenant, _ = Tenant.objects.get_or_create(
+                        identifier="default",
+                        defaults={
+                            "name": "Default Tenant",
+                            "created_by": user,
+                        },
+                    )
 
                 # Create a default namespace if none exists
                 default = cls.objects.create(

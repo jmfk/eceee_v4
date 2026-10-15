@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
+    Plus,
+    Edit3,
+    Trash2,
     Star,
+    StarOff,
     Eye,
     EyeOff,
     Search,
     Filter,
     ChevronDown,
+    Save,
     X,
     Users,
     FileText,
@@ -16,13 +21,19 @@ import {
 } from 'lucide-react'
 import { namespacesApi } from '../api/namespaces.js'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
+import { useNotificationContext } from './NotificationManager'
+import { extractErrorMessage } from '../utils/errorHandling.js'
 
 const NamespaceManager = () => {
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState('all')
     const [showFilters, setShowFilters] = useState(false)
+    const [isCreating, setIsCreating] = useState(false)
+    const [editingNamespace, setEditingNamespace] = useState(null)
     const [showContentSummary, setShowContentSummary] = useState(null)
     const { addNotification } = useGlobalNotifications()
+    const queryClient = useQueryClient()
+    const { showConfirm } = useNotificationContext()
 
     // Fetch namespaces
     const { data: namespacesResponse, isLoading } = useQuery({
@@ -31,11 +42,58 @@ const NamespaceManager = () => {
             const params = {}
             if (searchTerm) params.search = searchTerm
             if (statusFilter !== 'all') {
-                if (statusFilter === 'active') params.isActive = true
-                if (statusFilter === 'inactive') params.isActive = false
-                if (statusFilter === 'default') params.isDefault = true
+                if (statusFilter === 'active') params.is_active = true
+                if (statusFilter === 'inactive') params.is_active = false
+                if (statusFilter === 'default') params.is_default = true
             }
             return namespacesApi.list(params)
+        }
+    })
+
+    // Mutations
+    const createNamespaceMutation = useMutation({
+        mutationFn: namespacesApi.create,
+        onSuccess: () => {
+            addNotification('Namespace created successfully', 'success', 'namespace-create')
+            handleCloseCreateModal()
+            queryClient.invalidateQueries({ queryKey: ['namespaces'] })
+        },
+        onError: (error) => {
+            addNotification(extractErrorMessage(error, 'Failed to create namespace'), 'error', 'namespace-create')
+        }
+    })
+
+    const updateNamespaceMutation = useMutation({
+        mutationFn: async ({ id, ...data }) => await namespacesApi.update(id, data),
+        onSuccess: () => {
+            addNotification('Namespace updated successfully', 'success', 'namespace-update')
+            handleCloseEditModal()
+            queryClient.invalidateQueries({ queryKey: ['namespaces'] })
+        },
+        onError: (error) => {
+            addNotification(extractErrorMessage(error, 'Failed to update namespace'), 'error', 'namespace-update')
+        }
+    })
+
+    const deleteNamespaceMutation = useMutation({
+        mutationFn: namespacesApi.delete,
+        onSuccess: () => {
+            addNotification('Namespace deleted successfully', 'success', 'namespace-delete')
+            queryClient.invalidateQueries({ queryKey: ['namespaces'] })
+        },
+        onError: (error) => {
+            addNotification(extractErrorMessage(error, 'Failed to delete namespace'), 'error', 'namespace-delete')
+        }
+    })
+
+    const setDefaultMutation = useMutation({
+        mutationFn: namespacesApi.setAsDefault,
+        onSuccess: (data) => {
+            addNotification(data.message, 'success', 'namespace-default')
+            queryClient.invalidateQueries({ queryKey: ['namespaces'] })
+        },
+        onError: (error) => {
+            addNotification(extractErrorMessage(error, 'Failed to set default namespace'), 'error', 'namespace-default')
         }
     })
 
@@ -44,8 +102,8 @@ const NamespaceManager = () => {
         onSuccess: (data) => {
             setShowContentSummary(data)
         },
-        onError: () => {
-            addNotification('Failed to get content summary', 'error', 'namespace-summary')
+        onError: (error) => {
+            addNotification(extractErrorMessage(error, 'Failed to get content summary'), 'error', 'namespace-summary')
         }
     })
 
@@ -75,10 +133,62 @@ const NamespaceManager = () => {
         }
     }, [statusFilter, addNotification])
 
+    // Modal action handlers with notifications
+    const handleOpenCreateModal = useCallback(() => {
+        addNotification('Opening create namespace dialog...', 'info', 'modal-open')
+        setIsCreating(true)
+    }, [addNotification])
+
+    const handleCloseCreateModal = useCallback(() => {
+        addNotification('Create namespace dialog closed', 'info', 'modal-close')
+        setIsCreating(false)
+    }, [addNotification])
+
+    const handleOpenEditModal = useCallback((namespace) => {
+        addNotification(`Opening edit dialog for "${namespace.name}"...`, 'info', 'modal-open')
+        setEditingNamespace(namespace)
+    }, [addNotification])
+
+    const handleCloseEditModal = useCallback(() => {
+        addNotification('Edit namespace dialog closed', 'info', 'modal-close')
+        setEditingNamespace(null)
+    }, [addNotification])
+
     const handleCloseContentSummary = useCallback(() => {
         addNotification('Content summary closed', 'info', 'modal-close')
         setShowContentSummary(null)
     }, [addNotification])
+
+    const handleDelete = async (namespace) => {
+        if (namespace.isDefault) {
+            addNotification('Cannot delete the default namespace', 'error', 'namespace-validation')
+            return
+        }
+
+        if (namespace.contentCount > 0) {
+            addNotification('Cannot delete namespace with existing content', 'error', 'namespace-validation')
+            return
+        }
+
+        const confirmed = await showConfirm({
+            title: 'Delete Namespace',
+            message: `Are you sure you want to delete "${namespace.name}"? This action cannot be undone.`,
+            confirmText: 'Delete',
+            confirmButtonStyle: 'danger'
+        })
+
+        if (confirmed) {
+            deleteNamespaceMutation.mutate(namespace.id)
+        }
+    }
+
+    const handleSetDefault = (namespace) => {
+        if (namespace.isDefault) {
+            addNotification('This namespace is already the default', 'info', 'namespace-info')
+            return
+        }
+        setDefaultMutation.mutate(namespace.id)
+    }
 
     const handleViewContent = (namespace) => {
         addNotification(`Loading content summary for "${namespace.name}"...`, 'info', 'content-summary')
@@ -113,21 +223,31 @@ const NamespaceManager = () => {
     return (
         <div className="space-y-6 px-6 pb-6 pt-2">
             {/* Header */}
-            <div>
-                <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Namespace Management</div>
-                <div className="text-sm text-gray-600 mt-1">
-                    The default namespace is used unless a feature creates a dedicated namespace for a specific purpose.
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <div className="text-xl font-semibold text-gray-900" role="heading" aria-level="2">Namespace Management</div>
+                    <div className="text-sm text-gray-600 mt-1">
+                        The default namespace is used unless content has a specific reason to use another namespace.
+                    </div>
                 </div>
+                <button
+                    onClick={handleOpenCreateModal}
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Namespace
+                </button>
             </div>
 
             {/* Search and Filters */}
             <div className="bg-white rounded-lg shadow p-4">
-                <div className="flex items-center space-x-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                     <div className="flex-1">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                             <input
                                 type="text"
+                                aria-label="Search namespaces"
                                 placeholder="Search namespaces..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -136,7 +256,9 @@ const NamespaceManager = () => {
                         </div>
                     </div>
                     <button
+                        type="button"
                         onClick={() => setShowFilters(!showFilters)}
+                        aria-expanded={showFilters}
                         className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                     >
                         <Filter className="w-4 h-4 mr-2" />
@@ -149,10 +271,11 @@ const NamespaceManager = () => {
                     <div className="mt-4 pt-4 border-t border-gray-200">
                         <div className="flex items-center space-x-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="namespace-status-filter" className="block text-sm font-medium text-gray-700 mb-1">
                                     Status
                                 </label>
                                 <select
+                                    id="namespace-status-filter"
                                     value={statusFilter}
                                     onChange={(e) => setStatusFilter(e.target.value)}
                                     className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -179,7 +302,7 @@ const NamespaceManager = () => {
                     <div className="p-8 text-center text-gray-500">
                         <FolderOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                         <div className="text-lg font-medium text-gray-900 mb-2" role="heading" aria-level="3">No namespaces found</div>
-                        <div>No namespace is configured for this workspace.</div>
+                        <div>Create your first namespace to get started</div>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -197,6 +320,9 @@ const NamespaceManager = () => {
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Created
+                                    </th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Actions
                                     </th>
                                 </tr>
                             </thead>
@@ -239,6 +365,41 @@ const NamespaceManager = () => {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {new Date(namespace.createdAt).toLocaleDateString()}
                                         </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <div className="flex items-center justify-end space-x-2">
+                                                {!namespace.isDefault && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSetDefault(namespace)}
+                                                        aria-label={`Set ${namespace.name} as default`}
+                                                        className="text-yellow-600 hover:text-yellow-800"
+                                                        title="Set as default"
+                                                    >
+                                                        <StarOff className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleOpenEditModal(namespace)}
+                                                    aria-label={`Edit ${namespace.name}`}
+                                                    className="text-blue-600 hover:text-blue-800"
+                                                    title="Edit namespace"
+                                                >
+                                                    <Edit3 className="w-4 h-4" />
+                                                </button>
+                                                {!namespace.isDefault && namespace.contentCount === 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDelete(namespace)}
+                                                        aria-label={`Delete ${namespace.name}`}
+                                                        className="text-red-600 hover:text-red-800"
+                                                        title="Delete namespace"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -247,6 +408,22 @@ const NamespaceManager = () => {
                 )}
             </div>
 
+            {/* Create/Edit Modal */}
+            {(isCreating || editingNamespace) && (
+                <NamespaceForm
+                    namespace={editingNamespace}
+                    onSave={(data) => {
+                        if (editingNamespace) {
+                            updateNamespaceMutation.mutate({ id: editingNamespace.id, ...data })
+                        } else {
+                            createNamespaceMutation.mutate(data)
+                        }
+                    }}
+                    onCancel={editingNamespace ? handleCloseEditModal : handleCloseCreateModal}
+                    isLoading={createNamespaceMutation.isPending || updateNamespaceMutation.isPending}
+                />
+            )}
+
             {/* Content Summary Modal */}
             {showContentSummary && (
                 <ContentSummaryModal
@@ -254,6 +431,147 @@ const NamespaceManager = () => {
                     onClose={handleCloseContentSummary}
                 />
             )}
+        </div>
+    )
+}
+
+const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }) => {
+    const { addNotification } = useGlobalNotifications()
+    const [formData, setFormData] = useState({
+        name: namespace?.name || '',
+        slug: namespace?.slug || '',
+        description: namespace?.description || '',
+        isActive: namespace?.isActive ?? true
+    })
+
+    const handleSubmit = (e) => {
+        e.preventDefault()
+        if (!formData.name.trim()) {
+            addNotification('Namespace name is required', 'error', 'form-validation')
+            return
+        }
+        if (!formData.slug.trim()) {
+            addNotification('Namespace slug is required', 'error', 'form-validation')
+            return
+        }
+        onSave(formData)
+    }
+
+    const generateSlug = (name) => {
+        return name
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .trim()
+    }
+
+    const handleNameChange = (e) => {
+        const name = e.target.value
+        setFormData(prev => ({
+            ...prev,
+            name,
+            // Auto-generate slug if it's empty or matches the previous auto-generated slug
+            slug: !namespace && (!prev.slug || prev.slug === generateSlug(prev.name))
+                ? generateSlug(name)
+                : prev.slug
+        }))
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-600/10 px-4" role="dialog" aria-modal="true" aria-labelledby="namespace-form-title">
+            <div className="relative top-20 mx-auto w-full max-w-md rounded-md border bg-white p-5 shadow-lg">
+                <div className="flex items-center justify-between mb-4">
+                    <div id="namespace-form-title" className="text-lg font-medium text-gray-900" role="heading" aria-level="3">
+                        {namespace ? 'Edit Namespace' : 'Create Namespace'}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        aria-label="Close namespace form"
+                        className="text-gray-400 hover:text-gray-500"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label htmlFor="namespace-name" className="block text-sm font-medium text-gray-700 mb-1">
+                            Name *
+                        </label>
+                        <input
+                            type="text"
+                            id="namespace-name"
+                            value={formData.name}
+                            onChange={handleNameChange}
+                            placeholder="Enter namespace name"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="namespace-slug" className="block text-sm font-medium text-gray-700 mb-1">
+                            Slug *
+                        </label>
+                        <input
+                            type="text"
+                            id="namespace-slug"
+                            value={formData.slug}
+                            onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                            placeholder="namespace-slug"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="namespace-description" className="block text-sm font-medium text-gray-700 mb-1">
+                            Description
+                        </label>
+                        <textarea
+                            id="namespace-description"
+                            value={formData.description}
+                            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="Enter namespace description"
+                            rows={3}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="flex items-center">
+                            <input
+                                type="checkbox"
+                                checked={formData.isActive}
+                                onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Active</span>
+                        </label>
+
+                    </div>
+
+                    <div className="flex items-center justify-end space-x-3 pt-4">
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        >
+                            <Save className="w-4 h-4 mr-2" />
+                            {isLoading ? 'Saving...' : (namespace ? 'Update' : 'Create')}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     )
 }

@@ -11,8 +11,6 @@ DEMO_FRONTEND_PORT="${DEMO_FRONTEND_PORT:-10100}"
 DEMO_HOSTNAMES="${DEMO_HOSTNAMES:-localhost,127.0.0.1}"
 DEMO_TENANT_IDENTIFIER="${DEMO_TENANT_IDENTIFIER:-demo}"
 DEMO_TENANT_NAME="${DEMO_TENANT_NAME:-Demo Site}"
-DEMO_NAMESPACE_SLUG="${DEMO_NAMESPACE_SLUG:-demo}"
-DEMO_NAMESPACE_NAME="${DEMO_NAMESPACE_NAME:-Demo}"
 DEMO_USER="${DEMO_USER:-demo}"
 DEMO_PASSWORD="${DEMO_PASSWORD:-demo}"
 START_DEMO_SITE="${START_DEMO_SITE:-0}"
@@ -66,8 +64,6 @@ docker compose -f docker-compose.dev.yml run --rm -T \
   --password "$DEMO_PASSWORD" \
   --tenant-identifier "$DEMO_TENANT_IDENTIFIER" \
   --tenant-name "$DEMO_TENANT_NAME" \
-  --namespace-slug "$DEMO_NAMESPACE_SLUG" \
-  --namespace-name "$DEMO_NAMESPACE_NAME" \
   --hostnames "$DEMO_HOSTNAMES"
 
 echo "Setting demo tenant as the default request tenant..."

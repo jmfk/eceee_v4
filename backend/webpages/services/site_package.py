@@ -2243,12 +2243,12 @@ class SitePackageImporter:
             base_slug = slugify(requested_name) or "imported-media"
             slug = base_slug
             counter = 2
-            while Namespace.objects.filter(slug=slug).exists():
+            while Namespace.objects.filter(tenant=tenant, slug=slug).exists():
                 slug = f"{base_slug}-{counter}"
                 counter += 1
             name = requested_name
             counter = 2
-            while Namespace.objects.filter(name=name).exists():
+            while Namespace.objects.filter(tenant=tenant, name=name).exists():
                 name = f"{requested_name} {counter}"
                 counter += 1
             self._resolved_namespace = Namespace.objects.create(
@@ -2260,7 +2260,7 @@ class SitePackageImporter:
             )
             return self._resolved_namespace
         namespace = Namespace.objects.filter(tenant=tenant, is_default=True).first()
-        self._resolved_namespace = namespace or Namespace.get_default()
+        self._resolved_namespace = namespace or Namespace.get_default(tenant=tenant)
         return self._resolved_namespace
 
     def _import_themes(self, package: zipfile.ZipFile, pages_payload=None) -> Dict[int, PageTheme]:
