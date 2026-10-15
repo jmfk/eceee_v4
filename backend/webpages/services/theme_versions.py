@@ -99,9 +99,14 @@ def restore_theme_version(theme, version, *, user):
     restored_layouts = version.snapshot.get("layouts", theme.layouts)
     validate_theme_layouts(restored_layouts)
     validate_layout_compatibility(theme, restored_layouts)
+    from webpages.services.theme_preview_content import materialize_legacy_preview_collections
+
     for field in SNAPSHOT_FIELDS:
         if field in version.snapshot:
-            setattr(theme, field, version.snapshot[field])
+            value = version.snapshot[field]
+            if field == "designer_preview":
+                value = materialize_legacy_preview_collections(value, theme.tenant)
+            setattr(theme, field, value)
     theme.save(
         version_source="restore",
         version_source_label=f"Restored version {version.version_number}",

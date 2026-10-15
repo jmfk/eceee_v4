@@ -235,6 +235,119 @@ def detach_theme_preview_object_references(value):
     return detached
 
 
+def materialize_legacy_preview_collections(value, tenant):
+    """Detach saved preview widgets from live collections using tenant-owned media or embedded samples."""
+    media_cache = {}
+
+    def media_item(sample):
+        if not isinstance(sample, dict):
+            return None
+        media_id = sample.get("id") or sample.get("mediaId") or sample.get("media_id")
+        media_file = None
+        if media_id:
+            if media_id not in media_cache:
+                try:
+                    tenant_media = MediaFile.objects.filter(
+                        id=media_id,
+                        tenant=tenant,
+                        namespace__tenant=tenant,
+                        is_deleted=False,
+                    ).first()
+                    media_cache[media_id] = (tenant_media, MediaFile.objects.filter(id=media_id).exists())
+                except (TypeError, ValueError, ValidationError):
+                    media_cache[media_id] = (None, False)
+            media_file, media_exists = media_cache[media_id]
+            if media_file is None and media_exists:
+                return None
+        url = (
+            media_file.get_absolute_url()
+            if media_file
+            else sample.get("imgproxyBaseUrl")
+            or sample.get("imgproxy_base_url")
+            or sample.get("fileUrl")
+            or sample.get("file_url")
+            or sample.get("url")
+        )
+        if not url:
+            return None
+        metadata = media_file.metadata if media_file and isinstance(media_file.metadata, dict) else {}
+        return {
+            "url": url,
+            "type": "image",
+            "altText": (media_file.title if media_file else None)
+            or sample.get("altText")
+            or sample.get("alt_text")
+            or sample.get("title")
+            or "Image",
+            "caption": (media_file.description if media_file else None) or sample.get("caption") or "",
+            "annotation": metadata.get("annotation", ""),
+            "title": (media_file.title if media_file else None) or sample.get("title") or "",
+            "width": media_file.width if media_file else sample.get("width"),
+            "height": media_file.height if media_file else sample.get("height"),
+            "thumbnailUrl": sample.get("thumbnailUrl") or sample.get("thumbnail_url") or url,
+        }
+
+    def collection_items(selector):
+        collection = None
+        try:
+            collection = MediaCollection.objects.filter(
+                id=selector.get("id"),
+                namespace__tenant=tenant,
+                namespace__is_active=True,
+            ).first()
+        except (TypeError, ValueError, ValidationError):
+            pass
+        if collection:
+            samples = [
+                {
+                    "id": str(media_file.id),
+                    "title": media_file.title,
+                    "url": media_file.get_absolute_url(),
+                    "width": media_file.width,
+                    "height": media_file.height,
+                }
+                for media_file in MediaFile.objects.filter(
+                    collections=collection,
+                    tenant=tenant,
+                    namespace=collection.namespace,
+                    file_type="image",
+                    is_deleted=False,
+                ).order_by("-created_at", "id")
+            ]
+        else:
+            samples = selector.get("sampleImages") or selector.get("sample_images") or []
+        return [item for sample in samples if (item := media_item(sample))]
+
+    def rewrite(current):
+        if isinstance(current, dict):
+            selector = current.get("image")
+            is_collection = (
+                isinstance(selector, dict)
+                and selector.get("id")
+                and (
+                    selector.get("type") == "collection"
+                    or any(
+                        key in selector for key in ("fileCount", "file_count", "sampleImages", "sample_images", "slug")
+                    )
+                )
+            )
+            rewritten = {key: rewrite(child) for key, child in current.items()}
+            if is_collection:
+                fallback = collection_items(selector)
+                rewritten.pop("image", None)
+                rewritten.pop("collectionId", None)
+                rewritten.pop("collection_id", None)
+                if fallback:
+                    rewritten["mediaItems"] = fallback
+                    rewritten.pop("media_items", None)
+            return rewritten
+        if isinstance(current, list):
+            return [rewrite(child) for child in current]
+        return copy.deepcopy(current)
+
+    return rewrite(value)
+
+
 def _media_file_for_reference(theme, reference):
     if not isinstance(reference, str) or not reference:
         return None
@@ -361,7 +474,33 @@ def _copy_preview_images(theme, value):
             .first()
         )
         if not collection:
-            return []
+            samples = selector.get("sampleImages") or selector.get("sample_images") or []
+            return [
+                {
+                    "url": sample.get("imgproxyBaseUrl")
+                    or sample.get("imgproxy_base_url")
+                    or sample.get("fileUrl")
+                    or sample.get("file_url")
+                    or sample.get("url"),
+                    "type": "image",
+                    "altText": sample.get("altText") or sample.get("alt_text") or sample.get("title") or "Image",
+                    "caption": sample.get("caption", ""),
+                    "annotation": sample.get("annotation", ""),
+                    "title": sample.get("title", ""),
+                    "width": sample.get("width"),
+                    "height": sample.get("height"),
+                    "thumbnailUrl": sample.get("thumbnailUrl") or sample.get("thumbnail_url"),
+                }
+                for sample in samples
+                if isinstance(sample, dict)
+                and (
+                    sample.get("imgproxyBaseUrl")
+                    or sample.get("imgproxy_base_url")
+                    or sample.get("fileUrl")
+                    or sample.get("file_url")
+                    or sample.get("url")
+                )
+            ]
 
         files = MediaFile.objects.filter(
             collections=collection,

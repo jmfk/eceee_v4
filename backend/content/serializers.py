@@ -24,6 +24,8 @@ class NamespaceSerializer(serializers.ModelSerializer):
             "description",
             "is_active",
             "is_default",
+            "is_hidden",
+            "kind",
             "created_at",
             "updated_at",
             "created_by",
@@ -49,6 +51,18 @@ class NamespaceSerializer(serializers.ModelSerializer):
             value = attrs.get(field, getattr(self.instance, field, None))
             if value and Namespace.objects.filter(tenant=tenant, **{field: value}).exclude(pk=namespace_id).exists():
                 raise serializers.ValidationError({field: f"A namespace with this {field} already exists."})
+        is_hidden = attrs.get("is_hidden", getattr(self.instance, "is_hidden", False))
+        is_default = attrs.get("is_default", getattr(self.instance, "is_default", False))
+        kind = attrs.get("kind", getattr(self.instance, "kind", Namespace.KIND_CONTENT))
+        if kind == Namespace.KIND_THEME_MEDIA:
+            is_hidden = True
+            existing_theme_media = Namespace.objects.filter(tenant=tenant, kind=Namespace.KIND_THEME_MEDIA).exclude(
+                pk=namespace_id
+            )
+            if existing_theme_media.exists():
+                raise serializers.ValidationError({"kind": "This tenant already has a theme-media namespace."})
+        if is_hidden and is_default:
+            raise serializers.ValidationError({"is_hidden": "The default namespace cannot be hidden."})
         return attrs
 
     def validate_is_default(self, value):
@@ -86,6 +100,8 @@ class NamespaceListSerializer(serializers.ModelSerializer):
             "description",
             "is_active",
             "is_default",
+            "is_hidden",
+            "kind",
             "created_at",
             "created_by_name",
             "content_count",

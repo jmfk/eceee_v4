@@ -111,6 +111,92 @@ class NamespaceAPITest(APITestCase):
         self.assertTrue(namespace.is_active)
         self.assertFalse(namespace.is_default)
 
+    def test_hidden_namespaces_are_only_listed_when_explicitly_requested(self):
+        visible = Namespace.objects.create(
+            name="Visible",
+            slug="visible",
+            tenant=self.tenant,
+            created_by=self.user,
+        )
+        hidden = Namespace.objects.create(
+            name="Hidden",
+            slug="hidden",
+            tenant=self.tenant,
+            is_hidden=True,
+            created_by=self.user,
+        )
+
+        ordinary = self.client.get("/api/v1/namespaces/")
+        designer = self.client.get("/api/v1/namespaces/?include_hidden=true")
+
+        self.assertEqual(ordinary.status_code, 200)
+        self.assertIn(visible.id, [item["id"] for item in ordinary.data["results"]])
+        self.assertNotIn(hidden.id, [item["id"] for item in ordinary.data["results"]])
+        self.assertIn(hidden.id, [item["id"] for item in designer.data["results"]])
+        hidden_payload = next(item for item in designer.data["results"] if item["id"] == hidden.id)
+        self.assertTrue(hidden_payload["is_hidden"])
+        self.assertEqual(hidden_payload["kind"], Namespace.KIND_CONTENT)
+
+    def test_theme_media_kind_is_hidden_and_unique_per_tenant(self):
+        response = self.client.post(
+            "/api/v1/namespaces/",
+            {
+                "name": "Theme media",
+                "slug": "theme-media",
+                "kind": Namespace.KIND_THEME_MEDIA,
+                "isHidden": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        namespace = Namespace.objects.get(pk=response.data["id"])
+        self.assertEqual(namespace.kind, Namespace.KIND_THEME_MEDIA)
+        self.assertTrue(namespace.is_hidden)
+        self.assertFalse(namespace.is_default)
+
+        duplicate = self.client.post(
+            "/api/v1/namespaces/",
+            {"name": "Other theme media", "slug": "other-theme-media", "kind": Namespace.KIND_THEME_MEDIA},
+            format="json",
+        )
+        self.assertEqual(duplicate.status_code, 400)
+        self.assertIn("kind", duplicate.data)
+
+    def test_namespace_kind_can_be_updated(self):
+        namespace = Namespace.objects.create(
+            name="Theme assets",
+            slug="theme-assets",
+            tenant=self.tenant,
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            f"/api/v1/namespaces/{namespace.id}/",
+            {"kind": Namespace.KIND_THEME_MEDIA},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        namespace.refresh_from_db()
+        self.assertEqual(namespace.kind, Namespace.KIND_THEME_MEDIA)
+        self.assertTrue(namespace.is_hidden)
+
+    def test_hidden_namespace_cannot_be_default(self):
+        namespace = Namespace.objects.create(
+            name="Hidden",
+            slug="hidden-default",
+            tenant=self.tenant,
+            is_hidden=True,
+            created_by=self.user,
+        )
+
+        response = self.client.post(f"/api/v1/namespaces/{namespace.id}/set_as_default/?include_hidden=true")
+
+        self.assertEqual(response.status_code, 400)
+        namespace.refresh_from_db()
+        self.assertFalse(namespace.is_default)
+
     def test_setting_a_default_does_not_replace_another_tenants_default(self):
         current_default = Namespace.objects.create(
             name="Current Default",

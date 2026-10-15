@@ -224,4 +224,33 @@ describe('ImageWidget', () => {
 
         expect(mediaCollectionsApi.getFiles).toHaveBeenCalledTimes(1)
     })
+
+    it('renders embedded collection samples when the saved collection no longer exists', async () => {
+        mediaCollectionsApi.getFiles.mockImplementation(() => () => Promise.reject(new Error('Not found')))
+
+        render(
+            <ImageWidget
+                mode="editor"
+                widgetId="image-1"
+                slotName="main"
+                config={{
+                    displayType: 'gallery',
+                    image: {
+                        id: 'missing-collection',
+                        type: 'collection',
+                        namespace: 'default',
+                        sample_images: [
+                            { id: 'sample-1', title: 'Partner logo', imgproxy_base_url: '/partner-logo.png' },
+                        ],
+                    },
+                    mediaItems: [],
+                }}
+            />
+        )
+
+        expect(await screen.findByRole('img', { name: 'Partner logo' })).toHaveAttribute(
+            'src',
+            '/imgproxy/resize:fit//partner-logo.png'
+        )
+    })
 })

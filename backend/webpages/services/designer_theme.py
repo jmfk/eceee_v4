@@ -306,6 +306,8 @@ def _render_layout_preview_template(layout):
 
 def normalized_designer_preview(theme, layouts=None):
     """Return only explicitly saved Designer preview documents."""
+    from webpages.services.theme_preview_content import materialize_legacy_preview_collections
+
     if layouts is None:
         from webpages.layout_autodiscovery import autodiscover_layouts
         from webpages.layout_registry import layout_registry
@@ -313,7 +315,10 @@ def normalized_designer_preview(theme, layouts=None):
         autodiscover_layouts()
         layouts = layout_registry.list_layouts(active_only=True)
     available = {layout.name: layout for layout in layouts}
-    preview_config = copy.deepcopy(theme.designer_preview) if isinstance(theme.designer_preview, dict) else {}
+    preview_config = materialize_legacy_preview_collections(
+        theme.designer_preview if isinstance(theme.designer_preview, dict) else {},
+        theme.tenant,
+    )
     configured = preview_config.get("views", [])
     views = []
     seen = set()
@@ -960,12 +965,17 @@ def _cleanup_designer_assets_after_commit(theme_id, snapshots):
 
 
 def apply_designer_snapshot(theme, snapshot):
+    from webpages.services.theme_preview_content import materialize_legacy_preview_collections
+
     theme.name = snapshot.get("name", theme.name)
     theme.description = snapshot.get("description", theme.description)
     theme.colors = copy.deepcopy(snapshot.get("colors", {}))
     theme.fonts = copy.deepcopy(snapshot.get("fonts", {}))
     theme.design_groups = copy.deepcopy(snapshot.get("design_groups", {}))
-    theme.designer_preview = copy.deepcopy(snapshot.get("designer_preview", theme.designer_preview))
+    theme.designer_preview = materialize_legacy_preview_collections(
+        snapshot.get("designer_preview", theme.designer_preview),
+        theme.tenant,
+    )
     layouts = copy.deepcopy(snapshot.get("layouts", theme.layouts))
     theme.layouts = {
         **layouts,

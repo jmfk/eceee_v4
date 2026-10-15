@@ -99,13 +99,9 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         if tenant is not None and instance.tenant_id != tenant.pk:
             raise Http404
 
-        from content.models import Namespace
-
         from ..security import user_can_access_namespace
 
-        if instance.namespace.kind == Namespace.KIND_THEME_MEDIA and not user_can_access_namespace(
-            request.user, instance.namespace
-        ):
+        if instance.namespace.is_hidden and not user_can_access_namespace(request.user, instance.namespace):
             raise Http404
 
         instance.delete(user=request.user, force=True)
@@ -156,29 +152,29 @@ class MediaFileViewSet(viewsets.ModelViewSet):
         if namespace_param:
             from content.models import Namespace
 
-            from ..security import user_can_access_theme_media
+            from ..security import user_can_access_namespace
 
             theme_namespace = Namespace.objects.filter(
                 slug=namespace_param,
                 tenant=tenant,
-                kind=Namespace.KIND_THEME_MEDIA,
+                is_hidden=True,
             ).first()
-            include_theme_media = bool(theme_namespace and user_can_access_theme_media(user, theme_namespace.tenant))
+            include_theme_media = bool(theme_namespace and user_can_access_namespace(user, theme_namespace))
         elif self.kwargs.get(self.lookup_field):
             from content.models import Namespace
 
-            from ..security import user_can_access_theme_media
+            from ..security import user_can_access_namespace
 
             theme_media = (
                 queryset.filter(
                     pk=self.kwargs[self.lookup_field],
-                    namespace__kind=Namespace.KIND_THEME_MEDIA,
+                    namespace__is_hidden=True,
                 )
                 .select_related("tenant")
                 .first()
             )
             if theme_media and (tenant is None or theme_media.tenant_id == tenant.pk):
-                include_theme_media = user_can_access_theme_media(user, theme_media.tenant)
+                include_theme_media = user_can_access_namespace(user, theme_media.namespace)
                 if include_theme_media:
                     filter_tenant = theme_media.tenant
 

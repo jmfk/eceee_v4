@@ -18,6 +18,7 @@ from webpages.services.theme_preview_content import (
     _copy_preview_images,
     _managed_storage_path,
     import_theme_preview_document,
+    materialize_legacy_preview_collections,
     normalize_theme_preview_namespaces,
     rewrite_theme_library_image_urls,
 )
@@ -473,6 +474,63 @@ class ThemePreviewContentTests(TestCase):
         self.assertEqual(len(config["mediaItems"]), 1)
         self.assertIn(f"theme_images/{self.theme.id}/library/", config["mediaItems"][0]["url"])
         self.assertNotIn(str(collection.id), str(config))
+
+    def test_missing_collection_uses_only_tenant_owned_embedded_samples(self):
+        foreign_namespace = Namespace.objects.create(
+            name="Foreign media",
+            slug="foreign-media",
+            tenant=self.other_tenant,
+            created_by=self.user,
+        )
+        foreign_media = MediaFile.objects.create(
+            title="Foreign image",
+            slug="foreign-image",
+            original_filename="foreign.jpg",
+            file_path="uploads/foreign.jpg",
+            file_size=12,
+            content_type="image/jpeg",
+            file_hash="d" * 64,
+            uploaded_by=self.user,
+            file_type="image",
+            namespace=foreign_namespace,
+            tenant=self.other_tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        preview = {
+            "views": [
+                {
+                    "content": {
+                        "widgets": {
+                            "main": [
+                                {
+                                    "config": {
+                                        "image": {
+                                            "id": "67d9020f-1d73-47be-bd24-1fe52d2dbef8",
+                                            "type": "collection",
+                                            "sample_images": [
+                                                {"id": str(self.media_file.id), "title": "Owned"},
+                                                {"id": str(foreign_media.id), "title": "Foreign"},
+                                            ],
+                                        },
+                                        "collection_id": "67d9020f-1d73-47be-bd24-1fe52d2dbef8",
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+
+        normalized = materialize_legacy_preview_collections(preview, self.tenant)
+        config = normalized["views"][0]["content"]["widgets"]["main"][0]["config"]
+
+        self.assertNotIn("image", config)
+        self.assertNotIn("collection_id", config)
+        self.assertEqual(len(config["mediaItems"]), 1)
+        self.assertEqual(config["mediaItems"][0]["title"], self.media_file.title)
+        self.assertNotIn(str(foreign_media.id), str(normalized))
 
     def test_page_import_removes_object_children_parent_but_keeps_widget_id(self):
         self.page_version.page_data = {}

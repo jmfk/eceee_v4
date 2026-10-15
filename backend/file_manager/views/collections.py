@@ -35,9 +35,7 @@ logger = logging.getLogger(__name__)
 
 def _namespace_visible_to_request(namespace, request):
     """Keep system-owned namespaces inside their owning product boundary."""
-    from content.models import Namespace
-
-    if namespace.kind != Namespace.KIND_THEME_MEDIA:
+    if not namespace.is_hidden:
         return True
     tenant = getattr(request, "tenant", None)
     return (tenant is None or tenant.pk == namespace.tenant_id) and user_can_access_namespace(request.user, namespace)
@@ -49,7 +47,16 @@ def _validate_create_namespace(serializer, request):
 
     namespace_data = serializer.validated_data.get("namespace") or {}
     namespace_slug = namespace_data.get("slug")
-    namespace = Namespace.objects.filter(slug=namespace_slug).first() if namespace_slug else Namespace.get_default()
+    tenant = getattr(request, "tenant", None)
+    if namespace_slug == "default":
+        namespace = Namespace.get_default(tenant=tenant)
+    else:
+        namespaces = Namespace.objects.all()
+        if tenant is not None:
+            namespaces = namespaces.filter(tenant=tenant)
+        namespace = (
+            namespaces.filter(slug=namespace_slug).first() if namespace_slug else Namespace.get_default(tenant=tenant)
+        )
     if namespace and not _namespace_visible_to_request(namespace, request):
         raise PermissionDenied("Access denied to specified namespace.")
 
@@ -316,7 +323,13 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
 
         namespace_slug = self.request.query_params.get("namespace")
         if namespace_slug:
-            namespace = Namespace.objects.filter(slug=namespace_slug).first()
+            if namespace_slug == "default":
+                namespace = Namespace.get_default(tenant=tenant)
+            else:
+                namespaces = Namespace.objects.all()
+                if tenant is not None:
+                    namespaces = namespaces.filter(tenant=tenant)
+                namespace = namespaces.filter(slug=namespace_slug).first()
             if not namespace or not _namespace_visible_to_request(namespace, self.request):
                 return queryset.none()
             return queryset.filter(namespace=namespace)

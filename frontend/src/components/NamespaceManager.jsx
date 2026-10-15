@@ -39,7 +39,7 @@ const NamespaceManager = () => {
     const { data: namespacesResponse, isLoading } = useQuery({
         queryKey: ['namespaces', { search: searchTerm, status: statusFilter }],
         queryFn: async () => {
-            const params = {}
+            const params = { include_hidden: true }
             if (searchTerm) params.search = searchTerm
             if (statusFilter !== 'all') {
                 if (statusFilter === 'active') params.is_active = true
@@ -196,6 +196,14 @@ const NamespaceManager = () => {
     }
 
     const getStatusBadge = (namespace) => {
+        if (namespace.isHidden) {
+            return (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                    <EyeOff className="w-3 h-3 mr-1" />
+                    Hidden
+                </span>
+            )
+        }
         if (namespace.isDefault) {
             return (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
@@ -337,6 +345,9 @@ const NamespaceManager = () => {
                                                 <div className="text-sm text-gray-500">
                                                     {namespace.slug}
                                                 </div>
+                                                <div className="text-xs text-gray-400 mt-1">
+                                                    Kind: {namespace.kind || 'content'}
+                                                </div>
                                                 {namespace.description && (
                                                     <div className="text-xs text-gray-400 mt-1">
                                                         {namespace.description}
@@ -367,7 +378,7 @@ const NamespaceManager = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end space-x-2">
-                                                {!namespace.isDefault && (
+                                                {!namespace.isDefault && !namespace.isHidden && (
                                                     <button
                                                         type="button"
                                                         onClick={() => handleSetDefault(namespace)}
@@ -441,7 +452,9 @@ const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }
         name: namespace?.name || '',
         slug: namespace?.slug || '',
         description: namespace?.description || '',
-        isActive: namespace?.isActive ?? true
+        isActive: namespace?.isActive ?? true,
+        isHidden: namespace?.isHidden ?? false,
+        kind: namespace?.kind || 'content'
     })
 
     const handleSubmit = (e) => {
@@ -541,6 +554,25 @@ const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }
                     </div>
 
                     <div>
+                        <label htmlFor="namespace-kind" className="block text-sm font-medium text-gray-700 mb-1">
+                            Kind
+                        </label>
+                        <select
+                            id="namespace-kind"
+                            value={formData.kind}
+                            onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                kind: e.target.value,
+                                isHidden: e.target.value === 'theme_media' ? true : prev.isHidden,
+                            }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="content">Content</option>
+                            <option value="theme_media">Theme media</option>
+                        </select>
+                    </div>
+
+                    <div>
                         <label className="flex items-center">
                             <input
                                 type="checkbox"
@@ -550,7 +582,21 @@ const NamespaceForm = ({ namespace = null, onSave, onCancel, isLoading = false }
                             />
                             <span className="ml-2 text-sm text-gray-700">Active</span>
                         </label>
-
+                        <label className="mt-3 flex items-start">
+                            <input
+                                type="checkbox"
+                                checked={formData.isHidden}
+                                onChange={(e) => setFormData(prev => ({ ...prev, isHidden: e.target.checked }))}
+                                disabled={formData.kind === 'theme_media'}
+                                className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">
+                                Hidden from users
+                                <span className="block text-xs text-gray-500">
+                                    Available to Theme Designer and system services only.
+                                </span>
+                            </span>
+                        </label>
                     </div>
 
                     <div className="flex items-center justify-end space-x-3 pt-4">

@@ -15,6 +15,17 @@ from .models import Category, Namespace, Tag
 from .serializers import CategorySerializer, NamespaceListSerializer, NamespaceSerializer, TagSerializer
 
 
+def _user_can_view_hidden_namespaces(user, tenant):
+    """Expose hidden namespaces only to tenant owners/members and assigned theme designers."""
+    if not user or not user.is_authenticated or tenant is None:
+        return False
+    if tenant.user_has_access(user):
+        return True
+    from webpages.models import ThemeDesignerAssignment
+
+    return ThemeDesignerAssignment.objects.filter(tenant=tenant, user=user).exists()
+
+
 class NamespaceViewSet(viewsets.ModelViewSet):
     """ViewSet for Namespace model"""
 
@@ -39,6 +50,10 @@ class NamespaceViewSet(viewsets.ModelViewSet):
         if tenant:
             queryset = queryset.filter(tenant=tenant)
 
+        include_hidden = self.request.query_params.get("include_hidden", "").lower() == "true"
+        if not (include_hidden and _user_can_view_hidden_namespaces(self.request.user, tenant)):
+            queryset = queryset.filter(is_hidden=False)
+
         # Filter by active status
         is_active = self.request.query_params.get("is_active")
         if is_active is not None:
@@ -48,6 +63,10 @@ class NamespaceViewSet(viewsets.ModelViewSet):
         is_default = self.request.query_params.get("is_default")
         if is_default is not None:
             queryset = queryset.filter(is_default=is_default.lower() == "true")
+
+        kind = self.request.query_params.get("kind")
+        if kind:
+            queryset = queryset.filter(kind=kind)
 
         return queryset
 
@@ -72,6 +91,11 @@ class NamespaceViewSet(viewsets.ModelViewSet):
     def set_as_default(self, request, pk=None):
         """Set this namespace as the default namespace"""
         namespace = self.get_object()
+        if namespace.is_hidden:
+            return Response(
+                {"error": "A hidden namespace cannot be set as default."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Unset all other namespaces as default
         Namespace.objects.filter(tenant=namespace.tenant, is_default=True).exclude(pk=namespace.pk).update(

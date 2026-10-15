@@ -3,7 +3,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("content", "0022_namespace_tenant_constraints"),
+        ("content", "0021_reset_namespace_id_sequence"),
     ]
 
     operations = [

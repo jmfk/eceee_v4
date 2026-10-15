@@ -61,9 +61,7 @@ def user_can_access_theme_media(user, tenant):
 
 def user_can_access_namespace(user, namespace):
     """Apply the stricter access boundary used by system-owned namespaces."""
-    from content.models import Namespace
-
-    if namespace.kind == Namespace.KIND_THEME_MEDIA:
+    if namespace.is_hidden:
         return user_can_access_theme_media(user, namespace.tenant)
     if user.is_staff or namespace.created_by == user:
         return True
@@ -81,7 +79,7 @@ def filter_media_files_for_user(queryset, user, tenant=None, include_theme_media
     if include_theme_media and not user_can_access_theme_media(user, tenant):
         include_theme_media = False
     if not include_theme_media:
-        queryset = queryset.exclude(namespace__kind=Namespace.KIND_THEME_MEDIA)
+        queryset = queryset.exclude(namespace__is_hidden=True)
     if user.is_staff:
         return queryset
 
@@ -115,13 +113,9 @@ class MediaFilePermission(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
         """Check if user has permission to access specific media file."""
-        from content.models import Namespace
-
-        if obj.namespace.kind == Namespace.KIND_THEME_MEDIA and not self._has_namespace_access(
-            user=request.user, namespace=obj.namespace
-        ):
+        if obj.namespace.is_hidden and not self._has_namespace_access(user=request.user, namespace=obj.namespace):
             return False
-        if obj.namespace.kind == Namespace.KIND_THEME_MEDIA:
+        if obj.namespace.is_hidden:
             return True
 
         # Staff users have full access

@@ -310,9 +310,15 @@ class PageThemeSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Designer preview view kind must be page or object")
             if not view.get("id") or not view.get("layout"):
                 raise serializers.ValidationError("Each Designer preview view needs an id and layout")
-        from ..services.theme_preview_content import detach_theme_preview_object_references
+        from ..services.theme_preview_content import (
+            detach_theme_preview_object_references,
+            materialize_legacy_preview_collections,
+        )
 
-        return detach_theme_preview_object_references(value)
+        normalized = detach_theme_preview_object_references(value)
+        if self.instance is not None:
+            normalized = materialize_legacy_preview_collections(normalized, self.instance.tenant)
+        return normalized
 
     def validate_image_styles(self, value):
         """Validate image_styles configuration (unified gallery and carousel)"""

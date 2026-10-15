@@ -297,6 +297,13 @@ IS_TEST_RUN = (
     or any("pytest" in arg for arg in sys.argv)
 )
 
+# Runtime rendering stays hard-disabled. The test process explicitly enables the
+# retained implementation so its resolver and compatibility tests remain useful;
+# rendering_deprecation tests override these flags back to False.
+if IS_TEST_RUN:
+    DJANGO_PUBLIC_RENDERER_ENABLED = True
+    DJANGO_LEGACY_RENDER_API_ENABLED = True
+
 if IS_TEST_RUN and os.environ.get("DJANGO_TEST_DATABASE", "sqlite").lower() == "sqlite":
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.sqlite3",
