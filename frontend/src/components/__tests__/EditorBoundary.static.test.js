@@ -200,6 +200,8 @@ describe('page editor active/legacy boundaries', () => {
         expect(publicRenderCSS).not.toContain('.cms-content :where(p){margin:revert}')
         expect(publicRenderCSS).not.toContain('.cms-content p{margin:revert}')
         expect(publicRenderCSS).toContain('.media-insert.img-width-half')
+        expect(publicRenderCSS).toContain('border-width:0;border-style:solid')
+        expect(publicRenderCSS).not.toContain('--tw-')
     })
 
     it('finalizes cross-version cut sources only after the destination save', () => {

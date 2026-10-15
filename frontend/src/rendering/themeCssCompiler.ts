@@ -234,6 +234,16 @@ const variablesCss = (variables: JsonObject): string => {
     return declarations.length ? `:root {\n${declarations.join('\n')}\n}` : ''
 }
 
+const themeRootCss = (fonts: JsonObject): string => {
+    const families = Array.isArray(fonts.googleFonts)
+        ? fonts.googleFonts
+        : Array.isArray(fonts.google_fonts) ? fonts.google_fonts : []
+    const family = String(object(families[0]).family ?? '').trim()
+    if (!family) return ''
+    const escaped = family.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+    return `body,.site-renderer {\n  font-family: "${escaped}", ui-sans-serif, system-ui, -apple-system, sans-serif;\n}`
+}
+
 const widgetCss = (): string => {
     const widgets = manifest.widgets as Record<string, { css?: string, cssVariables?: Record<string, string> }>
     const variables: Record<string, string> = {}
@@ -272,6 +282,7 @@ export const compileRenderStyles = ({
             PUBLIC_RENDER_CSS,
             widgetCss(),
             variablesCss(variables),
+            themeRootCss(theme.fonts),
             designCss,
             styleCollectionCss(theme.componentStyles, theme.breakpoints),
             styleCollectionCss(theme.imageStyles, theme.breakpoints),
