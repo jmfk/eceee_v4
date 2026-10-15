@@ -150,7 +150,7 @@ function reader(client: PoolClient): PageReader {
           AND media.tenant_id = $2 AND namespace.tenant_id = $2
           AND collection.access_level = 'public'
           AND media.access_level = 'public' AND media.is_deleted = false
-        ORDER BY media.created_at DESC, media.id DESC`, [collectionIds, tenantId]) : { rows: [] as Array<PublicMediaRow & { collection_id: string }> };
+        ORDER BY media.created_at, media.id`, [collectionIds, tenantId]) : { rows: [] as Array<PublicMediaRow & { collection_id: string }> };
       const collections: Record<string, PublicMediaItem[]> = {};
       for (const row of collectionRows.rows) {
         const { collection_id, ...item } = row;

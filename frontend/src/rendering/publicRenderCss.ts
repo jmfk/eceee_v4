@@ -1,5 +1,5 @@
 export const PUBLIC_RENDER_CSS = `
-html,body,#root{margin:0;min-height:100%;background:#fff}body{font-family:system-ui,sans-serif}
+html,body,#root{margin:0;min-height:100%;background:#fff}
 *,*::before,*::after{box-sizing:border-box}.site-renderer{min-height:100vh}.widget-item{position:relative}
 .site-renderer .layout-slot{position:relative;display:flex;flex-direction:column;gap:0;min-height:0}
 .site-renderer .layout-slot>.layout-preview-placeholder-item{display:flex;flex:1 1 auto;flex-direction:column;min-height:0}

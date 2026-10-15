@@ -41,6 +41,14 @@ const object = (value: unknown): JsonObject => value && typeof value === 'object
 
 const nonEmptyObject = (value: unknown): JsonObject => object(value)
 
+const canonicalStyleProperty = (property: string): string => property.startsWith('--')
+    ? property
+    : property.replace(/[-_]([a-z])/g, (_, letter: string) => letter.toUpperCase())
+
+const normalizeStyleProperties = (rawProperties: unknown): JsonObject => Object.fromEntries(
+    Object.entries(object(rawProperties)).map(([property, value]) => [canonicalStyleProperty(property), value]),
+)
+
 const read = (source: JsonObject | null | undefined, camel: string, snake: string): any => (
     source?.[camel] ?? source?.[snake]
 )
@@ -74,7 +82,7 @@ const normalizeBackgroundImages = (
         const group = object(rawGroup)
         const elements = Object.fromEntries(Object.entries(object(group.elements)).map(([element, rawStyles]) => [
             element,
-            Object.fromEntries(Object.entries(object(rawStyles)).map(([property, value]) => (
+            Object.fromEntries(Object.entries(normalizeStyleProperties(rawStyles)).map(([property, value]) => (
                 property === 'backgroundImage' || property === 'background_image'
                     ? ['backgroundImage', normalizeImage(value)]
                     : [property, value]
@@ -84,7 +92,7 @@ const normalizeBackgroundImages = (
         const resolvedLayout = Object.fromEntries(Object.entries(layoutProperties).map(([part, rawBreakpoints]) => [
             part,
             Object.fromEntries(Object.entries(object(rawBreakpoints)).map(([breakpoint, rawProperties]) => {
-                const properties = object(rawProperties)
+                const properties = normalizeStyleProperties(rawProperties)
                 const background = properties.backgroundImage ?? properties.background_image
                 if (!background || typeof background !== 'object') return [breakpoint, properties]
                 const normalizedProperties = { ...properties }
@@ -97,7 +105,14 @@ const normalizeBackgroundImages = (
         ]))
         return { ...group, elements, layoutProperties: resolvedLayout, layout_properties: undefined }
     })
-    return { ...designGroups, groups }
+    const structuralSpacing = (Array.isArray(designGroups.structuralSpacing)
+        ? designGroups.structuralSpacing
+        : Array.isArray(designGroups.structural_spacing) ? designGroups.structural_spacing : [])
+        .map((rawRow: unknown) => {
+            const row = object(rawRow)
+            return { ...row, values: normalizeStyleProperties(row.values) }
+        })
+    return { ...designGroups, groups, structuralSpacing, structural_spacing: undefined }
 }
 
 export const normalizeThemeCssConfig = (

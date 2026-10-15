@@ -532,6 +532,51 @@ function prepareWidgets(
   pages: Page[],
   navigationPages: PublishedNavigationPage[],
 ): Record<string, Widget[]> {
+  const sampleMediaItems = (selector: Record<string, unknown>): PublicMediaItem[] => {
+    const samples = selector.sampleImages ?? selector.sample_images;
+    if (!Array.isArray(samples)) return [];
+    return samples.flatMap(candidate => {
+      const sample = object(candidate);
+      const url = String(value(sample, 'url', 'fileUrl', 'file_url', 'imgproxyBaseUrl', 'imgproxy_base_url') ?? '').trim();
+      if (!url) return [];
+      const title = String(value(sample, 'title', 'altText', 'alt_text') ?? '');
+      return [{
+        id: String(sample.id ?? url),
+        url,
+        type: String(sample.type ?? 'image'),
+        altText: String(value(sample, 'altText', 'alt_text') ?? title),
+        caption: String(sample.caption ?? ''),
+        annotation: String(sample.annotation ?? ''),
+        title,
+        width: Number.isFinite(Number(sample.width)) && Number(sample.width) > 0 ? Number(sample.width) : null,
+        height: Number.isFinite(Number(sample.height)) && Number(sample.height) > 0 ? Number(sample.height) : null,
+        thumbnailUrl: String(value(sample, 'thumbnailUrl', 'thumbnail_url') ?? url),
+      }];
+    });
+  };
+  const mergeCollectionSamples = (items: PublicMediaItem[], selector: Record<string, unknown>): PublicMediaItem[] => {
+    const merged = [...items];
+    const identities = new Set(items.flatMap(item => [
+      String(item.id).toLowerCase(),
+      item.title.trim().toLowerCase(),
+      item.url.trim().toLowerCase(),
+    ]).filter(Boolean));
+    for (const sample of sampleMediaItems(selector)) {
+      const candidates = [String(sample.id).toLowerCase(), sample.title.trim().toLowerCase(), sample.url.trim().toLowerCase()].filter(Boolean);
+      if (candidates.some(candidate => identities.has(candidate))) continue;
+      merged.push(sample);
+      candidates.forEach(candidate => identities.add(candidate));
+    }
+    return merged;
+  };
+  const shuffled = <T,>(items: T[]): T[] => {
+    const result = [...items];
+    for (let index = result.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+    }
+    return result;
+  };
   const responsiveItem = (item: PublicMediaItem, options: ResponsiveImageOptions = { maxWidth: 896, resizeType: 'fit', quality: 85, format: 'webp' }): PublicMediaItem => {
     const responsive = item.type === 'image' && item.url ? responsiveImageSources(item, item.url, options) : null;
     return responsive ? {
@@ -614,10 +659,13 @@ function prepareWidgets(
       };
       const collectionId = image.type === 'collection' ? image.id : (image.collectionId ?? image.collection_id ?? config.collectionId ?? config.collection_id);
       if (collectionId) {
-        let items = (collections[String(collectionId).toLowerCase()] ?? []).map(item => responsiveItem(item, processing));
+        let items = mergeCollectionSamples(collections[String(collectionId).toLowerCase()] ?? [], image)
+          .map(item => responsiveItem(item, processing));
         const collectionConfig = object(config.collectionConfig ?? config.collection_config);
         const limit = Number(collectionConfig.maxItems ?? collectionConfig.max_items ?? 0);
         if (limit > 0) items = items.slice(0, limit);
+        const randomize = config.randomize ?? style?.defaultRandomize ?? collectionConfig.randomize ?? false;
+        if (randomize === true) items = shuffled(items);
         config.mediaItems = items;
       } else if (Object.keys(image).length) {
         const item = media.get(String(image.id ?? '').toLowerCase()) ?? image;

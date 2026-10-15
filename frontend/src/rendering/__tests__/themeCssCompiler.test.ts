@@ -13,7 +13,7 @@ const themeFixture = {
         groups: [{
             widget_types: ['easy_widgets.ContentWidget'],
             slots: ['main'],
-            elements: { h1: { color: 'brand' } },
+            elements: { h1: { color: 'brand', font_family: 'Source Sans 3, sans-serif' } },
             layout_properties: {
                 'content-widget': {
                     xs: { minHeight: '20rem' },
@@ -63,6 +63,7 @@ describe('canonical render CSS compiler', () => {
             version: { page_css_variables: { versionOnly: 'blue' }, page_custom_css: '.version-only {}' },
         })
         expect(css).toContain('.card { display: grid; }')
+        expect(css).toContain('font-family: "Source Sans 3", sans-serif')
         expect(css).toContain('@media (min-width: 800px)')
         expect(css).toContain('@media (min-width: 900px)')
         expect(css).toContain('[data-render-layout="main_layout"] .layout-slot[data-slot-name="main"]')
