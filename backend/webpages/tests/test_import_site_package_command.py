@@ -5,7 +5,6 @@ from content.models import Namespace
 from core.models import Tenant
 from webpages.management.commands.import_site_package import Command
 
-
 User = get_user_model()
 
 

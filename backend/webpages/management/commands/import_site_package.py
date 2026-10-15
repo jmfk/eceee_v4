@@ -98,18 +98,14 @@ class Command(BaseCommand):
             created_by=user,
             options={
                 "tenant_id": str(tenant.id),
-                "preserve_publication_status": not options[
-                    "no_preserve_publication_status"
-                ],
+                "preserve_publication_status": not options["no_preserve_publication_status"],
             },
             expires_at=timezone.now() + timedelta(hours=24),
         )
 
         try:
             with zipfile.ZipFile(package_path, "r") as package:
-                imported_root = SitePackageImporter(
-                    job, storage=storage
-                ).import_package(package)
+                imported_root = SitePackageImporter(job, storage=storage).import_package(package)
         except FileNotFoundError as exc:
             job.mark_failed(exc)
             raise CommandError(f"Package not found: {package_path}") from exc
@@ -133,11 +129,7 @@ class Command(BaseCommand):
             },
         )
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Imported '{imported_root.title}' as page {imported_root.id}"
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(f"Imported '{imported_root.title}' as page {imported_root.id}"))
         self.stdout.write(f"Tenant: {tenant.name} ({tenant.identifier})")
         self.stdout.write(f"User: {user.username}")
         self.stdout.write(f"Hostnames: {', '.join(imported_root.hostnames) or '(none)'}")
@@ -179,9 +171,7 @@ class Command(BaseCommand):
         return tenant
 
     def get_or_create_namespace(self, slug, name, tenant, user):
-        existing_default = Namespace.objects.filter(
-            tenant=tenant, is_default=True
-        ).first()
+        existing_default = Namespace.objects.filter(tenant=tenant, is_default=True).first()
         if existing_default:
             return existing_default
 

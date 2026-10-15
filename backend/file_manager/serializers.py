@@ -5,12 +5,13 @@ Provides serialization for media files, tags, collections, and related models
 following the existing API patterns and camelCase conversion.
 """
 
-from rest_framework import serializers
-from django.contrib.auth.models import User
 from django.conf import settings
+from rest_framework import serializers
+
 from content.models import Namespace
-from .models import MediaFile, MediaTag, MediaCollection, MediaUsage, PendingMediaFile
 from utils.serializers import UserSerializer
+
+from .models import MediaCollection, MediaFile, MediaTag, MediaUsage, PendingMediaFile
 
 
 def convert_tag_names_to_ids(tag_items, namespace, user):
@@ -61,9 +62,7 @@ def convert_tag_names_to_ids(tag_items, namespace, user):
 class MediaTagSerializer(serializers.ModelSerializer):
     """Serializer for media tags."""
 
-    created_by_name = serializers.CharField(
-        source="created_by.username", read_only=True
-    )
+    created_by_name = serializers.CharField(source="created_by.username", read_only=True)
     namespace = serializers.CharField(source="namespace.slug", required=False)
     usage_count = serializers.SerializerMethodField()
 
@@ -100,7 +99,6 @@ class MediaTagSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Set created_by from request user and handle namespace slug conversion."""
         from content.models import Namespace
-        from django.db import IntegrityError
 
         # Set created_by from request user
         validated_data["created_by"] = self.context["request"].user
@@ -115,9 +113,7 @@ class MediaTagSerializer(serializers.ModelSerializer):
                     namespaces = namespaces.filter(tenant=tenant)
                 validated_data["namespace"] = namespaces.get(slug=namespace_slug)
             except Namespace.DoesNotExist:
-                raise serializers.ValidationError(
-                    f"Namespace '{namespace_slug}' not found."
-                )
+                raise serializers.ValidationError(f"Namespace '{namespace_slug}' not found.")
         else:
             # Set default namespace if none provided
             validated_data["namespace"] = Namespace.get_default(tenant=tenant)
@@ -127,9 +123,7 @@ class MediaTagSerializer(serializers.ModelSerializer):
             name=validated_data["name"],
             namespace=validated_data["namespace"],
             defaults={
-                "slug": validated_data.get(
-                    "slug", validated_data["name"].lower().replace(" ", "-")
-                ),
+                "slug": validated_data.get("slug", validated_data["name"].lower().replace(" ", "-")),
                 "created_by": validated_data["created_by"],
                 "color": validated_data.get("color", "#3B82F6"),
                 "description": validated_data.get("description", ""),
@@ -142,9 +136,7 @@ class MediaTagSerializer(serializers.ModelSerializer):
 class MediaUsageSerializer(serializers.ModelSerializer):
     """Serializer for media usage tracking."""
 
-    created_by_name = serializers.CharField(
-        source="created_by.username", read_only=True
-    )
+    created_by_name = serializers.CharField(source="created_by.username", read_only=True)
 
     class Meta:
         model = MediaUsage
@@ -166,16 +158,10 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
     """Serializer for media collections."""
 
     tags = MediaTagSerializer(many=True, read_only=True)
-    tag_ids = serializers.ListField(
-        child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
-    )
+    tag_ids = serializers.ListField(child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True)
 
-    created_by_name = serializers.CharField(
-        source="created_by.username", read_only=True
-    )
-    last_modified_by_name = serializers.CharField(
-        source="last_modified_by.username", read_only=True
-    )
+    created_by_name = serializers.CharField(source="created_by.username", read_only=True)
+    last_modified_by_name = serializers.CharField(source="last_modified_by.username", read_only=True)
     namespace = serializers.CharField(source="namespace.slug", required=False)
     file_count = serializers.SerializerMethodField()
     sample_images = serializers.SerializerMethodField()
@@ -220,9 +206,7 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
     def get_sample_images(self, obj):
         """Get sample images for thumbnail grid (max 16)."""
         # Get image files from the collection
-        image_files = obj.mediafile_set.filter(file_type="image")[
-            :16
-        ]  # Limit to 16 images max
+        image_files = obj.mediafile_set.filter(file_type="image")[:16]  # Limit to 16 images max
 
         # Return simplified data for thumbnails
         sample_images = []
@@ -244,8 +228,7 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
         """Validate that at least one tag is provided for collection creation."""
         if not value or len(value) == 0:
             raise serializers.ValidationError(
-                "At least one tag is required to create a collection. "
-                "Collections must have tags to accept uploads."
+                "At least one tag is required to create a collection. " "Collections must have tags to accept uploads."
             )
         return value
 
@@ -267,9 +250,7 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
                     namespaces = namespaces.filter(tenant=tenant)
                 validated_data["namespace"] = namespaces.get(slug=namespace_slug)
             except Namespace.DoesNotExist:
-                raise serializers.ValidationError(
-                    f"Namespace '{namespace_slug}' not found."
-                )
+                raise serializers.ValidationError(f"Namespace '{namespace_slug}' not found.")
         else:
             # Set default namespace if none provided
             validated_data["namespace"] = Namespace.get_default(tenant=tenant)
@@ -277,9 +258,7 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
         collection = super().create(validated_data)
 
         if tag_ids:
-            tags = MediaTag.objects.filter(
-                id__in=tag_ids, namespace=collection.namespace
-            )
+            tags = MediaTag.objects.filter(id__in=tag_ids, namespace=collection.namespace)
             collection.tags.set(tags)
 
         return collection
@@ -292,9 +271,7 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
         collection = super().update(instance, validated_data)
 
         if tag_ids is not None:
-            tags = MediaTag.objects.filter(
-                id__in=tag_ids, namespace=collection.namespace
-            )
+            tags = MediaTag.objects.filter(id__in=tag_ids, namespace=collection.namespace)
             collection.tags.set(tags)
 
         return collection
@@ -304,9 +281,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for media file lists."""
 
     tags = MediaTagSerializer(many=True, read_only=True)
-    created_by_name = serializers.CharField(
-        source="created_by.username", read_only=True
-    )
+    created_by_name = serializers.CharField(source="created_by.username", read_only=True)
     namespace = serializers.CharField(source="namespace.slug", read_only=True)
     file_size_human = serializers.CharField(read_only=True)
     dimensions = serializers.CharField(read_only=True)
@@ -363,26 +338,26 @@ class MediaFileListSerializer(serializers.ModelSerializer):
         """Get SEO-friendly slug-based URL."""
         try:
             return obj.get_absolute_url()
-        except:
+        except Exception:
             return None
 
     def get_uuid_url(self, obj):
         """Get UUID-based URL."""
         try:
             return obj.get_uuid_url()
-        except:
+        except Exception:
             return None
 
     def get_download_url(self, obj):
         """Get download URL."""
         try:
             return obj.get_download_url()
-        except:
+        except Exception:
             return None
 
     def get_annotation(self, obj):
         """Get annotation from metadata."""
-        if hasattr(obj, 'metadata') and obj.metadata and isinstance(obj.metadata, dict):
+        if hasattr(obj, "metadata") and obj.metadata and isinstance(obj.metadata, dict):
             return obj.metadata.get("annotation", "")
         return ""
 
@@ -402,19 +377,13 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
     collections = MediaCollectionSerializer(many=True, read_only=True)
     usage_records = MediaUsageSerializer(many=True, read_only=True)
 
-    tag_ids = serializers.ListField(
-        child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
-    )
+    tag_ids = serializers.ListField(child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True)
     collection_ids = serializers.ListField(
         child=serializers.UUIDField(), write_only=True, required=False, allow_empty=True
     )
 
-    created_by_name = serializers.CharField(
-        source="created_by.username", read_only=True
-    )
-    last_modified_by_name = serializers.CharField(
-        source="last_modified_by.username", read_only=True
-    )
+    created_by_name = serializers.CharField(source="created_by.username", read_only=True)
+    last_modified_by_name = serializers.CharField(source="last_modified_by.username", read_only=True)
     namespace = serializers.CharField(source="namespace.slug", read_only=True)
     file_size_human = serializers.CharField(read_only=True)
     dimensions = serializers.CharField(read_only=True)
@@ -514,12 +483,13 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
         """Get file URL (proxy URL)."""
         try:
             return obj.get_absolute_url()
-        except:
+        except Exception:
             return f"/api/media/files/{obj.id}/download/"
 
     def validate_slug(self, value):
         """Validate slug format and uniqueness within namespace."""
         import re
+
         from django.utils.text import slugify
 
         if not value:
@@ -529,20 +499,18 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
         cleaned_slug = slugify(value)
 
         # Validate format (lowercase, alphanumeric, hyphens only)
-        if not re.match(r'^[a-z0-9-]+$', cleaned_slug):
-            raise serializers.ValidationError(
-                "Slug must contain only lowercase letters, numbers, and hyphens."
-            )
+        if not re.match(r"^[a-z0-9-]+$", cleaned_slug):
+            raise serializers.ValidationError("Slug must contain only lowercase letters, numbers, and hyphens.")
 
         # Check uniqueness within namespace (excluding current instance)
         instance = self.instance
         if instance:
-            from content.models import Namespace
-            
             # Check if slug exists in the same namespace (excluding this file)
-            existing = MediaFile.objects.filter(
-                namespace=instance.namespace, slug=cleaned_slug
-            ).exclude(pk=instance.pk).first()
+            existing = (
+                MediaFile.objects.filter(namespace=instance.namespace, slug=cleaned_slug)
+                .exclude(pk=instance.pk)
+                .first()
+            )
 
             if existing:
                 raise serializers.ValidationError(
@@ -559,7 +527,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
         validated_data["last_modified_by"] = self.context["request"].user
 
         # Handle annotation in metadata
-        if annotation is not None and hasattr(instance, 'metadata'):
+        if annotation is not None and hasattr(instance, "metadata"):
             if not instance.metadata:
                 instance.metadata = {}
             instance.metadata["annotation"] = annotation
@@ -568,15 +536,11 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
         media_file = super().update(instance, validated_data)
 
         if tag_ids is not None:
-            tags = MediaTag.objects.filter(
-                id__in=tag_ids, namespace=media_file.namespace
-            )
+            tags = MediaTag.objects.filter(id__in=tag_ids, namespace=media_file.namespace)
             media_file.tags.set(tags)
 
         if collection_ids is not None:
-            collections = MediaCollection.objects.filter(
-                id__in=collection_ids, namespace=media_file.namespace
-            )
+            collections = MediaCollection.objects.filter(id__in=collection_ids, namespace=media_file.namespace)
             media_file.collections.set(collections)
 
         return media_file
@@ -591,8 +555,9 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
         """Get pre-generated thumbnail URL (150x150 for images, or document thumbnail)."""
         if obj.is_image:
             return obj.get_imgproxy_thumbnail_url(size=150)
-        elif obj.file_type == 'document' and obj.has_thumbnail():
+        elif obj.file_type == "document" and obj.has_thumbnail():
             from .storage import S3MediaStorage
+
             storage = S3MediaStorage()
             return storage.get_public_url(obj.get_thumbnail_path())
         return None
@@ -600,7 +565,7 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         """Add annotation from metadata to representation."""
         representation = super().to_representation(instance)
-        if hasattr(instance, 'metadata') and instance.metadata and isinstance(instance.metadata, dict):
+        if hasattr(instance, "metadata") and instance.metadata and isinstance(instance.metadata, dict):
             representation["annotation"] = instance.metadata.get("annotation", "")
         else:
             representation["annotation"] = ""
@@ -617,9 +582,7 @@ class MediaUploadSerializer(serializers.Serializer):
             settings, "MEDIA_MAX_FILES_PER_UPLOAD", 50
         ),  # Configurable limit (field limits handled separately)
     )
-    folder_path = serializers.CharField(
-        max_length=200, required=False, allow_blank=True
-    )
+    folder_path = serializers.CharField(max_length=200, required=False, allow_blank=True)
     namespace = serializers.CharField(required=True)
     force_upload = serializers.BooleanField(required=False, default=False)
     replace_files = serializers.JSONField(
@@ -627,22 +590,16 @@ class MediaUploadSerializer(serializers.Serializer):
         default=dict,
         help_text="Map of filename to action: 'replace' or 'keep'. For replace, also include existing file ID.",
     )
-    
+
     # ZIP extraction fields
     collection_id = serializers.UUIDField(
-        required=False,
-        allow_null=True,
-        help_text="Collection ID to add extracted files to (for ZIP uploads)"
+        required=False, allow_null=True, help_text="Collection ID to add extracted files to (for ZIP uploads)"
     )
     extract_zip = serializers.BooleanField(
-        required=False,
-        default=True,
-        help_text="Whether to extract ZIP files or upload as-is"
+        required=False, default=True, help_text="Whether to extract ZIP files or upload as-is"
     )
     max_zip_size = serializers.IntegerField(
-        required=False,
-        allow_null=True,
-        help_text="Override maximum ZIP file size in bytes"
+        required=False, allow_null=True, help_text="Override maximum ZIP file size in bytes"
     )
 
     def validate_namespace(self, value):
@@ -664,9 +621,7 @@ class MediaUploadSerializer(serializers.Serializer):
 
     def validate_files(self, files):
         """Validate uploaded files."""
-        max_file_size = getattr(
-            settings, "MEDIA_FILE_MAX_SIZE", 100 * 1024 * 1024
-        )  # 100MB
+        max_file_size = getattr(settings, "MEDIA_FILE_MAX_SIZE", 100 * 1024 * 1024)  # 100MB
         allowed_types = getattr(
             settings,
             "MEDIA_ALLOWED_TYPES",
@@ -692,7 +647,7 @@ class MediaUploadSerializer(serializers.Serializer):
             # Check file size (allow larger for ZIP files)
             is_zip = file.content_type in ["application/zip", "application/x-zip-compressed"]
             file_max_size = max_file_size if not is_zip else max_file_size
-            
+
             if file.size > file_max_size:
                 raise serializers.ValidationError(
                     f"File {file.name} is too large. Maximum size is {file_max_size // (1024*1024)}MB."
@@ -700,9 +655,7 @@ class MediaUploadSerializer(serializers.Serializer):
 
             # Check content type
             if file.content_type not in allowed_types:
-                raise serializers.ValidationError(
-                    f"File type {file.content_type} is not allowed for {file.name}."
-                )
+                raise serializers.ValidationError(f"File type {file.content_type} is not allowed for {file.name}.")
 
         return files
 
@@ -714,12 +667,8 @@ class MediaSearchSerializer(serializers.Serializer):
     q = serializers.CharField(required=False, allow_blank=True)
 
     # New structured search fields
-    text_search = serializers.CharField(
-        required=False, allow_blank=True, max_length=255
-    )
-    tag_names = serializers.ListField(
-        child=serializers.CharField(max_length=100), required=False, allow_empty=True
-    )
+    text_search = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    tag_names = serializers.ListField(child=serializers.CharField(max_length=100), required=False, allow_empty=True)
     text_tags = serializers.ListField(
         child=serializers.CharField(max_length=100),
         required=False,
@@ -728,27 +677,17 @@ class MediaSearchSerializer(serializers.Serializer):
     )
 
     # Existing fields
-    file_type = serializers.ChoiceField(
-        choices=MediaFile.FILE_TYPE_CHOICES, required=False, allow_blank=True
-    )
+    file_type = serializers.ChoiceField(choices=MediaFile.FILE_TYPE_CHOICES, required=False, allow_blank=True)
     # New fields for multiple file type and MIME type filtering
     file_types = serializers.ListField(
         child=serializers.ChoiceField(choices=MediaFile.FILE_TYPE_CHOICES),
         required=False,
         allow_empty=True,
     )
-    mime_types = serializers.ListField(
-        child=serializers.CharField(max_length=100), required=False, allow_empty=True
-    )
-    tags = serializers.ListField(
-        child=serializers.UUIDField(), required=False, allow_empty=True
-    )
-    collections = serializers.ListField(
-        child=serializers.UUIDField(), required=False, allow_empty=True
-    )
-    access_level = serializers.ChoiceField(
-        choices=MediaFile.ACCESS_LEVEL_CHOICES, required=False, allow_blank=True
-    )
+    mime_types = serializers.ListField(child=serializers.CharField(max_length=100), required=False, allow_empty=True)
+    tags = serializers.ListField(child=serializers.UUIDField(), required=False, allow_empty=True)
+    collections = serializers.ListField(child=serializers.UUIDField(), required=False, allow_empty=True)
+    access_level = serializers.ChoiceField(choices=MediaFile.ACCESS_LEVEL_CHOICES, required=False, allow_blank=True)
     created_after = serializers.DateTimeField(required=False)
     created_before = serializers.DateTimeField(required=False)
     min_size = serializers.IntegerField(required=False, min_value=0)
@@ -777,15 +716,11 @@ class MediaSearchSerializer(serializers.Serializer):
         """Cross-field validation."""
         if data.get("min_size") and data.get("max_size"):
             if data["min_size"] > data["max_size"]:
-                raise serializers.ValidationError(
-                    "min_size cannot be greater than max_size."
-                )
+                raise serializers.ValidationError("min_size cannot be greater than max_size.")
 
         if data.get("created_after") and data.get("created_before"):
             if data["created_after"] > data["created_before"]:
-                raise serializers.ValidationError(
-                    "created_after cannot be after created_before."
-                )
+                raise serializers.ValidationError("created_after cannot be after created_before.")
 
         # Validate that both q and text_search are not provided (avoid confusion)
         if data.get("q") and data.get("text_search"):
@@ -831,13 +766,9 @@ class BulkOperationSerializer(serializers.Serializer):
     operation = serializers.ChoiceField(choices=OPERATION_CHOICES)
 
     # Optional parameters based on operation
-    tag_names = serializers.ListField(
-        child=serializers.CharField(max_length=100), required=False, allow_empty=True
-    )
+    tag_names = serializers.ListField(child=serializers.CharField(max_length=100), required=False, allow_empty=True)
     collection_id = serializers.UUIDField(required=False, allow_null=True)
-    access_level = serializers.ChoiceField(
-        choices=MediaFile.ACCESS_LEVEL_CHOICES, required=False
-    )
+    access_level = serializers.ChoiceField(choices=MediaFile.ACCESS_LEVEL_CHOICES, required=False)
 
     def validate(self, data):
         """Validate operation parameters."""
@@ -850,14 +781,10 @@ class BulkOperationSerializer(serializers.Serializer):
             "add_to_collection",
             "remove_from_collection",
         ] and not data.get("collection_id"):
-            raise serializers.ValidationError(
-                "collection_id required for collection operations."
-            )
+            raise serializers.ValidationError("collection_id required for collection operations.")
 
         if operation == "set_access_level" and not data.get("access_level"):
-            raise serializers.ValidationError(
-                "access_level required for access level operations."
-            )
+            raise serializers.ValidationError("access_level required for access level operations.")
 
         return data
 
@@ -865,9 +792,7 @@ class BulkOperationSerializer(serializers.Serializer):
 class PendingMediaFileListSerializer(serializers.ModelSerializer):
     """Serializer for pending media file list view."""
 
-    uploaded_by_name = serializers.CharField(
-        source="uploaded_by.username", read_only=True
-    )
+    uploaded_by_name = serializers.CharField(source="uploaded_by.username", read_only=True)
     namespace = serializers.CharField(source="namespace.slug", read_only=True)
     file_size_human = serializers.SerializerMethodField()
 
@@ -901,9 +826,7 @@ class PendingMediaFileListSerializer(serializers.ModelSerializer):
 class PendingMediaFileDetailSerializer(serializers.ModelSerializer):
     """Serializer for pending media file detail view."""
 
-    uploaded_by_name = serializers.CharField(
-        source="uploaded_by.username", read_only=True
-    )
+    uploaded_by_name = serializers.CharField(source="uploaded_by.username", read_only=True)
     namespace = serializers.CharField(source="namespace.slug", read_only=True)
     file_size_human = serializers.SerializerMethodField()
     thumbnail_url = serializers.SerializerMethodField()
@@ -945,8 +868,9 @@ class PendingMediaFileDetailSerializer(serializers.ModelSerializer):
 
     def get_thumbnail_url(self, obj):
         """Get document thumbnail URL if available."""
-        if obj.file_type == 'document' and obj.has_thumbnail():
+        if obj.file_type == "document" and obj.has_thumbnail():
             from .storage import S3MediaStorage
+
             storage = S3MediaStorage()
             return storage.get_public_url(obj.get_thumbnail_path())
         return None
@@ -959,16 +883,10 @@ class MediaFileApprovalSerializer(serializers.Serializer):
     slug = serializers.SlugField(max_length=255, required=False, allow_blank=True)
     description = serializers.CharField(required=False, allow_blank=True)
     annotation = serializers.CharField(required=False, allow_blank=True)
-    tag_ids = serializers.ListField(
-        child=serializers.CharField(), required=True, allow_empty=False
-    )
-    access_level = serializers.ChoiceField(
-        choices=MediaFile.ACCESS_LEVEL_CHOICES, default="public"
-    )
+    tag_ids = serializers.ListField(child=serializers.CharField(), required=True, allow_empty=False)
+    access_level = serializers.ChoiceField(choices=MediaFile.ACCESS_LEVEL_CHOICES, default="public")
     collection_id = serializers.UUIDField(required=False, allow_null=True)
-    collection_name = serializers.CharField(
-        max_length=255, required=False, allow_blank=True, allow_null=True
-    )
+    collection_name = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
 
     def validate_title(self, value):
         """Validate title is not empty."""
@@ -979,9 +897,7 @@ class MediaFileApprovalSerializer(serializers.Serializer):
     def validate_tag_ids(self, value):
         """Validate that at least one tag is provided and convert tag names to IDs."""
         if not value or len(value) == 0:
-            raise serializers.ValidationError(
-                "At least one tag is required to approve a file."
-            )
+            raise serializers.ValidationError("At least one tag is required to approve a file.")
 
         # Get namespace and user from context
         namespace = self.context.get("namespace")
@@ -1007,19 +923,13 @@ class BulkApprovalItemSerializer(serializers.Serializer):
     slug = serializers.SlugField(max_length=255, required=False, allow_blank=True)
     description = serializers.CharField(required=False, allow_blank=True)
     annotation = serializers.CharField(required=False, allow_blank=True)
-    tag_ids = serializers.ListField(
-        child=serializers.CharField(), required=True, allow_empty=False
-    )
-    access_level = serializers.ChoiceField(
-        choices=MediaFile.ACCESS_LEVEL_CHOICES, default="public"
-    )
+    tag_ids = serializers.ListField(child=serializers.CharField(), required=True, allow_empty=False)
+    access_level = serializers.ChoiceField(choices=MediaFile.ACCESS_LEVEL_CHOICES, default="public")
 
     def validate_tag_ids(self, value):
         """Validate that at least one tag is provided and convert tag names to IDs."""
         if not value or len(value) == 0:
-            raise serializers.ValidationError(
-                "At least one tag is required to approve a file."
-            )
+            raise serializers.ValidationError("At least one tag is required to approve a file.")
 
         # Note: Tag conversion will be handled in the view for bulk operations
         # since each file might be in a different namespace

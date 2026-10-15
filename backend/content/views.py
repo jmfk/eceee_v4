@@ -4,21 +4,15 @@ Content Object Views for Object Publishing System
 Provides REST API views for content objects that can be published as pages.
 """
 
-from django.shortcuts import render, get_object_or_404
-from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
-from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import SearchFilter, OrderingFilter
-from django.utils import timezone
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.response import Response
 
-from .models import Category, Tag, Namespace
-from .serializers import (
-    CategorySerializer,
-    TagSerializer,
-    NamespaceSerializer,
-    NamespaceListSerializer,
-)
+from .models import Category, Namespace, Tag
+from .serializers import CategorySerializer, NamespaceListSerializer, NamespaceSerializer, TagSerializer
 
 
 class NamespaceViewSet(viewsets.ModelViewSet):
@@ -41,7 +35,7 @@ class NamespaceViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
 
         # Filter by tenant from middleware
-        tenant = getattr(self.request, 'tenant', None)
+        tenant = getattr(self.request, "tenant", None)
         if tenant:
             queryset = queryset.filter(tenant=tenant)
 
@@ -59,18 +53,17 @@ class NamespaceViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # Get tenant from request (set by middleware)
-        tenant = getattr(self.request, 'tenant', None)
+        tenant = getattr(self.request, "tenant", None)
         if not tenant:
             from rest_framework.exceptions import ValidationError
+
             raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
         serializer.save(created_by=self.request.user, tenant=tenant)
 
     def perform_update(self, serializer):
         # If setting this namespace as default, unset others
         if serializer.validated_data.get("is_default", False):
-            Namespace.objects.filter(
-                tenant=serializer.instance.tenant, is_default=True
-            ).exclude(
+            Namespace.objects.filter(tenant=serializer.instance.tenant, is_default=True).exclude(
                 pk=serializer.instance.pk
             ).update(is_default=False)
         serializer.save()
@@ -81,9 +74,9 @@ class NamespaceViewSet(viewsets.ModelViewSet):
         namespace = self.get_object()
 
         # Unset all other namespaces as default
-        Namespace.objects.filter(
-            tenant=namespace.tenant, is_default=True
-        ).exclude(pk=namespace.pk).update(is_default=False)
+        Namespace.objects.filter(tenant=namespace.tenant, is_default=True).exclude(pk=namespace.pk).update(
+            is_default=False
+        )
 
         # Set this namespace as default
         namespace.is_default = True
@@ -132,7 +125,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
 
         # Filter by tenant from middleware
-        tenant = getattr(self.request, 'tenant', None)
+        tenant = getattr(self.request, "tenant", None)
         if tenant:
             queryset = queryset.filter(tenant=tenant)
 
@@ -161,7 +154,7 @@ class TagViewSet(viewsets.ModelViewSet):
         queryset = Tag.objects.select_related("namespace")
 
         # Filter by tenant from middleware
-        tenant = getattr(self.request, 'tenant', None)
+        tenant = getattr(self.request, "tenant", None)
         if tenant:
             queryset = queryset.filter(tenant=tenant)
 
@@ -184,9 +177,7 @@ class TagViewSet(viewsets.ModelViewSet):
         tenant = getattr(request, "tenant", None)
 
         if namespace_id:
-            namespace = get_object_or_404(
-                Namespace, id=namespace_id, tenant=tenant
-            )
+            namespace = get_object_or_404(Namespace, id=namespace_id, tenant=tenant)
         else:
             namespace = Namespace.get_default(tenant=tenant)
 
@@ -209,9 +200,7 @@ class TagViewSet(viewsets.ModelViewSet):
             )
 
         if namespace_id:
-            namespace = get_object_or_404(
-                Namespace, id=namespace_id, tenant=tenant
-            )
+            namespace = get_object_or_404(Namespace, id=namespace_id, tenant=tenant)
         else:
             namespace = Namespace.get_default(tenant=tenant)
 
@@ -237,9 +226,7 @@ class TagViewSet(viewsets.ModelViewSet):
         """Get existing tag or create new one"""
         name = request.data.get("name")
         if not name:
-            return Response(
-                {"error": "Name is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Name is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         namespace_id = request.data.get("namespace")
         namespace = None
@@ -247,15 +234,9 @@ class TagViewSet(viewsets.ModelViewSet):
             namespace = get_object_or_404(Namespace, id=namespace_id)
 
         # Extract additional fields
-        extra_fields = {
-            key: value
-            for key, value in request.data.items()
-            if key not in ["name", "namespace"]
-        }
+        extra_fields = {key: value for key, value in request.data.items() if key not in ["name", "namespace"]}
 
-        tag, created = Tag.get_or_create_tag(
-            name=name, namespace=namespace, **extra_fields
-        )
+        tag, created = Tag.get_or_create_tag(name=name, namespace=namespace, **extra_fields)
 
         serializer = self.get_serializer(tag)
         return Response(

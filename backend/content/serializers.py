@@ -5,15 +5,14 @@ Provides REST API serialization for content objects that can be published as pag
 """
 
 from rest_framework import serializers
-from .models import Category, Tag, Namespace
+
+from .models import Category, Namespace, Tag
 
 
 class NamespaceSerializer(serializers.ModelSerializer):
     """Serializer for Namespace model"""
 
-    created_by_name = serializers.CharField(
-        source="created_by.username", read_only=True
-    )
+    created_by_name = serializers.CharField(source="created_by.username", read_only=True)
     content_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -44,41 +43,23 @@ class NamespaceSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         request = self.context.get("request")
-        tenant = (
-            self.instance.tenant
-            if self.instance
-            else getattr(request, "tenant", None)
-        )
+        tenant = self.instance.tenant if self.instance else getattr(request, "tenant", None)
         namespace_id = self.instance.pk if self.instance else None
         for field in ("name", "slug"):
             value = attrs.get(field, getattr(self.instance, field, None))
-            if (
-                value
-                and Namespace.objects.filter(tenant=tenant, **{field: value})
-                .exclude(pk=namespace_id)
-                .exists()
-            ):
-                raise serializers.ValidationError(
-                    {field: f"A namespace with this {field} already exists."}
-                )
+            if value and Namespace.objects.filter(tenant=tenant, **{field: value}).exclude(pk=namespace_id).exists():
+                raise serializers.ValidationError({field: f"A namespace with this {field} already exists."})
         return attrs
 
     def validate_is_default(self, value):
         """Ensure only one default namespace can exist per tenant."""
         request = self.context.get("request")
-        tenant = (
-            self.instance.tenant
-            if self.instance
-            else getattr(request, "tenant", None)
-        )
+        tenant = self.instance.tenant if self.instance else getattr(request, "tenant", None)
         defaults = Namespace.objects.filter(tenant=tenant, is_default=True)
         if value and defaults.exists():
             # If this is an update, exclude the current instance
             if self.instance:
-                if (
-                    defaults.exclude(pk=self.instance.pk)
-                    .exists()
-                ):
+                if defaults.exclude(pk=self.instance.pk).exists():
                     raise serializers.ValidationError(
                         "Only one default namespace can exist. Please unset the current default first."
                     )
@@ -93,9 +74,7 @@ class NamespaceSerializer(serializers.ModelSerializer):
 class NamespaceListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for Namespace lists"""
 
-    created_by_name = serializers.CharField(
-        source="created_by.username", read_only=True
-    )
+    created_by_name = serializers.CharField(source="created_by.username", read_only=True)
     content_count = serializers.SerializerMethodField()
 
     class Meta:

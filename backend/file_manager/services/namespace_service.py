@@ -5,9 +5,11 @@ Service for handling namespace resolution and access control.
 import logging
 from dataclasses import dataclass
 from typing import Optional, Union
+
 from rest_framework.response import Response
 
 from content.models import Namespace
+
 from ..security import SecurityAuditLogger
 
 logger = logging.getLogger(__name__)
@@ -25,9 +27,7 @@ class NamespaceResult:
 class NamespaceAccessService:
     """Service class to handle namespace resolution and access control."""
 
-    def get_and_validate_namespace(
-        self, user, namespace_slug: str, tenant=None
-    ) -> Union[Namespace, Response]:
+    def get_and_validate_namespace(self, user, namespace_slug: str, tenant=None) -> Union[Namespace, Response]:
         """
         Get and validate access to a namespace.
 

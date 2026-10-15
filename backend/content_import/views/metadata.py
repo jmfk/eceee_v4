@@ -1,14 +1,15 @@
 """Metadata extraction view for content import."""
 
 import logging
-from rest_framework.views import APIView
-from rest_framework.response import Response
+
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from content.models import Namespace, Tag
-from ..services.openai_service import OpenAIService
 
+from ..services.openai_service import OpenAIService
 
 logger = logging.getLogger(__name__)
 
@@ -56,22 +57,15 @@ class ExtractMetadataView(APIView):
 
         # Get namespace
         try:
-            namespace = Namespace.resolve(
-                namespace_slug, tenant=getattr(request, "tenant", None)
-            )
+            namespace = Namespace.resolve(namespace_slug, tenant=getattr(request, "tenant", None))
         except Namespace.DoesNotExist:
-            return Response(
-                {"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Invalid namespace"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             # Get existing tags from the system (content.Tag, not file_manager.MediaTag)
             existing_tag_names = list(
-                Tag.objects.filter(namespace=namespace)
-                .order_by("-usage_count")
-                .values_list("name", flat=True)[:100]
+                Tag.objects.filter(namespace=namespace).order_by("-usage_count").values_list("name", flat=True)[:100]
             )
-
 
             # Extract metadata using OpenAI
             openai_service = OpenAIService(user=request.user)
@@ -106,9 +100,7 @@ class ExtractMetadataView(APIView):
             for tag_name in metadata.get("suggested_tags", []):
                 # Check if tag exists in database
                 try:
-                    existing_tag = Tag.objects.get(
-                        name__iexact=tag_name, namespace=namespace
-                    )
+                    existing_tag = Tag.objects.get(name__iexact=tag_name, namespace=namespace)
                     enriched_tags.append(
                         {
                             "name": existing_tag.name,
@@ -139,6 +131,4 @@ class ExtractMetadataView(APIView):
 
         except Exception as e:
             logger.error(f"Failed to extract metadata: {e}", exc_info=True)
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
