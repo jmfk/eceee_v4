@@ -476,7 +476,7 @@ ThreeColumnsWidget.propTypes = {
     parentComponentId: PropTypes.string
 };
 
-ThreeColumnsWidget.displayName = 'ECEEE Three Columns';
+ThreeColumnsWidget.displayName = 'Three Columns';
 ThreeColumnsWidget.widgetType = 'easy_widgets.ThreeColumnsWidget';
 ThreeColumnsWidget.description = 'ECEEE-specific three-column layout with left, center, and right slots';
 

@@ -461,7 +461,7 @@ TwoColumnsWidget.propTypes = {
     parentComponentId: PropTypes.string
 };
 
-TwoColumnsWidget.displayName = 'ECEEE Two Columns';
+TwoColumnsWidget.displayName = 'Two Columns';
 TwoColumnsWidget.widgetType = 'easy_widgets.TwoColumnsWidget';
 TwoColumnsWidget.description = 'ECEEE-specific two-column layout with left and right slots for widgets';
 

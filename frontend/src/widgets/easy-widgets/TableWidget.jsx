@@ -233,7 +233,7 @@ const TableWidget = memo(({
 })
 
 // === COLOCATED METADATA ===
-TableWidget.displayName = 'eceee TableWidget'
+TableWidget.displayName = 'Table'
 TableWidget.widgetType = 'easy_widgets.TableWidget'
 
 // Default configuration
