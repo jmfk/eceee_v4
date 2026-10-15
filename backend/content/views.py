@@ -181,10 +181,14 @@ class TagViewSet(viewsets.ModelViewSet):
         """Get most popular tags"""
         namespace_id = request.query_params.get("namespace")
         limit = int(request.query_params.get("limit", 20))
+        tenant = getattr(request, "tenant", None)
 
-        namespace = None
         if namespace_id:
-            namespace = get_object_or_404(Namespace, id=namespace_id)
+            namespace = get_object_or_404(
+                Namespace, id=namespace_id, tenant=tenant
+            )
+        else:
+            namespace = Namespace.get_default(tenant=tenant)
 
         tags = Tag.get_popular_tags(namespace=namespace, limit=limit)
         serializer = self.get_serializer(tags, many=True)
@@ -196,6 +200,7 @@ class TagViewSet(viewsets.ModelViewSet):
         query = request.query_params.get("q", "")
         namespace_id = request.query_params.get("namespace")
         limit = int(request.query_params.get("limit", 10))
+        tenant = getattr(request, "tenant", None)
 
         if not query:
             return Response(
@@ -203,9 +208,12 @@ class TagViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        namespace = None
         if namespace_id:
-            namespace = get_object_or_404(Namespace, id=namespace_id)
+            namespace = get_object_or_404(
+                Namespace, id=namespace_id, tenant=tenant
+            )
+        else:
+            namespace = Namespace.get_default(tenant=tenant)
 
         tags = Tag.search_tags(query=query, namespace=namespace, limit=limit)
         serializer = self.get_serializer(tags, many=True)
