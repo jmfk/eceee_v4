@@ -28,11 +28,11 @@ def _can_access_theme_pending(pending_file, user, tenant=None):
     """Keep pending theme uploads inside their tenant's Designer boundary."""
     from ..security import user_can_access_namespace
 
+    if tenant is not None and tenant.pk != pending_file.namespace.tenant_id:
+        return False
     if not pending_file.namespace.is_hidden:
         return True
-    return (tenant is None or tenant.pk == pending_file.namespace.tenant_id) and user_can_access_namespace(
-        user, pending_file.namespace
-    )
+    return user_can_access_namespace(user, pending_file.namespace)
 
 
 class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
@@ -103,6 +103,8 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
         from core.permissions import user_can_switch_tenant
 
         tenant = getattr(self.request, "tenant", None)
+        if tenant is not None:
+            queryset = queryset.filter(namespace__tenant=tenant)
         theme_media = Q(namespace__is_hidden=True)
         if user_can_switch_tenant(self.request.user):
             allowed_theme_media = theme_media
@@ -186,8 +188,14 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             # Get new tags from the approval data
             new_tag_ids = request.data.get("tag_ids", [])
             if new_tag_ids:
-                # Add new tags to existing file
-                existing_file.tags.add(*new_tag_ids)
+                from ..serializers import convert_tag_names_to_ids
+
+                validated_tag_ids = convert_tag_names_to_ids(
+                    new_tag_ids,
+                    pending_file.namespace,
+                    request.user,
+                )
+                existing_file.tags.add(*validated_tag_ids)
 
             # Handle annotation update if provided
             annotation = request.data.get("annotation")
@@ -342,7 +350,14 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
 
         for approval_data in approvals:
             try:
-                pending_file = PendingMediaFile.objects.get(id=approval_data["pending_file_id"], status="pending")
+                pending_files = PendingMediaFile.objects.filter(
+                    id=approval_data["pending_file_id"],
+                    status="pending",
+                )
+                tenant = getattr(request, "tenant", None)
+                if tenant is not None:
+                    pending_files = pending_files.filter(namespace__tenant=tenant)
+                pending_file = pending_files.get()
 
                 # Check permissions
                 if not _can_access_theme_pending(pending_file, request.user, getattr(request, "tenant", None)):
@@ -432,7 +447,11 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
 
         for file_id in file_ids:
             try:
-                pending_file = PendingMediaFile.objects.get(id=file_id, status="pending")
+                pending_files = PendingMediaFile.objects.filter(id=file_id, status="pending")
+                tenant = getattr(request, "tenant", None)
+                if tenant is not None:
+                    pending_files = pending_files.filter(namespace__tenant=tenant)
+                pending_file = pending_files.get()
 
                 # Check permissions
                 if not _can_access_theme_pending(pending_file, request.user, getattr(request, "tenant", None)):

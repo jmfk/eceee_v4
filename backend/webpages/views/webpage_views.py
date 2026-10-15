@@ -90,7 +90,15 @@ class WebPageViewSet(viewsets.ModelViewSet):
 
         # Exclude deleted pages by default (unless specifically accessing deleted endpoint)
         # Check if is_deleted field exists (migration might not be run yet)
-        if self.action not in ["list_deleted", "bulk_restore"]:
+        deleted_page_actions = {
+            "list_deleted",
+            "restore_page",
+            "bulk_restore",
+            "permanent_delete",
+            "bulk_permanent_delete",
+            "permanent_delete_all",
+        }
+        if self.action not in deleted_page_actions:
             try:
                 queryset = queryset.filter(is_deleted=False)
             except Exception:
@@ -257,9 +265,12 @@ class WebPageViewSet(viewsets.ModelViewSet):
         # tenant. Resolve that explicit id independently of a stale/default
         # tenant header, then authorize and scope every descendant lookup to
         # the site's owning tenant.
-        site = (
-            WebPage.objects.select_related("tenant").filter(pk=site_id, parent__isnull=True, is_deleted=False).first()
-        )
+        sites = WebPage.objects.select_related("tenant").filter(pk=site_id, parent__isnull=True, is_deleted=False)
+        from core.models import MachineAPIKey
+
+        if isinstance(request.auth, MachineAPIKey):
+            sites = sites.filter(tenant=getattr(request, "tenant", None))
+        site = sites.first()
         if site is None or not site.tenant.user_has_access(request.user):
             return Response(
                 {"detail": "Site not found."},
@@ -709,7 +720,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
         from ..serializers import DeletedPageSerializer
 
         # Filter deleted pages
-        queryset = WebPage.objects.filter(is_deleted=True).select_related("deleted_by")
+        queryset = self.get_queryset().filter(is_deleted=True).select_related("deleted_by")
 
         # Search functionality
         search = request.query_params.get("search", "").strip()
@@ -787,7 +798,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
             return Response({"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Fetch deleted pages
-        pages = WebPage.objects.filter(id__in=page_ids, is_deleted=True)
+        pages = self.get_queryset().filter(id__in=page_ids, is_deleted=True)
 
         if not pages.exists():
             return Response(
@@ -894,7 +905,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
             return Response({"error": "page_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Fetch soft-deleted pages
-        pages = WebPage.objects.filter(id__in=page_ids, is_deleted=True)
+        pages = self.get_queryset().filter(id__in=page_ids, is_deleted=True)
 
         if not pages.exists():
             return Response(
@@ -957,7 +968,7 @@ class WebPageViewSet(viewsets.ModelViewSet):
             )
 
         # Get all soft-deleted pages
-        deleted_pages = WebPage.objects.filter(is_deleted=True)
+        deleted_pages = self.get_queryset().filter(is_deleted=True)
 
         if not deleted_pages.exists():
             return Response(

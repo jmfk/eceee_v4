@@ -23,7 +23,6 @@ OBJECT_WRITE = "object.write"
 OBJECT_PUBLISH = "object.publish"
 LAYOUT_READ = "layout.read"
 SITE_READ = "site.read"
-SITE_WRITE = "site.write"
 CONTENT_READ = "content.read"
 CONTENT_WRITE = "content.write"
 SITE_TRANSFER = "site.transfer"
@@ -44,7 +43,6 @@ ALLOWED_SCOPES = {
     OBJECT_PUBLISH,
     LAYOUT_READ,
     SITE_READ,
-    SITE_WRITE,
     CONTENT_READ,
     CONTENT_WRITE,
     SITE_TRANSFER,
@@ -79,7 +77,8 @@ PAGE_PUBLISH_ACTIONS = {
     "unpublish-all",
     "unpublish-explicit",
 }
-OBJECT_PUBLISH_ACTIONS = {"publish", "unpublish"}
+OBJECT_PUBLISH_ACTIONS = {"publish", "schedule", "unpublish"}
+OBJECT_FULL_ACCESS_PATHS = {"/api/v1/objects/objects/bulk-operations"}
 
 
 def deployment_environment():
@@ -135,14 +134,17 @@ def _required_scope(request):
     if request.path.startswith("/api/v1/webpages/widget-types/"):
         return LAYOUT_READ
 
-    site_configuration_prefixes = (
+    if request.path.startswith("/api/v1/webpages/path-patterns/"):
+        return SITE_READ
+    if request.path.rstrip("/") == "/api/v1/webpages/page-data-schemas/validate":
+        return SITE_READ
+    global_site_configuration_prefixes = (
         "/api/v1/webpages/page-data-schemas/",
-        "/api/v1/webpages/path-patterns/",
         "/api/v1/webpages/preview-sizes/",
         "/api/v1/utils/value-lists/",
     )
-    if request.path.startswith(site_configuration_prefixes):
-        return _read_or_write_scope(request, SITE_READ, SITE_WRITE)
+    if request.path.startswith(global_site_configuration_prefixes):
+        return SITE_READ if request.method in SAFE_METHODS else SERVER_FULL_ACCESS
 
     page_prefixes = (
         "/api/v1/webpages/pages/",
@@ -158,6 +160,10 @@ def _required_scope(request):
         return _read_or_write_scope(request, MEDIA_READ, MEDIA_WRITE)
 
     if request.path.startswith("/api/v1/objects/"):
+        if request.path.startswith("/api/v1/objects/object-types/"):
+            return OBJECT_READ if request.method in SAFE_METHODS else SERVER_FULL_ACCESS
+        if request.path.rstrip("/") in OBJECT_FULL_ACCESS_PATHS:
+            return SERVER_FULL_ACCESS
         if request.method not in SAFE_METHODS and _path_has_action(request.path, OBJECT_PUBLISH_ACTIONS):
             return OBJECT_PUBLISH
         return _read_or_write_scope(request, OBJECT_READ, OBJECT_WRITE)

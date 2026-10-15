@@ -290,3 +290,66 @@ class NamespaceAPITest(APITestCase):
         self.assertEqual([tag["name"] for tag in popular.data], ["Current Shared"])
         self.assertEqual(search.status_code, 200)
         self.assertEqual([tag["name"] for tag in search.data], ["Current Shared"])
+
+    def test_tag_writes_cannot_select_another_tenants_namespace(self):
+        namespace = Namespace.objects.create(
+            name="Tag namespace",
+            slug="tag-namespace",
+            tenant=self.tenant,
+            is_default=True,
+            created_by=self.user,
+        )
+        foreign_namespace = Namespace.objects.create(
+            name="Foreign tag namespace",
+            slug="foreign-tag-namespace",
+            tenant=self.other_tenant,
+            is_default=True,
+            created_by=self.user,
+        )
+        tag = Tag.objects.create(
+            name="Tenant tag",
+            slug="tenant-tag",
+            namespace=namespace,
+            tenant=self.tenant,
+        )
+
+        update = self.client.patch(
+            f"/api/v1/content/tags/{tag.id}/",
+            {"namespace": foreign_namespace.id},
+            format="json",
+        )
+        get_or_create = self.client.post(
+            "/api/v1/content/tags/get_or_create/",
+            {"name": "Foreign attempt", "namespace": foreign_namespace.id},
+            format="json",
+        )
+
+        tag.refresh_from_db()
+        self.assertEqual(update.status_code, 400)
+        self.assertEqual(tag.namespace, namespace)
+        self.assertEqual(get_or_create.status_code, 404)
+        self.assertFalse(Tag.objects.filter(name="Foreign attempt").exists())
+
+    def test_category_create_assigns_the_selected_tenant(self):
+        default_namespace = Namespace.objects.create(
+            name="Category default",
+            slug="category-default",
+            tenant=self.tenant,
+            is_default=True,
+            created_by=self.user,
+        )
+
+        response = self.client.post(
+            "/api/v1/content/categories/",
+            {
+                "name": "Tenant category",
+                "slug": "tenant-category",
+                "description": "Created through the content API",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        category = Category.objects.get(pk=response.data["id"])
+        self.assertEqual(category.tenant, self.tenant)
+        self.assertEqual(category.namespace, default_namespace)

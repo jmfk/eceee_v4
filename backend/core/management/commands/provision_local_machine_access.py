@@ -28,7 +28,6 @@ from core.machine_api_keys import (
     PAGE_WRITE,
     SITE_READ,
     SITE_TRANSFER,
-    SITE_WRITE,
     THEME_READ,
     THEME_TRANSFER,
     THEME_VERSION,
@@ -54,7 +53,6 @@ DEFAULT_SCOPES = sorted(
         PAGE_WRITE,
         SITE_READ,
         SITE_TRANSFER,
-        SITE_WRITE,
         THEME_READ,
         THEME_TRANSFER,
         THEME_VERSION,
@@ -149,7 +147,12 @@ class Command(BaseCommand):
         if principal_created:
             principal.set_unusable_password()
             principal.save(update_fields=["password"])
-        elif not principal.is_active or not principal.is_staff:
+        elif (
+            not principal.is_active
+            or not principal.is_staff
+            or principal.is_superuser
+            or principal.has_usable_password()
+        ):
             raise CommandError("principal=existing_account_incompatible")
         tenant.members.add(principal)
 
