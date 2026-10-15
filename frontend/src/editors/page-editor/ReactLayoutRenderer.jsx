@@ -1704,6 +1704,7 @@ const ReactLayoutRenderer = forwardRef(({
                     }}
                     renderSlot={(slotName) => {
                         const policy = layoutDefinition.slots?.[slotName] || {};
+                        const inheritanceAllowed = policy.allows_inheritance ?? policy.allowsInheritance ?? false;
                         return (
                             <WidgetSlot
                                 name={slotName}
@@ -1722,7 +1723,9 @@ const ReactLayoutRenderer = forwardRef(({
                                     disallowedWidgetTypes: policy.disallowed_widget_types || policy.disallowedWidgetTypes || null,
                                     maxWidgets: Object.hasOwn(policy, 'max_widgets') ? policy.max_widgets : policy.maxWidgets,
                                     required: Boolean(policy.required),
-                                    slotType: (policy.allows_inheritance ?? policy.allowsInheritance) ? 'inherited' : 'content',
+                                    slotType: inheritanceAllowed ? 'inherited' : 'content',
+                                    inheritanceAllowed,
+                                    collapseBehavior: policy.collapse_behavior ?? policy.collapseBehavior ?? 'never',
                                 }}
                                 inheritedWidgets={inheritedWidgets}
                                 slotInheritanceRules={slotInheritanceRules}
