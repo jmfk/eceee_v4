@@ -165,6 +165,7 @@ describe('page editor active/legacy boundaries', () => {
         expect(globalCSS).not.toMatch(/\.widget-content\s+(?:ul|ol|li)/)
         expect(globalCSS).not.toContain('.media-insert img')
         expect(publicRenderCSS).toContain('.site-renderer .layout-slot{')
+        expect(publicRenderCSS).toContain('.layout-slot>.widget-slot>.widget-item:not(:last-child)>.banner-widget')
         expect(publicRenderCSS).toContain('.cms-content :where(h1,h2,h3,h4,h5,h6)')
         expect(publicRenderCSS).toContain('.media-insert.img-width-half')
     })

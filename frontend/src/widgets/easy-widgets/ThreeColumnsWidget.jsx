@@ -438,25 +438,19 @@ const ThreeColumnsWidget = ({
                 <div className="three-col-slot left" data-slot="left" data-widget-slot="left" data-owner-widget-type="easy_widgets.ThreeColumnsWidget">
                     {slotsData.left && slotsData.left.length > 0 ? (
                         slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
-                    ) : (
-                        <div className="three-col-empty-slot">Left column</div>
-                    )}
+                    ) : null}
                 </div>
 
                 <div className="three-col-slot center" data-slot="center" data-widget-slot="center" data-owner-widget-type="easy_widgets.ThreeColumnsWidget">
                     {slotsData.center && slotsData.center.length > 0 ? (
                         slotsData.center.map((widget, index) => renderWidget(widget, 'center', index))
-                    ) : (
-                        <div className="three-col-empty-slot">Center column</div>
-                    )}
+                    ) : null}
                 </div>
 
                 <div className="three-col-slot right" data-slot="right" data-widget-slot="right" data-owner-widget-type="easy_widgets.ThreeColumnsWidget">
                     {slotsData.right && slotsData.right.length > 0 ? (
                         slotsData.right.map((widget, index) => renderWidget(widget, 'right', index))
-                    ) : (
-                        <div className="three-col-empty-slot">Right column</div>
-                    )}
+                    ) : null}
                 </div>
             </div>
         );

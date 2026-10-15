@@ -405,6 +405,7 @@ const BannerWidget = ({
             `mode-${bannerMode}`,
             `image-size-${imageSize}`
         ].join(' ')
+        const showBorder = configRef.current.showBorder ?? configRef.current.show_border ?? false
 
         if (mode === 'editor') {
             return (
@@ -507,7 +508,7 @@ const BannerWidget = ({
 
         return (
             <div
-                className="banner-widget container"
+                className={`banner-widget cms-content${showBorder ? ' border-enabled' : ''}`}
                 id={configRef.current.anchor || undefined}
                 style={{ position: 'relative', height: '140px', ...bannerStyle }}
             >
