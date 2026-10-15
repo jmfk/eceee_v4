@@ -133,6 +133,7 @@ describe('page editor active/legacy boundaries', () => {
         const bioWidgetSource = readSource('src/widgets/easy-widgets/BioWidget.jsx')
         const contentCardWidgetSource = readSource('src/widgets/easy-widgets/ContentCardWidget.jsx')
         const globalCSS = readSource('src/index.css')
+        const publicRenderCSS = readSource('src/rendering/publicRenderCss.ts')
 
         expect(rendererSource).toContain('eceee-theme-scope')
         expect(rendererSource).toContain('data-eceee-theme-scope')
@@ -159,6 +160,13 @@ describe('page editor active/legacy boundaries', () => {
         expect(bioWidgetSource).toContain('eceee-editor-ui absolute top-2 right-2')
         expect(contentCardWidgetSource).toContain('eceee-editor-ui absolute top-2 right-2')
         expect(globalCSS).not.toContain('.cms-content-isolated')
+        expect(globalCSS).not.toMatch(/\.layout-slot\s*\{/)
+        expect(globalCSS).not.toMatch(/\.theme-content(?:\s|\.|\{|:)/)
+        expect(globalCSS).not.toMatch(/\.widget-content\s+(?:ul|ol|li)/)
+        expect(globalCSS).not.toContain('.media-insert img')
+        expect(publicRenderCSS).toContain('.site-renderer .layout-slot{')
+        expect(publicRenderCSS).toContain('.cms-content :where(h1,h2,h3,h4,h5,h6)')
+        expect(publicRenderCSS).toContain('.media-insert.img-width-half')
     })
 
     it('finalizes cross-version cut sources only after the destination save', () => {

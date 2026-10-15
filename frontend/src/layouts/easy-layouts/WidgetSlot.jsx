@@ -5,7 +5,7 @@
  * It handles widget rendering, empty states, slot management, and widget inheritance.
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Layout, Plus, Eye, EyeOff } from 'lucide-react';
 import PageWidgetFactory from '../../editors/page-editor/PageWidgetFactory';
 import PageSlotIconMenu from '../../editors/page-editor/PageSlotIconMenu';
@@ -65,7 +65,9 @@ const WidgetSlot = ({
         disallowedWidgetTypes: behaviorDisallowedTypes = disallowedWidgetTypes,
         maxWidgets: behaviorMaxWidgets = maxWidgets,
         required: behaviorRequired = required,
-        slotType: behaviorSlotType = slotType
+        slotType: behaviorSlotType = slotType,
+        inheritanceAllowed: behaviorInheritanceAllowed,
+        collapseBehavior: behaviorCollapseBehavior
     } = behavior;
 
     // Use the extracted values
@@ -78,7 +80,18 @@ const WidgetSlot = ({
     // Extract widgets for this specific slot
     const localWidgets = widgets[name] || [];
     const slotInheritedWidgets = inheritedWidgets[name] || [];
-    const slotRules = slotInheritanceRules[name] || {};
+    const slotRules = useMemo(() => {
+        const inheritedSlotRules = slotInheritanceRules[name] || {};
+        return {
+            ...inheritedSlotRules,
+            ...(behaviorInheritanceAllowed !== undefined
+                ? { inheritanceAllowed: behaviorInheritanceAllowed }
+                : {}),
+            ...(behaviorCollapseBehavior !== undefined
+                ? { collapseBehavior: behaviorCollapseBehavior }
+                : {})
+        };
+    }, [slotInheritanceRules, name, behaviorInheritanceAllowed, behaviorCollapseBehavior]);
 
 
     // Determine smart default for slot mode
@@ -89,8 +102,17 @@ const WidgetSlot = ({
 
     // Slot-level mode state (controlled or uncontrolled)
     const [internalMode, setInternalMode] = useState(defaultMode);
+    const hasUserSelectedMode = useRef(false);
     const currentMode = slotMode || internalMode; // Use external mode if provided
     const isPreviewMode = currentMode === 'preview';
+
+    // Inheritance and local widget data can arrive after the slot first renders.
+    // Follow the layout-defined default until the editor explicitly chooses a mode.
+    useEffect(() => {
+        if (!hasUserSelectedMode.current) {
+            setInternalMode(defaultMode);
+        }
+    }, [defaultMode]);
 
     // Check if slot has inherited content
     const hasInheritance = hasInheritedContent(slotInheritedWidgets);
@@ -215,6 +237,7 @@ const WidgetSlot = ({
                 newMode = 'edit';
             }
 
+            hasUserSelectedMode.current = true;
             setInternalMode(newMode);
             if (onSlotModeChange) {
                 onSlotModeChange(name, newMode);

@@ -4,12 +4,93 @@ import { describe, expect, it, vi } from 'vitest'
 import WidgetSlot from '../WidgetSlot'
 
 vi.mock('../../../editors/page-editor/PageWidgetFactory', () => ({
-    default: ({ widget }) => (
-        <div data-testid="rendered-widget">
+    default: ({ widget, mode, showControls }) => (
+        <div data-testid="rendered-widget" data-mode={mode} data-show-controls={String(showControls)}>
             {widget.type}
         </div>
     )
 }))
+
+describe('WidgetSlot preview defaults', () => {
+    it.each(['header', 'navbar', 'hero', 'footer'])(
+        'enters preview mode when %s content arrives after the first render',
+        (slotName) => {
+            const props = {
+                name: slotName,
+                label: slotName,
+                widgets: {},
+                inheritedWidgets: {},
+                slotInheritanceRules: {},
+                behavior: {
+                    slotType: 'inherited',
+                    inheritanceAllowed: true,
+                    collapseBehavior: 'any',
+                },
+                editable: true,
+            }
+            const { rerender } = render(<WidgetSlot {...props} />)
+
+            expect(screen.getByTitle('Preview entire slot')).toBeInTheDocument()
+
+            rerender(
+                <WidgetSlot
+                    {...props}
+                    inheritedWidgets={{
+                        [slotName]: [{
+                            id: `${slotName}-widget`,
+                            type: `easy_widgets.${slotName}Widget`,
+                            config: {},
+                        }],
+                    }}
+                />
+            )
+
+            expect(screen.getByTestId('rendered-widget')).toHaveAttribute('data-mode', 'display')
+            expect(screen.getByTestId('rendered-widget')).toHaveAttribute('data-show-controls', 'false')
+            expect(screen.getByTitle('Exit slot preview mode')).toBeInTheDocument()
+        }
+    )
+
+    it('preserves an explicit edit choice when async slot content changes again', () => {
+        const inheritedWidget = {
+            id: 'header-widget',
+            type: 'easy_widgets.HeaderWidget',
+            config: {},
+        }
+        const props = {
+            name: 'header',
+            label: 'Header',
+            widgets: {},
+            inheritedWidgets: { header: [inheritedWidget] },
+            slotInheritanceRules: {
+                header: {
+                    inheritanceAllowed: true,
+                    collapseBehavior: 'any',
+                },
+            },
+            editable: true,
+        }
+        const { rerender } = render(<WidgetSlot {...props} />)
+
+        fireEvent.click(screen.getByTitle('Exit slot preview mode'))
+        expect(screen.getByTestId('rendered-widget')).toHaveAttribute('data-mode', 'editor')
+
+        rerender(
+            <WidgetSlot
+                {...props}
+                inheritedWidgets={{
+                    header: [
+                        inheritedWidget,
+                        { id: 'header-widget-2', type: 'easy_widgets.HeaderWidget', config: {} },
+                    ],
+                }}
+            />
+        )
+
+        expect(screen.getAllByTestId('rendered-widget')).toHaveLength(2)
+        expect(screen.getAllByTestId('rendered-widget')[0]).toHaveAttribute('data-mode', 'editor')
+    })
+})
 
 describe('WidgetSlot hidden empty restore bar', () => {
     const renderSlot = (props = {}) => render(
