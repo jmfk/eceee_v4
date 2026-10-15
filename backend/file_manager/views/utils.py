@@ -173,7 +173,10 @@ class BulkMediaOperationsView(APIView):
         operation = data["operation"]
 
         # Get files that user has permission to modify
+        selected_tenant = getattr(request, "tenant", None)
         files = MediaFile.objects.filter(id__in=file_ids)
+        if selected_tenant is not None:
+            files = files.filter(tenant=selected_tenant)
 
         # System-owned theme media is shared only inside its tenant's Designer.
         # Staff status alone must not cross that tenant boundary.
@@ -181,7 +184,6 @@ class BulkMediaOperationsView(APIView):
 
         from ..security import user_can_access_namespace
 
-        selected_tenant = getattr(request, "tenant", None)
         accessible_theme_file_ids = [
             file_obj.id
             for file_obj in files.filter(namespace__is_hidden=True).select_related("namespace", "namespace__tenant")
@@ -235,7 +237,10 @@ class BulkMediaOperationsView(APIView):
                     collection_id = data.get("collection_id")
                     if collection_id:
                         try:
-                            collection = MediaCollection.objects.get(id=collection_id)
+                            collections = MediaCollection.objects.filter(id=collection_id)
+                            if selected_tenant is not None:
+                                collections = collections.filter(namespace__tenant=selected_tenant)
+                            collection = collections.get()
                             file_obj.collections.add(collection)
                         except MediaCollection.DoesNotExist:
                             errors.append(
@@ -250,7 +255,10 @@ class BulkMediaOperationsView(APIView):
                     collection_id = data.get("collection_id")
                     if collection_id:
                         try:
-                            collection = MediaCollection.objects.get(id=collection_id)
+                            collections = MediaCollection.objects.filter(id=collection_id)
+                            if selected_tenant is not None:
+                                collections = collections.filter(namespace__tenant=selected_tenant)
+                            collection = collections.get()
                             file_obj.collections.remove(collection)
                         except MediaCollection.DoesNotExist:
                             errors.append(

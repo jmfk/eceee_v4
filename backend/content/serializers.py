@@ -159,6 +159,15 @@ class TagSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+    def validate_namespace(self, value):
+        request = self.context.get("request")
+        tenant = getattr(request, "tenant", None)
+        if value is None:
+            return Namespace.get_default(tenant=tenant)
+        if tenant is not None and value.tenant_id != tenant.id:
+            raise serializers.ValidationError("Namespace must belong to the selected tenant.")
+        return value
+
     def create(self, validated_data):
         """Create tag with default namespace if none provided"""
         if "namespace" not in validated_data or validated_data["namespace"] is None:

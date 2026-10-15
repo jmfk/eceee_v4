@@ -29,6 +29,13 @@ DENIED_PREFIXES = (
 )
 
 
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects so the machine Authorization header cannot change origin."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def read_env_file(env_file: Path) -> dict[str, str]:
     try:
         mode = stat.S_IMODE(env_file.stat().st_mode)
@@ -147,7 +154,8 @@ def main() -> int:
         if body is not None:
             headers["Content-Type"] = content_type
         request = urllib.request.Request(url, data=body, headers=headers, method=args.method)
-        with urllib.request.urlopen(request, timeout=30) as response:
+        opener = urllib.request.build_opener(NoRedirectHandler())
+        with opener.open(request, timeout=30) as response:
             response_body = response.read()
             status_code = response.status
     except ValueError as exc:

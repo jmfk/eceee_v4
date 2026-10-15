@@ -25,7 +25,9 @@ store.
 - Media uses `media.read` and `media.write`.
 - Objects use `object.read`, `object.write`, `object.publish`, and `object.transfer`.
 - Taxonomies use `content.read` and `content.write`.
-- Page schemas, path patterns, preview sizes, and value lists use `site.read` and `site.write`.
+- Page schemas, path patterns, preview sizes, and value lists use `site.read`.
+  These resources are global; mutations require a deliberately granted
+  `server.full_access` credential.
 
 Runtime configuration, secrets, users, remote credentials, deployments, SSH,
 backups, and database administration are outside this skill.

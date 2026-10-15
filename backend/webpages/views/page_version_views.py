@@ -786,7 +786,7 @@ class PageVersionViewSet(
             )
 
         try:
-            page = WebPage.objects.get(id=page_id)
+            page = self._page_queryset().get(id=page_id)
 
             # Find the current published version
             current_published = None
@@ -855,7 +855,7 @@ class PageVersionViewSet(
         """Get all versions for a specific page"""
         try:
             # Verify page exists
-            page = get_object_or_404(WebPage, id=page_id)
+            page = get_object_or_404(self._page_queryset(), id=page_id)
 
             # Get queryset and apply filters
             queryset = self.get_queryset().filter(page=page)
@@ -939,7 +939,7 @@ class PageVersionViewSet(
             )
 
         try:
-            page = WebPage.objects.get(id=page_id)
+            page = self._page_queryset().get(id=page_id)
 
             # Find the current published version
             current_published = None

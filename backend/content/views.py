@@ -167,6 +167,14 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    def perform_create(self, serializer):
+        tenant = getattr(self.request, "tenant", None)
+        if tenant is None:
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
+        serializer.save(tenant=tenant, namespace=Namespace.get_default(tenant=tenant))
+
 
 class TagViewSet(viewsets.ModelViewSet):
     """Enhanced ViewSet for Tag model with namespace and usage features"""
@@ -199,6 +207,14 @@ class TagViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(namespace=default_namespace)
 
         return queryset
+
+    def perform_create(self, serializer):
+        tenant = getattr(self.request, "tenant", None)
+        if tenant is None:
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
+        serializer.save(tenant=tenant)
 
     @action(detail=False, methods=["get"])
     def popular(self, request):
@@ -260,14 +276,14 @@ class TagViewSet(viewsets.ModelViewSet):
             return Response({"error": "Name is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         namespace_id = request.data.get("namespace")
+        tenant = getattr(request, "tenant", None)
         namespace = None
         if namespace_id:
-            namespace = get_object_or_404(Namespace, id=namespace_id)
+            namespace = get_object_or_404(Namespace, id=namespace_id, tenant=tenant)
+        else:
+            namespace = Namespace.get_default(tenant=tenant)
 
-        # Extract additional fields
-        extra_fields = {key: value for key, value in request.data.items() if key not in ["name", "namespace"]}
-
-        tag, created = Tag.get_or_create_tag(name=name, namespace=namespace, **extra_fields)
+        tag, created = Tag.get_or_create_tag(name=name, namespace=namespace, tenant=tenant)
 
         serializer = self.get_serializer(tag)
         return Response(

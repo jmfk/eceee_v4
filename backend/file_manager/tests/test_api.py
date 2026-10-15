@@ -519,6 +519,173 @@ class MediaFileAPITest(APITestCase):
             [str(self.media_file.id)],
         )
 
+    def test_staff_bulk_operations_cannot_change_another_tenant(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        other_tenant = Tenant.objects.create(
+            name="Bulk other tenant",
+            identifier="bulk-other-tenant",
+            created_by=self.user,
+        )
+        other_namespace = Namespace.objects.create(
+            name="Bulk other namespace",
+            slug="bulk-other-namespace",
+            is_active=True,
+            created_by=self.user,
+            tenant=other_tenant,
+        )
+        foreign_media = MediaFile.objects.create(
+            title="Foreign bulk image",
+            slug="foreign-bulk-image",
+            file_type="image",
+            file_path="other/bulk.jpg",
+            file_hash="foreign-bulk-hash",
+            file_size=1024,
+            uploaded_by=self.user,
+            created_by=self.user,
+            last_modified_by=self.user,
+            namespace=other_namespace,
+            tenant=other_tenant,
+            content_type="image/jpeg",
+        )
+        foreign_collection = MediaCollection.objects.create(
+            title="Foreign collection",
+            slug="foreign-collection",
+            namespace=other_namespace,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+        headers = {"HTTP_X_TENANT_ID": self.tenant.identifier}
+
+        delete_response = self.client.post(
+            reverse("api:file_manager:bulk-operations"),
+            {"file_ids": [str(foreign_media.id)], "operation": "delete"},
+            format="json",
+            **headers,
+        )
+        collection_response = self.client.post(
+            reverse("api:file_manager:bulk-operations"),
+            {
+                "file_ids": [str(self.media_file.id)],
+                "operation": "add_to_collection",
+                "collection_id": str(foreign_collection.id),
+            },
+            format="json",
+            **headers,
+        )
+
+        self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(delete_response.data["successful_count"], 0)
+        self.assertTrue(MediaFile.objects.filter(pk=foreign_media.id).exists())
+        self.assertEqual(collection_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(collection_response.data["successful_count"], 0)
+        self.assertFalse(self.media_file.collections.filter(pk=foreign_collection.id).exists())
+
+    def test_staff_pending_media_actions_cannot_cross_tenants(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        other_tenant = Tenant.objects.create(
+            name="Pending other tenant",
+            identifier="pending-other-tenant",
+            created_by=self.user,
+        )
+        other_namespace = Namespace.objects.create(
+            name="Pending other namespace",
+            slug="pending-other-namespace",
+            is_active=True,
+            created_by=self.user,
+            tenant=other_tenant,
+        )
+        foreign_pending = PendingMediaFile.objects.create(
+            original_filename="foreign-pending.jpg",
+            file_path="other/foreign-pending.jpg",
+            file_size=1024,
+            content_type="image/jpeg",
+            file_hash="foreign-pending-hash",
+            file_type="image",
+            namespace=other_namespace,
+            expires_at=timezone.now() + timedelta(hours=1),
+            uploaded_by=self.user,
+        )
+        headers = {"HTTP_X_TENANT_ID": self.tenant.identifier}
+
+        listed = self.client.get(reverse("api:file_manager:pendingmediafile-list"), **headers)
+        detail = self.client.get(
+            reverse("api:file_manager:pendingmediafile-detail", kwargs={"pk": foreign_pending.id}),
+            **headers,
+        )
+        bulk_approve = self.client.post(
+            reverse("api:file_manager:pendingmediafile-bulk-approve"),
+            {
+                "approvals": [
+                    {
+                        "pending_file_id": str(foreign_pending.id),
+                        "title": "Foreign approval",
+                        "tag_ids": ["foreign"],
+                    }
+                ]
+            },
+            format="json",
+            **headers,
+        )
+        bulk_reject = self.client.post(
+            reverse("api:file_manager:pendingmediafile-bulk-reject"),
+            {"file_ids": [str(foreign_pending.id)]},
+            format="json",
+            **headers,
+        )
+
+        self.assertEqual(listed.status_code, status.HTTP_200_OK)
+        self.assertEqual(listed.data["results"], [])
+        self.assertEqual(detail.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(bulk_approve.data["summary"]["errors"], 1)
+        self.assertEqual(bulk_reject.data["summary"]["errors"], 1)
+        foreign_pending.refresh_from_db()
+        self.assertEqual(foreign_pending.status, "pending")
+
+    def test_duplicate_pending_approval_rejects_tags_from_another_tenant(self):
+        other_tenant = Tenant.objects.create(
+            name="Duplicate tag other tenant",
+            identifier="duplicate-tag-other-tenant",
+            created_by=self.user,
+        )
+        other_namespace = Namespace.objects.create(
+            name="Duplicate tag other namespace",
+            slug="duplicate-tag-other-namespace",
+            is_active=True,
+            created_by=self.user,
+            tenant=other_tenant,
+        )
+        foreign_tag = MediaTag.objects.create(
+            name="Foreign tag",
+            slug="foreign-tag",
+            namespace=other_namespace,
+            created_by=self.user,
+        )
+        duplicate_pending = PendingMediaFile.objects.create(
+            original_filename="duplicate.jpg",
+            file_path="test/duplicate.jpg",
+            file_size=1024,
+            content_type="image/jpeg",
+            file_hash=self.media_file.file_hash,
+            file_type="image",
+            namespace=self.namespace,
+            expires_at=timezone.now() + timedelta(hours=1),
+            uploaded_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("api:file_manager:pendingmediafile-approve", kwargs={"pk": duplicate_pending.id}),
+            {"title": "Duplicate", "tag_ids": [str(foreign_tag.id)]},
+            format="json",
+            HTTP_X_TENANT_ID=self.tenant.identifier,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(self.media_file.tags.filter(pk=foreign_tag.id).exists())
+        duplicate_pending.refresh_from_db()
+        self.assertEqual(duplicate_pending.status, "pending")
+
 
 class MediaCollectionAPITest(APITestCase):
     def setUp(self):

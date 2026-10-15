@@ -35,7 +35,6 @@ from core.machine_api_keys import (
     SERVER_FULL_ACCESS,
     SITE_READ,
     SITE_TRANSFER,
-    SITE_WRITE,
     THEME_READ,
     THEME_TRANSFER,
     THEME_VERSION,
@@ -43,7 +42,7 @@ from core.machine_api_keys import (
     generate_machine_api_key,
 )
 from core.models import MachineAPIKey, Tenant
-from webpages.models import PageTheme
+from webpages.models import PageTheme, WebPage
 
 
 @override_settings(APP_VERSION="build-123")
@@ -264,6 +263,33 @@ class MachineAPIKeyAuthenticationTest(TestCase):
         self.assertEqual(listed.status_code, status.HTTP_200_OK)
         self.assertEqual(created.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_machine_read_routes_cannot_contextualize_another_tenant(self):
+        raw_key, api_key = self.create_key([PAGE_READ, SITE_READ])
+        api_key.tenants.add(self.other_tenant)
+        foreign_site = WebPage.objects.create(
+            title="Foreign machine site",
+            slug="foreign-machine-site",
+            hostnames=["foreign-machine.example.test"],
+            tenant=self.other_tenant,
+            created_by=self.admin,
+            last_modified_by=self.admin,
+        )
+        foreign_site.create_version(self.admin, "Foreign machine version")
+        self.authorize(raw_key, self.tenant)
+
+        resolved = self.client.get(
+            "/api/v1/webpages/pages/resolve-render-path/",
+            {"site_id": foreign_site.id, "path": ""},
+        )
+        patterns = self.client.get(
+            "/api/v1/webpages/path-patterns/",
+            {"page_id": foreign_site.id},
+        )
+
+        self.assertEqual(resolved.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(patterns.status_code, status.HTTP_200_OK)
+        self.assertTrue(all("contextualized_example" not in pattern for pattern in patterns.data["patterns"]))
+
     def test_media_read_key_cannot_reach_pages(self):
         raw_key, _ = self.create_key([MEDIA_READ])
         self.authorize(raw_key)
@@ -271,6 +297,42 @@ class MachineAPIKeyAuthenticationTest(TestCase):
         response = self.client.get("/api/v1/webpages/pages/")
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_object_write_key_cannot_change_publication_state(self):
+        raw_key, _ = self.create_key([OBJECT_WRITE])
+        self.authorize(raw_key)
+
+        scheduled = self.client.post(
+            "/api/v1/objects/versions/1/schedule/",
+            {"effective_date": "2030-01-01T00:00:00Z"},
+            format="json",
+        )
+        bulk_published = self.client.post(
+            "/api/v1/objects/objects/bulk-operations/",
+            {"operation": "publish", "object_ids": [1]},
+            format="json",
+        )
+
+        self.assertEqual(scheduled.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(bulk_published.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tenant_scoped_keys_cannot_mutate_global_configuration(self):
+        raw_key, _ = self.create_key([OBJECT_WRITE, SITE_READ])
+        self.authorize(raw_key)
+
+        object_type = self.client.patch(
+            "/api/v1/objects/object-types/1/",
+            {"label": "Changed"},
+            format="json",
+        )
+        page_schema = self.client.post(
+            "/api/v1/webpages/page-data-schemas/",
+            {"scope": "system", "schema": {}},
+            format="json",
+        )
+
+        self.assertEqual(object_type.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(page_schema.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_theme_read_key_can_reach_designer_theme_list(self):
         raw_key, _ = self.create_key([THEME_READ])
@@ -446,11 +508,18 @@ class MachineAPIKeyAuthenticationTest(TestCase):
             ("POST", "/api/v1/media/upload/", MEDIA_WRITE),
             ("GET", "/api/v1/objects/objects/", OBJECT_READ),
             ("PATCH", "/api/v1/objects/objects/2/", OBJECT_WRITE),
+            ("GET", "/api/v1/objects/object-types/", OBJECT_READ),
+            ("PATCH", "/api/v1/objects/object-types/2/", SERVER_FULL_ACCESS),
             ("POST", "/api/v1/objects/versions/2/publish/", OBJECT_PUBLISH),
+            ("POST", "/api/v1/objects/versions/2/schedule/", OBJECT_PUBLISH),
+            ("POST", "/api/v1/objects/objects/bulk-operations/", SERVER_FULL_ACCESS),
             ("GET", "/api/v1/webpages/layouts/", LAYOUT_READ),
             ("POST", "/api/v1/webpages/widget-types/easy_widgets.ContentWidget/validate/", LAYOUT_READ),
             ("GET", "/api/v1/webpages/page-data-schemas/", SITE_READ),
-            ("POST", "/api/v1/webpages/page-data-schemas/", SITE_WRITE),
+            ("POST", "/api/v1/webpages/page-data-schemas/validate/", SITE_READ),
+            ("POST", "/api/v1/webpages/page-data-schemas/", SERVER_FULL_ACCESS),
+            ("POST", "/api/v1/webpages/preview-sizes/", SERVER_FULL_ACCESS),
+            ("POST", "/api/v1/utils/value-lists/", SERVER_FULL_ACCESS),
             ("GET", "/api/v1/content/namespaces/", CONTENT_READ),
             ("POST", "/api/v1/content/tags/", CONTENT_WRITE),
         )
@@ -534,3 +603,20 @@ class ProvisionLocalMachineAccessTest(TestCase):
                     tenant=self.tenant.identifier,
                     env_file=env_file,
                 )
+
+    def test_command_rejects_a_password_bearing_staff_principal(self):
+        User.objects.create_user(username="codex-local", password="human-password", is_staff=True)
+
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / ".env.local"
+
+            with self.assertRaisesMessage(CommandError, "principal=existing_account_incompatible"):
+                call_command(
+                    "provision_local_machine_access",
+                    tenant=self.tenant.identifier,
+                    env_file=env_file,
+                )
+
+            self.assertFalse(env_file.exists())
+            self.assertFalse(MachineAPIKey.objects.filter(name="Codex local CMS access").exists())
+            self.assertFalse(self.tenant.members.filter(username="codex-local").exists())

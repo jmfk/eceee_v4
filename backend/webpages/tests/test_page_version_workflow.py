@@ -132,6 +132,79 @@ class PageVersionWorkflowTest(TestCase):
         self.assertFalse(PageVersion.objects.filter(pk=old_draft.pk).exists())
         self.assertTrue(PageVersion.objects.filter(pk=current.pk).exists())
 
+    def test_page_maintenance_endpoints_stay_in_the_selected_tenant(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        own_deleted = WebPage.objects.create(
+            title="Own deleted page",
+            slug="own-deleted-page",
+            tenant=self.tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+            is_deleted=True,
+            deleted_by=self.user,
+            deleted_at=timezone.now(),
+        )
+        other_tenant = Tenant.objects.create(
+            name="Other maintenance tenant",
+            identifier="other-maintenance-tenant",
+            created_by=self.user,
+        )
+        foreign_deleted = WebPage.objects.create(
+            title="Foreign deleted page",
+            slug="foreign-deleted-page",
+            tenant=other_tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+            is_deleted=True,
+            deleted_by=self.user,
+            deleted_at=timezone.now(),
+        )
+
+        listed = self.client.get(reverse("api:webpage-list-deleted"))
+        bulk_restore = self.client.post(
+            reverse("api:webpage-bulk-restore"),
+            {"page_ids": [foreign_deleted.id]},
+            format="json",
+        )
+        permanent_delete = self.client.delete(
+            reverse("api:webpage-permanent-delete", kwargs={"pk": foreign_deleted.id}),
+            format="json",
+        )
+        delete_all = self.client.post(
+            reverse("api:webpage-permanent-delete-all"),
+            {"confirm": True},
+            format="json",
+        )
+
+        listed_ids = [item["id"] for item in listed.data.get("results", listed.data)]
+        self.assertEqual(listed_ids, [own_deleted.id])
+        self.assertEqual(bulk_restore.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(permanent_delete.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(delete_all.status_code, status.HTTP_200_OK)
+        self.assertFalse(WebPage.objects.filter(pk=own_deleted.id).exists())
+        self.assertTrue(WebPage.objects.filter(pk=foreign_deleted.id, is_deleted=True).exists())
+
+    def test_page_version_maintenance_cannot_pack_another_tenant(self):
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        other_tenant = Tenant.objects.create(
+            name="Other packing tenant",
+            identifier="other-packing-tenant",
+            created_by=self.user,
+        )
+        foreign_page = WebPage.objects.create(
+            title="Foreign packing page",
+            slug="foreign-packing-page",
+            tenant=other_tenant,
+            created_by=self.user,
+            last_modified_by=self.user,
+        )
+
+        for route in ("api:pageversion-pack-aggressive", "api:pageversion-pack-drafts"):
+            response = self.client.post(reverse(route), {"page_id": foreign_page.id}, format="json")
+            self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_page_scoped_save_atomically_creates_and_updates_first_working_copy(self):
         live = self.publish_initial()
 

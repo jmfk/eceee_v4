@@ -44,6 +44,20 @@ class ECEEEAPIClientTest(unittest.TestCase):
             self.assertIn(b"file-content", body)
             self.assertTrue(content_type.startswith("multipart/form-data; boundary="))
 
+    def test_redirects_are_refused_to_protect_the_authorization_header(self):
+        handler = eceee_api.NoRedirectHandler()
+
+        redirected = handler.redirect_request(
+            object(),
+            object(),
+            302,
+            "Found",
+            {},
+            "https://other.example/api/v1/webpages/pages/",
+        )
+
+        self.assertIsNone(redirected)
+
 
 if __name__ == "__main__":
     unittest.main()
