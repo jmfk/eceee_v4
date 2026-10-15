@@ -54,7 +54,7 @@ class NavbarWidgetTests(SimpleTestCase):
 
     def test_widget_css_keeps_both_desktop_menus_inside_the_navbar(self):
         self.assertIn("column-gap: 8px;", self.widget.widget_css)
-        self.assertIn("padding: var(--navbar-primary-padding, 0);", self.widget.widget_css)
+        self.assertIn("padding: var(--navbar-primary-padding, 0 0 0 20px);", self.widget.widget_css)
         self.assertIn("@media (min-width: 1024px)", self.widget.widget_css)
         self.assertIn("column-gap: 24px;", self.widget.widget_css)
         self.assertIn("padding: var(--navbar-secondary-padding, 0);", self.widget.widget_css)

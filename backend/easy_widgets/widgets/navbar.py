@@ -196,7 +196,7 @@ class NavbarWidget(BaseWidget):
         .navbar-primary-menu {
             column-gap: 8px;
             flex: 1 0 auto;
-            padding: var(--navbar-primary-padding, 0);
+            padding: var(--navbar-primary-padding, 0 0 0 20px);
         }
 
         @media (min-width: 1024px) {
