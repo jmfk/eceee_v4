@@ -234,6 +234,29 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(screen.getByTitle('Live theme preview')).not.toHaveAttribute('srcdoc')
     })
 
+    it('uses CSS zoom so a scaled desktop iframe remains painted and scrollable', async () => {
+        const observers = []
+        vi.stubGlobal('ResizeObserver', class ResizeObserver {
+            constructor(callback) {
+                this.callback = callback
+                observers.push(this)
+            }
+
+            observe(target) { this.target = target }
+            disconnect() {}
+        })
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        const iframe = await screen.findByTitle('Live theme preview')
+        const frameObserver = observers.find((observer) => observer.target === iframe.parentElement)
+
+        expect(frameObserver).toBeDefined()
+        act(() => frameObserver.callback([{ contentRect: { width: 640 } }]))
+
+        expect(iframe.style.zoom).toBe('0.5')
+        expect(iframe.style.height).toBe('100%')
+        expect(iframe.style.transform).toBe('')
+    })
+
     it('opens the dedicated layout mode after local Designer changes are settled', async () => {
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         const editLayouts = await screen.findByRole('button', { name: 'Edit layouts' })
