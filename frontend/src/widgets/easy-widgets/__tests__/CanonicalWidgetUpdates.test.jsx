@@ -222,6 +222,26 @@ describe('canonical widget update ownership', () => {
         expect(publishUpdateMock).not.toHaveBeenCalled()
     })
 
+    it('BannerWidget display mode preserves the canonical render class contract', () => {
+        const { container } = render(
+            <BannerWidget
+                mode="display"
+                widgetId="banner-preview"
+                slotName="main"
+                config={{
+                    bannerMode: 'text',
+                    textContent: '<p>Preview banner</p>',
+                    show_border: true
+                }}
+                context={{ pageId: '101' }}
+            />
+        )
+
+        const banner = container.querySelector('.banner-widget')
+        expect(banner).toHaveClass('cms-content', 'border-enabled')
+        expect(banner).not.toHaveClass('container')
+    })
+
     it('BannerWidget hydrates external UDC updates without echoing user edits', async () => {
         const onConfigChange = vi.fn()
 

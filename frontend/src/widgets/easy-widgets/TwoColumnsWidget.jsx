@@ -228,7 +228,7 @@ const TwoColumnsWidget = ({
         const fullWidgetPath = [...widgetPath, slotName, widget.id];
 
         return (
-            <div key={uniqueKey} className="widget-wrapper">
+            <div key={uniqueKey} className="two-col-widget-wrapper">
                 <PageWidgetFactory
                     widget={widget}
                     slotName={slotName}
@@ -424,23 +424,19 @@ const TwoColumnsWidget = ({
     // Default rendering helper function
     function renderDefaultTwoColumns() {
         const layoutStyle = config.layoutStyle || config.layout_style || '3:3'
-        const gridClasses = getGridClasses(layoutStyle)
+        const ratioClass = `two-col-ratio-${layoutStyle.replace(/:/g, '-')}`
 
         return (
-            <div className={`grid grid-cols-1 ${gridClasses} gap-4 w-full mb-4`}>
-                <div className="two-col-slot left min-h-[50px]" data-slot="left" data-widget-slot="left" data-owner-widget-type="easy_widgets.TwoColumnsWidget">
+            <div className={`two-columns-widget ${ratioClass}`}>
+                <div className="two-col-slot left" data-slot="left" data-widget-slot="left" data-owner-widget-type="easy_widgets.TwoColumnsWidget">
                     {slotsData.left && slotsData.left.length > 0 ? (
                         slotsData.left.map((widget, index) => renderWidget(widget, 'left', index))
-                    ) : (
-                        <div className="p-4 text-center text-gray-400">Left column</div>
-                    )}
+                    ) : null}
                 </div>
-                <div className="two-col-slot right min-h-[50px]" data-slot="right" data-widget-slot="right" data-owner-widget-type="easy_widgets.TwoColumnsWidget">
+                <div className="two-col-slot right" data-slot="right" data-widget-slot="right" data-owner-widget-type="easy_widgets.TwoColumnsWidget">
                     {slotsData.right && slotsData.right.length > 0 ? (
                         slotsData.right.map((widget, index) => renderWidget(widget, 'right', index))
-                    ) : (
-                        <div className="p-4 text-center text-gray-400">Right column</div>
-                    )}
+                    ) : null}
                 </div>
             </div>
         );

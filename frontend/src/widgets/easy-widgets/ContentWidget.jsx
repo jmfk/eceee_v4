@@ -297,14 +297,25 @@ const ContentWidget = memo(({
         )
     }
 
+    const variantClasses = localConfig.variantClasses || localConfig.variant_classes || ''
+    const showBorder = localConfig.showBorder ?? localConfig.show_border ?? false
+
     return (
-        <div className="content-widget min-h-32">
+        <div
+            id={localConfig.anchor || undefined}
+            className={`content-widget min-h-32${variantClasses ? ` ${variantClasses}` : ''}${showBorder ? ' border-enabled' : ''}`}
+        >
             {localConfig.content && <div dangerouslySetInnerHTML={{ __html: localConfig.content }} />}
         </div>
     )
 }, (prevProps, nextProps) => {
     return (
         prevProps.config?.content === nextProps.config?.content &&
+        (prevProps.config?.showBorder ?? prevProps.config?.show_border) ===
+            (nextProps.config?.showBorder ?? nextProps.config?.show_border) &&
+        (prevProps.config?.variantClasses ?? prevProps.config?.variant_classes) ===
+            (nextProps.config?.variantClasses ?? nextProps.config?.variant_classes) &&
+        prevProps.config?.anchor === nextProps.config?.anchor &&
         prevProps.mode === nextProps.mode &&
         prevProps.themeId === nextProps.themeId &&
         prevProps.widgetId === nextProps.widgetId &&

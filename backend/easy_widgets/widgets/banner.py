@@ -205,7 +205,10 @@ class BannerWidget(BaseWidget):
     .banner-widget.border-disabled {
         outline: none;
     }
-    .banner-widget:last-child {
+    .layout-slot > .widget-item:last-child > .banner-widget,
+    [data-widget-slot] > .widget-item:last-child > .banner-widget,
+    .two-col-widget-wrapper:last-child > .widget-item > .banner-widget,
+    .three-col-widget-wrapper:last-child > .widget-item > .banner-widget {
         margin-bottom: 0;
     }
     .banner-background {

@@ -113,13 +113,20 @@ describe('ContentWidget', () => {
     it('renders in display mode with provided content', () => {
         const { container } = render(
             <ContentWidget
-                config={{ content: '<p>Hello world</p>' }}
+                config={{
+                    content: '<p>Hello world</p>',
+                    show_border: true,
+                    variant_classes: 'article-body',
+                    anchor: 'introduction'
+                }}
                 mode="display"
                 widgetId="w1"
                 slotName="main"
             />
         )
         expect(container.innerHTML).toContain('Hello world')
+        expect(container.firstElementChild).toHaveClass('content-widget', 'border-enabled', 'article-body')
+        expect(container.firstElementChild).toHaveAttribute('id', 'introduction')
     })
 
     it('emits one canonical parent update and does not publish directly when editor fires onChange', async () => {
