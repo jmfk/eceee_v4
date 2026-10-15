@@ -16,7 +16,7 @@ class Command(BaseCommand):
         if options["check"]:
             current = MANIFEST_PATH.read_text(encoding="utf-8") if MANIFEST_PATH.exists() else ""
             if current != generated:
-                raise CommandError("Publisher renderer manifest is stale; run export_publisher_manifest.")
+                raise CommandError("Shared render manifest is stale; run export_publisher_manifest.")
             self.stdout.write(self.style.SUCCESS("Publisher renderer manifest is current."))
             return
 

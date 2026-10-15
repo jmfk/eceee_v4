@@ -3,12 +3,17 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PUBLIC_RENDER_CSS } from '../../rendering/publicRenderCss'
-import { buildDesignerTheme, buildEditorThemeCSS, buildThemeCSS, compileEditorCSS } from '../editorThemeCSS'
+import manifest from '../../rendering/generated/render-manifest.json'
+import { compileRenderStyles } from '../../rendering/themeCssCompiler'
+import { buildDesignerTheme, buildEditorThemeCSS, compileEditorCSS } from '../editorThemeCSS'
 
 const testDir = dirname(fileURLToPath(import.meta.url))
 const frontendRoot = resolve(testDir, '../../..')
 const widgetSourcesDir = resolve(frontendRoot, '../backend/easy_widgets/widgets')
-const editorWidgetBaseCSS = readFileSync(resolve(frontendRoot, 'src/styles/editorWidgetBase.css'), 'utf8')
+const editorWidgetBaseCSS = Object.values(manifest.widgets).map(widget => [
+    ...Object.entries(widget.cssVariables || {}).map(([name, value]) => `--${name}: ${value};`),
+    widget.css || '',
+].join('\n')).join('\n')
 const normalizeCSS = css => css.replace(/\s+/g, ' ').trim()
 
 const options = {
@@ -218,7 +223,7 @@ describe('buildEditorThemeCSS', () => {
 
 describe('shared TypeScript theme CSS', () => {
     it('builds an unscoped stylesheet for iframe and standalone rendering', () => {
-        const result = buildThemeCSS({ theme: { colors: { brand: '#123456' }, customCss: 'body { color: var(--brand); }' } })
+        const result = compileRenderStyles({ theme: { colors: { brand: '#123456' }, customCss: 'body { color: var(--brand); }' } }).css
 
         expect(result).toContain(':root {\n  --brand: #123456;')
         expect(result).toContain('body { color: var(--brand); }')
@@ -226,18 +231,18 @@ describe('shared TypeScript theme CSS', () => {
     })
 
     it('falls back to legacy CSS variables when the modern color palette is empty', () => {
-        const result = buildThemeCSS({
+        const result = compileRenderStyles({
             theme: {
                 colors: {},
                 cssVariables: { legacyBrand: '#654321' },
             },
-        })
+        }).css
 
         expect(result).toContain('--legacyBrand: #654321;')
     })
 
     it('keeps legacy element CSS when structural spacing is added', () => {
-        const result = buildThemeCSS({
+        const result = compileRenderStyles({
             theme: {
                 htmlElements: { h1: { color: 'red' } },
                 designGroups: {
@@ -248,7 +253,7 @@ describe('shared TypeScript theme CSS', () => {
                     }],
                 },
             },
-        })
+        }).css
 
         expect(result).toContain('h1 {\n  color: red;\n}')
         expect(result).toContain('[data-render-layout="main_layout"] .layout-slot[data-slot-name="main"]')
@@ -256,7 +261,7 @@ describe('shared TypeScript theme CSS', () => {
     })
 
     it('includes gallery and carousel style collections', () => {
-        const result = buildThemeCSS({
+        const result = compileRenderStyles({
             theme: {
                 galleryStyles: {
                     logos: { css: '.partner-logos { gap: 1rem; }' },
@@ -265,7 +270,7 @@ describe('shared TypeScript theme CSS', () => {
                     hero: { css: '.hero-carousel { min-height: 20rem; }' },
                 },
             },
-        })
+        }).css
 
         expect(result).toContain('.partner-logos { gap: 1rem; }')
         expect(result).toContain('.hero-carousel { min-height: 20rem; }')
@@ -295,7 +300,7 @@ describe('shared TypeScript theme CSS', () => {
     })
 
     it('preserves the theme image density without backend image rendering', () => {
-        const result = buildThemeCSS({
+        const result = compileRenderStyles({
             theme: {
                 designGroups: {
                     groups: [{
@@ -308,7 +313,7 @@ describe('shared TypeScript theme CSS', () => {
                     }],
                 },
             },
-        })
+        }).css
 
         expect(result).toContain("background-image: image-set(url('https://images.test/header.png') 2x)")
     })

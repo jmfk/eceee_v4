@@ -66,7 +66,7 @@ function normalizeForCSS(value) {
  * @param {Object} breakpoints - Breakpoint configuration (defaults to DEFAULT_BREAKPOINTS)
  * @returns {string} Generated CSS
  */
-export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', widgetType = null, slot = null, frontendScoped = false, breakpoints = null) {
+export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', widgetType = undefined, slot = undefined, frontendScoped = false, breakpoints = null) {
     // Use provided breakpoints or defaults
     const bps = breakpoints || DEFAULT_BREAKPOINTS;
     if (!designGroups) {
@@ -81,11 +81,11 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
         const groupSlot = group.slot;
 
         // Check if group applies to the current context
-        const widgetMatch = widgetType === null
+        const widgetMatch = widgetType == null
             || groupWidgetType === null
             || groupWidgetType === undefined
             || groupWidgetType === widgetType;
-        const slotMatch = slot === null
+        const slotMatch = slot == null
             || groupSlot === null
             || groupSlot === undefined
             || groupSlot === slot;
@@ -203,6 +203,20 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
             for (const [propertyName, propertyValue] of Object.entries(styles)) {
                 const cssProperty = camelToKebab(propertyName);
                 let value = propertyValue;
+
+                if (propertyName === 'images') continue;
+                if (propertyName === 'backgroundImage' && value && typeof value === 'object' && value.url) {
+                    cssRule += `  background-image: url('${value.url}');\n`;
+                    if (value.oneX && value.twoX) {
+                        cssRule += `  background-image: -webkit-image-set(url('${value.oneX}') 1x, url('${value.twoX}') 2x);\n`;
+                        cssRule += `  background-image: image-set(url('${value.oneX}') 1x, url('${value.twoX}') 2x);\n`;
+                    }
+                    if (value.backgroundSize) cssRule += `  background-size: ${value.backgroundSize};\n`;
+                    if (value.backgroundPosition) cssRule += `  background-position: ${value.backgroundPosition};\n`;
+                    if (value.backgroundRepeat) cssRule += `  background-repeat: ${value.backgroundRepeat};\n`;
+                    if (value.useAspectRatio === true && value.aspectRatio) cssRule += `  aspect-ratio: ${value.aspectRatio};\n`;
+                    continue;
+                }
 
                 // Handle color references (named colors from palette)
                 // Check for any color-related property
@@ -327,12 +341,20 @@ export function generateDesignGroupsCSS(designGroups, colors = {}, scope = '', w
                         if (prop === 'images') continue; // Skip images - handled as CSS variables
 
                         // Handle composite image properties (backgroundImage with url field)
-                        if (prop === 'backgroundImage' && value && typeof value === 'object' && value.url) {
-                            cssRules.push(`  background-image: url('${value.url}');`);
+                        if ((prop === 'backgroundImage' || prop === 'background_image') && value && typeof value === 'object') {
+                            const imageUrl = value.url || value.fileUrl || value.file_url || value.publicUrl
+                                || value.public_url || value.imgproxyBaseUrl || value.imgproxy_base_url;
+                            if (!imageUrl) continue;
+                            cssRules.push(`  background-image: url('${imageUrl}');`);
+                            const oneX = value.oneX || value.one_x;
+                            const twoX = value.twoX || value.two_x;
                             const dpr = Number(value.dpr);
-                            if (Number.isFinite(dpr) && dpr > 1) {
-                                cssRules.push(`  background-image: -webkit-image-set(url('${value.url}') ${dpr}x);`);
-                                cssRules.push(`  background-image: image-set(url('${value.url}') ${dpr}x);`);
+                            if (oneX && twoX) {
+                                cssRules.push(`  background-image: -webkit-image-set(url('${oneX}') 1x, url('${twoX}') 2x);`);
+                                cssRules.push(`  background-image: image-set(url('${oneX}') 1x, url('${twoX}') 2x);`);
+                            } else if (Number.isFinite(dpr) && dpr > 1) {
+                                cssRules.push(`  background-image: -webkit-image-set(url('${imageUrl}') ${dpr}x);`);
+                                cssRules.push(`  background-image: image-set(url('${imageUrl}') ${dpr}x);`);
                             }
 
                             // Only output properties if explicitly set (not empty strings)
@@ -453,7 +475,7 @@ export function generateColorsCSS(colors, scope = ':root') {
  * @returns {string} kebab-case text
  */
 function camelToKebab(text) {
-    return text.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+    return text.replace(/_/g, '-').replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 }
 
 /**

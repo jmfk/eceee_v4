@@ -6,40 +6,18 @@
  */
 
 import { getBreakpoints } from './themeUtils';
+import { compileResponsiveCss } from '../rendering/themeCssCompiler';
 
 /**
- * Generate CSS with media queries from breakpoint object
- * Used for client-side preview only - production CSS comes from styles.css API
+ * Generate CSS with the canonical render compiler's responsive rules.
+ * ComponentStyleRenderer uses this only for its editor-local scope step.
  * 
  * @param {string|Object} cssObj - CSS as string (legacy) or object with breakpoints
  * @param {Object} theme - Theme object with breakpoints
  * @returns {string} - Generated CSS with media queries
  */
 export function generateCSSFromBreakpoints(cssObj, theme) {
-    // Legacy support - if CSS is already a string, return as-is
-    if (typeof cssObj === 'string') {
-        return cssObj;
-    }
-
-    // Get breakpoints from theme
-    const breakpoints = getBreakpoints(theme);
-
-    const parts = [];
-
-    // Base styles (xs - no media query)
-    if (cssObj.xs) {
-        parts.push(cssObj.xs);
-    }
-
-    // Generate media queries for larger breakpoints (mobile-first)
-    ['sm', 'md', 'lg', 'xl'].forEach(bp => {
-        if (cssObj[bp] && cssObj[bp].trim() && breakpoints[bp]) {
-            const mediaQuery = `@media (min-width: ${breakpoints[bp]}px) {\n${cssObj[bp]}\n}`;
-            parts.push(mediaQuery);
-        }
-    });
-
-    return parts.join('\n\n');
+    return compileResponsiveCss(cssObj, getBreakpoints(theme));
 }
 
 /**

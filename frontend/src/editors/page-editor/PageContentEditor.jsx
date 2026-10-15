@@ -60,9 +60,8 @@ const PageContentEditor = forwardRef(({
     const { error: themeStyleError, scopeId: themeScopeId } = useEditorThemeStyles({
         versionId,
         theme: pageVersionData?.effectiveTheme || currentVersion?.effectiveTheme || webpageData?.effectiveTheme,
-        pageCssVariables: webpageData?.pageCssVariables ?? pageVersionData?.pageCssVariables,
-        pageCustomCss: webpageData?.pageCustomCss ?? pageVersionData?.pageCustomCss,
-        enableCssInjection: (webpageData?.enableCssInjection ?? pageVersionData?.enableCssInjection) !== false,
+        page: webpageData,
+        version: pageVersionData || currentVersion,
         enabled: applyPageTheme && !!versionId
     });
 

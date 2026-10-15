@@ -9,8 +9,8 @@ import { DESIGNER_PREVIEW_BREAKPOINTS, designerPreviewWidth } from '../component
 import StatusBar from '../components/StatusBar'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { buildResolvedRenderModel } from '../rendering/directRender'
-import { googleFontsStylesheetUrl } from '../rendering/primitives'
-import { buildDesignerTheme, buildThemeCSS } from '../utils/editorThemeCSS'
+import { compileRenderStyles } from '../rendering/themeCssCompiler'
+import { buildDesignerTheme } from '../utils/editorThemeCSS'
 
 const workspaceDraftPayload = (workspace) => workspace ? ({
     draftVersion: workspace.draftVersion,
@@ -57,10 +57,7 @@ const DesignerThemeWorkspacePage = () => {
     const payload = useMemo(() => workspaceDraftPayload(workspace), [workspace])
     const preview = useMemo(() => {
         const theme = buildDesignerTheme(workspace)
-        return {
-            css: theme ? buildThemeCSS({ theme }) : '',
-            fontUrl: googleFontsStylesheetUrl(theme?.fonts),
-        }
+        return compileRenderStyles({ theme })
     }, [workspace])
 
     const acceptWorkspace = useCallback((next) => {

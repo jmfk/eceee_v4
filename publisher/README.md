@@ -17,7 +17,7 @@ The reference Django renderer is available at `http://summerstudy.localhost:1010
 
 ## Publisher manifest
 
-Registered widget CSS, CSS variables, layout parts and variant metadata plus the built base CSS are stored in `src/generated/publisher-manifest.json`. Regenerate the deterministic artifact after a backend widget or base CSS change:
+Registered widget CSS, CSS variables, layout parts and variant metadata plus the built base CSS are stored in `../frontend/src/rendering/generated/render-manifest.json`. The frontend renderers and publisher import the same deterministic artifact. Regenerate it after a backend widget or base CSS change:
 
 ```sh
 make publisher-manifest

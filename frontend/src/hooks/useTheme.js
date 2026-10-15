@@ -48,9 +48,8 @@ export const useThemeData = ({ pageId = null, enabled = true } = {}) => {
 export const useEditorThemeStyles = ({
     versionId = null,
     theme = null,
-    pageCssVariables = null,
-    pageCustomCss = '',
-    enableCssInjection = true,
+    page = null,
+    version = null,
     enabled = true,
 } = {}) => {
     const componentIdRef = useRef(`editor-theme-${Math.random().toString(36).slice(2, 11)}`)
@@ -67,9 +66,8 @@ export const useEditorThemeStyles = ({
             return {
                 css: buildEditorThemeCSS({
                     theme,
-                    pageCssVariables,
-                    pageCustomCss,
-                    enableCssInjection,
+                    page,
+                    version,
                     scopeId: styleKey,
                 }),
                 compileError: null,
@@ -78,13 +76,12 @@ export const useEditorThemeStyles = ({
             return { css: '', compileError: error }
         }
     }, [
-        enableCssInjection,
         enabled,
-        pageCssVariables,
-        pageCustomCss,
+        page,
         scopeSupported,
         styleKey,
         theme,
+        version,
     ])
 
     useEffect(() => {

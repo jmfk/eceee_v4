@@ -24,7 +24,7 @@ describe('PageContentEditor theme settings', () => {
         mocks.useEditorThemeStyles.mockClear()
     })
 
-    it('uses live webpage CSS settings before saved version fallbacks', () => {
+    it('passes page and version CSS separately to the canonical resolver', () => {
         render(
             <PageContentEditor
                 currentVersion={{ id: 83 }}
@@ -42,13 +42,12 @@ describe('PageContentEditor theme settings', () => {
         )
 
         expect(mocks.useEditorThemeStyles).toHaveBeenLastCalledWith(expect.objectContaining({
-            pageCssVariables: { '--page-color': 'live' },
-            pageCustomCss: '.live {}',
-            enableCssInjection: false
+            page: expect.objectContaining({ pageCustomCss: '.live {}', enableCssInjection: false }),
+            version: expect.objectContaining({ pageCustomCss: '.saved {}', enableCssInjection: true })
         }))
     })
 
-    it('falls back to version CSS settings when webpage fields are absent', () => {
+    it('passes an empty page separately from version CSS', () => {
         render(
             <PageContentEditor
                 currentVersion={{ id: 83 }}
@@ -62,9 +61,8 @@ describe('PageContentEditor theme settings', () => {
         )
 
         expect(mocks.useEditorThemeStyles).toHaveBeenLastCalledWith(expect.objectContaining({
-            pageCssVariables: { '--page-color': 'saved' },
-            pageCustomCss: '.saved {}',
-            enableCssInjection: false
+            page: {},
+            version: expect.objectContaining({ pageCustomCss: '.saved {}', enableCssInjection: false })
         }))
     })
 })
