@@ -3,7 +3,7 @@ import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Bra
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel, createPageRenderModel, withLayoutPreviewPlaceholders } from '../../rendering/adapters'
-import { compileRenderStyles } from '../../rendering/themeCssCompiler'
+import { useBrowserRenderStyles } from '../../rendering/useBrowserRenderStyles'
 import { validateLayoutDefinition } from '../../rendering/themeLayoutRenderer'
 import { buildDesignerTheme } from '../../utils/editorThemeCSS'
 import MediaSelectModal from '../media/MediaSelectModal'
@@ -768,10 +768,9 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
         }
     }
 
-    const layoutThemePreview = useMemo(() => {
-        const theme = buildDesignerTheme(workspace)
-        return compileRenderStyles({ theme })
-    }, [workspace])
+    const layoutPreviewTheme = useMemo(() => buildDesignerTheme(workspace), [workspace])
+    const layoutPreviewInput = useMemo(() => ({ theme: layoutPreviewTheme }), [layoutPreviewTheme])
+    const layoutThemePreview = useBrowserRenderStyles(layoutPreviewInput)
 
     const canvasModel = useMemo(() => {
         if (!selectedLayout) return null

@@ -6,7 +6,7 @@ import PreviewSizeManager from './PreviewSizeManager';
 import { resolvePagePreviewModel } from './resolvePagePreviewModel';
 import RenderFrame from '../rendering/RenderFrame';
 import { createPageRenderModel } from '../rendering/adapters';
-import { compileRenderStyles } from '../rendering/themeCssCompiler';
+import { useBrowserRenderStyles } from '../rendering/useBrowserRenderStyles';
 import type { RenderPageModel } from '../rendering/types';
 
 interface PreviewSize {
@@ -107,11 +107,12 @@ const PagePreview: React.FC<PagePreviewProps> = ({
     const effectiveTheme = pageVersionData?.effectiveTheme
         || (typeof pageVersionData?.theme === 'object' ? pageVersionData.theme : null)
         || webpageData?.effectiveTheme;
-    const compiledStyles = useMemo(() => compileRenderStyles({
+    const compiledStylesInput = useMemo(() => ({
         theme: effectiveTheme,
         page: webpageData,
         version: pageVersionData,
     }), [effectiveTheme, webpageData, pageVersionData]);
+    const compiledStyles = useBrowserRenderStyles(compiledStylesInput);
 
     const layoutName = layoutData?.layout?.name || layoutData?.name || pageVersionData?.layoutKey || pageVersionData?.codeLayout
         || effectiveTheme?.layouts?.default_layout_key || effectiveTheme?.layouts?.defaultLayoutKey || 'main_layout';

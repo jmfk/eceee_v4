@@ -18,8 +18,8 @@ export default async function ThemeErrorPage({ params }: { params: Promise<{ sta
   });
   if (!model) return <main><h1>{status} — Error</h1></main>;
   return <>
-    {model.fontUrl && <link rel="stylesheet" href={model.fontUrl} />}
-    <style>{model.themeCss}</style>
+    {model.fontUrl && <link data-eceee-render-font rel="stylesheet" href={model.fontUrl} />}
+    <style data-eceee-render-css>{model.themeCss}</style>
     <PublishedPage model={model} />
   </>;
 }

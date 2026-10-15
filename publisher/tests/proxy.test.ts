@@ -3,6 +3,14 @@ import { NextRequest } from 'next/server';
 import { proxy } from '../proxy';
 
 describe('theme error route proxy', () => {
+  it('exposes the publisher build identifier on ordinary routes', () => {
+    process.env.APP_VERSION = 'v-test-build';
+    const response = proxy(new NextRequest('https://example.org/news'));
+
+    expect(response.headers.get('x-eceee-build')).toBe('v-test-build');
+    delete process.env.APP_VERSION;
+  });
+
   it.each([403, 500, 503])('rewrites /%s to the theme renderer and preserves the error status', statusCode => {
     const response = proxy(new NextRequest(`https://example.org/${statusCode}`));
 

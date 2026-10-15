@@ -1846,8 +1846,12 @@ export const RenderFrameRuntime = () => {
             }
         }
         window.addEventListener('message', receive)
+        document.documentElement.dataset.eceeeRenderFrameReady = 'true'
         window.parent.postMessage({ source: 'eceee-render-frame', action: 'ready' }, '*')
-        return () => window.removeEventListener('message', receive)
+        return () => {
+            delete document.documentElement.dataset.eceeeRenderFrameReady
+            window.removeEventListener('message', receive)
+        }
     }, [])
 
     useLayoutEffect(() => {

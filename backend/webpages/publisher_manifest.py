@@ -8,9 +8,8 @@ from django.conf import settings
 from webpages.theme_layouts import default_special_pages
 from webpages.widget_registry import widget_type_registry
 
-MANIFEST_VERSION = 1
+MANIFEST_VERSION = 2
 MANIFEST_PATH = Path(settings.BASE_DIR).parent / "frontend" / "src" / "rendering" / "generated" / "render-manifest.json"
-BASE_CSS_PATH = Path(settings.BASE_DIR) / "static" / "css" / "tailwind.output.css"
 
 
 def _layout_parts(widget):
@@ -39,7 +38,6 @@ def build_publisher_manifest():
         }
     return {
         "formatVersion": MANIFEST_VERSION,
-        "baseCss": BASE_CSS_PATH.read_text(encoding="utf-8"),
         "defaultSpecialPages": default_special_pages(),
         "widgets": widgets,
     }

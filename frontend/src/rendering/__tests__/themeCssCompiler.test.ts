@@ -91,7 +91,7 @@ describe('canonical render CSS compiler', () => {
             page: { pageCustomCss: '.page-order {}' },
         })
         const markers = [
-            '/*! tailwindcss',
+            'html,body,#root{margin:0',
             '.site-renderer{min-height:100vh}',
             '/* Widget:',
             '--orderColor: #123456',
@@ -104,6 +104,8 @@ describe('canonical render CSS compiler', () => {
         const positions = markers.map(marker => css.indexOf(marker))
         expect(positions.every(position => position >= 0)).toBe(true)
         expect(positions).toEqual([...positions].sort((left, right) => left - right))
+        expect(css).not.toContain('/*! tailwindcss')
+        expect(css.match(/\.media-insert img\{/g)).toHaveLength(1)
     })
 
     it.each([

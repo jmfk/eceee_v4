@@ -9,6 +9,36 @@ const repoRoot = resolve(testDir, '../../..')
 const readSource = path => readFileSync(resolve(repoRoot, path), 'utf8')
 
 describe('page editor active/legacy boundaries', () => {
+    it('keeps standalone render bootstrapping isolated from editor CSS and App', () => {
+        const mainSource = readSource('src/main.jsx')
+        const editorBootstrap = readSource('src/editorBootstrap.jsx')
+        const renderBootstrap = readSource('src/rendering/renderBootstrap.tsx')
+
+        expect(mainSource).not.toMatch(/import ['"]\.\/index\.css['"]/)
+        expect(mainSource).not.toMatch(/import App from/)
+        expect(mainSource).toContain("import('./rendering/renderBootstrap')")
+        expect(mainSource).toContain("import('./editorBootstrap')")
+        expect(editorBootstrap).toContain("import './index.css'")
+        expect(editorBootstrap).toContain("import App from './App.jsx'")
+        expect(renderBootstrap).not.toContain('index.css')
+        expect(renderBootstrap).not.toMatch(/from ['"][^'"]*App/)
+    })
+
+    it('keeps public render components independent of Tailwind utility classes', () => {
+        const publicRenderFiles = [
+            'src/rendering/RenderDocument.tsx',
+            'src/rendering/StandaloneRenderRuntime.tsx',
+            'src/rendering/StandaloneVersionRenderRuntime.tsx',
+            'src/rendering/primitives.tsx',
+            'src/rendering/widgetRenderers.tsx',
+        ]
+        const tailwindUtilityInStaticClassName = /className=["'][^"']*\b(?:min-h-screen|w-full|p-[0-9]+|m[trblxy]?-[0-9]+|text-(?:center|gray-[0-9]+|red-[0-9]+|sm|lg)|bg-[a-z]+-[0-9]+|border|block)\b[^"']*["']/
+
+        for (const file of publicRenderFiles) {
+            expect(readSource(file), `${file} must use semantic render classes`).not.toMatch(tailwindUtilityInStaticClassName)
+        }
+    })
+
     it('keeps active React editor files off stale LayoutRenderer imperative APIs', () => {
         const activeFiles = [
             'src/components/PageEditor.jsx',

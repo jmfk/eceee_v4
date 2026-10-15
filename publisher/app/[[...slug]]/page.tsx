@@ -36,5 +36,5 @@ export default async function Page(props: Props) {
       publicForms: { ...model.context.publicForms, result },
     },
   } : model;
-  return <>{model.fontUrl && <link rel="stylesheet" href={model.fontUrl} />}<style>{model.themeCss}</style><PublishedPage model={renderModel} /></>;
+  return <>{model.fontUrl && <link data-eceee-render-font rel="stylesheet" href={model.fontUrl} />}<style data-eceee-render-css>{model.themeCss}</style><PublishedPage model={renderModel} /></>;
 }

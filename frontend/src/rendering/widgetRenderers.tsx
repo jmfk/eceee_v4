@@ -71,7 +71,7 @@ const HeadlineRender: WidgetRenderComponent = ({ widget }) => {
 }
 
 const HeaderRender: WidgetRenderComponent = ({ widget }) => (
-    <header className="widget-type-header header-widget block w-full" />
+    <header className="widget-type-header header-widget" />
 )
 
 const FooterRender: WidgetRenderComponent = ({ widget, renderWidgets }) => (
@@ -304,8 +304,8 @@ const TableRender: WidgetRenderComponent = ({ widget }) => {
     ].filter(Boolean).join(' ')
     const columnWidths = asArray<string>(value(config, 'columnWidths', 'column_widths'))
     return <div className={className}>
-        <table className={`${value(config, 'tableWidth', 'table_width') === 'full' ? 'w-full' : ''}${showBorders ? ' border' : ''}`} style={{ borderCollapse: 'collapse', borderColor: showBorders ? '#d1d5db' : undefined }}>
-            {value(config, 'caption') && <caption className="table-caption text-sm text-gray-600 mb-2">{value(config, 'caption')}</caption>}
+        <table className={value(config, 'tableWidth', 'table_width') === 'full' ? 'table-width-full' : undefined} style={{ borderCollapse: 'collapse', borderColor: showBorders ? '#d1d5db' : undefined }}>
+            {value(config, 'caption') && <caption className="table-caption">{value(config, 'caption')}</caption>}
             {columnWidths.length > 0 && <colgroup>{columnWidths.map((width, index) => <col key={index} style={{ width }} />)}</colgroup>}
             <tbody>{rows.map((row, rowIndex) => {
                 const normalizedRow = Array.isArray(row) ? { cells: row.map((content) => ({ content })) } : row

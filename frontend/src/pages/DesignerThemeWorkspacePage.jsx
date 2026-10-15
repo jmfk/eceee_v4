@@ -9,7 +9,7 @@ import { DESIGNER_PREVIEW_BREAKPOINTS, designerPreviewWidth } from '../component
 import StatusBar from '../components/StatusBar'
 import { useGlobalNotifications } from '../contexts/GlobalNotificationContext'
 import { buildResolvedRenderModel } from '../rendering/directRender'
-import { compileRenderStyles } from '../rendering/themeCssCompiler'
+import { useBrowserRenderStyles } from '../rendering/useBrowserRenderStyles'
 import { buildDesignerTheme } from '../utils/editorThemeCSS'
 
 const workspaceDraftPayload = (workspace) => workspace ? ({
@@ -55,10 +55,9 @@ const DesignerThemeWorkspacePage = () => {
     }, [])
 
     const payload = useMemo(() => workspaceDraftPayload(workspace), [workspace])
-    const preview = useMemo(() => {
-        const theme = buildDesignerTheme(workspace)
-        return compileRenderStyles({ theme })
-    }, [workspace])
+    const previewTheme = useMemo(() => buildDesignerTheme(workspace), [workspace])
+    const previewInput = useMemo(() => ({ theme: previewTheme }), [previewTheme])
+    const preview = useBrowserRenderStyles(previewInput)
 
     const acceptWorkspace = useCallback((next) => {
         baselineSignatureRef.current = workspaceSignature(next)

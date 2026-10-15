@@ -78,6 +78,7 @@ services:
       PUBLISHER_IMGPROXY_KEY: ${IMGPROXY_KEY}
       PUBLISHER_IMGPROXY_SALT: ${IMGPROXY_SALT}
       PUBLISHER_IMGPROXY_PUBLIC_URL: /imgproxy
+      APP_VERSION: ${IMAGE_TAG:-unknown}
     depends_on:
       db:
         condition: service_healthy

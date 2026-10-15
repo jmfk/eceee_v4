@@ -10,8 +10,8 @@ export default async function NotFound() {
   const model = await buildThemeErrorPageModel(database, host, 404);
   if (!model) return <main><h1>Page not found</h1></main>;
   return <>
-    {model.fontUrl && <link rel="stylesheet" href={model.fontUrl} />}
-    <style>{model.themeCss}</style>
+    {model.fontUrl && <link data-eceee-render-font rel="stylesheet" href={model.fontUrl} />}
+    <style data-eceee-render-css>{model.themeCss}</style>
     <PublishedPage model={model} />
   </>;
 }

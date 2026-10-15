@@ -159,7 +159,7 @@ describe('buildEditorThemeCSS', () => {
         })
 
         expect(result).toContain('--primary: #123456')
-        expect(result).toContain('fonts.googleapis.com')
+        expect(result).not.toContain('fonts.googleapis.com')
         expect(result).toContain('--contentWidth: 72rem')
         expect(result).toContain('.card')
         expect(result).toContain(':scope .custom')
