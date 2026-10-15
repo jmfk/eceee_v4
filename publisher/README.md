@@ -8,12 +8,13 @@ From the repository root run:
 
 ```sh
 make servers
-make publisher-dev
 ```
 
-The reference Django renderer is available at `http://summerstudy.localhost:10101` and the Next renderer with HMR at `http://summerstudy.localhost:10115`. No `/etc/hosts` entry is needed: names below `.localhost` resolve to the loopback interface, and `summerstudy.localhost` is already assigned to the matching root page in the local database. Port `10115` is the registered `publisher-preview` port; the target does not create a database, container, or another port.
+This starts the Django backend, Vite frontend, Next publisher, and Celery worker together. Use `make publisher-dev` when only the publisher should run in the foreground.
 
-`make publisher-dev` reads the repository's ignored `.env` without printing it, derives a publisher connection string for the existing shared PostgreSQL service, forces transactions to be read-only, and starts Next directly on the host. The renderer process needs PostgreSQL and public object storage, but it does not need a running Django web process except when doing a visual comparison. Media rows with no stored `file_url` use `PUBLISHER_MEDIA_BASE_URL` (the full public bucket URL), or fall back to `AWS_S3_ENDPOINT_URL` plus `AWS_STORAGE_BUCKET_NAME`.
+The reference Django renderer is available at `http://summerstudy.localhost:10101` and the Next renderer with HMR at `http://summerstudy.localhost:10115`. Names below `.localhost` resolve to the loopback interface, and `summerstudy.localhost` is assigned to the matching root page in the local database. Port `10115` is the registered `publisher-preview` port.
+
+The publisher service reads the repository's ignored `.env` through explicit Compose variable mappings, derives a publisher connection string for the existing shared PostgreSQL service, and forces render transactions to be read-only. The renderer needs PostgreSQL and public object storage, but it does not need a running Django web process except when doing a visual comparison. Media rows with no stored `file_url` use `PUBLISHER_MEDIA_BASE_URL` (the full public bucket URL), or fall back to `AWS_S3_ENDPOINT_URL` plus `AWS_STORAGE_BUCKET_NAME`.
 
 ## Publisher manifest
 

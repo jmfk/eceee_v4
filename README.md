@@ -24,7 +24,7 @@ registry and writes the ignored mode-0600 `.env` from provider-managed
 credentials. The canonical checkout uses `eceee-media`; additional checkouts get
 their own port-scoped public and checkpoint buckets plus scoped credentials from
 the shared provider. Configuration fails closed when either bucket is unavailable. `make dev`
-starts the ECEEE-owned backend, frontend, Celery worker,
+starts the ECEEE-owned backend, frontend, Next.js publisher, Celery worker,
 and imgproxy in the background. PostgreSQL, Redis, and MinIO remain
 lifecycle-owned by `../shared-local-infrastructure`.
 
@@ -194,6 +194,7 @@ See [Frontend Refactoring Guide](docs/FRONTEND_REFACTORING_GUIDE.md) for detaile
 |---------|-----|---------|
 | Frontend | `$FRONTEND_PORT` (registered per checkout) | React application |
 | Backend API | `$BACKEND_PORT` (registered per checkout) | Django REST API |
+| Next.js publisher | `http://summerstudy.localhost:$PUBLISHER_PORT/` | Standalone public TypeScript/React renderer |
 | Admin Panel | `http://localhost:$BACKEND_PORT/admin/` | Django admin interface |
 | API Docs | `http://localhost:$BACKEND_PORT/api/docs/` | Interactive API documentation |
 | MinIO API | http://localhost:10302 | Shared S3-compatible object storage |

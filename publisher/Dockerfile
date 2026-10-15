@@ -1,9 +1,21 @@
-FROM node:22-alpine AS build
+FROM node:22-alpine AS dependencies
 
 WORKDIR /app/publisher
 
 COPY publisher/package*.json ./
 RUN npm ci
+
+FROM dependencies AS development
+
+ENV NODE_ENV=development \
+    NEXT_TELEMETRY_DISABLED=1
+
+COPY publisher ./
+COPY frontend /app/frontend
+
+CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"]
+
+FROM dependencies AS build
 
 COPY publisher ./
 COPY frontend /app/frontend
