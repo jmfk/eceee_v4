@@ -1,5 +1,6 @@
 import DOMPurify from 'isomorphic-dompurify'
 import React from 'react'
+import { portableInternalHref } from '../utils/portableLinks'
 
 export const value = (config: Record<string, any>, ...names: string[]) => {
     for (const name of names) {
@@ -110,6 +111,7 @@ export const linkHref = (candidate: any): string => {
     if (!candidate) return '#'
     if (typeof candidate === 'string') return candidate
     if (candidate.resolvedUrl || candidate.resolved_url) return candidate.resolvedUrl || candidate.resolved_url
+    if (candidate.type === 'internal') return portableInternalHref(candidate)
     if (candidate.type === 'external' || candidate.type === 'media') return candidate.url || '#'
     if (candidate.type === 'email') return candidate.address ? `mailto:${candidate.address}` : '#'
     if (candidate.type === 'phone') return candidate.number ? `tel:${String(candidate.number).replace(/[^\d+]/g, '')}` : '#'

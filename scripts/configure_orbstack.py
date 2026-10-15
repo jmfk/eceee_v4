@@ -122,6 +122,43 @@ def checkout_postgres_identity(project_root: Path = ROOT) -> tuple[str, str]:
     return database, f"local_{database}"
 
 
+def checkout_minio_identity(
+    frontend_port: int, project_root: Path = ROOT
+) -> tuple[str, str, str, str]:
+    """Return access key, public bucket, checkpoint bucket, and secret filename."""
+    if project_root.name == "eceee_v4":
+        return (
+            "eceee-v4",
+            "eceee-media",
+            "eceee-media-checkpoints",
+            "eceee-v4.minio.secret-key",
+        )
+    suffix = str(frontend_port)
+    return (
+        f"eceee-v4-{suffix}",
+        f"eceee-media-{suffix}",
+        f"eceee-media-checkpoints-{suffix}",
+        f"eceee-v4-{suffix}.minio.secret-key",
+    )
+
+
+def provision_checkout_minio(provider: Path, frontend_port: int) -> None:
+    script = provider / "scripts" / "admit_eceee_checkout_minio.py"
+    if not script.is_file():
+        raise SystemExit(
+            "shared-local-infrastructure is missing checkout MinIO admission support"
+        )
+    result = subprocess.run(
+        [sys.executable, str(script), "--frontend-port", str(frontend_port)],
+        text=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if result.returncode:
+        raise SystemExit("shared MinIO checkout admission failed")
+
+
 def has_isolated_postgres_config(
     present: dict[str, str], project_root: Path = ROOT
 ) -> bool:
@@ -259,6 +296,9 @@ def main() -> int:
     else:
         original = ""
     present = parse_dotenv_values(original)
+    minio_access_key, media_bucket, checkpoint_bucket, minio_secret_filename = checkout_minio_identity(
+        frontend_port
+    )
 
     if args.runtime_check:
         if not ENV_FILE.exists() or ENV_FILE.stat().st_mode & 0o077:
@@ -291,6 +331,9 @@ def main() -> int:
             "ECEEE_PLAYWRIGHT_PORT": str(
                 registered_ports["playwright-renderer"]
             ),
+            "AWS_ACCESS_KEY_ID": minio_access_key,
+            "AWS_STORAGE_BUCKET_NAME": media_bucket,
+            "AWS_CHECKPOINT_STORAGE_BUCKET_NAME": checkpoint_bucket,
         }
         mismatched_keys = sorted(
             key
@@ -305,6 +348,11 @@ def main() -> int:
         check_minio_bucket(
             present["AWS_ACCESS_KEY_ID"],
             present["AWS_SECRET_ACCESS_KEY"],
+            present["AWS_STORAGE_BUCKET_NAME"],
+        )
+        check_minio_bucket(
+            present["AWS_ACCESS_KEY_ID"],
+            present["AWS_SECRET_ACCESS_KEY"],
             present["AWS_CHECKPOINT_STORAGE_BUCKET_NAME"],
         )
         print("eceee-local-runtime=orbstack")
@@ -313,8 +361,10 @@ def main() -> int:
         return 0
 
     password_root = provider / "secrets" / "projects"
+    if ROOT.name != "eceee_v4" and not args.check_only:
+        provision_checkout_minio(provider, frontend_port)
     redis_password = read_secret(password_root / "eceee-v4.redis.password")
-    minio_secret = read_secret(password_root / "eceee-v4.minio.secret-key")
+    minio_secret = read_secret(password_root / minio_secret_filename)
 
     if args.check_only and not all(
         present.get(key) for key in ("IMGPROXY_KEY", "IMGPROXY_SALT")
@@ -358,15 +408,20 @@ def main() -> int:
             f"{quote(redis_password, safe='')}@host.docker.internal:10301/0"
         ),
         "ECEEE_REDIS_NAMESPACE": checkout_redis_namespace(),
-        "AWS_ACCESS_KEY_ID": "eceee-v4",
+        "AWS_ACCESS_KEY_ID": minio_access_key,
         "AWS_SECRET_ACCESS_KEY": minio_secret,
-        "AWS_STORAGE_BUCKET_NAME": "eceee-media",
-        "AWS_CHECKPOINT_STORAGE_BUCKET_NAME": "eceee-media-checkpoints",
+        "AWS_STORAGE_BUCKET_NAME": media_bucket,
+        "AWS_CHECKPOINT_STORAGE_BUCKET_NAME": checkpoint_bucket,
         "AWS_S3_ENDPOINT_URL": "http://localhost:10302",
         "AWS_S3_INTERNAL_ENDPOINT_URL": "http://host.docker.internal:10302",
         "IMGPROXY_KEY": present.get("IMGPROXY_KEY") or secrets.token_hex(32),
         "IMGPROXY_SALT": present.get("IMGPROXY_SALT") or secrets.token_hex(32),
     }
+    check_minio_bucket(
+        updates["AWS_ACCESS_KEY_ID"],
+        updates["AWS_SECRET_ACCESS_KEY"],
+        updates["AWS_STORAGE_BUCKET_NAME"],
+    )
     check_minio_bucket(
         updates["AWS_ACCESS_KEY_ID"],
         updates["AWS_SECRET_ACCESS_KEY"],

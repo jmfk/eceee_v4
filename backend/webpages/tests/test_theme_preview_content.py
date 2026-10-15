@@ -17,14 +17,33 @@ from webpages.services.theme_preview_content import (
     MAX_IMPORTED_IMAGE_BYTES,
     _copy_preview_images,
     _managed_storage_path,
+    _materialize_page_links,
     import_theme_preview_document,
     materialize_legacy_preview_collections,
     normalize_theme_preview_namespaces,
+    resolve_theme_preview_library_urls,
     rewrite_theme_library_image_urls,
 )
 
 
 class ThemePreviewContentUnitTests(SimpleTestCase):
+    def test_preview_library_urls_are_resolved_at_runtime(self):
+        theme = SimpleNamespace(
+            _resolve_theme_library_image_url=lambda url: url.replace(
+                "http://localhost:10302/eceee-media/",
+                "http://localhost:10302/eceee-media-11600/",
+            )
+        )
+        source = {
+            "image": "http://localhost:10302/eceee-media/theme_images/8/library/hero.png",
+            "html": '<img src="http://localhost:10302/eceee-media/theme_images/8/library/hero.png">',
+        }
+
+        resolved = resolve_theme_preview_library_urls(theme, source)
+
+        self.assertIn("eceee-media-11600", resolved["image"])
+        self.assertIn("eceee-media-11600", resolved["html"])
+
     @patch("webpages.services.theme_preview_content.ObjectInstance.objects.filter")
     def test_object_import_requires_content(self, instance_filter):
         instance_filter.return_value.select_related.return_value.first.return_value = SimpleNamespace(
@@ -271,6 +290,72 @@ class ThemePreviewContentTests(TestCase):
         self.assertIn("theme_images/1/library/article-copy.jpg", config["imageUrl"])
         self.assertEqual(copied_images, 1)
         storage.save.assert_called_once()
+
+    def test_page_import_materializes_internal_links_before_removing_page_ids(self):
+        self.page_version.widgets = {
+            "navbar": [
+                {
+                    "id": "navigation-widget",
+                    "config": {
+                        "menuItems": [
+                            {
+                                "label": "Article",
+                                "linkData": {"type": "internal", "pageId": self.page.id},
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+        self.page_version.save(update_fields=["widgets"])
+
+        preview, _copied_images = import_theme_preview_document(self.theme, "page", self.page.id)
+
+        link = preview["content"]["widgets"]["navbar"][0]["config"]["menuItems"][0]["linkData"]
+        self.assertEqual(link["type"], "internal")
+        self.assertEqual(link["path"], "/article/")
+        self.assertEqual(link["siteHostname"], "example.test")
+        self.assertNotIn("pageId", link)
+        self.assertNotIn("resolvedUrl", link)
+
+    def test_legacy_tenant_url_is_converted_to_portable_internal_link(self):
+        portable = _materialize_page_links(
+            self.theme,
+            {
+                "type": "external",
+                "url": "http://example.test:10101/article/?view=full#details",
+                "label": "Article",
+            },
+        )
+
+        self.assertEqual(
+            portable,
+            {
+                "type": "internal",
+                "label": "Article",
+                "path": "/article/",
+                "siteHostname": "example.test",
+                "anchor": "details",
+                "query": "view=full",
+            },
+        )
+
+    def test_external_url_outside_the_tenant_remains_external(self):
+        source = {"type": "external", "url": "https://www.eceee.org/", "label": "eceee"}
+
+        self.assertEqual(_materialize_page_links(self.theme, source), source)
+
+    def test_embedded_link_json_is_made_portable(self):
+        source = (
+            '<p><a href="{&quot;type&quot;:&quot;internal&quot;,'
+            f'&quot;pageId&quot;:{self.page.id}}}">Article</a></p>'
+        )
+
+        portable = _materialize_page_links(self.theme, source)
+
+        self.assertIn("&quot;path&quot;:&quot;/article/&quot;", portable)
+        self.assertIn("&quot;siteHostname&quot;:&quot;example.test&quot;", portable)
+        self.assertNotIn("pageId", portable)
 
     @patch("webpages.services.theme_preview_content.system_storage")
     def test_page_import_copies_canonical_and_uuid_media_urls(self, storage):
