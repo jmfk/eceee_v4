@@ -156,7 +156,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
     const [manualZoom, setManualZoom] = useState(1)
     const [canvasViewportSize, setCanvasViewportSize] = useState({ width: 0, height: 0 })
     const [imagePickerOpen, setImagePickerOpen] = useState(false)
-    const [previewSource, setPreviewSource] = useState('')
+    const [previewSource, setPreviewSource] = useState('layout')
     const [createLayoutOpen, setCreateLayoutOpen] = useState(false)
     const [newLayoutLabel, setNewLayoutLabel] = useState('')
     const [newLayoutStructure, setNewLayoutStructure] = useState('one')
@@ -793,16 +793,21 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
             .sort((left, right) => right.contentCount - left.contentCount || left.index - right.index)
             .map(({ view }) => view)
             .map((view) => ({ key: `view:${view.id}`, label: view.label, kind: 'view', view }))
-        return [...previewViews, ...specialPages, { key: 'layout', label: 'Layout defaults', kind: 'layout' }]
+        return [{ key: 'layout', label: 'Layout defaults', kind: 'layout' }, ...previewViews, ...specialPages]
     }, [layouts.default_layout_key, layouts.special_pages, selectedLayout, workspace.previewContent?.views])
 
     useEffect(() => {
-        if (!layoutPreviewSources.some((source) => source.key === previewSource)) setPreviewSource(layoutPreviewSources[0]?.key || 'layout')
+        if (!layoutPreviewSources.some((source) => source.key === previewSource)) setPreviewSource('layout')
     }, [layoutPreviewSources, previewSource])
+
+    useEffect(() => {
+        setPreviewSource('layout')
+    }, [selectedLayout?.id])
 
     const previewModel = useMemo(() => {
         if (!selectedLayout) return null
-        const source = layoutPreviewSources.find((candidate) => candidate.key === previewSource) || layoutPreviewSources[0]
+        const source = layoutPreviewSources.find((candidate) => candidate.key === previewSource)
+            || layoutPreviewSources.find((candidate) => candidate.key === 'layout')
         if (source?.kind === 'view') {
             return withLayoutPreviewPlaceholders(createDesignerRenderModel({
                 workspace,
