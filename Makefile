@@ -11,7 +11,7 @@ COMPOSE_TEST_FILES ?= -f docker-compose.test-infra.yml
 COMPOSE_DEV = $(DOCKER_COMPOSE) $(COMPOSE_DEV_FILES)
 COMPOSE_INFRA = $(DOCKER_COMPOSE) $(COMPOSE_INFRA_FILES)
 COMPOSE_TEST = $(DOCKER_COMPOSE) $(COMPOSE_TEST_FILES)
-DEV_SERVICES := backend frontend celery-worker
+DEV_SERVICES := backend frontend publisher celery-worker
 PY_LINT_BASE ?= origin/main
 
 # Global help request check
@@ -247,7 +247,7 @@ dev-build: infra-up ## Rebuild images and start the development stack.
 dev-stop: ## Stop application containers without touching shared services.
 	$(COMPOSE_DEV) stop $(DEV_SERVICES)
 
-dev-logs: ## Follow backend, frontend, and worker logs.
+dev-logs: ## Follow backend, frontend, publisher, and worker logs.
 	$(COMPOSE_DEV) logs -f --tail=100 $(DEV_SERVICES)
 
 dev-status: ## Show development containers and endpoint health.
@@ -268,10 +268,9 @@ frontend:
 	 echo "🚀 Starting Frontend on http://localhost:$$FP (internal: 3000)"; \
 	 VITE_GIT_COMMIT_HASH=$$(git rev-parse --short HEAD) $(COMPOSE_DEV) up frontend
 
-publisher-dev: ## Start the standalone publisher with HMR on the reserved local port
-	@if [ -z "$(DATABASE_URL)" ]; then echo "DATABASE_URL is required in the ignored repository .env" >&2; exit 1; fi
+publisher-dev: infra-up ## Start the standalone publisher with HMR on the reserved local port
 	@echo "🚀 Starting Publisher on http://summerstudy.localhost:$(PUBLISHER_PORT)"
-	@cd publisher && PUBLISHER_DATABASE_URL="$(DATABASE_URL)" PUBLISHER_IMGPROXY_PUBLIC_URL="http://localhost:$(ECEEE_IMGPROXY_PORT)" npm run dev -- --hostname 0.0.0.0 --port "$(PUBLISHER_PORT)"
+	$(COMPOSE_DEV) up publisher
 
 publisher-manifest: ## Regenerate shared render CSS/widget metadata
 	$(COMPOSE_DEV) run --rm --no-deps -v "$(CURDIR)/frontend:/frontend" backend python manage.py export_publisher_manifest
@@ -694,6 +693,7 @@ check-servers: ## Check if backend and frontend servers are up
 	 echo "--- Local Apps (this repo) ---"; \
 	 check_http "Backend (Django)" "http://localhost:$$BP/health/"; \
 	 check_http "Frontend (Vite)" "http://localhost:$$FP/"; \
+	 check_http "Publisher (Next.js)" "http://summerstudy.localhost:$(PUBLISHER_PORT)/"; \
 	 echo ""; \
 	 echo "--- Shared OrbStack Services ---"; \
 	 status=$$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:$${SHARED_MINIO_API_PORT:-10302}/minio/health/live 2>/dev/null); \

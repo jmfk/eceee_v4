@@ -98,6 +98,48 @@ services:
     stdin_open: true
     tty: true
 
+  # Standalone public Next.js renderer with HMR.
+  publisher:
+    build:
+      context: .
+      dockerfile: publisher/Dockerfile
+      target: development
+    image: ${PUBLISHER_IMAGE:-eceee-v4-publisher}:development
+    restart: "no"
+    environment:
+      - PUBLISHER_DATABASE_URL=${DATABASE_URL:?Run make configure-local-infra}
+      - PUBLISHER_FORM_DATABASE_URL=${PUBLISHER_FORM_DATABASE_URL:-}
+      - PUBLISHER_MEDIA_BASE_URL=${PUBLISHER_MEDIA_BASE_URL:-}
+      - PUBLISHER_IMGPROXY_PUBLIC_URL=http://localhost:${ECEEE_IMGPROXY_PORT:-10106}
+      - PUBLISHER_IMGPROXY_KEY=${PUBLISHER_IMGPROXY_KEY:-}
+      - PUBLISHER_IMGPROXY_SALT=${PUBLISHER_IMGPROXY_SALT:-}
+      - IMGPROXY_KEY=${IMGPROXY_KEY:?Run make configure-local-infra}
+      - IMGPROXY_SALT=${IMGPROXY_SALT:?Run make configure-local-infra}
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://localhost:10302}
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:-eceee-media}
+      - PUBLISHER_ALLOW_WILDCARD_HOSTNAMES=${PUBLISHER_ALLOW_WILDCARD_HOSTNAMES:-false}
+      - PUBLISHER_DEFAULT_HOSTNAMES=${PUBLISHER_DEFAULT_HOSTNAMES:-}
+      - NEXT_TELEMETRY_DISABLED=1
+    networks:
+      - default
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./publisher/app:/app/publisher/app
+      - ./publisher/src:/app/publisher/src
+      - ./publisher/next.config.ts:/app/publisher/next.config.ts:ro
+      - ./frontend/src:/app/frontend/src:ro
+      - publisher_node_modules:/app/publisher/node_modules
+    ports:
+      - "127.0.0.1:${PUBLISHER_PORT:-10115}:3000"
+    command: npm run dev -- --hostname 0.0.0.0 --port 3000
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/icon.svg').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
   # Browser regression runner. The image version must match @playwright/test.
   frontend-e2e:
     image: mcr.microsoft.com/playwright:v1.60.0-noble
@@ -191,6 +233,7 @@ volumes:
   backend_static:
   frontend_node_modules:
   frontend_e2e_node_modules:
+  publisher_node_modules:
   mcp_logs:
 
 # networks:
