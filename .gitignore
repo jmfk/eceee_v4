@@ -45,6 +45,7 @@ deploy/.env
 .env.test.local
 .env.production.local
 .env.production
+.env.eceee_v4
 .env.*.local
 
 # Node.js
