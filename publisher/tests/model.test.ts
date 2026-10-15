@@ -632,7 +632,11 @@ describe('public resolution', () => {
           { id: 'nav', type: 'easy_widgets.NavigationWidget', config: { menuItems: [{ linkData: { type: 'internal', pageId: child.id, anchor: 'agenda', label: 'News' } }, { linkData: { type: 'internal', pageId: '999', label: 'Missing' } }, { linkData: { type: 'internal', pageId: 'invalid', label: 'Invalid' } }] } },
           { id: 'copy', type: 'easy_widgets.ContentWidget', config: { content: `<p><a data-page-id="2" href="#">News</a><a href="{&quot;type&quot;:&quot;internal&quot;,&quot;pageId&quot;:2,&quot;anchor&quot;:&quot;details&quot;}">Structured</a><a href="{&quot;type&quot;:&quot;external&quot;,&quot;url&quot;:&quot;https://example.net&quot;}">External</a><a data-page-id="999" href="#">Missing</a></p>${['full', 'half', 'third'].map(width => `<div data-media-insert="true" data-media-id="${inlineMediaId}" data-width="${width}"><img src="/old.png"></div>`).join('')}` } },
           { id: 'logos', type: 'easy_widgets.ImageWidget', config: {
-            collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8', display_type: 'gallery', image_style: 'cropped',
+            collection_id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8', display_type: 'gallery', image_style: 'cropped', randomize: true,
+            image: { type: 'collection', id: '67d9020f-1d73-47be-bd24-1fe52d2dbef8', sample_images: [
+              { id: 'sample-partner', title: 'Partner', imgproxy_base_url: '/duplicate-logo.png' },
+              { id: 'sample-fallback', title: 'Fallback partner', imgproxy_base_url: '/fallback-logo.png', width: 200, height: 80 },
+            ] },
             imgproxy_override: { width: 60, gravity: 'no' },
           } },
           { id: 'section', type: 'easy_widgets.SectionWidget', config: { slots: { content: [
@@ -659,6 +663,7 @@ describe('public resolution', () => {
     const previousSalt = process.env.PUBLISHER_IMGPROXY_SALT;
     process.env.PUBLISHER_IMGPROXY_KEY = '00'.repeat(32);
     process.env.PUBLISHER_IMGPROXY_SALT = '11'.repeat(32);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.999);
     try {
       const model = await buildPublishedPageModel({ withSnapshot: async read => read(enrichedReader) }, 'example.org', '/news/story', new Date('2026-06-01'));
       expect(model?.slots.main[0].config.menuItems).toEqual([
@@ -677,13 +682,23 @@ describe('public resolution', () => {
       expect(model?.slots.main[1].config.content).toContain('width="448" height="252"');
       expect(model?.slots.main[1].config.content).toContain('width="295" height="165"');
       expect(model?.slots.main[1].config.content).not.toContain('style="width:100%');
-      expect(model?.slots.main[2].config.mediaItems).toEqual([expect.objectContaining({
-        url: '/logo.png',
-        src: expect.stringContaining('resize:fill:60:30/gravity:no/quality:72/format:webp'),
-        srcSet: expect.stringMatching(/resize:fill:60:30.* 1x, .*resize:fill:100:50.* 2x/),
-        displayWidth: 60,
-        displayHeight: 30,
-      })]);
+      expect(model?.slots.main[2].config.mediaItems).toEqual([
+        expect.objectContaining({
+          url: '/logo.png',
+          src: expect.stringContaining('resize:fill:60:30/gravity:no/quality:72/format:webp'),
+          srcSet: expect.stringMatching(/resize:fill:60:30.* 1x, .*resize:fill:100:50.* 2x/),
+          displayWidth: 60,
+          displayHeight: 30,
+        }),
+        expect.objectContaining({
+          title: 'Fallback partner',
+          url: '/fallback-logo.png',
+          src: expect.stringContaining('resize:fill:60:24/gravity:no/quality:72/format:webp'),
+          displayWidth: 60,
+          displayHeight: 24,
+        }),
+      ]);
+      expect(random).toHaveBeenCalled();
       const nested = (model?.slots.main[3].config.slots as Record<string, Widget[]>).content;
       expect(nested[0].config.mediaItems).toEqual([expect.objectContaining({
         src: expect.stringContaining('resize:fit:100:50'),
@@ -705,6 +720,7 @@ describe('public resolution', () => {
       expect(publishedPageReferences).toHaveBeenCalledWith([child.id, '999'], root.tenant_id, root.id, expect.any(Date));
       expect(publicMedia).toHaveBeenCalledWith([inlineMediaId], ['67d9020f-1d73-47be-bd24-1fe52d2dbef8'], root.tenant_id);
     } finally {
+      random.mockRestore();
       if (previousKey === undefined) delete process.env.PUBLISHER_IMGPROXY_KEY;
       else process.env.PUBLISHER_IMGPROXY_KEY = previousKey;
       if (previousSalt === undefined) delete process.env.PUBLISHER_IMGPROXY_SALT;

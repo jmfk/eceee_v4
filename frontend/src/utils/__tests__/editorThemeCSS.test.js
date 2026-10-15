@@ -106,10 +106,10 @@ describe('compileEditorCSS', () => {
 })
 
 describe('buildEditorThemeCSS', () => {
-    it('keeps Hero layout declarations on the widget content surface', () => {
-        expect(editorWidgetBaseCSS).toMatch(/\.hero-widget\s*\{[^}]*display:\s*grid;/)
-        expect(editorWidgetBaseCSS).toMatch(/\.hero-widget\s*\{[^}]*padding:\s*30px;/)
-        expect(editorWidgetBaseCSS).not.toMatch(/\.hero-content\s*\{/)
+    it('keeps the Hero background and text layout on their canonical surfaces', () => {
+        expect(editorWidgetBaseCSS).toMatch(/\.hero-widget\s*\{[^}]*padding:\s*0;/)
+        expect(editorWidgetBaseCSS).toMatch(/\.hero-content\s*\{[^}]*display:\s*flex;/)
+        expect(editorWidgetBaseCSS).toMatch(/\.hero-content\s*\{[^}]*padding:\s*30px;/)
     })
 
     it('keeps the frontend widget baseline aligned with backend widget definitions', () => {
