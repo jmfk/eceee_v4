@@ -167,6 +167,8 @@ describe('page editor active/legacy boundaries', () => {
         expect(publicRenderCSS).toContain('.site-renderer .layout-slot{')
         expect(publicRenderCSS).toContain('.layout-slot>.widget-slot>.widget-item:not(:last-child)>.banner-widget')
         expect(publicRenderCSS).toContain('.cms-content :where(h1,h2,h3,h4,h5,h6)')
+        expect(publicRenderCSS).toContain('.cms-content :where(p){margin:revert}')
+        expect(publicRenderCSS).not.toContain('.cms-content p{margin:revert}')
         expect(publicRenderCSS).toContain('.media-insert.img-width-half')
     })
 
