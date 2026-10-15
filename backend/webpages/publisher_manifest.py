@@ -9,7 +9,14 @@ from webpages.theme_layouts import default_special_pages
 from webpages.widget_registry import widget_type_registry
 
 MANIFEST_VERSION = 1
-MANIFEST_PATH = Path(settings.BASE_DIR).parent / "publisher" / "src" / "generated" / "publisher-manifest.json"
+MANIFEST_PATH = (
+    Path(settings.BASE_DIR).parent
+    / "frontend"
+    / "src"
+    / "rendering"
+    / "generated"
+    / "render-manifest.json"
+)
 BASE_CSS_PATH = Path(settings.BASE_DIR) / "static" / "css" / "tailwind.output.css"
 
 

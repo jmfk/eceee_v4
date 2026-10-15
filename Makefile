@@ -111,8 +111,8 @@ help: ## Show this help message (use: make help-TARGET for one target)
 		echo "  backend           Start Django backend server"; \
 		echo "  frontend          Start React frontend dev server"; \
 		echo "  publisher-dev     Start standalone Next publisher on its registered port"; \
-		echo "  publisher-manifest Regenerate publisher CSS/widget metadata"; \
-		echo "  publisher-manifest-check Verify checked-in publisher CSS/widget metadata"; \
+		echo "  publisher-manifest Regenerate shared render CSS/widget metadata"; \
+		echo "  publisher-manifest-check Verify checked-in render CSS/widget metadata"; \
 		echo "  playwright-service Start Playwright website rendering service"; \
 		echo "  theme-sync        Start theme file sync service"; \
 		echo "  shell             Open bash shell in backend container"; \
@@ -273,11 +273,11 @@ publisher-dev: ## Start the standalone publisher with HMR on the reserved local 
 	@echo "🚀 Starting Publisher on http://summerstudy.localhost:$(PUBLISHER_PORT)"
 	@cd publisher && PUBLISHER_DATABASE_URL="$(DATABASE_URL)" PUBLISHER_IMGPROXY_PUBLIC_URL="http://localhost:$(ECEEE_IMGPROXY_PORT)" npm run dev -- --hostname 0.0.0.0 --port "$(PUBLISHER_PORT)"
 
-publisher-manifest: ## Regenerate publisher CSS/widget metadata
-	$(COMPOSE_DEV) run --rm --no-deps -v "$(CURDIR)/publisher:/publisher" backend python manage.py export_publisher_manifest
+publisher-manifest: ## Regenerate shared render CSS/widget metadata
+	$(COMPOSE_DEV) run --rm --no-deps -v "$(CURDIR)/frontend:/frontend" backend python manage.py export_publisher_manifest
 
-publisher-manifest-check: ## Verify publisher CSS/widget metadata is current
-	$(COMPOSE_DEV) run --rm --no-deps -v "$(CURDIR)/publisher:/publisher" backend python manage.py export_publisher_manifest --check
+publisher-manifest-check: ## Verify shared render CSS/widget metadata is current
+	$(COMPOSE_DEV) run --rm --no-deps -v "$(CURDIR)/frontend:/frontend" backend python manage.py export_publisher_manifest --check
 
 # Run Playwright website rendering service
 playwright-service:

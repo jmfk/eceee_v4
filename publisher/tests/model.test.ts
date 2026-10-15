@@ -79,7 +79,7 @@ describe('public resolution', () => {
     expect(model?.themeCss).toContain('--primary: #123456');
     expect(model?.themeCss).toContain('--spacing: 2rem');
     expect(model?.themeCss).toContain('.card { padding: 1rem; }');
-    expect(model?.fontCss).toContain("family=Open+Sans:wght@400;700&display=swap");
+    expect(model?.fontUrl).toContain("family=Open+Sans:wght@400;700&display=swap");
     expect(model?.themeCss).not.toContain('@import');
     expect(model?.themeCss).toContain('@media (min-width: 700px)');
     expect(JSON.parse(JSON.stringify(model))).toEqual(model);

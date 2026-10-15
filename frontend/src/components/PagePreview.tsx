@@ -6,8 +6,7 @@ import PreviewSizeManager from './PreviewSizeManager';
 import { resolvePagePreviewModel } from './resolvePagePreviewModel';
 import RenderFrame from '../rendering/RenderFrame';
 import { createPageRenderModel } from '../rendering/adapters';
-import { googleFontsStylesheetUrl } from '../rendering/primitives';
-import { buildThemeCSS } from '../utils/editorThemeCSS';
+import { compileRenderStyles } from '../rendering/themeCssCompiler';
 import type { RenderPageModel } from '../rendering/types';
 
 interface PreviewSize {
@@ -108,14 +107,10 @@ const PagePreview: React.FC<PagePreviewProps> = ({
     const effectiveTheme = pageVersionData?.effectiveTheme
         || (typeof pageVersionData?.theme === 'object' ? pageVersionData.theme : null)
         || webpageData?.effectiveTheme;
-    const themeCss = useMemo(() => buildThemeCSS({
+    const compiledStyles = useMemo(() => compileRenderStyles({
         theme: effectiveTheme,
-        pageCssVariables: webpageData?.pageCssVariables ?? webpageData?.page_css_variables
-            ?? pageVersionData?.pageCssVariables ?? pageVersionData?.page_css_variables,
-        pageCustomCss: webpageData?.pageCustomCss ?? webpageData?.page_custom_css
-            ?? pageVersionData?.pageCustomCss ?? pageVersionData?.page_custom_css,
-        enableCssInjection: webpageData?.enableCssInjection ?? webpageData?.enable_css_injection
-            ?? pageVersionData?.enableCssInjection ?? pageVersionData?.enable_css_injection ?? true,
+        page: webpageData,
+        version: pageVersionData,
     }), [effectiveTheme, webpageData, pageVersionData]);
 
     const layoutName = layoutData?.layout?.name || layoutData?.name || pageVersionData?.layoutKey || pageVersionData?.codeLayout
@@ -129,8 +124,8 @@ const PagePreview: React.FC<PagePreviewProps> = ({
         widgets: localWidgets || pageVersionData?.widgets || {},
         inheritedWidgets,
         slotInheritanceRules,
-        themeCss,
-        fontUrl: googleFontsStylesheetUrl(pageVersionData?.effectiveTheme?.fonts || webpageData?.effectiveTheme?.fonts),
+        themeCss: compiledStyles.css,
+        fontUrl: compiledStyles.fontUrl,
         context: {
             pageId: webpageData?.id,
             siteId: webpageData?.cachedRootId || webpageData?.cached_root_id || (!webpageData?.parentId && !webpageData?.parent_id ? webpageData?.id : undefined),
@@ -140,7 +135,7 @@ const PagePreview: React.FC<PagePreviewProps> = ({
             simulatedPath,
             componentStyles: pageVersionData?.effectiveTheme?.componentStyles || pageVersionData?.effectiveTheme?.component_styles || {},
         },
-    }), [layoutName, layoutDefinition, effectiveTheme?.breakpoints, localWidgets, pageVersionData, inheritedWidgets, slotInheritanceRules, themeCss, webpageData, pathVariables, simulatedPath]);
+    }), [layoutName, layoutDefinition, effectiveTheme?.breakpoints, localWidgets, pageVersionData, inheritedWidgets, slotInheritanceRules, compiledStyles, webpageData, pathVariables, simulatedPath]);
 
     useEffect(() => {
         let current = true;

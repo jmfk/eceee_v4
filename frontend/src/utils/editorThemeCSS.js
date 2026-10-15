@@ -1,7 +1,4 @@
-import { PUBLIC_RENDER_CSS } from '../rendering/publicRenderCss'
-import { googleFontsStylesheetUrl } from '../rendering/primitives'
-import EDITOR_WIDGET_BASE_CSS from '../styles/editorWidgetBase.css?inline'
-import { generateColorsCSS, generateDesignGroupsCSS, getBreakpoints } from './themeUtils'
+import { compileRenderStyles } from '../rendering/themeCssCompiler'
 
 const GLOBAL_AT_RULES = new Set([
     'charset',
@@ -168,77 +165,10 @@ export const compileEditorCSS = (css, {
     return topLevel.join('\n\n')
 }
 
-const responsiveCSS = (css, theme) => {
-    if (typeof css === 'string') return css
-    if (!css || typeof css !== 'object') return ''
-    const breakpoints = getBreakpoints(theme)
-    const parts = []
-    const base = css.xs || css.default
-    if (base) parts.push(base)
-    for (const breakpoint of ['sm', 'md', 'lg', 'xl']) {
-        if (css[breakpoint] && breakpoints[breakpoint]) {
-            parts.push(`@media (min-width: ${breakpoints[breakpoint]}px) {\n${css[breakpoint]}\n}`)
-        }
-    }
-    return parts.join('\n')
-}
-
-const styleCollectionCSS = (styles, theme) => Object.values(styles || {})
-    .map(style => responsiveCSS(style?.css, theme))
-    .filter(Boolean)
-    .join('\n')
-
-const legacyElementsCSS = elements => Object.entries(elements || {}).map(([selector, properties]) => {
-    const declarations = Object.entries(properties || {}).map(([property, value]) => {
-        const cssProperty = property.replace(/_/g, '-').replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
-        return `  ${cssProperty}: ${value};`
-    })
-    return declarations.length ? `${selector} {\n${declarations.join('\n')}\n}` : ''
-}).filter(Boolean).join('\n')
-
-const variablesCSS = variables => {
-    const declarations = Object.entries(variables || {}).map(([name, value]) => {
-        const variable = name.startsWith('--') ? name : `--${name}`
-        return `  ${variable}: ${value};`
-    })
-    return declarations.length ? `:root {\n${declarations.join('\n')}\n}` : ''
-}
-
-export const buildThemeCSS = ({
-    theme,
-    pageCssVariables,
-    pageCustomCss,
-    enableCssInjection = true,
-}) => {
-    const colors = theme?.colors && Object.keys(theme.colors).length > 0
-        ? theme.colors
-        : theme?.cssVariables || {}
-    const designGroups = theme?.designGroups || theme?.typography
-    const structuralSpacing = designGroups?.structuralSpacing || designGroups?.structural_spacing || []
-    const designCSS = designGroups?.groups?.length
-        ? generateDesignGroupsCSS(designGroups, colors, '', null, null, false, getBreakpoints(theme))
-        : [
-            legacyElementsCSS(theme?.htmlElements),
-            structuralSpacing.length
-                ? generateDesignGroupsCSS(designGroups, colors, '', null, null, false, getBreakpoints(theme))
-                : '',
-        ].filter(Boolean).join('\n\n')
-    return [
-        PUBLIC_RENDER_CSS,
-        EDITOR_WIDGET_BASE_CSS,
-        generateColorsCSS(colors),
-        designCSS,
-        styleCollectionCSS(theme?.componentStyles, theme),
-        styleCollectionCSS(theme?.galleryStyles, theme),
-        styleCollectionCSS(theme?.carouselStyles, theme),
-        theme?.customCss || '',
-        enableCssInjection ? variablesCSS(pageCssVariables) : '',
-        enableCssInjection ? pageCustomCss || '' : '',
-    ].filter(Boolean).join('\n\n')
-}
-
 export const buildEditorThemeCSS = ({
     theme,
+    page,
+    version,
     pageCssVariables,
     pageCustomCss,
     enableCssInjection = true,
@@ -246,15 +176,21 @@ export const buildEditorThemeCSS = ({
 }) => {
     if (!scopeId) return ''
 
-    const fontUrl = googleFontsStylesheetUrl(theme?.fonts)
-    const rawCSS = buildThemeCSS({ theme, pageCssVariables, pageCustomCss, enableCssInjection })
+    const pageCss = page || version
+        ? undefined
+        : {
+            enabled: enableCssInjection !== false,
+            variables: pageCssVariables || {},
+            customCss: pageCustomCss || '',
+        }
+    const compiledStyles = compileRenderStyles({ theme, page, version, pageCss })
 
     const rootSelector = `.eceee-theme-scope[data-eceee-theme-scope="${scopeId}"]`
-    const compiled = compileEditorCSS(rawCSS, {
+    const compiled = compileEditorCSS(compiledStyles.css, {
         rootSelector,
         namespace: `eceee-${scopeId.replace(/[^a-zA-Z0-9_-]/g, '-')}-`,
     })
-    return fontUrl ? `@import url("${fontUrl}");\n\n${compiled}` : compiled
+    return compiledStyles.fontUrl ? `@import url("${compiledStyles.fontUrl}");\n\n${compiled}` : compiled
 }
 
 export const buildDesignerTheme = workspace => {

@@ -1,4 +1,4 @@
-import { compileThemeCss, defaultSpecialPages, fontImports, widgetVariantClasses } from './theme';
+import { compilePublisherStyles, defaultSpecialPages, widgetVariantClasses } from './theme';
 import { responsiveImageSources, type ResponsiveImageOptions } from './imgproxy';
 import type { ThemeLayoutDefinition, ThemeLayoutDocument, ThemeLayoutSlot, ThemeSpecialPage } from '../../frontend/src/rendering/types';
 
@@ -175,7 +175,7 @@ export interface PublishedPageModel {
       result?: { widgetId: string; status: 'success' | 'error' };
     };
   };
-  fontCss: string;
+  fontUrl: string;
   themeCss: string;
   title: string;
   description: string;
@@ -891,6 +891,7 @@ async function buildSpecialPageModel(
 
   const themeOnlyPage = { ...root, enable_css_injection: false };
   const themeOnlyVersion = { ...rootVersion, enable_css_injection: false };
+  const compiledStyles = compilePublisherStyles(theme, themeOnlyPage, themeOnlyVersion);
   return {
     layout: layoutKey,
     layoutDefinition,
@@ -913,8 +914,8 @@ async function buildSpecialPageModel(
         pagePath: normalizedPath,
       },
     },
-    fontCss: theme ? fontImports(theme.fonts) : '',
-    themeCss: compileThemeCss(theme, themeOnlyPage, themeOnlyVersion, slots),
+    fontUrl: compiledStyles.fontUrl,
+    themeCss: compiledStyles.css,
     title: specialPage.label,
     description: '',
     matchedPath: normalizedPath,
@@ -1012,6 +1013,7 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
     const publicMedia = await reader.publicMedia([...mediaIds], [...collectionIds], root.tenant_id);
     const pagePaths = new Map(references.map(reference => [String(reference.id), reference.cached_path]));
     slots = prepareWidgets(slots, pagePaths, publicMedia.files, publicMedia.collections, theme, pages, navigationPages);
+    const compiledStyles = compilePublisherStyles(theme, current, currentVersion);
 
     return {
       layout: layoutKey,
@@ -1035,8 +1037,8 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
           pagePath: '/' + segments.join('/'),
         },
       },
-      fontCss: theme ? fontImports(theme.fonts) : '',
-      themeCss: compileThemeCss(theme, current, currentVersion, slots),
+      fontUrl: compiledStyles.fontUrl,
+      themeCss: compiledStyles.css,
       title: currentVersion.meta_title || current.title,
       description: currentVersion.meta_description || '',
       matchedPath,

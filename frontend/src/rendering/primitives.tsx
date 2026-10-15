@@ -129,16 +129,6 @@ export const imageUrl = (source: any): string => typeof source === 'string'
         || source?.publicUrl || source?.public_url || source?.absoluteUrl || source?.absolute_url
         || source?.downloadUrl || source?.download_url || source?.thumbnailUrl || source?.thumbnail_url || source?.url || ''
 
-export const googleFontsStylesheetUrl = (fonts: any): string => {
-    const families = Array.isArray(fonts?.googleFonts) ? fonts.googleFonts : Array.isArray(fonts?.google_fonts) ? fonts.google_fonts : []
-    const query = families.map((font: any) => {
-        const family = String(font.family || '').trim().replace(/\s+/g, '+')
-        const variants = (Array.isArray(font.variants) ? font.variants : []).map(String).filter((variant: string) => /^\d+$/.test(variant))
-        return family ? `family=${family}${variants.length ? `:wght@${variants.join(';')}` : ''}` : ''
-    }).filter(Boolean).join('&')
-    return query ? `https://fonts.googleapis.com/css2?${query}&display=swap` : ''
-}
-
 export const ImageView = ({ source, alt = '', className = '' }: { source?: any, alt?: string, className?: string }) => {
     const url = source && typeof source === 'object' && source.src ? source.src : imageUrl(source)
     const srcSet = source && typeof source === 'object' ? source.srcSet || source.srcset : undefined

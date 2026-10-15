@@ -1,6 +1,5 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react'
 import PageRenderer from './PageRenderer'
-import { PUBLIC_RENDER_CSS } from './publicRenderCss'
 import { rewriteDirectRenderHref } from './directRenderNavigation'
 import type { RenderPageModel } from './types'
 
@@ -66,7 +65,7 @@ export const RenderDocument = ({ model, rootRef, additionalCss = '', onNavigate 
     }, [model, onNavigate, renderRootRef])
 
     return <>
-        <style>{`${PUBLIC_RENDER_CSS}\n${additionalCss}`}</style>
+        {additionalCss && <style>{additionalCss}</style>}
         {model?.fontUrl && <link rel="stylesheet" href={model.fontUrl} />}
         {model?.themeCss && <style>{model.themeCss}</style>}
         <div ref={renderRootRef} className={model?.designer

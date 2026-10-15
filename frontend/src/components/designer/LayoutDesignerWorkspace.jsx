@@ -3,9 +3,9 @@ import { Archive, ArrowDown, ArrowLeftFromLine, ArrowRightFromLine, ArrowUp, Bra
 
 import RenderFrame from '../../rendering/RenderFrame'
 import { createDesignerRenderModel, createPageRenderModel, withLayoutPreviewPlaceholders } from '../../rendering/adapters'
-import { googleFontsStylesheetUrl } from '../../rendering/primitives'
+import { compileRenderStyles } from '../../rendering/themeCssCompiler'
 import { validateLayoutDefinition } from '../../rendering/themeLayoutRenderer'
-import { buildDesignerTheme, buildThemeCSS } from '../../utils/editorThemeCSS'
+import { buildDesignerTheme } from '../../utils/editorThemeCSS'
 import MediaSelectModal from '../media/MediaSelectModal'
 import { themeBreakpointDefinition } from '../theme/breakpointConfig'
 import { ThemeColorField, ThemeFontField, ThemeFontsEditor, ThemePaletteEditor } from './ThemeDesignTokens'
@@ -770,10 +770,7 @@ const LayoutDesignerWorkspace = ({ themeId, workspace, viewport, updateWorkspace
 
     const layoutThemePreview = useMemo(() => {
         const theme = buildDesignerTheme(workspace)
-        return {
-            css: theme ? buildThemeCSS({ theme }) : '',
-            fontUrl: googleFontsStylesheetUrl(theme?.fonts),
-        }
+        return compileRenderStyles({ theme })
     }, [workspace])
 
     const canvasModel = useMemo(() => {

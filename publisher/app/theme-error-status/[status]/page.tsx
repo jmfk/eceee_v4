@@ -4,7 +4,6 @@ import { database } from '@/src/db';
 import { contentHostname } from '@/src/hostname';
 import { buildThemeErrorPageModel } from '@/src/model';
 import { PublishedPage } from '@/src/render';
-import { PUBLIC_RENDER_CSS } from '../../../../frontend/src/rendering/publicRenderCss';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +18,8 @@ export default async function ThemeErrorPage({ params }: { params: Promise<{ sta
   });
   if (!model) return <main><h1>{status} — Error</h1></main>;
   return <>
-    <style>{`${model.fontCss}\n${PUBLIC_RENDER_CSS}\n${model.themeCss}`}</style>
+    {model.fontUrl && <link rel="stylesheet" href={model.fontUrl} />}
+    <style>{model.themeCss}</style>
     <PublishedPage model={model} />
   </>;
 }

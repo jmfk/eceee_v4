@@ -3,7 +3,6 @@ import { database } from '@/src/db';
 import { contentHostname } from '@/src/hostname';
 import { buildThemeErrorPageModel } from '@/src/model';
 import { PublishedPage } from '@/src/render';
-import { PUBLIC_RENDER_CSS } from '../../frontend/src/rendering/publicRenderCss';
 
 export default async function NotFound() {
   const requestHeaders = await headers();
@@ -11,7 +10,8 @@ export default async function NotFound() {
   const model = await buildThemeErrorPageModel(database, host, 404);
   if (!model) return <main><h1>Page not found</h1></main>;
   return <>
-    <style>{`${model.fontCss}\n${PUBLIC_RENDER_CSS}\n${model.themeCss}`}</style>
+    {model.fontUrl && <link rel="stylesheet" href={model.fontUrl} />}
+    <style>{model.themeCss}</style>
     <PublishedPage model={model} />
   </>;
 }

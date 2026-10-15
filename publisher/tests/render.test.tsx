@@ -17,7 +17,7 @@ const model: PublishedPageModel = {
     pageId: '2', versionId: '3', pathVariables: {}, simulatedPath: '/', componentStyles: {},
     publicForms: { endpointBase: '/api/forms/2', pagePath: '/' },
   },
-  fontCss: '', themeCss: '', title: 'Page', description: '', matchedPath: '/', remainingPath: '',
+  fontUrl: '', themeCss: '', title: 'Page', description: '', matchedPath: '/', remainingPath: '',
 };
 
 describe('public renderer', () => {

@@ -5,8 +5,7 @@ import { buildPathVariablesContext } from '../utils/pathParser'
 import { transformInheritanceData } from '../utils/widgetMerging'
 import { resolvePagePreviewModel } from '../components/resolvePagePreviewModel'
 import { createPageRenderModel } from './adapters'
-import { buildThemeCSS } from '../utils/editorThemeCSS'
-import { googleFontsStylesheetUrl } from './primitives'
+import { compileRenderStyles } from './themeCssCompiler'
 import { getCurrentTenantId } from '../utils/tenant'
 import type { RenderPageModel } from './types'
 
@@ -49,13 +48,12 @@ export const parseVersionRenderPath = (pathname: string, search = ''): VersionRe
 }
 
 export const buildResolvedRenderModel = async ({
-    resolved, page, version, rawInheritance, themeCss = '',
+    resolved, page, version, rawInheritance,
 }: {
     resolved: ResolvedRenderLocation
     page: any
     version: any
     rawInheritance: any
-    themeCss?: string
 }): Promise<RenderPageModel> => {
     const tenantId = resolved.tenantIdentifier
     const inheritance = transformInheritanceData(rawInheritance?.legacy || rawInheritance)
@@ -64,6 +62,10 @@ export const buildResolvedRenderModel = async ({
     const siteHostnames = page?.hostnames?.length
         ? page.hostnames
         : page?.cachedRootHostnames || page?.cached_root_hostnames || []
+    const theme = version?.effectiveTheme
+        || (typeof version?.theme === 'object' ? version.theme : null)
+        || page?.effectiveTheme
+    const compiledStyles = compileRenderStyles({ theme, page, version })
     const model = createPageRenderModel({
         layout: version?.layoutKey || version?.codeLayout || page?.effectiveLayout?.name || 'main_layout',
         layoutDefinition: (() => {
@@ -77,8 +79,8 @@ export const buildResolvedRenderModel = async ({
         widgets: version?.widgets || {},
         inheritedWidgets: inheritance.inheritedWidgets,
         slotInheritanceRules: inheritance.slotInheritanceRules,
-        themeCss,
-        fontUrl: googleFontsStylesheetUrl(version?.effectiveTheme?.fonts || page?.effectiveTheme?.fonts),
+        themeCss: compiledStyles.css,
+        fontUrl: compiledStyles.fontUrl,
         context: {
             tenantId,
             siteId: resolved.siteId,
@@ -88,8 +90,8 @@ export const buildResolvedRenderModel = async ({
             pathVariables,
             simulatedPath,
             renderRoutePrefix: `/_render/${resolved.siteId}`,
-            componentStyles: version?.effectiveTheme?.componentStyles
-                || version?.effectiveTheme?.component_styles
+            componentStyles: theme?.componentStyles
+                || theme?.component_styles
                 || {},
         },
     })
@@ -106,24 +108,11 @@ export const loadResolvedRenderModel = async (resolved: ResolvedRenderLocation):
     ])
     const page = pageResponse.data
     const version = versionResponse.data
-    const theme = version?.effectiveTheme
-        || (typeof version?.theme === 'object' ? version.theme : null)
-        || page?.effectiveTheme
-    const themeCss = buildThemeCSS({
-        theme,
-        pageCssVariables: page?.pageCssVariables ?? page?.page_css_variables
-            ?? version?.pageCssVariables ?? version?.page_css_variables,
-        pageCustomCss: page?.pageCustomCss ?? page?.page_custom_css
-            ?? version?.pageCustomCss ?? version?.page_custom_css,
-        enableCssInjection: page?.enableCssInjection ?? page?.enable_css_injection
-            ?? version?.enableCssInjection ?? version?.enable_css_injection ?? true,
-    })
     return buildResolvedRenderModel({
         resolved,
         page,
         version,
         rawInheritance: inheritanceResponse.data,
-        themeCss,
     })
 }
 
@@ -172,16 +161,6 @@ export const loadVersionRenderModel = async ({ pageId, versionId, tenantIdentifi
         effectiveTheme: theme,
         layoutKey: version?.layoutKey || version?.codeLayout || inheritance?.effectiveLayoutKey,
     }
-    const themeCss = buildThemeCSS({
-        theme,
-        pageCssVariables: version?.pageCssVariables ?? version?.page_css_variables
-            ?? page?.pageCssVariables ?? page?.page_css_variables,
-        pageCustomCss: version?.pageCustomCss ?? version?.page_custom_css
-            ?? page?.pageCustomCss ?? page?.page_custom_css,
-        enableCssInjection: version?.enableCssInjection ?? version?.enable_css_injection
-            ?? page?.enableCssInjection ?? page?.enable_css_injection ?? true,
-    })
-
     return buildResolvedRenderModel({
         resolved: {
             tenantIdentifier: tenantId,
@@ -193,6 +172,5 @@ export const loadVersionRenderModel = async ({ pageId, versionId, tenantIdentifi
         page,
         version: renderVersion,
         rawInheritance: inheritance,
-        themeCss,
     })
 }

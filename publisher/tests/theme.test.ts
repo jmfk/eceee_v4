@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compileThemeCss, widgetVariantClasses } from '../src/theme';
+import { compilePublisherStyles, widgetVariantClasses } from '../src/theme';
 import type { Page, Theme, Version } from '../src/model';
 
 const page = { enable_css_injection: true, page_css_variables: {}, page_custom_css: '' } as Page;
@@ -24,7 +24,7 @@ describe('publisher theme compiler', () => {
         }] },
       } as unknown as Theme;
 
-      const css = compileThemeCss(theme, page, version);
+      const css = compilePublisherStyles(theme, page, version).css;
       expect(css).toContain("background-image: -webkit-image-set(url('/imgproxy/");
       expect(css).toContain("background-image: image-set(url('/imgproxy/");
       expect(css).toContain('resize:fit:1200:160');
@@ -50,11 +50,11 @@ describe('publisher theme compiler', () => {
       }] },
     } as unknown as Theme;
 
-    const css = compileThemeCss(theme, page, version);
-    expect(css).toContain('.slot-header>.widget-type-easy-widgets-headerwidget h1');
+    const css = compilePublisherStyles(theme, page, version).css;
+    expect(css).toContain('.slot-header > .widget-type-easy-widgets-headerwidget h1');
     expect(css).toContain('color: var(--brand)');
     expect(css).toContain('font-family: "Source Sans 3", sans-serif');
-    expect(css).toContain('.slot-header>.widget-type-easy-widgets-headerwidget .header-widget');
+    expect(css).toContain('.slot-header > .widget-type-easy-widgets-headerwidget .header-widget');
     expect(css).toContain('@media (min-width: 800px)');
     expect(css).toContain('height: 120px');
     expect(css).toContain('.widget-type-header');
@@ -64,20 +64,15 @@ describe('publisher theme compiler', () => {
     expect(widgetVariantClasses('easy_widgets.ContentWidget', { show_border: true })).toContain('border-enabled');
   });
 
-  it('emits only styles selected by rendered widgets and skips empty image styles', () => {
+  it('emits every component and image style so every render surface gets the same stylesheet', () => {
     const theme = {
       colors: {}, css_variables: {}, html_elements: {}, custom_css: '', breakpoints: {}, fonts: {}, design_groups: {},
       component_styles: { selected: { css: '.selected { color: red; }' }, unused: { css: 'h4 { margin: 99px; }' } },
       image_styles: { logos: { css: 'h4 { margin: 88px; }' } }, gallery_styles: {}, carousel_styles: {},
     } as unknown as Theme;
-    const slots = { main: [
-      { id: 'content', type: 'easy_widgets.ContentWidget', config: { component_style: 'selected' } },
-      { id: 'empty-image', type: 'easy_widgets.ImageWidget', config: { image_style: 'logos', mediaItems: [] } },
-    ] };
-
-    const css = compileThemeCss(theme, page, version, slots);
+    const css = compilePublisherStyles(theme, page, version).css;
     expect(css).toContain('.selected { color: red; }');
-    expect(css).not.toContain('margin: 99px');
-    expect(css).not.toContain('margin: 88px');
+    expect(css).toContain('margin: 99px');
+    expect(css).toContain('margin: 88px');
   });
 });
