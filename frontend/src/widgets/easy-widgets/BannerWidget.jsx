@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { FileText, Type, AlignLeft, ImagePlus, Layers } from 'lucide-react'
+import { FileText, Type, AlignLeft, ImagePlus, Layers, Square, RectangleHorizontal } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -136,6 +136,10 @@ const BannerWidget = ({
     const bannerMode = configRef.current.bannerMode || 'text'
     const image1 = renderConfig.image1
     const backgroundImage = renderConfig.backgroundImage
+    const componentStyle = configRef.current.componentStyle || 'default'
+    const useCustomStyle = componentStyle !== 'default' && currentTheme?.componentStyles
+    const usesCustomMarkup = Boolean(useCustomStyle?.[componentStyle])
+        && useCustomStyle[componentStyle].template?.trim() !== '{{passthru}}'
     const textColor = configRef.current.textColor || '#000000'
     const backgroundColor = configRef.current.backgroundColor || '#ffffff'
 
@@ -230,11 +234,20 @@ const BannerWidget = ({
         const updatedConfig = { ...configRef.current, bannerMode: newMode }
         setConfig(updatedConfig)
         forceRerender({})
+        setShowImageModal(false)
+        setEditingField(null)
 
         if (onConfigChange) {
             onConfigChange(updatedConfig)
         }
     }, [bannerMode, widgetId, slotName, onConfigChange])
+
+    const handleImageSizeToggle = useCallback(() => {
+        const updatedConfig = { ...configRef.current, imageSize: imageSize === 'square' ? 'rectangle' : 'square' }
+        setConfig(updatedConfig)
+        forceRerender({})
+        onConfigChange?.(updatedConfig)
+    }, [imageSize, onConfigChange])
 
     // Image change handler for quick edit
     const handleImageChange = useCallback((fieldName, newImage) => {
@@ -248,7 +261,7 @@ const BannerWidget = ({
 
     // Initialize editor in editor mode
     useEffect(() => {
-        if (mode === 'editor') {
+        if (mode === 'editor' && !usesCustomMarkup) {
             if (contentContainerRef.current && !contentEditorRef.current) {
                 // Text mode: inline-rich with toolbar (bold, italic, link)
                 // Header mode: inline-plain with no toolbar, max 1 line break
@@ -284,7 +297,7 @@ const BannerWidget = ({
                 contentEditorRef.current = null
             }
         }
-    }, [mode, bannerMode])
+    }, [mode, bannerMode, componentStyle, usesCustomMarkup])
 
     // Separate effect for onChange, className, namespace, slotDimensions, and pageId updates
     useEffect(() => {
@@ -333,10 +346,6 @@ const BannerWidget = ({
         }
     }, [configRef.current.headerContent, configRef.current.textContent, bannerMode, mode])
 
-    // Check if using component style with Mustache template
-    const componentStyle = configRef.current.componentStyle || 'default'
-    const useCustomStyle = componentStyle && componentStyle !== 'default' && currentTheme?.componentStyles
-
     if (useCustomStyle) {
         const style = currentTheme.componentStyles[componentStyle]
 
@@ -374,7 +383,7 @@ const BannerWidget = ({
                     // Use ComponentStyleRenderer for consistent scoped rendering
                     const styleId = `banner-${widgetId || 'preview'}-${componentStyle}`
 
-                    return (
+                    return renderWithEditorControls(
                         <ComponentStyleRenderer
                             template={style.template}
                             context={mustacheContext}
@@ -388,7 +397,7 @@ const BannerWidget = ({
                 // Passthru mode: render default with custom CSS
                 const styleId = `banner-${widgetId || 'preview'}-${componentStyle}`
 
-                return (
+                return renderWithEditorControls(
                     <div data-style-id={styleId}>
                         {style.css && <style>{`[data-style-id="${styleId}"] { ${style.css} }`}</style>}
                         {renderDefaultBanner()}
@@ -396,7 +405,7 @@ const BannerWidget = ({
                 )
             } catch (error) {
                 console.error('Error rendering custom component style:', error)
-                return (
+                return renderWithEditorControls(
                     <div>
                         <div className="text-red-500 text-sm p-2">Error rendering custom style</div>
                     </div>
@@ -421,57 +430,13 @@ const BannerWidget = ({
                     id={configRef.current.anchor || undefined}
                     style={{ position: 'relative', ...bannerStyle }}
                 >
-                    {/* Background image edit icon */}
-                    {bannerMode === 'header' && <button
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            setEditingField('backgroundImage')
-                            setShowImageModal(true)
-                        }}
-                        className="eceee-editor-ui absolute top-2 right-2 p-1.5 bg-white/70 hover:bg-white/90 rounded-md shadow-md opacity-80 hover:opacity-100 transition-all"
-                        title="Edit background image"
-                        style={{ zIndex: 10000, pointerEvents: 'auto' }}
-                    >
-                        <Layers className="w-4 h-4 text-gray-600" />
-                    </button>}
                     <div className={bodyClasses} style={{ position: 'relative', zIndex: 1 }}>
                         <div className="banner-text content" style={{ position: 'relative', zIndex: 1 }}>
                             <div ref={contentContainerRef} style={{ display: 'contents' }} />
-                            {/* Mode toggle button */}
-                            <button
-                                onClick={handleModeToggle}
-                                className="eceee-editor-ui absolute top-2 right-2 z-10 px-2 py-1 text-xs bg-white/90 hover:bg-white border border-gray-300 rounded shadow-sm flex items-center gap-1 transition-colors"
-                                title={`Switch to ${bannerMode === 'header' ? 'Text' : 'Header'} mode`}
-                                type="button"
-                            >
-                                {bannerMode === 'header' ? (
-                                    <>
-                                        <Type className="h-3 w-3" />
-                                        <span>Header</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <AlignLeft className="h-3 w-3" />
-                                        <span>Text</span>
-                                    </>
-                                )}
-                            </button>
                         </div>
 
                         {bannerMode === 'text' && image1 && (
                             <div className="banner-images image relative group/image">
-                                {/* Image1 edit icon */}
-                                <button
-                                    onClick={() => {
-                                        setEditingField('image1')
-                                        setShowImageModal(true)
-                                    }}
-                                    className={`eceee-editor-ui absolute top-2 p-1.5 bg-white/70 hover:bg-white/90 rounded-md shadow-md opacity-0 group-hover/image:opacity-80 transition-all z-[100] ${backgroundImage ? 'right-14' : 'right-2'}`}
-                                    title="Edit image"
-                                    style={{ pointerEvents: 'auto' }}
-                                >
-                                    <ImagePlus className="w-4 h-4 text-gray-600" />
-                                </button>
                                 <OptimizedImage
                                     src={image1.imgproxyBaseUrl || image1.fileUrl || image1.url}
                                     alt={image1.alt || image1.altText || ''}
@@ -484,32 +449,6 @@ const BannerWidget = ({
                             </div>
                         )}
                     </div>
-                    {/* Media Insert Modal */}
-                    {showImageModal && (
-                        <MediaSelectModal
-                            isOpen={showImageModal}
-                            onClose={() => {
-                                setShowImageModal(false)
-                                setEditingField(null)
-                            }}
-                            onSelect={(selectedItems) => {
-                                if (selectedItems === null) {
-                                    // Handle remove - set to null
-                                    handleImageChange(editingField, null)
-                                } else if (selectedItems && selectedItems.length > 0) {
-                                    handleImageChange(editingField, selectedItems[0])
-                                }
-                                setShowImageModal(false)
-                                setEditingField(null)
-                            }}
-                            mediaTypes={['image']}
-                            allowCollections={false}
-                            currentSelection={editingField === 'backgroundImage' ? backgroundImage : image1}
-                            namespace={namespace || context?.namespace}
-                            pageId={pageId}
-                            customTitle={editingField === 'backgroundImage' ? 'Edit Banner Background Image' : 'Edit Banner Image'}
-                        />
-                    )}
                 </div>
             )
         }
@@ -539,15 +478,60 @@ const BannerWidget = ({
         )
     }
 
+    function renderWithEditorControls(content) {
+        if (mode !== 'editor') return content
+        const isHeader = bannerMode === 'header'
+        const isRectangle = imageSize === 'rectangle'
+        const buttonClassName = 'inline-flex min-h-8 items-center gap-1.5 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500'
+        return <div className="banner-widget-editor group/banner relative isolate min-h-10">
+            <div role="toolbar" aria-label="Banner controls"
+                className="eceee-editor-ui absolute right-2 top-2 z-10 flex max-w-[calc(100%-1rem)] flex-wrap items-center justify-end gap-2 opacity-0 pointer-events-none group-hover/banner:opacity-100 group-hover/banner:pointer-events-auto group-focus-within/banner:opacity-100 group-focus-within/banner:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto"
+                onClick={event => event.stopPropagation()}>
+                <button type="button" onClick={handleModeToggle} className={buttonClassName}
+                    title={`Switch to ${isHeader ? 'Text' : 'Header'} mode`}>
+                    {isHeader ? <Type className="h-4 w-4" /> : <AlignLeft className="h-4 w-4" />}
+                    {isHeader ? 'Header' : 'Text'}
+                </button>
+                <button type="button" className={buttonClassName}
+                    title={isHeader ? 'Edit background image' : 'Edit image'}
+                    onClick={() => {
+                        setEditingField(isHeader ? 'backgroundImage' : 'image1')
+                        setShowImageModal(true)
+                    }}>
+                    {isHeader ? <Layers className="h-4 w-4" /> : <ImagePlus className="h-4 w-4" />}
+                    {isHeader ? 'Background image' : 'Image'}
+                </button>
+                {!isHeader && <button type="button" className={buttonClassName} onClick={handleImageSizeToggle}
+                    title={`Change image shape to ${isRectangle ? 'Square' : 'Rectangle'}`}>
+                    {isRectangle ? <RectangleHorizontal className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                    Image size: {isRectangle ? 'Rectangle' : 'Square'}
+                </button>}
+            </div>
+            <div className="relative z-0">{content}</div>
+            {showImageModal && editingField === (isHeader ? 'backgroundImage' : 'image1') && <MediaSelectModal
+                isOpen={showImageModal}
+                onClose={() => { setShowImageModal(false); setEditingField(null) }}
+                onSelect={selectedItems => {
+                    if (selectedItems === null) handleImageChange(editingField, null)
+                    else if (selectedItems?.length > 0) handleImageChange(editingField, selectedItems[0])
+                    setShowImageModal(false)
+                    setEditingField(null)
+                }}
+                mediaTypes={['image']}
+                allowCollections={false}
+                currentSelection={isHeader ? backgroundImage : image1}
+                namespace={namespace || context?.namespace}
+                pageId={pageId}
+                customTitle={isHeader ? 'Edit Banner Background Image' : 'Edit Banner Image'}
+            />}
+        </div>
+    }
+
     // Default rendering (no custom style)
     const hasContent = configRef.current.headerContent || configRef.current.textContent || image1 || backgroundImage
 
     if (mode === 'editor') {
-        return (
-            <div className="banner-widget-editor">
-                {renderDefaultBanner()}
-            </div>
-        )
+        return renderWithEditorControls(renderDefaultBanner())
     }
 
     // Preview mode

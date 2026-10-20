@@ -35,6 +35,7 @@ class ContentConfig(BaseModel):
         description="HTML content to display",
         # Control specifications
         json_schema_extra={
+            "hidden": True,  # Edited directly in the canvas
             "component": "HtmlSource",
             "rows": 6,
         },
@@ -47,6 +48,7 @@ class ContentConfig(BaseModel):
             "variant": "toggle",
             "warning": True,
             "group": "Advanced",
+            "editorPrimary": True,
         },
     )
     sanitize_html: bool = Field(
@@ -56,6 +58,7 @@ class ContentConfig(BaseModel):
             "component": "BooleanInput",
             "variant": "toggle",
             "group": "Advanced",
+            "editorPrimary": True,
         },
     )
     component_style: str = Field(
@@ -119,6 +122,7 @@ class ContentConfig(BaseModel):
             "placeholder": "section-name",
             "order": 9999,
             "group": "Advanced",
+            "editorPrimary": True,
         },
     )
     anchor_title: str = Field(
@@ -130,6 +134,7 @@ class ContentConfig(BaseModel):
             "helpText": "Displayed in navigation menus when linking to this content",
             "order": 10000,
             "group": "Advanced",
+            "editorPrimary": True,
         },
     )
 

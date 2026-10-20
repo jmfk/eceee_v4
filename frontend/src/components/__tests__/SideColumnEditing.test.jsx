@@ -52,6 +52,21 @@ const readyInput = async () => {
     return input
 }
 
+const bannerSchema = {
+    properties: {
+        componentStyle: { type: 'string', component: 'TextInput', title: 'Component style', group: 'Content' },
+        headerContent: { type: 'string', component: 'TextInput', title: 'Header content', group: 'Content', hidden: true,
+            conditionalOn: { bannerMode: ['header'] } },
+        textContent: { type: 'string', component: 'TextInput', title: 'Text content', group: 'Content', hidden: true,
+            conditionalOn: { bannerMode: ['text'] } },
+    }
+}
+const bannerTheme = { componentStyles: {
+    default: { template: '<section>{{{content}}}</section>' },
+    custom: { template: '<section>{{{content}}}</section>' },
+    passthrough: { template: '{{passthru}}' },
+} }
+
 function EchoingPanel({ provideSchema = true }) {
     const [currentWidget, setCurrentWidget] = useState(widget)
     return <WidgetEditorPanel
@@ -71,6 +86,67 @@ describe('Side-column editing acceptance regressions', () => {
         vi.clearAllMocks()
         getWidgetSchema.mockResolvedValue(schema)
         validateWidgetType.mockResolvedValue({ isValid: true, canEdit: true })
+    })
+
+    it('shows Content widget advanced settings directly without duplicate content or HTML editor controls', async () => {
+        const onRealTimeUpdate = vi.fn()
+        const config = { content: '<p>Preserve this copy</p>', allowScripts: false, sanitizeHtml: true,
+            anchor: 'original', anchorTitle: 'Original title' }
+        const properties = {
+            content: { type: 'string', component: 'HtmlSource', title: 'Content', hidden: true },
+            allowScripts: { type: 'boolean', component: 'BooleanInput', title: 'Allow scripts', group: 'Advanced', editorPrimary: true },
+            sanitizeHtml: { type: 'boolean', component: 'BooleanInput', title: 'Sanitize HTML', group: 'Advanced', editorPrimary: true },
+            anchor: { type: 'string', component: 'TextInput', title: 'Anchor', group: 'Advanced', editorPrimary: true },
+            anchorTitle: { type: 'string', component: 'TextInput', title: 'Anchor title', group: 'Advanced', editorPrimary: true },
+        }
+        render(<WidgetEditorPanel isOpen widgetData={{ ...widget, type: 'easy_widgets.ContentWidget', config }}
+            schema={{ required: ['content'], properties }} context={context} onRealTimeUpdate={onRealTimeUpdate}
+            showPublishingFields={false} />)
+
+        const anchor = await screen.findByRole('textbox', { name: 'Anchor', exact: true })
+        await waitFor(() => expect(anchor.readOnly).toBe(false))
+        for (const title of ['Allow scripts', 'Sanitize HTML', 'Anchor', 'Anchor title']) {
+            expect(screen.getByText(title, { exact: true })).toBeVisible()
+            expect(screen.getByText(title, { exact: true }).closest('details')).toBeNull()
+        }
+        expect(screen.queryByRole('textbox', { name: 'Content', exact: true })).toBeNull()
+        expect(screen.queryByRole('button', { name: 'Open HTML Editor' })).toBeNull()
+        expect(screen.queryByText('Advanced', { exact: true })).toBeNull()
+        fireEvent.change(anchor, { target: { value: 'updated' } })
+        expect(onRealTimeUpdate.mock.calls.at(-1)[0].config).toEqual({ ...config, anchor: 'updated' })
+    })
+
+    it.each(['header', 'text'])('keeps the active text field editable for a custom banner style in %s mode', async (bannerMode) => {
+        const onRealTimeUpdate = vi.fn()
+        const config = { bannerMode, componentStyle: 'custom', headerContent: 'Heading', textContent: 'Body' }
+        render(<WidgetEditorPanel isOpen widgetData={{ ...widget, config }} schema={bannerSchema}
+            pageVersionData={{ effectiveTheme: bannerTheme }} context={context} onRealTimeUpdate={onRealTimeUpdate}
+            showPublishingFields={false} />)
+
+        const label = bannerMode === 'header' ? 'Header content' : 'Text content'
+        const input = await screen.findByRole('textbox', { name: label })
+        await waitFor(() => expect(input.readOnly).toBe(false))
+        expect(screen.queryByRole('textbox', { name: bannerMode === 'header' ? 'Text content' : 'Header content' })).toBeNull()
+        fireEvent.change(input, { target: { value: 'Updated banner copy' } })
+        const field = bannerMode === 'header' ? 'headerContent' : 'textContent'
+        expect(onRealTimeUpdate.mock.calls.at(-1)[0].config).toEqual({ ...config, [field]: 'Updated banner copy' })
+        expect(bannerSchema.properties[field].hidden).toBe(true)
+    })
+
+    it('hides duplicate banner text controls when switching back to an inline-editable style', async () => {
+        const props = { isOpen: true, schema: { schema: bannerSchema }, context: { ...context, theme: bannerTheme },
+            showPublishingFields: false }
+        const config = { bannerMode: 'header', headerContent: 'Heading', componentStyle: 'custom' }
+        const { rerender } = render(<WidgetEditorPanel {...props} widgetData={{ ...widget, config }} />)
+        expect(await screen.findByRole('textbox', { name: 'Header content' })).toBeVisible()
+
+        for (const componentStyle of ['default', 'passthrough', 'missing']) {
+            rerender(<WidgetEditorPanel {...props} widgetData={{ ...widget, config: { ...config, componentStyle } }} />)
+            await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Header content' })).toBeNull())
+        }
+
+        rerender(<WidgetEditorPanel {...props} widgetData={{ ...widget, config }} />)
+        expect(await screen.findByRole('textbox', { name: 'Header content' })).toBeVisible()
     })
 
     it('keeps the focused input and its selection when its change returns through page props', async () => {

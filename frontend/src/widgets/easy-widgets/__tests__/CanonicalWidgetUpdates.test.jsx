@@ -13,7 +13,7 @@ vi.mock('../SimpleTextEditorRenderer', () => ({
         this.container = container
         this.options = { ...options }
         this.editorElement = document.createElement(options.element || 'div')
-        this.editorElement.contentEditable = 'true'
+        this.editorElement.setAttribute('contenteditable', 'true')
         this.editorElement.className = options.className || ''
         this.editorElement.innerHTML = options.content || ''
         this.render = vi.fn(() => {
@@ -92,11 +92,15 @@ vi.mock('../../../utils/imgproxySecure', () => ({
 }))
 
 vi.mock('../../../components/media/OptimizedImage', () => ({
-    default: ({ src, alt, className }) => <img src={src} alt={alt} className={className} />
+    default: ({ src, alt, className, width, height }) => <img src={src} alt={alt} className={className} width={width} height={height} />
 }))
 
 vi.mock('../../../components/media/MediaSelectModal', () => ({
-    default: () => null
+    default: ({ isOpen, onSelect, onClose, customTitle }) => isOpen && <div role="dialog" aria-label={customTitle}>
+        <button onClick={() => onSelect([{ url: '/selected.jpg' }])}>Select test image</button>
+        <button onClick={() => onSelect(null)}>Remove test image</button>
+        <button onClick={onClose}>Close picker</button>
+    </div>
 }))
 
 import HeadlineWidget from '../HeadlineWidget'
@@ -287,6 +291,80 @@ describe('canonical widget update ownership', () => {
         expect(onConfigChange).toHaveBeenCalledWith(expect.objectContaining({
             bannerMode: 'text', backgroundImage: { url: '/background.jpg' }
         }))
+    })
+
+    it.each(['default', 'custom', 'passthrough'].flatMap(componentStyle =>
+        ['header', 'text'].flatMap(bannerMode => [false, true].map(hasImage => ({ componentStyle, bannerMode, hasImage })))
+    ))('BannerWidget keeps controls reachable for $componentStyle / $bannerMode / image=$hasImage', async ({ componentStyle, bannerMode, hasImage }) => {
+        currentTheme = { componentStyles: { custom: { template: '<article>{{{content}}}</article>' }, passthrough: { template: '{{passthru}}' } } }
+        render(<BannerWidget mode="editor" widgetId="banner-controls" slotName="main" config={{
+            componentStyle, bannerMode, headerContent: 'Heading', textContent: 'Body',
+            image1: hasImage ? { url: '/inline.jpg' } : null, backgroundImage: hasImage ? { url: '/background.jpg' } : null,
+        }} />)
+
+        const toolbar = screen.getByRole('toolbar', { name: 'Banner controls' })
+        const imageButton = screen.getByTitle(bannerMode === 'header' ? 'Edit background image' : 'Edit image')
+        expect(imageButton).toBeVisible()
+        expect(toolbar).toContainElement(imageButton)
+        expect(toolbar.closest('.banner-widget')).toBeNull()
+        expect(screen.queryByTitle(bannerMode === 'header' ? 'Edit image' : 'Edit background image')).toBeNull()
+        expect(Boolean(screen.queryByRole('button', { name: 'Image size: Square' }))).toBe(bannerMode === 'text')
+
+        fireEvent.click(imageButton)
+        expect(screen.getByRole('dialog')).toBeVisible()
+        fireEvent.click(screen.getByRole('button', { name: 'Close picker' }))
+        await act(async () => {})
+    })
+
+    it.each([false, true])('BannerWidget can change image shape with image present=%s', async (hasImage) => {
+        const onConfigChange = vi.fn()
+        const config = { bannerMode: 'text', textContent: 'Body', imageSize: 'square',
+            image1: hasImage ? { url: '/inline.jpg' } : null, backgroundImage: { url: '/stored-background.jpg' } }
+        const { container } = render(<BannerWidget mode="editor" widgetId="banner-size" slotName="main"
+            config={config} onConfigChange={onConfigChange} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Image size: Square' }))
+        expect(screen.getByRole('button', { name: 'Image size: Rectangle' })).toBeVisible()
+        expect(onConfigChange).toHaveBeenLastCalledWith({ ...config, imageSize: 'rectangle' })
+        if (hasImage) expect(container.querySelector('.banner-image')).toHaveAttribute('width', '280')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Image size: Rectangle' }))
+        expect(onConfigChange).toHaveBeenLastCalledWith(config)
+        if (hasImage) expect(container.querySelector('.banner-image')).toHaveAttribute('width', '140')
+        await act(async () => {})
+    })
+
+    it('BannerWidget can select and remove a text image without losing its image button', async () => {
+        const onConfigChange = vi.fn()
+        const { container } = render(<BannerWidget mode="editor" widgetId="banner-select" slotName="main"
+            config={{ bannerMode: 'text', textContent: 'Body' }} onConfigChange={onConfigChange} />)
+
+        fireEvent.click(screen.getByTitle('Edit image'))
+        fireEvent.click(screen.getByRole('button', { name: 'Select test image' }))
+        expect(container.querySelector('.banner-image')).toHaveAttribute('src', '/selected.jpg')
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({ image1: { url: '/selected.jpg' } }))
+        fireEvent.click(screen.getByTitle('Edit image'))
+        fireEvent.click(screen.getByRole('button', { name: 'Remove test image' }))
+        expect(container.querySelector('.banner-image')).toBeNull()
+        expect(screen.getByTitle('Edit image')).toBeVisible()
+        await act(async () => {})
+    })
+
+    it('BannerWidget mounts its inline editor again after switching away from custom markup', async () => {
+        currentTheme = { componentStyles: { custom: { template: '<article>{{{content}}}</article>' }, passthrough: { template: '{{passthru}}' } } }
+        const onConfigChange = vi.fn()
+        const config = { bannerMode: 'text', textContent: 'Body', componentStyle: 'custom' }
+        const { container } = render(<BannerWidget mode="editor" widgetId="banner-style" slotName="main"
+            config={config} onConfigChange={onConfigChange} />)
+        expect(container.querySelector('[contenteditable="true"]')).toBeNull()
+        const subscription = externalChangeCallbacks.find(item => item.componentId === 'bannerwidget-banner-style')
+
+        for (const componentStyle of ['default', 'custom', 'passthrough']) {
+            await act(async () => subscription.callback(stateWithWidget('banner-style', 'main', { ...config, componentStyle })))
+            expect(Boolean(container.querySelector('[contenteditable="true"]'))).toBe(componentStyle !== 'custom')
+        }
+        await act(async () => latestRenderer().emitChange('Updated text'))
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({ textContent: 'Updated text' }))
     })
 
     it.each(['text', 'header'])('BannerWidget custom styles exclude inactive image data in %s mode', async (bannerMode) => {

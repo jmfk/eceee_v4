@@ -335,6 +335,8 @@ const WidgetEditorPanel = forwardRef(({
         setRefreshGeneration(value => value + 1)
     }, [widgetData])
 
+    const editorTheme = pageVersionData?.effectiveTheme || context?.theme || context?.pageVersionData?.effectiveTheme
+
     // Memoize context object to prevent unnecessary rerenders of IsolatedFormRenderer
     const memoizedContext = useMemo(() => {
         if (!widgetData) return {}
@@ -349,7 +351,7 @@ const WidgetEditorPanel = forwardRef(({
             instanceId: context?.instanceId || widgetData?.context?.instanceId,
             webpageData: context?.webpageData || webpageData,
             pageVersionData: context?.pageVersionData || pageVersionData,
-            theme: pageVersionData?.effectiveTheme,
+            theme: editorTheme,
             // Preserve widgetPath from widgetData (top-level or context) for nested widgets
             widgetPath: widgetData?.widgetPath || widgetData?.context?.widgetPath
         }
@@ -367,8 +369,27 @@ const WidgetEditorPanel = forwardRef(({
         context?.pageVersionData,
         webpageData?.id,
         pageVersionData?.versionId,
-        pageVersionData?.effectiveTheme
+        editorTheme
     ])
+
+    const sourceSchema = schema || fetchedSchema
+    const componentStyle = editorTheme?.componentStyles?.[widgetData?.config?.componentStyle]
+    const needsBannerContentFields = selectedType === 'easy_widgets.BannerWidget'
+        && widgetData?.config?.componentStyle !== 'default' && Boolean(componentStyle)
+        && componentStyle.template?.trim() !== '{{passthru}}'
+    const formSchema = useMemo(() => {
+        if (!needsBannerContentFields) return sourceSchema
+        // Replacing the default markup removes the inline editor, so keep one text editing path.
+        const definition = sourceSchema?.schema || sourceSchema
+        if (!definition?.properties) return sourceSchema
+        const properties = { ...definition.properties }
+        for (const field of ['headerContent', 'textContent']) {
+            if (properties[field]) properties[field] = { ...properties[field], hidden: false }
+        }
+        return sourceSchema.schema
+            ? { ...sourceSchema, schema: { ...definition, properties } }
+            : { ...sourceSchema, properties }
+    }, [sourceSchema, needsBannerContentFields])
 
     if (!isOpen) return null
     return (
@@ -507,7 +528,7 @@ const WidgetEditorPanel = forwardRef(({
                                 <IsolatedFormRenderer
                                     ref={formRendererRef}
                                     initWidgetData={widgetData}
-                                    initschema={schema || fetchedSchema}
+                                    initschema={formSchema}
                                     namespace={namespace}
                                     contextType={contextType}
                                     widgetId={widgetData?.id}
