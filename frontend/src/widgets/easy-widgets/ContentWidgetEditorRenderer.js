@@ -1184,7 +1184,9 @@ class ContentWidgetEditorRenderer {
      */
     handleKeyDown(e) {
         if (this.disabled) { e.preventDefault(); return }
-        if (this.inlineOnly && ((e.metaKey || e.ctrlKey) && /[0-9]/.test(e.key) || e.key === 'Tab')) {
+        // Form fields use native focus navigation; full content widgets retain indentation.
+        if (this.fieldMode && e.key === 'Tab') return
+        if (this.inlineOnly && (e.metaKey || e.ctrlKey) && /[0-9]/.test(e.key)) {
             e.preventDefault()
             return
         }
@@ -1391,6 +1393,8 @@ class ContentWidgetEditorRenderer {
      */
     handleContextMenu(e) {
         if (this.disabled) { e.preventDefault(); return }
+        // Inline fields use the native menu; the block editor menu exposes unsupported actions.
+        if (this.inlineOnly) { e.stopPropagation(); return }
         // Check global context menu config first, then LayoutRenderer
         const globalEnabled = window.__contextMenuConfig?.enabled ?? true
         const layoutEnabled = window.__layoutRenderer?.uiConfig?.enableContextMenu ?? true

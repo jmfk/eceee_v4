@@ -42,6 +42,7 @@ const WidgetEditorPanel = forwardRef(({
     const [widgetTypeSlug, setWidgetTypeSlug] = useState(null)
     const [fetchedSchema, setFetchedSchema] = useState(null)
     const [loadedSchemaType, setLoadedSchemaType] = useState(null)
+    const [refreshGeneration, setRefreshGeneration] = useState(0)
     const [isLoadingSchema, setIsLoadingSchema] = useState(false)
     const [schemaError, setSchemaError] = useState(null)
     const [panelWidth, setPanelWidth] = useState(400) // Default width in pixels
@@ -134,7 +135,7 @@ const WidgetEditorPanel = forwardRef(({
             }
         })
         return () => { active = false }
-    }, [selectedType])
+    }, [selectedType, refreshGeneration])
 
     useEffect(() => {
         if (schema) { setFetchedSchema(schema); setIsLoadingSchema(false); return }
@@ -150,7 +151,7 @@ const WidgetEditorPanel = forwardRef(({
             if (active) { setSchemaError(error.message); setIsLoadingSchema(false) }
         })
         return () => { active = false }
-    }, [selectedType, schema])
+    }, [selectedType, schema, refreshGeneration])
 
     // Setup vanilla JS resize handlers (no React state, pure DOM manipulation)
     useEffect(() => {
@@ -327,34 +328,12 @@ const WidgetEditorPanel = forwardRef(({
     }
 
     // Handle refresh widget types
-    const handleRefreshWidgetTypes = useCallback(async () => {
+    const handleRefreshWidgetTypes = useCallback(() => {
         if (!widgetData) return
-        // Clear cache and re-validate
+        // Retry through the effects so stale requests are cancelled on widget switches.
         clearWidgetTypesCache()
-        setIsValidatingType(true)
-
-        try {
-            const validation = await validateWidgetType(widgetData)
-            setWidgetTypeValidation(validation)
-
-            // If the widget type is now available, try to fetch schema
-            if (validation.canEdit && !schema) {
-                setIsLoadingSchema(true)
-                setSchemaError(null)
-                // The schema fetch effect will trigger due to widgetTypeValidation change
-            }
-        } catch (error) {
-            console.error('Error refreshing widget type:', error)
-            setWidgetTypeValidation({
-                isValid: false,
-                error: `Failed to refresh widget type: ${error.message}`,
-                canEdit: false,
-                shouldHide: false
-            })
-        } finally {
-            setIsValidatingType(false)
-        }
-    }, [widgetData, schema])
+        setRefreshGeneration(value => value + 1)
+    }, [widgetData])
 
     // Memoize context object to prevent unnecessary rerenders of IsolatedFormRenderer
     const memoizedContext = useMemo(() => {

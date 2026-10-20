@@ -419,6 +419,48 @@ const mockPanelSchemas = async page => {
 }
 
 test.describe('stable widget side panel', () => {
+  test('allows keyboard navigation out of richtext fields in both directions', async ({ page }) => {
+    installErrorGuards(page)
+    const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    await mockPanelSchemas(page)
+    await openEditor(page, state)
+    await page.getByTestId('page-widget-edit-easy-widgets-headlinewidget').click()
+    const rich = page.getByRole('textbox', { name: 'Panel content', exact: true })
+    await expect(rich).toContainText('Initial headline')
+    await rich.focus()
+    await rich.press('Tab')
+    await expect(page.getByRole('textbox', { name: 'Panel title', exact: true })).toBeFocused()
+    await rich.focus()
+    await rich.press('Shift+Tab')
+    await expect.poll(() => page.getByRole('toolbar', { name: 'Panel content formatting' })
+      .evaluate(element => element.contains(document.activeElement))).toBe(true)
+  })
+
+  test('preserves embedded HTML in ordinary richtext fields through source editing and save/reload', async ({ page }) => {
+    installErrorGuards(page)
+    const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    const original = '<span>Original copy</span><iframe src="https://example.test/embed"></iframe>'
+    state.version.widgets.main.find(widget => widget.id === 'headline-main').config.content = original
+    await mockPanelSchemas(page)
+    await openEditor(page, state)
+    await page.getByTestId('page-widget-edit-easy-widgets-headlinewidget').click()
+    await expect(page.getByRole('textbox', { name: 'Panel content', exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Open HTML Editor' }).click()
+    const source = page.locator('.html-editor-overlay .cm-content')
+    await expect(source).toHaveText(original)
+    await source.focus()
+    await source.press('ControlOrMeta+a')
+    const updated = original.replace('Original copy', 'Edited copy')
+    await page.keyboard.insertText(updated)
+    await source.press('Escape')
+    await saveCurrentVersion(page)
+    expect(getSavedVersion(state).widgets.main.find(widget => widget.id === 'headline-main').config.content).toBe(updated)
+    await page.reload()
+    await page.getByTestId('page-widget-edit-easy-widgets-headlinewidget').click()
+    await page.getByRole('button', { name: 'Open HTML Editor' }).click()
+    await expect(page.locator('.html-editor-overlay .cm-content')).toHaveText(updated)
+  })
+
   test('preserves input selection and schema while typing and saves the final keystroke', async ({ page }) => {
     installErrorGuards(page)
     const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })

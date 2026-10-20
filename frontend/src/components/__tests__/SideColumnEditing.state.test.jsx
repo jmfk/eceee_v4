@@ -133,6 +133,26 @@ it('keeps trusted scripts and embeds in a lossless source-only view', async () =
   expect(onChange).not.toHaveBeenCalled()
 })
 
+it('preserves unsupported HTML in ordinary richtext fields through source editing and external hydration', () => {
+  const raw = '<p>Existing copy</p><iframe src="https://example.test/embed"></iframe>'
+  const onChange = vi.fn()
+  const { rerender } = render(<RichTextInput value={raw} onChange={onChange} label="Body" />)
+  expect(screen.queryByRole('textbox')).toBeNull()
+  expect(onChange).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Open HTML Editor' }))
+  const source = screen.getByRole('textbox', { name: 'HTML source' })
+  expect(source).toHaveValue(raw)
+  const updated = raw.replace('Existing copy', 'Edited copy')
+  fireEvent.change(source, { target: { value: updated } })
+  expect(onChange).toHaveBeenLastCalledWith(updated)
+  rerender(<RichTextInput value={updated} onChange={onChange} label="Body" disabled />)
+  expect(screen.queryByRole('textbox')).toBeNull()
+  expect(screen.getByRole('button', { name: 'Open HTML Editor' })).toBeDisabled()
+  rerender(<RichTextInput value="<p>Supported HTML</p>" onChange={onChange} label="Body" />)
+  expect(screen.getByRole('textbox', { name: 'Body' })).toHaveTextContent('Supported HTML')
+  expect(onChange).toHaveBeenCalledTimes(1)
+})
+
 it('restricts inline paste and shortcuts and blocks edit events after disabling', () => {
   const onChange = vi.fn()
   document.execCommand = vi.fn((command, _, value) => {
@@ -153,4 +173,27 @@ it('restricts inline paste and shortcuts and blocks edit events after disabling'
   fireEvent.input(editor)
   expect(document.execCommand).not.toHaveBeenCalled()
   expect(onChange).not.toHaveBeenCalled()
+})
+
+it.each([false, true])('allows native Tab navigation in richtext fields (inlineOnly=%s)', inlineOnly => {
+  render(<RichTextInput label="Keyboard field" value="Text" onChange={vi.fn()} inlineOnly={inlineOnly} />)
+  const editor = screen.getByRole('textbox', { name: 'Keyboard field' })
+  document.execCommand = vi.fn()
+  expect(fireEvent.keyDown(editor, { key: 'Tab' })).toBe(true)
+  expect(fireEvent.keyDown(editor, { key: 'Tab', shiftKey: true })).toBe(true)
+  expect(document.execCommand).not.toHaveBeenCalled()
+})
+
+it('keeps the native context menu for inline fields instead of showing unavailable block commands', () => {
+  render(<RichTextInput label="Headline" value="Text" onChange={vi.fn()} inlineOnly />)
+  const editor = screen.getByRole('textbox', { name: 'Headline' })
+  const parentMenu = vi.fn()
+  document.addEventListener('contextmenu', parentMenu)
+  try {
+    expect(fireEvent.contextMenu(editor)).toBe(true)
+    expect(document.querySelector('.wysiwyg-context-menu-item')).toBeNull()
+    expect(parentMenu).not.toHaveBeenCalled()
+  } finally {
+    document.removeEventListener('contextmenu', parentMenu)
+  }
 })
