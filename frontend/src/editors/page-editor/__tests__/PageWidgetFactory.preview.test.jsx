@@ -56,6 +56,9 @@ describe('PageWidgetFactory preview markup', () => {
         )
 
         const widgetItem = container.querySelector('.widget-item')
+        expect(widgetItem).toHaveAttribute('tabindex', '0')
+        expect(widgetItem).toHaveAttribute('role', 'group')
+        expect(widgetItem).toHaveAttribute('aria-label', 'Banner widget')
         expect(widgetItem.querySelector(':scope > .widget-content-wrapper > .banner-widget')).toBeInTheDocument()
         expect(widgetItem.querySelector(':scope > .widget-content-wrapper')).toHaveClass('widget-content-wrapper')
         expect(widgetItem.querySelector(':scope > .widget-content')).toBeNull()

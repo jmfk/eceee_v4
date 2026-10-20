@@ -284,7 +284,12 @@ const SelfContainedSlotEditor = ({
     }, [pasteModeActive, onPasteAtPosition, slotName, slotPath]);
 
     return (
-        <div className="slot-editor editor-overlay-region relative">
+        <div
+            className="slot-editor editor-overlay-region relative"
+            tabIndex={mode === 'editor' ? 0 : undefined}
+            role={mode === 'editor' ? 'group' : undefined}
+            aria-label={mode === 'editor' ? `${slotLabel} slot` : undefined}
+        >
             <PageWidgetHeaderWithSlots
                 widgetType={slotLabel}
                 showControls={true}

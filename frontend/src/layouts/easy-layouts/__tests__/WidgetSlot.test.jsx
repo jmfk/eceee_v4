@@ -26,6 +26,9 @@ describe('WidgetSlot preview defaults', () => {
         )
 
         const slot = container.querySelector('.widget-slot')
+        expect(slot).toHaveAttribute('tabindex', '0')
+        expect(slot).toHaveAttribute('role', 'group')
+        expect(slot).toHaveAttribute('aria-label', 'Main Content slot')
         expect(slot.querySelector(':scope > .editor-slot-toolbar')).toHaveClass('editor-overlay-toolbar')
         expect(screen.getByTestId('rendered-widget').parentElement).toBe(slot)
     })
