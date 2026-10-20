@@ -1,11 +1,12 @@
 import { expect, test } from '@playwright/test'
 import { mockCmsApi, seedAuthenticatedSession, testTokens } from './fixtures/apiMocks'
+import { openCmsPage } from './fixtures/navigation'
 
 test.describe('CMS auth and page management regressions', () => {
   test('redirects protected routes to login when no session is available', async ({ page }) => {
     await mockCmsApi(page)
 
-    await page.goto('/pages')
+    await openCmsPage(page, '/pages')
 
     await expect(page).toHaveURL(/\/login$/)
     await expect(page.getByRole('heading', { name: 'EASY v4' })).toBeVisible()
@@ -16,7 +17,7 @@ test.describe('CMS auth and page management regressions', () => {
   test('logs in with JWT credentials and returns to the requested pages route', async ({ page }) => {
     await mockCmsApi(page)
 
-    await page.goto('/pages')
+    await openCmsPage(page, '/pages')
     await page.getByLabel('Username').fill('admin')
     await page.getByLabel('Password').fill('blarg123')
     await page.getByRole('button', { name: 'Sign In' }).click()
@@ -33,7 +34,7 @@ test.describe('CMS auth and page management regressions', () => {
     await mockCmsApi(page, { authenticated: true })
     await seedAuthenticatedSession(page)
 
-    await page.goto('/pages')
+    await openCmsPage(page, '/pages')
 
     await expect(page.getByRole('link', { name: 'Pages' })).toBeVisible()
     await expect(page.getByPlaceholder('Search pages...')).toBeVisible()
@@ -45,7 +46,7 @@ test.describe('CMS auth and page management regressions', () => {
   test('downloads a remote site and then updates its linked local copy', async ({ page }) => {
     await mockCmsApi(page, { authenticated: true })
     await seedAuthenticatedSession(page)
-    await page.goto('/pages')
+    await openCmsPage(page, '/pages')
 
     await page.getByTestId('import-site-package-button').click()
     await expect(page.getByRole('heading', { name: 'Import Root Site' })).toBeVisible()
@@ -79,7 +80,7 @@ test.describe('CMS auth and page management regressions', () => {
       await mockCmsApi(page, { authenticated: true })
       await seedAuthenticatedSession(page)
 
-      await page.goto('/pages')
+      await openCmsPage(page, '/pages')
 
       await expect(page.getByPlaceholder('Search pages...')).toBeVisible()
       await expect(page.getByTestId('page-tree-node-summer-study')).toBeVisible()
@@ -115,7 +116,7 @@ test.describe('CMS auth and page management regressions', () => {
     await mockCmsApi(page, { authenticated: true })
     await seedAuthenticatedSession(page)
 
-    await page.goto('/pages')
+    await openCmsPage(page, '/pages')
 
     const helpButton = page.getByRole('button', { name: 'Open Pages help' })
     await helpButton.evaluate(element => {
@@ -150,7 +151,7 @@ test.describe('CMS auth and page management regressions', () => {
       await mockCmsApi(page, { authenticated: true, responsivePages: true })
       await seedAuthenticatedSession(page)
 
-      await page.goto('/pages')
+      await openCmsPage(page, '/pages')
 
       const rootId = 'summer-study'
       const childId = 'published-conference-programme-with-long-title'
