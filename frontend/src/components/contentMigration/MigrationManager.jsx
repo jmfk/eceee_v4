@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, CheckCircle2, Download, Package, Play, RefreshCw } from 'lucide-react'
 
@@ -43,7 +43,8 @@ const MigrationManager = () => {
     const [selectedImporterId, setSelectedImporterId] = useState('')
     const [connectionId, setConnectionId] = useState('')
     const [options, setOptions] = useState({})
-    const [preflight, setPreflight] = useState(null)
+    const [preflightResult, setPreflight] = useState(null)
+    const initializedImporterId = useRef(null)
 
     const { data: pluginData, isLoading: pluginsLoading } = useQuery({
         queryKey: ['tenant-plugins'],
@@ -75,6 +76,9 @@ const MigrationManager = () => {
     )
     const importers = useMemo(() => importerData?.results || [], [importerData])
     const selectedImporter = importers.find((item) => item.id === selectedImporterId) || null
+    const importRequest = { importerId: selectedImporterId, connectionId, options }
+    const requestKey = JSON.stringify(importRequest)
+    const preflight = preflightResult?.requestKey === requestKey ? preflightResult.result : null
     const compatibleConnections = useMemo(
         () => connections.filter((item) => selectedImporter?.connectionKinds.includes(item.connectionType) && item.isActive),
         [connections, selectedImporter],
@@ -89,7 +93,7 @@ const MigrationManager = () => {
     }, [connections, importers])
     const healthQueries = useQueries({
         queries: healthConnections.map((connection) => ({
-            queryKey: ['data-connection-health', connection.id],
+            queryKey: ['data-connection-health', connection.id, connection.updatedAt],
             queryFn: async () => (await api.post(`/api/v1/data-connections/connections/${connection.id}/test/`)).data,
             retry: false,
             staleTime: 60_000,
@@ -98,7 +102,7 @@ const MigrationManager = () => {
     const connectionHealth = useMemo(() => Object.fromEntries(
         healthConnections.map((connection, index) => {
             const query = healthQueries[index]
-            const status = query?.isPending
+            const status = query?.isPending || query?.isFetching
                 ? 'checking'
                 : query?.isError || query?.data?.status !== 'ready'
                     ? 'unavailable'
@@ -123,7 +127,13 @@ const MigrationManager = () => {
     }, [importers, selectedImporter])
 
     useEffect(() => {
-        if (!selectedImporter) return
+        if (!selectedImporter) {
+            initializedImporterId.current = null
+            setPreflight(null)
+            return
+        }
+        if (initializedImporterId.current === selectedImporter.id) return
+        initializedImporterId.current = selectedImporter.id
         setOptions(Object.fromEntries(selectedImporter.fields.map((field) => [field.name, field.default ?? ''])))
         setPreflight(null)
     }, [selectedImporter])
@@ -131,7 +141,10 @@ const MigrationManager = () => {
     useEffect(() => {
         if (!selectedImporter) return
         const currentIsCompatible = compatibleConnections.some((connection) => connection.id === connectionId)
-        if (!currentIsCompatible) setConnectionId(compatibleConnections[0]?.id || '')
+        if (!currentIsCompatible) {
+            setConnectionId(compatibleConnections[0]?.id || '')
+            setPreflight(null)
+        }
     }, [compatibleConnections, connectionId, selectedImporter])
 
     const activationMutation = useMutation({
@@ -146,14 +159,17 @@ const MigrationManager = () => {
     })
 
     const preflightMutation = useMutation({
-        mutationFn: async () => (await api.post(
-            `${endpoint}/importers/${selectedImporter.id}/preflight/`,
-            { connectionId, options },
+        mutationFn: async (request) => (await api.post(
+            `${endpoint}/importers/${request.importerId}/preflight/`,
+            { connectionId: request.connectionId, options: request.options },
         )).data,
-        onSuccess: setPreflight,
-        onError: (error) => setPreflight({
-            status: 'blocked',
-            error: error.response?.data?.error || 'Preflight failed',
+        onSuccess: (result, request) => setPreflight({ requestKey: JSON.stringify(request), result }),
+        onError: (error, request) => setPreflight({
+            requestKey: JSON.stringify(request),
+            result: {
+                status: 'blocked',
+                error: error.response?.data?.error || 'Preflight failed',
+            },
         }),
     })
 
@@ -317,7 +333,7 @@ const MigrationManager = () => {
                                     <button
                                         type="button"
                                         disabled={!connectionId || preflightMutation.isPending}
-                                        onClick={() => preflightMutation.mutate()}
+                                        onClick={() => preflightMutation.mutate(importRequest)}
                                         className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                                     >
                                         {preflightMutation.isPending ? 'Checking…' : 'Run preflight'}
