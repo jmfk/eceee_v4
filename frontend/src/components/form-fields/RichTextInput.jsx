@@ -38,8 +38,24 @@ const RichTextEditor = ({ value, defaultValue = '', onChange, onBlur, onFocus, l
         renderer.toolbarElement?.setAttribute('role', 'toolbar')
         renderer.toolbarElement?.setAttribute('aria-label', `${label || 'Rich text'} formatting`)
         renderer.toolbarElement?.classList.add('flex-wrap')
-        const keepSelection = event => { if (event.target.closest('button')) event.preventDefault() }
+        const keepSelection = event => {
+            if (!event.target.closest('button')) return
+            const selection = window.getSelection()
+            if (!selection?.rangeCount || !element.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+                element.focus()
+                if (selection && (!selection.rangeCount || !element.contains(selection.getRangeAt(0).commonAncestorContainer))) {
+                    const range = document.createRange()
+                    range.selectNodeContents(element)
+                    range.collapse(false)
+                    selection.removeAllRanges()
+                    selection.addRange(range)
+                }
+            }
+            event.preventDefault()
+        }
         renderer.toolbarElement?.addEventListener('mousedown', keepSelection)
+        // Keyboard activation has no mousedown; capture the click before the command executes.
+        renderer.toolbarElement?.addEventListener('click', keepSelection, true)
         const focus = event => callbacksRef.current.onFocus?.(event)
         const blur = event => callbacksRef.current.onBlur?.(event)
         const blockDisabledEdit = event => {
@@ -54,6 +70,7 @@ const RichTextEditor = ({ value, defaultValue = '', onChange, onBlur, onFocus, l
             element.removeEventListener('blur', blur)
             editEvents.forEach(name => element.removeEventListener(name, blockDisabledEdit, true))
             renderer.toolbarElement?.removeEventListener('mousedown', keepSelection)
+            renderer.toolbarElement?.removeEventListener('click', keepSelection, true)
             renderer.destroy()
             editorRef.current = null
         }
@@ -91,19 +108,19 @@ const RichTextEditor = ({ value, defaultValue = '', onChange, onBlur, onFocus, l
 }
 
 // Every HTML-valued field needs the same lossless path, including nested richtext fields.
-const RichTextInput = ({ value, defaultValue = '', onChange, disabled, showSourceButton = false, ...props }) => {
+const RichTextInput = ({ value, defaultValue = '', onChange, disabled, showSourceButton = false, inlineOnly = false, ...props }) => {
     const [sourceOpen, setSourceOpen] = useState(false)
     const html = value ?? defaultValue
-    const sourceOnly = useMemo(() => requiresHtmlSource(html), [html])
+    const sourceOnly = useMemo(() => requiresHtmlSource(html, inlineOnly), [html, inlineOnly])
     useEffect(() => { if (disabled) setSourceOpen(false) }, [disabled])
     return <div className="space-y-2">
         {sourceOnly
             ? <>
                 {props.label && <div className="text-sm font-medium text-gray-700">{props.label}{props.required && ' *'}</div>}
                 <FieldHelpText>{props.description}</FieldHelpText>
-                <p className="text-sm text-gray-600">Use the HTML editor to preserve scripts and embedded content.</p>
+                <p className="text-sm text-gray-600">Use the HTML editor to preserve this content without removing markup.</p>
             </>
-            : <RichTextEditor {...props} value={value} defaultValue={defaultValue} onChange={onChange} disabled={disabled} />}
+            : <RichTextEditor {...props} value={value} defaultValue={defaultValue} onChange={onChange} disabled={disabled} inlineOnly={inlineOnly} />}
         {(sourceOnly || showSourceButton) && <button type="button" disabled={disabled} onClick={() => setSourceOpen(true)}
             className="text-sm text-gray-600 underline focus-visible:outline focus-visible:outline-2">
             Open HTML Editor

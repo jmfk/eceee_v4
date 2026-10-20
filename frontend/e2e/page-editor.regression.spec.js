@@ -402,7 +402,7 @@ test.describe('page editor collaboration', () => {
   })
 })
 
-const mockPanelSchemas = async page => {
+const mockPanelSchemas = async (page, extraFields = {}) => {
   const requests = []
   await page.route('**/api/v1/webpages/widget-types/*/validate/', route =>
     route.fulfill({ json: { errors: {}, warnings: {} } }))
@@ -413,12 +413,92 @@ const mockPanelSchemas = async page => {
       content: { type: 'string', component: type.includes('Headline') ? 'RichTextInput' : 'HtmlSource',
         inlineOnly: type.includes('Headline'), title: 'Panel content', group: 'Content' },
       title: { type: 'string', component: 'TextInput', title: 'Panel title', group: 'Content' },
+      ...extraFields,
     } } } })
   })
   return requests
 }
 
 test.describe('stable widget side panel', () => {
+  test('body paste and paragraph formatting preserve unrelated markup, undo and save/reload', async ({ page }) => {
+    installErrorGuards(page)
+    const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    const untouched = '<span class="highlight" style="color:red" data-note="keep">Existing</span>'
+    state.version.widgets.main[0].config.content = `<p>${untouched}</p><p>Target</p>`
+    await mockPanelSchemas(page)
+    await openEditor(page, state)
+    await page.getByTestId('page-widget-edit-easy-widgets-contentwidget').first().click()
+    const rich = page.getByRole('textbox', { name: 'Panel content', exact: true })
+    await expect(rich.locator('.highlight')).toHaveText('Existing')
+    const paste = async (type = 'text/html', content = '<p>Pasted</p>') => rich.evaluate((element, data) => {
+      element.focus()
+      const range = document.createRange()
+      range.selectNodeContents(element.lastChild)
+      range.collapse(false)
+      window.getSelection().removeAllRanges()
+      window.getSelection().addRange(range)
+      const clipboardData = new DataTransfer()
+      clipboardData.setData(data.type, data.content)
+      element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }))
+    }, { type, content })
+    await paste()
+    await expect(rich).toContainText('Pasted')
+    expect(await rich.locator('.highlight').evaluate(element => element.outerHTML)).toBe(untouched)
+    await rich.press('ControlOrMeta+z')
+    await expect(rich).not.toContainText('Pasted')
+    await paste('text/plain', '<b>Literal</b>')
+    await expect(rich).toContainText('<b>Literal</b>')
+    await expect(rich.locator('b')).toHaveCount(0)
+    await rich.press('ControlOrMeta+z')
+    await expect(rich).not.toContainText('Literal')
+    await paste()
+    await rich.evaluate(element => {
+      const range = document.createRange()
+      range.selectNodeContents(element.lastChild)
+      window.getSelection().removeAllRanges()
+      window.getSelection().addRange(range)
+    })
+    const toolbar = page.getByRole('toolbar', { name: 'Panel content formatting' })
+    await toolbar.getByRole('button', { name: /^(Format|Paragraph|Heading [1-6])$/ }).click()
+    await toolbar.getByRole('button', { name: 'Heading 2', exact: true }).click()
+    await expect(rich.locator('h2')).toContainText('Pasted')
+    expect(await rich.locator('.highlight').evaluate(element => element.outerHTML)).toBe(untouched)
+    await saveCurrentVersion(page)
+    expect(getSavedVersion(state).widgets.main[0].config.content).toContain(untouched)
+    await page.reload()
+    await page.getByTestId('page-widget-edit-easy-widgets-contentwidget').first().click()
+    expect(await rich.locator('.highlight').evaluate(element => element.outerHTML)).toBe(untouched)
+    await expect(rich.locator('h2')).toContainText('Pasted')
+  })
+
+  test('formatting controls never edit a different richtext field', async ({ page }) => {
+    installErrorGuards(page)
+    const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    state.version.widgets.main[0].config.secondBody = '<p>Second field</p>'
+    await mockPanelSchemas(page, { secondBody: { type: 'string', component: 'RichTextInput', title: 'Second body', group: 'Content' } })
+    await openEditor(page, state)
+    await page.getByTestId('page-widget-edit-easy-widgets-contentwidget').first().click()
+    const first = page.getByRole('textbox', { name: 'Panel content', exact: true })
+    await expect(first).toHaveText('Initial editor copy')
+    const original = await first.innerHTML()
+    await first.evaluate(element => {
+      element.focus()
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      window.getSelection().removeAllRanges()
+      window.getSelection().addRange(range)
+    })
+    await page.getByRole('toolbar', { name: 'Second body formatting' }).getByTitle('Bold', { exact: true }).click()
+    expect(await first.innerHTML()).toBe(original)
+    const second = page.getByRole('textbox', { name: 'Second body', exact: true })
+    await expect(second).toBeFocused()
+    await page.keyboard.insertText('X')
+    await expect(second.locator('b, strong')).toHaveText('X')
+    await saveCurrentVersion(page)
+    expect(getSavedVersion(state).widgets.main[0].config.content).toBe(original)
+    expect(getSavedVersion(state).widgets.main[0].config.secondBody).toMatch(/<(b|strong)>X<\/(b|strong)>/)
+  })
+
   test('allows keyboard navigation out of richtext fields in both directions', async ({ page }) => {
     installErrorGuards(page)
     const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
@@ -436,30 +516,34 @@ test.describe('stable widget side panel', () => {
       .evaluate(element => element.contains(document.activeElement))).toBe(true)
   })
 
-  test('preserves embedded HTML in ordinary richtext fields through source editing and save/reload', async ({ page }) => {
-    installErrorGuards(page)
-    const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
-    const original = '<span>Original copy</span><iframe src="https://example.test/embed"></iframe>'
-    state.version.widgets.main.find(widget => widget.id === 'headline-main').config.content = original
-    await mockPanelSchemas(page)
-    await openEditor(page, state)
-    await page.getByTestId('page-widget-edit-easy-widgets-headlinewidget').click()
-    await expect(page.getByRole('textbox', { name: 'Panel content', exact: true })).toHaveCount(0)
-    await page.getByRole('button', { name: 'Open HTML Editor' }).click()
-    const source = page.locator('.html-editor-overlay .cm-content')
-    await expect(source).toHaveText(original)
-    await source.focus()
-    await source.press('ControlOrMeta+a')
-    const updated = original.replace('Original copy', 'Edited copy')
-    await page.keyboard.insertText(updated)
-    await source.press('Escape')
-    await saveCurrentVersion(page)
-    expect(getSavedVersion(state).widgets.main.find(widget => widget.id === 'headline-main').config.content).toBe(updated)
-    await page.reload()
-    await page.getByTestId('page-widget-edit-easy-widgets-headlinewidget').click()
-    await page.getByRole('button', { name: 'Open HTML Editor' }).click()
-    await expect(page.locator('.html-editor-overlay .cm-content')).toHaveText(updated)
-  })
+  for (const [markupType, original] of [
+    ['embedded HTML', '<span>Original copy</span><iframe src="https://example.test/embed"></iframe>'],
+    ['inline images and attributes', '<span class="legacy-label" style="color:red" data-note="keep">Original copy</span><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Logo">']
+  ]) {
+    test(`preserves ${markupType} in richtext fields through source editing and save/reload`, async ({ page }) => {
+      installErrorGuards(page)
+      const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+      state.version.widgets.main.find(widget => widget.id === 'headline-main').config.content = original
+      await mockPanelSchemas(page)
+      await openEditor(page, state)
+      await page.getByTestId('page-widget-edit-easy-widgets-headlinewidget').click()
+      await expect(page.getByRole('textbox', { name: 'Panel content', exact: true })).toHaveCount(0)
+      await page.getByRole('button', { name: 'Open HTML Editor' }).click()
+      const source = page.locator('.html-editor-overlay .cm-content')
+      await expect(source).toHaveText(original)
+      await source.focus()
+      await source.press('ControlOrMeta+a')
+      const updated = original.replace('Original copy', 'Edited copy')
+      await page.keyboard.insertText(updated)
+      await source.press('Escape')
+      await saveCurrentVersion(page)
+      expect(getSavedVersion(state).widgets.main.find(widget => widget.id === 'headline-main').config.content).toBe(updated)
+      await page.reload()
+      await page.getByTestId('page-widget-edit-easy-widgets-headlinewidget').click()
+      await page.getByRole('button', { name: 'Open HTML Editor' }).click()
+      await expect(page.locator('.html-editor-overlay .cm-content')).toHaveText(updated)
+    })
+  }
 
   test('preserves input selection and schema while typing and saves the final keystroke', async ({ page }) => {
     installErrorGuards(page)
