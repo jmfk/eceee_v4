@@ -2,13 +2,13 @@
 Headline widget implementation.
 """
 
-from typing import Type, Optional
-from pydantic import BaseModel, Field, ConfigDict
+import logging
+from typing import Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -136,12 +136,12 @@ class HeadlineWidget(BaseWidget):
     .headline-widget:last-child {
         margin-bottom: 0;
     }
-    
+
     .headline-content {
         padding: 0;
         margin: 0;
     }
-    
+
     /* Responsive behavior */
     @media (max-width: 768px) {
         .headline-content {
@@ -168,8 +168,8 @@ class HeadlineWidget(BaseWidget):
             Tuple of (html, css) - always renders using template
         """
         from webpages.utils.mustache_renderer import (
-            render_mustache,
             prepare_component_context,
+            render_mustache,
         )
 
         style_name = config.get("component_style", "default")
@@ -210,14 +210,13 @@ class HeadlineWidget(BaseWidget):
         Prepare template context with snake_case field conversions.
         """
         from webpages.services.link_resolver import resolve_links_in_html
-        
+
         template_config = config.copy() if config else {}
 
         # Resolve links in content
         if template_config.get("content"):
             template_config["content"] = resolve_links_in_html(
-                template_config["content"], 
-                context.get("request") if context else None
+                template_config["content"], context.get("request") if context else None
             )
 
         # Ensure snake_case fields for template
