@@ -206,11 +206,13 @@ describe('ObjectBrowser grouped type list', () => {
         })
     })
 
-    it('opens the remote object import from the type overview', async () => {
+    it('opens the import catalog and keeps remote v4 transfer as a separate action', async () => {
         renderBrowser()
 
-        fireEvent.click(await screen.findByRole('button', { name: 'Import remote objects' }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Imports' }))
+        expect(mocks.navigate).toHaveBeenCalledWith('/settings/content-migration')
 
+        fireEvent.click(screen.getByRole('button', { name: 'Transfer from v4 site' }))
         expect(await screen.findByRole('dialog', { name: 'Import remote objects' })).toBeInTheDocument()
         expect(await screen.findByText(/No remote site connection is configured/)).toBeInTheDocument()
     })

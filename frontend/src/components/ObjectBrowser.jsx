@@ -238,7 +238,23 @@ const ObjectBrowser = () => {
                                         <ContextualHelpLink topicId="objects" label="Open Objects help" className="ml-2" />
                                     </div>
                                 </div>
-                                <button type="button" onClick={() => setShowRemoteImport(true)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><Download className="h-4 w-4" />Import remote objects</button>
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate('/settings/content-migration')}
+                                        className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                                    >
+                                        <Download className="h-4 w-4" />
+                                        Imports
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowRemoteImport(true)}
+                                        className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                    >
+                                        Transfer from v4 site
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
