@@ -331,7 +331,7 @@ const SchemaFieldRenderer = ({
         anyOf, oneOf, allOf, $ref, $defs, properties, items,
         minimum, maximum, minLength, maxLength, pattern,
         const: constValue, default: defaultValue,
-        conditionalOn, // Exclude conditionalOn from being passed to DOM
+        conditionalOn, editorPrimary, // Editor metadata must not reach DOM inputs
         isOverride, // Exclude isOverride from being passed to DOM (Pydantic schema extra)
         // Include only component-relevant properties
         ...componentProps

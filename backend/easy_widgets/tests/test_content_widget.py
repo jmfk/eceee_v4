@@ -23,6 +23,14 @@ class ContentWidgetPrepareTemplateContextTest(SimpleTestCase):
         self.assertEqual(properties["sanitizeHtml"]["group"], "Advanced")
         self.assertEqual(properties["componentStyle"]["group"], "Styling")
 
+    def test_sidebar_hides_content_and_keeps_advanced_settings_primary(self):
+        properties = ContentConfig.model_json_schema()["properties"]
+
+        self.assertTrue(properties["content"]["hidden"])
+        for field in ("allowScripts", "sanitizeHtml", "anchor", "anchorTitle"):
+            self.assertTrue(properties[field]["editorPrimary"])
+            self.assertEqual(properties[field]["group"], "Advanced")
+
     def test_plain_html_no_media_inserts(self):
         """No NameError when content has no data-media-insert divs."""
         config = {"content": "<p>Hello world</p>"}

@@ -19,8 +19,8 @@ Configure a banner with text and image layout.
 <!-- outcome: After this walkthrough, you should know where to add the Banner widget and where to continue configuring it. -->
 
 1. Add or edit a Banner widget in the target slot.
-2. Choose Text Mode or Header Mode and edit the text directly in the banner.
-3. In Text Mode, choose Image1 and Imagesize in the main settings form. In Header Mode, choose Backgroundimage instead. Only the active mode's image is displayed; switching modes preserves both image selections.
+2. Choose Text Mode or Header Mode and edit the text directly in the banner. If a component style replaces the inline editor, edit the active text field in the settings panel instead.
+3. Hover over the banner or focus it with the keyboard to show its overlay toolbar. On touch devices, the controls stay visible. Select an image even when none is selected yet. Text Mode provides Image and an Image size button that switches between Square and Rectangle. Header Mode provides Background image instead. These settings are also in the main form. Only the active mode's image is displayed; switching modes preserves both image selections.
 4. Save and preview the page at desktop and mobile widths.
 5. Keep the banner focused on one message or action.
 

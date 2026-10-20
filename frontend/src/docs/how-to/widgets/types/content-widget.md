@@ -19,7 +19,7 @@ Edit rich HTML content in a page slot.
 <!-- outcome: After this walkthrough, you should know where to add the Content widget and where to continue configuring it. -->
 
 1. Add or edit a Content widget.
-2. Use the rich text editor for headings, paragraphs, links, and lists.
+2. Edit headings, paragraphs, links, and lists directly in the canvas. The settings panel shows Advanced settings directly; the duplicate text editor and Open HTML Editor link are hidden.
 3. Keep formatting simple and consistent with the theme.
 4. Use media widgets for complex media rather than embedding large media directly.
 5. Save and preview the rendered content.
