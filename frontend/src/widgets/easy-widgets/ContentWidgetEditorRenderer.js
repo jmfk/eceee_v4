@@ -1528,6 +1528,14 @@ class ContentWidgetEditorRenderer {
         this.showLinkDialog(existingHref, selectedText, linkElement, range)
     }
 
+    // A closed dialog no longer owns permission to apply an asynchronous result.
+    closeLinkDialog() {
+        const picker = this.linkPickerModal
+        this.linkPickerModal = null
+        // The picker owns a separate React root; never unmount it inside a field commit.
+        if (picker) queueMicrotask(() => picker.hide())
+    }
+
     /**
      * Show link dialog using LinkPicker
      */
@@ -1543,7 +1551,8 @@ class ContentWidgetEditorRenderer {
         const namespace = this.namespace || null
 
         // Show the link picker
-        this.linkPickerModal.show({
+        const picker = this.linkPickerModal
+        picker.show({
             url: existingHref,
             text: selectedText,
             openInNewTab: linkElement && linkElement.getAttribute('target') === '_blank',
@@ -1552,6 +1561,7 @@ class ContentWidgetEditorRenderer {
             currentSiteRootId: currentSiteRootId,
             namespace: namespace
         }).then(result => {
+            if (this.linkPickerModal !== picker || this.isDestroyed || this.disabled || !this.editorElement) return
             if (result.action === 'remove') {
                 this.removeLink(linkElement)
             } else if (result.action === 'insert') {
@@ -1568,7 +1578,7 @@ class ContentWidgetEditorRenderer {
             this.editorElement.focus()
         }).catch(() => {
             // User cancelled
-            this.editorElement.focus()
+            if (this.linkPickerModal === picker && !this.isDestroyed && !this.disabled) this.editorElement?.focus()
         })
     }
 

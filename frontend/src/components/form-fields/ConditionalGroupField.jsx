@@ -76,7 +76,7 @@ const ConditionalGroupField = ({
     const [schemas, setSchemas] = useState({}) // Fetched Pydantic model schemas
     const [schemaLoading, setSchemaLoading] = useState({}) // Loading state per group
     const [schemaErrors, setSchemaErrors] = useState({}) // Error state per group
-    const [formKey, setFormKey] = useState(0) // Force remount when switching groups
+    const [, renderFormDataChange] = useState(0) // Render ref-only external changes without remounting fields
 
     // Ref for ALL groups' form data (uncontrolled like ItemForm)
     // Structure: {pageSections: {...}, pageSubmenu: {...}, none: {}}
@@ -90,10 +90,10 @@ const ConditionalGroupField = ({
         if (externalActiveGroup && externalActiveGroup !== activeGroup) {
             setActiveGroup(externalActiveGroup)
             formDataRef.current = externalFormData
-            setFormKey(prev => prev + 1)
+            renderFormDataChange(prev => prev + 1)
         } else if (JSON.stringify(externalFormData) !== JSON.stringify(formDataRef.current)) {
             formDataRef.current = externalFormData
-            setFormKey(prev => prev + 1)
+            renderFormDataChange(prev => prev + 1)
         }
     }, [value, activeGroup])
 
@@ -125,7 +125,7 @@ const ConditionalGroupField = ({
 
     // Subscribe to UDC for external changes
     useExternalChanges(componentId, (state, metadata) => {
-        if (!widgetId || !slotName || !contextType || !fieldName) {
+        if (context?.managedByForm || !widgetId || !slotName || !contextType || !fieldName) {
             return
         }
 
@@ -142,7 +142,7 @@ const ConditionalGroupField = ({
             if (externalActiveGroup !== activeGroup) {
                 setActiveGroup(externalActiveGroup)
                 formDataRef.current = externalFormData
-                setFormKey(prev => prev + 1)  // Remount to show new group's data
+                renderFormDataChange(prev => prev + 1)
                 return
             }
 
@@ -152,9 +152,9 @@ const ConditionalGroupField = ({
                     // Internal change (from our own field edits) - just sync ref, no remount
                     formDataRef.current = externalFormData
                 } else {
-                    // External change - sync ref AND remount to update defaultValues
+                    // External change - update controlled values without replacing their DOM.
                     formDataRef.current = externalFormData
-                    setFormKey(prev => prev + 1)
+                    renderFormDataChange(prev => prev + 1)
                 }
             }
         }
@@ -169,7 +169,7 @@ const ConditionalGroupField = ({
 
         // DON'T clear form data - all groups' data is preserved in formDataRef
         // Just switch which group we're viewing
-        setFormKey(prev => prev + 1) // Force form remount to show new group's data
+        renderFormDataChange(prev => prev + 1)
 
         // Create new value object
         const newValue = {
@@ -308,7 +308,7 @@ const ConditionalGroupField = ({
         const currentGroupData = formDataRef.current[activeGroup] || {}
 
         return (
-            <div key={formKey} className="space-y-4 mt-4">
+            <div key={activeGroup} className="space-y-4 mt-4">
                 {Object.entries(properties).map(([propName, propSchema]) => {
                     const fieldValue = currentGroupData[propName] || ''  // Read from active group's data
                     const isRequired = requiredFields.includes(propName)
