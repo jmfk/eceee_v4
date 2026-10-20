@@ -9,6 +9,17 @@ import { api } from '../../api/client'
 import { endpoints } from '../../api/endpoints'
 import FieldHelpText from '../form-fields/FieldHelpText'
 
+// Reuse component types across renders and fields; creating lazy() in render remounts inputs.
+const lazyFieldComponents = new Map()
+export const getStableFieldComponent = name => {
+    const componentName = name === 'ColorInput' ? 'ColorSelector' : name
+    const resolvedName = FIELD_COMPONENTS[componentName] ? componentName : 'TextInput'
+    if (!lazyFieldComponents.has(resolvedName)) {
+        lazyFieldComponents.set(resolvedName, React.lazy(FIELD_COMPONENTS[resolvedName]))
+    }
+    return lazyFieldComponents.get(resolvedName)
+}
+
 /**
  * Simple slugify function to normalize anchor values for comparison
  */
@@ -272,6 +283,10 @@ const SchemaFieldRenderer = ({
                 switch (format) {
                     case 'textarea':
                         return 'textarea'
+                    case 'richtext':
+                    case 'rich-text':
+                    case 'rich_text':
+                        return 'rich_text'
                     case 'email':
                         return 'email'
                     case 'uri':
@@ -322,20 +337,7 @@ const SchemaFieldRenderer = ({
         ...componentProps
     } = fieldSchema
 
-    // Memoize FieldComponent
-    const FieldComponent = useMemo(() => {
-        if (!componentName) return null;
-        return React.lazy(() => {
-            // Map ColorInput to ColorSelector for theme palette support
-            const actualComponentName = componentName === 'ColorInput' ? 'ColorSelector' : componentName;
-
-            if (FIELD_COMPONENTS[actualComponentName]) {
-                return FIELD_COMPONENTS[actualComponentName]()
-            }
-            console.warn(`Field component '${actualComponentName}' not found, falling back to TextInput`)
-            return FIELD_COMPONENTS.TextInput()
-        })
-    }, [componentName]) // Only recreate if componentName changes
+    const FieldComponent = componentName ? getStableFieldComponent(componentName) : null
 
     // Memoize itemLabelTemplate function at top level (not inside useMemo)
     const itemLabelTemplateFn = useCallback(
@@ -353,6 +355,7 @@ const SchemaFieldRenderer = ({
     const fieldProps = useMemo(() => {
         const baseProps = {
             label: fieldSchema.title || formatFieldLabel(fieldName),
+            'aria-label': fieldSchema.title || formatFieldLabel(fieldName),
             description: fieldDescription,
             required,
             disabled,
@@ -450,18 +453,12 @@ const SchemaFieldRenderer = ({
     }
 
     // Dynamically load the field component from registry
-    const RegistryFieldComponent = React.lazy(() => {
-        if (FIELD_COMPONENTS[fieldTypeDef.component]) {
-            return FIELD_COMPONENTS[fieldTypeDef.component]()
-        }
-        // Fallback to TextInput if component not found
-        console.warn(`Field component '${fieldTypeDef.component}' not found, falling back to TextInput`)
-        return FIELD_COMPONENTS.TextInput()
-    })
+    const RegistryFieldComponent = getStableFieldComponent(fieldTypeDef.component)
 
     // Prepare props for the field component
     const registryFieldProps = {
         label: fieldSchema.title || formatFieldLabel(fieldName),
+        'aria-label': fieldSchema.title || formatFieldLabel(fieldName),
         description: fieldDescription,
         required,
         disabled,
@@ -558,7 +555,6 @@ const SchemaFieldRenderer = ({
                 fieldProps={registryFieldProps}
                 onFieldChange={onChange}
                 onFieldValidation={combinedValidation}
-                debounceMs={200}
                 validateOnChange={true}
             />
         </Suspense>

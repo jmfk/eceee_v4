@@ -1,410 +1,112 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { getWidgetSchema, validateWidgetConfiguration } from '../api/widgetSchemas.js'
-import { WIDGET_CHANGE_TYPES } from '../types/widgetEvents'
 import SchemaFieldRenderer from './forms/SchemaFieldRenderer.jsx'
 import { useFormDataBuffer } from '../hooks/useFormDataBuffer.js'
 import { useUnifiedData } from '../contexts/unified-data/context/UnifiedDataContext'
 import { OperationTypes } from '../contexts/unified-data/types/operations'
-import { lookupWidget, hasWidgetContentChanged, calculateActiveVariants } from '../utils/widgetUtils'
-import {
-    buildWidgetPropUpdate,
-    countConfigChangedFields,
-    createActiveWidgetPropContext,
-    isFieldLevelPropSource,
-    shouldHydrateExternalWidgetProps
-} from '../utils/pageEditorPropAdapter'
+import { lookupWidget, calculateActiveVariants } from '../utils/widgetUtils'
+import { buildWidgetPropUpdate, createActiveWidgetPropContext } from '../utils/pageEditorPropAdapter'
 
 const PRIMARY_FIELD_GROUPS = new Set(['content', 'media', 'layout'])
+const equal = (left, right) => JSON.stringify(left) === JSON.stringify(right)
+const isPrimaryWidgetField = (fieldName, fieldSchema, requiredFields) =>
+    requiredFields.includes(fieldName) || fieldSchema.editorPrimary === true || PRIMARY_FIELD_GROUPS.has(fieldSchema.group?.toLowerCase())
 
-const isPrimaryWidgetField = (fieldName, fieldSchema, requiredFields) => {
-    const groupName = fieldSchema.group?.toLowerCase()
-    return requiredFields.includes(fieldName)
-        || fieldSchema.editorPrimary === true
-        || PRIMARY_FIELD_GROUPS.has(groupName)
-}
-
-/**
- * IsolatedFieldWrapper - Simplified wrapper that uses LocalStateFieldWrapper
- * Removes double state management and relies on LocalStateFieldWrapper for all state logic
- */
-const IsolatedFieldWrapper = React.memo(({
-    fieldName,
-    fieldSchema,
-    widgetData,
-    widgetType,
-    isRequired,
-    onFieldChange,
-    namespace = null,
-    context = {},
-    fullSchema = null, // Full schema with $defs for resolving $ref
-}) => {
-    // Extract UDC context
-    const widgetId = context?.widgetId || widgetData?.id
-    const slotName = context?.slotName || widgetData?.slotName || widgetData?.slot
-    const contextType = context?.contextType
-    const widgetPath = context?.widgetPath
-
-    // UDC Integration for field-level updates
-    const { useExternalChanges, getState } = useUnifiedData()
-    const fieldComponentId = useMemo(() =>
-        `field-${widgetId || 'preview'}-${fieldName}`,
-        [widgetId, fieldName]
-    )
-
-    // All fields subscribe to field-level paths - BannerWidget now only publishes to field-level
-    // This avoids the self-update filter issue and prevents form rerenders
-    const subscriptionComponentId = useMemo(() => {
-        // All fields (including content) subscribe to field-level paths
-        // BannerWidget publishes to field-* paths, so this will receive updates
-        return fieldComponentId
-    }, [fieldComponentId])
-
-    // Local state for this field to receive external updates
-    const [fieldValue, setFieldValue] = useState(widgetData?.config?.[fieldName] ?? '')
-    const fieldValueRef = useRef(fieldValue)
-
-    // Subscribe to UDC updates for this specific field
-    useExternalChanges(subscriptionComponentId, (state, metadata) => {
-        if (!widgetId || !slotName || !contextType) {
-            return
+const IsolatedFieldWrapper = React.memo(function IsolatedFieldWrapper({
+    fieldName, fieldSchema, initialValue, getCurrentWidgetData, isRequired, onFieldChange,
+    namespace, context, fullSchema
+}) {
+    const handleFieldValidation = useCallback(async (name, value) => {
+        const current = getCurrentWidgetData()
+        if (!current?.type) return null
+        const result = await validateWidgetConfiguration(current.type, { ...current.config, [name]: value })
+        const errors = result.errors?.[name]
+        return {
+            isValid: !errors,
+            errors: errors ? (Array.isArray(errors) ? errors : [errors]) : [],
+            warnings: result.warnings?.[name] || []
         }
-        // All fields subscribe to field-level paths, so sourceId should be field-*
-        // No special filtering needed - UDC will handle self-update filtering
-        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-        const newFieldValue = widget?.config?.[fieldName]
+    }, [getCurrentWidgetData])
+    return <SchemaFieldRenderer fieldName={fieldName} fieldSchema={fieldSchema} value={initialValue}
+        onChange={onFieldChange} onValidation={handleFieldValidation} required={isRequired}
+        namespace={namespace} context={context} schema={fullSchema} />
+}, (previous, next) => Object.keys(next).every(key => key === 'initialValue'
+    ? equal(previous[key], next[key]) : previous[key] === next[key]))
 
-        if (newFieldValue !== undefined && newFieldValue !== fieldValueRef.current) {
-            const sourceId = metadata?.sourceId || ''
+// The key below is the only reset boundary. Content edits never recreate a session.
+const IsolatedFormSession = forwardRef(function IsolatedFormSession({
+    initWidgetData, initschema, namespace, contextType, widgetId, slotName, context,
+    onDirtyChange, onWidgetChange, publishChanges
+}, ref) {
+    const callbacksRef = useRef({ onDirtyChange, onWidgetChange, context, publishChanges })
+    callbacksRef.current = { onDirtyChange, onWidgetChange, context, publishChanges }
+    const handleDirtyChange = useCallback(dirty => callbacksRef.current.onDirtyChange?.(dirty), [])
+    const formBuffer = useFormDataBuffer(initWidgetData, null, { onDirtyChange: handleDirtyChange })
+    const { getCurrentData: getCurrentWidgetData, updateField, hydrate } = formBuffer
+    const [, renderExternalChange] = useState(0)
+    const { useExternalChanges, publishUpdate } = useUnifiedData()
+    const componentId = `isolated-form-${widgetId || 'preview'}`
+    const [loadedSchema, setLoadedSchema] = useState(null)
+    const activeSchema = initschema || loadedSchema
 
-            // Check if update came from this form field itself (self-update)
-            // Form publishes with isolated-form-* componentId prefix, so sourceId starts with isolated-form-*
-            const isSelfUpdate = sourceId.startsWith('isolated-form-')
-
-            if (!isSelfUpdate) {
-                // External update (from WYSIWYG editor with bannerwidget-* sourceId) - update field value
-                fieldValueRef.current = newFieldValue
-                setFieldValue(newFieldValue)
-            } else {
-                // Self update from form field - just sync ref, no rerender
-                fieldValueRef.current = newFieldValue
-            }
-        }
-    })
-
-    // Sync fieldValue when widgetData prop changes (initial load)
+    useImperativeHandle(ref, () => ({ getCurrentWidgetData }), [getCurrentWidgetData])
+    useEffect(() => { handleDirtyChange(false) }, [handleDirtyChange])
     useEffect(() => {
-        const propValue = widgetData?.config?.[fieldName] ?? ''
-        if (propValue !== fieldValueRef.current) {
-            fieldValueRef.current = propValue
-            setFieldValue(propValue)
+        if (initschema || !initWidgetData?.type) return
+        let active = true
+        getWidgetSchema(initWidgetData.type).then(value => { if (active) setLoadedSchema(value) })
+            .catch(error => { if (active) console.error('Failed to fetch widget schema:', error) })
+        return () => { active = false }
+    }, [initschema, initWidgetData?.type])
+
+    const hydrateWidget = useCallback(incoming => {
+        const current = getCurrentWidgetData()
+        if (incoming?.config && !equal(current?.config, incoming.config)) {
+            hydrate({ ...current, ...incoming })
+            renderExternalChange(value => value + 1)
         }
-    }, [widgetData?.config?.[fieldName], fieldName])
+    }, [getCurrentWidgetData, hydrate])
 
-    // Use fieldValue state instead of widgetData for initial value
-    const initialValue = fieldValue
-
-    // Hide fields that are managed by special editors
-    const hiddenFields = {
-    }
-
-    // Custom validation function for this field
-    const handleFieldValidation = useCallback(async (fieldName, value) => {
-        if (!widgetData?.type) return null
-
-        try {
-            // Get current config and update with new value
-            const fullConfig = {
-                ...widgetData.config,
-                [fieldName]: value
-            }
-            const result = await validateWidgetConfiguration(widgetData.type, fullConfig)
-            const fieldValidation = result.errors?.[fieldName] ? {
-                isValid: false,
-                errors: Array.isArray(result.errors[fieldName]) ? result.errors[fieldName] : [result.errors[fieldName]],
-                warnings: result.warnings?.[fieldName] || []
-            } : {
-                isValid: true,
-                errors: [],
-                warnings: result.warnings?.[fieldName] || []
-            }
-
-            return fieldValidation
-        } catch (error) {
-            console.error(`Field validation failed for ${fieldName}:`, error)
-            const errorValidation = {
-                isValid: false,
-                errors: ['Validation failed'],
-                warnings: []
-            }
-            return errorValidation
-        }
-    }, [fieldName, widgetData])
-
-    // Handle field changes
-    const handleFieldChange = useCallback((fieldName, value) => {
-        if (onFieldChange) {
-            onFieldChange(fieldName, value, (fullConfig) => {
-                // Validation is now handled by LocalStateFieldWrapper
-                // This callback is kept for backward compatibility
-            })
-        }
-    }, [fieldName, onFieldChange])
-
-    if (hiddenFields[widgetType]?.includes(fieldName)) {
-        return null
-    }
-
-    // Use SchemaFieldRenderer for custom components or fallback to basic rendering
-    if (fieldSchema.component) {
-        return (
-            <SchemaFieldRenderer
-                fieldName={fieldName}
-                fieldSchema={fieldSchema}
-                value={initialValue}
-                onChange={handleFieldChange}
-                onValidation={handleFieldValidation}
-                required={isRequired}
-                disabled={false}
-                namespace={namespace}
-                context={context}
-                schema={fullSchema}
-            />
-        )
-    }
-
-    // For non-component fields, use SchemaFieldRenderer which handles LocalStateFieldWrapper internally
-    return (
-        <SchemaFieldRenderer
-            fieldName={fieldName}
-            fieldSchema={fieldSchema}
-            value={initialValue}
-            onChange={handleFieldChange}
-            onValidation={handleFieldValidation}
-            required={isRequired}
-            disabled={false}
-            namespace={namespace}
-            context={context}
-            schema={fullSchema}
-        />
-    )
-})
-
-/**
- * IsolatedFormRenderer - Form container that coordinates isolated fields
- * Each field is completely independent and only re-renders when its own data changes
- */
-const IsolatedFormRenderer = React.memo(forwardRef(({
-    initWidgetData,
-    initschema,
-    namespace = null,
-    contextType = null,
-    widgetId = null,
-    slotName = null,
-    context = {},
-    onDirtyChange = null,
-    onWidgetChange = null,
-    publishChanges = true
-}, ref) => {
-    const schemaRef = useRef(null)
-    // Use refs for form state to prevent rerenders
-    const fieldValidationsRef = useRef({})
-
-    // ODC Integration
-    const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
-    const componentId = useMemo(() => `isolated-form-${widgetId || 'preview'}`, [widgetId])
-
-    // Ref to track current config for ODC synchronization
-    const configRef = useRef(initWidgetData?.config || {})
-    // Ref to track last UDC update timestamp to prevent prop sync from overwriting UDC updates
-    const lastUdcUpdateRef = useRef(0)
-
-    // Callback for dirty state changes
-    const handleDirtyChange = useCallback((isDirty) => {
-        // Notify parent component of dirty state changes
-        if (onDirtyChange) {
-            onDirtyChange(isDirty)
-        }
-    }, [onDirtyChange])
-
-    // Use form data buffer to store changes without re-renders
-    const formBuffer = useFormDataBuffer(initWidgetData, null, {
-        onDirtyChange: handleDirtyChange
-    })
-
-    // Memoize current widget data to prevent rerenders from new object references
-    // formBuffer.getCurrentData() returns a new object each time, so we need to memoize
-    const currentWidgetDataRef = useRef(initWidgetData)
-    const getCurrentWidgetData = useCallback(() => {
-        const currentData = formBuffer.getCurrentData() || initWidgetData
-        // Only update ref if data actually changed (by ID comparison)
-        if (currentData?.id !== currentWidgetDataRef.current?.id ||
-            JSON.stringify(currentData?.config) !== JSON.stringify(currentWidgetDataRef.current?.config)) {
-            currentWidgetDataRef.current = currentData
-        }
-        return currentWidgetDataRef.current
-    }, [formBuffer, initWidgetData])
-
-    useImperativeHandle(ref, () => ({
-        getCurrentWidgetData
-    }), [getCurrentWidgetData])
-
-    // Keep original state for schema and type info (these don't change frequently)
-    const [schema] = useState(initschema)
-
-    // Store schema in ref
-    useEffect(() => {
-        const currentData = formBuffer.getCurrentData()
-        if (currentData && !schema) {
-            const fetchSchema = async () => {
-                try {
-                    const schemaData = await getWidgetSchema(currentData.type)
-                    schemaRef.current = schemaData
-                } catch (error) {
-                    console.error('Failed to fetch widget schema:', error)
-                }
-            }
-            fetchSchema()
-        } else if (schema) {
-            schemaRef.current = schema
-        }
-    }, [schema, formBuffer])
-
-    // Sync initWidgetData prop changes to state and formBuffer
-    // BUT: Don't overwrite if we just received a UDC update (to prevent prop updates from overriding UDC)
-    useEffect(() => {
-        if (initWidgetData) {
-            // Check if this prop update is newer than our last UDC update
-            // If UDC updated recently (within last 100ms), skip prop sync to prevent overwriting
-            const timeSinceLastUdcUpdate = Date.now() - lastUdcUpdateRef.current
-            if (timeSinceLastUdcUpdate < 100) {
-                // UDC update just happened, don't overwrite with stale prop data
-                return
-            }
-
-            // Check if the prop config is actually different from current UDC state
-            const currentUdcConfig = configRef.current
-            const propConfig = initWidgetData?.config || {}
-
-            // If prop config matches UDC config, it's safe to sync (no conflict)
-            // If prop config is different, it might be stale, so check if UDC is newer
-            if (JSON.stringify(propConfig) !== JSON.stringify(currentUdcConfig)) {
-                // Configs differ - UDC is source of truth, don't overwrite
-                return
-            }
-
-            // Safe to sync - configs match or UDC hasn't updated recently
-            formBuffer.resetTo(initWidgetData)
-            configRef.current = initWidgetData?.config || {}
-        }
-    }, [initWidgetData, formBuffer])
-
-    // ODC External Changes Subscription - Listen for updates from other components
+    // Prop owners supply the canonical draft. A matching local echo does nothing.
+    useLayoutEffect(() => { hydrateWidget(initWidgetData) }, [initWidgetData, hydrateWidget])
     useExternalChanges(componentId, (state, metadata) => {
         if (!widgetId || !slotName || !contextType) return
-
-        const sourceId = metadata?.sourceId || ''
-
-        // Skip updates from field-level sources - those are handled by individual fields
-        // This prevents form rerenders when fields update via field-level subscriptions
-        if (isFieldLevelPropSource(sourceId)) {
-            // Field-level updates are handled by IsolatedFieldWrapper subscriptions
-            // Don't update widgetData here to prevent form rerenders
-            // Only sync the config ref silently
-            const widgetPath = context?.widgetPath
-            const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-            if (widget && widget.config) {
-                configRef.current = widget.config
-            }
-            return
-        }
-
-        // Skip widget-level updates from widgets when they're publishing field-level changes
-        // Widgets publish with bannerwidget-*-field-* pattern, which we already skip above
-        // But also check for direct widget-level updates that are single-field changes
-        if (!isFieldLevelPropSource(sourceId)) {
-            // Widget-level update from a widget - check if it's a single field update
-            const widgetPath = context?.widgetPath
-            const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-            if (widget && widget.config) {
-                const changedFields = countConfigChangedFields(configRef.current, widget.config)
-
-                if (!shouldHydrateExternalWidgetProps({ sourceId, changedFields })) {
-                    // Only sync the config ref silently
-                    configRef.current = widget.config
-                    return
-                }
-            }
-        }
-
-        // Also skip save operations - they don't need to trigger form rerenders
-        // Fields will sync from UDC state when needed
-        if (sourceId === 'udc-save-current-version') {
-            // Save operation completed - just sync config ref, no rerender
-            const widgetPath = context?.widgetPath
-            const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-            if (widget && widget.config) {
-                configRef.current = widget.config
-            }
-            return
-        }
-
-        const widgetPath = context?.widgetPath
-        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-        if (widget && widget.config && hasWidgetContentChanged(configRef.current, widget.config)) {
-            // Mark this as a UDC update to prevent prop sync from overwriting it
-            lastUdcUpdateRef.current = Date.now()
-
-            configRef.current = widget.config
-            const updatedData = { ...initWidgetData, config: widget.config }
-            // Update form buffer with new config from UDC
-            formBuffer.resetTo(updatedData)
-            // NO setWidgetData() - fields sync via their own subscriptions, no form rerender needed
-        }
+        if (metadata?.sourceId?.startsWith(`${componentId}-field-`)) return
+        const widget = lookupWidget(state, widgetId, slotName, contextType, context?.widgetPath)
+        if (widget) hydrateWidget({ ...getCurrentWidgetData(), config: widget.config })
     })
 
-    // Handle field changes from isolated fields
-    const handleFieldChange = useCallback(async (fieldName, value, triggerValidation) => {
-        // Update field in buffer without re-rendering
-        const fieldPath = `config.${fieldName}`
-        formBuffer.updateField(fieldPath, value)
-
-        // Get updated config for real-time updates
-        const currentData = formBuffer.getCurrentData()
-
-        // Recalculate active variants based on new config and schema metadata
-        const activeSchema = schemaRef.current || schema;
-        const newActiveVariants = calculateActiveVariants(currentData, activeSchema);
-
-        const propContext = createActiveWidgetPropContext({
-            widgetData: currentData,
-            context,
-            widgetId,
-            slotName,
-            contextType,
-            componentId
-        })
+    const handleFieldChange = useCallback((fieldName, value) => {
+        updateField(`config.${fieldName}`, value)
+        const current = getCurrentWidgetData()
+        const options = callbacksRef.current
         const propUpdate = buildWidgetPropUpdate({
-            currentWidgetData: currentData,
-            propContext,
-            fieldName,
-            value,
-            activeVariants: newActiveVariants
+            currentWidgetData: current,
+            propContext: createActiveWidgetPropContext({ widgetData: current, context: options.context,
+                widgetId, slotName, contextType, componentId }),
+            fieldName, value, activeVariants: calculateActiveVariants(current, activeSchema)
         })
-
-        if (publishChanges) {
-            await publishUpdate(
-                propUpdate.fieldSourceId,
-                OperationTypes.UPDATE_WIDGET_CONFIG,
-                propUpdate.udcPayload
-            )
+        if (options.publishChanges) {
+            publishUpdate(propUpdate.fieldSourceId, OperationTypes.UPDATE_WIDGET_CONFIG, propUpdate.udcPayload)
         } else {
-            onWidgetChange?.(propUpdate.updatedWidget)
+            options.onWidgetChange?.(propUpdate.updatedWidget, {
+                sourceId: propUpdate.fieldSourceId, configPatch: propUpdate.configPatch
+            })
         }
-    }, [formBuffer, context, componentId, widgetId, slotName, contextType, publishUpdate, schema, onWidgetChange, publishChanges])
+    }, [updateField, getCurrentWidgetData, widgetId, slotName, contextType, componentId, activeSchema, publishUpdate])
 
-    const activeSchema = schemaRef.current || schema
-
+    const widgetPathKey = JSON.stringify(context?.widgetPath || [])
+    // Ordinary fields need identity/theme/link context, not a new entire page snapshot on each keystroke.
+    const fieldContext = useMemo(() => ({
+        widgetId, slotName, contextType, mode: 'edit', managedByForm: true,
+        pageId: context?.pageId, versionId: context?.versionId, instanceId: context?.instanceId,
+        siteId: context?.siteId, siteRootId: context?.siteRootId,
+        webpageData: context?.webpageData, theme: context?.theme || context?.pageVersionData?.effectiveTheme,
+        widgetPath: JSON.parse(widgetPathKey)
+    }), [widgetId, slotName, contextType, context?.pageId, context?.versionId, context?.instanceId,
+        context?.siteId, context?.siteRootId, context?.webpageData, context?.theme,
+        context?.pageVersionData?.effectiveTheme, widgetPathKey])
     // Check if form fields should be hidden (widget uses special editor exclusively)
     // The schema might be the full response object from config-ui-schema endpoint
     if (activeSchema?.hideFormFields) {
@@ -457,12 +159,12 @@ const IsolatedFormRenderer = React.memo(forwardRef(({
                 key={fieldName}
                 fieldName={fieldName}
                 fieldSchema={fieldSchema}
-                widgetData={getCurrentWidgetData()}
-                widgetType={getCurrentWidgetData()?.type || ''}
+                initialValue={getCurrentWidgetData()?.config?.[fieldName] ?? ''}
+                getCurrentWidgetData={getCurrentWidgetData}
                 isRequired={isRequired}
                 onFieldChange={handleFieldChange}
                 namespace={namespace}
-                context={context}
+                context={fieldSchema.component === 'PageSectionsDisplayField' ? context : fieldContext}
                 fullSchema={activeSchema?.schema || activeSchema}
             />
         )
@@ -484,75 +186,18 @@ const IsolatedFormRenderer = React.memo(forwardRef(({
             ))}
         </div>
     )
-}), (prevProps, nextProps) => {
-    // Custom comparison: only rerender if props actually changed
-    // Return true if props are equal (prevent rerender), false if different (allow rerender)
+})
 
-    // Compare primitive props
-    if (prevProps.widgetId !== nextProps.widgetId) return false
-    if (prevProps.slotName !== nextProps.slotName) return false
-    if (prevProps.contextType !== nextProps.contextType) return false
-    if (prevProps.namespace !== nextProps.namespace) return false
-    if (prevProps.publishChanges !== nextProps.publishChanges) return false
-    if (prevProps.onWidgetChange !== nextProps.onWidgetChange) return false
-    if (prevProps.onDirtyChange !== nextProps.onDirtyChange) return false
-
-    // Compare schema reference (should be stable)
-    if (prevProps.initschema !== nextProps.initschema) return false
-
-    // Compare widget data by ID
-    const prevId = prevProps.initWidgetData?.id
-    const nextId = nextProps.initWidgetData?.id
-    if (prevId !== nextId) return false
-
-    // Compare widget type
-    const prevType = prevProps.initWidgetData?.type
-    const nextType = nextProps.initWidgetData?.type
-    if (prevType !== nextType) return false
-
-    // Deep compare config objects - only rerender if config actually changed
-    const prevConfig = prevProps.initWidgetData?.config
-    const nextConfig = nextProps.initWidgetData?.config
-
-    // If both are undefined/null, they're equal
-    if (!prevConfig && !nextConfig) {
-        // Continue to context comparison
-    } else if (!prevConfig || !nextConfig) {
-        return false // One is null, other isn't
-    } else {
-        // Both exist, do deep comparison
-        try {
-            if (JSON.stringify(prevConfig) !== JSON.stringify(nextConfig)) {
-                return false
-            }
-        } catch (e) {
-            // If JSON.stringify fails, assume they're different to be safe
-            return false
-        }
-    }
-
-    // Deep compare context object
-    const prevContext = prevProps.context
-    const nextContext = nextProps.context
-
-    // If both are empty objects or undefined, they're equal
-    if ((!prevContext || Object.keys(prevContext).length === 0) &&
-        (!nextContext || Object.keys(nextContext).length === 0)) {
-        return true
-    }
-
-    // Compare context deeply
-    try {
-        if (JSON.stringify(prevContext) !== JSON.stringify(nextContext)) {
-            return false
-        }
-    } catch (e) {
-        // If JSON.stringify fails, assume they're different to be safe
-        return false
-    }
-
-    // All props are equal, prevent rerender
-    return true
+const IsolatedFormRenderer = forwardRef(function IsolatedFormRenderer(props, ref) {
+    const context = props.context || {}
+    const widgetId = props.widgetId || props.initWidgetData?.id
+    const slotName = props.slotName || props.initWidgetData?.slotName || props.initWidgetData?.slot
+    const contextType = props.contextType || context.contextType
+    const sessionKey = JSON.stringify([contextType, context.pageId, context.instanceId, context.versionId,
+        widgetId, props.initWidgetData?.type, slotName, context.widgetPath || []])
+    return <IsolatedFormSession {...props} key={sessionKey} ref={ref} context={context}
+        widgetId={widgetId} slotName={slotName} contextType={contextType}
+        publishChanges={props.publishChanges ?? true} />
 })
 
 export default IsolatedFormRenderer

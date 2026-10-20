@@ -1753,18 +1753,18 @@ const PageEditor = () => {
         )
     }, [pageVersionData?.widgets])
 
-    const handleRealTimeWidgetUpdate = useCallback((updatedWidget) => {
+    const handleRealTimeWidgetUpdate = useCallback((updatedWidget, change) => {
         applyWidgetUpdateToPageState(updatedWidget)
         const slotName = updatedWidget?.slotName || updatedWidget?.slot || updatedWidget?.context?.slotName
         if (!updatedWidget?.id || !slotName) return
 
-        publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
+        publishUpdate(change?.sourceId || componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
             id: updatedWidget.id,
             slotName,
             contextType: 'page',
             pageId,
             versionId,
-            config: updatedWidget.config || {},
+            config: change?.configPatch || updatedWidget.config || {},
             widgetUpdates: updatedWidget.widgetUpdates,
             widgetPath: updatedWidget.widgetPath || updatedWidget.context?.widgetPath
         })
@@ -2294,6 +2294,7 @@ const PageEditor = () => {
                         onSave={handleSaveWidget}
                         onRealTimeUpdate={handleRealTimeWidgetUpdate}
                         widgetData={editingWidget}
+                        isDocumentDirty={isDirty}
                         title={editingWidget ? `Edit ${getWidgetDisplayName(editingWidget.type)}` : 'Edit Widget'}
                         autoOpenSpecialEditor={true}
                         namespace={namespace}

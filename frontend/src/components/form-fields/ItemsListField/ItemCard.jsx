@@ -1,9 +1,6 @@
-import React, { useRef, useState, useMemo, useCallback } from 'react'
+import React, { useRef, useState, useCallback } from 'react'
 import { ChevronDown, ChevronRight, X, ArrowUp, ArrowDown, GripVertical } from 'lucide-react'
 import ItemForm from './ItemForm'
-import { useUnifiedData } from '../../../contexts/unified-data/context/UnifiedDataContext'
-import { OperationTypes } from '../../../contexts/unified-data/types/operations'
-import { lookupWidget } from '../../../utils/widgetUtils'
 
 /**
  * ItemCard Component
@@ -13,6 +10,7 @@ import { lookupWidget } from '../../../utils/widgetUtils'
  */
 const ItemCard = ({
     initialItem,
+    onItemChange,
     index,
     labelTemplate,
     isExpanded,
@@ -25,26 +23,9 @@ const ItemCard = ({
     schema,
     disabled,
     errors,
-    // UDC context props (passed individually for stable memo comparison)
-    widgetId,
-    slotName,
-    contextType,
-    widgetPath,
-    fieldName,
-    parentComponentId
+    context,
+    namespace
 }) => {
-
-    // UDC Integration
-    const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
-
-    // Create hierarchical componentId using parent's ID as prefix
-    const componentId = useMemo(() => {
-        if (parentComponentId) {
-            return `${parentComponentId}-item-${index}`
-        }
-        // Fallback for standalone use
-        return `item-card-${widgetId || 'preview'}-${fieldName || 'items'}-${index}`
-    }, [parentComponentId, widgetId, fieldName, index])
 
     // Item data ref - holds current item from UDC
     const itemRef = useRef(initialItem)
@@ -76,66 +57,19 @@ const ItemCard = ({
     // Label update trigger
     const [labelKey, setLabelKey] = useState(0)
 
-    // Handle field changes from ItemForm - update local storage and publish to UDC
-    const handleItemFieldChange = useCallback(async (changedFieldName, value) => {
-        // Update local storage (itemRef)
-        const updatedItem = {
-            ...itemRef.current,
-            [changedFieldName]: value
+    React.useEffect(() => {
+        if (itemRef.current !== initialItem) {
+            itemRef.current = initialItem
+            setLabelKey(value => value + 1)
         }
-        itemRef.current = updatedItem
-        setLabelKey(prev => prev + 1) // Force label re-render
+    }, [initialItem])
 
-        // Publish to UDC if context is available
-        if (!publishUpdate || !widgetId || !slotName || !contextType || !fieldName) {
-            return
-        }
-
-        // Get current items array from UDC
-        const state = getState()
-        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-
-        if (widget && widget.config) {
-            const currentItems = widget.config[fieldName] || []
-            const newItems = [...currentItems]
-            newItems[indexRef.current] = updatedItem // Use indexRef.current instead of index
-
-            // Merge with existing config to preserve other fields
-            const updatedConfig = {
-                ...widget.config,
-                [fieldName]: newItems
-            }
-
-            // Publish full array to UDC
-            await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-                id: widgetId,
-                slotName: slotName,
-                contextType: contextType,
-                config: updatedConfig,
-                widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
-            })
-        }
-    }, [publishUpdate, widgetId, slotName, contextType, fieldName, widgetPath, componentId, getState])
-
-    // Subscribe to UDC for external changes only
-    useExternalChanges(componentId, (state) => {
-        if (!widgetId || !slotName || !contextType || !fieldName) {
-            return
-        }
-
-        const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
-        if (widget && widget.config && widget.config[fieldName]) {
-            const items = widget.config[fieldName]
-            if (Array.isArray(items) && items[index] !== undefined) {
-                const udcItem = items[index]
-                // Only update if item actually changed
-                if (JSON.stringify(udcItem) !== JSON.stringify(itemRef.current)) {
-                    itemRef.current = udcItem
-                    setLabelKey(prev => prev + 1) // Force label re-render
-                }
-            }
-        }
-    })
+    const handleItemFieldChange = useCallback((changedFieldName, value) => {
+        const updated = { ...itemRef.current, [changedFieldName]: value }
+        itemRef.current = updated
+        setLabelKey(key => key + 1)
+        onItemChange(indexRef.current, updated)
+    }, [onItemChange])
 
     // Generate label from itemRef.current (live data from UDC)
     const label = typeof labelTemplate === 'function'
@@ -249,6 +183,8 @@ const ItemCard = ({
                 >
                     <ItemForm
                         item={itemRef.current}
+                        context={context}
+                        namespace={namespace}
                         schema={schema}
                         disabled={disabled}
                         errors={errors}
@@ -262,30 +198,4 @@ const ItemCard = ({
 
 ItemCard.displayName = 'ItemCard'
 
-// Memoize to prevent re-renders when parent re-renders
-// UDC-integrated component - manages its own state via UDC subscription
-// DOES NOT re-render based on initialItem - only uses it for initial mount
-export default React.memo(ItemCard, (prevProps, nextProps) => {
-    return (
-        prevProps.index === nextProps.index &&
-        prevProps.isExpanded === nextProps.isExpanded &&
-        prevProps.canMoveUp === nextProps.canMoveUp &&
-        prevProps.canMoveDown === nextProps.canMoveDown &&
-        prevProps.schema === nextProps.schema &&
-        prevProps.disabled === nextProps.disabled &&
-        prevProps.onToggle === nextProps.onToggle &&
-        prevProps.onRemove === nextProps.onRemove &&
-        prevProps.onMoveUp === nextProps.onMoveUp &&
-        prevProps.onMoveDown === nextProps.onMoveDown &&
-        prevProps.widgetId === nextProps.widgetId &&
-        prevProps.slotName === nextProps.slotName &&
-        prevProps.contextType === nextProps.contextType &&
-        prevProps.fieldName === nextProps.fieldName &&
-        prevProps.parentComponentId === nextProps.parentComponentId &&
-        JSON.stringify(prevProps.widgetPath) === JSON.stringify(nextProps.widgetPath) &&
-        JSON.stringify(prevProps.errors) === JSON.stringify(nextProps.errors) &&
-        prevProps.labelTemplate === nextProps.labelTemplate
-        // Deliberately NOT comparing initialItem - we use UDC subscription for updates
-    )
-})
-
+export default React.memo(ItemCard)

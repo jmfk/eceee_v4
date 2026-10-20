@@ -6,6 +6,8 @@
  * to avoid conflicts between React and document.execCommand() operations.
  */
 
+import { inlineFieldHtml } from '../../utils/richTextFieldHtml'
+
 import { WysiwygContextMenu } from '../../components/wysiwyg/WysiwygContextMenu.js'
 import { LinkPickerModal } from '../../components/special-editors/LinkPickerModal.js'
 
@@ -549,6 +551,9 @@ class ContentWidgetEditorRenderer {
 
         // Detached toolbar mode - if true, toolbar is managed externally
         this.detachedToolbar = options.detachedToolbar || false
+        this.disabled = options.disabled || false
+        this.fieldMode = options.fieldMode || false
+        this.inlineOnly = options.inlineOnly || false
 
         // DOM elements
         this.rootElement = null
@@ -657,6 +662,11 @@ class ContentWidgetEditorRenderer {
         const linkButton = this.createLinkButton()
         this.toolbarButtons.set('link', linkButton)
         this.toolbarElement.appendChild(linkButton)
+
+        if (this.inlineOnly) {
+            this.rootElement.appendChild(this.toolbarElement)
+            return
+        }
 
         // Separator
         this.toolbarElement.appendChild(this.createSeparator())
@@ -955,6 +965,7 @@ class ContentWidgetEditorRenderer {
 
         // Add blur listener for cleanup
         const blurHandler = () => {
+            if (this.fieldMode) return
             // Clean up on blur
             setTimeout(() => {
                 if (this.editorElement) {
@@ -995,8 +1006,9 @@ class ContentWidgetEditorRenderer {
      * Handle content changes
      */
     handleContentChange() {
+        if (this.disabled) return
         if (this.editorElement) {
-            const currentContent = this.editorElement.innerHTML
+            const currentContent = this.inlineOnly ? inlineFieldHtml(this.editorElement.innerHTML) : this.editorElement.innerHTML
             // Only call onChange if content actually changed
             if (currentContent !== this.content) {
                 this.content = currentContent
@@ -1016,6 +1028,16 @@ class ContentWidgetEditorRenderer {
      * Inserts content at root level, breaking up block elements if needed
      */
     handlePaste(e) {
+        if (this.disabled) { e.preventDefault(); return }
+        if (this.inlineOnly) {
+            e.preventDefault()
+            const source = document.createElement('div')
+            source.textContent = e.clipboardData.getData('text/plain')
+            const html = e.clipboardData.getData('text/html') || source.innerHTML
+            document.execCommand('insertHTML', false, inlineFieldHtml(html))
+            this.handleContentChange()
+            return
+        }
         e.preventDefault()
 
         // Get pasted content
@@ -1161,6 +1183,17 @@ class ContentWidgetEditorRenderer {
      * Handle key down events
      */
     handleKeyDown(e) {
+        if (this.disabled) { e.preventDefault(); return }
+        if (this.inlineOnly && ((e.metaKey || e.ctrlKey) && /[0-9]/.test(e.key) || e.key === 'Tab')) {
+            e.preventDefault()
+            return
+        }
+        if (this.inlineOnly && e.key === 'Enter') {
+            e.preventDefault()
+            document.execCommand('insertHTML', false, '<br>')
+            this.handleContentChange()
+            return
+        }
         const isMod = e.metaKey || e.ctrlKey // Cmd on Mac, Ctrl on Windows/Linux
 
         // Tab handling for indentation
@@ -1357,6 +1390,7 @@ class ContentWidgetEditorRenderer {
      * Handle context menu
      */
     handleContextMenu(e) {
+        if (this.disabled) { e.preventDefault(); return }
         // Check global context menu config first, then LayoutRenderer
         const globalEnabled = window.__contextMenuConfig?.enabled ?? true
         const layoutEnabled = window.__layoutRenderer?.uiConfig?.enableContextMenu ?? true
@@ -1444,6 +1478,7 @@ class ContentWidgetEditorRenderer {
      * Handle link insertion/editing
      */
     handleLinkAction() {
+        if (this.disabled) return
         const selection = window.getSelection()
         if (!selection.rangeCount) return
 
@@ -2429,6 +2464,8 @@ class ContentWidgetEditorRenderer {
      * Execute editor commands
      */
     execCommand(command, value = null) {
+        if (this.disabled) return
+        if (this.inlineOnly && !['bold', 'italic', 'underline', 'strikeThrough', 'createLink', 'unlink', 'undo', 'redo'].includes(command)) return
         // Handle special commands
         if (command === 'addImage') {
             this.openMediaInsertModal()
@@ -2489,16 +2526,17 @@ class ContentWidgetEditorRenderer {
     setContent(content) {
         if (!this.editorElement) return;
 
+        // Field hydration is silent. Untouched HTML and local undo/selection must survive prop echoes.
+        if (this.fieldMode) {
+            if (content !== this.editorElement.innerHTML) this.editorElement.innerHTML = content || ''
+            this.content = content || ''
+            return
+        }
+
         // First set the raw content to ensure editor is usable
         if (content !== this.editorElement.innerHTML) {
-            const oldContent = this.content;
             this.content = content;
             this.editorElement.innerHTML = content;
-
-            // Only trigger onChange if this is not the initial content
-            if (oldContent !== undefined && oldContent !== content) {
-                this.onChange(content);
-            }
         }
 
         // Then schedule the HTML cleaning for the next tick

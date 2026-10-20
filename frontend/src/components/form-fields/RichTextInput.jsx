@@ -1,114 +1,91 @@
-import React from 'react'
-import { AlertCircle } from 'lucide-react'
+import React, { useEffect, useLayoutEffect, useRef, useId } from 'react'
+import DOMPurify from 'isomorphic-dompurify'
+import ContentWidgetEditorRenderer from '../../widgets/easy-widgets/ContentWidgetEditorRenderer'
 import FieldHelpText from './FieldHelpText'
 
-/**
- * RichTextInput Component
- * 
- * Rich text editor component for formatted text input.
- * Currently a placeholder that renders as a textarea until a proper
- * rich text editor is integrated.
- */
-const RichTextInput = ({
-    value,
-    onChange,
-    validation,
-    isValidating,
-    label,
-    description,
-    required,
-    disabled,
-    placeholder,
-    rows = 6,
-    toolbar = 'basic',
-    // Custom props that shouldn't be spread to DOM
-    context,
-    formData,
-    fieldName,
-    ...props
-}) => {
-    // Get validation status for styling
-    const getValidationStatus = () => {
-        if (isValidating) return 'validating'
-        if (!validation) return 'none'
-        if (validation.errors?.length > 0) return 'error'
-        if (validation.warnings?.length > 0) return 'warning'
-        return 'valid'
-    }
+/** Own the editor DOM once; local value echoes never reset its content or native undo history. */
+const RichTextInput = ({ value, defaultValue = '', onChange, onBlur, onFocus, label, description,
+    required, disabled = false, validation, rows = 6, placeholder, inlineOnly = false,
+    namespace, context, fieldName }) => {
+    const id = useId()
+    const containerRef = useRef(null)
+    const editorRef = useRef(null)
+    const callbacksRef = useRef({ onChange, onBlur, onFocus })
+    callbacksRef.current = { onChange, onBlur, onFocus }
+    const lastValueRef = useRef(value ?? defaultValue)
 
-    const validationStatus = getValidationStatus()
-    const hasError = validationStatus === 'error'
-    const hasWarning = validationStatus === 'warning'
+    useLayoutEffect(() => {
+        const renderer = new ContentWidgetEditorRenderer(containerRef.current, {
+            content: DOMPurify.sanitize(lastValueRef.current || ''), fieldMode: true, inlineOnly,
+            namespace, pageId: context?.pageId,
+            siteRootId: context?.siteRootId || context?.webpageData?.cachedRootId,
+            onChange: html => {
+                if (renderer.isDestroyed || renderer.disabled) return
+                lastValueRef.current = html
+                callbacksRef.current.onChange?.(html)
+            }
+        })
+        renderer.render()
+        editorRef.current = renderer
+        const element = renderer.editorElement
+        element.id = id
+        element.setAttribute('role', 'textbox')
+        element.setAttribute('aria-multiline', 'true')
+        element.setAttribute('aria-label', label || fieldName || 'Rich text')
+        element.dataset.placeholder = placeholder || ''
+        renderer.toolbarElement?.setAttribute('role', 'toolbar')
+        renderer.toolbarElement?.setAttribute('aria-label', `${label || 'Rich text'} formatting`)
+        renderer.toolbarElement?.classList.add('flex-wrap')
+        const keepSelection = event => { if (event.target.closest('button')) event.preventDefault() }
+        renderer.toolbarElement?.addEventListener('mousedown', keepSelection)
+        const focus = event => callbacksRef.current.onFocus?.(event)
+        const blur = event => callbacksRef.current.onBlur?.(event)
+        const blockDisabledEdit = event => {
+            if (renderer.disabled) { event.preventDefault(); event.stopImmediatePropagation() }
+        }
+        const editEvents = ['beforeinput', 'input', 'paste', 'drop', 'keydown', 'contextmenu']
+        editEvents.forEach(name => element.addEventListener(name, blockDisabledEdit, true))
+        element.addEventListener('focus', focus)
+        element.addEventListener('blur', blur)
+        return () => {
+            element.removeEventListener('focus', focus)
+            element.removeEventListener('blur', blur)
+            editEvents.forEach(name => element.removeEventListener(name, blockDisabledEdit, true))
+            renderer.toolbarElement?.removeEventListener('mousedown', keepSelection)
+            renderer.destroy()
+            editorRef.current = null
+        }
+    }, [id, inlineOnly])
 
-    const handleChange = (e) => {
-        onChange(e.target.value)
-    }
+    useEffect(() => {
+        if (value !== undefined && value !== lastValueRef.current) {
+            lastValueRef.current = value
+            editorRef.current?.updateConfig({ content: DOMPurify.sanitize(value || '') })
+        }
+    }, [value])
+    useEffect(() => {
+        const renderer = editorRef.current
+        if (!renderer) return
+        renderer.namespace = namespace
+        renderer.disabled = disabled
+        renderer.pageId = context?.pageId
+        renderer.siteRootId = context?.siteRootId || context?.webpageData?.cachedRootId
+        renderer.editorElement.contentEditable = String(!disabled)
+        renderer.editorElement.setAttribute('contenteditable', String(!disabled))
+        renderer.editorElement.setAttribute('aria-disabled', String(disabled))
+        renderer.editorElement.setAttribute('aria-required', String(Boolean(required)))
+        renderer.editorElement.setAttribute('aria-invalid', String(Boolean(validation?.errors?.length)))
+        renderer.editorElement.style.minHeight = `${Math.max(2, rows) * 1.5}rem`
+        renderer.toolbarElement?.querySelectorAll('button, select').forEach(control => { control.disabled = disabled })
+    }, [disabled, required, validation, rows, namespace, context, inlineOnly])
 
-    return (
-        <div className="space-y-2">
-            {/* Label */}
-            {label && (
-                <label className="block text-sm font-medium text-gray-700">
-                    {label}
-                    {required && <span className="text-red-500 ml-1">*</span>}
-                </label>
-            )}
-
-            {/* Description */}
-            <FieldHelpText>{description}</FieldHelpText>
-
-            {/* Rich Text Editor Placeholder */}
-            <div className="relative">
-                {/* TODO: Replace with proper rich text editor like TinyMCE, Quill, or similar */}
-                <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md flex items-center space-x-2">
-                    <AlertCircle className="w-4 h-4 text-yellow-600" />
-                    <span className="text-xs text-yellow-700">
-                        Rich text editor not yet implemented - using textarea
-                    </span>
-                </div>
-
-                <textarea
-                    value={value || ''}
-                    onChange={handleChange}
-                    disabled={disabled}
-                    placeholder={placeholder || 'Enter rich text content...'}
-                    rows={rows}
-                    className={`
-                        w-full px-3 py-2 border rounded-md resize-y
-                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                        disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
-                        ${hasError ? 'border-red-300 bg-red-50' :
-                            hasWarning ? 'border-yellow-300 bg-yellow-50' :
-                                'border-gray-300 bg-white'}
-                        ${isValidating ? 'animate-pulse' : ''}
-                    `}
-                    {...props}
-                />
-            </div>
-
-            {/* Validation Messages */}
-            {hasError && validation.errors?.map((error, index) => (
-                <div key={index} className="text-sm text-red-600 flex items-center space-x-1">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{error}</span>
-                </div>
-            ))}
-
-            {hasWarning && validation.warnings?.map((warning, index) => (
-                <div key={index} className="text-sm text-yellow-600 flex items-center space-x-1">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{warning}</span>
-                </div>
-            ))}
-
-            {/* Loading State */}
-            {isValidating && (
-                <div className="text-sm text-blue-600">Validating...</div>
-            )}
-        </div>
-    )
+    return <div className="space-y-2">
+        {label && <label htmlFor={id} className="block text-sm font-medium text-gray-700">{label}{required && ' *'}</label>}
+        <FieldHelpText>{description}</FieldHelpText>
+        <div ref={containerRef} className="overflow-hidden rounded-md border border-gray-300 bg-white text-gray-900 focus-within:ring-2 focus-within:ring-blue-500" />
+        {validation?.errors?.map((error, index) => <div role="alert" key={index} className="text-sm text-red-600">{error}</div>)}
+        {validation?.warnings?.map((warning, index) => <div key={index} className="text-sm text-yellow-700">{warning}</div>)}
+    </div>
 }
-
-RichTextInput.displayName = 'RichTextInput'
 
 export default RichTextInput

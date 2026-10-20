@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react'
-import { FIELD_COMPONENTS } from '../../form-fields'
+import { getStableFieldComponent } from '../../forms/SchemaFieldRenderer'
 import { Loader2 } from 'lucide-react'
 
 /**
@@ -11,7 +11,7 @@ import { Loader2 } from 'lucide-react'
  * Calls onFieldChange handler (provided by ItemCard) when fields change.
  * ItemCard handles all state management and UDC integration.
  */
-const ItemForm = ({ item, schema, disabled, errors = [], onFieldChange }) => {
+const ItemForm = ({ item, schema, disabled, errors = [], onFieldChange, context, namespace }) => {
     // Use item prop directly - it comes from ItemCard's itemRef.current
 
     const getFieldError = (fieldName) => {
@@ -48,22 +48,18 @@ const ItemForm = ({ item, schema, disabled, errors = [], onFieldChange }) => {
                 // Determine which component to use
                 const componentName = field.component || mapFieldTypeToComponent(field)
 
-                // Dynamically load the field component
-                const FieldComponent = React.lazy(() => {
-                    if (FIELD_COMPONENTS[componentName]) {
-                        return FIELD_COMPONENTS[componentName]()
-                    }
-                    console.warn(`Field component '${componentName}' not found, falling back to TextInput`)
-                    return FIELD_COMPONENTS.TextInput()
-                })
+                const FieldComponent = getStableFieldComponent(componentName)
 
                 const fieldProps = {
-                    label: field.label,
+                    label: field.label || field.title,
+                    fieldName: field.name,
+                    context,
+                    namespace,
                     description: field.description,
                     required: field.required || false,
                     disabled: disabled || field.disabled || false,
                     placeholder: field.placeholder,
-                    defaultValue: fieldValue, // UNCONTROLLED - only sets initial value
+                    value: fieldValue ?? '',
                     onChange: (value) => onFieldChange(field.name, value),
                     validation: fieldValidation,
                     // Field-specific props
@@ -111,6 +107,7 @@ function mapFieldTypeToComponent(field) {
     // Handle based on type and format
     switch (type) {
         case 'string':
+            if (['richtext', 'rich-text', 'rich_text'].includes(format) || field.fieldType === 'rich_text') return 'RichTextInput'
             if (format === 'textarea') return 'TextareaInput'
             if (format === 'email') return 'EmailInput'
             if (format === 'url' || format === 'uri') return 'URLInput'
@@ -147,15 +144,4 @@ function mapFieldTypeToComponent(field) {
 
 ItemForm.displayName = 'ItemForm'
 
-// Memoize to prevent re-renders when parent re-renders
-// Like a native input element - NEVER re-renders based on item data changes
-export default React.memo(ItemForm, (prevProps, nextProps) => {
-    // Only re-render if UI control props change, NOT item data
-    return (
-        prevProps.schema === nextProps.schema &&
-        prevProps.disabled === nextProps.disabled &&
-        JSON.stringify(prevProps.errors) === JSON.stringify(nextProps.errors) &&
-        prevProps.onFieldChange === nextProps.onFieldChange
-        // Deliberately NOT comparing item - we're uncontrolled
-    )
-})
+export default React.memo(ItemForm)

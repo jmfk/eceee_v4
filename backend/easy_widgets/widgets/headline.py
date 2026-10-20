@@ -26,6 +26,7 @@ class HeadlineConfig(BaseModel):
         description="Header text content",
         json_schema_extra={
             "component": "RichTextInput",
+            "inlineOnly": True,
             "rows": 3,
             "order": 1,
             "group": "Content",

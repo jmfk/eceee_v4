@@ -103,10 +103,23 @@ const ItemsListField = ({
     const [itemErrors, setItemErrors] = useState({})
     const lastAddedIndex = useRef(null)
 
+    // Controlled updates (including external hydration) retain existing local item identities.
+    useEffect(() => {
+        const raw = Array.isArray(value) ? value : []
+        const next = raw.map((item, index) => ({ ...item,
+            _itemId: item._itemId || itemsRef.current.find(old => (item.id || item._id) &&
+                (old.id || old._id) === (item.id || item._id))?._itemId || itemsRef.current[index]?._itemId || generateItemId()
+        }))
+        if (JSON.stringify(next) !== JSON.stringify(itemsRef.current)) {
+            itemsRef.current = next
+            forceRerender()
+        }
+    }, [value, forceRerender])
+
     // Subscribe to UDC external changes
     // useExternalChanges is a hook that handles useEffect internally
     useExternalChanges(componentId, (state, metadata) => {
-        if (!widgetId || !slotName || !contextType || !fieldName) {
+        if (context?.managedByForm || !widgetId || !slotName || !contextType || !fieldName) {
             return
         }
 
@@ -142,7 +155,7 @@ const ItemsListField = ({
         onChange(newItems)
 
         // If UDC is available and we have context, publish to it
-        if (udcPublishUpdate && widgetId && slotName && contextType && fieldName) {
+        if (!context?.managedByForm && udcPublishUpdate && widgetId && slotName && contextType && fieldName) {
             await udcPublishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
                 id: widgetId,
                 slotName: slotName,
@@ -151,7 +164,14 @@ const ItemsListField = ({
                 widgetPath: widgetPath && widgetPath.length > 0 ? widgetPath : undefined
             })
         }
-    }, [widgetId, slotName, contextType, fieldName, widgetPath, componentId, udcPublishUpdate, onChange])
+    }, [widgetId, slotName, contextType, fieldName, widgetPath, componentId, udcPublishUpdate, onChange, context?.managedByForm])
+
+    const handleItemChange = useCallback((index, item) => {
+        const next = [...itemsRef.current]
+        next[index] = item
+        itemsRef.current = next
+        publishItemsUpdate(next)
+    }, [publishItemsUpdate])
 
     // Parse the item schema to get field definitions
     const parsedSchema = useMemo(() => parseItemSchema(itemSchema), [itemSchema])
@@ -367,6 +387,7 @@ const ItemsListField = ({
                             <ItemCard
                                 key={item._itemId || `fallback-${index}`}
                                 initialItem={item}
+                                onItemChange={handleItemChange}
                                 index={index}
                                 labelTemplate={itemLabelTemplate}
                                 isExpanded={expandedItems.has(index)}
@@ -379,12 +400,8 @@ const ItemsListField = ({
                                 schema={parsedSchema}
                                 disabled={disabled}
                                 errors={itemErrors[index]}
-                                widgetId={context?.widgetId}
-                                slotName={context?.slotName}
-                                contextType={context?.contextType}
-                                widgetPath={context?.widgetPath}
-                                fieldName={fieldName}
-                                parentComponentId={componentId}
+                                context={context}
+                                namespace={namespace}
                             />
                         ))
                     )}
@@ -410,14 +427,4 @@ const ItemsListField = ({
 
 ItemsListField.displayName = 'ItemsListField'
 
-// Memoize to prevent unnecessary re-renders from parent updates
-export default React.memo(ItemsListField, (prevProps, nextProps) => {
-    // Only re-render if these specific props change
-    return (
-        prevProps.value === nextProps.value &&
-        prevProps.disabled === nextProps.disabled &&
-        prevProps.validation === nextProps.validation &&
-        prevProps.isValidating === nextProps.isValidating &&
-        prevProps.itemSchema === nextProps.itemSchema
-    )
-})
+export default React.memo(ItemsListField)
