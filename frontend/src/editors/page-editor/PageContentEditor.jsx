@@ -17,6 +17,7 @@ const PageContentEditor = forwardRef(({
     onUpdate,
     onOpenWidgetEditor,
     editable = true,
+    alwaysShowEditorControls = true,
     namespace,
     // PageEditor-specific props
     currentVersion,
@@ -86,6 +87,7 @@ const PageContentEditor = forwardRef(({
             widgets={currentWidgets}
             onWidgetChange={handleWidgetChange}
             editable={editable}
+            alwaysShowEditorControls={alwaysShowEditorControls}
             onOpenWidgetEditor={onOpenWidgetEditor}
             namespace={namespace}
             // PageEditor-specific props

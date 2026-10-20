@@ -2,7 +2,8 @@ import { render } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-    useEditorThemeStyles: vi.fn(() => ({ error: null, scopeId: 'version-83' }))
+    useEditorThemeStyles: vi.fn(() => ({ error: null, scopeId: 'version-83' })),
+    rendererProps: vi.fn(),
 }))
 
 vi.mock('../../../hooks/useTheme', () => ({
@@ -14,7 +15,10 @@ vi.mock('../../../utils/defaultLayout', () => ({
 }))
 
 vi.mock('../ReactLayoutRenderer', () => ({
-    default: () => <div data-testid="layout-renderer" />
+    default: (props) => {
+        mocks.rendererProps(props)
+        return <div data-testid="layout-renderer" />
+    }
 }))
 
 import PageContentEditor from '../PageContentEditor'
@@ -22,6 +26,7 @@ import PageContentEditor from '../PageContentEditor'
 describe('PageContentEditor theme settings', () => {
     beforeEach(() => {
         mocks.useEditorThemeStyles.mockClear()
+        mocks.rendererProps.mockClear()
     })
 
     it('passes page and version CSS separately to the canonical resolver', () => {
@@ -63,6 +68,20 @@ describe('PageContentEditor theme settings', () => {
         expect(mocks.useEditorThemeStyles).toHaveBeenLastCalledWith(expect.objectContaining({
             page: {},
             version: expect.objectContaining({ pageCustomCss: '.saved {}', enableCssInjection: false })
+        }))
+    })
+
+    it('passes the editor control visibility preference to the layout renderer', () => {
+        render(
+            <PageContentEditor
+                currentVersion={{ id: 83 }}
+                pageVersionData={{}}
+                alwaysShowEditorControls={false}
+            />
+        )
+
+        expect(mocks.rendererProps).toHaveBeenLastCalledWith(expect.objectContaining({
+            alwaysShowEditorControls: false
         }))
     })
 })

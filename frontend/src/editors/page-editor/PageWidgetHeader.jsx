@@ -154,9 +154,9 @@ const PageWidgetHeader = ({
     };
 
     return (
-        <div className={`eceee-editor-ui widget-header page-editor-header px-3 py-2 flex items-center justify-between ${isInherited ? 'bg-amber-50 border-2 border-amber-300' : 'bg-gray-100 border border-gray-200'} ${isSelected ? 'ring-2 ring-blue-500' : ''} ${isCut ? 'opacity-60' : ''} ${className}`}>
+        <div className={`eceee-editor-ui widget-header page-editor-header editor-responsive-toolbar px-3 py-2 flex items-center justify-between ${isInherited ? 'bg-amber-50 border-2 border-amber-300' : 'bg-gray-100 border border-gray-200'} ${isSelected ? 'ring-2 ring-blue-500' : ''} ${isCut ? 'opacity-60' : ''} ${className}`}>
             {/* Left side - Widget info and status */}
-            <div className="flex items-center space-x-2">
+            <div className="editor-toolbar-primary flex items-center space-x-2">
                 {/* Selection checkbox */}
                 {onToggleSelection && !isInherited && (
                     <input
@@ -174,8 +174,8 @@ const PageWidgetHeader = ({
                     <Lock className="h-3.5 w-3.5 text-amber-600" />
                 )}
 
-                <div className="flex items-center space-x-2">
-                    <span className={`text-xs font-medium ${isInherited ? 'text-amber-800' : 'text-gray-700'} ${isCut ? 'line-through' : ''}`}>
+                <div className="editor-toolbar-identity flex items-center space-x-2">
+                    <span className={`editor-toolbar-label text-xs font-medium ${isInherited ? 'text-amber-800' : 'text-gray-700'} ${isCut ? 'line-through' : ''}`}>
                         {widgetType}
                         {widget?.config?.anchor && (
                             <span className="text-gray-500"> → #{widget.config.anchor}</span>
@@ -187,7 +187,7 @@ const PageWidgetHeader = ({
                         <button
                             onClick={handleToggleActive}
                             data-testid={`page-widget-active-${widgetTestId}`}
-                            className={`text-xs px-2 py-0.5 rounded transition-colors ${
+                            className={`editor-toolbar-status text-xs px-2 py-0.5 rounded transition-colors ${
                                 isActive
                                     ? 'bg-green-100 text-green-700 hover:bg-green-200'
                                     : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
@@ -218,13 +218,13 @@ const PageWidgetHeader = ({
             {/* Right side - Action buttons */}
             {isInherited ? (
                 /* Replace button for inherited widgets - only visible on hover */
-                <div className="flex items-center space-x-2">
+                <div className="editor-toolbar-actions flex items-center space-x-2">
                     <button
                         onClick={() => {
                             // TODO: Implement replace functionality
                             alert(`Replace inherited ${widgetType} from ${inheritedFrom?.title || 'parent page'}\n\nReplace functionality coming soon.`);
                         }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded"
+                        className="editor-toolbar-hover-action opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded"
                         title="Replace this inherited widget with a local one"
                     >
                         Replace
@@ -232,7 +232,7 @@ const PageWidgetHeader = ({
                 </div>
             ) : (
                 /* Normal controls for local widgets */
-                <div className="flex items-center space-x-1">
+                <div className="editor-toolbar-actions flex items-center space-x-1">
                     {/* Custom actions - rendered first (left) */}
                     {customActions && (
                         <div className="flex items-center border-r border-gray-300 pr-2 mr-2">

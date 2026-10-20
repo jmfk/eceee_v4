@@ -146,6 +146,7 @@ const ReactLayoutRenderer = forwardRef(({
     widgets = {},
     onWidgetChange,
     editable = true,
+    alwaysShowEditorControls = true,
     namespace,
     // PageEditor-specific props
     currentVersion,
@@ -1609,7 +1610,7 @@ const ReactLayoutRenderer = forwardRef(({
     // Render the direct-DOM editor canvas at the full available width.
     return (
         <div
-            className="react-layout-renderer eceee-theme-scope site-renderer w-full h-full relative cms-content"
+            className={`react-layout-renderer eceee-theme-scope site-renderer w-full h-full relative cms-content ${alwaysShowEditorControls ? 'editor-controls-always' : ''}`}
             data-eceee-theme-scope={themeScopeId || undefined}
             data-testid="page-editor-surface"
         >
