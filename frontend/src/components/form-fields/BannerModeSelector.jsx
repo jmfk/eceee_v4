@@ -32,7 +32,7 @@ const BannerModeSelector = React.memo(({
             value: 'header', 
             label: 'Header Mode', 
             icon: Type,
-            description: 'H2 centered, no image'
+            description: 'H2 centered, optional background image'
         },
     ]
 

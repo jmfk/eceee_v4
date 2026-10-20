@@ -1,11 +1,12 @@
 import React from 'react'
-import { act, render } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let rendererInstances = []
 let bioRendererInstances = []
 let publishUpdateMock = vi.fn()
 let externalChangeCallbacks = []
+let currentTheme = null
 
 vi.mock('../SimpleTextEditorRenderer', () => ({
     SimpleTextEditorRenderer: vi.fn(function (container, options) {
@@ -66,7 +67,7 @@ vi.mock('../ContentWidgetEditorRenderer', () => ({
 }))
 
 vi.mock('../../../hooks/useTheme', () => ({
-    useTheme: () => ({ currentTheme: null })
+    useTheme: () => ({ currentTheme })
 }))
 
 vi.mock('../../../contexts/unified-data/context/UnifiedDataContext', () => ({
@@ -91,7 +92,7 @@ vi.mock('../../../utils/imgproxySecure', () => ({
 }))
 
 vi.mock('../../../components/media/OptimizedImage', () => ({
-    default: props => <img {...props} />
+    default: ({ src, alt, className }) => <img src={src} alt={alt} className={className} />
 }))
 
 vi.mock('../../../components/media/MediaSelectModal', () => ({
@@ -132,6 +133,8 @@ describe('canonical widget update ownership', () => {
         bioRendererInstances = []
         externalChangeCallbacks = []
         publishUpdateMock = vi.fn()
+        currentTheme = null
+        vi.restoreAllMocks()
         vi.clearAllMocks()
     })
 
@@ -240,6 +243,64 @@ describe('canonical widget update ownership', () => {
         const banner = container.querySelector('.banner-widget')
         expect(banner).toHaveClass('cms-content', 'border-enabled')
         expect(banner).not.toHaveClass('container')
+    })
+
+    it.each(['editor', 'preview'])('BannerWidget only renders the active mode image in %s mode', async (mode) => {
+        // jsdom drops image-set(), so also check the CSS value React assigns.
+        const backgroundAssignments = vi.spyOn(CSSStyleDeclaration.prototype, 'backgroundImage', 'set')
+        const config = {
+            bannerMode: 'text', textContent: '<p>Text banner</p>', headerContent: 'Header banner',
+            image1: { url: '/inline.jpg' }, backgroundImage: { url: '/background.jpg' }
+        }
+        const { container } = render(<BannerWidget mode={mode} widgetId="banner-images" slotName="main"
+            config={config} context={{ pageId: '101' }} />)
+
+        await waitFor(() => expect(container.querySelector('.banner-image')).not.toBeNull())
+        expect(container.querySelector('.banner-widget').style.backgroundImage).toBe('')
+        expect(screen.queryByTitle('Edit background image')).toBeNull()
+
+        const subscription = externalChangeCallbacks.find(item => item.componentId === 'bannerwidget-banner-images')
+        await act(async () => subscription.callback(stateWithWidget('banner-images', 'main', { ...config, bannerMode: 'header' })))
+        expect(container.querySelector('.banner-image')).toBeNull()
+        await waitFor(() => expect(backgroundAssignments).toHaveBeenCalledWith(expect.stringContaining('generated.jpg')))
+        if (mode === 'editor') expect(screen.getByTitle('Edit background image')).toBeVisible()
+
+        await act(async () => subscription.callback(stateWithWidget('banner-images', 'main', config)))
+        expect(container.querySelector('.banner-widget').style.backgroundImage).toBe('')
+        expect(screen.queryByTitle('Edit background image')).toBeNull()
+        await waitFor(() => expect(container.querySelector('.banner-image')).not.toBeNull())
+        expect(config.image1.url).toBe('/inline.jpg')
+        expect(config.backgroundImage.url).toBe('/background.jpg')
+        backgroundAssignments.mockRestore()
+    })
+
+    it('BannerWidget applies image restrictions immediately when its inline mode toggle is used', async () => {
+        const onConfigChange = vi.fn()
+        render(<BannerWidget mode="editor" widgetId="banner-toggle" slotName="main"
+            config={{ bannerMode: 'header', headerContent: 'Heading', backgroundImage: { url: '/background.jpg' } }}
+            onConfigChange={onConfigChange} />)
+
+        await waitFor(() => expect(screen.getByTitle('Edit background image')).toBeVisible())
+        fireEvent.click(screen.getByTitle('Switch to Text mode'))
+        expect(screen.queryByTitle('Edit background image')).toBeNull()
+        expect(document.querySelector('.banner-widget').style.backgroundImage).toBe('')
+        expect(onConfigChange).toHaveBeenCalledWith(expect.objectContaining({
+            bannerMode: 'text', backgroundImage: { url: '/background.jpg' }
+        }))
+    })
+
+    it.each(['text', 'header'])('BannerWidget custom styles exclude inactive image data in %s mode', async (bannerMode) => {
+        currentTheme = { componentStyles: { custom: { template:
+            '{{#config.backgroundImage}}<span>Background image</span>{{/config.backgroundImage}}' +
+            '{{#config.image1}}<span>Inline image</span>{{/config.image1}}'
+        } } }
+        render(<BannerWidget config={{ bannerMode, componentStyle: 'custom', headerContent: 'Heading', textContent: 'Body',
+            image1: { url: '/inline.jpg' }, backgroundImage: { url: '/background.jpg' } }}
+            context={{ pageId: '101' }} />)
+
+        expect(screen.getByText(bannerMode === 'header' ? 'Background image' : 'Inline image')).toBeVisible()
+        expect(screen.queryByText(bannerMode === 'header' ? 'Inline image' : 'Background image')).toBeNull()
+        await act(async () => {})
     })
 
     it('BannerWidget hydrates external UDC updates without echoing user edits', async () => {

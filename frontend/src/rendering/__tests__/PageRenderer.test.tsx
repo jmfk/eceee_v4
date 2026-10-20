@@ -187,6 +187,44 @@ describe('PageRenderer', () => {
         expect(container.querySelector('.banner-image')).toBeNull()
     })
 
+    it.each(['text', 'header'])('renders only the active banner image in %s mode with both images saved', (bannerMode) => {
+        const config = {
+            bannerMode, headerContent: 'Heading', textContent: '<p>Body</p>',
+            image1: { url: '/inline.jpg' }, image1Url: '/inline.jpg',
+            backgroundImage: { url: '/background.jpg' }, backgroundImageUrl: '/background.jpg',
+        }
+        const model = createPageRenderModel({ widgets: { main: [{ id: 'banner', type: 'easy_widgets.BannerWidget', config }] } })
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(Boolean(container.querySelector('.banner-image'))).toBe(bannerMode === 'text')
+        expect(Boolean(container.querySelector('.banner-background'))).toBe(bannerMode === 'header')
+        expect(container.innerHTML).not.toContain(bannerMode === 'header' ? '/inline.jpg' : '/background.jpg')
+        expect(config.image1.url).toBe('/inline.jpg')
+        expect(config.backgroundImage.url).toBe('/background.jpg')
+    })
+
+    it.each(['text', 'header'])('filters inactive banner images and cached URLs from custom styles in %s mode', (bannerMode) => {
+        const config = {
+            banner_mode: bannerMode, header_content: 'Heading', text_content: 'Body', componentStyle: 'custom',
+            image_1: { url: '/inline.jpg' }, image_1_url_2x: '/inline-2x.jpg',
+            background_image: { url: '/background.jpg' }, background_image_url_2x: '/background-2x.jpg',
+        }
+        const model = createPageRenderModel({
+            widgets: { main: [{ id: 'banner', type: 'easy_widgets.BannerWidget', config }] },
+            context: { componentStyles: { custom: { template:
+                '{{#background_image}}<span>Background image</span>{{/background_image}}' +
+                '{{#background_image_url_2x}}<img src="{{background_image_url_2x}}">{{/background_image_url_2x}}' +
+                '{{#image_1}}<span>Inline image</span>{{/image_1}}' +
+                '{{#image_1_url_2x}}<img src="{{image_1_url_2x}}">{{/image_1_url_2x}}'
+            } } },
+        })
+        const { container } = render(<PageRenderer model={model} />)
+
+        expect(screen.getByText(bannerMode === 'header' ? 'Background image' : 'Inline image')).toBeVisible()
+        expect(screen.queryByText(bannerMode === 'header' ? 'Inline image' : 'Background image')).toBeNull()
+        expect(container.innerHTML).not.toContain(bannerMode === 'header' ? '/inline-2x.jpg' : '/background-2x.jpg')
+    })
+
     it('keeps resolved same-site navigation when lookup responses do not include hostname caches', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'nav', type: 'easy_widgets.NavigationWidget', config: { menuItems: [

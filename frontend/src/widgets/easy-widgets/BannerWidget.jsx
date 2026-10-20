@@ -10,6 +10,7 @@ import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
 import OptimizedImage from '../../components/media/OptimizedImage'
 import MediaSelectModal from '../../components/media/MediaSelectModal'
+import { getBannerRenderConfig } from '../../utils/bannerConfig'
 
 /**
  * EASY Banner Widget Component
@@ -130,10 +131,11 @@ const BannerWidget = ({
     })
 
     // Get image objects from config
-    const imageSize = configRef.current.imageSize || 'square'
+    const renderConfig = getBannerRenderConfig(configRef.current)
+    const imageSize = renderConfig.imageSize || 'square'
     const bannerMode = configRef.current.bannerMode || 'text'
-    const image1 = configRef.current.image1
-    const backgroundImage = configRef.current.backgroundImage
+    const image1 = renderConfig.image1
+    const backgroundImage = renderConfig.backgroundImage
     const textColor = configRef.current.textColor || '#000000'
     const backgroundColor = configRef.current.backgroundColor || '#ffffff'
 
@@ -141,12 +143,12 @@ const BannerWidget = ({
     const bannerStyle = {
         backgroundColor: backgroundColor,
         color: textColor,
-        ...(backgroundImageUrl && backgroundImageUrl2x ? {
+        ...(backgroundImage && backgroundImageUrl && backgroundImageUrl2x ? {
             backgroundImage: `image-set(url('${backgroundImageUrl}') 1x, url('${backgroundImageUrl2x}') 2x)`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat'
-        } : backgroundImageUrl ? {
+        } : backgroundImage && backgroundImageUrl ? {
             backgroundImage: `url('${backgroundImageUrl}')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
@@ -156,8 +158,12 @@ const BannerWidget = ({
 
     // Load optimized image URLs from backend API
     useEffect(() => {
+        let active = true
         const loadImages = async () => {
             setImageLoading(true)
+            setBackgroundImageUrl('')
+            setBackgroundImageUrl2x('')
+            setImage1Url('')
 
             try {
                 // Load background image (1x and 2x)
@@ -172,11 +178,10 @@ const BannerWidget = ({
                         height: 1200,
                         resizeType: 'fill'
                     })
-                    setBackgroundImageUrl(url1x)
-                    setBackgroundImageUrl2x(url2x)
-                } else {
-                    setBackgroundImageUrl('')
-                    setBackgroundImageUrl2x('')
+                    if (active) {
+                        setBackgroundImageUrl(url1x)
+                        setBackgroundImageUrl2x(url2x)
+                    }
                 }
 
                 // Load image URL based on imageSize (only for text mode)
@@ -188,18 +193,17 @@ const BannerWidget = ({
                         ...dimensions,
                         resizeType: 'fill'
                     })
-                    setImage1Url(url)
-                } else {
-                    setImage1Url('')
+                    if (active) setImage1Url(url)
                 }
             } catch (error) {
                 console.error('Failed to load optimized banner images:', error)
             } finally {
-                setImageLoading(false)
+                if (active) setImageLoading(false)
             }
         }
 
         loadImages()
+        return () => { active = false }
     }, [image1, imageSize, backgroundImage, bannerMode])
 
     // Determine text position - removed, no longer used
@@ -225,6 +229,7 @@ const BannerWidget = ({
         const newMode = bannerMode === 'header' ? 'text' : 'header'
         const updatedConfig = { ...configRef.current, bannerMode: newMode }
         setConfig(updatedConfig)
+        forceRerender({})
 
         if (onConfigChange) {
             onConfigChange(updatedConfig)
@@ -349,17 +354,19 @@ const BannerWidget = ({
                     // Prepare context for Mustache rendering
                     const mustacheContext = prepareComponentContext(
                         content,
-                        configRef.current.anchor || '',
-                        style.variables || {},
-                        configRef.current
+                        style.variables || {}
                     )
+                    mustacheContext.anchor = renderConfig.anchor || ''
+                    mustacheContext.config = renderConfig
 
                     // Add banner specific context
                     mustacheContext.bannerMode = bannerMode
                     mustacheContext.headerContent = configRef.current.headerContent || ''
                     mustacheContext.textContent = configRef.current.textContent || ''
                     mustacheContext.imageSize = imageSize
-                    mustacheContext.image1 = image1Url
+                    mustacheContext.image1 = image1 ? image1Url : ''
+                    mustacheContext.backgroundImage = backgroundImage
+                    mustacheContext.backgroundImageUrl = backgroundImage ? backgroundImageUrl : ''
 
                     // Render template
                     const html = renderMustache(style.template, mustacheContext)
@@ -415,7 +422,7 @@ const BannerWidget = ({
                     style={{ position: 'relative', ...bannerStyle }}
                 >
                     {/* Background image edit icon */}
-                    <button
+                    {bannerMode === 'header' && <button
                         onClick={(e) => {
                             e.stopPropagation()
                             setEditingField('backgroundImage')
@@ -426,9 +433,10 @@ const BannerWidget = ({
                         style={{ zIndex: 10000, pointerEvents: 'auto' }}
                     >
                         <Layers className="w-4 h-4 text-gray-600" />
-                    </button>
+                    </button>}
                     <div className={bodyClasses} style={{ position: 'relative', zIndex: 1 }}>
-                        <div className="banner-text content" style={{ position: 'relative', zIndex: 1 }} ref={contentContainerRef}>
+                        <div className="banner-text content" style={{ position: 'relative', zIndex: 1 }}>
+                            <div ref={contentContainerRef} style={{ display: 'contents' }} />
                             {/* Mode toggle button */}
                             <button
                                 onClick={handleModeToggle}
@@ -521,7 +529,7 @@ const BannerWidget = ({
                         }} />
                     </div>
 
-                    {bannerMode === 'text' && image1Url && (
+                    {bannerMode === 'text' && image1 && image1Url && (
                         <div className="banner-images image">
                             <img className="banner-image" src={image1Url} alt="" />
                         </div>
