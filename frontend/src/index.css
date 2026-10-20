@@ -157,6 +157,11 @@
     display: flex !important;
   }
 
+  .editor-overlay-region:focus-within > .editor-overlay-toolbar .editor-toolbar-hover-action,
+  .editor-toolbar-hover-action:focus-visible {
+    opacity: 1 !important;
+  }
+
   .editor-overlay-region:hover > .editor-slot-toolbar,
   .editor-overlay-region:focus-within > .editor-slot-toolbar {
     display: block !important;
@@ -220,11 +225,12 @@
     }
 
     .editor-toolbar-primary {
-      flex: 1 1 40%;
+      flex: 1 1 50%;
+      max-width: 50%;
     }
 
     .editor-toolbar-actions-scroll {
-      flex: 1 1 60%;
+      flex: 1 1 50%;
     }
 
     .editor-toolbar-primary > :not(:first-child),
