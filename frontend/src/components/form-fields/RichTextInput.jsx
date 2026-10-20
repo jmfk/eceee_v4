@@ -1,10 +1,12 @@
-import React, { useEffect, useLayoutEffect, useRef, useId } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useId, useMemo, useState } from 'react'
 import DOMPurify from 'isomorphic-dompurify'
 import ContentWidgetEditorRenderer from '../../widgets/easy-widgets/ContentWidgetEditorRenderer'
 import FieldHelpText from './FieldHelpText'
+import { HtmlEditor } from '../fields/HtmlEditor'
+import { requiresHtmlSource } from '../../utils/richTextFieldHtml'
 
 /** Own the editor DOM once; local value echoes never reset its content or native undo history. */
-const RichTextInput = ({ value, defaultValue = '', onChange, onBlur, onFocus, label, description,
+const RichTextEditor = ({ value, defaultValue = '', onChange, onBlur, onFocus, label, description,
     required, disabled = false, validation, rows = 6, placeholder, inlineOnly = false,
     namespace, context, fieldName }) => {
     const id = useId()
@@ -85,6 +87,29 @@ const RichTextInput = ({ value, defaultValue = '', onChange, onBlur, onFocus, la
         <div ref={containerRef} className="overflow-hidden rounded-md border border-gray-300 bg-white text-gray-900 focus-within:ring-2 focus-within:ring-blue-500" />
         {validation?.errors?.map((error, index) => <div role="alert" key={index} className="text-sm text-red-600">{error}</div>)}
         {validation?.warnings?.map((warning, index) => <div key={index} className="text-sm text-yellow-700">{warning}</div>)}
+    </div>
+}
+
+// Every HTML-valued field needs the same lossless path, including nested richtext fields.
+const RichTextInput = ({ value, defaultValue = '', onChange, disabled, showSourceButton = false, ...props }) => {
+    const [sourceOpen, setSourceOpen] = useState(false)
+    const html = value ?? defaultValue
+    const sourceOnly = useMemo(() => requiresHtmlSource(html), [html])
+    useEffect(() => { if (disabled) setSourceOpen(false) }, [disabled])
+    return <div className="space-y-2">
+        {sourceOnly
+            ? <>
+                {props.label && <div className="text-sm font-medium text-gray-700">{props.label}{props.required && ' *'}</div>}
+                <FieldHelpText>{props.description}</FieldHelpText>
+                <p className="text-sm text-gray-600">Use the HTML editor to preserve scripts and embedded content.</p>
+            </>
+            : <RichTextEditor {...props} value={value} defaultValue={defaultValue} onChange={onChange} disabled={disabled} />}
+        {(sourceOnly || showSourceButton) && <button type="button" disabled={disabled} onClick={() => setSourceOpen(true)}
+            className="text-sm text-gray-600 underline focus-visible:outline focus-visible:outline-2">
+            Open HTML Editor
+        </button>}
+        {sourceOpen && !disabled && <HtmlEditor value={html || ''}
+            onChange={next => { if (!disabled) onChange?.(next) }} onClose={() => setSourceOpen(false)} />}
     </div>
 }
 

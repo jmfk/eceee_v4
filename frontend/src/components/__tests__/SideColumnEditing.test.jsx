@@ -7,6 +7,7 @@ import IsolatedFormRenderer from '../IsolatedFormRenderer'
 import SchemaFieldRenderer from '../forms/SchemaFieldRenderer'
 import RichTextInput from '../form-fields/RichTextInput'
 import { getWidgetSchema } from '../../api/widgetSchemas'
+import { validateWidgetType } from '../../utils/widgetTypeValidation'
 import { fieldTypeRegistry } from '../../utils/fieldTypeRegistry'
 
 vi.mock('../../api/widgetSchemas.js', () => ({
@@ -69,6 +70,7 @@ describe('Side-column editing acceptance regressions', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         getWidgetSchema.mockResolvedValue(schema)
+        validateWidgetType.mockResolvedValue({ isValid: true, canEdit: true })
     })
 
     it('keeps the focused input and its selection when its change returns through page props', async () => {
@@ -166,5 +168,15 @@ describe('Side-column editing acceptance regressions', () => {
         await act(async () => resolveOld({ properties: { stale: { type: 'string', component: 'TextInput', title: 'Stale field' } } }))
         expect(screen.queryByText('Stale field')).toBeNull()
         expect(await readyInput()).toHaveValue('Initial text')
+    })
+
+    it('reloads the schema after an unavailable widget type is restored', async () => {
+        validateWidgetType.mockResolvedValueOnce({ isValid: false, canEdit: false })
+        render(<EchoingPanel provideSchema={false} />)
+        await waitFor(() => expect(getWidgetSchema).toHaveBeenCalledTimes(1))
+        fireEvent.click(await screen.findByRole('button', { name: 'Refresh Types' }))
+        expect(await readyInput()).toHaveValue('Initial text')
+        expect(getWidgetSchema).toHaveBeenCalledTimes(2)
+        expect(screen.queryByText('Loading widget configuration...')).toBeNull()
     })
 })

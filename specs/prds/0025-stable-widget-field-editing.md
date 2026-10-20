@@ -49,3 +49,5 @@ The widget side panel remounts fields during typing, delays the save buffer and 
 - Browser screenshot: `frontend/test-results/side-column-richtext.png` (local ignored test artifact), visually inspected.
 - Independent final P0–P3 review: no verified findings remain; previously identified P1/P2 and source-disabled P3 defects were fixed and re-reviewed.
 - No live backend, production or deployment checks were run; this batch changes client editing and two widget UI schema annotations.
+- PR #252 review follow-up: lossless source editing now protects all rich-text fields, including direct and nested `RichTextInput` fields. Refresh retries both type validation and schema loading, and Tab/Shift+Tab navigate between form controls.
+- Review verification: all 1,654 frontend tests in 162 files and all 17 Chromium page-editor regressions pass. Frontend lint/build, diff checks and specs validation pass; existing revision/merge/conflict paths remain unchanged. Inline fields retain the native context menu rather than displaying unsupported block commands.
