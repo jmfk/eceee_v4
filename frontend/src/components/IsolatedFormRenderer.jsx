@@ -44,11 +44,12 @@ const IsolatedFormSession = forwardRef(function IsolatedFormSession({
     const handleDirtyChange = useCallback(dirty => callbacksRef.current.onDirtyChange?.(dirty), [])
     const formBuffer = useFormDataBuffer(initWidgetData, null, { onDirtyChange: handleDirtyChange })
     const { getCurrentData: getCurrentWidgetData, updateField, hydrate } = formBuffer
-    const [, renderExternalChange] = useState(0)
+    const [, renderForm] = useState(0)
     const { useExternalChanges, publishUpdate } = useUnifiedData()
     const componentId = `isolated-form-${widgetId || 'preview'}`
     const [loadedSchema, setLoadedSchema] = useState(null)
     const activeSchema = initschema || loadedSchema
+    const schemaProperties = activeSchema?.schema?.properties || activeSchema?.properties
 
     useImperativeHandle(ref, () => ({ getCurrentWidgetData }), [getCurrentWidgetData])
     useEffect(() => { handleDirtyChange(false) }, [handleDirtyChange])
@@ -64,7 +65,7 @@ const IsolatedFormSession = forwardRef(function IsolatedFormSession({
         const current = getCurrentWidgetData()
         if (incoming?.config && !equal(current?.config, incoming.config)) {
             hydrate({ ...current, ...incoming })
-            renderExternalChange(value => value + 1)
+            renderForm(value => value + 1)
         }
     }, [getCurrentWidgetData, hydrate])
 
@@ -79,6 +80,9 @@ const IsolatedFormSession = forwardRef(function IsolatedFormSession({
 
     const handleFieldChange = useCallback((fieldName, value) => {
         updateField(`config.${fieldName}`, value)
+        if (Object.values(schemaProperties || {}).some(field => Array.isArray(field.conditionalOn?.[fieldName]))) {
+            renderForm(value => value + 1)
+        }
         const current = getCurrentWidgetData()
         const options = callbacksRef.current
         const propUpdate = buildWidgetPropUpdate({
@@ -94,7 +98,7 @@ const IsolatedFormSession = forwardRef(function IsolatedFormSession({
                 sourceId: propUpdate.fieldSourceId, configPatch: propUpdate.configPatch
             })
         }
-    }, [updateField, getCurrentWidgetData, widgetId, slotName, contextType, componentId, activeSchema, publishUpdate])
+    }, [updateField, getCurrentWidgetData, widgetId, slotName, contextType, componentId, activeSchema, schemaProperties, publishUpdate])
 
     const widgetPathKey = JSON.stringify(context?.widgetPath || [])
     // Ordinary fields need identity/theme/link context, not a new entire page snapshot on each keystroke.
@@ -113,9 +117,6 @@ const IsolatedFormSession = forwardRef(function IsolatedFormSession({
         return null // Special editor handles all configuration
     }
 
-    // Extract the actual schema if we received the full config-ui-schema response
-    const schemaProperties = activeSchema?.schema?.properties || activeSchema?.properties
-
     if (!schemaProperties) {
         return (
             <div className="text-center text-gray-500 py-8 p-4">
@@ -129,8 +130,12 @@ const IsolatedFormSession = forwardRef(function IsolatedFormSession({
 
     const renderedFields = Object.entries(schemaProperties)
         .filter(([, fieldSchema]) => {
-            // Filter out hidden fields
-            return !fieldSchema.hidden
+            return !fieldSchema.hidden && Object.entries(fieldSchema.conditionalOn || {}).every(
+                // Preserve existing behavior for legacy, non-array conditional metadata.
+                ([fieldName, allowedValues]) => !Array.isArray(allowedValues) || allowedValues.includes(
+                    getCurrentWidgetData()?.config?.[fieldName] ?? schemaProperties[fieldName]?.default
+                )
+            )
         })
 
     let primaryFields = renderedFields.filter(([fieldName, fieldSchema]) =>

@@ -23,10 +23,11 @@ vi.mock('../../contexts/unified-data/context/UnifiedDataContext', () => ({
 }))
 
 vi.mock('../forms/SchemaFieldRenderer.jsx', () => ({
-    default: ({ fieldName, onChange }) => {
+    default: ({ fieldName, value, onChange }) => {
         schemaFieldRenderCount += 1
         return (
-            <button type="button" onClick={() => onChange(fieldName, `<p>${fieldName} update</p>`)}>
+            <button type="button" onClick={() => onChange(fieldName,
+                fieldName === 'bannerMode' ? (value === 'header' ? 'text' : 'header') : `<p>${fieldName} update</p>`)}>
                 Change {fieldName}
             </button>
         )
@@ -43,6 +44,17 @@ const baseWidget = {
 const schema = {
     properties: {
         content: { type: 'string' }
+    }
+}
+
+const bannerSchema = {
+    properties: {
+        bannerMode: { type: 'string', default: 'text', group: 'Content' },
+        headerContent: { type: 'string', hidden: true },
+        textContent: { type: 'string', hidden: true },
+        backgroundImage: { type: 'object', group: 'Content', conditionalOn: { bannerMode: ['header'] } },
+        image1: { type: 'object', group: 'Images', editorPrimary: true, conditionalOn: { bannerMode: ['text'] } },
+        imageSize: { type: 'string', group: 'Layout', conditionalOn: { bannerMode: ['text'] } },
     }
 }
 
@@ -288,6 +300,51 @@ describe('IsolatedFormRenderer active prop ownership', () => {
 
         expect(accordion).toHaveAttribute('open')
         expect(screen.getByRole('button', { name: 'Change showCaptions' })).toBeVisible()
+    })
+
+    it.each(['text', 'header', undefined])('shows only active primary banner controls in %s mode', (bannerMode) => {
+        render(<IsolatedFormRenderer initWidgetData={{ ...baseWidget, config: { bannerMode } }} initschema={bannerSchema} />)
+
+        const visibleFields = bannerMode === 'header' ? ['backgroundImage'] : ['image1', 'imageSize']
+        const hiddenFields = bannerMode === 'header' ? ['image1', 'imageSize'] : ['backgroundImage']
+        for (const field of visibleFields) {
+            const control = screen.getByRole('button', { name: `Change ${field}` })
+            expect(control).toBeVisible()
+            expect(control.closest('details')).toBeNull()
+        }
+        for (const field of [...hiddenFields, 'headerContent', 'textContent']) {
+            expect(screen.queryByRole('button', { name: `Change ${field}`, hidden: true })).toBeNull()
+        }
+        expect(screen.queryByText('Images')).toBeNull()
+    })
+
+    it('updates banner controls immediately on mode changes while retaining both stored images', () => {
+        const onWidgetChange = vi.fn()
+        const config = { bannerMode: 'text', image1: { id: 'inline' }, backgroundImage: { id: 'background' } }
+        render(<IsolatedFormRenderer initWidgetData={{ ...baseWidget, config }} initschema={bannerSchema}
+            publishChanges={false} onWidgetChange={onWidgetChange} />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Change bannerMode' }))
+        expect(screen.getByRole('button', { name: 'Change backgroundImage' })).toBeVisible()
+        expect(screen.queryByRole('button', { name: 'Change image1', hidden: true })).toBeNull()
+        expect(screen.queryByRole('button', { name: 'Change imageSize', hidden: true })).toBeNull()
+        expect(onWidgetChange.mock.calls.at(-1)[0].config).toEqual({ ...config, bannerMode: 'header' })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Change bannerMode' }))
+        expect(screen.getByRole('button', { name: 'Change image1' })).toBeVisible()
+        expect(screen.getByRole('button', { name: 'Change imageSize' })).toBeVisible()
+        expect(screen.queryByRole('button', { name: 'Change backgroundImage', hidden: true })).toBeNull()
+        expect(onWidgetChange.mock.calls.at(-1)[0].config).toEqual(config)
+    })
+
+    it('preserves existing visibility for legacy scalar and field/value condition metadata', () => {
+        render(<IsolatedFormRenderer initWidgetData={baseWidget} initschema={{ properties: {
+            legacyScalar: { group: 'Content', conditionalOn: { imageStyle: 'carousel' } },
+            legacyBoolean: { group: 'Content', conditionalOn: { field: 'enable_collapse', value: true } },
+        } }} />)
+
+        expect(screen.getByRole('button', { name: 'Change legacyScalar' })).toBeVisible()
+        expect(screen.getByRole('button', { name: 'Change legacyBoolean' })).toBeVisible()
     })
 
     it('collapses fields assigned to secondary groups', () => {

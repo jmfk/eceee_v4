@@ -10,7 +10,7 @@
 
 <div class="banner-widget widget-type-{{ widget_type.css_class_name }} cms-content{% if config.show_border %} border-enabled{% endif %}" style="{{ config.banner_style }}"{% if config.anchor %} id="{{ config.anchor }}"{% endif %}>
     {# Background image if provided - full width with retina support #}
-    {% if config.background_image %}
+    {% if config.banner_mode == 'header' and config.background_image %}
         <div class="banner-background" style="background-image: image-set(url('{% imgproxy config.background_image width=1920 height=600 resize_type='fill' %}') 1x, url('{% imgproxy config.background_image width=3840 height=1200 resize_type='fill' %}') 2x);"></div>
     {% endif %}
 
@@ -23,21 +23,21 @@
             {% endif %}
         </div>
         
-        {% if config.banner_mode == 'text' and config.image1 %}
+        {% if config.banner_mode == 'text' and config.image_1 %}
         <div class="banner-images">
             {% if config.image_size == 'rectangle' %}
                 {# Rectangle image - 280x140 (2:1 ratio), 2x: 560x280 #}
                 <img 
                     class="banner-image"
-                    src="{% imgproxy config.image1 width=280 height=140 resize_type='fill' %}"
-                    srcset="{% imgproxy config.image1 width=280 height=140 resize_type='fill' %} 1x, {% imgproxy config.image1 width=560 height=280 resize_type='fill' %} 2x"
+                    src="{% imgproxy config.image_1 width=280 height=140 resize_type='fill' %}"
+                    srcset="{% imgproxy config.image_1 width=280 height=140 resize_type='fill' %} 1x, {% imgproxy config.image_1 width=560 height=280 resize_type='fill' %} 2x"
                     alt="" />
             {% else %}
                 {# Square image - 140x140, 2x: 280x280 #}
                 <img 
                     class="banner-image"
-                    src="{% imgproxy config.image1 width=140 height=140 resize_type='fill' %}"
-                    srcset="{% imgproxy config.image1 width=140 height=140 resize_type='fill' %} 1x, {% imgproxy config.image1 width=280 height=280 resize_type='fill' %} 2x"
+                    src="{% imgproxy config.image_1 width=140 height=140 resize_type='fill' %}"
+                    srcset="{% imgproxy config.image_1 width=140 height=140 resize_type='fill' %} 1x, {% imgproxy config.image_1 width=280 height=280 resize_type='fill' %} 2x"
                     alt="" />
             {% endif %}
         </div>

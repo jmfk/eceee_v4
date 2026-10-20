@@ -23,7 +23,10 @@ class BannerConfig(BaseModel):
 
     banner_mode: Literal["header", "text"] = Field(
         "text",
-        description="Banner mode: header (H2 centered) or text (H3 + paragraph with optional image)",
+        description=(
+            "Banner mode: header (H2 centered with optional background image) "
+            "or text (H3 + paragraph with optional image)"
+        ),
         json_schema_extra={
             "component": "BannerModeSelector",
             "order": 1,
@@ -34,6 +37,7 @@ class BannerConfig(BaseModel):
         "",
         description="Header text content (plain text, shown when in header mode)",
         json_schema_extra={
+            "hidden": True,  # Edited inline in the banner
             "component": "RichTextInput",
             "inlineOnly": True,
             "rows": 3,
@@ -46,6 +50,7 @@ class BannerConfig(BaseModel):
         "",
         description="Rich text content (shown when in text mode)",
         json_schema_extra={
+            "hidden": True,  # Edited inline in the banner
             "component": "RichTextInput",
             "rows": 6,
             "order": 3,
@@ -71,6 +76,7 @@ class BannerConfig(BaseModel):
             "mediaTypes": ["image"],
             "order": 5,
             "group": "Images",
+            "editorPrimary": True,
             "conditionalOn": {"bannerMode": ["text"]},
         },
     )
@@ -82,6 +88,7 @@ class BannerConfig(BaseModel):
             "mediaTypes": ["image"],
             "order": 3,
             "group": "Content",
+            "conditionalOn": {"bannerMode": ["header"]},
         },
     )
 
@@ -325,6 +332,34 @@ class BannerWidget(BaseWidget):
     def configuration_model(self) -> Type[BaseModel]:
         return BannerConfig
 
+    def _render_config(self, config):
+        """Keep inactive images stored, but exclude them from every render context."""
+        config = {**(config or {}), **BannerConfig(**(config or {})).model_dump(exclude_unset=True)}
+        inactive_fields = (
+            (
+                "image_1",
+                "image1",
+                "image_1_url",
+                "image1Url",
+                "image_1_url_2x",
+                "image1Url2x",
+                "image_size",
+                "imageSize",
+            )
+            if config.get("banner_mode", "text") == "header"
+            else (
+                "background_image",
+                "backgroundImage",
+                "background_image_url",
+                "backgroundImageUrl",
+                "background_image_url_2x",
+                "backgroundImageUrl2x",
+            )
+        )
+        for field in inactive_fields:
+            config.pop(field, None)
+        return config
+
     def render_with_style(self, config, theme):
         """
         Render banner with custom component style from theme.
@@ -338,6 +373,7 @@ class BannerWidget(BaseWidget):
         """
         from webpages.utils.mustache_renderer import prepare_component_context, render_mustache
 
+        config = self._render_config(config)
         style_name = config.get("component_style", "default")
 
         # For default style, return None to use standard Django template rendering
@@ -394,6 +430,7 @@ class BannerWidget(BaseWidget):
         from webpages.services.link_resolver import resolve_links_in_html
         from webpages.utils.color_utils import resolve_color_value
 
+        config = self._render_config(config)
         template_config = config.copy() if config else {}
         request = context.get("request") if context else None
 
