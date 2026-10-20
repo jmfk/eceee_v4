@@ -1,28 +1,27 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Menu, X, Settings, Grid3X3, FolderOpen, Database, Hash, User as UserIcon, BarChart2, Palette } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+
+const navigation = [
+  { name: 'Pages', href: '/pages', icon: Grid3X3 },
+  { name: 'Objects', href: '/objects', icon: Database },
+  { name: 'Media', href: '/media', icon: FolderOpen },
+  { name: 'Statistics', href: '/statistics', icon: BarChart2 },
+  { name: 'Tags', href: '/tags', icon: Hash },
+  { name: 'Designer', href: '/designer/themes', icon: Palette },
+  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Profile', href: '/profile', icon: UserIcon },
+]
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const location = useLocation()
-  const { logout, user } = useAuth()
+  const { logout } = useAuth()
   const navRef = useRef(null)
+  const navContainerRef = useRef(null)
   const desktopNavRef = useRef(null)
-
-  const navigation = [
-    { name: 'Pages', href: '/pages', icon: Grid3X3 },
-    { name: 'Objects', href: '/objects', icon: Database },
-    { name: 'Media', href: '/media', icon: FolderOpen },
-    { name: 'Statistics', href: '/statistics', icon: BarChart2 },
-    { name: 'Tags', href: '/tags', icon: Hash },
-    { name: 'Designer', href: '/designer/themes', icon: Palette },
-    { name: 'Settings', href: '/settings', icon: Settings },
-    { name: 'Profile', href: '/profile', icon: UserIcon },
-  ]
-
-  const isSchemasActive = false
 
   const isActive = (path) => {
     if (path === '/settings') {
@@ -31,23 +30,27 @@ const Navbar = () => {
     return location.pathname === path || location.pathname.startsWith(path + '/')
   }
 
-  // Overflow detection effect
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const container = navContainerRef.current
+    const desktopNav = desktopNavRef.current
+    if (!container || !desktopNav) return
+
     const updateNavMode = () => {
-      if (!navRef.current || !desktopNavRef.current) return
-      const isOverflowing = desktopNavRef.current.scrollWidth > desktopNavRef.current.clientWidth
+      // Compare stable, fractional widths: Safari can round scrollWidth and
+      // clientWidth differently, even when the menu fits comfortably.
+      const isOverflowing = desktopNav.getBoundingClientRect().width > container.getBoundingClientRect().width + 1
       setIsCollapsed(isOverflowing)
+      if (!isOverflowing) setIsOpen(false)
     }
 
     const ro = new ResizeObserver(updateNavMode)
-    if (navRef.current) {
-      ro.observe(navRef.current)
-    }
+    ro.observe(container)
+    ro.observe(desktopNav)
 
-    updateNavMode() // Initial check
+    updateNavMode()
 
     return () => ro.disconnect()
-  }, [navigation])
+  }, [])
 
   // Click outside handler for mobile menu
   useEffect(() => {
@@ -66,9 +69,15 @@ const Navbar = () => {
   return (
     <nav ref={navRef} className={`bg-white shadow-sm border-b border-gray-200 ${isCollapsed ? 'nav-collapsed' : ''}`}>
       <div className="container mx-auto px-4">
-        <div className="flex justify-start h-16">
+        <div ref={navContainerRef} className="relative flex justify-start h-16 overflow-hidden">
           {/* Desktop navigation */}
-          <div ref={desktopNavRef} className={`items-center space-x-8 ${isCollapsed ? 'hidden' : 'flex'}`}>
+          {/* Keep the collapsed menu measurable without exposing its links. */}
+          <div
+            ref={desktopNavRef}
+            className={`flex w-max shrink-0 items-center space-x-8 ${isCollapsed ? 'invisible absolute inset-y-0 left-0' : ''}`}
+            aria-hidden={isCollapsed}
+            inert={isCollapsed}
+          >
             {navigation.map((item) => (
               <Link
                 key={item.name}
@@ -95,9 +104,13 @@ const Navbar = () => {
           </div>
 
           {/* Mobile/Collapsed menu button */}
-          <div className={`flex items-center ${isCollapsed ? 'flex' : 'hidden'}`}>
+          <div className={`flex items-center ${isCollapsed ? 'flex' : 'hidden'}`} aria-hidden={!isCollapsed} inert={!isCollapsed}>
             <button
+              type="button"
               onClick={() => setIsOpen(!isOpen)}
+              aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={isOpen}
+              aria-controls="cms-mobile-navigation"
               className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
             >
               {isOpen ? (
@@ -111,7 +124,7 @@ const Navbar = () => {
 
         {/* Mobile/Collapsed navigation */}
         {isOpen && isCollapsed && (
-          <div className="py-4 border-t border-gray-200">
+          <div id="cms-mobile-navigation" className="py-4 border-t border-gray-200">
             <div className="space-y-2">
               {navigation.map((item) => (
                 <Link
