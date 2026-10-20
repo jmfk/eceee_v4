@@ -347,6 +347,9 @@ const PageWidgetFactory = ({
             <div
                 ref={widgetRef}
                 className={`widget-item widget-type-${normalizeForCSS(widget.type)} page-editor-widget editor-overlay-region relative group ${className} ${isPublished ? 'published-widget' : ''} ${pasteModeActive && showPasteMarkers ? 'paste-mode-active' : ''}`}
+                tabIndex={0}
+                role="group"
+                aria-label={`${getWidgetDisplayName(widget.type)} widget`}
                 data-widget-type={widget.type}
                 data-widget-id={widget.id}
                 data-version-id={versionId}

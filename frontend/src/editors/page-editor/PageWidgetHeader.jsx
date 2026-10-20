@@ -232,7 +232,13 @@ const PageWidgetHeader = ({
                 </div>
             ) : (
                 /* Normal controls for local widgets */
-                <div className="editor-toolbar-actions flex items-center space-x-1">
+                <div
+                    className="editor-toolbar-actions editor-toolbar-actions-scroll flex items-center space-x-1"
+                    role="toolbar"
+                    aria-label={`${widgetType} actions`}
+                    tabIndex={0}
+                    data-testid={`page-widget-actions-${widgetTestId}`}
+                >
                     {/* Custom actions - rendered first (left) */}
                     {customActions && (
                         <div className="flex items-center border-r border-gray-300 pr-2 mr-2">

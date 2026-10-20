@@ -116,7 +116,6 @@
 
   .editor-responsive-toolbar {
     min-width: 0;
-    overflow: hidden;
   }
 
   .editor-toolbar-primary,
@@ -140,6 +139,17 @@
   .editor-toolbar-status,
   .editor-toolbar-actions {
     flex: 0 0 auto;
+  }
+
+  .editor-toolbar-actions-scroll {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    scroll-padding-inline: 0.25rem;
   }
 
   .editor-overlay-region:hover > .editor-overlay-toolbar,
@@ -207,6 +217,14 @@
     .editor-toolbar-actions,
     .editor-toolbar-actions > div {
       gap: 0 !important;
+    }
+
+    .editor-toolbar-primary {
+      flex: 1 1 40%;
+    }
+
+    .editor-toolbar-actions-scroll {
+      flex: 1 1 60%;
     }
 
     .editor-toolbar-primary > :not(:first-child),

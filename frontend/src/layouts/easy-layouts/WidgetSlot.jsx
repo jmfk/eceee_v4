@@ -417,6 +417,9 @@ const WidgetSlot = ({
         return (
             <div
                 className={`widget-slot slot-${normalizeForCSS(name)} editor-overlay-region group relative`}
+                tabIndex={editable && !isSlotPreviewMode ? 0 : undefined}
+                role={editable && !isSlotPreviewMode ? 'group' : undefined}
+                aria-label={editable && !isSlotPreviewMode ? `${label || name} slot` : undefined}
                 data-slot-name={name}
                 data-testid={`page-editor-slot-${name}`}
                 data-widget-slot={name}

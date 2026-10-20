@@ -96,4 +96,31 @@ describe('PageWidgetHeader', () => {
             isActive: false
         })
     })
+
+    it('keeps narrow action rows keyboard-scrollable with all actions present', () => {
+        render(
+            <PageWidgetHeader
+                widgetType="ImageWidget"
+                widget={{
+                    id: 'image-1',
+                    type: 'easy_widgets.ImageWidget',
+                    config: {}
+                }}
+                slotName="sidebar"
+                canMoveUp={true}
+                canMoveDown={true}
+                onMoveUp={vi.fn()}
+                onMoveDown={vi.fn()}
+                onPaste={vi.fn()}
+                onEdit={vi.fn()}
+                onDelete={vi.fn()}
+            />
+        )
+
+        const actions = screen.getByTestId('page-widget-actions-easy-widgets-imagewidget')
+        expect(actions).toHaveClass('editor-toolbar-actions-scroll')
+        expect(actions).toHaveAttribute('tabindex', '0')
+        expect(screen.getByTestId('page-widget-edit-easy-widgets-imagewidget')).toBeInTheDocument()
+        expect(screen.getByTestId('page-widget-delete-easy-widgets-imagewidget')).toBeInTheDocument()
+    })
 })

@@ -263,7 +263,12 @@ const PageWidgetHeaderWithSlots = ({
                     </button>
                 </div>
             ) : (
-                <div className="editor-toolbar-actions flex items-center space-x-1">
+                <div
+                    className="editor-toolbar-actions editor-toolbar-actions-scroll flex items-center space-x-1"
+                    role="toolbar"
+                    aria-label={`${widgetType} actions`}
+                    tabIndex={0}
+                >
                     {/* Slot controls */}
                     {(showAddButton || showClearButton || widgets || onPasteToSlot) && (
                         <div className="flex items-center border-r border-gray-300 pr-2 mr-2 space-x-1">
