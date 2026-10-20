@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { createCollaborativeEditorState, mockCmsApi, seedAuthenticatedSession } from './fixtures/apiMocks'
+import { openCmsPage } from './fixtures/navigation'
 
 const editorPath = '/pages/101/edit/content'
 
@@ -20,7 +21,7 @@ const installErrorGuards = page => {
 
 const openEditor = async (page, editorState) => {
   await seedAuthenticatedSession(page)
-  await page.goto(editorPath, { waitUntil: 'domcontentloaded' })
+  await openCmsPage(page, editorPath)
   await expect(page.getByTestId('page-editor-surface')).toBeVisible()
   await expect(page.getByTestId('content-widget-editor-content-intro').locator('[contenteditable="true"]')).toBeVisible()
   return editorState
@@ -91,7 +92,7 @@ test.describe('page editor regressions', () => {
     await mockCmsApi(page, { authenticated: true, pageEditor: true })
     await seedAuthenticatedSession(page)
 
-    await page.goto('/pages/101/edit/theme', { waitUntil: 'domcontentloaded' })
+    await openCmsPage(page, '/pages/101/edit/theme')
 
     await expect(page).toHaveURL(/\/pages\/101\/edit\/settings$/)
     await expect(page.getByTestId('page-editor-tab-settings')).toContainText('Settings')
