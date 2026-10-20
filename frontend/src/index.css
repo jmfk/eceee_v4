@@ -121,7 +121,18 @@
   .editor-toolbar-primary,
   .editor-toolbar-identity {
     min-width: 0;
+  }
+
+  .editor-toolbar-primary {
     overflow: hidden;
+  }
+
+  .editor-toolbar-identity {
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    scroll-padding-inline: 0.25rem;
   }
 
   .editor-toolbar-primary {
