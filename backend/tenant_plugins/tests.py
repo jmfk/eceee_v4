@@ -30,14 +30,25 @@ class TenantPluginApiTests(TestCase):
         self.client.force_authenticate(self.owner)
         self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
 
-    def test_catalog_lists_separate_legacy_and_proceedings_plugins(self):
+    def test_import_catalog_only_lists_import_plugins(self):
         response = self.client.get("/api/v1/content-migration/plugins/")
 
         self.assertEqual(response.status_code, 200)
         plugins = {item["id"]: item for item in response.data["results"]}
         self.assertEqual(plugins["org.eceee.legacy_import"]["kind"], "import")
-        self.assertEqual(plugins["org.eceee.proceedings"]["kind"], "feature")
-        self.assertEqual(plugins["org.eceee.proceedings"]["status"], "foundation")
+        self.assertNotIn("org.eceee.proceedings", plugins)
+
+    def test_import_activation_rejects_feature_plugins(self):
+        response = self.client.post("/api/v1/content-migration/plugins/org.eceee.proceedings/activation/")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["pluginId"], "This plugin is not an import plugin.")
+        self.assertFalse(
+            TenantPluginActivation.objects.filter(
+                tenant=self.tenant,
+                plugin_id="org.eceee.proceedings",
+            ).exists()
+        )
 
     def test_activation_is_tenant_scoped_and_exposes_registered_importer(self):
         response = self.client.post("/api/v1/content-migration/plugins/org.eceee.legacy_import/activation/")

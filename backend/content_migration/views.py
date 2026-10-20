@@ -33,6 +33,10 @@ def _active_plugins(tenant):
     return {item.plugin_id: item for item in TenantPluginActivation.objects.filter(tenant=tenant, is_active=True)}
 
 
+def _import_plugins():
+    return tuple(plugin for plugin in registry.plugins() if plugin.kind == "import")
+
+
 class PluginCatalogView(APIView):
     permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
 
@@ -45,7 +49,7 @@ class PluginCatalogView(APIView):
                         active=plugin.id in active and active[plugin.id].plugin_version == plugin.version,
                         compatible=plugin.supports_tenant(request.tenant),
                     )
-                    for plugin in registry.plugins()
+                    for plugin in _import_plugins()
                 ],
                 "canManage": request.tenant.user_has_access(request.user),
             }
@@ -62,6 +66,8 @@ class PluginActivationView(APIView):
             plugin = registry.plugin(plugin_id)
         except PluginRegistryError as exc:
             raise serializers.ValidationError({"pluginId": str(exc)}) from exc
+        if plugin.kind != "import":
+            raise serializers.ValidationError({"pluginId": "This plugin is not an import plugin."})
         if not plugin.supports_tenant(request.tenant):
             raise serializers.ValidationError({"pluginId": "This plugin is not available for this workspace."})
         activation, _created = TenantPluginActivation.objects.update_or_create(
@@ -78,6 +84,12 @@ class PluginActivationView(APIView):
     @transaction.atomic
     def delete(self, request, plugin_id):
         _admin(request)
+        try:
+            plugin = registry.plugin(plugin_id)
+        except PluginRegistryError as exc:
+            raise serializers.ValidationError({"pluginId": str(exc)}) from exc
+        if plugin.kind != "import":
+            raise serializers.ValidationError({"pluginId": "This plugin is not an import plugin."})
         TenantPluginActivation.objects.filter(tenant=request.tenant, plugin_id=plugin_id).update(is_active=False)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -92,7 +104,7 @@ class ImporterCatalogView(APIView):
             for item in Namespace.objects.filter(tenant=request.tenant, is_active=True).order_by("name")
         ]
         results = []
-        for plugin in registry.plugins():
+        for plugin in _import_plugins():
             activation = active.get(plugin.id)
             if (
                 not plugin.supports_tenant(request.tenant)

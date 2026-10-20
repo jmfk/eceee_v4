@@ -1,11 +1,41 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, CheckCircle2, Download, Package, Play, RefreshCw } from 'lucide-react'
 
 import { api } from '../../api/client'
 import { useGlobalNotifications } from '../../contexts/GlobalNotificationContext'
 
 const endpoint = '/api/v1/content-migration'
+
+const statusStyles = {
+    ready: 'border-green-200 bg-green-50 text-green-800',
+    checking: 'border-blue-200 bg-blue-50 text-blue-800',
+    unavailable: 'border-red-200 bg-red-50 text-red-800',
+    missing: 'border-amber-200 bg-amber-50 text-amber-900',
+}
+
+const ConnectionStatus = ({ state, onRefresh }) => {
+    const status = state?.status || 'missing'
+    const labels = {
+        ready: 'Legacy server connected',
+        checking: 'Checking legacy server…',
+        unavailable: 'Legacy server unavailable',
+        missing: 'Source connection required',
+    }
+    return (
+        <div className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm ${statusStyles[status]}`}>
+            <span className="flex items-center gap-2 font-medium">
+                {status === 'ready' ? <CheckCircle2 className="h-4 w-4" /> : status === 'checking' ? <RefreshCw className="h-4 w-4 animate-spin" /> : <AlertCircle className="h-4 w-4" />}
+                {labels[status]}
+            </span>
+            {onRefresh && status !== 'checking' && (
+                <button type="button" onClick={onRefresh} className="font-semibold underline underline-offset-2">
+                    Check again
+                </button>
+            )}
+        </div>
+    )
+}
 
 const MigrationManager = () => {
     const queryClient = useQueryClient()
@@ -39,13 +69,54 @@ const MigrationManager = () => {
         },
     })
 
-    const plugins = pluginData?.results || []
-    const importers = importerData?.results || []
+    const plugins = useMemo(
+        () => (pluginData?.results || []).filter((plugin) => plugin.kind === 'import'),
+        [pluginData],
+    )
+    const importers = useMemo(() => importerData?.results || [], [importerData])
     const selectedImporter = importers.find((item) => item.id === selectedImporterId) || null
     const compatibleConnections = useMemo(
         () => connections.filter((item) => selectedImporter?.connectionKinds.includes(item.connectionType) && item.isActive),
         [connections, selectedImporter],
     )
+    const healthConnections = useMemo(() => {
+        const supportedKinds = new Set(importers.flatMap((importer) => importer.connectionKinds || []))
+        return connections.filter((connection) => (
+            connection.isActive
+            && connection.connectionType === 'LEGACY_API'
+            && supportedKinds.has(connection.connectionType)
+        ))
+    }, [connections, importers])
+    const healthQueries = useQueries({
+        queries: healthConnections.map((connection) => ({
+            queryKey: ['data-connection-health', connection.id],
+            queryFn: async () => (await api.post(`/api/v1/data-connections/connections/${connection.id}/test/`)).data,
+            retry: false,
+            staleTime: 60_000,
+        })),
+    })
+    const connectionHealth = useMemo(() => Object.fromEntries(
+        healthConnections.map((connection, index) => {
+            const query = healthQueries[index]
+            const status = query?.isPending
+                ? 'checking'
+                : query?.isError || query?.data?.status !== 'ready'
+                    ? 'unavailable'
+                    : 'ready'
+            return [connection.id, { status, refetch: query?.refetch }]
+        }),
+    ), [healthConnections, healthQueries])
+
+    const importerConnectionState = (importer) => {
+        const compatible = connections.filter((connection) => (
+            connection.isActive && importer.connectionKinds.includes(connection.connectionType)
+        ))
+        if (!compatible.length) return { status: 'missing' }
+        const states = compatible.map((connection) => connectionHealth[connection.id]).filter(Boolean)
+        if (states.some((state) => state.status === 'ready')) return states.find((state) => state.status === 'ready')
+        if (states.some((state) => state.status === 'checking')) return states.find((state) => state.status === 'checking')
+        return states[0] || { status: 'unavailable' }
+    }
 
     useEffect(() => {
         if (!selectedImporter && importers.length) setSelectedImporterId(importers[0].id)
@@ -54,14 +125,19 @@ const MigrationManager = () => {
     useEffect(() => {
         if (!selectedImporter) return
         setOptions(Object.fromEntries(selectedImporter.fields.map((field) => [field.name, field.default ?? ''])))
-        setConnectionId('')
         setPreflight(null)
-    }, [selectedImporter?.id])
+    }, [selectedImporter])
+
+    useEffect(() => {
+        if (!selectedImporter) return
+        const currentIsCompatible = compatibleConnections.some((connection) => connection.id === connectionId)
+        if (!currentIsCompatible) setConnectionId(compatibleConnections[0]?.id || '')
+    }, [compatibleConnections, connectionId, selectedImporter])
 
     const activationMutation = useMutation({
         mutationFn: async ({ plugin, active }) => active
-            ? api.delete(`${endpoint}/plugins/${plugin.id}/activation/`)
-            : api.post(`${endpoint}/plugins/${plugin.id}/activation/`),
+            ? await api.delete(`${endpoint}/plugins/${plugin.id}/activation/`)
+            : await api.post(`${endpoint}/plugins/${plugin.id}/activation/`),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tenant-plugins'] })
             queryClient.invalidateQueries({ queryKey: ['tenant-importers'] })
@@ -103,14 +179,14 @@ const MigrationManager = () => {
     return (
         <div className="mx-auto max-w-7xl space-y-8 p-6">
             <div>
-                <h1 className="text-2xl font-bold text-gray-900">Content Migrations</h1>
-                <p className="text-gray-600">Run trusted, tenant-specific importers installed with this deployment.</p>
+                <h1 className="text-2xl font-bold text-gray-900">Imports</h1>
+                <p className="text-gray-600">Review installed import scripts, verify their source connections, and run tenant-specific imports.</p>
             </div>
 
             <section>
                 <div className="mb-3 flex items-center gap-2">
                     <Package className="h-5 w-5 text-gray-500" />
-                    <h2 className="text-lg font-semibold text-gray-900">Installed plugins</h2>
+                    <h2 className="text-lg font-semibold text-gray-900">Installed import plugins</h2>
                 </div>
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     {plugins.map((plugin) => (
@@ -122,7 +198,13 @@ const MigrationManager = () => {
                                         <span className="rounded bg-gray-100 px-2 py-0.5 text-xs uppercase text-gray-600">{plugin.kind}</span>
                                     </div>
                                     <p className="mt-1 text-sm text-gray-600">{plugin.description}</p>
-                                    <p className="mt-2 text-xs text-gray-400">{plugin.id} · version {plugin.version}</p>
+                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                        <span className="text-gray-400">{plugin.id} · version {plugin.version}</span>
+                                        <span className={`rounded-full px-2 py-0.5 font-medium ${plugin.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                            {plugin.active ? 'Active' : 'Inactive'}
+                                        </span>
+                                        {plugin.importerCount > 0 && <span className="text-gray-500">{plugin.importerCount} import script{plugin.importerCount === 1 ? '' : 's'}</span>}
+                                    </div>
                                 </div>
                                 <button
                                     type="button"
@@ -136,6 +218,51 @@ const MigrationManager = () => {
                         </div>
                     ))}
                 </div>
+            </section>
+
+            <section>
+                <div className="mb-3 flex items-center gap-2">
+                    <Download className="h-5 w-5 text-gray-500" />
+                    <h2 className="text-lg font-semibold text-gray-900">Import scripts</h2>
+                </div>
+                {!importers.length ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+                        Activate an import plugin above to make its scripts available.
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        {importers.map((importer) => {
+                            const state = importerConnectionState(importer)
+                            const selected = importer.id === selectedImporterId
+                            return (
+                                <button
+                                    key={importer.id}
+                                    type="button"
+                                    aria-pressed={selected}
+                                    onClick={() => setSelectedImporterId(importer.id)}
+                                    className={`rounded-lg border bg-white p-5 text-left shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${selected ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200 hover:border-gray-300'}`}
+                                >
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <h3 className="font-semibold text-gray-900">{importer.label}</h3>
+                                            <p className="mt-1 text-xs font-medium text-gray-500">{importer.pluginLabel} · version {importer.version}</p>
+                                        </div>
+                                        {selected && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">Selected</span>}
+                                    </div>
+                                    <p className="mt-3 text-sm text-gray-600">{importer.description}</p>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {(importer.capabilities || []).map((capability) => (
+                                            <span key={capability} className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
+                                                {capability.replaceAll('_', ' ')}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="mt-4"><ConnectionStatus state={state} /></div>
+                                </button>
+                            )
+                        })}
+                    </div>
+                )}
             </section>
 
             <section className="grid grid-cols-1 gap-8 xl:grid-cols-3">
@@ -164,6 +291,12 @@ const MigrationManager = () => {
                                         {compatibleConnections.map((connection) => <option key={connection.id} value={connection.id}>{connection.name}</option>)}
                                     </select>
                                 </FormField>
+                                {connectionId && (
+                                    <ConnectionStatus
+                                        state={connectionHealth[connectionId] || { status: 'unavailable' }}
+                                        onRefresh={connectionHealth[connectionId]?.refetch}
+                                    />
+                                )}
                                 {selectedImporter && compatibleConnections.length === 0 && (
                                     <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                                         A compatible connection is required before this import can run.{' '}
