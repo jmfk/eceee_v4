@@ -73,6 +73,10 @@ import { usePageWebSocket } from '../hooks/usePageWebSocket'
 
 import { logValidationSync } from '../utils/stateVerification'
 import { buildPathVariablesContext, getDefaultSimulatedPath } from '../utils/pathParser'
+import {
+    readAlwaysShowEditorControls,
+    writeAlwaysShowEditorControls,
+} from '../utils/pageEditorPreferences'
 import { detectPageConflicts, applyConflictResolutions } from '../utils/conflictResolution'
 import { deriveTodoItemsFromError } from '../utils/pageEditorValidationErrors'
 import ConflictResolutionModal from './ConflictResolutionModal'
@@ -191,6 +195,7 @@ const PageEditor = () => {
     // Local widget state for fast UI operations
     const [localWidgets, setLocalWidgets] = useState({})
     const [editorResetKey, setEditorResetKey] = useState(0)
+    const [alwaysShowEditorControls, setAlwaysShowEditorControls] = useState(readAlwaysShowEditorControls)
 
     // Path pattern state for dynamic URL path simulation
     const [simulatedPath, setSimulatedPath] = useState('')
@@ -1856,6 +1861,14 @@ const PageEditor = () => {
     // State for mobile dropdown menu
     const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false)
 
+    const toggleEditorControlsVisibility = () => {
+        setAlwaysShowEditorControls((currentValue) => {
+            const nextValue = !currentValue
+            writeAlwaysShowEditorControls(nextValue)
+            return nextValue
+        })
+    }
+
     // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -2039,6 +2052,26 @@ const PageEditor = () => {
                                 })}
                             </div>
 
+                            {activeTab === 'content' && (
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={alwaysShowEditorControls}
+                                    aria-label="Always show editor controls"
+                                    title={alwaysShowEditorControls
+                                        ? 'Editor controls are always visible'
+                                        : 'Editor controls appear on hover or focus'}
+                                    onClick={toggleEditorControlsVisibility}
+                                    className="flex items-center gap-2 rounded-lg px-2 py-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                                >
+                                    <Eye className="h-4 w-4" />
+                                    <span className="hidden 2xl:inline text-sm font-medium">Controls</span>
+                                    <span className={`relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors ${alwaysShowEditorControls ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                                        <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${alwaysShowEditorControls ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                                    </span>
+                                </button>
+                            )}
+
 
 
                             <div className="lg:hidden relative">
@@ -2155,6 +2188,7 @@ const PageEditor = () => {
                                                     isNewPage={isNewPage}
                                                     layoutJson={layoutData}
                                                     editable={true}
+                                                    alwaysShowEditorControls={alwaysShowEditorControls}
                                                     onOpenWidgetEditor={handleOpenWidgetEditor}
                                                     namespace={namespace}
                                                     // PageEditor-specific props

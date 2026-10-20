@@ -410,9 +410,9 @@ const BannerWidget = ({
         if (mode === 'editor') {
             return (
                 <div
-                    className="banner-widget container relative group"
+                    className={`banner-widget cms-content relative group${showBorder ? ' border-enabled' : ''}`}
                     id={configRef.current.anchor || undefined}
-                    style={{ position: 'relative', height: '140px', ...bannerStyle }}
+                    style={{ position: 'relative', ...bannerStyle }}
                 >
                     {/* Background image edit icon */}
                     <button

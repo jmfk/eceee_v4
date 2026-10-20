@@ -284,7 +284,7 @@ const SelfContainedSlotEditor = ({
     }, [pasteModeActive, onPasteAtPosition, slotName, slotPath]);
 
     return (
-        <div className="slot-editor p-4 relative">
+        <div className="slot-editor editor-overlay-region relative">
             <PageWidgetHeaderWithSlots
                 widgetType={slotLabel}
                 showControls={true}
@@ -298,6 +298,7 @@ const SelfContainedSlotEditor = ({
                 maxWidgets={maxWidgets}
                 widgets={widgets}
                 onPasteToSlot={handlePasteToSlot}
+                className="editor-overlay-toolbar editor-slot-toolbar"
             />
 
             {pasteError && (
@@ -317,7 +318,7 @@ const SelfContainedSlotEditor = ({
                 </div>
             )}
 
-            <div className="widgets-list">
+            <div className="widgets-list" data-widget-slot={slotName}>
                 {widgets.length === 0 ? (
                     <div 
                         className={`empty-slot text-center py-6 text-gray-500 border-2 border-dashed ${pasteModeActive ? 'border-purple-500 bg-purple-50 cursor-pointer hover:bg-purple-100' : 'border-gray-300'}`}
@@ -351,77 +352,74 @@ const SelfContainedSlotEditor = ({
                         // Build full path for this nested widget: append widget ID to slot path
                         const fullWidgetPath = [...slotPath, widget.id];
                         const validWidgets = filterValidWidgets(widgets);
-                        const isLast = index === validWidgets.length - 1;
-
                         return (
-                            <div key={widget.id} className={isLast ? '' : 'mb-8'}>
-                                <PageWidgetFactory
-                                    widget={widget}
-                                    slotName={slotName}
-                                    index={index}
-                                    onEdit={handleEditWidget}
-                                    onDelete={() => handleRemoveWidget(index)}
-                                    onMoveUp={() => handleMoveWidget(index, index - 1)}
-                                    onMoveDown={() => handleMoveWidget(index, index + 1)}
-                                    onConfigChange={(newConfig) => handleConfigChange(widget.id, newConfig)}
-                                    canMoveUp={index > 0}
-                                    canMoveDown={index < validWidgets.length - 1}
-                                    mode={mode}
-                                    showControls={mode === 'editor'}
-                                    widgetId={widget.id}
-                                    contextType={contextType}
-                                    onOpenWidgetEditor={onOpenWidgetEditor}
-                                    // Pass parent context for nested widgets
-                                    parentComponentId={parentComponentId}
-                                    pageId={pageId}
-                                    versionId={versionId}
-                                    webpageData={webpageData}
-                                    pageVersionData={pageVersionData}
-                                    // Widget path for infinite nesting
-                                    widgetPath={fullWidgetPath}
-                                    // Legacy nested widget props (deprecated)
-                                    nestedParentWidgetId={parentWidgetId}
-                                    nestedParentSlotName={parentSlotName}
-                                    // Selection props - build nested path for nested widgets
-                                    selectedWidgets={selectedWidgets}
-                                    cutWidgets={cutWidgets}
-                                    onToggleWidgetSelection={onToggleWidgetSelection ? () => {
-                                        // Build full nested path: "topSlot/containerId/nestedSlot/widgetId"
-                                        if (isNestedSlot && topSlot && containerId) {
-                                            // For nested widgets, nestedPath should be "nestedSlot/widgetId"
-                                            const nestedPath = `${slotName}/${widget.id}`;
-                                            onToggleWidgetSelection(topSlot, containerId, nestedPath);
-                                        } else {
-                                            // Top-level widget
-                                            onToggleWidgetSelection(slotName, widget.id);
-                                        }
-                                    } : undefined}
-                                    isWidgetSelected={isWidgetSelected ? () => {
-                                        // Build full nested path for nested widgets
-                                        if (isNestedSlot && topSlot && containerId) {
-                                            const nestedPath = `${slotName}/${widget.id}`;
-                                            return isWidgetSelected(topSlot, containerId, nestedPath);
-                                        }
+                            <PageWidgetFactory
+                                key={widget.id}
+                                widget={widget}
+                                slotName={slotName}
+                                index={index}
+                                onEdit={handleEditWidget}
+                                onDelete={() => handleRemoveWidget(index)}
+                                onMoveUp={() => handleMoveWidget(index, index - 1)}
+                                onMoveDown={() => handleMoveWidget(index, index + 1)}
+                                onConfigChange={(newConfig) => handleConfigChange(widget.id, newConfig)}
+                                canMoveUp={index > 0}
+                                canMoveDown={index < validWidgets.length - 1}
+                                mode={mode}
+                                showControls={mode === 'editor'}
+                                widgetId={widget.id}
+                                contextType={contextType}
+                                onOpenWidgetEditor={onOpenWidgetEditor}
+                                // Pass parent context for nested widgets
+                                parentComponentId={parentComponentId}
+                                pageId={pageId}
+                                versionId={versionId}
+                                webpageData={webpageData}
+                                pageVersionData={pageVersionData}
+                                // Widget path for infinite nesting
+                                widgetPath={fullWidgetPath}
+                                // Legacy nested widget props (deprecated)
+                                nestedParentWidgetId={parentWidgetId}
+                                nestedParentSlotName={parentSlotName}
+                                // Selection props - build nested path for nested widgets
+                                selectedWidgets={selectedWidgets}
+                                cutWidgets={cutWidgets}
+                                onToggleWidgetSelection={onToggleWidgetSelection ? () => {
+                                    // Build full nested path: "topSlot/containerId/nestedSlot/widgetId"
+                                    if (isNestedSlot && topSlot && containerId) {
+                                        // For nested widgets, nestedPath should be "nestedSlot/widgetId"
+                                        const nestedPath = `${slotName}/${widget.id}`;
+                                        onToggleWidgetSelection(topSlot, containerId, nestedPath);
+                                    } else {
                                         // Top-level widget
-                                        return isWidgetSelected(slotName, widget.id);
-                                    } : undefined}
-                                    isWidgetCut={isWidgetCut ? () => {
-                                        // Build full nested path for nested widgets
-                                        if (isNestedSlot && topSlot && containerId) {
-                                            const nestedPath = `${slotName}/${widget.id}`;
-                                            return isWidgetCut(topSlot, containerId, nestedPath);
-                                        }
-                                        // Top-level widget
-                                        return isWidgetCut(slotName, widget.id);
-                                    } : undefined}
-                                    buildWidgetPath={buildWidgetPath}
-                                    parseWidgetPath={parseWidgetPath}
-                                    // Paste mode props
-                                    pasteModeActive={pasteModeActive}
-                                    onPasteAtPosition={onPasteAtPosition}
-                                    showPasteMarkers={showPasteMarkers}
-                                />
-                            </div>
+                                        onToggleWidgetSelection(slotName, widget.id);
+                                    }
+                                } : undefined}
+                                isWidgetSelected={isWidgetSelected ? () => {
+                                    // Build full nested path for nested widgets
+                                    if (isNestedSlot && topSlot && containerId) {
+                                        const nestedPath = `${slotName}/${widget.id}`;
+                                        return isWidgetSelected(topSlot, containerId, nestedPath);
+                                    }
+                                    // Top-level widget
+                                    return isWidgetSelected(slotName, widget.id);
+                                } : undefined}
+                                isWidgetCut={isWidgetCut ? () => {
+                                    // Build full nested path for nested widgets
+                                    if (isNestedSlot && topSlot && containerId) {
+                                        const nestedPath = `${slotName}/${widget.id}`;
+                                        return isWidgetCut(topSlot, containerId, nestedPath);
+                                    }
+                                    // Top-level widget
+                                    return isWidgetCut(slotName, widget.id);
+                                } : undefined}
+                                buildWidgetPath={buildWidgetPath}
+                                parseWidgetPath={parseWidgetPath}
+                                // Paste mode props
+                                pasteModeActive={pasteModeActive}
+                                onPasteAtPosition={onPasteAtPosition}
+                                showPasteMarkers={showPasteMarkers}
+                            />
                         );
                     })
                 )}

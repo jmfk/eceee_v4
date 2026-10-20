@@ -187,9 +187,9 @@ const PageWidgetHeaderWithSlots = ({
     const canAdd = canAddWidget && (!maxWidgets || widgetCount < maxWidgets)
 
     return (
-        <div className={`eceee-editor-ui widget-header page-editor-header px-3 py-2 flex items-center justify-between ${isInherited ? 'bg-amber-50 border-2 border-amber-300' : 'bg-gray-100 border border-gray-200'} ${isSelected ? 'ring-2 ring-blue-500' : ''} ${isCut ? 'opacity-60' : ''} ${className}`}>
+        <div className={`eceee-editor-ui widget-header page-editor-header editor-responsive-toolbar px-3 py-2 flex items-center justify-between ${isInherited ? 'bg-amber-50 border-2 border-amber-300' : 'bg-gray-100 border border-gray-200'} ${isSelected ? 'ring-2 ring-blue-500' : ''} ${isCut ? 'opacity-60' : ''} ${className}`}>
             {/* Left side - Widget info and slot label */}
-            <div className="flex items-center space-x-2">
+            <div className="editor-toolbar-primary flex items-center space-x-2">
                 {/* Selection checkbox */}
                 {onToggleSelection && !isInherited && (
                     <input
@@ -206,8 +206,8 @@ const PageWidgetHeaderWithSlots = ({
                     <Lock className="h-3.5 w-3.5 text-amber-600" />
                 )}
 
-                <div className="flex items-center space-x-2">
-                    <span className={`text-xs font-medium ${isInherited ? 'text-amber-800' : 'text-gray-700'} ${isCut ? 'line-through' : ''}`}>
+                <div className="editor-toolbar-identity flex items-center space-x-2">
+                    <span className={`editor-toolbar-label text-xs font-medium ${isInherited ? 'text-amber-800' : 'text-gray-700'} ${isCut ? 'line-through' : ''}`}>
                         {widgetType}
                     </span>
 
@@ -251,19 +251,19 @@ const PageWidgetHeaderWithSlots = ({
 
             {/* Right side - Action buttons */}
             {isInherited ? (
-                <div className="flex items-center space-x-2">
+                <div className="editor-toolbar-actions flex items-center space-x-2">
                     <button
                         onClick={() => {
                             alert(`Replace inherited ${widgetType} from ${inheritedFrom?.title || 'parent page'}\n\nReplace functionality coming soon.`)
                         }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded"
+                        className="editor-toolbar-hover-action opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded"
                         title="Replace this inherited widget with a local one"
                     >
                         Replace
                     </button>
                 </div>
             ) : (
-                <div className="flex items-center space-x-1">
+                <div className="editor-toolbar-actions flex items-center space-x-1">
                     {/* Slot controls */}
                     {(showAddButton || showClearButton || widgets || onPasteToSlot) && (
                         <div className="flex items-center border-r border-gray-300 pr-2 mr-2 space-x-1">

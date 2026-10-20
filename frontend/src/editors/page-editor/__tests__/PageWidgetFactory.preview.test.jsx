@@ -39,4 +39,29 @@ describe('PageWidgetFactory preview markup', () => {
         expect(widgetItem.firstElementChild).toHaveClass('banner-widget')
         expect(widgetItem.querySelector('.widget-content-wrapper')).toBeNull()
     })
+
+    it('keeps editable widget content in the preview-compatible direct-child position', () => {
+        const { container } = render(
+            <PageWidgetFactory
+                widget={{
+                    id: 'banner-1',
+                    type: 'easy_widgets.BannerWidget',
+                    config: { textContent: 'Editable banner' },
+                }}
+                slotName="main"
+                index={0}
+                mode="editor"
+                showControls={true}
+            />
+        )
+
+        const widgetItem = container.querySelector('.widget-item')
+        expect(widgetItem.querySelector(':scope > .widget-content-wrapper > .banner-widget')).toBeInTheDocument()
+        expect(widgetItem.querySelector(':scope > .widget-content-wrapper')).toHaveClass('widget-content-wrapper')
+        expect(widgetItem.querySelector(':scope > .widget-content')).toBeNull()
+        expect(widgetItem.querySelector(':scope > .widget-header')).toHaveClass(
+            'editor-overlay-toolbar',
+            'editor-widget-toolbar',
+        )
+    })
 })

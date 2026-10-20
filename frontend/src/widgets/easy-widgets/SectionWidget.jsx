@@ -351,10 +351,23 @@ const SectionWidget = ({
     // In editor mode, show SlotEditor with custom header
     if (mode === 'editor') {
         const widgets = slotsData.content || [];
+        const isCollapsed = config.enableCollapse && !isExpanded;
+        const sectionClassName = config.enableCollapse
+            ? `section-widget${config.showBorder || config.show_border ? ' border-enabled' : ''}${isCollapsed ? ' section-collapsed' : ''}`
+            : `section-content-only-widget${config.showBorder || config.show_border ? ' border-enabled' : ''}`;
 
         return (
-            <div className={`section-widget border border-gray-200 mb-4 ${config.enableCollapse && !isExpanded ? 'collapsed' : ''}`}>
-                <div className="p-4">
+            <div
+                id={config.anchor || undefined}
+                className={sectionClassName}
+                data-accordion-mode={config.accordionMode || undefined}
+            >
+                <div
+                    className={config.enableCollapse ? 'slot-section-content' : undefined}
+                    data-slot="content"
+                    data-widget-slot="content"
+                    data-owner-widget-type="easy_widgets.SectionWidget"
+                >
                     <SlotEditor
                         slotName="content"
                         slotLabel={slotLabel}
@@ -384,7 +397,7 @@ const SectionWidget = ({
                         onPasteAtPosition={onPasteAtPosition}
                         widgetPath={widgetPath}
                         emptyMessage="No content in section"
-                        className={`[&_.slot-editor]:!p-0 ${config.enableCollapse && !isExpanded ? '[&_.widgets-list]:hidden' : ''}`}
+                        className={config.enableCollapse && !isExpanded ? '[&_.widgets-list]:hidden' : ''}
                         mode="editor"
                         showClearButton={false}
                         compactAddButton={true}

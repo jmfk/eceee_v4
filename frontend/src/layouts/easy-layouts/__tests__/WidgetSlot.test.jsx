@@ -12,6 +12,24 @@ vi.mock('../../../editors/page-editor/PageWidgetFactory', () => ({
 }))
 
 describe('WidgetSlot preview defaults', () => {
+    it('keeps edit controls out of the slot layout flow', () => {
+        const { container } = render(
+            <WidgetSlot
+                name="main"
+                label="Main Content"
+                widgets={{
+                    main: [{ id: 'widget-1', type: 'easy_widgets.ContentWidget', config: {} }],
+                }}
+                slotMode="edit"
+                editable={true}
+            />
+        )
+
+        const slot = container.querySelector('.widget-slot')
+        expect(slot.querySelector(':scope > .editor-slot-toolbar')).toHaveClass('editor-overlay-toolbar')
+        expect(screen.getByTestId('rendered-widget').parentElement).toBe(slot)
+    })
+
     it.each(['header', 'navbar', 'hero', 'footer'])(
         'enters preview mode when %s content arrives after the first render',
         (slotName) => {

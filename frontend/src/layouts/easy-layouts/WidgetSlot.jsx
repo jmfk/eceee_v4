@@ -416,7 +416,7 @@ const WidgetSlot = ({
 
         return (
             <div
-                className={`widget-slot slot-${normalizeForCSS(name)} group relative`}
+                className={`widget-slot slot-${normalizeForCSS(name)} editor-overlay-region group relative`}
                 data-slot-name={name}
                 data-testid={`page-editor-slot-${name}`}
                 data-widget-slot={name}
@@ -429,15 +429,15 @@ const WidgetSlot = ({
                 {editable && !isSlotPreviewMode && (
                     <div
                         key={name}
-                        className="eceee-editor-ui relative border px-4 py-2 transition-colors border-gray-200 "
+                        className="eceee-editor-ui editor-overlay-toolbar editor-slot-toolbar editor-responsive-toolbar border px-4 py-2 border-gray-200 bg-white"
                         data-slot-name={name}
                         data-slot-title={label}
                     >
-                        <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                                <div className="flex items-center">
+                        <div className="flex items-center justify-between min-w-0">
+                            <div className="editor-toolbar-primary flex-1">
+                                <div className="editor-toolbar-identity flex items-center min-w-0">
                                     <Layout className="h-4 w-4 mr-2 text-gray-400" />
-                                    <div className="text-sm font-medium text-gray-900">
+                                    <div className="editor-toolbar-label text-sm font-medium text-gray-900">
                                         {label}
                                     </div>
                                     {/* Slot type indicator */}
@@ -448,11 +448,11 @@ const WidgetSlot = ({
                                     )}
                                 </div>
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="editor-toolbar-actions flex items-center space-x-2">
                                 {/* Slot Preview Toggle - Always visible on hover */}
                                 <button
                                     onClick={handleSlotPreviewToggle}
-                                    className="p-1 rounded transition-all duration-200 text-gray-600 hover:text-gray-900 hover:bg-gray-200 opacity-0 group-hover:opacity-100"
+                                    className="editor-toolbar-hover-action p-1 rounded transition-all duration-200 text-gray-600 hover:text-gray-900 hover:bg-gray-200 opacity-0 group-hover:opacity-100"
                                     title={isPreviewMode ? "Exit preview mode" : "Preview entire slot"}
                                 >
                                     {isPreviewMode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -512,32 +512,32 @@ const WidgetSlot = ({
                             <>
                                 {/* Override widgets replace everything */}
                                 {overrideLocalWidgets.length > 0 ? (
-                                    <div className="override-widgets-section">
+                                    <>
                                         {overrideLocalWidgets.filter(w => w != null && w.id != null).map((widget, index) => renderWidget(widget, index))}
-                                    </div>
+                                    </>
                                 ) : (
                                     <>
                                         {/* Before Local Widgets - appear BEFORE inherited */}
                                         {beforeLocalWidgets.length > 0 && (
-                                            <div className="before-local-widgets-section">
+                                            <>
                                                 {beforeLocalWidgets.filter(w => w != null && w.id != null).map((widget, index) => renderWidget(widget, index))}
-                                            </div>
+                                            </>
                                         )}
 
                                         {/* Inherited Widgets Section */}
                                         {Array.isArray(displayInheritedWidgets) && displayInheritedWidgets.length > 0 && (
-                                            <div className="inherited-widgets-section">
+                                            <>
                                                 {displayInheritedWidgets.filter(w => w != null && w.id != null).map((widget, index) =>
                                                     renderWidget({ ...widget, isInherited: true }, index)
                                                 )}
-                                            </div>
+                                            </>
                                         )}
 
                                         {/* After Local Widgets - appear AFTER inherited (default) */}
                                         {afterLocalWidgets.length > 0 && (
-                                            <div className="after-local-widgets-section">
+                                            <>
                                                 {afterLocalWidgets.filter(w => w != null && w.id != null).map((widget, index) => renderWidget(widget, index))}
-                                            </div>
+                                            </>
                                         )}
 
                                         {/* Add Widget Section - Show when in merge mode with inherited widgets but no local widgets */}
