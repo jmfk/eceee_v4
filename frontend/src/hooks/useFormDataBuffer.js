@@ -139,6 +139,11 @@ export const useFormDataBuffer = (initialData = {}, onSave, options = {}) => {
         return { ...dataRef.current };
     }, []);
 
+    // External hydration updates the draft without treating it as a user edit or a successful save.
+    const hydrate = useCallback((data) => {
+        dataRef.current = { ...data };
+    }, []);
+
     /**
      * Check if form has unsaved changes
      * @returns {boolean} True if form is dirty
@@ -191,6 +196,7 @@ export const useFormDataBuffer = (initialData = {}, onSave, options = {}) => {
         save,
         reset,
         resetTo,
+        hydrate,
 
         // Data access
         getCurrentData,

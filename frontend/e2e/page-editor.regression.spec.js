@@ -401,3 +401,98 @@ test.describe('page editor collaboration', () => {
     }
   })
 })
+
+const mockPanelSchemas = async page => {
+  const requests = []
+  await page.route('**/api/v1/webpages/widget-types/*/validate/', route =>
+    route.fulfill({ json: { errors: {}, warnings: {} } }))
+  await page.route('**/api/v1/webpages/widget-types/*/config-ui-schema/', route => {
+    const type = decodeURIComponent(new URL(route.request().url()).pathname.split('/').at(-3))
+    requests.push(type)
+    return route.fulfill({ json: { schema: { properties: {
+      content: { type: 'string', component: type.includes('Headline') ? 'RichTextInput' : 'HtmlSource',
+        inlineOnly: type.includes('Headline'), title: 'Panel content', group: 'Content' },
+      title: { type: 'string', component: 'TextInput', title: 'Panel title', group: 'Content' },
+    } } } })
+  })
+  return requests
+}
+
+test.describe('stable widget side panel', () => {
+  test('preserves input selection and schema while typing and saves the final keystroke', async ({ page }) => {
+    installErrorGuards(page)
+    const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    state.version.widgets.main[0].config.title = 'Initial panel title'
+    const schemaRequests = await mockPanelSchemas(page)
+    await openEditor(page, state)
+    await page.getByTestId('page-widget-edit-easy-widgets-contentwidget').first().click()
+    const title = page.getByRole('textbox', { name: 'Panel title', exact: true })
+    await expect(title).toHaveValue('Initial panel title')
+    const requestCount = schemaRequests.length
+    await title.fill('Final panel title')
+    await title.evaluate(element => { element.dataset.kept = 'true'; element.setSelectionRange(2, 7) })
+    await expect.poll(() => title.evaluate(element => [element.dataset.kept, element.selectionStart, element.selectionEnd,
+      document.activeElement === element])).toEqual(['true', 2, 7, true])
+    expect(schemaRequests).toHaveLength(requestCount)
+    await saveCurrentVersion(page)
+    expect(getSavedVersion(state).widgets.main[0].config.title).toBe('Final panel title')
+    await expect(page.getByText('Unsaved changes', { exact: true })).toHaveCount(0)
+    await page.reload()
+    await expect(contentEditor(page)).toContainText('Initial editor copy')
+    await page.getByTestId('page-widget-edit-easy-widgets-contentwidget').first().click()
+    await expect(page.getByRole('textbox', { name: 'Panel title', exact: true })).toHaveValue('Final panel title')
+  })
+
+  test('richtext formatting and native undo survive value echoes and save/reload', async ({ page }) => {
+    installErrorGuards(page)
+    const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    await mockPanelSchemas(page)
+    await openEditor(page, state)
+    await page.getByTestId('page-widget-edit-easy-widgets-headlinewidget').click()
+    const rich = page.getByRole('textbox', { name: 'Panel content', exact: true })
+    await expect(rich).toContainText('Initial headline')
+    await rich.evaluate(element => {
+      element.dataset.kept = 'true'
+      element.focus()
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      const selection = window.getSelection()
+      selection.removeAllRanges()
+      selection.addRange(range)
+    })
+    await page.getByRole('toolbar', { name: 'Panel content formatting' }).getByTitle('Bold', { exact: true }).click()
+    await expect(rich.locator('b, strong')).toHaveText('Initial headline')
+    await rich.press('ArrowRight')
+    await page.keyboard.insertText('X')
+    await expect(rich).toContainText('Initial headlineX')
+    await rich.press('ControlOrMeta+z')
+    await expect(rich).toHaveText('Initial headline')
+    await expect(rich).toHaveAttribute('data-kept', 'true')
+    await saveCurrentVersion(page)
+    expect(getSavedVersion(state).widgets.main.find(widget => widget.id === 'headline-main').config.content).toMatch(/<(b|strong)>/)
+    await page.screenshot({ path: 'test-results/side-column-richtext.png', fullPage: true })
+    await page.reload()
+    await page.getByTestId('page-widget-edit-easy-widgets-headlinewidget').click()
+    await expect(page.getByRole('textbox', { name: 'Panel content', exact: true }).locator('b, strong')).toHaveText('Initial headline')
+  })
+
+  test('switches between widgets of the same type without losing either draft', async ({ page }) => {
+    installErrorGuards(page)
+    const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    await mockPanelSchemas(page)
+    await openEditor(page, state)
+    await page.getByTestId('page-widget-edit-easy-widgets-contentwidget').first().click()
+    await page.getByRole('textbox', { name: 'Panel content', exact: true }).fill('First widget draft')
+    await page.getByTestId('page-widget-edit-easy-widgets-contentwidget').nth(1).click()
+    const second = page.getByRole('textbox', { name: 'Panel content', exact: true })
+    await expect(second).not.toContainText('First widget draft')
+    await second.fill('Second widget draft')
+    await saveCurrentVersion(page)
+    const widgets = getSavedVersion(state).widgets.main
+    expect(widgets[0].config.content).toMatch(/^(<p>)?First widget draft(<\/p>)?$/)
+    expect(widgets[1].config.content).toMatch(/^(<p>)?Second widget draft(<\/p>)?$/)
+    await page.reload()
+    await expect(contentEditor(page, 'content-intro')).toHaveText('First widget draft')
+    await expect(contentEditor(page, 'content-sidebar')).toHaveText('Second widget draft')
+  })
+})

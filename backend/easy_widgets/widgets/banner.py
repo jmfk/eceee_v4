@@ -35,6 +35,7 @@ class BannerConfig(BaseModel):
         description="Header text content (plain text, shown when in header mode)",
         json_schema_extra={
             "component": "RichTextInput",
+            "inlineOnly": True,
             "rows": 3,
             "order": 2,
             "group": "Content",

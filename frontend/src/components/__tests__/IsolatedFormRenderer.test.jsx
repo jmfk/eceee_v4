@@ -1,5 +1,5 @@
 import React from 'react'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import IsolatedFormRenderer from '../IsolatedFormRenderer'
 
@@ -73,7 +73,7 @@ describe('IsolatedFormRenderer active prop ownership', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Change content' }))
 
         expect(onWidgetChange).toHaveBeenCalledOnce()
-        expect(onWidgetChange).toHaveBeenCalledWith(expect.objectContaining({
+        expect(onWidgetChange.mock.calls[0][0]).toEqual(expect.objectContaining({
             id: 'content-1',
             slotName: 'main',
             config: { content: '<p>content update</p>', isActive: true }
@@ -137,7 +137,7 @@ describe('IsolatedFormRenderer active prop ownership', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Change content' }))
 
         expect(onWidgetChange).toHaveBeenCalledOnce()
-        expect(onWidgetChange).toHaveBeenCalledWith(expect.objectContaining({
+        expect(onWidgetChange.mock.calls[0][0]).toEqual(expect.objectContaining({
             id: 'nested-1',
             slotName: 'children',
             context: expect.objectContaining({
@@ -164,7 +164,7 @@ describe('IsolatedFormRenderer active prop ownership', () => {
         )
 
         const formSubscription = externalChangeCallbacks.find(item => item.componentId === 'isolated-form-content-1')
-        formSubscription.callback({
+        act(() => formSubscription.callback({
             versions: {
                 201: {
                     widgets: {
@@ -178,7 +178,7 @@ describe('IsolatedFormRenderer active prop ownership', () => {
                 }
             },
             metadata: { currentVersionId: '201' }
-        }, { sourceId: 'playwright-external-config' })
+        }, { sourceId: 'playwright-external-config' }))
 
         expect(onWidgetChange).not.toHaveBeenCalled()
         expect(publishUpdateMock).not.toHaveBeenCalled()

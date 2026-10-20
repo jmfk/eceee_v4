@@ -35,11 +35,13 @@ const WidgetEditorPanel = forwardRef(({
     onSave = null,
     onRealTimeUpdate = null,
     showPublishingFields = true,
+    isDocumentDirty,
 }, ref) => {
     const [hasChanges, setHasChanges] = useState(false)
     const [widgetTypeName, setWidgetTypeName] = useState(null)
     const [widgetTypeSlug, setWidgetTypeSlug] = useState(null)
     const [fetchedSchema, setFetchedSchema] = useState(null)
+    const [loadedSchemaType, setLoadedSchemaType] = useState(null)
     const [isLoadingSchema, setIsLoadingSchema] = useState(false)
     const [schemaError, setSchemaError] = useState(null)
     const [panelWidth, setPanelWidth] = useState(400) // Default width in pixels
@@ -111,85 +113,44 @@ const WidgetEditorPanel = forwardRef(({
         }
     }, [showSpecialEditor, onSpecialEditorStateChange])
 
-    // Validate widget type availability when widget data changes
+    const selectedType = widgetData?.type
     useEffect(() => {
-        if (widgetData) {
-            setIsValidatingType(true)
-            validateWidgetType(widgetData)
-                .then(validation => {
-                    setWidgetTypeValidation(validation)
-                    setIsValidatingType(false)
-                })
-                .catch(error => {
-                    console.error('Error validating widget type:', error)
-                    setWidgetTypeValidation({
-                        isValid: false,
-                        error: `Failed to validate widget type: ${error.message}`,
-                        canEdit: false,
-                        shouldHide: false
-                    })
-                    setIsValidatingType(false)
-                })
-        } else {
+        if (isDocumentDirty === false) setHasChanges(false)
+    }, [isDocumentDirty])
+    useEffect(() => {
+        if (!selectedType) {
             setWidgetTypeValidation(null)
             setIsValidatingType(false)
+            return
         }
-    }, [widgetData])
-
-    // Set widget type name and slug for display purposes
-    useEffect(() => {
-        if (widgetData) {
-            const resolvedWidgetTypeName = widgetData.name ||
-                widgetData.widgetType?.name ||
-                widgetData.type
-
-            setWidgetTypeName(resolvedWidgetTypeName)
-            setWidgetTypeSlug(widgetData.type)
-        }
-    }, [widgetData])
-
-    // Fetch schema from backend when widget type changes (only if widget type is valid)
-    useEffect(() => {
-        if (widgetData && !schema && widgetTypeValidation?.canEdit !== false) {
-            setIsLoadingSchema(true)
-            setSchemaError(null)
-
-            const fetchSchemaForWidget = async () => {
-                try {
-                    let resolvedWidgetTypeName = widgetData.name ||
-                        widgetData.widgetType?.name
-
-                    if (!resolvedWidgetTypeName && widgetData.type) {
-                        // Use the widget type directly
-                        resolvedWidgetTypeName = widgetData.type
-                    }
-
-                    if (resolvedWidgetTypeName) {
-                        setWidgetTypeName(resolvedWidgetTypeName)
-                        const widgetTypeToUse = widgetData.type
-
-                        setWidgetTypeSlug(widgetTypeToUse)
-
-                        const schemaData = await getWidgetSchema(widgetTypeToUse)
-                        setFetchedSchema(schemaData)
-                        setIsLoadingSchema(false)
-                    } else {
-                        throw new Error('Widget type name could not be determined')
-                    }
-                } catch (error) {
-                    console.error('Failed to fetch widget schema:', error)
-                    setSchemaError(error.message || 'Failed to load widget schema')
-                    setIsLoadingSchema(false)
-                }
+        let active = true
+        setIsValidatingType(true)
+        validateWidgetType({ type: selectedType }).then(validation => {
+            if (active) { setWidgetTypeValidation(validation); setIsValidatingType(false) }
+        }).catch(error => {
+            if (active) {
+                setWidgetTypeValidation({ isValid: false, error: error.message, canEdit: false })
+                setIsValidatingType(false)
             }
+        })
+        return () => { active = false }
+    }, [selectedType])
 
-            fetchSchemaForWidget()
-        } else if (schema) {
-            // Use provided schema if available
-            setFetchedSchema(schema)
-        }
-    }, [widgetData, schema, widgetTypeValidation])
-
+    useEffect(() => {
+        if (schema) { setFetchedSchema(schema); setIsLoadingSchema(false); return }
+        if (!selectedType) return
+        let active = true
+        setIsLoadingSchema(true)
+        setSchemaError(null)
+        setWidgetTypeName(selectedType)
+        setWidgetTypeSlug(selectedType)
+        getWidgetSchema(selectedType).then(value => {
+            if (active) { setFetchedSchema(value); setLoadedSchemaType(selectedType); setIsLoadingSchema(false) }
+        }).catch(error => {
+            if (active) { setSchemaError(error.message); setIsLoadingSchema(false) }
+        })
+        return () => { active = false }
+    }, [selectedType, schema])
 
     // Setup vanilla JS resize handlers (no React state, pure DOM manipulation)
     useEffect(() => {
@@ -336,9 +297,10 @@ const WidgetEditorPanel = forwardRef(({
         isSpecialEditorOpen: () => showSpecialEditor
     }), [hasChanges, widgetData, showSpecialEditor, onSave])
 
-    const handleFormWidgetChange = useCallback((updatedWidget) => {
+    const handleFormWidgetChange = useCallback((updatedWidget, change) => {
         setHasChanges(true)
-        onRealTimeUpdate?.(updatedWidget)
+        if (change) onRealTimeUpdate?.(updatedWidget, change)
+        else onRealTimeUpdate?.(updatedWidget)
     }, [onRealTimeUpdate])
 
     // Handle close - revert changes if not saved
@@ -405,6 +367,7 @@ const WidgetEditorPanel = forwardRef(({
             contextType,
             pageId: context?.pageId || webpageData?.id,
             versionId: context?.versionId || pageVersionData?.versionId,
+            instanceId: context?.instanceId || widgetData?.context?.instanceId,
             webpageData: context?.webpageData || webpageData,
             pageVersionData: context?.pageVersionData || pageVersionData,
             theme: pageVersionData?.effectiveTheme,
@@ -420,6 +383,7 @@ const WidgetEditorPanel = forwardRef(({
         contextType,
         context?.pageId,
         context?.versionId,
+        context?.instanceId,
         context?.webpageData,
         context?.pageVersionData,
         webpageData?.id,
@@ -547,7 +511,7 @@ const WidgetEditorPanel = forwardRef(({
                                     <div>Widget editing is disabled because the widget type is not available.</div>
                                 </div>
                             </div>
-                        ) : isLoadingSchema ? (
+                        ) : isLoadingSchema || (!schemaError && !schema && selectedType && loadedSchemaType !== selectedType) ? (
                             <div className="flex items-center justify-center py-8">
                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
                                 <span className="text-gray-600">Loading widget configuration...</span>
@@ -564,7 +528,7 @@ const WidgetEditorPanel = forwardRef(({
                                 <IsolatedFormRenderer
                                     ref={formRendererRef}
                                     initWidgetData={widgetData}
-                                    initschema={fetchedSchema || schema}
+                                    initschema={schema || fetchedSchema}
                                     namespace={namespace}
                                     contextType={contextType}
                                     widgetId={widgetData?.id}

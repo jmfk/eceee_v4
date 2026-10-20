@@ -9,7 +9,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
  * 
  * Key Features:
  * - Local state management for each field
- * - Debounced updates to parent form
+ * - Synchronous updates to the save buffer; debounced validation
  * - Validation state isolation
  * - Memoized to prevent unnecessary re-renders
  * - Ref-based parent communication to avoid prop drilling
@@ -21,7 +21,6 @@ const LocalStateFieldWrapper = React.memo(({
     fieldProps = {},
     onFieldChange,
     onFieldValidation,
-    debounceMs = 300,
     validateOnChange = true,
     validateOnBlur = true,
     context = null,
@@ -34,56 +33,21 @@ const LocalStateFieldWrapper = React.memo(({
     const [isDirty, setIsDirty] = useState(false)
     const [isTouched, setIsTouched] = useState(false)
 
-    // Refs to prevent re-renders and manage timeouts
-    const debounceTimeoutRef = useRef(null)
     const validationTimeoutRef = useRef(null)
-    const initializedRef = useRef(false)
-    const lastSentValueRef = useRef(initialValue)
-    const fieldRef = useRef(null) // Add this line - ref for direct DOM updates
-
-    // Add a ref to track current value without state updates
+    const validationGenerationRef = useRef(0)
     const currentValueRef = useRef(initialValue)
 
-    // Initialize local value when initialValue changes (e.g., form reset)
     useEffect(() => {
-        // Only update if value actually changed
         if (initialValue !== currentValueRef.current) {
-            // Check if this is a textarea/input field by checking the fieldName or component type
-            // For content fields (which are typically textarea), update DOM directly
-            const isTextareaField = fieldName === 'content' ||
-                fieldProps.component === 'Textarea' ||
-                (fieldRef.current && (fieldRef.current.tagName === 'TEXTAREA' || fieldRef.current.tagName === 'INPUT'))
-
-            if (isTextareaField && fieldRef.current) {
-                // Direct DOM update - no rerender needed
-                fieldRef.current.value = initialValue
-                // Sync refs silently - DON'T call setLocalValue
-                currentValueRef.current = initialValue
-                lastSentValueRef.current = initialValue
-                return // Exit early - no state update, no rerender
-            }
-
-            // For other field types, update state normally (will cause rerender)
+            validationGenerationRef.current += 1
+            clearTimeout(validationTimeoutRef.current)
+            setValidation(null)
+            setIsValidating(false)
+            currentValueRef.current = initialValue
             setLocalValue(initialValue)
             setIsDirty(false)
-            currentValueRef.current = initialValue
-            lastSentValueRef.current = initialValue
-            initializedRef.current = true
         }
-    }, [initialValue, fieldName, fieldProps.component]) // Remove localValue from dependencies
-
-    // Debounced function to notify parent of changes
-    const notifyParentChange = useCallback((value) => {
-        if (debounceTimeoutRef.current) {
-            clearTimeout(debounceTimeoutRef.current)
-        }
-        debounceTimeoutRef.current = setTimeout(() => {
-            if (onFieldChange && value !== lastSentValueRef.current) {
-                onFieldChange(fieldName, value)
-                lastSentValueRef.current = value
-            }
-        }, debounceMs)
-    }, [fieldName, onFieldChange, debounceMs])
+    }, [initialValue])
 
     // Debounced validation function
     const validateField = useCallback(async (value) => {
@@ -93,6 +57,7 @@ const LocalStateFieldWrapper = React.memo(({
             clearTimeout(validationTimeoutRef.current)
         }
 
+        const generation = ++validationGenerationRef.current
         setIsValidating(true)
 
         validationTimeoutRef.current = setTimeout(async () => {
@@ -100,7 +65,7 @@ const LocalStateFieldWrapper = React.memo(({
                 // If parent provides validation function, use it
                 if (onFieldValidation) {
                     const result = await onFieldValidation(fieldName, value)
-                    setValidation(result)
+                    if (generation === validationGenerationRef.current) setValidation(result)
                 } else {
                     // Basic client-side validation
                     const isRequired = fieldProps.required || wrapperProps.required
@@ -121,6 +86,7 @@ const LocalStateFieldWrapper = React.memo(({
                     }
                 }
             } catch (error) {
+                if (generation !== validationGenerationRef.current) return
                 console.error(`Validation error for field ${fieldName}:`, error)
                 setValidation({
                     isValid: false,
@@ -128,7 +94,7 @@ const LocalStateFieldWrapper = React.memo(({
                     warnings: []
                 })
             } finally {
-                setIsValidating(false)
+                if (generation === validationGenerationRef.current) setIsValidating(false)
             }
         }, 150) // Shorter timeout for validation
     }, [fieldName, onFieldValidation, validateOnChange, validateOnBlur, fieldProps, wrapperProps])
@@ -138,20 +104,15 @@ const LocalStateFieldWrapper = React.memo(({
         setLocalValue(newValue)
         setIsDirty(true)
         
-        // Sync ref for textarea fields
-        const isTextareaField = fieldName === 'content' || fieldProps.component === 'Textarea'
-        if (isTextareaField) {
-            currentValueRef.current = newValue
-        }
-        
-        // Immediately notify parent for real-time updates
-        notifyParentChange(newValue)
+        currentValueRef.current = newValue
+        // Save and dirty tracking must see the keystroke before this handler returns.
+        onFieldChange?.(fieldName, newValue)
 
         // Validate if enabled
         if (validateOnChange) {
             validateField(newValue)
         }
-    }, [notifyParentChange, validateOnChange, validateField, fieldName, fieldProps.component])
+    }, [onFieldChange, validateOnChange, validateField, fieldName])
 
     // Handle field blur events
     const handleBlur = useCallback((e) => {
@@ -228,9 +189,7 @@ const LocalStateFieldWrapper = React.memo(({
     // Cleanup timeouts on unmount
     useEffect(() => {
         return () => {
-            if (debounceTimeoutRef.current) {
-                clearTimeout(debounceTimeoutRef.current)
-            }
+            validationGenerationRef.current += 1
             if (validationTimeoutRef.current) {
                 clearTimeout(validationTimeoutRef.current)
             }

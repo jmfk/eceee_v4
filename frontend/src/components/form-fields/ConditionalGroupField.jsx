@@ -181,7 +181,7 @@ const ConditionalGroupField = ({
         onChange?.(newValue)
 
         // Publish to UDC - Get current config and merge
-        if (publishUpdate && widgetId && slotName && contextType && fieldName && getState) {
+        if (!context?.managedByForm && publishUpdate && widgetId && slotName && contextType && fieldName && getState) {
             const state = getState()
             const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
             const currentConfig = widget?.config || {}
@@ -226,7 +226,7 @@ const ConditionalGroupField = ({
         onChange?.(newValue)
 
         // Publish to UDC - Get current config and merge
-        if (publishUpdate && widgetId && slotName && contextType && fieldName && getState) {
+        if (!context?.managedByForm && publishUpdate && widgetId && slotName && contextType && fieldName && getState) {
             const state = getState()
             const widget = lookupWidget(state, widgetId, slotName, contextType, widgetPath)
             const currentConfig = widget?.config || {}
@@ -336,7 +336,7 @@ const ConditionalGroupField = ({
                         required: isRequired,
                         disabled: disabled,
                         placeholder: propSchema.placeholder,
-                        defaultValue: fieldValue,
+                        value: fieldValue ?? '',
                         onChange: (value) => handleFieldChange(propName, value),
                         validation: validation?.[propName],
                         context: context,  // Pass context through to child fields
@@ -471,6 +471,7 @@ function mapSchemaTypeToComponent(propSchema) {
     // Handle based on type and format
     switch (type) {
         case 'string':
+            if (['richtext', 'rich-text', 'rich_text'].includes(format)) return 'RichTextInput'
             if (format === 'textarea') return 'TextareaInput'
             if (format === 'email') return 'EmailInput'
             if (format === 'url' || format === 'uri') return 'URLInput'
