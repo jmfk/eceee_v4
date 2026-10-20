@@ -420,6 +420,58 @@ const mockPanelSchemas = async (page, extraFields = {}) => {
 }
 
 test.describe('stable widget side panel', () => {
+  test('rapid conditional-group edits keep the same richtext field and final saved value', async ({ page }) => {
+    installErrorGuards(page)
+    const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    state.version.widgets.main[0].config.settings = { activeGroup: 'text', formData: { text: { body: 'Old' } } }
+    await page.route('**/pydantic-models/TestConfig/schema/', route => route.fulfill({ json: { schema: { properties: {
+      body: { type: 'string', component: 'RichTextInput', title: 'Group body' }
+    } } } }))
+    await mockPanelSchemas(page, { settings: { type: 'object', component: 'ConditionalGroupField', title: 'Settings', group: 'Content',
+      groups: { text: { label: 'Text', configModel: 'TestConfig' } } } })
+    await openEditor(page, state)
+    await page.getByTestId('page-widget-edit-easy-widgets-contentwidget').first().click()
+    const editor = page.getByRole('textbox', { name: 'Group body', exact: true })
+    await expect(editor).toHaveText('Old')
+    await editor.evaluate(element => {
+      element.focus()
+      element.dataset.kept = 'true'
+      for (const body of ['First local', 'Latest local']) {
+        element.innerHTML = body
+        element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }))
+      }
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      window.getSelection().removeAllRanges()
+      window.getSelection().addRange(range)
+    })
+    await expect(editor).toHaveAttribute('data-kept', 'true')
+    await expect(editor).toHaveText('Latest local')
+    expect(await editor.evaluate(element => document.activeElement === element && window.getSelection().toString())).toBe('Latest local')
+    await saveCurrentVersion(page)
+    expect(getSavedVersion(state).widgets.main[0].config.settings.formData.text.body).toBe('Latest local')
+  })
+
+  test('closes an open field link dialog on client-side navigation', async ({ page }) => {
+    installErrorGuards(page)
+    const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
+    await mockPanelSchemas(page)
+    await openEditor(page, state)
+    await page.getByRole('button', { name: 'Back to Pages', exact: true }).click()
+    await expect(page).toHaveURL(/\/pages$/)
+    await page.goBack()
+    await expect(page.getByTestId('page-editor-surface')).toBeVisible()
+    await page.getByTestId('page-widget-edit-easy-widgets-contentwidget').first().click()
+    const editor = page.getByRole('textbox', { name: 'Panel content', exact: true })
+    await editor.focus()
+    await page.getByRole('toolbar', { name: 'Panel content formatting' }).getByTitle('Insert/Edit Link', { exact: true }).click()
+    await expect(page.locator('#link-picker-modal-container')).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
+    await page.goForward()
+    await expect(page).toHaveURL(/\/pages$/)
+    await expect(page.locator('#link-picker-modal-container')).toHaveCount(0)
+  })
+
   test('body paste and paragraph formatting preserve unrelated markup, undo and save/reload', async ({ page }) => {
     installErrorGuards(page)
     const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })

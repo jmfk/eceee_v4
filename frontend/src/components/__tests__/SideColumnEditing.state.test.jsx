@@ -118,6 +118,90 @@ it('writes nested richtext immediately through the parent list buffer', async ()
   expect(screen.getByRole('textbox', { name: 'Item body' })).toBe(rich)
 })
 
+it('lets the parent own conditional-group hydration without applying stale child echoes', async () => {
+  const { api } = await import('../../api/client')
+  const schemaRequest = vi.spyOn(api, 'get').mockResolvedValue({ data: { schema: { properties: {
+    body: { type: 'string', component: 'RichTextInput', title: 'Group body' },
+    other: { type: 'string', component: 'TextInput', title: 'Group other' }
+  } } } })
+  try {
+    const ref = createRef()
+    const onWidgetChange = vi.fn()
+    const settings = (body, other = 'Sibling') => ({ activeGroup: 'text', formData: { text: { body, other } } })
+    render(<IsolatedFormRenderer ref={ref} initWidgetData={{ ...initial, config: { settings: settings('Old') } }}
+      initschema={{ properties: { settings: { type: 'object', component: 'ConditionalGroupField', title: 'Settings', group: 'Content',
+        groups: { text: { label: 'Text', configModel: 'TestConfig' } } } } }}
+      context={context} publishChanges={false} onWidgetChange={onWidgetChange} />)
+    const editor = await ready('Group body')
+    editor.focus()
+    for (const body of ['First local', 'Latest local']) {
+      editor.innerHTML = body
+      fireEvent.input(editor)
+    }
+    const range = document.createRange()
+    range.selectNodeContents(editor)
+    window.getSelection().removeAllRanges()
+    window.getSelection().addRange(range)
+    const state = (body, other) => ({ versions: { 201: { widgets: { main: [{ ...initial, config: { settings: settings(body, other) } }] } } },
+      metadata: { currentVersionId: '201' } })
+    const child = subscriptions.filter(item => item.id === 'conditional-group-one-settings').at(-1)
+    act(() => child.callback(state('First local'), { sourceId: 'isolated-form-one-field-settings' }))
+    expect(await ready('Group body')).toBe(editor)
+    expect(window.getSelection().toString()).toBe('Latest local')
+    expect(ref.current.getCurrentWidgetData().config.settings.formData.text.body).toBe('Latest local')
+    const editCount = onWidgetChange.mock.calls.length
+    const parent = subscriptions.filter(item => item.id === 'isolated-form-one').at(-1)
+    act(() => parent.callback(state('Latest local', 'External sibling'), { sourceId: 'external-editor' }))
+    expect(await ready('Group other')).toHaveValue('External sibling')
+    expect(await ready('Group body')).toBe(editor)
+    expect(window.getSelection().toString()).toBe('Latest local')
+    act(() => parent.callback(state('External body'), { sourceId: 'external-editor' }))
+    expect(await ready('Group body')).toHaveTextContent('External body')
+    expect(ref.current.getCurrentWidgetData().config.settings.formData.text.body).toBe('External body')
+    expect(onWidgetChange).toHaveBeenCalledTimes(editCount)
+  } finally {
+    schemaRequest.mockRestore()
+  }
+})
+
+it.each(['unmount', 'disable', 'hydrate'])('closes pending link dialogs and ignores stale results on %s', async action => {
+  const { LinkPickerModal } = await import('../special-editors/LinkPickerModal')
+  let picker
+  let resolveResult
+  const show = vi.spyOn(LinkPickerModal.prototype, 'show').mockImplementation(function () {
+    picker = this
+    this.container = document.createElement('div')
+    this.container.dataset.testid = 'pending-link-dialog'
+    document.body.appendChild(this.container)
+    return new Promise(resolve => { resolveResult = resolve })
+  })
+  try {
+    const onChange = vi.fn()
+    const props = { value: '<p>Existing</p>', label: 'Body', onChange }
+    const { rerender, unmount } = render(<RichTextInput {...props} />)
+    const editor = screen.getByRole('textbox', { name: 'Body' })
+    const range = document.createRange()
+    range.selectNodeContents(editor)
+    window.getSelection().removeAllRanges()
+    window.getSelection().addRange(range)
+    fireEvent.click(screen.getByTitle('Insert/Edit Link'))
+    expect(show).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('pending-link-dialog')).toBeInTheDocument()
+    if (action === 'unmount') unmount()
+    else rerender(<RichTextInput {...props} disabled={action === 'disable'}
+      value={action === 'hydrate' ? '<p>External</p>' : props.value} />)
+    await waitFor(() => expect(screen.queryByTestId('pending-link-dialog')).toBeNull())
+    document.execCommand = vi.fn()
+    await act(async () => resolveResult({ action: 'insert', url: '/stale', replaceText: false }))
+    expect(document.execCommand).not.toHaveBeenCalled()
+    expect(onChange).not.toHaveBeenCalled()
+    if (action === 'hydrate') expect(editor).toHaveTextContent('External')
+  } finally {
+    picker?.hide()
+    show.mockRestore()
+  }
+})
+
 it('keeps trusted scripts and embeds in a lossless source-only view', async () => {
   const { default: HtmlSourceField } = await import('../fields/HtmlSourceField')
   const onChange = vi.fn()

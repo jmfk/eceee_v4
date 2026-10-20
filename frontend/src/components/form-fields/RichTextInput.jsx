@@ -71,6 +71,7 @@ const RichTextEditor = ({ value, defaultValue = '', onChange, onBlur, onFocus, l
             editEvents.forEach(name => element.removeEventListener(name, blockDisabledEdit, true))
             renderer.toolbarElement?.removeEventListener('mousedown', keepSelection)
             renderer.toolbarElement?.removeEventListener('click', keepSelection, true)
+            renderer.closeLinkDialog()
             renderer.destroy()
             editorRef.current = null
         }
@@ -79,6 +80,7 @@ const RichTextEditor = ({ value, defaultValue = '', onChange, onBlur, onFocus, l
     useEffect(() => {
         if (value !== undefined && value !== lastValueRef.current) {
             lastValueRef.current = value
+            editorRef.current?.closeLinkDialog()
             editorRef.current?.updateConfig({ content: DOMPurify.sanitize(value || '') })
         }
     }, [value])
@@ -87,6 +89,7 @@ const RichTextEditor = ({ value, defaultValue = '', onChange, onBlur, onFocus, l
         if (!renderer) return
         renderer.namespace = namespace
         renderer.disabled = disabled
+        if (disabled) renderer.closeLinkDialog()
         renderer.pageId = context?.pageId
         renderer.siteRootId = context?.siteRootId || context?.webpageData?.cachedRootId
         renderer.editorElement.contentEditable = String(!disabled)
