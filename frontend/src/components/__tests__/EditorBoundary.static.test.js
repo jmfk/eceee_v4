@@ -86,7 +86,7 @@ describe('page editor active/legacy boundaries', () => {
         }
     })
 
-    it('keeps active prop-manager behavior behind the page editor prop adapter', () => {
+    it('keeps widget prop updates behind the adapter without legacy source heuristics', () => {
         const pageWidgetFactorySource = readSource('src/editors/page-editor/PageWidgetFactory.jsx')
         const isolatedFormRendererSource = readSource('src/components/IsolatedFormRenderer.jsx')
         const adapterSource = readSource('src/utils/pageEditorPropAdapter.js')
@@ -95,7 +95,6 @@ describe('page editor active/legacy boundaries', () => {
         expect(pageWidgetFactorySource).not.toMatch(/onConfigChange\.length/)
 
         expect(isolatedFormRendererSource).toContain('buildWidgetPropUpdate')
-        expect(isolatedFormRendererSource).toContain('shouldHydrateExternalWidgetProps')
         expect(isolatedFormRendererSource).not.toMatch(/sourceId\.startsWith\(['"]field-/)
         expect(isolatedFormRendererSource).not.toMatch(/sourceId\.startsWith\(['"]bannerwidget-/)
         expect(isolatedFormRendererSource).not.toMatch(/sourceId\.startsWith\(['"]widget-/)
