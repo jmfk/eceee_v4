@@ -1,4 +1,5 @@
 // Render a copy so switching modes never removes the user's stored images.
+/** @param {Record<string, any>} config */
 export const getBannerRenderConfig = (config = {}) => {
     const rendered = { ...config }
     const mode = config.bannerMode ?? config.banner_mode ?? 'text'
