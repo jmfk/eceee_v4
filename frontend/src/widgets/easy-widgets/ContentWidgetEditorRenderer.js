@@ -1041,13 +1041,27 @@ class ContentWidgetEditorRenderer {
         e.preventDefault()
 
         // Get pasted content
-        const paste = (e.clipboardData || window.clipboardData).getData('text/html') ||
-            (e.clipboardData || window.clipboardData).getData('text/plain')
+        const clipboardData = e.clipboardData || window.clipboardData
+        const htmlPaste = clipboardData.getData('text/html')
+        const paste = htmlPaste || clipboardData.getData('text/plain')
 
         if (!paste) return
 
         // Clean the pasted HTML
-        const cleanedPaste = this.cleanHTMLStrict(paste)
+        let htmlToClean = paste
+        if (this.fieldMode && !htmlPaste) {
+            const text = document.createElement('div')
+            text.textContent = paste
+            htmlToClean = text.innerHTML
+        }
+        const cleanedPaste = this.cleanHTMLStrict(htmlToClean)
+
+        if (this.fieldMode) {
+            // Let the browser preserve selection/undo and leave existing field markup alone.
+            document.execCommand('insertHTML', false, cleanedPaste)
+            this.handleContentChange()
+            return
+        }
 
         // Get current selection
         const selection = window.getSelection()
@@ -2510,7 +2524,7 @@ class ContentWidgetEditorRenderer {
         document.execCommand(command, false, value)
 
         // Apply strict cleanup after formatBlock to fix nesting
-        if (command === 'formatBlock') {
+        if (command === 'formatBlock' && !this.fieldMode) {
             setTimeout(() => {
                 if (this.editorElement) {
                     fixInvalidNesting(this.editorElement)

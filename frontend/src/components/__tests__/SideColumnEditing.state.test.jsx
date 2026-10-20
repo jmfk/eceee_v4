@@ -153,6 +153,82 @@ it('preserves unsupported HTML in ordinary richtext fields through source editin
   expect(onChange).toHaveBeenCalledTimes(1)
 })
 
+it.each([
+  ['images', '<img src="/header.png" alt="Logo">Header'],
+  ['inline attributes', '<span class="highlight" style="color:red" data-note="keep">Header</span>'],
+  ['blocks', '<p>Existing header</p>']
+])('preserves existing %s that inline formatting cannot round-trip', (_, raw) => {
+  const onChange = vi.fn()
+  render(<RichTextInput value={raw} onChange={onChange} label="Headline" inlineOnly />)
+  expect(screen.queryByRole('textbox')).toBeNull()
+  expect(onChange).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Open HTML Editor' }))
+  const source = screen.getByRole('textbox', { name: 'HTML source' })
+  expect(source).toHaveValue(raw)
+  const updated = raw.replace(/Header|header/, 'Edited')
+  fireEvent.change(source, { target: { value: updated } })
+  expect(onChange).toHaveBeenLastCalledWith(updated)
+})
+
+it.each(['paste', 'plainPaste', 'formatBlock'])('preserves unrelated body markup during %s and updates the save buffer synchronously', async action => {
+  const ref = createRef()
+  const untouched = '<span class="highlight" style="color:red" data-note="keep">Existing</span>'
+  render(<IsolatedFormRenderer ref={ref} initWidgetData={{ ...initial, config: { body: `<p>${untouched}</p><p>Target</p>` } }}
+    initschema={{ properties: { body: { type: 'string', component: 'RichTextInput', title: 'Body', group: 'Content' } } }}
+    context={context} publishChanges={false} />)
+  const editor = await ready('Body')
+  const target = editor.lastChild
+  const range = document.createRange()
+  range.selectNodeContents(target)
+  range.collapse(false)
+  window.getSelection().removeAllRanges()
+  window.getSelection().addRange(range)
+  document.execCommand = vi.fn((command, _, value) => {
+    if (command === 'insertHTML') range.insertNode(range.createContextualFragment(value))
+    if (command === 'formatBlock') {
+      const heading = document.createElement('h2')
+      heading.append(...target.childNodes)
+      target.replaceWith(heading)
+    }
+    return true
+  })
+  if (action !== 'formatBlock') {
+    const plain = action === 'plainPaste'
+    fireEvent.paste(editor, { clipboardData: { getData: type => plain
+      ? (type === 'text/plain' ? '<b>Literal</b>' : '') : '<p>Pasted</p>' } })
+    expect(ref.current.getCurrentWidgetData().config.body).toContain(plain ? '&lt;b&gt;Literal&lt;/b&gt;' : 'Pasted')
+    if (plain) expect(editor.querySelector('b')).toBeNull()
+  } else {
+    fireEvent.click(screen.getByRole('button', { name: 'Format', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'Heading 2', exact: true }))
+    expect(ref.current.getCurrentWidgetData().config.body).toContain('<h2>Target</h2>')
+  }
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
+  expect(editor.querySelector('.highlight')?.outerHTML).toBe(untouched)
+  expect(ref.current.getCurrentWidgetData().config.body).toContain(untouched)
+})
+
+it.each(['mouse', 'keyboard'])('keeps toolbar commands in their own field with %s activation', activation => {
+  render(<><RichTextInput label="First" value="<p>First</p>" onChange={vi.fn()} />
+    <RichTextInput label="Second" value="<p>Second</p>" onChange={vi.fn()} /></>)
+  const first = screen.getByRole('textbox', { name: 'First' })
+  const second = screen.getByRole('textbox', { name: 'Second' })
+  const range = document.createRange()
+  range.selectNodeContents(first)
+  window.getSelection().removeAllRanges()
+  window.getSelection().addRange(range)
+  let commandInsideSecond = false
+  document.execCommand = vi.fn(() => { commandInsideSecond = second.contains(window.getSelection().anchorNode); return true })
+  const button = screen.getByRole('toolbar', { name: 'Second formatting' }).querySelector('[title="Bold"]')
+  if (activation === 'mouse') fireEvent.mouseDown(button)
+  else act(() => button.focus())
+  fireEvent.click(button)
+  expect(document.execCommand).toHaveBeenCalledWith('bold', false, null)
+  expect(commandInsideSecond).toBe(true)
+  expect(second).toHaveFocus()
+  expect(first.innerHTML).toBe('<p>First</p>')
+})
+
 it('restricts inline paste and shortcuts and blocks edit events after disabling', () => {
   const onChange = vi.fn()
   document.execCommand = vi.fn((command, _, value) => {
