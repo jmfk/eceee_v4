@@ -59,7 +59,7 @@ Themes, the restricted Designer, and the Layout Editor operate on overlapping pa
 - Designer-only mutations use the existing shared `ThemeDesignerDraft` and assignment permissions.
 - The first release supports layouts, special pages, palette colors, fonts, permitted spacing/style values, theme assets, and Designer preview documents.
 - Advanced theme fields such as arbitrary custom CSS, full component templates, image style templates, activation/default state, import/export, and remote transfer require the Theme/Admin profile unless separately allowlisted.
-- Before a coherent high-impact mutation, the agent persists an immutable pre-mutation Designer-draft recovery snapshot (or a validated inverse operation) tied to the tenant, theme, starting draft version, base sync version, affected paths, and referenced assets. Existing live-theme version history is not treated as recovery for an unpublished shared draft.
+- Before a coherent high-impact mutation, the agent persists an immutable pre-mutation Designer-draft recovery snapshot (or a validated inverse operation) tied to the tenant, theme, starting draft version, base sync version, affected paths, and referenced assets. Every unexpired recovery point, whether a snapshot or inverse operation, participates in Designer asset reference tracking and retention so cleanup cannot delete an asset while recovery still references it. Existing live-theme version history is not treated as recovery for an unpublished shared draft.
 - Full-theme updates begin from the latest editable server representation and preserve unknown keys, `stable_key`, ownership, assets, and preview references.
 
 ### Layout capabilities
@@ -99,6 +99,7 @@ Themes, the restricted Designer, and the Layout Editor operate on overlapping pa
 - A representative changed layout passes registry parity and the relevant editor-preview, standalone-render, and public-render checks.
 - Publication requires a distinct reviewed user action and creates or identifies a recovery point.
 - A high-impact unpublished draft mutation can be restored to its pre-agent state without reverting unrelated work added after that mutation.
+- Designer asset cleanup retains files referenced only by an unexpired snapshot or inverse recovery point and can remove them after that recovery point expires or is deleted.
 
 ## Constraints
 

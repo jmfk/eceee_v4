@@ -312,16 +312,17 @@ Give the `designer` profile accurate, bounded theme/layout context and useful pl
 
 ### Goal
 
-Complete the first user-visible vertical journey by applying validated, recoverable changes to the shared Designer draft.
+Complete the deterministic design-mutation integration path by applying validated, recoverable changes to the shared Designer draft. The useful model-driven alpha is complete only after the real-provider work in Batch 8.
 
 ### Work
 
-- Add typed operations for palette, fonts, allowed spacing/style properties, layouts, nodes, slots, responsive overrides, special pages, and theme-owned preview documents.
+- Add typed operations for palette, fonts, allowed spacing/style properties, layouts, nodes, slots, responsive overrides, special pages, authorized theme-asset replacement, and theme-owned preview documents.
 - Keep advanced full-theme fields outside the initial `designer` profile unless already supported by the restricted Designer API.
 - Apply each coherent operation batch through `save_designer_draft` or a narrow service that preserves the same row locks, `draft_version`, `base_sync_version`, patch validation, and snapshot behavior.
 - Use stable node/layout/widget IDs and reject index-only addressing.
 - Validate `validate_theme_layouts`, layout compatibility, theme field constraints, assets, and preview documents before commit.
 - Before a high-impact batch, persist an immutable pre-mutation Designer-draft snapshot or validated inverse operation tied to the tenant, theme, starting draft version, base sync version, affected paths, and referenced assets. Do not rely on live-theme history to restore an unpublished shared draft.
+- Extend `delete_unreferenced_designer_assets` (or its canonical successor) so every unexpired agent recovery point, including a validated inverse operation, counts as a persisted asset reference. Define recovery retention and cleanup together so assets become collectible only after every live draft, revision, export, and recovery reference is gone.
 - Return structural diffs and resulting draft version.
 - On conflict, re-read and require replan; do not auto-overwrite.
 - Restore is explicit and may apply only when the current draft still matches the mutation's resulting revision; otherwise show the diff and require a new plan.
@@ -330,9 +331,10 @@ Complete the first user-visible vertical journey by applying validated, recovera
 
 - Authorized designer and theme admin in restricted profile.
 - Unauthorized theme, changed assignment, cross-tenant theme, stale draft, stale live theme.
-- Required layouts, duplicate keys/IDs, invalid depth/node counts, referenced slot removal, unsupported styles, invalid special-page references.
+- Required layouts, duplicate keys/IDs, invalid depth/node counts, referenced slot removal, unsupported styles, invalid special-page references, and authorized asset replacement through the canonical Designer service.
 - Tool idempotency and crash recovery around the draft transaction.
 - Clean recovery to the pre-agent draft plus refusal to overwrite unrelated changes made after the agent mutation.
+- Asset cleanup retains an object referenced only by an unexpired snapshot or inverse recovery point, then removes it after that recovery point expires or is deleted and no other persisted reference remains.
 - Preservation of unrelated full-theme fields and snake/camel boundaries.
 - Theme preview documents remain independent of live pages/objects.
 
@@ -413,7 +415,7 @@ Add exact-state approval for Designer publication without conflating validation 
 
 ### Goal
 
-Replace the fake provider in an opt-in environment with secure OpenAI and Anthropic adapters.
+Turn the deterministic integration preview into a useful opt-in Design Agent alpha by replacing the fake provider with secure OpenAI and Anthropic adapters.
 
 ### Work
 
@@ -624,9 +626,9 @@ Use `make test` or the repository's current broader test target before a release
 ## Expected Delivery Shape
 
 - Batches 0–3: runtime foundation and embedded shell.
-- Batches 4–7: complete Design Agent alpha.
-- Batch 8: tenant BYOK and real-provider beta path.
+- Batches 4–7: deterministic Design Agent workflow integration preview.
+- Batch 8: useful tenant-BYOK Design Agent alpha with real providers.
 - Batches 9–11: CMS content and safe administration expansion.
 - Batches 12–13: measured optimization and production hardening.
 
-For one experienced full-time engineer, expect approximately five to eight months to complete the broad beta, with a useful Design Agent alpha after Batches 0–7. Two engineers can shorten calendar time only where files and invariants do not overlap; keep the runtime state machine, migrations, and shared agent shell under single-owner coordination.
+For one experienced full-time engineer, expect approximately five to eight months to complete the broad beta, with a useful Design Agent alpha after Batch 8. Two engineers can shorten calendar time only where files and invariants do not overlap; keep the runtime state machine, migrations, and shared agent shell under single-owner coordination.
