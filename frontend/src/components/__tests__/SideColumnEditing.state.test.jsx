@@ -67,6 +67,11 @@ it('hydrates external fields silently and ignores older echoes of its own edits'
   act(() => callback(state({ title: 'Latest local', other: 'External sibling' }), { sourceId: 'external-editor' }))
   expect(await ready('Other')).toHaveValue('External sibling')
   expect(onWidgetChange).toHaveBeenCalledTimes(count)
+  act(() => callback(state({ title: 'Inline widget update', other: 'External sibling' }), {
+    sourceId: 'bannerwidget-one-field-title'
+  }))
+  expect(title).toHaveValue('Inline widget update')
+  expect(onWidgetChange).toHaveBeenCalledTimes(count)
   fireEvent.change(title, { target: { value: 'Final local' } })
   expect(ref.current.getCurrentWidgetData().config).toEqual({ title: 'Final local', other: 'External sibling' })
 })

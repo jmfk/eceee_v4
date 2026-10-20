@@ -30,8 +30,7 @@ describe('LocalStateFieldWrapper', () => {
             label: 'Test Field',
             placeholder: 'Enter value...'
         },
-        onFieldChange: vi.fn(),
-        debounceMs: 100
+        onFieldChange: vi.fn()
     }
 
     beforeEach(() => {
@@ -46,7 +45,7 @@ describe('LocalStateFieldWrapper', () => {
         expect(screen.getByText('Test Field')).toBeInTheDocument()
     })
 
-    test('manages local state independently', async () => {
+    test('updates the field and the parent save buffer synchronously', () => {
         render(<LocalStateFieldWrapper {...defaultProps} />)
 
         const input = screen.getByTestId('field-input')
@@ -57,13 +56,8 @@ describe('LocalStateFieldWrapper', () => {
         // Local state should update immediately
         expect(input).toHaveValue('new value')
 
-        // Parent callback should be debounced
-        expect(defaultProps.onFieldChange).not.toHaveBeenCalled()
-
-        // Wait for debounce
-        await waitFor(() => {
-            expect(defaultProps.onFieldChange).toHaveBeenCalledWith('testField', 'new value')
-        }, { timeout: 200 })
+        // An immediate Save must observe the same value as the field.
+        expect(defaultProps.onFieldChange).toHaveBeenCalledExactlyOnceWith('testField', 'new value')
     })
 
     test('updates when initialValue prop changes', async () => {
