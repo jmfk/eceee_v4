@@ -19,6 +19,8 @@ import GlobalWysiwygToolbar from '../components/wysiwyg/GlobalWysiwygToolbar'
 import ObjectContentView from '../components/objectEdit/ObjectContentView'
 import ObjectSettingsView from '../components/objectEdit/ObjectSettingsView'
 import ObjectPublishingView from '../components/objectEdit/ObjectPublishingView'
+import ObjectEditorPanel from '../components/objectEdit/ObjectEditorPanel'
+import ObjectNavigation from '../components/objectEdit/ObjectNavigation'
 import ObjectSubObjectsView from '../components/objectEdit/ObjectSubObjectsView'
 
 const ObjectInstanceEditPage = () => {
@@ -452,7 +454,7 @@ const ObjectInstanceEditPage = () => {
                                     const Icon = tabDef.icon
                                     const isActive = tab === tabDef.id
                                     return (
-                                        <Link key={tabDef.id} to={isNewInstance ? `/objects/new/${objectTypeId}/${tabDef.id}` : `/objects/${instanceId}/edit/${tabDef.id}`} className={`flex items-center px-4 py-2 rounded-lg transition-colors ${isActive ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}>
+                                        <Link key={tabDef.id} to={(isNewInstance ? `/objects/new/${objectTypeId}/${tabDef.id}` : `/objects/${instanceId}/edit/${tabDef.id}`) + location.search} className={`flex items-center px-4 py-2 rounded-lg transition-colors ${isActive ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}>
                                             <Icon className="w-4 h-4 mr-2" />
                                             {tabDef.label}
                                         </Link>
@@ -464,7 +466,20 @@ const ObjectInstanceEditPage = () => {
                 </div>
             </div>
             <GlobalWysiwygToolbar />
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="flex flex-1 min-h-0 overflow-x-auto">
+                <ObjectEditorPanel side="left" title="Objects">
+                    <ObjectNavigation instanceId={instanceId}
+                        anchorId={urlParams.get('root') || instanceId || parentIdFromUrl}
+                        disabled={isSaving}
+                        onSelect={async (id, rootId) => {
+                            if (String(id) === String(instanceId) || isSaving) return
+                            try {
+                                if (hasUnsavedChanges) await handleSave()
+                                navigate(`/objects/${id}/edit/content?root=${rootId}`)
+                            } catch { /* handleSave reports errors; keep the current object open. */ }
+                        }} />
+                </ObjectEditorPanel>
+                <div className="flex-1 min-w-[320px] overflow-y-auto">
                 {udcInitError && (
                     <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mx-4 mt-4">
                         <div className="flex">
@@ -476,7 +491,7 @@ const ObjectInstanceEditPage = () => {
                         </div>
                     </div>
                 )}
-                {tab === 'content' && <ObjectContentView ref={contentTabRef} {...commonTabProps} />}
+                {tab === 'content' && <ObjectContentView key={instanceId || objectTypeId} ref={contentTabRef} {...commonTabProps} />}
                 {tab === 'settings' && <ObjectSettingsView {...commonTabProps} />}
                 {tab === 'publishing' && <ObjectPublishingView {...commonTabProps} isDirty={hasUnsavedChanges} showHistory={urlParams.get('panel') === 'history'} onWorkflowChange={refreshObject} onRestored={handleRestored}
                     isFeatured={isFeatured} onFeaturedChange={value => {
@@ -486,6 +501,7 @@ const ObjectInstanceEditPage = () => {
                         publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, { id: String(instanceId), updates: { isFeatured: value } })
                     }} />}
                 {tab === 'subobjects' && <ObjectSubObjectsView {...commonTabProps} />}
+                </div>
             </div>
             <StatusBar
                 isDirty={hasUnsavedChanges}

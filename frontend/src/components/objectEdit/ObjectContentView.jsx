@@ -9,6 +9,7 @@ import { getWidgetDisplayName } from '../../hooks/useWidgets'
 import { widgetsApi } from '../../api'
 import ObjectContentEditor from '../ObjectContentEditor'
 import WidgetEditorPanel from '../WidgetEditorPanel'
+import ObjectEditorPanel from './ObjectEditorPanel'
 import ObjectDataForm from './ObjectDataForm'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext';
 import { OperationTypes } from '../../contexts/unified-data/types/operations';
@@ -141,11 +142,11 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
         <div className="h-full flex flex-col relative">
             {/* Scrollable Content Area */}
             <div className={`flex-1 min-h-0 overflow-y-auto bg-white transition-all duration-300 ${isWidgetEditorOpen ? 'mr-0' : ''}`}>
-                <div className="p-6">
+                <div className="h-full">
                     {objectType?.slotConfiguration?.slots && objectType.slotConfiguration.slots.length > 0 ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="flex h-full min-w-[600px]">
                             {/* Left Column - Widget Slots */}
-                            <div className="space-y-6 border-r pr-6 border-gray-200">
+                            <div className="min-w-[280px] flex-1 space-y-6 overflow-auto p-6">
                                 <div>
                                     <ObjectContentEditor
                                         objectType={objectType}
@@ -160,7 +161,8 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                             </div>
 
                             {/* Right Column - Object Data */}
-                            <div className="space-y-6">
+                            <ObjectEditorPanel side="right" title="Object data" initialWidth={420}>
+                                <div className="space-y-6 p-6">
                                 <ObjectDataForm
                                     ref={formRef}
                                     objectType={objectType}
@@ -171,11 +173,12 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                                     onValidationChange={handleValidationChange}
                                     context={{ ...context, instanceId }}
                                 />
-                            </div>
+                                </div>
+                            </ObjectEditorPanel>
                         </div>
                     ) : (
                         /* Single Column - Object Data Only */
-                        <div className="space-y-6">
+                        <div className="space-y-6 p-6">
                             <div>
                                 <div className="text-lg font-medium text-gray-900 mb-4 flex items-center" role="heading" aria-level="3">
                                     <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>

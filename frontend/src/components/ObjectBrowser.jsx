@@ -28,6 +28,7 @@ const ObjectBrowser = () => {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const { typeName } = useParams()
+    const [categoryTab, setCategoryTab] = useState('main')
     const [currentView, setCurrentView] = useState('grid') // 'grid', 'list'
     const [selectedObjectType, setSelectedObjectType] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
@@ -258,15 +259,27 @@ const ObjectBrowser = () => {
                             </div>
                         </div>
 
+                        <div className="mb-6 flex gap-2" role="tablist" aria-label="Object categories">
+                            {[['main', 'Main'], ['supporting', 'Supporting objects']].map(([id, label]) => (
+                                <button key={id} type="button" role="tab" aria-selected={categoryTab === id}
+                                    onClick={() => setCategoryTab(id)}
+                                    className={`rounded-md px-4 py-2 text-sm font-medium focus-visible:ring-2 focus-visible:ring-blue-500 ${categoryTab === id ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
                         {typesLoading ? (
                             <div className="flex justify-center py-12">
                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                             </div>
                         ) : (
                             <ul className="space-y-4" aria-label="Object type groups">
-                                {objectTypeGroups.map(({ primary, supporting }) => (
+                                {categoryTab === 'supporting' && !objectTypeGroups.some(group => group.supporting.length > 0) && (
+                                    <li className="py-8 text-sm text-gray-500">No supporting object types.</li>
+                                )}
+                                {objectTypeGroups.filter(group => categoryTab === 'main' || group.supporting.length > 0).map(({ primary, supporting }) => (
                                     <li key={primary.id} className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                                        <button
+                                        {categoryTab === 'main' && <button
                                             type="button"
                                             data-testid={`object-type-card-${objectTypeTestId(primary)}`}
                                             onClick={() => handleObjectTypeSelect(primary)}
@@ -299,12 +312,12 @@ const ObjectBrowser = () => {
                                                 <span className="whitespace-nowrap">{itemCountLabel(primary.instanceCount)}</span>
                                                 <ChevronRight className="h-5 w-5 text-gray-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                                             </div>
-                                        </button>
+                                        </button>}
 
-                                        {supporting.length > 0 && (
+                                        {categoryTab === 'supporting' && supporting.length > 0 && (
                                             <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6 sm:py-4">
                                                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Supporting types
+                                                    {primary.pluralLabel || primary.label}
                                                 </div>
                                                 <ul className="divide-y divide-gray-200" aria-label={`Supporting types for ${primary.pluralLabel || primary.label}`}>
                                                     {supporting.map(type => (

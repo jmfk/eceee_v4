@@ -110,6 +110,10 @@ const renderBrowser = (initialEntry = '/objects', routePath = '/objects') => {
 }
 
 describe('buildObjectTypeGroups', () => {
+    it('excludes pure sub-object types from the overview', () => {
+        expect(buildObjectTypeGroups([news, { id: 9, label: 'Child', hierarchyLevel: 'sub_object_only' }])).toEqual([{ primary: news, supporting: [] }])
+    })
+
     it('sorts main and supporting types and falls back when a group is missing', () => {
         const orphan = {
             id: 4,
@@ -174,20 +178,23 @@ describe('ObjectBrowser grouped type list', () => {
         })
     })
 
-    it('renders large main rows and smaller supporting rows in alphabetical groups', async () => {
+    it('separates main objects and supporting types grouped by category', async () => {
         renderBrowser()
 
         const groupList = await screen.findByRole('list', { name: 'Object type groups' })
         const eventButton = within(groupList).getByTestId('object-type-card-event')
         const newsButton = within(groupList).getByTestId('object-type-card-news')
-        const categoryButton = within(groupList).getByTestId('object-type-supporting-row-news-category')
+        expect(within(groupList).queryByTestId('object-type-supporting-row-news-category')).not.toBeInTheDocument()
 
         expect(eventButton.compareDocumentPosition(newsButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(newsButton).toHaveTextContent('News Articles')
         expect(newsButton).toHaveTextContent('12 items')
+        fireEvent.click(screen.getByRole('tab', { name: 'Supporting objects' }))
+        const categoryButton = screen.getByTestId('object-type-supporting-row-news-category')
+        expect(screen.queryByTestId('object-type-card-news')).not.toBeInTheDocument()
         expect(categoryButton).toHaveTextContent('Categories')
         expect(categoryButton).toHaveTextContent('4 items')
-        expect(screen.getByText('Supporting types')).toBeInTheDocument()
+        expect(screen.getByText('News Articles')).toBeInTheDocument()
 
         fireEvent.click(categoryButton)
         expect(mocks.navigate).toHaveBeenCalledWith('/objects/news_category')
