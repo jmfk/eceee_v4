@@ -9,7 +9,7 @@
 | ADR-0036 | [Theme-owned named text effects](active/0036-theme-text-effects.md) | accepted | PRD-0027 |
 | ADR-0039 | [Frozen pilot contracts and isolated reference verification](active/0039-frozen-pilot-behavior-baseline.md) | accepted | PRD-0028 |
 | ADR-0035 | [Plain banner text](active/0035-plain-banner-text.md) | accepted | PRD-0026 |
-| ADR-0036 | [Theme-owned append-only widget releases](active/0036-theme-widget-revisions.md) | accepted | PRD-0027 |
+| ADR-0040 | [Theme-owned append-only widget releases](active/0040-theme-widget-revisions.md) | accepted | PRD-0029 |
 | ADR-0033 | [Widget editor session and field ownership](active/0033-widget-editor-session-and-field-ownership.md) | accepted | PRD-0025 |
 | ADR-0001 | [Canonical page version workflow](active/0001-canonical-page-version-workflow.md) | accepted | PRD-0001 |
 | ADR-0002 | [Single page workflow mutation boundary](active/0002-single-page-workflow-mutation-boundary.md) | accepted | PRD-0001, PRD-0002 |
