@@ -14,7 +14,9 @@ related_prds:
 
 Avveckla Django områdesvis och behåll PostgreSQL, lagrade ID:n, innehåll och den befintliga React-redigeraren. Den publika renderaren är redan fristående. Återstående arbete gäller framför allt CMS-backenden och dess implicita beteende i modeller, signaler och jobb.
 
-**Nästa konkreta batch är en Django-fri renderkatalog med en begränsad pilot för widgetscheman och validering.** Flytta den auktoritativa renderinformationen till ett språkoberoende kontrakt som både Python och TypeScript konsumerar. Därefter provas ett komplett sidflöde i en ny backend: läsa arbetskopia, spara med revisionskontroll och publicera en uttryckligen granskad version.
+**Nästa konkreta batch börjar med en körbar funktionsbaslinje för en Django-fri renderkatalog och en begränsad pilot för widgetscheman och validering.** Dokumentera och kör referensfallen innan implementationen flyttas. Flytta därefter den auktoritativa renderinformationen till ett språkoberoende kontrakt som både Python och TypeScript konsumerar. Sedan provas ett komplett sidflöde i en ny backend: läsa arbetskopia, spara med revisionskontroll och publicera en uttryckligen granskad version.
+
+**Bibehållen funktionalitet är ett villkor för avveckling.** [PLAN-0003](0003-django-parity-verification.md) anger funktionsmatris, jämförelse av gammal/ny implementation och kraven för att koppla bort en Django-del. Gröna tester för ett urval ger inte tillstånd att ta bort funktioner som ännu inte har kartlagts och verifierats.
 
 Detta är en utredning och ett implementeringsförslag. Inget nytt backendramverk, databasformat eller ersättande ADR är antaget. [PRD-0027](../prds/0027-framework-independent-content-contract.md) är ett redigerbart utkast för den första batchen.
 
@@ -73,6 +75,8 @@ Redigeraren behöver dessutom `schema`, `config-ui-schema`, `configuration-defau
 
 ### Föreslagen leverans
 
+Före kodflytten: etablera pilotens körbara referensbaslinje och jämförelsefall enligt [PLAN-0003](0003-django-parity-verification.md). Varje senare etapp behöver motsvarande underlag för sitt eget scope.
+
 1. Skapa en liten katalog för inbyggda widgetdefinitioner, exempelvis `packages/content-contract/`, med språkoberoende JSON och dokumenterade versionsfält. Temabundna definitioner stannar i databasens versionssatta temadokument. Inget nytt runtime-API krävs för detta steg.
 2. Flytta samtliga befintliga manifestfält, inklusive CSS, CSS-variabler, layout parts, variants och default special pages, till den kanoniska katalogen. Behåll format version 2 om utdata är oförändrade. Pythonadapter och Node-generator ska läsa samma källa; redigera inte både Pythondefinitioner och JSON manuellt.
 3. Lägg till schema, defaults och UI-metadata för fyra representativa widgettyper: Headline, Banner, TwoColumns och Forms. De täcker enkla värden, innehålls-/mediakonfiguration, containrar och nästlade formulärfält. Återstående widgetscheman ligger kvar tydligt avgränsade i Python tills de migreras.
@@ -123,6 +127,7 @@ Inför inte samtidigt ett nytt generiskt dokumentlager, event sourcing, CRDT, ny
 
 | Etapp | Leverans och ägarskap | Kontroll före nästa steg |
 | --- | --- | --- |
+| 0. Verifieringsbaslinje | Funktionsmatris, syntetiska fixtures, känd referensversion och körbara kontrakts-/scenariotester för första delen. | Dokumenterad referenskörning, synliga täckningsluckor och jämförelseformat innan kodflytten börjar. Utökas inför varje senare etapp. |
 | 1. Gemensamma kontrakt | Fristående renderkatalog och schemapilot enligt PRD-0027. Django äger fortfarande produktskrivningar och schema. | Node kan regenerera hela manifestet; pilotens normalisering, validering och rendering matchar. |
 | 2. Isolerat sidprov | Ny CMS-domän/API med verklig identitet, tenantkontroll och läsa/spara/publicera. Endast syntetisk separat databas. | Fullt provflöde fungerar med Django stoppat; negativ tenant- och konflikttestning på PostgreSQL. |
 | 3. Komplett sidägande | Flytta hela sidaggregatet, inklusive scheman, restore, struktur, publiceringsjobb och post-commit-notifiering. | En enda skrivägare för dessa operationer; in-flight requests/jobb dräneras vid byte. Ingen Django-worker får skriva vidare bakom API:t. |
@@ -169,3 +174,4 @@ Ingen tillförlitlig totaltidsuppskattning kan göras från antal filer. Använd
 - Dokumentverifiering: `git diff --check`, specs-validatorn och kontroll av lokala Markdown-länkar.
 - Applikationstester har inte körts: inga applikationsändringar har gjorts. Befintliga testfiler har lästs som kontraktsunderlag; det räknas inte som ett nytt godkänt testresultat.
 - Ingen push, PR, CI-körning eller produktionsoperation ingår. Worktree och utkast behålls för fortsatt arbete.
+- 2026-10-21: Ägarens krav på verifierat bibehållen funktion har preciserats i PLAN-0003 och PRD-0027. Testkällor har kartlagts; körbar baslinje och kandidatjämförelse återstår. Detta är inte ett godkänt applikationstestresultat.

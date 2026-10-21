@@ -19,6 +19,7 @@ Den befintliga Next-publishern renderar utan Django vid förfrågningar, men reg
 - Ge Python och TypeScript samma deklarativa källa för flyttad metadata.
 - Bevisa schema- och valideringskompatibilitet för ett litet representativt urval innan fler widgets flyttas.
 - Behålla redigerarens beteende, renderresultat, åtkomstskydd och befintliga spar-/publiceringsregler.
+- Göra bibehållen funktion verifierbar med en körbar referensbaslinje före kodflytten och samma scenarier mot ersättaren.
 
 ## Non-Goals
 
@@ -46,15 +47,22 @@ Den befintliga Next-publishern renderar utan Django vid förfrågningar, men reg
 8. Manifestets befintliga format ska bevaras om utdata är kompatibla. Nya kontrakt ska ha ett dokumenterat versionsfält och ett enda schemaägande.
 9. Befintlig Django/Pydanticvalidering får vara auktoritativ under jämförelsefasen, men pilotens nya validator får inte kallas likvärdig innan fixturerna överensstämmer. Undvik permanent dubbelvalidering med konkurrerande resultat.
 10. Den statiska katalogen ska omfatta inbyggda kodwidgetar. Eventuella temabundna widgetdefinitioner ska behålla tenant-/temaägande och pinnade revisioner i databasens temadokument; de får inte läggas i ett globalt byggmanifest. Samordna med det parallella arbetets slutliga kontrakt före implementation.
+11. Före kodflytten ska pilotens funktioner och relevanta fel-/rättighets-/återhämtningsfall kartläggas och referensfallen köras mot en fixerad, granskad baslinje enligt [PLAN-0003](../plans/0003-django-parity-verification.md). Befintliga fel och täckningsluckor ska dokumenteras.
+12. Samma scenarioindata ska kunna köras mot referens och kandidat. Jämför API-kontrakt, normalisering, lagrat resultat och relevanta sidoeffekter samt redigerar-/preview-/publikt beteende. Muterande jämförelser ska använda separata testdatabaser med samma syntetiska startdata.
+13. En jämförelse får normalisera endast dokumenterade, förväntade miljöskillnader. Saknade funktioner, oväntade fält, ordning, revisioner, rättighetsavslag och fel får inte maskeras bort.
+14. Pilotens verifiering ska rapportera referens-/kandidatcommit, testdataversion, körkommandon, resultat, skillnader och överhoppade/blockerade scenarier. Inga obligatoriska luckor eller oförklarade skillnader får kvarstå när den berörda Djangoimplementationen tas bort.
+15. Godkänd pilot gäller endast pilotens scope. Full avveckling kräver motsvarande funktionsmatris och aktuell verifiering för alla andra stödda områden; en avsiktlig funktionsändring behöver ett separat dokumenterat produktbeslut.
 
 ## Acceptance Criteria
 
 - Ett dokumenterat Node-kommando genererar hela rendermanifestet deterministiskt i en miljö utan Django; checkläget upptäcker drift.
 - Pythonadaptern och Node-generatorn producerar samma renderdata från samma källa. Alla widgettyper som omfattas av dagens manifest finns kvar.
-- Pilotens schema/defaults/UI-data och valideringsutfall matchar fastlagda referensfixturer, eller en konkret blockerande avvikelse rapporteras före övergång.
+- Pilotens schema/defaults/UI-data och valideringsutfall matchar fastlagda referensfixturer. Varje oförklarad avvikelse blockerar byte av den berörda implementationen.
 - Befintliga registry-/rendererparitetstester och fokuserade kontraktstester passerar. Desktop-/mobilrendering kontrolleras för pilottyperna när renderdata flyttas.
 - En redaktör kan öppna, ändra, spara och förhandsvisa pilottyperna. Save påverkar fortfarande inte den publicerade versionen.
 - Dokumentationen anger vad som är Django-fritt och vilka runtime-/byggberoenden som återstår.
+- Den körbara referensbaslinjen har etablerats före kodflytten. Samma kritiska pilotfall är därefter godkända mot kandidaten och dokumenterade per scenario; inget obligatoriskt fall är överhoppat eller dolt av normalisering.
+- Sparade pilotdata kan laddas och redigeras igen, och rätt preview-/publicerad snapshot används. Inga oavsiktliga ändringar av relationer, ordning eller revisions-/publiceringsdata har tillkommit.
 
 ## Constraints
 
@@ -65,6 +73,7 @@ Den befintliga Next-publishern renderar utan Django vid förfrågningar, men reg
 ## Implementation Notes
 
 - 2026-10-21: Utkast från [PLAN-0002](../plans/0002-django-exit-investigation.md). Implementation har inte påbörjats.
+- 2026-10-21: Utkastet kompletterat med ägarens krav på verifierat bibehållen funktion. [PLAN-0003](../plans/0003-django-parity-verification.md) beskriver baslinje, jämförelsemodell och villkor för avveckling. Ingen verifieringskod har implementerats eller körts.
 
 ## Linked ADRs
 
