@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 logger = logging.getLogger(__name__)
 
@@ -108,141 +109,12 @@ class ContentCardConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class ContentCardWidget(BaseWidget):
     """Content card widget with flexible header, text, and image layouts"""
 
-    name = "Content Card"
     description = "Flexible content card with header, text, and configurable image layouts"
     template_name = "easy_widgets/widgets/content_card.html"
-
-    layout_parts = {
-        "content-card-widget": {
-            "label": "Content Card Widget",
-            "selector": ".content-card-widget",
-            "relationship": "same-element",  # Root element
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "backgroundColor",
-                "borderColor",
-                "borderWidth",
-            ],
-        },
-        "content-card-header": {
-            "label": "Card Header",
-            "selector": ".content-card-header",
-            "relationship": "direct-child",  # Direct child of root element
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "fontFamily",
-                "fontSize",
-                "fontWeight",
-                "color",
-                "lineHeight",
-                "borderBottom",
-            ],
-        },
-        "content-card-text": {
-            "label": "Text Content",
-            "selector": ".content-card-text",
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "fontFamily",
-                "fontSize",
-                "fontWeight",
-                "color",
-                "lineHeight",
-            ],
-        },
-        "content-card-image": {
-            "label": "Individual Image",
-            "selector": ".content-card-image",
-            "properties": [
-                "width",
-                "height",
-            ],
-        },
-    }
-
-    widget_css = """
-    .content-card-widget {
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        height: 310px;
-        outline: 1px solid rgb(0,0,0,0.3);
-        border-width: 0;
-        overflow: hidden;
-        border-radius: 0;
-        box-shadow: none;
-        margin-bottom: 30px;
-    }
-    .content-card-widget.border-disabled {
-        outline: none;
-    }
-    .content-card-widget:last-child {
-        margin-bottom: 0;
-    }
-
-    .content-card-header {
-        box-sizing: border-box;
-        height: 140px;
-        margin: 0;
-        padding: 30px;
-        font-size: 36px;
-        font-family: 'Source Sans 3', sans-serif;
-        font-weight: 400;
-    }
-    .content-card-body {
-        display: flex;
-        flex: 1;
-        min-height: 0;
-        height: 170px;
-        padding-bottom: 30px;
-        gap: 30px;
-    }
-    .content-card-text {
-        flex: 1;
-        padding: 0px 0px 0px 30px;
-        font-size: 16px;
-        font-family: 'Source Sans 3', sans-serif;
-        font-weight: 300;
-        line-height: 22px;
-        overflow: hidden;
-    }
-    .content-card-images {
-        display: flex;
-        align-items: top;
-        justify-content: right;
-        padding: 0px 30px 30px 0px;
-    }
-
-    /* Individual image styling - square (default) */
-    .content-card-image {
-        width: 140px;
-        height: 140px;
-        object-fit: cover;
-    }
-
-    /* Rectangle image styling */
-    .content-card-body.image-size-rectangle .content-card-image {
-        width: 280px;
-        height: 140px;
-    }
-
-    /* Responsive behavior */
-    @media (max-width: 768px) {
-        .content-card-body {
-            flex-direction: column;
-        }
-    }
-    """
 
     css_scope = "widget"
 

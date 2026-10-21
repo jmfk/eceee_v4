@@ -1,0 +1,13 @@
+{
+  "name": "@eceee/widget-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./index.mjs",
+  "scripts": {
+    "manifest": "node manifest.mjs",
+    "check": "node manifest.mjs --check",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "engines": { "node": ">=20" }
+}

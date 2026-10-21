@@ -20,7 +20,10 @@ DATABASES = {
         "TEST": {"NAME": "test_eceee_pilot_reference"},
     }
 }
-ALLOWED_HOSTS = ["testserver", "localhost"]
+# Existing error-page regressions use this synthetic site host and plain HTTP.
+# These settings are used only on the runner's unpublished disposable network.
+ALLOWED_HOSTS = ["testserver", "localhost", "testsite.com"]
+SECURE_SSL_REDIRECT = False
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}

@@ -5,151 +5,22 @@ Headline widget implementation.
 import logging
 from typing import Type
 
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import BaseModel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
+from widget_contracts.models import HeadlineConfig
 
 logger = logging.getLogger(__name__)
 
 
-class HeadlineConfig(BaseModel):
-    """Configuration for Headline widget"""
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
-    content: str = Field(
-        "",
-        description="Header text content",
-        json_schema_extra={
-            "hidden": True,
-            "component": "RichTextInput",
-            "inlineOnly": True,
-            "rows": 3,
-            "order": 1,
-            "group": "Content",
-        },
-    )
-    headerLevel: str = Field(
-        "h1",
-        description="HTML header level",
-        json_schema_extra={
-            "component": "SegmentedControlInput",
-            "options": [
-                {"value": "h1", "label": "H1"},
-                {"value": "h2", "label": "H2"},
-                {"value": "h3", "label": "H3"},
-                {"value": "h4", "label": "H4"},
-                {"value": "h5", "label": "H5"},
-                {"value": "h6", "label": "H6"},
-            ],
-            "order": 1.5,
-            "group": "Content",
-        },
-    )
-    componentStyle: str = Field(
-        "default",
-        description="Component style from theme",
-        json_schema_extra={
-            "component": "ComponentStyleSelector",
-            "order": 2,
-            "group": "Styling",
-        },
-    )
-    showBorder: bool = Field(
-        True,
-        description="Show widget border",
-        json_schema_extra={
-            "component": "BooleanInput",
-            "variant": "toggle",
-            "order": 3,
-            "group": "Styling",
-        },
-    )
-    anchor: str = Field(
-        "",
-        description="Anchor ID for linking to this section",
-        json_schema_extra={
-            "component": "TextInput",
-            "placeholder": "section-name",
-            "order": 9999,
-            "group": "Advanced",
-        },
-    )
-    anchor_title: str = Field(
-        "",
-        description="Anchor title (for navigation menus)",
-        json_schema_extra={
-            "component": "TextInput",
-            "placeholder": "Auto-generated from content",
-            "helpText": "Displayed in navigation menus when linking to this content",
-            "order": 10000,
-            "group": "Advanced",
-        },
-    )
-
-
 @register_widget_type
+@catalog_widget
 class HeadlineWidget(BaseWidget):
     """Headline widget for displaying header text"""
 
-    name = "Headline"
     description = "Header text widget for page sections"
     template_name = "easy_widgets/widgets/headline.html"
-
-    layout_parts = {
-        "headline-widget": {
-            "label": "Headline container",
-            "selector": ".headline-widget",
-            "properties": [
-                "width",
-                "height",
-                "min-height",
-                "padding",
-                "margin",
-                "backgroundColor",
-                "color",
-                "fontFamily",
-                "fontSize",
-                "lineHeight",
-            ],
-        },
-    }
-
-    widget_css = """
-    .headline-widget {
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        min-height: 140px;
-        outline: 1px solid rgb(0,0,0,0.3);
-        border-width: 0;
-        overflow: hidden;
-        margin-bottom: 30px;
-    }
-    .headline-widget.border-disabled {
-        outline: none;
-    }
-    .headline-widget:last-child {
-        margin-bottom: 0;
-    }
-
-    .headline-content {
-        padding: 0;
-        margin: 0;
-    }
-
-    /* Responsive behavior */
-    @media (max-width: 768px) {
-        .headline-content {
-            padding: 20px;
-        }
-    }
-    """
 
     css_scope = "widget"
 

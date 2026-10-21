@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 logger = logging.getLogger(__name__)
 
@@ -222,127 +223,12 @@ class ImageConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class ImageWidget(BaseWidget):
     """Image widget that contains image, image gallery, or video"""
 
-    name = "Image"
     description = "Image widget that contains image, image gallery, or video"
     template_name = "easy_widgets/widgets/image.html"
-
-    layout_parts = {
-        "image-widget": {
-            "label": "Image widget container",
-            "selector": ".image-widget",
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "margin",
-                "backgroundColor",
-            ],
-        },
-    }
-
-    widget_css = """
-    .image-widget {
-        display: block;
-        text-align: var(--image-alignment, center);
-        margin-bottom: 30px;
-    }
-    .image-widget:last-child {
-        image-widget: 0;
-    }
-
-    .image-widget img {
-        max-width: 100%;
-        height: auto;
-        border-radius: var(--image-radius, 0);
-        box-shadow: var(--image-shadow, none);
-        border: var(--image-border, none);
-    }
-
-    .image-widget video {
-        max-width: 100%;
-        height: auto;
-        border-radius: var(--video-radius, 0.5rem);
-        box-shadow: var(--video-shadow, 0 4px 6px rgba(0, 0, 0, 0.1));
-    }
-
-    .image-widget figure {
-        margin: 0;
-    }
-
-    .image-widget .caption,
-    .image-widget .image-caption,
-    .image-widget .carousel-caption {
-        margin-top: var(--caption-margin-top, 0.5rem);
-        font-size: var(--caption-font-size, 0.875rem);
-        color: var(--caption-color, #6b7280);
-        font-style: var(--caption-style, italic);
-        text-align: var(--caption-alignment, center);
-    }
-
-    .image-widget .gallery {
-        display: grid;
-        grid-template-columns: repeat(var(--gallery-columns, 3), 1fr);
-        gap: var(--gallery-gap, 1rem);
-        margin: var(--gallery-margin, 1rem 0);
-    }
-
-    .image-widget .gallery img {
-        width: 100%;
-        height: var(--gallery-item-height, 200px);
-        object-fit: cover;
-        cursor: pointer;
-        transition: transform 0.2s ease-in-out;
-    }
-
-    .image-widget .gallery img:hover {
-        transform: scale(1.05);
-    }
-
-    .image-widget.size-small img,
-    .image-widget.size-small video {
-        max-width: var(--size-small, 300px);
-    }
-
-    .image-widget.size-medium img,
-    .image-widget.size-medium video {
-        max-width: var(--size-medium, 600px);
-    }
-
-    .image-widget.size-large img,
-    .image-widget.size-large video {
-        max-width: var(--size-large, 900px);
-    }
-
-    .image-widget.size-full img,
-    .image-widget.size-full video {
-        max-width: 100%;
-        width: 100%;
-    }
-    """
-
-    css_variables = {
-        "image-alignment": "center",
-        "image-radius": "0",
-        "image-shadow": "none",
-        "image-border": "none",
-        "video-radius": "0.5rem",
-        "video-shadow": "0 4px 6px rgba(0, 0, 0, 0.1)",
-        "caption-margin-top": "0.5rem",
-        "caption-font-size": "0.875rem",
-        "caption-color": "#6b7280",
-        "caption-style": "italic",
-        "caption-alignment": "center",
-        "gallery-columns": "3",
-        "gallery-gap": "1rem",
-        "gallery-margin": "1rem 0",
-        "gallery-item-height": "200px",
-        "size-small": "300px",
-        "size-medium": "600px",
-        "size-large": "900px",
-    }
 
     css_scope = "widget"
 

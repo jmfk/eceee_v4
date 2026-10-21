@@ -16,6 +16,9 @@ DEV_SERVICES := backend frontend publisher celery-worker
 .PHONY: pilot-baseline
 pilot-baseline: ## Run the frozen widget pilot baseline in isolated disposable containers.
 	python3 scripts/pilot_baseline.py run $(PILOT_BASELINE_ARGS)
+.PHONY: widget-contract-pilot
+widget-contract-pilot: ## Compare Node contracts and verify Django persistence plus desktop/mobile rendering.
+	python3 scripts/pilot_baseline.py run --candidate-contracts $(PILOT_BASELINE_ARGS)
 PY_LINT_BASE ?= origin/main
 
 # Global help request check
@@ -277,10 +280,10 @@ publisher-dev: infra-up ## Start the standalone publisher with HMR on the reserv
 	$(COMPOSE_DEV) up publisher
 
 publisher-manifest: ## Regenerate shared render CSS/widget metadata
-	$(COMPOSE_DEV) run --rm --no-deps -v "$(CURDIR)/frontend:/frontend" backend python manage.py export_publisher_manifest
+	node backend/widget_contracts/manifest.mjs
 
 publisher-manifest-check: ## Verify shared render CSS/widget metadata is current
-	$(COMPOSE_DEV) run --rm --no-deps -v "$(CURDIR)/frontend:/frontend" backend python manage.py export_publisher_manifest --check
+	node backend/widget_contracts/manifest.mjs --check
 
 # Run Playwright website rendering service
 playwright-service:

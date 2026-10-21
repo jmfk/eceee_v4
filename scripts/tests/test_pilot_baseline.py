@@ -97,6 +97,14 @@ class PilotComparisonTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertFalse(pilot.backend_passes({**result, key: 1}))
 
+    def test_candidate_mode_requires_the_adapter_scenarios(self):
+        required = pilot.REQUIRED_BACKEND_SCENARIOS | pilot.REQUIRED_CONTRACT_SCENARIOS
+        baseline = {"scenarios": [{"id": name, "status": "passed"} for name in pilot.REQUIRED_BACKEND_SCENARIOS]}
+        self.assertTrue(pilot.backend_passes(baseline))
+        self.assertFalse(pilot.backend_passes(baseline, required))
+        baseline["scenarios"] += [{"id": name, "status": "passed"} for name in pilot.REQUIRED_CONTRACT_SCENARIOS]
+        self.assertTrue(pilot.backend_passes(baseline, required))
+
     def test_frontend_scenario_identity_is_required_even_when_counts_match(self):
         result = {
             "success": True,

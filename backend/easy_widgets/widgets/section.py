@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 
 class SectionConfig(BaseModel):
@@ -132,153 +133,13 @@ class SectionConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class SectionWidget(BaseWidget):
     """Section widget with collapsible functionality and internal slot"""
 
     app_label = "easy_widgets"
-    name = "Section"
     description = "Collapsible section with anchor support and internal content slot"
     template_name = "easy_widgets/widgets/section.html"
-
-    variants = [
-        {
-            "id": "border-enabled",
-            "label": "Border Enabled",
-            "config_field": "show_border",
-            "type": "class",
-        },
-    ]
-
-    layout_parts = {
-        "section-widget": {
-            "label": "Section container (with collapse)",
-            "selector": ".section-widget",
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "margin",
-                "border",
-                "borderTop",
-                "borderRight",
-                "borderBottom",
-                "borderLeft",
-                "borderColor",
-                "borderWidth",
-                "borderStyle",
-                "borderRadius",
-                "backgroundColor",
-            ],
-        },
-        "section-content-only-widget": {
-            "label": "Section container (without collapse)",
-            "selector": ".section-content-only-widget",
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "margin",
-                "border",
-                "borderTop",
-                "borderRight",
-                "borderBottom",
-                "borderLeft",
-                "borderColor",
-                "borderWidth",
-                "borderStyle",
-                "borderRadius",
-                "backgroundColor",
-            ],
-        },
-    }
-
-    widget_css = """
-    .section-widget {
-        margin-bottom: 30px;
-    }
-    .section-widget.border-enabled {
-        outline: 1px solid rgb(0,0,0,0.3);
-    }
-    .section-widget:last-child {
-        margin-bottom: 0;
-    }
-    .section-content-only-widget {
-        margin-bottom: 30px;
-    }
-    .section-content-only-widget.border-enabled {
-        outline: 1px solid rgb(0,0,0,0.3);
-    }
-    .section-content-only-widget:last-child {
-        margin-bottom: 0;
-    }
-    .section-header {
-        padding: 30px;
-        user-select: none;
-    }
-
-    .widget-wrapper {
-    }
-
-    .section-remaining-content {
-        display: block;
-        margin-bottom: 30px;
-    }
-
-    .section-collapsed .section-remaining-content {
-        display: none;
-    }
-
-    .section-banner {
-        display: flex;
-        width: 100%;
-        align-items: center;
-        justify-content: center;
-        height: 30px;
-        outline: 1px solid rgb(0,0,0,0.3);
-        border-width: 0;
-        overflow: hidden;
-        border-radius: 0;
-        box-shadow: none;
-        padding: 0;
-        background: transparent;
-        color: inherit;
-        font-family: inherit;
-        cursor: pointer;
-        user-select: none;
-        transition: opacity 0.2s ease;
-        font-size: 16px;
-        font-weight: 300;
-    }
-
-    .section-banner:hover {
-        opacity: 0.8;
-    }
-
-    .contract-banner {
-        display: flex;
-    }
-
-    .section-collapsed .contract-banner {
-        display: none;
-    }
-
-    .expand-banner {
-        display: none;
-    }
-
-    .section-collapsed .expand-banner {
-        display: flex;
-    }
-
-    .empty-slot {
-        color: #9ca3af;
-        font-style: italic;
-        text-align: center;
-        font-size: 16px;
-        font-weight: 300;
-        padding: 30px;
-    }
-    """
 
     css_scope = "widget"
 

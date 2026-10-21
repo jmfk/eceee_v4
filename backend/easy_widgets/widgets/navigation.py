@@ -10,6 +10,7 @@ from pydantic.alias_generators import to_camel
 from easy_widgets.models import LinkData
 from webpages.error_page_defaults import exclude_legacy_error_subtrees
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 
 class NavigationItem(BaseModel):
@@ -67,59 +68,13 @@ class NavigationConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class NavigationWidget(BaseWidget):
     """Navigation widget with background and text styling options"""
 
-    name = "Navigation"
     description = "Navigation widget with background image/color and text color options"
     template_name = None
     mustache_template_name = "easy_widgets/widgets/navigation.mustache"
-
-    layout_parts = {
-        "nav-container": {
-            "label": "Navigation container",
-            "selector": ".nav-container",
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "margin",
-                "backgroundColor",
-                "color",
-                "fontFamily",
-                "fontSize",
-                "lineHeight",
-                "gap",
-            ],
-        }
-    }
-
-    widget_css = """
-    .nav-container {
-        display: flex;
-        flex-direction: column;
-        list-style: none;
-        margin: 0 0 30px 0;
-        padding: 0;
-        gap: 10px;
-        align-items: top;
-        height: var(--nav-height, auto);
-        width: 100%;
-    }
-    .nav-container li {
-        height: 24px;
-        width: 100%;
-    }
-    .nav-container a {
-        color: inherit;
-        text-decoration: none;
-        transition: opacity 0.2s;
-    }
-
-    .nav-container a:hover {
-        opacity: 0.7;
-    }
-    """
 
     css_scope = "widget"
 

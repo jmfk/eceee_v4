@@ -10,6 +10,7 @@ from pydantic.alias_generators import to_camel
 
 from easy_widgets.models import LinkData
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 logger = logging.getLogger(__name__)
 
@@ -105,159 +106,13 @@ class NavbarConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class NavbarWidget(BaseWidget):
     """Navbar widget with configurable menu items"""
 
-    name = "Navbar"
     description = "Navigation bar with configurable menu items"
     template_name = None
     mustache_template_name = "easy_widgets/widgets/navbar.mustache"
-
-    layout_parts = {
-        "navbar-widget": {
-            "label": "Navbar widget container",
-            "selector": ".navbar-widget",
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "margin",
-                "backgroundColor",
-                "backgroundImage",  # Composite property includes size, position, repeat, and aspect-ratio
-                "color",
-            ],
-        },
-        "navbar-primary-menu": {
-            "label": "Primary menu area",
-            "selector": ".navbar-primary-menu",
-            "properties": ["padding", "margin"],
-        },
-        "navbar-secondary-menu": {
-            "label": "Secondary menu area",
-            "selector": ".navbar-secondary-menu",
-            "properties": ["padding", "margin"],
-        },
-        "navbar-menu-item": {
-            "label": "Menu item",
-            "selector": ".navbar-menu-item",
-            "properties": ["padding", "margin", "backgroundColor", "color"],
-        },
-    }
-
-    widget_css = """
-        /* Navbar Widget - Styling from design groups */
-        .widget-type-navbar {
-            background-color: var(--navbar-bg-color-xs, #3b82f6);
-            color: var(--navbar-text-color-xs, #ffffff);
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-        }
-
-        @media (min-width: 640px) {
-            .widget-type-navbar {
-                background-color: var(--navbar-bg-color-sm, var(--navbar-bg-color-xs, #3b82f6));
-                color: var(--navbar-text-color-sm, var(--navbar-text-color-xs, #ffffff));
-            }
-        }
-
-        @media (min-width: 768px) {
-            .widget-type-navbar {
-                background-color: var(--navbar-bg-color-md, var(--navbar-bg-color-sm, #3b82f6));
-                color: var(--navbar-text-color-md, var(--navbar-text-color-sm, #ffffff));
-            }
-        }
-
-        @media (min-width: 1024px) {
-            .widget-type-navbar {
-                background-color: var(--navbar-bg-color-lg, #3b82f6);
-                color: var(--navbar-text-color-lg, #ffffff);
-            }
-        }
-
-        @media (min-width: 1280px) {
-            .widget-type-navbar {
-                background-color: var(--navbar-bg-color-xl, #3b82f6);
-                color: var(--navbar-text-color-xl, #ffffff);
-            }
-        }
-
-        /* Navbar Menu Styling */
-        .navbar-menu-list {
-            list-style: none !important;
-            font-size: 16px;
-            margin-top: 0px;
-            font-family: "Source Sans 3", sans-serif;
-            font-weight: 300;
-            line-height: 22px;
-            margin-bottom: 0;
-        }
-
-        .navbar-primary-menu {
-            column-gap: 8px;
-            flex: 1 0 auto;
-            padding: var(--navbar-primary-padding, 0 0 0 20px);
-        }
-
-        @media (min-width: 1024px) {
-            .navbar-primary-menu {
-                column-gap: 24px;
-            }
-        }
-
-        .navbar-primary-menu .navbar-link {
-            white-space: nowrap;
-        }
-
-        .navbar-menu-item {
-            list-style: none !important;
-            font-size: 14px;
-            margin-top: 0px;
-            font-family: "Source Sans 3", sans-serif;
-            font-weight: 300;
-            line-height: 22px;
-            margin-bottom: 0px;
-        }
-
-        .navbar-menu-item  a {
-            font-size: 14px;
-            color: inherit;
-            font-family: "Source Sans 3", sans-serif;
-            font-weight: 500;
-        }
-
-        .navbar-secondary-menu {
-            display: flex;
-            flex: 0 1 440px;
-            gap: 0;
-            list-style: none;
-            margin: 0;
-            min-width: max-content;
-            padding: var(--navbar-secondary-padding, 0);
-            align-items: flex-end;
-        }
-
-        .navbar-secondary-menu .navbar-menu-item {
-            flex: 1 1 140px;
-            min-width: max-content;
-            text-align: left;
-            width: auto;
-            padding: 2px 11px 2px;
-            margin-top: 2px;
-            box-shadow: inset -1px -1px 1px rgba(0, 0, 0, 0.2);
-        }
-
-        .navbar-secondary-menu .navbar-menu-item a {
-            border-radius: 0 0 0 0;
-            white-space: nowrap;
-        }
-
-        .navbar-link {
-            text-decoration: none !important;
-        }
-        """
-
-    css_variables = {}
 
     css_scope = "widget"
 

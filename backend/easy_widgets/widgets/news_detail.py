@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 
 class NewsDetailConfig(BaseModel):
@@ -90,27 +91,12 @@ class NewsDetailConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class NewsDetailWidget(BaseWidget):
     """Display a single news article if slug exists in context and matches configured ObjectTypes"""
 
-    name = "News Detail"
     description = "Display a single news article based on slug in URL path (multi-type support)"
     template_name = "easy_widgets/widgets/news_detail.html"
-
-    layout_parts = {
-        "news-detail-widget": {
-            "label": "News Detail widget container",
-            "selector": ".news-detail-widget",
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "margin",
-                "backgroundColor",
-                "color",
-            ],
-        },
-    }
 
     css_scope = "widget"
 

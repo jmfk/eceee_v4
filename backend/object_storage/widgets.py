@@ -13,6 +13,7 @@ from django.utils import timezone
 from pydantic import BaseModel, Field, validator
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 from .models import ObjectInstance, ObjectTypeDefinition
 
@@ -128,74 +129,16 @@ class ObjectChildrenConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class ObjectListWidget(BaseWidget):
     """Display a list of objects from the object storage system"""
 
-    name = "Object List"
     description = "Display a filtered list of objects from the object storage system"
     template_name = "object_storage/widgets/object_list.html"
 
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return ObjectListConfig
-
-    widget_css = """
-    .object-list-widget {
-        font-family: var(--body-font, inherit);
-    }
-
-    .object-list-widget .object-item {
-        padding: var(--object-padding, 1rem);
-        margin-bottom: var(--object-spacing, 1rem);
-        border: var(--object-border, 1px solid #e5e7eb);
-        border-radius: var(--object-radius, 0.5rem);
-        background: var(--object-bg, #ffffff);
-    }
-
-    .object-list-widget .object-item:hover {
-        box-shadow: var(--object-hover-shadow, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
-        transform: var(--object-hover-transform, translateY(-2px));
-        transition: all 0.2s ease;
-    }
-
-    .object-list-widget .object-title {
-        font-size: var(--object-title-size, 1.25rem);
-        font-weight: var(--object-title-weight, 600);
-        color: var(--object-title-color, #1f2937);
-        margin-bottom: var(--object-title-spacing, 0.5rem);
-    }
-
-    .object-list-widget .object-excerpt {
-        color: var(--object-text-color, #6b7280);
-        line-height: var(--object-line-height, 1.6);
-    }
-
-    .object-list-widget .object-meta {
-        font-size: var(--object-meta-size, 0.875rem);
-        color: var(--object-meta-color, #9ca3af);
-        margin-top: var(--object-meta-spacing, 0.5rem);
-    }
-
-    .object-list-widget.template-card .object-item {
-        background: var(--card-bg, #ffffff);
-        border: var(--card-border, 1px solid #e5e7eb);
-        border-radius: var(--card-radius, 0.75rem);
-        padding: var(--card-padding, 1.5rem);
-    }
-
-    .object-list-widget.template-list .object-item {
-        border-left: var(--list-border, 4px solid #3b82f6);
-        padding-left: var(--list-padding, 1rem);
-        background: transparent;
-        border-radius: 0;
-    }
-
-    .object-list-widget.template-minimal .object-item {
-        border: none;
-        padding: var(--minimal-padding, 0.5rem 0);
-        background: transparent;
-    }
-    """
 
     def get_context_data(self, config: ObjectListConfig, page_context: dict) -> dict:
         """Get objects and prepare context for template rendering"""
@@ -305,51 +248,16 @@ class ObjectListWidget(BaseWidget):
 
 
 @register_widget_type
+@catalog_widget
 class ObjectDetailWidget(BaseWidget):
     """Display a single object with full details"""
 
-    name = "Object Detail"
     description = "Display a single object with full details and widgets"
     template_name = "object_storage/widgets/object_detail.html"
 
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return ObjectDetailConfig
-
-    widget_css = """
-    .object-detail-widget {
-        font-family: var(--body-font, inherit);
-    }
-
-    .object-detail-widget .object-header {
-        margin-bottom: var(--header-spacing, 2rem);
-        padding-bottom: var(--header-padding, 1rem);
-        border-bottom: var(--header-border, 1px solid #e5e7eb);
-    }
-
-    .object-detail-widget .object-title {
-        font-size: var(--detail-title-size, 2rem);
-        font-weight: var(--detail-title-weight, 700);
-        color: var(--detail-title-color, #1f2937);
-        margin-bottom: var(--detail-title-spacing, 0.5rem);
-    }
-
-    .object-detail-widget .object-meta {
-        font-size: var(--detail-meta-size, 0.875rem);
-        color: var(--detail-meta-color, #6b7280);
-    }
-
-    .object-detail-widget .object-content {
-        margin: var(--content-spacing, 2rem 0);
-    }
-
-    .object-detail-widget .object-hierarchy {
-        background: var(--hierarchy-bg, #f9fafb);
-        padding: var(--hierarchy-padding, 1rem);
-        border-radius: var(--hierarchy-radius, 0.5rem);
-        margin: var(--hierarchy-spacing, 1rem 0);
-    }
-    """
 
     def get_context_data(self, config: ObjectDetailConfig, page_context: dict) -> dict:
         """Get object and prepare context for template rendering"""
@@ -498,59 +406,16 @@ class ObjectDetailWidget(BaseWidget):
 
 
 @register_widget_type
+@catalog_widget
 class ObjectChildrenWidget(BaseWidget):
     """Display children of an object in a hierarchical view"""
 
-    name = "Object Children"
     description = "Display child objects in a hierarchical structure"
     template_name = "object_storage/widgets/object_children.html"
 
     @property
     def configuration_model(self) -> Type[BaseModel]:
         return ObjectChildrenConfig
-
-    widget_css = """
-    .object-children-widget {
-        font-family: var(--body-font, inherit);
-    }
-
-    .object-children-widget .children-list {
-        margin: var(--children-spacing, 1rem 0);
-    }
-
-    .object-children-widget .child-item {
-        margin: var(--child-spacing, 0.5rem 0);
-        padding: var(--child-padding, 0.75rem);
-        border-left: var(--child-border, 3px solid #e5e7eb);
-        background: var(--child-bg, #f9fafb);
-    }
-
-    .object-children-widget .child-item.level-1 {
-        margin-left: var(--level-1-indent, 1rem);
-        border-color: var(--level-1-color, #3b82f6);
-    }
-
-    .object-children-widget .child-item.level-2 {
-        margin-left: var(--level-2-indent, 2rem);
-        border-color: var(--level-2-color, #10b981);
-    }
-
-    .object-children-widget .child-item.level-3 {
-        margin-left: var(--level-3-indent, 3rem);
-        border-color: var(--level-3-color, #f59e0b);
-    }
-
-    .object-children-widget .child-title {
-        font-weight: var(--child-title-weight, 600);
-        color: var(--child-title-color, #1f2937);
-        margin-bottom: var(--child-title-spacing, 0.25rem);
-    }
-
-    .object-children-widget .child-meta {
-        font-size: var(--child-meta-size, 0.75rem);
-        color: var(--child-meta-color, #6b7280);
-    }
-    """
 
     def get_context_data(self, config: ObjectChildrenConfig, page_context: dict) -> dict:
         """Get children objects and prepare context for template rendering"""

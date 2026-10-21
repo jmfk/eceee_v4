@@ -6,6 +6,7 @@ locked: true
 created: 2026-10-21
 related_adrs:
   - ADR-0039
+  - ADR-0041
 ---
 
 # PRD-0028: Framework-Independent Render Catalog and Widget Schema Pilot
@@ -78,9 +79,13 @@ Den befintliga Next-publishern renderar utan Django vid förfrågningar, men reg
 - 2026-10-21: Implementation av enbart testbaslinjen påbörjad i separat worktree `django-pilot-baseline`, branch `codex/django-pilot-baseline`. Kraven är nu låsta; katalog-/validatorflytten ingår inte i denna batch.
 - 2026-10-21: Testbaslinjen implementerad och lokalt körd med 51 frysta DRF-fall, katalogdigest, 6 backendtester på PostgreSQL 17, 11 React-tester och 6 Chromium-fall på desktop/mobil. Fristående jämförare och 4 tester av regressions-/rapportspärrar tillagda. Se [körinstruktionerna](../../backend/webpages/tests/fixtures/pilot_baseline/README.md).
 
+- 2026-10-21: Shared widget contract pilot implementation started in `codex/widget-contract-pilot`. [ADR-0041](../adrs/active/0041-shared-widget-contract-source.md) records source ownership and comparison-only Node validation.
+
 ## Linked ADRs
 
 - [ADR-0039](../adrs/active/0039-frozen-pilot-behavior-baseline.md): frysta kontrakt, isolerad referenskörning och separat kandidatstatus.
+
+- [ADR-0041](../adrs/active/0041-shared-widget-contract-source.md): shared render/model declarations, Node generation and Pydantic-authoritative runtime adapter.
 
 ## Completion Evidence
 
@@ -88,3 +93,5 @@ Den befintliga Next-publishern renderar utan Django vid förfrågningar, men reg
 - 2026-10-21: `python3 -m unittest discover -s scripts/tests -p test_pilot_baseline.py -v` passerade 4 tester. Black, isort, flake8 för berörda backendfiler, fokuserad frontend-ESLint, CI-YAML, specs-validering och lokala dokumentlänkar passerade.
 - Baslinjen kördes lokalt på implementationsarbetskatalogen före commit; rapporten redovisar föräldra-HEAD och `workingTreeDirty: true`. Referensproduktkoden är oförändrad från `9da0eb18451db16f5b8406f1c0c6c5a4f108483d`. Katalog-/validatorflytt och verifiering av en Django-fri kandidat återstår.
 - Inför merge uppdaterades referensen uttryckligen till `e80248dc4588ef90bcb6c7ef5b2d84759de9d16a` för redan mergade Banner-outline-kontrakt. Fixture-README dokumenterar skillnaderna. Dokumentidentiteterna blev PRD-0028 / ADR-0039 för att undvika kollision med mains PRD-0027 / ADR-0036; kravtexten är i övrigt oförändrad.
+
+- 2026-10-21: Shared contract pilot verified: Node reproduced all 25 manifest entries byte-for-byte and matched 51 frozen API cases plus catalog with zero differences. Django consumes the same model declarations; the expanded 129-test PostgreSQL/widget/theme/error-page gate, 714 direct Node/Pydantic configurations, 11 React tests, 6 Chromium tests and 9 Node / 9 runner tests passed without mandatory skips. See [package evidence and boundaries](../../backend/widget_contracts/README.md). Node remains comparison-only; no replacement backend, authoritative validator cutover or production deployment is claimed.
