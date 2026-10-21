@@ -410,6 +410,26 @@ class SitePackageServiceTests(TestCase):
 
         SitePackageImporter._validate_imported_version_layout(child_version)
 
+    def test_theme_import_rejects_invalid_outlines_before_create_or_update(self):
+        from rest_framework.exceptions import ValidationError as APIValidationError
+
+        job = SitePackageJob.objects.create(
+            kind=SitePackageJob.KIND_IMPORT,
+            created_by=self.user,
+            options={"tenant_id": str(self.tenant.id)},
+        )
+        importer = SitePackageImporter(job, storage=MemoryStorage())
+        data = {"name": "Invalid import", "text_outline_styles": {"bad": {"thickness": -1}}}
+        before = PageTheme.objects.count()
+        with self.assertRaises(APIValidationError):
+            importer._create_theme(None, data)
+        self.assertEqual(PageTheme.objects.count(), before)
+        with self.assertRaises(APIValidationError):
+            importer._apply_theme_data(None, self.theme, data)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.name, "Package Theme")
+        self.assertEqual(set(self.theme.text_outline_styles), {"dark", "light"})
+
     def test_legacy_theme_import_seeds_referenced_custom_layout_and_observed_slots(self):
         theme_data = {"source_id": self.theme.id, "name": "Legacy theme"}
         pages_payload = [

@@ -26,7 +26,6 @@ from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
 
 from content.models import Namespace
-from webpages.text_outline_styles import default_text_outline_styles
 from core.models import Tenant
 from file_manager.models import MediaCollection, MediaFile, MediaTag
 from file_manager.storage import S3MediaStorage
@@ -37,6 +36,7 @@ from webpages.services.theme_preview_content import (
     normalize_theme_preview_namespaces,
     rewrite_theme_library_image_urls,
 )
+from webpages.text_outline_styles import default_text_outline_styles, validate_text_outline_styles
 from webpages.theme_layouts import (
     default_theme_layouts,
     legacy_compatibility_layout,
@@ -2303,7 +2303,9 @@ class SitePackageImporter:
             ),
             "layouts": layouts,
             "image_styles": data.get("image_styles", {}),
-            "text_outline_styles": data.get("text_outline_styles", default_text_outline_styles()),
+            "text_outline_styles": validate_text_outline_styles(
+                data.get("text_outline_styles", default_text_outline_styles())
+            ),
             "gallery_styles": data.get("gallery_styles", {}),
             "carousel_styles": data.get("carousel_styles", {}),
             "table_templates": data.get("table_templates", {}),
@@ -2336,7 +2338,9 @@ class SitePackageImporter:
             ),
             "layouts": _with_compatibility_layouts(data.get("layouts"), layout_references),
             "image_styles": data.get("image_styles", {}),
-            "text_outline_styles": data.get("text_outline_styles", default_text_outline_styles()),
+            "text_outline_styles": validate_text_outline_styles(
+                data.get("text_outline_styles", default_text_outline_styles())
+            ),
             "gallery_styles": data.get("gallery_styles", {}),
             "carousel_styles": data.get("carousel_styles", {}),
             "table_templates": data.get("table_templates", {}),

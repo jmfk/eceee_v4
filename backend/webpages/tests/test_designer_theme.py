@@ -1,4 +1,5 @@
 import io
+import json
 import zipfile
 from datetime import timedelta
 from types import SimpleNamespace
@@ -1793,7 +1794,24 @@ class DesignerThemeApiTests(TestCase):
         self.assertTrue(refreshed.data["hasDraftChanges"])
         self.assertEqual(refreshed.data["description"], "Theme for editorial sites")
 
+    def test_theme_zip_import_rejects_invalid_outlines_before_creating_theme(self):
+        self.authenticate(self.owner)
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w") as package:
+            package.writestr("theme.json", json.dumps({"text_outline_styles": {"bad": {"style": "invalid"}}}))
+        before = PageTheme.objects.count()
+        response = self.client.post(
+            "/api/v1/webpages/themes/import_theme/",
+            {"theme_zip": SimpleUploadedFile("theme.zip", archive.getvalue(), content_type="application/zip")},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(PageTheme.objects.count(), before)
+
     def test_outline_publication_merges_stale_draft_without_publishing_other_changes(self):
+        # A no-op save advances sync_version but deduplicates the version snapshot.
+        self.theme.save(version_created_by=self.owner)
+        self.assertFalse(self.theme.versions.filter(sync_version=self.theme.sync_version).exists())
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data
         base_styles = self.theme.text_outline_styles
@@ -1917,7 +1935,9 @@ class DesignerThemeApiTests(TestCase):
 
     def test_outline_defaults_seed_only_empty_themes_and_drafts(self):
         import importlib
+
         from django.apps import apps
+
         from webpages.services.designer_theme import get_or_create_designer_draft
         from webpages.text_outline_styles import default_text_outline_styles
 

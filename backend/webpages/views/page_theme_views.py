@@ -19,15 +19,16 @@ from djangorestframework_camel_case.parser import CamelCaseJSONParser
 from djangorestframework_camel_case.render import CamelCaseJSONRenderer
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as APIValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.response import Response
 
-from webpages.text_outline_styles import default_text_outline_styles
 from core.models import Tenant
 from file_manager.storage import system_storage
+from webpages.text_outline_styles import default_text_outline_styles, validate_text_outline_styles
 
 from ..models import PageTheme
 from ..serializers import PageThemeSerializer
@@ -1685,7 +1686,9 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     ),
                     layouts=layouts,
                     image_styles=theme_data.get("image_styles", {}),
-                    text_outline_styles=theme_data.get("text_outline_styles", default_text_outline_styles()),
+                    text_outline_styles=validate_text_outline_styles(
+                        theme_data.get("text_outline_styles", default_text_outline_styles())
+                    ),
                     gallery_styles=theme_data.get("gallery_styles", {}),
                     carousel_styles=theme_data.get("carousel_styles", {}),
                     table_templates=theme_data.get("table_templates", {}),
@@ -1786,6 +1789,8 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_201_CREATED,
             )
 
+        except APIValidationError as e:
+            return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
         except zipfile.BadZipFile:
             return Response({"error": "Invalid zip file"}, status=status.HTTP_400_BAD_REQUEST)
         except json.JSONDecodeError as e:

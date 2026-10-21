@@ -3,8 +3,8 @@
 import copy
 
 from django.db import migrations, models
-import webpages.text_outline_styles
 
+import webpages.text_outline_styles
 
 # Freeze the migration values so future default changes cannot alter this backfill.
 DEFAULTS = {

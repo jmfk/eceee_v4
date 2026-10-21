@@ -30,6 +30,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
         componentStyles: true,
         designerPreview: true,
         imageStyles: true,
+        textOutlineStyles: true,
         tableTemplates: true,
     });
     const [pasteText, setPasteText] = useState('');
@@ -49,6 +50,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
         'component-styles': 'componentStyles',
         'preview-views': 'designerPreview',
         'image-styles': 'imageStyles',
+        'text-outline-styles': 'textOutlineStyles',
         'table-templates': 'tableTemplates',
     };
 
@@ -283,12 +285,13 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             componentStyles: 'Component Styles',
             designerPreview: 'Preview Views',
             imageStyles: 'Image Styles',
+            textOutlineStyles: 'Text Outline Styles',
             tableTemplates: 'Table Templates',
         };
         return labels[section] || section;
     };
 
-    const allSections = ['fonts', 'colors', 'breakpoints', 'designGroups', 'componentStyles', 'designerPreview', 'imageStyles', 'tableTemplates'];
+    const allSections = ['fonts', 'colors', 'breakpoints', 'designGroups', 'componentStyles', 'designerPreview', 'imageStyles', 'textOutlineStyles', 'tableTemplates'];
 
     const handleSelectAll = () => {
         const newSelection = {};

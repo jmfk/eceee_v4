@@ -478,7 +478,7 @@ class BannerWidget(BaseWidget):
         style_parts.append(f"background-color: {background_color};")
         style_parts.append(f"color: {text_color};")
         style_parts.append(f"--banner-text-color: {text_color};")
-        from webpages.text_outline_styles import STYLE_KEY, RESERVED_KEYS
+        from webpages.text_outline_styles import RESERVED_KEYS, STYLE_KEY
 
         outline = config.get("text_outline", "none")
         shadow = "none"

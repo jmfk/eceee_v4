@@ -1828,7 +1828,12 @@ def publish_outline_draft(theme_id, tenant, user, draft_version, live_sync_versi
             raise DesignerDraftConflict("The live theme changed. Reload Designer before publishing outlines.")
         was_stale = draft.base_sync_version != theme.sync_version
         if was_stale:
-            base = ThemeVersion.objects.filter(theme=theme, sync_version=draft.base_sync_version).first()
+            # Unchanged saves advance sync_version without recording another snapshot.
+            base = (
+                ThemeVersion.objects.filter(theme=theme, sync_version__lte=draft.base_sync_version)
+                .order_by("-sync_version", "-version_number")
+                .first()
+            )
             if not base:
                 raise DesignerDraftConflict(
                     "This draft's original version is unavailable. Export it before starting a new draft."
