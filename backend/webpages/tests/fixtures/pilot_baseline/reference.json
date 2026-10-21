@@ -1,5 +1,5 @@
 {
-  "casesSha256": "1650f9779bcd38fcfb10cafdeadad110b9fce352905aa407d875fa9aed880cfe",
+  "casesSha256": "06279b28c0f63bf56dd576be2628464b3c73381e2660a25472ba8750afb7fa12",
   "formatVersion": 1,
   "observations": {
     "banner-anonymous-schema": {
@@ -237,24 +237,10 @@
             "description": "Text outline for contrast against the banner background",
             "name": "text_outline",
             "required": false,
-            "type": "Literal",
+            "type": "str",
             "ui": {
-              "component": "SelectInput",
+              "component": "TextOutlineSelect",
               "group": "Styling",
-              "options": [
-                {
-                  "label": "None",
-                  "value": "none"
-                },
-                {
-                  "label": "Dark outline",
-                  "value": "dark"
-                },
-                {
-                  "label": "Light outline",
-                  "value": "light"
-                }
-              ],
               "order": 6
             }
           }
@@ -437,29 +423,10 @@
               "type": "string"
             },
             "textOutline": {
-              "component": "SelectInput",
+              "component": "TextOutlineSelect",
               "default": "none",
               "description": "Text outline for contrast against the banner background",
-              "enum": [
-                "none",
-                "dark",
-                "light"
-              ],
               "group": "Styling",
-              "options": [
-                {
-                  "label": "None",
-                  "value": "none"
-                },
-                {
-                  "label": "Dark outline",
-                  "value": "dark"
-                },
-                {
-                  "label": "Light outline",
-                  "value": "light"
-                }
-              ],
               "order": 6,
               "title": "Textoutline",
               "type": "string"
@@ -666,29 +633,10 @@
               "type": "string"
             },
             "textOutline": {
-              "component": "SelectInput",
+              "component": "TextOutlineSelect",
               "default": "none",
               "description": "Text outline for contrast against the banner background",
-              "enum": [
-                "none",
-                "dark",
-                "light"
-              ],
               "group": "Styling",
-              "options": [
-                {
-                  "label": "None",
-                  "value": "none"
-                },
-                {
-                  "label": "Dark outline",
-                  "value": "dark"
-                },
-                {
-                  "label": "Light outline",
-                  "value": "light"
-                }
-              ],
               "order": 6,
               "title": "Textoutline",
               "type": "string"
@@ -697,6 +645,29 @@
           "title": "BannerConfig",
           "type": "object"
         }
+      },
+      "status": 200
+    },
+    "banner-custom-outline": {
+      "body": {
+        "errors": {},
+        "isValid": true,
+        "validatedData": {
+          "anchor": "",
+          "anchorTitle": "",
+          "backgroundColor": "#ffffff",
+          "backgroundImage": null,
+          "bannerMode": "text",
+          "componentStyle": "default",
+          "headerContent": "",
+          "image1": null,
+          "imageSize": "square",
+          "showBorder": true,
+          "textColor": "#000000",
+          "textContent": "",
+          "textOutline": "invalid"
+        },
+        "warnings": {}
       },
       "status": 200
     },
@@ -746,32 +717,6 @@
       },
       "status": 200
     },
-    "banner-invalid": {
-      "body": {
-        "errors": {
-          "textOutline": [
-            "Input should be 'none', 'dark' or 'light'"
-          ]
-        },
-        "isValid": false,
-        "rawErrors": [
-          {
-            "ctx": {
-              "expected": "'none', 'dark' or 'light'"
-            },
-            "input": "invalid",
-            "loc": [
-              "text_outline"
-            ],
-            "msg": "Input should be 'none', 'dark' or 'light'",
-            "type": "literal_error",
-            "url": "https://errors.pydantic.dev/2.13/v/literal_error"
-          }
-        ],
-        "warnings": {}
-      },
-      "status": 200
-    },
     "banner-missing": {
       "body": {
         "errors": {},
@@ -811,7 +756,7 @@
             ],
             "msg": "Input should be a valid string",
             "type": "string_type",
-            "url": "https://errors.pydantic.dev/2.13/v/string_type"
+            "url": "https://errors.pydantic.dev/2.14/v/string_type"
           }
         ],
         "warnings": {}
@@ -1020,29 +965,10 @@
               "type": "string"
             },
             "textOutline": {
-              "component": "SelectInput",
+              "component": "TextOutlineSelect",
               "default": "none",
               "description": "Text outline for contrast against the banner background",
-              "enum": [
-                "none",
-                "dark",
-                "light"
-              ],
               "group": "Styling",
-              "options": [
-                {
-                  "label": "None",
-                  "value": "none"
-                },
-                {
-                  "label": "Dark outline",
-                  "value": "dark"
-                },
-                {
-                  "label": "Light outline",
-                  "value": "light"
-                }
-              ],
               "order": 6,
               "title": "Textoutline",
               "type": "string"
@@ -2146,7 +2072,7 @@
             ],
             "msg": "String should have at least 1 character",
             "type": "string_too_short",
-            "url": "https://errors.pydantic.dev/2.13/v/string_too_short"
+            "url": "https://errors.pydantic.dev/2.14/v/string_too_short"
           },
           {
             "ctx": {
@@ -2160,7 +2086,7 @@
             ],
             "msg": "List should have at least 1 item after validation, not 0",
             "type": "too_short",
-            "url": "https://errors.pydantic.dev/2.13/v/too_short"
+            "url": "https://errors.pydantic.dev/2.14/v/too_short"
           }
         ],
         "warnings": {}
@@ -2246,7 +2172,7 @@
             ],
             "msg": "Input should be 'text', 'email', 'phone', 'number', 'textarea', 'select', 'checkbox', 'radio', 'file', 'date' or 'time'",
             "type": "literal_error",
-            "url": "https://errors.pydantic.dev/2.13/v/literal_error"
+            "url": "https://errors.pydantic.dev/2.14/v/literal_error"
           }
         ],
         "warnings": {}
@@ -2272,7 +2198,7 @@
             ],
             "msg": "Field required",
             "type": "missing",
-            "url": "https://errors.pydantic.dev/2.13/v/missing"
+            "url": "https://errors.pydantic.dev/2.14/v/missing"
           },
           {
             "input": {},
@@ -2281,7 +2207,7 @@
             ],
             "msg": "Field required",
             "type": "missing",
-            "url": "https://errors.pydantic.dev/2.13/v/missing"
+            "url": "https://errors.pydantic.dev/2.14/v/missing"
           }
         ],
         "warnings": {}
@@ -2307,7 +2233,7 @@
             ],
             "msg": "Input should be a valid string",
             "type": "string_type",
-            "url": "https://errors.pydantic.dev/2.13/v/string_type"
+            "url": "https://errors.pydantic.dev/2.14/v/string_type"
           },
           {
             "input": null,
@@ -2316,7 +2242,7 @@
             ],
             "msg": "Input should be a valid list",
             "type": "list_type",
-            "url": "https://errors.pydantic.dev/2.13/v/list_type"
+            "url": "https://errors.pydantic.dev/2.14/v/list_type"
           }
         ],
         "warnings": {}
@@ -3196,7 +3122,7 @@
             ],
             "msg": "Input should be a valid string",
             "type": "string_type",
-            "url": "https://errors.pydantic.dev/2.13/v/string_type"
+            "url": "https://errors.pydantic.dev/2.14/v/string_type"
           }
         ],
         "warnings": {}
@@ -3235,7 +3161,7 @@
             ],
             "msg": "Input should be a valid string",
             "type": "string_type",
-            "url": "https://errors.pydantic.dev/2.13/v/string_type"
+            "url": "https://errors.pydantic.dev/2.14/v/string_type"
           }
         ],
         "warnings": {}
@@ -3562,7 +3488,7 @@
             ],
             "msg": "Input should be '5:1', '4:2', '3:3', '2:4' or '1:5'",
             "type": "literal_error",
-            "url": "https://errors.pydantic.dev/2.13/v/literal_error"
+            "url": "https://errors.pydantic.dev/2.14/v/literal_error"
           }
         ],
         "warnings": {}
@@ -3600,7 +3526,7 @@
             ],
             "msg": "Input should be '5:1', '4:2', '3:3', '2:4' or '1:5'",
             "type": "literal_error",
-            "url": "https://errors.pydantic.dev/2.13/v/literal_error"
+            "url": "https://errors.pydantic.dev/2.14/v/literal_error"
           }
         ],
         "warnings": {}
@@ -3705,10 +3631,10 @@
       "status": 404
     }
   },
-  "referenceCommit": "9da0eb18451db16f5b8406f1c0c6c5a4f108483d",
+  "referenceCommit": "e80248dc4588ef90bcb6c7ef5b2d84759de9d16a",
   "referenceRuntime": {
     "django": "4.2.30",
-    "pydantic": "2.13.5",
+    "pydantic": "2.14.1",
     "python": "3.11.17"
   }
 }

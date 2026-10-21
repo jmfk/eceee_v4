@@ -1,6 +1,6 @@
 {
   "formatVersion": 1,
-  "referenceCommit": "9da0eb18451db16f5b8406f1c0c6c5a4f108483d",
+  "referenceCommit": "e80248dc4588ef90bcb6c7ef5b2d84759de9d16a",
   "scope": [
     "easy_widgets.HeadlineWidget",
     "easy_widgets.BannerWidget",
@@ -218,7 +218,7 @@
       "expectValid": false
     },
     {
-      "id": "banner-invalid",
+      "id": "banner-custom-outline",
       "method": "POST",
       "path": "/api/v1/webpages/widget-types/easy_widgets.BannerWidget/validate/",
       "expectStatus": 200,
@@ -227,7 +227,10 @@
           "textOutline": "invalid"
         }
       },
-      "expectValid": false
+      "expectValid": true,
+      "expectNormalized": {
+        "textOutline": "invalid"
+      }
     },
     {
       "id": "banner-empty",

@@ -1,14 +1,14 @@
 ---
-id: PRD-0027
+id: PRD-0028
 title: Framework-independent render catalog and widget schema pilot
 status: in-progress
 locked: true
 created: 2026-10-21
 related_adrs:
-  - ADR-0036
+  - ADR-0039
 ---
 
-# PRD-0027: Framework-Independent Render Catalog and Widget Schema Pilot
+# PRD-0028: Framework-Independent Render Catalog and Widget Schema Pilot
 
 ## Problem
 
@@ -80,10 +80,11 @@ Den befintliga Next-publishern renderar utan Django vid förfrågningar, men reg
 
 ## Linked ADRs
 
-- [ADR-0036](../adrs/active/0036-frozen-pilot-behavior-baseline.md): frysta kontrakt, isolerad referenskörning och separat kandidatstatus.
+- [ADR-0039](../adrs/active/0039-frozen-pilot-behavior-baseline.md): frysta kontrakt, isolerad referenskörning och separat kandidatstatus.
 
 ## Completion Evidence
 
 - 2026-10-21: `python3 scripts/pilot_baseline.py run --output /tmp/eceee-pilot-baseline-verified` passerade alla obligatoriska baslinjekontroller; inga överhoppade eller flaky fall. Status `passed_with_known_reference_issues`: befintlig Headline-casingavvikelse är dokumenterad, inte korrigerad eller godkänd för en ersättare.
 - 2026-10-21: `python3 -m unittest discover -s scripts/tests -p test_pilot_baseline.py -v` passerade 4 tester. Black, isort, flake8 för berörda backendfiler, fokuserad frontend-ESLint, CI-YAML, specs-validering och lokala dokumentlänkar passerade.
 - Baslinjen kördes lokalt på implementationsarbetskatalogen före commit; rapporten redovisar föräldra-HEAD och `workingTreeDirty: true`. Referensproduktkoden är oförändrad från `9da0eb18451db16f5b8406f1c0c6c5a4f108483d`. Katalog-/validatorflytt och verifiering av en Django-fri kandidat återstår.
+- Inför merge uppdaterades referensen uttryckligen till `e80248dc4588ef90bcb6c7ef5b2d84759de9d16a` för redan mergade Banner-outline-kontrakt. Fixture-README dokumenterar skillnaderna. Dokumentidentiteterna blev PRD-0028 / ADR-0039 för att undvika kollision med mains PRD-0027 / ADR-0036; kravtexten är i övrigt oförändrad.
