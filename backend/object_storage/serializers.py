@@ -8,7 +8,6 @@ following camelCase API conventions and existing patterns.
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.utils import timezone
 from rest_framework import serializers
 
 from content.models import Namespace
@@ -790,22 +789,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         return obj.id
 
     def get_status(self, obj):
-        """Return computed publication status based on current published version"""
-        # Check if object has a currently published version
-        current_version = obj.get_current_published_version()
-
-        if current_version:
-            # Has a published version
-            return "published"
-
-        # Check if there's a version scheduled for future
-        latest_version = obj.get_latest_version()
-        if latest_version and latest_version.effective_date:
-            if latest_version.effective_date > timezone.now():
-                return "scheduled"
-
-        # Default to draft
-        return "draft"
+        return obj.get_publication_status()
 
     def get_is_published(self, obj):
         """Return publication status"""
@@ -820,25 +804,35 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         return obj.versions.count()
 
     def to_representation(self, instance):
-        """Add data and widgets from current version to the serialized output"""
+        """Read the canonical editor snapshot without creating a working copy."""
+        from webpages.utils.widget_serialization import serialize_widget_slots
+
+        from .services.version_workflow import ObjectVersionWorkflow
+
         data = super().to_representation(instance)
-
-        # Add data and widgets from current version
-        data["data"] = instance.data
-
-        # Convert widget configurations from snake_case to camelCase and inject active variants
-        if instance.widgets and isinstance(instance.widgets, dict):
-            from webpages.utils.widget_serialization import serialize_widget_slots
-
-            data["widgets"] = serialize_widget_slots(instance.widgets)
-        else:
-            data["widgets"] = instance.widgets
-
+        workflow = ObjectVersionWorkflow(instance)
+        editable = workflow.editable()
+        version = editable or workflow.live() or workflow.versions().first()
+        if version:
+            data.update(
+                title=version.content_title,
+                is_working_copy=editable is not None,
+                data=version.data,
+                widgets=(
+                    serialize_widget_slots(version.widgets) if isinstance(version.widgets, dict) else version.widgets
+                ),
+                version=version.version_number,
+                version_id=version.id,
+                edit_revision=version.edit_revision,
+                version_updated_at=version.updated_at,
+                is_featured=version.is_featured,
+            )
         from webpages.theme_widgets import empty_widget_types, iter_widgets, object_widget_theme
 
-        if any(iter_widgets(instance.widgets)):
+        if any(iter_widgets(version.widgets if version else {})):
             theme = object_widget_theme(instance.tenant_id)
             data["theme_widget_types"] = theme.widget_types if theme else empty_widget_types()
+
         return data
 
     def validate_object_type_id(self, value):
@@ -982,7 +976,9 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         try:
             instance = super().create(validated_data)
             # Include initial widgets in the same transaction as the object itself.
-            instance.create_version(user, data=data, widgets=widgets, change_description="Initial version")
+            instance.create_version(
+                user, data=data, widgets=widgets, change_description="Initial version", sync_relationships=False
+            )
         except ValidationError as exc:
             raise serializers.ValidationError({"widgets": exc.messages}) from exc
 
@@ -1029,6 +1025,7 @@ class ObjectInstanceListSerializer(serializers.ModelSerializer):
     object_type_name = serializers.CharField(source="object_type.name", read_only=True)
     object_type_label = serializers.CharField(source="object_type.label", read_only=True)
     created_by_name = serializers.CharField(source="created_by.username", read_only=True)
+    status = serializers.SerializerMethodField()
     is_published = serializers.SerializerMethodField()
     parent_title = serializers.CharField(source="parent.title", read_only=True)
 
@@ -1054,6 +1051,9 @@ class ObjectInstanceListSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "slug", "version", "created_at", "updated_at"]
 
+    def get_status(self, obj):
+        return obj.get_publication_status()
+
     def get_is_published(self, obj):
         """Return publication status"""
         return obj.is_published()
@@ -1078,6 +1078,9 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
             "version_id",
             "object_instance",
             "version_number",
+            "title",
+            "updated_at",
+            "edit_revision",
             "data",
             "widgets",
             "created_by",
@@ -1097,6 +1100,9 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
             "version_id",
             "object_instance",
             "version_number",
+            "title",
+            "updated_at",
+            "edit_revision",
             "data",
             "widgets",
             "created_by",
@@ -1217,6 +1223,9 @@ class ObjectVersionListSerializer(serializers.ModelSerializer):
             "object_instance",
             "object_title",
             "version_number",
+            "title",
+            "updated_at",
+            "edit_revision",
             "created_by_name",
             "created_at",
             "change_description",
@@ -1230,6 +1239,9 @@ class ObjectVersionListSerializer(serializers.ModelSerializer):
             "id",
             "object_instance",
             "version_number",
+            "title",
+            "updated_at",
+            "edit_revision",
             "created_by_name",
             "created_at",
             "publication_status",

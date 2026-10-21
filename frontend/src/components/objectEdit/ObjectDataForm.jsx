@@ -19,30 +19,37 @@ const ObjectDataForm = forwardRef(({
     onSave,
     onValidationChange,
     onFormChange,
+    initializeObject = true,
     context
 }, ref) => {
     const [namespace, setNamespace] = useState(null)
 
     // ODC Integration
-    const { useExternalChanges, publishUpdate, setIsDirty: setUDCDirty } = useUnifiedData()
+    const { useExternalChanges, publishUpdate, getState, setIsDirty: setUDCDirty } = useUnifiedData()
     const componentId = useMemo(() => `object-data-form-${instance?.id || 'new'}`, [instance?.id])
     const contextType = useEditorContext()
     const isThemePreview = context?.mode === 'theme-preview'
 
-    // Form state management
-    const [formData, setFormData] = useState({
+    // The editor page owns initialization; remounting a tab must keep its working copy.
+    const formInstance = useCallback(() => {
+        const state = getState()
+        return !initializeObject && instance?.id && String(state.metadata.currentObjectId) === String(instance?.id)
+            ? state.objects[String(instance.id)] || instance
+            : instance
+    }, [getState, initializeObject, instance])
+    const [formData, setFormData] = useState(() => ({
         objectTypeId: objectType?.id || '',
-        title: instance?.title || '',
-        data: instance?.data || {},
-        status: instance?.status || 'draft',
-        widgets: instance?.widgets || {},
-        metadata: instance?.metadata || {}
-    })
+        title: formInstance()?.title || '',
+        data: formInstance()?.data || {},
+        status: formInstance()?.status || 'draft',
+        widgets: formInstance()?.widgets || {},
+        metadata: formInstance()?.metadata || {}
+    }))
 
     const [errors, setErrors] = useState({})
 
-    // Ref for debouncing data field updates
-    const dataFieldTimeoutRef = useRef(null)
+    const formDataRef = useRef(formData)
+    formDataRef.current = formData
 
     // Fetch available object types for selection (when creating)
     const { data: typesResponse } = useQuery({
@@ -54,10 +61,11 @@ const ObjectDataForm = forwardRef(({
     const availableTypes = typesResponse?.data || []
 
     // Subscribe to external changes from ODC
-    useExternalChanges(componentId, (state) => {
+    useExternalChanges(componentId, () => {
         if (!instance?.id) return;
 
-        const objectData = state.objects?.[String(instance.id)];
+        // Deferred notifications may describe a snapshot from before the latest keystroke.
+        const objectData = getState().objects?.[String(instance.id)];
         if (objectData) {
             const newFormData = {
                 objectTypeId: objectData.objectType?.id || objectData.objectTypeId || '',
@@ -100,7 +108,7 @@ const ObjectDataForm = forwardRef(({
 
     // Initialize ODC object data when instance changes
     useEffect(() => {
-        if (instance && instance.id) {
+        if (initializeObject && instance && instance.id) {
             // Initialize object in ODC
             publishUpdate(componentId, OperationTypes.INIT_OBJECT, {
                 id: String(instance.id),
@@ -110,37 +118,28 @@ const ObjectDataForm = forwardRef(({
                     type: instance?.objectType?.name || 'unknown',
                     status: instance?.status || 'draft',
                     metadata: instance?.metadata || {},
-                    widgets: instance?.widgets || {}
+                    widgets: instance?.widgets || {},
+                    currentVersionId: instance.versionId ? String(instance.versionId) : undefined
                 }
             });
         }
-    }, [instance, componentId, publishUpdate])
+    }, [instance, componentId, publishUpdate, initializeObject])
 
-    // Update form data when instance changes (keep local state for immediate UI feedback)
+    // Read the existing working copy when returning to Content or receiving a save baseline.
     useEffect(() => {
-        if (instance) {
-            const newFormData = {
-                objectTypeId: instance.objectType?.id || '',
-                title: instance.title || '',
-                data: instance.data || {},
-                status: instance.status || 'draft',
-                widgets: instance.widgets || {},
-                metadata: instance.metadata || {}
-            }
-
-            setFormData(newFormData)
-            setErrors({}) // Clear errors when instance changes
+        const source = formInstance()
+        if (source) {
+            setFormData({
+                objectTypeId: source.objectType?.id || '',
+                title: source.title || '',
+                data: source.data || {},
+                status: source.status || 'draft',
+                widgets: source.widgets || {},
+                metadata: source.metadata || {}
+            })
+            setErrors({})
         }
-    }, [instance])
-
-    // Cleanup timeout on component unmount
-    useEffect(() => {
-        return () => {
-            if (dataFieldTimeoutRef.current) {
-                clearTimeout(dataFieldTimeoutRef.current);
-            }
-        };
-    }, [])
+    }, [formInstance])
 
     // Helper function to map componentType to React component name
     const mapComponentTypeToComponent = (componentType) => {
@@ -319,50 +318,24 @@ const ObjectDataForm = forwardRef(({
         }
     }, [errors, onFormChange, instance?.id, componentId, publishUpdate, setUDCDirty])
 
-    // Update nested data field with debouncing
+    // Publish local edits immediately so Save and tab navigation see the complete working copy.
     const handleDataFieldChange = useCallback((fieldName, value) => {
         setUDCDirty(true)
-
-        // Update local state immediately for instant UI feedback
-        setFormData(prev => {
-            const updated = {
-                ...prev,
-                data: { ...prev.data, [fieldName]: value }
-            };
-            onFormChange?.(updated);
-            return updated;
-        });
-
-        // Clear error when user starts typing
-        const errorKey = `data_${fieldName}`;
-        if (errors[errorKey]) {
-            setErrors(prev => ({ ...prev, [errorKey]: null }));
+        const updated = {
+            ...formDataRef.current,
+            data: { ...formDataRef.current.data, [fieldName]: value },
         }
-
-        // Cancel any pending publish (debounce pattern)
-        if (dataFieldTimeoutRef.current) {
-            clearTimeout(dataFieldTimeoutRef.current);
-        }
-
-        // Schedule publish of final state after user stops typing
+        formDataRef.current = updated
+        setFormData(updated)
+        onFormChange?.(updated)
+        const errorKey = `data_${fieldName}`
+        setErrors(previous => ({ ...previous, [errorKey]: null }))
         if (instance?.id) {
-            dataFieldTimeoutRef.current = setTimeout(() => {
-                // Capture current form state at time of publish
-                setFormData(current => {
-                    // Notify parent of the change (outside render cycle)
-                    Promise.resolve().then(() => onFormChange?.(current));
-
-                    publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
-                        id: String(instance.id),
-                        updates: { data: current.data }
-                    });
-                    return current; // No change to state
-                });
-            }, 300); // 300ms delay - responsive for typing
+            publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
+                id: String(instance.id), updates: { data: updated.data },
+            })
         }
-    }, [errors, onFormChange, instance?.id, componentId, publishUpdate, setUDCDirty])
-
-
+    }, [onFormChange, instance?.id, componentId, publishUpdate, setUDCDirty])
 
     // Expose methods to parent component
     useImperativeHandle(ref, () => ({
@@ -422,7 +395,7 @@ const ObjectDataForm = forwardRef(({
                     </div>
                 )}
                 <div className="text-gray-500 text-sm mt-1">
-                    This is the object's display title (stored on the object, not in schema data)
+                    The display title is saved with the working copy and becomes public when published.
                 </div>
             </div>
 

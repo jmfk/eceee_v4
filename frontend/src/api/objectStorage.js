@@ -9,6 +9,12 @@ import { api } from './client.js'
 
 const BASE_URL = '/api/v1/objects'
 
+const normalizedMetadata = (value) => JSON.stringify(value, (_, item) => (
+    item && typeof item === 'object' && !Array.isArray(item)
+        ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
+        : item
+))
+
 /**
  * Object Type Definition API
  */
@@ -137,6 +143,32 @@ export const objectInstancesApi = {
     async get(id, requestConfig = {}) {
         const response = await api.get(`${BASE_URL}/objects/${id}/`, requestConfig)
         return response
+    },
+
+    async getWorkflow(id) {
+        return api.get(`${BASE_URL}/objects/${id}/workflow/`)
+    },
+
+    async saveWorkingCopy(id, content, version, baseline) {
+        const payload = {
+            title: content.title,
+            data: content.data,
+            widgets: content.widgets,
+            is_featured: content.isFeatured || false,
+            expected_version_id: version.id,
+            expected_revision: version.editRevision,
+        }
+        const baselineParentId = baseline?.parent?.id ?? baseline?.parent ?? null
+        const parentId = content.parentId ?? null
+        if (baseline && String(parentId) !== String(baselineParentId)) {
+            payload.parent = parentId
+            payload.expected_parent_id = baselineParentId
+        }
+        if (baseline && normalizedMetadata(content.metadata ?? {}) !== normalizedMetadata(baseline.metadata ?? {})) {
+            payload.metadata = content.metadata ?? {}
+            payload.expected_metadata = baseline.metadata ?? {}
+        }
+        return api.post(`${BASE_URL}/objects/${id}/save_working_copy/`, payload)
     },
 
     /**
@@ -369,25 +401,39 @@ export const objectVersionsApi = {
     /**
      * Publish a version immediately
      */
-    async publish(versionId, data = {}) {
-        const response = await api.post(`${BASE_URL}/versions/${versionId}/publish/`, data)
+    async publish(versionId, revision) {
+        const response = await api.post(`${BASE_URL}/versions/${versionId}/publish/`, { expected_version_id: versionId, expected_revision: revision })
         return response
     },
 
     /**
      * Schedule a version for future publication
      */
-    async schedule(versionId, data) {
-        const response = await api.post(`${BASE_URL}/versions/${versionId}/schedule/`, data)
+    async schedule(versionId, data, revision) {
+        const response = await api.post(`${BASE_URL}/versions/${versionId}/schedule/`, { ...data, expected_version_id: versionId, expected_revision: revision })
         return response
     },
 
     /**
      * Unpublish a version
      */
-    async unpublish(versionId) {
-        const response = await api.post(`${BASE_URL}/versions/${versionId}/unpublish/`)
+    async unpublish(versionId, revision) {
+        const response = await api.post(`${BASE_URL}/versions/${versionId}/unpublish/`, { expected_version_id: versionId, expected_revision: revision })
         return response
+    },
+
+    async cancelSchedule(version) {
+        return api.post(`${BASE_URL}/versions/${version.id}/cancel_schedule/`, {
+            expected_version_id: version.id, expected_revision: version.editRevision,
+        })
+    },
+
+    async restore(sourceVersionId, reviewedVersion) {
+        return api.post(`${BASE_URL}/versions/${reviewedVersion.id}/restore/`, {
+            source_version_id: sourceVersionId,
+            expected_version_id: reviewedVersion.id,
+            expected_revision: reviewedVersion.editRevision,
+        })
     }
 }
 

@@ -101,6 +101,9 @@ def refresh_publication_caches(now=None):
             reject_scheduled_activation(page, error)
             continue
         updated_count += 1
+    from object_storage.services.version_workflow import refresh_scheduled_object_publications
+
+    refresh_scheduled_object_publications(now)
     return updated_count
 
 

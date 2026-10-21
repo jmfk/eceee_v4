@@ -16,19 +16,19 @@ import { OperationTypes } from '../../contexts/unified-data/types/operations';
 const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewInstance, onSave, onCancel, onUnsavedChanges, context }, ref) => {
     const navigate = useNavigate()
     const { instanceId, objectTypeId, tab } = useParams()
-    const [localWidgets, setLocalWidgets] = useState(instance?.widgets || {})
+    const { useExternalChanges, publishUpdate, getState } = useUnifiedData()
+    const workingWidgets = useCallback(() => getState().objects[String(instanceId)]?.widgets || instance?.widgets || {}, [getState, instanceId, instance])
+    const [localWidgets, setLocalWidgets] = useState(workingWidgets)
     const [namespace, setNamespace] = useState(null)
     const [formValidationState, setFormValidationState] = useState({ isValid: true, errors: {} })
-
-    const { useExternalChanges, publishUpdate } = useUnifiedData()
 
     const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
 
     // Subscribe to external changes from UDC
-    useExternalChanges(componentId, (state) => {
+    useExternalChanges(componentId, () => {
         if (!instanceId) return;
 
-        const objectData = state.objects?.[String(instanceId)];
+        const objectData = getState().objects?.[String(instanceId)];
         if (objectData) {
             // Sync widgets from UDC state
             if (objectData.widgets && JSON.stringify(objectData.widgets) !== JSON.stringify(localWidgets)) {
@@ -121,9 +121,9 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
     // Sync local widgets with instance
     useEffect(() => {
         if (instance) {
-            setLocalWidgets(instance.widgets || {})
+            setLocalWidgets(workingWidgets())
         }
-    }, [instance])
+    }, [instance, workingWidgets])
 
     // Form change callback - track current form data
     const handleFormChange = useCallback((newFormData) => {
@@ -165,6 +165,7 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                                     ref={formRef}
                                     objectType={objectType}
                                     instance={instance}
+                                    initializeObject={false}
                                     isNewInstance={isNewInstance}
                                     onFormChange={handleFormChange}
                                     onValidationChange={handleValidationChange}
@@ -185,6 +186,7 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                                 ref={formRef}
                                 objectType={objectType}
                                 instance={instance}
+                                initializeObject={false}
                                 isNewInstance={isNewInstance}
                                 onFormChange={handleFormChange}
                                 onValidationChange={handleValidationChange}

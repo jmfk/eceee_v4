@@ -175,22 +175,22 @@ function reader(client: PoolClient): PageReader {
         created_at: 'object.created_at, object.id',
         '-updated_at': 'object.updated_at DESC, object.id DESC',
         updated_at: 'object.updated_at, object.id',
-        title: 'object.title, object.id',
-        '-title': 'object.title DESC, object.id DESC',
+        title: "COALESCE(NULLIF(published.title, ''), object.title), object.id",
+        '-title': "COALESCE(NULLIF(published.title, ''), object.title) DESC, object.id DESC",
       };
       const order = sortOrders[query.sortOrder] ?? sortOrders['-publish_date'];
       const priority = query.pinnedFirst
         ? `(object.metadata @> '{"pinned": true}'::jsonb OR object.metadata @> '{"featured": true}'::jsonb) DESC, `
         : query.featuredFirst ? 'published.is_featured DESC, ' : '';
       const result = await client.query<PublishedObject>(`
-        SELECT object.id::text, object.title, object.slug,
+        SELECT object.id::text, COALESCE(NULLIF(published.title, ''), object.title) AS title, object.slug,
           jsonb_build_object('id', type.id::text, 'name', type.name, 'label', type.label, 'pluralLabel', type.plural_label) AS "objectType",
           published.data, published.widgets, object.metadata,
           published.effective_date::text AS "publishDate", published.is_featured AS "isFeatured",
           object.created_at::text AS "createdAt", object.updated_at::text AS "updatedAt", object.level,
           CASE WHEN $8::boolean THEN (
             SELECT jsonb_build_object(
-              'id', parent.id::text, 'title', parent.title, 'slug', parent.slug,
+              'id', parent.id::text, 'title', COALESCE(NULLIF(parent_published.title, ''), parent.title), 'slug', parent.slug,
               'objectType', jsonb_build_object('id', parent_type.id::text, 'name', parent_type.name,
                 'label', parent_type.label, 'pluralLabel', parent_type.plural_label)
             )
@@ -198,7 +198,7 @@ function reader(client: PoolClient): PageReader {
             JOIN object_storage_objecttypedefinition AS parent_type ON parent_type.id = parent.object_type_id
             LEFT JOIN content_namespace AS parent_namespace ON parent_namespace.id = parent_type.namespace_id
             JOIN LATERAL (
-              SELECT 1
+              SELECT parent_version.title
               FROM object_storage_objectversion AS parent_version
               WHERE parent_version.object_instance_id = parent.id
                 AND parent_version.effective_date <= $4
@@ -213,7 +213,7 @@ function reader(client: PoolClient): PageReader {
           ) ELSE NULL END AS parent,
           CASE WHEN $8::boolean THEN COALESCE((
             SELECT jsonb_agg(jsonb_build_object(
-              'id', ancestor.id::text, 'title', ancestor.title, 'slug', ancestor.slug,
+              'id', ancestor.id::text, 'title', COALESCE(NULLIF(ancestor_published.title, ''), ancestor.title), 'slug', ancestor.slug,
               'objectType', jsonb_build_object('id', ancestor_type.id::text, 'name', ancestor_type.name,
                 'label', ancestor_type.label, 'pluralLabel', ancestor_type.plural_label)
             ) ORDER BY ancestor.lft)
@@ -221,7 +221,7 @@ function reader(client: PoolClient): PageReader {
             JOIN object_storage_objecttypedefinition AS ancestor_type ON ancestor_type.id = ancestor.object_type_id
             LEFT JOIN content_namespace AS ancestor_namespace ON ancestor_namespace.id = ancestor_type.namespace_id
             JOIN LATERAL (
-              SELECT 1
+              SELECT ancestor_version.title
               FROM object_storage_objectversion AS ancestor_version
               WHERE ancestor_version.object_instance_id = ancestor.id
                 AND ancestor_version.effective_date <= $4
@@ -237,7 +237,7 @@ function reader(client: PoolClient): PageReader {
           ), '[]'::jsonb) ELSE '[]'::jsonb END AS ancestors,
           CASE WHEN $8::boolean THEN COALESCE((
             SELECT jsonb_agg(jsonb_build_object(
-              'id', child.id::text, 'title', child.title, 'slug', child.slug,
+              'id', child.id::text, 'title', COALESCE(NULLIF(child_published.title, ''), child.title), 'slug', child.slug,
               'objectType', jsonb_build_object('id', child_type.id::text, 'name', child_type.name,
                 'label', child_type.label, 'pluralLabel', child_type.plural_label),
               'publishDate', child_published.effective_date::text
@@ -246,7 +246,7 @@ function reader(client: PoolClient): PageReader {
             JOIN object_storage_objecttypedefinition AS child_type ON child_type.id = child.object_type_id
             LEFT JOIN content_namespace AS child_namespace ON child_namespace.id = child_type.namespace_id
             JOIN LATERAL (
-              SELECT child_version.effective_date
+              SELECT child_version.title, child_version.effective_date
               FROM object_storage_objectversion AS child_version
               WHERE child_version.object_instance_id = child.id
                 AND child_version.effective_date <= $4
@@ -263,7 +263,7 @@ function reader(client: PoolClient): PageReader {
         JOIN object_storage_objecttypedefinition AS type ON type.id = object.object_type_id
         LEFT JOIN content_namespace AS type_namespace ON type_namespace.id = type.namespace_id
         JOIN LATERAL (
-          SELECT version.data, version.widgets, version.effective_date, version.is_featured
+          SELECT version.title, version.data, version.widgets, version.effective_date, version.is_featured
           FROM object_storage_objectversion AS version
           WHERE version.object_instance_id = object.id
             AND version.effective_date <= $4

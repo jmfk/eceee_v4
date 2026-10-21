@@ -217,6 +217,8 @@ class NewsDetailWidget(BaseWidget):
             if not published_version:
                 return None, None
 
+            obj.title = published_version.content_title
+
             # Step 3: Return both for rendering
             return obj, published_version
 

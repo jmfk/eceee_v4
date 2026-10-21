@@ -384,12 +384,12 @@ class PublishedObjectManager(models.Manager):
         Annotate queryset with published version data.
 
         Returns queryset annotated with:
-        - is_featured: boolean from current_version.is_featured
+        - is_featured: boolean from the live version
         """
         if now is None:
             now = timezone.now()
 
-        from django.db.models import Exists, F, OuterRef
+        from django.db.models import Exists, OuterRef, Subquery
 
         # Subquery to get published version for each object
         published_versions = (
@@ -399,7 +399,7 @@ class PublishedObjectManager(models.Manager):
         )
 
         return self.get_queryset().annotate(
-            is_featured=F("current_version__is_featured"),
+            is_featured=Subquery(published_versions.values("is_featured")[:1]),
             has_published_version=Exists(published_versions),
         )
 
@@ -425,9 +425,9 @@ class PublishedObjectManager(models.Manager):
         """
         Order by featured status (featured first).
 
-        Uses the is_featured field from current_version.
+        Uses the live version rather than the editable current_version pointer.
         """
-        return self.get_queryset().order_by("-current_version__is_featured")
+        return self.with_published_versions().order_by("-is_featured")
 
 
 class ObjectInstance(MPTTModel):
@@ -858,6 +858,15 @@ class ObjectInstance(MPTTModel):
         current_version = self.get_current_published_version(now)
         return current_version is not None
 
+    def get_publication_status(self, now=None):
+        """Object browser status uses the same dates as public content selection."""
+        now = now or timezone.now()
+        if self.get_current_published_version(now):
+            return "published"
+        if self.versions.filter(effective_date__gt=now).exists():
+            return "scheduled"
+        return "draft"
+
     def get_current_published_version(self, now=None):
         """
         Get the currently published version using date-based logic.
@@ -934,7 +943,7 @@ class ObjectInstance(MPTTModel):
 
         return True
 
-    def create_version(self, user, data=None, widgets=None, change_description=""):
+    def create_version(self, user, data=None, widgets=None, change_description="", *, sync_relationships=True):
         """Create a new version of this object with the provided data and widgets.
 
         Args:
@@ -952,14 +961,17 @@ class ObjectInstance(MPTTModel):
         version_widgets = widgets if widgets is not None else (self.widgets.copy() if self.current_version else {})
 
         # Create the new version
-        new_version = ObjectVersion.objects.create(
+        new_version = ObjectVersion(
             object_instance=self,
             version_number=next_version,
+            title=self.title,
             data=version_data,
             widgets=version_widgets,
             created_by=user,
             change_description=change_description,
         )
+
+        new_version.save(sync_relationships=sync_relationships)
 
         # Update current version pointer and version counter
         self.current_version = new_version
@@ -1043,7 +1055,7 @@ class ObjectInstance(MPTTModel):
         if now is None:
             now = timezone.now()
 
-        from django.db.models import F
+        from django.db.models import OuterRef, Subquery
 
         # Start with published objects only
         queryset = cls.published.published_only(now).select_related("object_type", "current_version")
@@ -1057,14 +1069,16 @@ class ObjectInstance(MPTTModel):
         if object_type_ids:
             queryset = queryset.filter(object_type_id__in=object_type_ids)
 
-        # Annotate with featured status if needed
-        if prioritize_featured:
-            queryset = queryset.annotate(is_featured=F("current_version__is_featured"))
-
-        # Map publish_date to actual field
-        sort_field = sort_order
-        if "publish_date" in sort_order:
-            sort_field = sort_order.replace("publish_date", "current_version__effective_date")
+        live_versions = (
+            ObjectVersion.objects.filter(object_instance=OuterRef("pk"), effective_date__lte=now)
+            .filter(models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gt=now))
+            .order_by("-version_number")
+        )
+        queryset = queryset.annotate(
+            is_featured=Subquery(live_versions.values("is_featured")[:1]),
+            live_effective_date=Subquery(live_versions.values("effective_date")[:1]),
+        )
+        sort_field = sort_order.replace("publish_date", "live_effective_date")
 
         # Apply sorting
         if prioritize_featured:
@@ -1533,6 +1547,15 @@ class ObjectVersion(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     change_description = models.TextField(blank=True, help_text="Description of changes made in this version")
 
+    title = models.CharField(max_length=255, blank=True, default="")
+    edit_revision = models.PositiveIntegerField(default=1)
+    workflow_metadata = models.JSONField(default=dict, blank=True)
+
+    @property
+    def content_title(self):
+        """Legacy versions inherit the title recorded on their Object."""
+        return self.title or self.object_instance.title
+
     # Publication date fields - similar to PageVersion
     effective_date = models.DateTimeField(blank=True, null=True, help_text="When this version becomes active/published")
     expiry_date = models.DateTimeField(
@@ -1729,19 +1752,24 @@ class ObjectVersion(models.Model):
 
     @transaction.atomic
     def save(self, *args, **kwargs):
-        """
-        Override save to sync relationships from data.
-        """
+        """Keep revision tokens current for internal imports as well as editor saves."""
+        sync_relationships = kwargs.pop("sync_relationships", True)
+        advance_revision = kwargs.pop("advance_revision", True) and not self._state.adding
+        if advance_revision:
+            self.edit_revision = models.F("edit_revision") + 1
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = [*kwargs["update_fields"], "edit_revision", "updated_at"]
         from core.models import Tenant
         from webpages.theme_widgets import validate_version_widgets
 
         Tenant.objects.select_for_update().get(pk=self.object_instance.tenant_id)
         validate_version_widgets(self)
-        # Call parent save first
-        super().save(*args, **kwargs)
 
-        # Sync relationships after save
-        self.sync_relationships_from_data()
+        super().save(*args, **kwargs)
+        if advance_revision:
+            self.refresh_from_db(fields=["edit_revision", "updated_at"])
+        if sync_relationships:
+            self.sync_relationships_from_data()
 
     def to_dict(self):
         """Convert to dictionary for API serialization."""

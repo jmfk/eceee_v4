@@ -8,14 +8,39 @@ These widgets integrate with the existing widget system to show dynamic objects.
 from datetime import datetime
 from typing import Optional, Type
 
-from django.db.models import Q
+from django.db.models import F, OuterRef, Q, Subquery, Value
+from django.db.models.functions import Coalesce, NullIf
 from django.utils import timezone
 from pydantic import BaseModel, Field, validator
 
 from webpages.widget_registry import BaseWidget, register_widget_type
 from widget_contracts import catalog_widget
 
-from .models import ObjectInstance, ObjectTypeDefinition
+from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
+
+
+def _bind_public_snapshot(obj, now):
+    """Attach render-only fields from the live version without changing its pointer."""
+    version = obj.get_current_published_version(now)
+    if version:
+        obj.title = version.content_title
+        obj.render_data = version.data
+        obj.render_publish_date = version.effective_date
+    return version
+
+
+def _order_by_public_title(queryset, order_by, now):
+    """Sort on the same live title rendered after the queryset is limited."""
+    live_title = (
+        ObjectVersion.objects.filter(object_instance_id=OuterRef("pk"), effective_date__lte=now)
+        .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+        .order_by("-version_number")
+        .values("title")[:1]
+    )
+    direction = "-" if order_by.startswith("-") else ""
+    return queryset.annotate(public_title=Coalesce(NullIf(Subquery(live_title), Value("")), F("title"))).order_by(
+        f"{direction}public_title", f"{direction}id"
+    )
 
 
 class ObjectListConfig(BaseModel):
@@ -154,7 +179,8 @@ class ObjectListWidget(BaseWidget):
             object_type = object_types.get()
 
             # Public rendering must always start from effective, unexpired versions.
-            queryset = ObjectInstance.published.published_only().filter(object_type=object_type)
+            now = timezone.now()
+            queryset = ObjectInstance.published.published_only(now).filter(object_type=object_type)
             if tenant:
                 queryset = queryset.filter(tenant=tenant)
 
@@ -164,15 +190,12 @@ class ObjectListWidget(BaseWidget):
                 queryset = queryset.filter(status=config.status_filter)
 
             # Apply ordering
-            if config.order_by.lstrip("-") == "publish_date":
-                from django.db.models import OuterRef, Subquery
-                from django.utils import timezone
-
-                from .models import ObjectVersion
-
+            if config.order_by.lstrip("-") == "title":
+                queryset = _order_by_public_title(queryset, config.order_by, now)
+            elif config.order_by.lstrip("-") == "publish_date":
                 published_version = (
-                    ObjectVersion.objects.filter(object_instance=OuterRef("pk"), effective_date__lte=timezone.now())
-                    .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=timezone.now()))
+                    ObjectVersion.objects.filter(object_instance=OuterRef("pk"), effective_date__lte=now)
+                    .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
                     .order_by("-version_number")
                 )
                 direction = "-" if config.order_by.startswith("-") else ""
@@ -187,14 +210,21 @@ class ObjectListWidget(BaseWidget):
 
             # Prepare objects with excerpts
             for obj in objects:
-                published_version = obj.get_current_published_version()
-                if published_version:
-                    obj.render_publish_date = published_version.effective_date
+                published_version = _bind_public_snapshot(obj, now)
                 obj.excerpt = self._get_excerpt(
                     obj,
                     config,
                     published_version.data if published_version else {},
                 )
+                if config.show_hierarchy and obj.parent_id:
+                    parent = (
+                        ObjectInstance.published.published_only(now)
+                        .filter(pk=obj.parent_id, tenant=tenant, object_type__is_active=True)
+                        .filter(Q(object_type__namespace__tenant=tenant) | Q(object_type__namespace__isnull=True))
+                        .first()
+                    )
+                    if parent and _bind_public_snapshot(parent, now):
+                        obj.render_parent = parent
 
             return {
                 "objects": objects,
@@ -319,6 +349,7 @@ class ObjectDetailWidget(BaseWidget):
 
             published_version = obj.get_current_published_version()
             if published_version:
+                obj.title = published_version.content_title
                 obj.render_publish_date = published_version.effective_date
 
             context = {
@@ -341,13 +372,12 @@ class ObjectDetailWidget(BaseWidget):
                     )
                 published_ids = list(published_qs.values_list("id", flat=True))
 
-                context.update(
-                    {
-                        "ancestors": obj.get_ancestors().filter(id__in=published_ids),
-                        "children": obj.get_children().filter(id__in=published_ids),
-                        "siblings": obj.get_siblings().filter(id__in=published_ids),
-                    }
-                )
+                ancestors = list(obj.get_ancestors().filter(id__in=published_ids))
+                children = list(obj.get_children().filter(id__in=published_ids))
+                siblings = list(obj.get_siblings().filter(id__in=published_ids))
+                for relative in (*ancestors, *children, *siblings):
+                    _bind_public_snapshot(relative, now)
+                context.update({"ancestors": ancestors, "children": children, "siblings": siblings})
 
             return context
 
@@ -429,14 +459,26 @@ class ObjectChildrenWidget(BaseWidget):
     def get_context_data(self, config: ObjectChildrenConfig, page_context: dict) -> dict:
         """Get children objects and prepare context for template rendering"""
         try:
+            current_page = page_context.get("current_page") or page_context.get("page")
+            tenant = getattr(current_page, "tenant", None)
+            if tenant is None:
+                return {"children": [], "error": "Tenant context is required", "config": config}
+            now = timezone.now()
+            published_qs = (
+                ObjectInstance.published.published_only(now)
+                .filter(tenant=tenant, object_type__is_active=True)
+                .filter(Q(object_type__namespace__tenant=tenant) | Q(object_type__namespace__isnull=True))
+            )
             parent_obj = None
 
             # Get parent object (using version-based publishing)
             if config.parent_object_id:
-                parent_obj = ObjectInstance.published.published_only().filter(id=config.parent_object_id).first()
+                parent_obj = published_qs.filter(id=config.parent_object_id).first()
             else:
                 # Try to get from page context (if object detail page)
-                parent_obj = page_context.get("object")
+                context_obj = page_context.get("object")
+                if context_obj:
+                    parent_obj = published_qs.filter(id=context_obj.id).first()
 
             if not parent_obj:
                 return {
@@ -445,11 +487,9 @@ class ObjectChildrenWidget(BaseWidget):
                     "config": config,
                 }
 
-            # Get children with hierarchy (filter to only published)
-            from django.utils import timezone
+            _bind_public_snapshot(parent_obj, now)
 
-            now = timezone.now()
-            published_qs = ObjectInstance.published.published_only(now)
+            # Get children with hierarchy (filter to only published)
             published_ids = list(published_qs.values_list("id", flat=True))
 
             children = parent_obj.get_descendants().filter(
@@ -461,8 +501,14 @@ class ObjectChildrenWidget(BaseWidget):
                 object_type = ObjectTypeDefinition.objects.get(name=config.object_type_filter, is_active=True)
                 children = children.filter(object_type=object_type)
 
-            # Apply ordering and limit
-            children = children.order_by(config.order_by)[: config.limit]
+            # Apply ordering and limit using the live title when requested.
+            if config.order_by.lstrip("-") == "title":
+                children = _order_by_public_title(children, config.order_by, now)
+            else:
+                children = children.order_by(config.order_by)
+            children = list(children[: config.limit])
+            for child in children:
+                _bind_public_snapshot(child, now)
 
             return {"parent_object": parent_obj, "children": children, "config": config}
 

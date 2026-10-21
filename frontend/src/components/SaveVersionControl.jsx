@@ -24,6 +24,8 @@ const SaveVersionControl = ({
                 <button
                     type="button"
                     onClick={onHistoryClick}
+                    aria-label="History"
+                    title="History"
                     className="flex min-h-9 items-center gap-1 rounded border border-gray-300 bg-white px-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
                     <History className="h-3.5 w-3.5" />
@@ -34,6 +36,8 @@ const SaveVersionControl = ({
                 <button
                     type="button"
                     onClick={onScheduleClick}
+                    aria-label="Schedule"
+                    title="Schedule"
                     className="flex min-h-9 items-center gap-1 rounded border border-gray-300 bg-white px-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
                     <Calendar className="h-3.5 w-3.5" />
