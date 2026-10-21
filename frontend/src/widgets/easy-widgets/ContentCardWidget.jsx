@@ -416,7 +416,7 @@ const ContentCardWidget = ({
 
     function renderWithEditorControls(content) {
         return <WidgetEditorControls mode={mode} label="Content Card" controls={<>
-            {usesCustomMarkup && <WidgetEditorButton title={editingStyledText ? 'Preview style' : 'Edit text'} onClick={() => setEditingStyledText(value => !value)}>
+            {usesCustomMarkup && <WidgetEditorButton valueLabel={editingStyledText ? 'Style preview' : 'Text editing'} title={editingStyledText ? 'Preview style' : 'Edit text'} onClick={() => setEditingStyledText(value => !value)}>
                 <Type className="h-4 w-4" />
             </WidgetEditorButton>}
             <WidgetEditorButton title="Edit card image" aria-label="Image" onClick={() => setShowImageModal(true)}>

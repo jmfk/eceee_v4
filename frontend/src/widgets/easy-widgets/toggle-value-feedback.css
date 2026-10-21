@@ -1,0 +1,25 @@
+.toggle-value-feedback {
+    position: fixed;
+    z-index: 10000;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: calc(100vw - 2rem);
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.75rem;
+    background: rgb(17 24 39 / 80%);
+    color: white;
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: center;
+    pointer-events: none;
+    animation: toggle-value-fade 1.6s ease-out forwards;
+}
+@keyframes toggle-value-fade {
+    0%, 55% { opacity: 0.9; }
+    100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .toggle-value-feedback { animation-timing-function: steps(1, end); }
+}

@@ -96,7 +96,7 @@ const HeadlineWidget = ({
     function renderWithEditorControls(content) {
         if (!usesCustomMarkup) return content
         return <WidgetEditorControls mode={mode} label="Headline" controls={
-            <WidgetEditorButton title={editingStyledText ? 'Preview style' : 'Edit text'} onClick={() => setEditingStyledText(value => !value)}>
+            <WidgetEditorButton valueLabel={editingStyledText ? 'Style preview' : 'Text editing'} title={editingStyledText ? 'Preview style' : 'Edit text'} onClick={() => setEditingStyledText(value => !value)}>
                 <Type className="h-4 w-4" />
             </WidgetEditorButton>
         }>{content}</WidgetEditorControls>
