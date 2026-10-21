@@ -257,6 +257,9 @@ jobs:
       - name: Run backend tests
         run: make backend-test
 
+      - name: Verify pilot comparator rejects regressions
+        run: python3 -m unittest discover -s scripts/tests -p test_pilot_baseline.py -v
+
       - name: Clean up Docker resources
         if: always()
         run: |
@@ -309,12 +312,18 @@ jobs:
         working-directory: frontend
         run: npm run test:e2e:admin
 
+      - name: Run isolated pilot browser baseline
+        working-directory: frontend
+        run: npx playwright test --config playwright.pilot.config.js
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: frontend-admin-playwright-report
-          path: frontend/playwright-report/
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/pilot/
           if-no-files-found: ignore
 
   frontend-public-e2e:

@@ -12,6 +12,10 @@ COMPOSE_DEV = $(DOCKER_COMPOSE) $(COMPOSE_DEV_FILES)
 COMPOSE_INFRA = $(DOCKER_COMPOSE) $(COMPOSE_INFRA_FILES)
 COMPOSE_TEST = $(DOCKER_COMPOSE) $(COMPOSE_TEST_FILES)
 DEV_SERVICES := backend frontend publisher celery-worker
+
+.PHONY: pilot-baseline
+pilot-baseline: ## Run the frozen widget pilot baseline in isolated disposable containers.
+	python3 scripts/pilot_baseline.py run $(PILOT_BASELINE_ARGS)
 PY_LINT_BASE ?= origin/main
 
 # Global help request check

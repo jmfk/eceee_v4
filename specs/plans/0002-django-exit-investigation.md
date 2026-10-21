@@ -175,3 +175,4 @@ Ingen tillförlitlig totaltidsuppskattning kan göras från antal filer. Använd
 - Applikationstester har inte körts: inga applikationsändringar har gjorts. Befintliga testfiler har lästs som kontraktsunderlag; det räknas inte som ett nytt godkänt testresultat.
 - Ingen push, PR, CI-körning eller produktionsoperation ingår. Worktree och utkast behålls för fortsatt arbete.
 - 2026-10-21: Ägarens krav på verifierat bibehållen funktion har preciserats i PLAN-0003 och PRD-0027. Testkällor har kartlagts; körbar baslinje och kandidatjämförelse återstår. Detta är inte ett godkänt applikationstestresultat.
+- 2026-10-21: Pilotens första körbara referensbaslinje är därefter implementerad och lokalt verifierad i separat worktree `django-pilot-baseline`, branch `codex/django-pilot-baseline`. Se [PLAN-0003:s körresultat](0003-django-parity-verification.md#genomförd-pilotbaslinje-2026-10-21). Någon Django-fri ersättare har ännu inte verifierats.
