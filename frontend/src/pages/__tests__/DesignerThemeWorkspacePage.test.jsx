@@ -2926,7 +2926,9 @@ describe('DesignerThemeWorkspacePage', () => {
         fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
         await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
         expect(Object.keys(mocks.save.mock.calls[0][1]).sort()).toEqual(['colors', 'description', 'draftVersion', 'fonts', 'name', 'spacing', 'typography'])
-        fireEvent.click(screen.getByRole('button', { name: /publish changes/i }))
+        const publishButton = screen.getByRole('button', { name: /publish changes/i })
+        await waitFor(() => expect(publishButton).toBeEnabled())
+        fireEvent.click(publishButton)
         await waitFor(() => expect(mocks.publish).toHaveBeenCalledWith('7', 3))
     })
 
