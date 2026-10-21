@@ -58,15 +58,15 @@ class BannerWidgetTests(SimpleTestCase):
                 self.assertIsNone(prepared[inactive_field])
         self.assertEqual(self.config, original)
 
-    def test_presentation_schema_and_existing_banners_default_to_no_outline(self):
+    def test_presentation_schema_keeps_banner_text_plain(self):
         properties = BannerConfig.model_json_schema()["properties"]
-        self.assertEqual(properties["textOutline"]["enum"], ["none", "dark", "light"])
+        self.assertNotIn("textOutline", properties)
         prepared = self.widget.prepare_template_context(self.config)
-        self.assertIn("--banner-text-shadow: none;", prepared["banner_style"])
+        self.assertIn("text-shadow: none;", prepared["banner_style"])
 
-    def test_palette_colors_and_outline_reach_the_template(self):
+    def test_palette_colors_reach_the_template_without_old_outlines(self):
         theme = SimpleNamespace(colors={"paper": "#ffffff", "ocean": "#082f49"})
-        for outline, expected in (("dark", "#000"), ("light", "#fff")):
+        for outline in ("dark", "light"):
             with self.subTest(outline=outline):
                 prepared = self.widget.prepare_template_context(
                     {**self.config, "textColor": "paper", "backgroundColor": "ocean", "textOutline": outline},
@@ -74,9 +74,9 @@ class BannerWidgetTests(SimpleTestCase):
                 )
                 self.assertIn("--banner-text-color: var(--paper);", prepared["banner_style"])
                 self.assertIn("background-color: var(--ocean);", prepared["banner_style"])
-                self.assertIn(f"1px 1px 0 {expected}", prepared["banner_style"])
+                self.assertIn("text-shadow: none;", prepared["banner_style"])
 
-    def test_direct_colors_and_snake_case_outline_are_preserved(self):
+    def test_direct_colors_are_preserved_and_old_snake_case_outline_is_ignored(self):
         prepared = self.widget.prepare_template_context(
             {
                 "text_content": "<p>Body</p>",
@@ -87,7 +87,7 @@ class BannerWidgetTests(SimpleTestCase):
         )
         self.assertIn("--banner-text-color: #fff;", prepared["banner_style"])
         self.assertIn("background-color: #082f49;", prepared["banner_style"])
-        self.assertIn("1px 1px 0 #fff", prepared["banner_style"])
+        self.assertIn("text-shadow: none;", prepared["banner_style"])
 
     def test_custom_styles_cannot_access_inactive_images_or_cached_urls(self):
         theme = SimpleNamespace(

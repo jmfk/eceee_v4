@@ -187,7 +187,7 @@ describe('PageRenderer', () => {
         expect(container.querySelector('.banner-image')).toBeNull()
     })
 
-    it.each(['text', 'header'])('preserves named colors and text outlines in the %s banner render', bannerMode => {
+    it.each(['text', 'header'])('preserves named colors and plain text in the %s banner render', bannerMode => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'banner', type: 'easy_widgets.BannerWidget', config: {
                 banner_mode: bannerMode, header_content: '<h2>Heading</h2>', text_content: '<h3>Text heading</h3><p>Body</p>',
@@ -200,20 +200,17 @@ describe('PageRenderer', () => {
         expect(banner.style.color).toBe('var(--paper, paper)')
         expect(banner.style.backgroundColor).toBe('var(--ocean, ocean)')
         expect(banner.style.getPropertyValue('--banner-text-color')).toBe('var(--paper, paper)')
-        expect(banner.style.getPropertyValue('--banner-text-shadow')).toContain('#000')
+        expect(banner.style.textShadow).toBe('none')
     })
 
-    it.each(['none', 'dark', 'light', '__proto__'])('renders direct banner colors safely with outline %s', textOutline => {
+    it.each(['none', 'dark', 'light', '__proto__'])('renders direct banner colors without an outline even with stored value %s', textOutline => {
         const model = createPageRenderModel({ widgets: { main: [{ id: 'banner', type: 'easy_widgets.BannerWidget', config: {
             textContent: '<p>Body</p>', textColor: '#ffffff', backgroundColor: '#082f49', textOutline,
         } }] } })
         const { container } = render(<PageRenderer model={model} />)
         const banner = container.querySelector('.banner-widget') as HTMLElement
         expect(banner).toHaveStyle({ color: '#ffffff', backgroundColor: '#082f49' })
-        const shadow = banner.style.getPropertyValue('--banner-text-shadow')
-        if (textOutline === 'dark') expect(shadow).toContain('#000')
-        else if (textOutline === 'light') expect(shadow).toContain('#fff')
-        else expect(shadow).toBe('none')
+        expect(banner.style.textShadow).toBe('none')
     })
 
     it.each(['text', 'header'])('renders only the active banner image in %s mode with both images saved', (bannerMode) => {

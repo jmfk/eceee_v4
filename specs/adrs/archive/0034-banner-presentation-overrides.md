@@ -1,12 +1,13 @@
 ---
 id: ADR-0034
 title: Banner presentation overrides
-status: accepted
+status: superseded
 date: 2026-10-21
 related_prds:
   - PRD-0026
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0035
 ---
 
 # ADR-0034: Banner Presentation Overrides

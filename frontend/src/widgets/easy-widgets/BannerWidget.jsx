@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { FileText, Type, AlignLeft, ImagePlus, Layers, Square, RectangleHorizontal, Baseline, PaintBucket, ALargeSmall } from 'lucide-react'
+import { FileText, Type, AlignLeft, ImagePlus, Layers, Square, RectangleHorizontal, Baseline, PaintBucket } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -171,7 +171,6 @@ const BannerWidget = ({
         && useCustomStyle[componentStyle].template?.trim() !== '{{passthru}}'
     const textColor = configRef.current.textColor || configRef.current.text_color || '#000000'
     const backgroundColor = configRef.current.backgroundColor || configRef.current.background_color || '#ffffff'
-    const textOutline = configRef.current.textOutline ?? configRef.current.text_outline ?? 'none'
 
     // Build inline styles for colors and background image
     const bannerStyle = {
@@ -520,8 +519,6 @@ const BannerWidget = ({
         const isHeader = bannerMode === 'header'
         const isRectangle = imageSize === 'rectangle'
         const buttonClassName = 'relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700'
-        const outlineLabels = { none: 'Off', dark: 'Dark', light: 'Light' }
-        const nextOutline = { none: 'dark', dark: 'light', light: 'none' }[textOutline] || 'dark'
         return <div className="banner-widget-editor group/banner relative isolate min-h-10">
             <div ref={presentationToolbarRef} role="toolbar" aria-label="Banner controls"
                 className="eceee-editor-ui absolute right-2 top-2 z-10 flex max-w-[calc(100%-1rem)] flex-wrap items-center justify-end gap-1 opacity-0 pointer-events-none group-hover/banner:opacity-100 group-hover/banner:pointer-events-auto group-focus-within/banner:opacity-100 group-focus-within/banner:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto"
@@ -560,16 +557,6 @@ const BannerWidget = ({
                     onChange={value => handlePresentationChange('backgroundColor', value)}
                     onOpenChange={handlePaletteOpenChange} onClose={handlePaletteClose}
                     icon={<PaintBucket className="h-4 w-4" />} title="Background color" compact />
-                <Tooltip text={`Text outline: ${outlineLabels[textOutline] || 'Off'}. Change to ${outlineLabels[nextOutline]}.`}>
-                    <button type="button" className={buttonClassName}
-                        aria-label={`Text outline: ${outlineLabels[textOutline] || 'Off'}`}
-                        aria-pressed={textOutline === 'dark' || textOutline === 'light'}
-                        onMouseDown={event => event.preventDefault()}
-                        onClick={() => handlePresentationChange('textOutline', nextOutline)}>
-                        <ALargeSmall className="h-4 w-4" />
-                        <span className={`absolute bottom-1 h-0.5 w-4 ${textOutline === 'light' ? 'bg-white ring-1 ring-gray-400' : textOutline === 'dark' ? 'bg-black' : 'bg-transparent'}`} />
-                    </button>
-                </Tooltip>
             </div>
             <div className="relative z-0">{content}</div>
             {showImageModal && editingField === (isHeader ? 'backgroundImage' : 'image1') && <MediaSelectModal
@@ -621,7 +608,6 @@ BannerWidget.defaultConfig = {
     image1: null,
     textColor: '#000000',
     backgroundColor: '#ffffff',
-    textOutline: 'none',
     componentStyle: 'default'
 }
 
