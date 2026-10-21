@@ -810,6 +810,16 @@ const PageEditor = () => {
 
         // Priority 1: Use DataManager data if available (preserves websocket updates during hot-reload)
         if (existingPage && existingVersion) {
+            // Cached data still needs to become the active editing context after
+            // returning from another page or an object editor.
+            if (String(udcState.metadata.currentPageId) !== String(pageId)
+                || String(udcState.metadata.currentVersionId) !== String(versionId)
+                || udcState.metadata.currentObjectId) {
+                void publishUpdate(`page-editor-${pageId}-${versionId}`, OperationTypes.SWITCH_VERSION, {
+                    pageId: existingVersion.pageId,
+                    versionId: existingVersion.id,
+                });
+            }
             const mergedPage = mergeVersionedPageAttributes(existingPage, existingVersion);
             setWebpageData(mergedPage);
             setPageVersionData(existingVersion);
