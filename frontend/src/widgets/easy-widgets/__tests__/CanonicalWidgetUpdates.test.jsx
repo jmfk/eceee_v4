@@ -700,6 +700,35 @@ describe('inline widget controls', () => {
         expect(rendererInstances.filter(instance => instance.editorElement.isConnected)).toHaveLength(0)
     })
 
+    it.each([[ContentCardWidget, { header: 'Heading', content: '<p>Body</p>' }, 2],
+        [HeadlineWidget, { content: 'Heading' }, 1]])('keeps text editors mounted when a passthrough theme loads asynchronously', (Widget, fields, count) => {
+        const props = { mode: 'editor', widgetId: 'loading-theme', slotName: 'main',
+            config: { ...fields, componentStyle: 'passthrough' }, onConfigChange: vi.fn() }
+        const { rerender } = render(<Widget {...props} />)
+        expect(rendererInstances.filter(instance => instance.editorElement.isConnected)).toHaveLength(count)
+        currentTheme = { componentStyles: { passthrough: { template: '{{passthru}}', css: 'color: navy;' } } }
+        rerender(<Widget {...props} />)
+        expect(rendererInstances.filter(instance => instance.editorElement.isConnected)).toHaveLength(count)
+        const editor = rendererInstances.filter(instance => instance.editorElement.isConnected)[0]
+        act(() => editor.emitChange('Edited after loading'))
+        expect(props.onConfigChange).toHaveBeenCalledWith(expect.objectContaining({
+            [Widget === ContentCardWidget ? 'header' : 'content']: 'Edited after loading',
+        }))
+        currentTheme = null
+        rerender(<Widget {...props} />)
+        expect(rendererInstances.filter(instance => instance.editorElement.isConnected)).toHaveLength(count)
+    })
+
+    it('keeps Headline text editable after changing the heading level', () => {
+        const props = { mode: 'editor', widgetId: 'heading-level', slotName: 'main', onConfigChange: vi.fn() }
+        const { rerender } = render(<HeadlineWidget {...props} config={{ content: 'Heading', headerLevel: 'h1' }} />)
+        rerender(<HeadlineWidget {...props} config={{ content: 'Heading', headerLevel: 'h2' }} />)
+        const active = rendererInstances.filter(instance => instance.editorElement.isConnected)
+        expect(active).toHaveLength(1)
+        act(() => active[0].emitChange('Edited H2'))
+        expect(props.onConfigChange).toHaveBeenCalledWith(expect.objectContaining({ content: 'Edited H2', headerLevel: 'h2' }))
+    })
+
     it('Bio preserves original proportions by default and cycles through all shapes', () => {
         const onConfigChange = vi.fn()
         const { container } = render(<BioWidget mode="editor" config={{ image: { url: '/portrait.jpg' }, bioText: 'Bio' }} onConfigChange={onConfigChange} />)

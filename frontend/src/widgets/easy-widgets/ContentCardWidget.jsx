@@ -60,7 +60,8 @@ const ContentCardWidget = ({
     const [editingStyledText, setEditingStyledText] = useState(false)
     const componentStyle = configRef.current.componentStyle || 'default'
     const style = currentTheme?.componentStyles?.[componentStyle]
-    const usesCustomMarkup = componentStyle !== 'default' && Boolean(style) && style.template?.trim() !== '{{passthru}}'
+    const usesPassthruStyle = componentStyle !== 'default' && style?.template?.trim() === '{{passthru}}'
+    const usesCustomMarkup = componentStyle !== 'default' && Boolean(style) && !usesPassthruStyle
     const canEditInline = !usesCustomMarkup || editingStyledText
 
     useEffect(() => { setEditingStyledText(false) }, [componentStyle])
@@ -188,7 +189,7 @@ const ContentCardWidget = ({
         }
     }, [onConfigChange])
 
-    // Initialize editors in editor mode (only once)
+    // Reinitialize when a late passthrough theme replaces the editor hosts.
     useEffect(() => {
         if (mode === 'editor' && canEditInline) {
             // Initialize header editor
@@ -237,7 +238,7 @@ const ContentCardWidget = ({
                 contentEditorRef.current = null
             }
         }
-    }, [mode, componentStyle, canEditInline])
+    }, [mode, componentStyle, canEditInline, usesPassthruStyle])
 
     // Update onChange callbacks and context when handlers change
     useEffect(() => {

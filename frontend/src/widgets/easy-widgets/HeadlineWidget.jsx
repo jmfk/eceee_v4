@@ -79,9 +79,11 @@ const HeadlineWidget = ({
     const contentContainerRef = useRef(null)
 
     const [editingStyledText, setEditingStyledText] = useState(false)
+    const headerLevel = configRef.current.headerLevel || 'h1'
     const componentStyle = configRef.current.componentStyle || 'default'
     const style = currentTheme?.componentStyles?.[componentStyle]
-    const usesCustomMarkup = componentStyle !== 'default' && Boolean(style) && style.template?.trim() !== '{{passthru}}'
+    const usesPassthruStyle = componentStyle !== 'default' && style?.template?.trim() === '{{passthru}}'
+    const usesCustomMarkup = componentStyle !== 'default' && Boolean(style) && !usesPassthruStyle
     const canEditInline = !usesCustomMarkup || editingStyledText
     useEffect(() => { setEditingStyledText(false) }, [componentStyle])
     useEffect(() => {
@@ -160,7 +162,7 @@ const HeadlineWidget = ({
         }
     }, [widgetId, slotName, onConfigChange])
 
-    // Initialize editor in editor mode
+    // Reinitialize when the theme wrapper or heading level replaces the editor host.
     useEffect(() => {
         if (mode === 'editor' && canEditInline) {
             if (contentContainerRef.current && !contentEditorRef.current) {
@@ -170,7 +172,7 @@ const HeadlineWidget = ({
                     mode: 'inline-rich',
                     onChange: handleContentChange,
                     placeholder: 'Enter headline...',
-                    element: configRef.current.headerLevel || 'h1',
+                    element: headerLevel,
                     allowedButtons: ['bold', 'italic', 'link'],
                     pageId: pageId,
                     siteRootId: context?.siteRootId,
@@ -186,7 +188,7 @@ const HeadlineWidget = ({
                 contentEditorRef.current = null
             }
         }
-    }, [mode, componentStyle, canEditInline])
+    }, [mode, componentStyle, canEditInline, usesPassthruStyle, headerLevel])
 
     // Separate effect for onChange, pageId, and siteRootId updates
     useEffect(() => {
@@ -206,11 +208,11 @@ const HeadlineWidget = ({
             if (contentEditorRef.current) {
                 contentEditorRef.current.updateConfig({
                     content: configRef.current.content || '',
-                    element: configRef.current.headerLevel || 'h1'
+                    element: headerLevel
                 })
             }
         }
-    }, [configRef.current.content, configRef.current.headerLevel, mode])
+    }, [configRef.current.content, headerLevel, mode])
 
     // Check if using component style with Mustache template
     const useCustomStyle = componentStyle && componentStyle !== 'default' && currentTheme?.componentStyles
@@ -268,7 +270,7 @@ const HeadlineWidget = ({
 
     // Default rendering helper function
     function renderDefaultHeadline() {
-        const HeaderTag = configRef.current.headerLevel || 'h1'
+        const HeaderTag = headerLevel
         const borderClass = configRef.current.showBorder === false ? 'border-disabled' : ''
 
         if (mode === 'editor') {
