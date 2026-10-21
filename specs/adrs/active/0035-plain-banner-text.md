@@ -14,7 +14,7 @@ superseded_by: []
 
 ## Decision
 
-The owner narrowed the scope to clean banner text without an outline. Remove the new outline field and toolbar action; ignore any stored outline choices from the initial implementation. Explicitly render banner text without a text shadow, including nested headings and links.
+Clarified owner scope: clean text is one selectable mode, not the removal of the outline feature. Keep the outline field and toolbar action cycling through No outline, Dark outline and Light outline. Default to No outline and explicitly render that mode without text shadow, including nested headings and links. Show the newly selected value briefly in a large, semi-transparent overlay that fades away when cycling widget controls.
 
 Keep text and background color controls in the WYSIWYG toolbar. Palette colors resolve through theme variables, and the banner's explicit text color overrides theme typography within its text area. Retain the compact icon actions and descriptive help across all widget text, image and table toolbars.
 

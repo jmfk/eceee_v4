@@ -45,3 +45,9 @@ related_adrs:
 - A focus-scroll regression was reproduced in the CI Playwright Linux image and corrected; its full 43-case suite passed. In the final plain-text browser run, 42 cases passed and one reload timed out while loading; that reload passed twice on focused rerun.
 - Backend: seven banner tests passed. Publisher typecheck and six render/theme tests passed. Generated manifest matches the canonical backend export.
 - Frontend lint passed with existing warnings; production build, specs governance and diff checks passed. No database migration is required.
+
+## Owner clarification — 2026-10-21
+
+The earlier no-outline scope note was a misunderstanding. Keep the outline button cycling through No outline, Dark outline and Light outline; No outline is the default. Theme-managed presets remain deferred. Cycling widget controls show the selected value in a large, semi-transparent, non-interactive overlay that fades away. This includes banner mode, outline, image shape and text editing/style preview controls. Reduced-motion preferences suppress the gradual fade.
+
+Owner-requested review of the clarified revision found no verified P0–P3 defects. Focused verification passed: 208 frontend tests (widget config/rendering and feedback lifetime), seven Django banner tests, three Chromium banner editor/render cases, touched-component ESLint and diff checks. Broad local suites were not repeated; prior evidence applies to unchanged code. The pre-push full-suite hook was skipped for this push in line with the owner's requested efficient verification scope.

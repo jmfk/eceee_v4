@@ -279,7 +279,7 @@ describe('canonical widget update ownership', () => {
         backgroundAssignments.mockRestore()
     })
 
-    it.each(['text', 'header'])('BannerWidget edits colors with plain text inline without remounting its %s editor', async bannerMode => {
+    it.each(['text', 'header'])('BannerWidget edits colors and outline inline without remounting its %s editor', async bannerMode => {
         currentTheme = { colors: { paper: '#ffffff', ocean: '#082f49' } }
         const onConfigChange = vi.fn()
         const { container } = render(<BannerWidget mode="editor" widgetId="banner-colors" slotName="main"
@@ -296,15 +296,19 @@ describe('canonical widget update ownership', () => {
         fireEvent.click(screen.getByTitle('paper'))
         fireEvent.click(screen.getByRole('button', { name: 'Background color', exact: true }))
         fireEvent.click(screen.getByTitle('ocean'))
+        fireEvent.click(screen.getByRole('button', { name: 'Text outline: No outline' }))
 
         expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({
-            textColor: 'paper', backgroundColor: 'ocean',
+            textColor: 'paper', backgroundColor: 'ocean', textOutline: 'dark',
         }))
         const element = container.querySelector('.banner-widget')
         expect(element.style.getPropertyValue('--banner-text-color')).toBe('var(--paper, paper)')
         expect(element.style.backgroundColor).toBe('var(--ocean, ocean)')
-        expect(element.style.textShadow).toBe('none')
-        expect(screen.queryByRole('button', { name: /Text outline/ })).not.toBeInTheDocument()
+        expect(element.style.getPropertyValue('--banner-text-shadow')).toContain('#000')
+        fireEvent.click(screen.getByRole('button', { name: 'Text outline: Dark outline' }))
+        expect(element.style.getPropertyValue('--banner-text-shadow')).toContain('#fff')
+        fireEvent.click(screen.getByRole('button', { name: 'Text outline: Light outline' }))
+        expect(element.style.getPropertyValue('--banner-text-shadow')).toBe('none')
         expect(latestRenderer()).toBe(editor)
         expect(editor.destroy).not.toHaveBeenCalled()
         await act(async () => {})

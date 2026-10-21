@@ -69,7 +69,7 @@ const expectCanonicalStyles = async (page) => {
   await expect(page.locator('link[data-eceee-render-font]')).toHaveCount(1)
 }
 
-test('banner palette colors override theme typography with clean text in the render frame', async ({ page }) => {
+test('banner palette colors and outlines override theme typography in the render frame', async ({ page }) => {
   const theme = compileRenderStyles({ theme: {
     colors: { paper: '#ffffff', ocean: '#082f49' },
     customCss: '.cms-content h2,.cms-content h3,.cms-content p{color:#b91c1c}',
@@ -85,7 +85,7 @@ test('banner palette colors override theme typography with clean text in the ren
   await expect(page.locator('.banner-widget')).toHaveCSS('background-color', 'rgb(8, 47, 73)')
   for (const tag of ['h3', 'p']) {
     await expect(page.locator(`.banner-text ${tag}`)).toHaveCSS('color', 'rgb(255, 255, 255)')
-    await expect(page.locator(`.banner-text ${tag}`)).toHaveCSS('text-shadow', 'none')
+    await expect(page.locator(`.banner-text ${tag}`)).not.toHaveCSS('text-shadow', 'none')
   }
 })
 
