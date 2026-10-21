@@ -53,7 +53,7 @@ const Session = forwardRef(function ThemeWidgetInstanceSession({ widgetData, the
         } }))
         setErrors({})
     }
-    return <aside aria-label="Edit theme widget" className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[440px] overflow-auto border-l border-gray-300 bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 p-6 space-y-5">
+    return <aside aria-label="Edit theme widget" style={{ zIndex: 10000 }} className="fixed right-0 top-0 bottom-0 w-full sm:w-[440px] overflow-auto border-l border-gray-300 bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 p-6 space-y-5">
         <div className="flex justify-between gap-3"><h2 className="text-lg font-semibold">{definition?.item.name || 'Missing widget revision'}</h2><button disabled={busy} onClick={onClose} className="border px-3 py-2">Cancel</button></div>
         {stale && <div role="alert"><p>This widget changed elsewhere while you were editing. Your draft has been kept. Reload the latest widget before saving.</p><button disabled={busy} onClick={reload} className="border px-3 py-2">Reload latest widget</button></div>}
         <p className="text-sm">Type version {widget.typeVersion ?? widget.type_version}</p>
@@ -69,6 +69,6 @@ const Session = forwardRef(function ThemeWidgetInstanceSession({ widgetData, the
 export default forwardRef(function ThemeWidgetInstanceEditor(props, ref) {
     const theme = useWidgetTheme(props.pageVersionData?.effectiveTheme || props.webpageData?.effectiveTheme || props.context?.theme)
     if (!props.isOpen || !props.widgetData) return null
-    if (!theme) return <aside role="status" className="fixed right-0 top-0 z-50 bg-white p-6">Loading theme…<button onClick={props.onClose}>Cancel</button></aside>
+    if (!theme) return <aside role="status" style={{ zIndex: 10000 }} className="fixed right-0 top-0 bg-white p-6">Loading theme…<button onClick={props.onClose}>Cancel</button></aside>
     return <Session {...props} theme={theme} ref={ref} key={props.widgetData.id} />
 })
