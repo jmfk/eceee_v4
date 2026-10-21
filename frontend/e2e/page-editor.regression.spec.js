@@ -674,3 +674,45 @@ test.describe('stable widget side panel', () => {
     await expect(contentEditor(page, 'content-sidebar')).toHaveText('Second widget draft')
   })
 })
+
+test('inline widget image controls overlay content at regular and narrow widths', async ({ page }) => {
+  const editorState = createCollaborativeEditorState()
+  const image = { url: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22600%22%3E%3Crect width=%22400%22 height=%22600%22 fill=%22%2393c5fd%22/%3E%3Ccircle cx=%22200%22 cy=%22250%22 r=%22100%22 fill=%22%23334155%22/%3E%3C/svg%3E', altText: 'Shape fixture' }
+  editorState.version.widgets.main.push(
+    { id: 'card-inline', type: 'easy_widgets.ContentCardWidget', config: { header: 'Card heading', content: '<p>Card copy</p>', image1: image } },
+    { id: 'bio-inline', type: 'easy_widgets.BioWidget', config: { bioText: '<p>Biography</p>', image, imageSize: 'square', caption: 'Portrait caption' } },
+    { id: 'image-inline', type: 'easy_widgets.ImageWidget', config: {} },
+  )
+  await mockCmsApi(page, { authenticated: true, pageEditor: true, editorState })
+  await seedAuthenticatedSession(page)
+  await openCmsPage(page, editorPath)
+  for (const width of [1440, 768]) {
+    await page.setViewportSize({ width, height: 1000 })
+    for (const label of ['Content card', 'Bio', 'Image']) {
+      const toolbar = page.getByRole('toolbar', { name: `${label} controls` })
+      await toolbar.locator('..').hover()
+      await expect(toolbar).toHaveCSS('opacity', '1')
+      const button = toolbar.getByRole('button', { name: 'Image', exact: true })
+      await expect(button).toBeEnabled()
+      expect(await button.evaluate(element => { const rect = element.getBoundingClientRect(); return element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)) })).toBe(true)
+      await expect(toolbar.getByRole('button', { name: 'Image', exact: true })).toBeVisible()
+      await toolbar.locator('..').screenshot({ path: `/tmp/eceee-inline-${label.replace(' ', '-')}-${width}.png` })
+      const bounds = await toolbar.boundingBox()
+      expect(bounds.x).toBeGreaterThanOrEqual(0)
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(width)
+    }
+    await expect(page.getByRole('img', { name: 'No image selected' })).toBeVisible()
+    await page.screenshot({ path: `/tmp/eceee-inline-widgets-${width}.png`, fullPage: true })
+  }
+  const bio = page.getByRole('toolbar', { name: 'Bio controls' })
+  await bio.locator('..').hover()
+  await bio.getByRole('button', { name: 'Image size: Square' }).click()
+  await expect(bio.getByRole('button', { name: 'Image size: Rectangle' })).toBeVisible()
+  await bio.locator('..').screenshot({ path: '/tmp/eceee-inline-Bio-rectangle.png' })
+  const card = page.getByRole('toolbar', { name: 'Content card controls' })
+  await card.locator('..').hover()
+  await card.getByRole('button', { name: 'Image size: Square' }).click()
+  await expect(card.getByRole('button', { name: 'Image size: Rectangle' })).toBeVisible()
+  await saveCurrentVersion(page)
+  expect(getSavedVersion(editorState).widgets.main.find(widget => widget.id === 'card-inline').config.imageSize).toBe('rectangle')
+})

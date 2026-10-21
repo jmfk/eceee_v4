@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Image } from 'lucide-react'
+import { Image, ImagePlus } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -7,6 +7,8 @@ import { OperationTypes } from '../../contexts/unified-data/types/operations'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 import { renderMustache, prepareGalleryContext, prepareCarouselContext, prepareComponentContext } from '../../utils/mustacheRenderer'
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
+import MediaSelectModal from '../../components/media/MediaSelectModal'
+import WidgetEditorControls, { WidgetEditorButton } from './WidgetEditorControls'
 import { generateCSSFromBreakpoints } from '../../utils/cssBreakpointUtils'
 import { getGridStyle, getObjectFitClass } from '../../utils/imageGridLayout'
 import { mediaCollectionsApi } from '../../api/media'
@@ -52,6 +54,32 @@ const ImageWidget = ({
     const contextType = useEditorContext()
 
     const [localConfig, setLocalConfig] = useState(config)
+    const [showImageModal, setShowImageModal] = useState(false)
+    const configRef = useRef(localConfig)
+    configRef.current = localConfig
+    useEffect(() => { setLocalConfig(previous => hasWidgetContentChanged(previous, config) ? config : previous) }, [config])
+
+    const selectImage = selected => {
+        if (selected !== null && !selected?.length) return
+        const next = { ...configRef.current, image: selected === null ? null : selected[0] }
+        // Resolved/legacy media belongs to the previous selection.
+        for (const field of ['mediaItems', 'media_items', 'imageUrl', 'image_url', 'collectionId', 'collection_id']) delete next[field]
+        setCollectionMediaItems([])
+        setLocalConfig(next)
+        configRef.current = next
+        onConfigChange?.(next)
+        setShowImageModal(false)
+    }
+
+    function renderWithEditorControls(content) {
+        return <WidgetEditorControls mode={mode} label="Image" controls={
+            <WidgetEditorButton title="Edit image" onClick={() => setShowImageModal(true)}><ImagePlus className="h-4 w-4" />Image</WidgetEditorButton>
+        } picker={showImageModal && <MediaSelectModal isOpen onClose={() => setShowImageModal(false)}
+            onSelect={selectImage} mediaTypes={['image']} allowCollections currentSelection={localConfig.image}
+            namespace={context?.namespace} pageId={pageId} customTitle="Edit Image" />}
+        >{content}</WidgetEditorControls>
+    }
+
 
     // Collection resolution state
     const [collectionMediaItems, setCollectionMediaItems] = useState([])
@@ -148,8 +176,11 @@ const ImageWidget = ({
     useEffect(() => {
         if (!isCollection || !collectionId) {
             setCollectionMediaItems([])
+            setLoadingCollection(false)
             return
         }
+        let active = true
+        setCollectionMediaItems([])
 
         const fetchCollectionFiles = async () => {
             setLoadingCollection(true)
@@ -187,16 +218,17 @@ const ImageWidget = ({
                         thumbnailUrl: thumbUrl
                     }
                 })
-                setCollectionMediaItems(mediaItems)
+                if (active) setCollectionMediaItems(mediaItems)
             } catch (error) {
                 console.error('Failed to load collection files:', error)
-                setCollectionMediaItems([])
+                if (active) setCollectionMediaItems([])
             } finally {
-                setLoadingCollection(false)
+                if (active) setLoadingCollection(false)
             }
         }
 
         fetchCollectionFiles()
+        return () => { active = false }
     }, [
         isCollection,
         collectionId,
@@ -484,7 +516,7 @@ const ImageWidget = ({
     const componentStyle = localConfig.componentStyle || 'default';
     const useComponentStyle = componentStyle && componentStyle !== 'default' && currentTheme?.componentStyles;
 
-    if (useComponentStyle) {
+    if (useComponentStyle && !(mode === 'editor' && !loadingCollection && sourceItems.length === 0)) {
         const style = currentTheme.componentStyles[componentStyle];
 
         if (style) {
@@ -508,7 +540,7 @@ const ImageWidget = ({
                     // Use ComponentStyleRenderer for consistent scoped rendering
                     const styleId = `image-${widgetId || 'preview'}-${componentStyle}`;
 
-                    return (
+                    return renderWithEditorControls(
                         <ComponentStyleRenderer
                             template={style.template}
                             context={mustacheContext}
@@ -522,7 +554,7 @@ const ImageWidget = ({
                 // Passthru mode: render default with custom CSS
                 const styleId = `image-${widgetId || 'preview'}-${componentStyle}`;
 
-                return (
+                return renderWithEditorControls(
                     <div data-style-id={styleId}>
                         {style.css && <style>{`[data-style-id="${styleId}"] { ${generateCSSFromBreakpoints(style.css, currentTheme)} }`}</style>}
                         {renderDefaultImage()}
@@ -530,7 +562,7 @@ const ImageWidget = ({
                 );
             } catch (error) {
                 console.error('Error rendering custom component style:', error);
-                return (
+                return renderWithEditorControls(
                     <div>
                         <div className="text-red-500 text-sm p-2">Error rendering custom style</div>
                     </div>
@@ -562,7 +594,7 @@ const ImageWidget = ({
                     ? 'image-widget-editor p-4 custom-style'
                     : 'image-widget custom-style'
 
-                return (
+                return renderWithEditorControls(
                     <div className={wrapperClass}>
                         {style.css && <style>{generateCSSFromBreakpoints(style.css, currentTheme)}</style>}
                         <div dangerouslySetInnerHTML={{ __html: html }} />
@@ -574,7 +606,7 @@ const ImageWidget = ({
                 const wrapperClass = mode === 'editor'
                     ? 'image-widget-editor p-4 custom-style'
                     : 'image-widget custom-style'
-                return (
+                return renderWithEditorControls(
                     <div className={wrapperClass}>
                         <div className="text-red-500 text-sm p-2">Error rendering custom style</div>
                     </div>
@@ -602,9 +634,12 @@ const ImageWidget = ({
                                 // Multiple images: use displayType setting
                                 (localConfig.displayType || 'gallery') === 'carousel' ? renderCarousel() : renderGallery()
                             )
-                        ) : (
-                            null
-                        )}
+                        ) : !loadingCollection && sourceItems.length === 0 ? (
+                            <div role="img" aria-label="No image selected" className="flex aspect-video w-full flex-col items-center justify-center gap-3 bg-gray-100 text-gray-400">
+                                <Image className="h-16 w-16" aria-hidden="true" />
+                                <span className="text-sm">{isCollection ? 'This collection has no images' : 'No image selected'}</span>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
             );
@@ -633,7 +668,7 @@ const ImageWidget = ({
     }
 
     // Default rendering (no custom style selected)
-    return renderDefaultImage()
+    return renderWithEditorControls(renderDefaultImage())
 }
 
 // === COLOCATED METADATA ===

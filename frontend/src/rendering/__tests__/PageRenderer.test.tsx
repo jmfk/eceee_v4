@@ -828,6 +828,15 @@ describe('PageRenderer', () => {
         expect(screen.queryByRole('heading', { name: 'Name' })).toBeNull()
     })
 
+    it.each(['original', 'square', 'rectangle'])('renders Bio image shape %s without editor controls', imageSize => {
+        const model = createPageRenderModel({ widgets: { main: [{ id: 'bio', type: 'easy_widgets.BioWidget', config: {
+            imageSize, image: { url: '/portrait.jpg', altText: 'Portrait' }, bioText: '<p>Biography</p>',
+        } }] } })
+        const { container } = render(<PageRenderer model={model} />)
+        expect(container.querySelector(`.bio-widget--image-${imageSize}`)).toBeInTheDocument()
+        expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
+    })
+
     it('renders canonical table rows, headers, HTML and cell spans', () => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'table', type: 'easy_widgets.TableWidget', config: {

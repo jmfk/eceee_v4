@@ -651,3 +651,76 @@ describe('canonical widget update ownership', () => {
         }))
     })
 })
+
+
+describe('inline widget controls', () => {
+    beforeEach(() => {
+        rendererInstances = []
+        bioRendererInstances = []
+        externalChangeCallbacks = []
+        publishUpdateMock = vi.fn()
+        currentTheme = null
+        vi.restoreAllMocks()
+        vi.clearAllMocks()
+    })
+    it.each([['Content Card', ContentCardWidget, { header: 'Header', content: '<p>Body</p>' }, 'image1'],
+        ['Bio', BioWidget, { bioText: '<p>Bio</p>' }, 'image']])('%s keeps image and size actions reachable after adding and removing images', async (label, Widget, config, field) => {
+        const onConfigChange = vi.fn()
+        render(<Widget mode="editor" widgetId="controls" slotName="main" config={config} onConfigChange={onConfigChange} />)
+        const toolbar = screen.getByRole('toolbar', { name: `${label} controls` })
+        expect(toolbar).toHaveClass('absolute', 'z-10', 'opacity-0', 'pointer-events-none')
+        expect(toolbar.parentElement).toHaveClass('isolate')
+        expect(toolbar.className).toContain('group-focus-within/widget-controls:opacity-100')
+        fireEvent.click(screen.getByRole('button', { name: 'Image', exact: true }))
+        fireEvent.click(screen.getByRole('button', { name: 'Select test image' }))
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({ [field]: { url: '/selected.jpg' } }))
+        fireEvent.click(screen.getByRole('button', { name: /Image size:/ }))
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({ imageSize: label === 'Bio' ? 'square' : 'rectangle' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Image', exact: true }))
+        fireEvent.click(screen.getByRole('button', { name: 'Remove test image' }))
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({ [field]: null }))
+        expect(screen.getByRole('button', { name: 'Image', exact: true })).toBeInTheDocument()
+        expect(publishUpdateMock).not.toHaveBeenCalled()
+    })
+
+    it.each([['Content Card', ContentCardWidget, { header: 'Header', content: '<p>Card body</p>' }, 'header', 'Changed card'],
+        ['Headline', HeadlineWidget, { content: 'Headline' }, 'content', 'Changed headline']])('%s edits replacement-style text inside the widget and restores its styled preview', async (label, Widget, config, field, updated) => {
+        currentTheme = { componentStyles: { replacement: { template: '<section>{{header}} {{{content}}}</section>' } } }
+        const onConfigChange = vi.fn()
+        render(<Widget mode="editor" widgetId="styled" slotName="main" config={{ ...config, componentStyle: 'replacement' }} onConfigChange={onConfigChange} />)
+        expect(screen.getByRole('toolbar', { name: `${label} controls` })).toBeInTheDocument()
+        expect(rendererInstances.filter(instance => instance.editorElement.isConnected)).toHaveLength(0)
+        fireEvent.click(screen.getByRole('button', { name: 'Edit text' }))
+        const active = rendererInstances.filter(instance => instance.editorElement.isConnected)
+        expect(active.length).toBeGreaterThan(0)
+        act(() => active[0].emitChange(updated))
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({ [field]: updated }))
+        fireEvent.click(screen.getByRole('button', { name: 'Preview style' }))
+        expect(screen.getByText(new RegExp(updated))).toBeInTheDocument()
+        expect(rendererInstances.filter(instance => instance.editorElement.isConnected)).toHaveLength(0)
+    })
+
+    it('Bio preserves original proportions by default and cycles through all shapes', () => {
+        const onConfigChange = vi.fn()
+        const { container } = render(<BioWidget mode="editor" config={{ image: { url: '/portrait.jpg' }, bioText: 'Bio' }} onConfigChange={onConfigChange} />)
+        expect(container.querySelector('.bio-widget--image-original')).toBeInTheDocument()
+        for (const shape of ['square', 'rectangle', 'original']) {
+            fireEvent.click(screen.getByRole('button', { name: /Image size:/ }))
+            expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({ imageSize: shape }))
+            expect(container.querySelector(`.bio-widget--image-${shape}`)).toBeInTheDocument()
+        }
+    })
+
+    it('Bio edits captions in the WYSIWYG', () => {
+        const onConfigChange = vi.fn()
+        render(<BioWidget mode="editor" config={{ image: { url: '/portrait.jpg' }, caption: 'Original' }} onConfigChange={onConfigChange} />)
+        const caption = rendererInstances.find(instance => instance.options.content === 'Original')
+        act(() => caption.emitChange('New caption'))
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({ caption: 'New caption' }))
+    })
+
+    it.each([[ContentCardWidget, { header: 'Header' }], [BioWidget, { bioText: '<p>Bio</p>' }], [HeadlineWidget, { content: 'Headline' }]])('keeps editing controls out of preview output', (Widget, config) => {
+        render(<Widget mode="preview" config={config} />)
+        expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
+    })
+})

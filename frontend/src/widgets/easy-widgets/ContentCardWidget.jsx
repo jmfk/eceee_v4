@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { FileText, ImagePlus } from 'lucide-react'
+import { FileText, ImagePlus, Type } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -10,6 +10,7 @@ import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
 import OptimizedImage from '../../components/media/OptimizedImage'
 import MediaSelectModal from '../../components/media/MediaSelectModal'
+import WidgetEditorControls, { WidgetEditorButton, ImageSizeButton } from './WidgetEditorControls'
 
 /**
  * EASY Content Card Widget Component
@@ -56,7 +57,19 @@ const ContentCardWidget = ({
 
     // State for image edit modal
     const [showImageModal, setShowImageModal] = useState(false)
-    const [editingField, setEditingField] = useState(null)
+    const [editingStyledText, setEditingStyledText] = useState(false)
+    const componentStyle = configRef.current.componentStyle || 'default'
+    const style = currentTheme?.componentStyles?.[componentStyle]
+    const usesCustomMarkup = componentStyle !== 'default' && Boolean(style) && style.template?.trim() !== '{{passthru}}'
+    const canEditInline = !usesCustomMarkup || editingStyledText
+
+    useEffect(() => { setEditingStyledText(false) }, [componentStyle])
+    useEffect(() => {
+        if (hasWidgetContentChanged(configRef.current, config)) {
+            setConfig(config)
+            forceRerender({})
+        }
+    }, [config])
 
     // Initialize from UDC state on mount
     useEffect(() => {
@@ -133,6 +146,15 @@ const ContentCardWidget = ({
     const imageSize = configRef.current.imageSize || 'square'
     const image1 = configRef.current.image1
 
+    useEffect(() => {
+        let active = true
+        setImage1Url('')
+        if (image1) getImgproxyUrlFromImage(image1, { width: imageSize === 'rectangle' ? 280 : 140, height: 140, resize_type: 'fill' })
+            .then(url => { if (active) setImage1Url(url || '') })
+            .catch(() => { if (active) setImage1Url('') })
+        return () => { active = false }
+    }, [image1, imageSize])
+
     // Content change handlers - use configRef for stable references
     const handleHeaderChange = useCallback((newContent) => {
         if (widgetId && slotName) {
@@ -168,7 +190,7 @@ const ContentCardWidget = ({
 
     // Initialize editors in editor mode (only once)
     useEffect(() => {
-        if (mode === 'editor') {
+        if (mode === 'editor' && canEditInline) {
             // Initialize header editor
             if (headerContainerRef.current && !headerEditorRef.current) {
                 headerEditorRef.current = new SimpleTextEditorRenderer(headerContainerRef.current, {
@@ -215,7 +237,7 @@ const ContentCardWidget = ({
                 contentEditorRef.current = null
             }
         }
-    }, [mode])
+    }, [mode, componentStyle, canEditInline])
 
     // Update onChange callbacks and context when handlers change
     useEffect(() => {
@@ -252,10 +274,9 @@ const ContentCardWidget = ({
     }, [configRef.current.header, configRef.current.content, mode])
 
     // Check if using component style with Mustache template
-    const componentStyle = configRef.current.componentStyle || 'default'
     const useCustomStyle = componentStyle && componentStyle !== 'default' && currentTheme?.componentStyles
 
-    if (useCustomStyle) {
+    if (useCustomStyle && !(mode === 'editor' && editingStyledText)) {
         const style = currentTheme.componentStyles[componentStyle]
 
         if (style) {
@@ -283,7 +304,7 @@ const ContentCardWidget = ({
                     // Use ComponentStyleRenderer for consistent scoped rendering
                     const styleId = `content-card-${widgetId || 'preview'}-${componentStyle}`
 
-                    return (
+                    return renderWithEditorControls(
                         <ComponentStyleRenderer
                             template={style.template}
                             context={mustacheContext}
@@ -297,7 +318,7 @@ const ContentCardWidget = ({
                 // Passthru mode: render default with custom CSS
                 const styleId = `content-card-${widgetId || 'preview'}-${componentStyle}`
 
-                return (
+                return renderWithEditorControls(
                     <div data-style-id={styleId}>
                         {style.css && <style>{`[data-style-id="${styleId}"] { ${style.css} }`}</style>}
                         {renderDefaultCard()}
@@ -305,7 +326,7 @@ const ContentCardWidget = ({
                 )
             } catch (error) {
                 console.error('Error rendering custom component style:', error)
-                return (
+                return renderWithEditorControls(
                     <div>
                         <div className="text-red-500 text-sm p-2">Error rendering custom style</div>
                     </div>
@@ -335,17 +356,6 @@ const ContentCardWidget = ({
 
                         {image1 && (
                             <div className="content-card-images image relative group/image">
-                                {/* Image edit icon */}
-                                <button
-                                    onClick={() => {
-                                        setEditingField('image1')
-                                        setShowImageModal(true)
-                                    }}
-                                    className="eceee-editor-ui absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-lg shadow-lg opacity-0 group-hover/image:opacity-100 transition-opacity z-10"
-                                    title="Edit card image"
-                                >
-                                    <ImagePlus className="w-5 h-5 text-gray-700" />
-                                </button>
                                 <OptimizedImage
                                     src={image1.imgproxyBaseUrl || image1.fileUrl || image1.url}
                                     alt={image1.alt || image1.altText || ''}
@@ -358,32 +368,7 @@ const ContentCardWidget = ({
                             </div>
                         )}
                     </div>
-                    {/* Media Insert Modal */}
-                    {showImageModal && (
-                        <MediaSelectModal
-                            isOpen={showImageModal}
-                            onClose={() => {
-                                setShowImageModal(false)
-                                setEditingField(null)
-                            }}
-                            onSelect={(selectedItems) => {
-                                if (selectedItems === null) {
-                                    // Handle remove - set to null
-                                    handleImageChange(editingField, null)
-                                } else if (selectedItems && selectedItems.length > 0) {
-                                    handleImageChange(editingField, selectedItems[0])
-                                }
-                                setShowImageModal(false)
-                                setEditingField(null)
-                            }}
-                            mediaTypes={['image']}
-                            allowCollections={false}
-                            currentSelection={image1}
-                            namespace={namespace || context?.namespace}
-                            pageId={pageId}
-                            customTitle="Edit Card Image"
-                        />
-                    )}
+
                 </div>
             )
         }
@@ -428,15 +413,30 @@ const ContentCardWidget = ({
         )
     }
 
+    function renderWithEditorControls(content) {
+        return <WidgetEditorControls mode={mode} label="Content Card" controls={<>
+            {usesCustomMarkup && <WidgetEditorButton onClick={() => setEditingStyledText(value => !value)}>
+                <Type className="h-4 w-4" />{editingStyledText ? 'Preview style' : 'Edit text'}
+            </WidgetEditorButton>}
+            <WidgetEditorButton title="Edit card image" onClick={() => setShowImageModal(true)}>
+                <ImagePlus className="h-4 w-4" />Image
+            </WidgetEditorButton>
+            <ImageSizeButton value={imageSize} onChange={value => handleImageChange('imageSize', value)} />
+        </>} picker={showImageModal && <MediaSelectModal isOpen onClose={() => setShowImageModal(false)}
+            onSelect={selected => {
+                if (selected === null) handleImageChange('image1', null)
+                else if (selected?.length) handleImageChange('image1', selected[0])
+                setShowImageModal(false)
+            }} mediaTypes={['image']} allowCollections={false} currentSelection={image1}
+            namespace={namespace || context?.namespace} pageId={pageId} customTitle="Edit Card Image" />}
+        >{content}</WidgetEditorControls>
+    }
+
     // Default rendering (no custom style)
     const hasContent = configRef.current.header || configRef.current.content || image1
 
     if (mode === 'editor') {
-        return (
-            <div className="content-card-widget-editor">
-                {renderDefaultCard()}
-            </div>
-        )
+        return renderWithEditorControls(renderDefaultCard())
     }
 
     // Preview mode
