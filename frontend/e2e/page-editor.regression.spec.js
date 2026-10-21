@@ -79,7 +79,7 @@ test.describe('page editor regressions', () => {
       const editorState = createCollaborativeEditorState()
       editorState.version.effectiveTheme = {
         colors: { paper: '#ffffff', ocean: '#082f49' },
-        customCss: 'h2,h3,p{color:#b91c1c}',
+        customCss: 'h2,h3,p{color:#b91c1c;text-shadow:1px 1px 0 white}',
       }
       editorState.page.effectiveTheme = editorState.version.effectiveTheme
       const sibling = { id: 'column-sibling', type: 'easy_widgets.HeadlineWidget', config: { content: 'Keep this column' } }
@@ -102,7 +102,7 @@ test.describe('page editor regressions', () => {
       const toolbar = banner.getByRole('toolbar', { name: 'Banner controls' })
       await banner.hover()
       await expect(toolbar).toBeVisible()
-      expect(await toolbar.locator('button').allTextContents()).toEqual(['', '', '', '', ''])
+      expect(await toolbar.locator('button').allTextContents()).toEqual(['', '', '', ''])
       await toolbar.getByRole('button', { name: 'Text color', exact: true }).focus()
       await expect(page.getByText('Text color', { exact: true })).toBeVisible()
       await toolbar.getByRole('button', { name: 'Text color', exact: true }).press('Enter')
@@ -117,10 +117,9 @@ test.describe('page editor regressions', () => {
       expect(paletteBox.x).toBeGreaterThanOrEqual(0)
       expect(paletteBox.x + paletteBox.width).toBeLessThanOrEqual(page.viewportSize().width)
       await page.getByRole('button', { name: 'ocean', exact: true }).click()
-      await toolbar.getByRole('button', { name: 'Text outline: Off' }).click()
       await expect(editor).toHaveCSS('color', 'rgb(255, 255, 255)')
       await expect(banner.locator('.banner-widget')).toHaveCSS('background-color', 'rgb(8, 47, 73)')
-      await expect(editor).not.toHaveCSS('text-shadow', 'none')
+      await expect(editor).toHaveCSS('text-shadow', 'none')
       expect(await editor.evaluate(element => element === window.__bannerEditorElement)).toBe(true)
       await banner.screenshot({ path: `test-results/banner-styling-${scheme}.png` })
 
@@ -128,11 +127,11 @@ test.describe('page editor regressions', () => {
       const savedColumns = getSavedVersion(editorState).widgets.main.find(widget => widget.id === 'banner-columns')
       expect(savedColumns.config.slots.left).toEqual([sibling])
       expect(savedColumns.config.slots.right[0].config).toMatchObject({
-        textColor: 'paper', backgroundColor: 'ocean', textOutline: 'dark', textContent: '<p>Stored body</p>',
+        textColor: 'paper', backgroundColor: 'ocean', textContent: '<p>Stored body</p>',
       })
       await page.reload()
       await expect(editor).toHaveCSS('color', 'rgb(255, 255, 255)')
-      await expect(editor).not.toHaveCSS('text-shadow', 'none')
+      await expect(editor).toHaveCSS('text-shadow', 'none')
       await expect(banner.locator('.banner-widget')).toHaveCSS('background-color', 'rgb(8, 47, 73)')
     })
   }
@@ -162,7 +161,7 @@ test.describe('page editor regressions', () => {
     const formatting = page.locator('.global-wysiwyg-toolbar')
     await expect(formatting).toBeInViewport()
     await toolbar.getByRole('button', { name: 'Text color', exact: true }).click()
-    await toolbar.getByRole('button', { name: 'Text outline: Off' }).click()
+    await toolbar.getByRole('button', { name: 'Text color', exact: true }).click()
     await expect(editor).toBeFocused()
     await toolbar.getByRole('button', { name: 'Text color', exact: true }).click()
     // Outlast the editor's blur delay while keyboard focus is inside the palette.
@@ -637,6 +636,7 @@ test.describe('stable widget side panel', () => {
 
   test('formatting controls never edit a different richtext field', async ({ page }) => {
     installErrorGuards(page)
+    await page.setViewportSize({ width: 1280, height: 600 })
     const state = await mockCmsApi(page, { authenticated: true, pageEditor: true })
     state.version.widgets.main[0].config.secondBody = '<p>Second field</p>'
     await mockPanelSchemas(page, { secondBody: { type: 'string', component: 'RichTextInput', title: 'Second body', group: 'Content' } })

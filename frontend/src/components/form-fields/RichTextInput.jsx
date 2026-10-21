@@ -42,7 +42,8 @@ const RichTextEditor = ({ value, defaultValue = '', onChange, onBlur, onFocus, l
             if (!event.target.closest('button')) return
             const selection = window.getSelection()
             if (!selection?.rangeCount || !element.contains(selection.getRangeAt(0).commonAncestorContainer)) {
-                element.focus()
+                // Keep the clicked toolbar under the pointer until mouseup/click.
+                element.focus({ preventScroll: true })
                 if (selection && (!selection.rangeCount || !element.contains(selection.getRangeAt(0).commonAncestorContainer))) {
                     const range = document.createRange()
                     range.selectNodeContents(element)

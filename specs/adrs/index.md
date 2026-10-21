@@ -4,7 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
-| ADR-0034 | [Banner presentation overrides](active/0034-banner-presentation-overrides.md) | accepted | PRD-0026 |
+| ADR-0035 | [Plain banner text](active/0035-plain-banner-text.md) | accepted | PRD-0026 |
 | ADR-0033 | [Widget editor session and field ownership](active/0033-widget-editor-session-and-field-ownership.md) | accepted | PRD-0025 |
 | ADR-0001 | [Canonical page version workflow](active/0001-canonical-page-version-workflow.md) | accepted | PRD-0001 |
 | ADR-0002 | [Single page workflow mutation boundary](active/0002-single-page-workflow-mutation-boundary.md) | accepted | PRD-0001, PRD-0002 |
@@ -39,6 +39,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0034 | [Banner presentation overrides](archive/0034-banner-presentation-overrides.md) | superseded | PRD-0026 |
 | ADR-0006 | [Immutable theme snapshots with request-scoped remote credentials](archive/0006-theme-version-lineage.md) | superseded | PRD-0005 |
 | ADR-0012 | [Validate the publisher through an isolated hostname alias](archive/0012-isolated-publisher-test-host.md) | superseded | PRD-0010, PRD-0011 |
 | ADR-0013 | [Gate the legacy News migration through canonical golden samples](archive/0013-legacy-news-golden-sample-gate.md) | superseded | PRD-0012 |
