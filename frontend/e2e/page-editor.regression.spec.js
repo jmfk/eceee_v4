@@ -131,6 +131,7 @@ test.describe('page editor regressions', () => {
         textColor: 'paper', backgroundColor: 'ocean', textOutline: 'dark', textContent: '<p>Stored body</p>',
       })
       await page.reload()
+      await expect(page.getByTestId('page-editor-surface')).toBeVisible({ timeout: 30_000 })
       await expect(editor).toHaveCSS('color', 'rgb(255, 255, 255)')
       await expect(editor).not.toHaveCSS('text-shadow', 'none')
       await expect(banner.locator('.banner-widget')).toHaveCSS('background-color', 'rgb(8, 47, 73)')
