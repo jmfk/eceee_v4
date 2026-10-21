@@ -1,7 +1,7 @@
 import React from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { ImageSizeButton } from '../WidgetEditorControls'
+import { ImageSizeButton, WidgetEditorButton } from '../WidgetEditorControls'
 
 function ShapeControl() {
     const [size, setSize] = React.useState('square')
@@ -20,6 +20,14 @@ describe('cycling value feedback', () => {
         expect(second).toHaveTextContent('Image shape: Square')
         fireEvent.animationEnd(second)
         expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+
+    it('replaces feedback from another control instead of stacking centered labels', () => {
+        render(<><ShapeControl /><WidgetEditorButton title="Preview" valueLabel="Style preview" /></>)
+        fireEvent.click(screen.getByRole('button', { name: 'Image size: Square' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+        expect(screen.getAllByRole('status')).toHaveLength(1)
+        expect(screen.getByRole('status')).toHaveTextContent('Style preview')
     })
 
     it('removes the portal when its widget is unmounted', () => {
