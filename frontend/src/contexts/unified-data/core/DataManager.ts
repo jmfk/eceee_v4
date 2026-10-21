@@ -714,6 +714,8 @@ export class DataManager {
                                 ...state.metadata,
                                 currentVersionId: id,
                                 currentPageId: data.pageId, // Set current page ID to match version
+                                currentObjectId: undefined,
+                                currentObjectVersionId: undefined,
                                 isDirty: false // Reset dirty state when initializing version
                             }
                         };
@@ -743,6 +745,8 @@ export class DataManager {
                             metadata: {
                                 ...state.metadata,
                                 currentPageId: id,
+                                currentObjectId: undefined,
+                                currentObjectVersionId: undefined,
                                 isDirty: false // Reset dirty state when initializing version
                             }                            
                         };
@@ -1208,6 +1212,8 @@ export class DataManager {
                             metadata: {
                                 ...state.metadata,
                                 currentObjectId: id,
+                                currentPageId: undefined,
+                                currentVersionId: undefined,
                                 isDirty: false
                             }
                         } as any;
@@ -1228,6 +1234,8 @@ export class DataManager {
                             metadata: {
                                 ...state.metadata,
                                 currentObjectId: objectId,
+                                currentPageId: undefined,
+                                currentVersionId: undefined,
                                 isDirty: false
                             }
                         } as any;
@@ -1507,6 +1515,8 @@ export class DataManager {
                                 ...state.metadata,
                                 currentPageId: pageId,
                                 currentVersionId: versionId,
+                                currentObjectId: undefined,
+                                currentObjectVersionId: undefined,
                                 isDirty: false,  // Reset dirty state when switching versions
                                 // Track this version as the last viewed for this page (persists across tab switches)
                                 lastViewedVersions: {

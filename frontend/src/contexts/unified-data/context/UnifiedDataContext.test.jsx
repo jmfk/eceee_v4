@@ -8,6 +8,11 @@ import { OperationTypes } from '../types/operations'
 
 const mocks = vi.hoisted(() => ({
     updateCurrentObjectVersion: vi.fn(),
+    saveWorkingCopy: vi.fn(),
+}))
+
+vi.mock('../../../api/versions', () => ({
+    versionsApi: { saveWorkingCopy: mocks.saveWorkingCopy },
 }))
 
 vi.mock('../../../api/objectStorage', async (importOriginal) => {
@@ -65,7 +70,7 @@ const ExternalSnapshotProbe = ({ onSnapshot }) => {
 }
 
 const ObjectSaveProbe = () => {
-    const { getState, saveCurrentVersion, setIsDirty } = useUnifiedData()
+    const { getState, saveCurrentVersion, setIsDirty, publishUpdate } = useUnifiedData()
     const [dirty, setDirty] = useState(() => String(getState().metadata.isDirty))
 
     const markDirty = () => {
@@ -87,6 +92,10 @@ const ObjectSaveProbe = () => {
             <div data-testid="object-dirty-state">{dirty}</div>
             <button type="button" onClick={markDirty}>Edit object</button>
             <button type="button" onClick={save}>Save object</button>
+            <button type="button" onClick={() => publishUpdate('object-editor', OperationTypes.INIT_OBJECT, {
+                id: 'object-1',
+                data: { id: 'object-1', title: 'News', data: {}, widgets: {} },
+            })}>Open news</button>
         </div>
     )
 }
@@ -141,6 +150,7 @@ const objectEditorState = () => createAppState({
 describe('UnifiedDataContext test provider', () => {
     beforeEach(() => {
         mocks.updateCurrentObjectVersion.mockReset()
+        mocks.saveWorkingCopy.mockReset()
     })
 
     it('renders state-aware components with the shared provider harness', async () => {
@@ -197,6 +207,37 @@ describe('UnifiedDataContext test provider', () => {
             expect(mocks.updateCurrentObjectVersion).toHaveBeenCalledOnce()
             expect(screen.getByTestId('object-dirty-state')).toHaveTextContent('true')
         })
+    })
+
+    it('saves the news object after navigating from a page without calling the page API', async () => {
+        mocks.updateCurrentObjectVersion.mockResolvedValue({ id: 'object-version-1' })
+        renderWithStateProviders(<ObjectSaveProbe />, { initialState: createAppState() })
+
+        fireEvent.click(screen.getByRole('button', { name: /open news/i }))
+        fireEvent.click(screen.getByRole('button', { name: /edit object/i }))
+        fireEvent.click(screen.getByRole('button', { name: /save object/i }))
+
+        await waitFor(() => {
+            expect(mocks.updateCurrentObjectVersion).toHaveBeenCalledWith('object-1', expect.objectContaining({ title: 'News' }))
+            expect(screen.getByTestId('object-dirty-state')).toHaveTextContent('false')
+        })
+        expect(mocks.saveWorkingCopy).not.toHaveBeenCalled()
+    })
+
+    it('sends only writable page fields when saving a page', async () => {
+        mocks.saveWorkingCopy.mockResolvedValue({ id: 'version-1' })
+        renderWithStateProviders(<ObjectSaveProbe />, { initialState: createAppState() })
+
+        fireEvent.click(screen.getByRole('button', { name: /save object/i }))
+
+        await waitFor(() => expect(mocks.saveWorkingCopy).toHaveBeenCalledOnce())
+        const [versionId, payload] = mocks.saveWorkingCopy.mock.calls[0]
+        expect(versionId).toBe('version-1')
+        expect(payload).toHaveProperty('widgets')
+        expect(payload).toHaveProperty('pageData')
+        expect(payload).not.toHaveProperty('pageId')
+        expect(payload).not.toHaveProperty('id')
+        expect(mocks.updateCurrentObjectVersion).not.toHaveBeenCalled()
     })
 
     it('routes an explicit object widget update away from stale page context', async () => {

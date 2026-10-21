@@ -4,6 +4,36 @@ import { OperationTypes } from '../types/operations'
 import { createAppState, createPage, createVersion, createWidget } from '../../../test/unifiedDataTestUtils'
 
 describe('DataManager state operations', () => {
+    it('clears the page selection when opening an object while keeping cached page data', () => {
+        const manager = new DataManager(createAppState())
+        manager.dispatch({
+            type: OperationTypes.INIT_OBJECT,
+            payload: { id: 'object-1', data: { title: 'News', data: {}, widgets: {} } }
+        })
+
+        expect(manager.getState().metadata).toMatchObject({
+            currentObjectId: 'object-1',
+            currentPageId: undefined,
+            currentVersionId: undefined,
+        })
+        expect(manager.getState().versions['version-1']).toBeDefined()
+    })
+
+    it.each([
+        [OperationTypes.INIT_PAGE, { id: 'page-1', data: createPage() }],
+        [OperationTypes.INIT_VERSION, { id: 'version-1', data: createVersion() }],
+        [OperationTypes.SWITCH_VERSION, { pageId: 'page-1', versionId: 'version-1' }],
+    ])('clears object selection when activating a page via %s', (type, payload) => {
+        const manager = new DataManager(createAppState({
+            metadata: { currentObjectId: 'object-1', currentObjectVersionId: 'object-version-1' }
+        }))
+        manager.dispatch({ type, payload })
+
+        expect(manager.getState().metadata.currentPageId).toBe('page-1')
+        expect(manager.getState().metadata.currentObjectId).toBeUndefined()
+        expect(manager.getState().metadata.currentObjectVersionId).toBeUndefined()
+    })
+
     it('initializes page and version state without marking dirty', () => {
         const manager = new DataManager()
         const page = createPage()
