@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, within, fireEvent } from '@testing-library/react'
+import { render, screen, within, fireEvent, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ObjectNavigation from './ObjectNavigation'
@@ -11,8 +11,8 @@ const root = { id: 1, title: 'Root', parent: null }
 const child = { id: 2, title: 'Child', parent: 1 }
 const grandchild = { id: 3, title: 'Grandchild', parent: 2 }
 const related = { id: 4, title: 'Source' }
-const renderNavigation = (props = {}) => render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+const renderNavigation = (props = {}, client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) => render(
+    <QueryClientProvider client={client}>
         <ObjectNavigation instanceId="3" anchorId="3" onSelect={vi.fn()} {...props} />
     </QueryClientProvider>
 )
@@ -43,6 +43,21 @@ describe('Object navigation', () => {
         await screen.findByRole('list', { name: 'Object tree' })
         expect(api.getPathToRoot).toHaveBeenCalledWith('1')
         expect(api.getRelatedObjects).toHaveBeenCalledWith(1)
+    })
+
+    it('refreshes a mounted tree and relations after object mutation invalidation', async () => {
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        renderNavigation({}, client)
+        await screen.findByRole('button', { name: 'Grandchild' })
+        await screen.findByRole('button', { name: 'Source' })
+        api.getTree.mockResolvedValue({ data: [root, child, { ...grandchild, title: 'Renamed' }, { id: 5, title: 'New child', parent: 1 }] })
+        api.getRelatedObjects.mockResolvedValue({ data: { relatedObjects: [{ object: { ...related, title: 'Updated source' } }] } })
+        api.getRelatedFromObjects.mockResolvedValue({ data: { relatedFromObjects: [] } })
+        await act(() => client.invalidateQueries({ queryKey: ['objectInstances'] }))
+        expect(await screen.findByRole('button', { name: 'New child' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Renamed' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Updated source' })).toBeInTheDocument()
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Grandchild' })).not.toBeInTheDocument())
     })
 
     it('reports a failed tree without hiding related objects', async () => {

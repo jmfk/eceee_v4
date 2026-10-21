@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { createRef } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -104,6 +104,18 @@ describe('ObjectContentEditor widget config updates', () => {
     beforeEach(() => {
         publishUpdateMock.mockReset()
         useEditorContextMock.mockReturnValue('object')
+    })
+
+    it('exposes whether the widget editor is open before sidebar navigation', async () => {
+        const ref = createRef()
+        render(
+            <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+                <ObjectContentEditor ref={ref} objectType={objectType} widgets={widgets} context={{ instanceId: 'object-1' }} />
+            </QueryClientProvider>
+        )
+        expect(ref.current.isWidgetEditorOpen()).toBe(false)
+        fireEvent.click(screen.getByTitle('Edit widget configuration'))
+        await waitFor(() => expect(ref.current.isWidgetEditorOpen()).toBe(true))
     })
 
     it('publishes inline object widget config changes to Unified Data', async () => {

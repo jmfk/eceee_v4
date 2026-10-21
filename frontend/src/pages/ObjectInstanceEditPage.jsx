@@ -37,6 +37,7 @@ const ObjectInstanceEditPage = () => {
     const [udcInitError, setUdcInitError] = useState(null)
     const [isSaving, setIsSaving] = useState(false)
     const [isFeatured, setIsFeatured] = useState(false)
+    const [navigationError, setNavigationError] = useState(null)
     
     const contentTabRef = useRef(null)
     const initializedObjectId = useRef(null)
@@ -473,11 +474,17 @@ const ObjectInstanceEditPage = () => {
                         disabled={isSaving}
                         onSelect={async (id, rootId) => {
                             if (String(id) === String(instanceId) || isSaving) return
+                            if (contentTabRef.current?.hasOpenWidgetEditor()) {
+                                setNavigationError('Save or close the widget editor before switching objects.')
+                                return
+                            }
+                            setNavigationError(null)
                             try {
-                                if (hasUnsavedChanges) await handleSave()
+                                if (getState().metadata.isDirty) await handleSave()
                                 navigate(`/objects/${id}/edit/content?root=${rootId}`)
                             } catch { /* handleSave reports errors; keep the current object open. */ }
                         }} />
+                    {navigationError && <p role="alert" className="px-3 pb-3 text-sm text-red-700">{navigationError}</p>}
                 </ObjectEditorPanel>
                 <div className="flex-1 min-w-[320px] overflow-y-auto">
                 {udcInitError && (
