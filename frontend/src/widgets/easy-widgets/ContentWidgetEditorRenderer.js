@@ -735,8 +735,9 @@ class ContentWidgetEditorRenderer {
     createToolbarButton(command, title, iconSvg) {
         const button = document.createElement('button')
         button.type = 'button'
-        button.className = 'p-1 hover:bg-gray-200 rounded'
+        button.className = 'inline-flex h-8 w-8 items-center justify-center hover:bg-gray-200 rounded'
         button.title = title
+        button.setAttribute('aria-label', title)
         button.innerHTML = iconSvg
 
         const clickHandler = (e) => {
@@ -763,11 +764,13 @@ class ContentWidgetEditorRenderer {
         // Create dropdown button
         const dropdownButton = document.createElement('button')
         dropdownButton.type = 'button'
-        dropdownButton.className = 'flex items-center gap-1 px-2 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+        dropdownButton.className = 'inline-flex h-8 w-8 items-center justify-center text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+        dropdownButton.title = 'Text format: Format'
+        dropdownButton.setAttribute('aria-label', dropdownButton.title)
         dropdownButton.innerHTML = `
-            <span class="format-label">Format</span>
-            <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            <span class="format-label sr-only">Format</span>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7V4h16v3M12 4v16M8 20h8"></path>
             </svg>
         `
 
@@ -816,6 +819,8 @@ class ContentWidgetEditorRenderer {
                 e.stopPropagation()
                 this.execCommand('formatBlock', option.value)
                 dropdownButton.querySelector('.format-label').textContent = option.label
+                dropdownButton.title = `Text format: ${option.label}`
+                dropdownButton.setAttribute('aria-label', dropdownButton.title)
                 this.hideDropdown(dropdownMenu)
             })
 
@@ -1785,6 +1790,8 @@ class ContentWidgetEditorRenderer {
             const labelElement = this.formatDropdown.button.querySelector('.format-label')
             if (labelElement) {
                 labelElement.textContent = formatLabel
+                this.formatDropdown.button.title = `Text format: ${formatLabel}`
+                this.formatDropdown.button.setAttribute('aria-label', this.formatDropdown.button.title)
             }
         }
 

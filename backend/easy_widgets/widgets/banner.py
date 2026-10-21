@@ -12,6 +12,16 @@ from webpages.widget_registry import BaseWidget, register_widget_type
 
 logger = logging.getLogger(__name__)
 
+TEXT_OUTLINES = {
+    "none": "none",
+    **{
+        name: ", ".join(
+            f"{x}px {y}px 0 {color}" for x, y in ((-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1))
+        )
+        for name, color in (("dark", "#000"), ("light", "#fff"))
+    },
+}
+
 
 class BannerConfig(BaseModel):
     """Configuration for Banner widget"""
@@ -112,12 +122,27 @@ class BannerConfig(BaseModel):
         },
     )
 
+    text_outline: Literal["none", "dark", "light"] = Field(
+        "none",
+        description="Text outline for contrast against the banner background",
+        json_schema_extra={
+            "component": "SelectInput",
+            "group": "Styling",
+            "order": 6,
+            "options": [
+                {"value": "none", "label": "None"},
+                {"value": "dark", "label": "Dark outline"},
+                {"value": "light", "label": "Light outline"},
+            ],
+        },
+    )
+
     component_style: str = Field(
         "default",
         description="Component style from theme",
         json_schema_extra={
             "component": "ComponentStyleSelector",
-            "order": 6,
+            "order": 7,
             "group": "Styling",
         },
     )
@@ -127,7 +152,7 @@ class BannerConfig(BaseModel):
         json_schema_extra={
             "component": "BooleanInput",
             "variant": "toggle",
-            "order": 7,
+            "order": 8,
             "group": "Styling",
         },
     )
@@ -238,6 +263,14 @@ class BannerWidget(BaseWidget):
         height: 140px;
         position: relative;
         z-index: 1;
+    }
+
+    /* Explicit banner presentation wins over theme heading/link colors.
+       Keep this inside the text area so images and editor controls are unaffected. */
+    .banner-widget .banner-text,
+    .banner-widget .banner-text * {
+        color: var(--banner-text-color, inherit) !important;
+        text-shadow: var(--banner-text-shadow, none) !important;
     }
 
     /* Text mode styles */
@@ -459,6 +492,8 @@ class BannerWidget(BaseWidget):
 
         style_parts.append(f"background-color: {background_color};")
         style_parts.append(f"color: {text_color};")
+        style_parts.append(f"--banner-text-color: {text_color};")
+        style_parts.append(f"--banner-text-shadow: {TEXT_OUTLINES[config.get('text_outline', 'none')]};")
 
         # Join all style parts
         template_config["banner_style"] = " ".join(style_parts)

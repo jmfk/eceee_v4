@@ -5,6 +5,8 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { Type } from 'lucide-react';
+import Tooltip from '../Tooltip';
 
 // SVG Icons (matching the vanilla JS editor)
 const ICONS = {
@@ -96,18 +98,22 @@ const ToolbarButton = ({ command, title, icon, isActive, onClick }) => {
     };
 
     return (
+        <Tooltip text={title} position="bottom">
         <button
             type="button"
-            className={`p-1 rounded transition-colors ${isActive
+            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded transition-colors ${isActive
                 ? 'bg-blue-500 text-white'
-                : 'hover:bg-gray-200'
+                : 'hover:bg-gray-200 dark:text-gray-100 dark:hover:bg-gray-700'
                 }`}
             title={title}
+            aria-label={title}
+            aria-pressed={['bold', 'italic', 'createLink', 'insertUnorderedList', 'insertOrderedList', 'formatCode', 'formatBlockquote'].includes(command) ? Boolean(isActive) : undefined}
             onClick={handleClick}
             onMouseDown={(e) => e.preventDefault()} // Prevent focus loss
         >
             {icon}
         </button>
+        </Tooltip>
     );
 };
 
@@ -115,7 +121,7 @@ const ToolbarButton = ({ command, title, icon, isActive, onClick }) => {
  * Toolbar separator
  */
 const ToolbarSeparator = () => (
-    <div className="w-px h-6 bg-gray-300 mx-1" />
+    <div className="w-px h-6 bg-gray-300 mx-1 dark:bg-gray-600" />
 );
 
 /**
@@ -175,26 +181,34 @@ const FormatDropdown = ({ currentFormat, maxHeaderLevel, allowedFormats, onComma
     };
 
     return (
-        <div className="relative" ref={dropdownRef}>
+        <div className="relative" ref={dropdownRef} onKeyDown={event => {
+            if (event.key === 'Escape' && isOpen) {
+                event.preventDefault();
+                event.stopPropagation();
+                setIsOpen(false);
+                dropdownRef.current?.querySelector('button')?.focus();
+            }
+        }}>
+            <Tooltip text={`Text format: ${currentFormat}`} position="bottom">
             <button
                 type="button"
-                className="flex items-center gap-1 px-2 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+                aria-label={`Text format: ${currentFormat}`}
+                aria-expanded={isOpen}
                 onClick={() => setIsOpen(!isOpen)}
                 onMouseDown={(e) => e.preventDefault()}
             >
-                <span>{currentFormat}</span>
-                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
+                <Type className="h-4 w-4" />
             </button>
+            </Tooltip>
 
             {isOpen && (
-                <div className="absolute left-0 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                <div className="absolute left-0 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-50 dark:bg-gray-800 dark:border-gray-600">
                     {formatOptions.map(option => (
                         <button
                             key={option.value}
                             type="button"
-                            className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:bg-blue-50"
+                            className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:bg-blue-50 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
                             onClick={() => handleFormatClick(option.value, option.label)}
                             onMouseDown={(e) => e.preventDefault()}
                         >
@@ -220,7 +234,7 @@ const ToolbarButtons = ({ state, onCommand }) => {
     const isAllowed = (button) => allowedButtons.includes(button);
 
     return (
-        <div className="flex items-center gap-1">
+        <div role="toolbar" aria-label="Text formatting" className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
             {isAllowed('bold') && (
                 <ToolbarButton
                     command="bold"

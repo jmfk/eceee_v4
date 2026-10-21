@@ -14,6 +14,7 @@ import { OperationTypes } from '../../contexts/unified-data/types/operations';
 import { useWidgets } from '../../hooks/useWidgets';
 import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure';
 import MediaSelectModal from '../../components/media/MediaSelectModal';
+import { WidgetEditorButton } from './WidgetEditorControls';
 import PropTypes from 'prop-types';
 
 const FooterWidget = ({
@@ -217,16 +218,17 @@ const FooterWidget = ({
         return (
             <footer className="footer-widget border border-gray-200 mb-4 relative group" style={footerStyle}>
                 {/* Background image edit icon */}
-                <button
+                <div className="eceee-editor-ui absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 z-10">
+                <WidgetEditorButton
                     onClick={() => {
                         setEditingField('backgroundImage');
                         setShowImageModal(true);
                     }}
-                    className="eceee-editor-ui absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
                     title="Edit background image"
                 >
-                    <Layers className="w-5 h-5 text-gray-700" />
-                </button>
+                    <Layers className="w-4 h-4" />
+                </WidgetEditorButton>
+                </div>
                 <div className="p-1">
                     <SlotEditor
                         slotName="content"

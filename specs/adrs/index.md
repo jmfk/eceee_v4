@@ -4,6 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0034 | [Banner presentation overrides](active/0034-banner-presentation-overrides.md) | accepted | PRD-0026 |
 | ADR-0033 | [Widget editor session and field ownership](active/0033-widget-editor-session-and-field-ownership.md) | accepted | PRD-0025 |
 | ADR-0001 | [Canonical page version workflow](active/0001-canonical-page-version-workflow.md) | accepted | PRD-0001 |
 | ADR-0002 | [Single page workflow mutation boundary](active/0002-single-page-workflow-mutation-boundary.md) | accepted | PRD-0001, PRD-0002 |

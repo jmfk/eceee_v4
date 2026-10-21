@@ -642,6 +642,7 @@ export class SimpleTextEditorRenderer {
      * Activate editor (register with global toolbar for inline-rich mode)
      */
     activate() {
+        clearTimeout(this.deactivationTimeout)
         this.isActive = true
 
         // Only register with toolbar manager for inline-rich mode
@@ -658,7 +659,9 @@ export class SimpleTextEditorRenderer {
      */
     deactivate() {
         // Small delay to allow button clicks to register
-        setTimeout(() => {
+        clearTimeout(this.deactivationTimeout)
+        this.deactivationTimeout = setTimeout(() => {
+            if (this.editorElement?.contains(document.activeElement) || this.options.isToolbarActive?.()) return
             this.isActive = false
 
             // Unregister from toolbar manager for inline-rich mode
@@ -732,9 +735,12 @@ export class SimpleTextEditorRenderer {
      * Destroy editor
      */
     destroy() {
-        // Deactivate if active
-        if (this.isActive) {
-            this.deactivate()
+        clearTimeout(this.deactivationTimeout)
+        this.isActive = false
+        if (this.options.mode === 'inline-rich') {
+            import('../../utils/wysiwygToolbarManager.js').then(({ toolbarManager }) => {
+                toolbarManager.unregisterEditor(this)
+            })
         }
 
         // Remove event listeners

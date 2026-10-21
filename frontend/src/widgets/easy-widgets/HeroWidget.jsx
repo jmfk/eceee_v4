@@ -6,6 +6,7 @@ import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataC
 import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 import MediaSelectModal from '../../components/media/MediaSelectModal'
+import { WidgetEditorButton } from './WidgetEditorControls'
 
 /**
  * EASY Hero Widget Component
@@ -302,16 +303,17 @@ const HeroWidget = ({
                     </div>
                 )}
                 {/* Background image edit icon */}
-                <button
+                <div className="eceee-editor-ui absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 z-10">
+                <WidgetEditorButton
                     onClick={() => {
                         setEditingField('image')
                         setShowImageModal(true)
                     }}
-                    className="eceee-editor-ui absolute top-2 right-2 p-1.5 bg-white/70 hover:bg-white/90 rounded-md shadow-md opacity-0 group-hover:opacity-80 transition-all z-10"
                     title="Edit background image"
                 >
-                    <Layers className="w-4 h-4 text-gray-600" />
-                </button>
+                    <Layers className="w-4 h-4" />
+                </WidgetEditorButton>
+                </div>
                 <div className="hero-content">
                     <div ref={beforeTextContainerRef} style={{ display: 'contents' }} />
                     <div ref={headerContainerRef} style={{ display: 'contents' }} />

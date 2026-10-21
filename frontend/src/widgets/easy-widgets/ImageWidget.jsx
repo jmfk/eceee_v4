@@ -73,7 +73,7 @@ const ImageWidget = ({
 
     function renderWithEditorControls(content) {
         return <WidgetEditorControls mode={mode} label="Image" controls={
-            <WidgetEditorButton title="Edit image" onClick={() => setShowImageModal(true)}><ImagePlus className="h-4 w-4" />Image</WidgetEditorButton>
+            <WidgetEditorButton title="Edit image" aria-label="Image" onClick={() => setShowImageModal(true)}><ImagePlus className="h-4 w-4" /></WidgetEditorButton>
         } picker={showImageModal && <MediaSelectModal isOpen onClose={() => setShowImageModal(false)}
             onSelect={selectImage} mediaTypes={['image']} allowCollections currentSelection={localConfig.image}
             namespace={context?.namespace} pageId={pageId} customTitle="Edit Image" />}
