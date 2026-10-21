@@ -259,7 +259,7 @@ const BioWidget = memo(({
     if (mode === 'editor') {
         return (
             <WidgetEditorControls mode={mode} label="Bio" controls={<>
-                <WidgetEditorButton title="Edit bio image" onClick={() => setShowImageModal(true)}><ImagePlus className="h-4 w-4" />Image</WidgetEditorButton>
+                <WidgetEditorButton title="Edit bio image" aria-label="Image" onClick={() => setShowImageModal(true)}><ImagePlus className="h-4 w-4" /></WidgetEditorButton>
                 <ImageSizeButton value={imageSize} allowOriginal onChange={value => handleImageChange('imageSize', value)} />
             </>} picker={showImageModal && <MediaSelectModal isOpen onClose={() => setShowImageModal(false)}
                 onSelect={selected => {

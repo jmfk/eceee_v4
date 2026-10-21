@@ -416,11 +416,11 @@ const ContentCardWidget = ({
 
     function renderWithEditorControls(content) {
         return <WidgetEditorControls mode={mode} label="Content Card" controls={<>
-            {usesCustomMarkup && <WidgetEditorButton onClick={() => setEditingStyledText(value => !value)}>
-                <Type className="h-4 w-4" />{editingStyledText ? 'Preview style' : 'Edit text'}
+            {usesCustomMarkup && <WidgetEditorButton title={editingStyledText ? 'Preview style' : 'Edit text'} onClick={() => setEditingStyledText(value => !value)}>
+                <Type className="h-4 w-4" />
             </WidgetEditorButton>}
-            <WidgetEditorButton title="Edit card image" onClick={() => setShowImageModal(true)}>
-                <ImagePlus className="h-4 w-4" />Image
+            <WidgetEditorButton title="Edit card image" aria-label="Image" onClick={() => setShowImageModal(true)}>
+                <ImagePlus className="h-4 w-4" />
             </WidgetEditorButton>
             <ImageSizeButton value={imageSize} onChange={value => handleImageChange('imageSize', value)} />
         </>} picker={showImageModal && <MediaSelectModal isOpen onClose={() => setShowImageModal(false)}

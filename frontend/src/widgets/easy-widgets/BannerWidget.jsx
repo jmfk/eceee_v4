@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { FileText, Type, AlignLeft, ImagePlus, Layers, Square, RectangleHorizontal } from 'lucide-react'
+import { FileText, Type, AlignLeft, ImagePlus, Layers, Square, RectangleHorizontal, Baseline, PaintBucket, ALargeSmall } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
 import { useUnifiedData } from '../../contexts/unified-data/context/UnifiedDataContext'
 import { useEditorContext } from '../../contexts/unified-data/hooks'
@@ -10,7 +10,9 @@ import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
 import OptimizedImage from '../../components/media/OptimizedImage'
 import MediaSelectModal from '../../components/media/MediaSelectModal'
-import { getBannerRenderConfig } from '../../utils/bannerConfig'
+import { getBannerRenderConfig, getBannerPresentationStyle } from '../../utils/bannerConfig'
+import ColorSelector from '../../components/theme/form-fields/ColorSelector'
+import Tooltip from '../../components/Tooltip'
 
 /**
  * EASY Banner Widget Component
@@ -58,6 +60,33 @@ const BannerWidget = ({
     // Refs for editor renderers
     const contentEditorRef = useRef(null)
     const contentContainerRef = useRef(null)
+    const presentationToolbarRef = useRef(null)
+    const presentationPaletteOpenRef = useRef(false)
+    const presentationSelectionRef = useRef(null)
+
+    const handlePaletteOpenChange = open => {
+        presentationPaletteOpenRef.current = open
+        if (!open) return
+        const selection = window.getSelection()
+        const range = selection?.rangeCount ? selection.getRangeAt(0) : null
+        presentationSelectionRef.current = range && contentEditorRef.current?.editorElement?.contains(range.commonAncestorContainer)
+            ? range.cloneRange() : null
+    }
+    const handlePaletteClose = (reason, target) => {
+        const range = presentationSelectionRef.current
+        presentationSelectionRef.current = null
+        const editor = contentEditorRef.current
+        const resumesEditing = reason !== 'outside' || presentationToolbarRef.current?.contains(target)
+        if (resumesEditing && range && editor?.editorElement?.contains(range.commonAncestorContainer)) {
+            editor.editorElement.focus()
+            const selection = window.getSelection()
+            selection.removeAllRanges()
+            selection.addRange(range)
+            return true
+        }
+        editor?.deactivate()
+        return false
+    }
 
     // Initialize from UDC state on mount
     useEffect(() => {
@@ -140,13 +169,13 @@ const BannerWidget = ({
     const useCustomStyle = componentStyle !== 'default' && currentTheme?.componentStyles
     const usesCustomMarkup = Boolean(useCustomStyle?.[componentStyle])
         && useCustomStyle[componentStyle].template?.trim() !== '{{passthru}}'
-    const textColor = configRef.current.textColor || '#000000'
-    const backgroundColor = configRef.current.backgroundColor || '#ffffff'
+    const textColor = configRef.current.textColor || configRef.current.text_color || '#000000'
+    const backgroundColor = configRef.current.backgroundColor || configRef.current.background_color || '#ffffff'
+    const textOutline = configRef.current.textOutline ?? configRef.current.text_outline ?? 'none'
 
     // Build inline styles for colors and background image
     const bannerStyle = {
-        backgroundColor: backgroundColor,
-        color: textColor,
+        ...getBannerPresentationStyle(configRef.current),
         ...(backgroundImage && backgroundImageUrl && backgroundImageUrl2x ? {
             backgroundImage: `image-set(url('${backgroundImageUrl}') 1x, url('${backgroundImageUrl2x}') 2x)`,
             backgroundSize: 'cover',
@@ -259,6 +288,13 @@ const BannerWidget = ({
         }
     }, [onConfigChange])
 
+    const handlePresentationChange = useCallback((fieldName, value) => {
+        const updatedConfig = { ...configRef.current, [fieldName]: value }
+        setConfig(updatedConfig)
+        forceRerender({})
+        onConfigChange?.(updatedConfig)
+    }, [onConfigChange])
+
     // Initialize editor in editor mode
     useEffect(() => {
         if (mode === 'editor' && !usesCustomMarkup) {
@@ -285,7 +321,8 @@ const BannerWidget = ({
                     allowedFormats: allowedFormatsForMode,
                     maxBreaks: bannerMode === 'header' ? 1 : undefined,
                     pageId: pageId,
-                    siteRootId: context?.siteRootId
+                    siteRootId: context?.siteRootId,
+                    isToolbarActive: () => presentationPaletteOpenRef.current || Boolean(presentationToolbarRef.current?.contains(document.activeElement))
                 })
                 contentEditorRef.current.render()
             }
@@ -482,30 +519,57 @@ const BannerWidget = ({
         if (mode !== 'editor') return content
         const isHeader = bannerMode === 'header'
         const isRectangle = imageSize === 'rectangle'
-        const buttonClassName = 'inline-flex min-h-8 items-center gap-1.5 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500'
+        const buttonClassName = 'relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700'
+        const outlineLabels = { none: 'Off', dark: 'Dark', light: 'Light' }
+        const nextOutline = { none: 'dark', dark: 'light', light: 'none' }[textOutline] || 'dark'
         return <div className="banner-widget-editor group/banner relative isolate min-h-10">
-            <div role="toolbar" aria-label="Banner controls"
-                className="eceee-editor-ui absolute right-2 top-2 z-10 flex max-w-[calc(100%-1rem)] flex-wrap items-center justify-end gap-2 opacity-0 pointer-events-none group-hover/banner:opacity-100 group-hover/banner:pointer-events-auto group-focus-within/banner:opacity-100 group-focus-within/banner:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto"
-                onClick={event => event.stopPropagation()}>
+            <div ref={presentationToolbarRef} role="toolbar" aria-label="Banner controls"
+                className="eceee-editor-ui absolute right-2 top-2 z-10 flex max-w-[calc(100%-1rem)] flex-wrap items-center justify-end gap-1 opacity-0 pointer-events-none group-hover/banner:opacity-100 group-hover/banner:pointer-events-auto group-focus-within/banner:opacity-100 group-focus-within/banner:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto"
+                onClick={event => event.stopPropagation()}
+                onBlurCapture={() => contentEditorRef.current?.deactivate()}>
+                <Tooltip text={`Switch to ${isHeader ? 'Text' : 'Header'} mode`}>
                 <button type="button" onClick={handleModeToggle} className={buttonClassName}
+                    aria-label={`Switch to ${isHeader ? 'Text' : 'Header'} mode`}
                     title={`Switch to ${isHeader ? 'Text' : 'Header'} mode`}>
                     {isHeader ? <Type className="h-4 w-4" /> : <AlignLeft className="h-4 w-4" />}
-                    {isHeader ? 'Header' : 'Text'}
                 </button>
+                </Tooltip>
+                <Tooltip text={isHeader ? 'Edit background image' : 'Edit image'}>
                 <button type="button" className={buttonClassName}
+                    aria-label={isHeader ? 'Background image' : 'Image'}
                     title={isHeader ? 'Edit background image' : 'Edit image'}
                     onClick={() => {
                         setEditingField(isHeader ? 'backgroundImage' : 'image1')
                         setShowImageModal(true)
                     }}>
                     {isHeader ? <Layers className="h-4 w-4" /> : <ImagePlus className="h-4 w-4" />}
-                    {isHeader ? 'Background image' : 'Image'}
                 </button>
-                {!isHeader && <button type="button" className={buttonClassName} onClick={handleImageSizeToggle}
+                </Tooltip>
+                {!isHeader && <Tooltip text={`Change image shape to ${isRectangle ? 'Square' : 'Rectangle'}`}>
+                <button type="button" className={buttonClassName} onClick={handleImageSizeToggle}
+                    aria-label={`Image size: ${isRectangle ? 'Rectangle' : 'Square'}`}
                     title={`Change image shape to ${isRectangle ? 'Square' : 'Rectangle'}`}>
                     {isRectangle ? <RectangleHorizontal className="h-4 w-4" /> : <Square className="h-4 w-4" />}
-                    Image size: {isRectangle ? 'Rectangle' : 'Square'}
-                </button>}
+                </button>
+                </Tooltip>}
+                <ColorSelector value={textColor} colors={currentTheme?.colors || {}}
+                    onChange={value => handlePresentationChange('textColor', value)}
+                    onOpenChange={handlePaletteOpenChange} onClose={handlePaletteClose}
+                    icon={<Baseline className="h-4 w-4" />} title="Text color" compact />
+                <ColorSelector value={backgroundColor} colors={currentTheme?.colors || {}}
+                    onChange={value => handlePresentationChange('backgroundColor', value)}
+                    onOpenChange={handlePaletteOpenChange} onClose={handlePaletteClose}
+                    icon={<PaintBucket className="h-4 w-4" />} title="Background color" compact />
+                <Tooltip text={`Text outline: ${outlineLabels[textOutline] || 'Off'}. Change to ${outlineLabels[nextOutline]}.`}>
+                    <button type="button" className={buttonClassName}
+                        aria-label={`Text outline: ${outlineLabels[textOutline] || 'Off'}`}
+                        aria-pressed={textOutline === 'dark' || textOutline === 'light'}
+                        onMouseDown={event => event.preventDefault()}
+                        onClick={() => handlePresentationChange('textOutline', nextOutline)}>
+                        <ALargeSmall className="h-4 w-4" />
+                        <span className={`absolute bottom-1 h-0.5 w-4 ${textOutline === 'light' ? 'bg-white ring-1 ring-gray-400' : textOutline === 'dark' ? 'bg-black' : 'bg-transparent'}`} />
+                    </button>
+                </Tooltip>
             </div>
             <div className="relative z-0">{content}</div>
             {showImageModal && editingField === (isHeader ? 'backgroundImage' : 'image1') && <MediaSelectModal
@@ -557,6 +621,7 @@ BannerWidget.defaultConfig = {
     image1: null,
     textColor: '#000000',
     backgroundColor: '#ffffff',
+    textOutline: 'none',
     componentStyle: 'default'
 }
 

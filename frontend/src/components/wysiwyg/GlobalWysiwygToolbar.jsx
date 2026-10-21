@@ -69,7 +69,7 @@ const GlobalWysiwygToolbar = () => {
 
     return (
         <div
-            className={`global-wysiwyg-toolbar fixed top-0 left-0 right-0 z-50 bg-gray-50 border-b border-gray-200 px-4 py-2 shadow-lg transition-transform duration-300 ease-in-out ${isVisible && toolbarState ? 'translate-y-0' : '-translate-y-full'
+            className={`global-wysiwyg-toolbar fixed top-0 left-0 right-0 z-50 bg-gray-50 border-b border-gray-200 px-4 py-2 shadow-lg transition-transform duration-300 ease-in-out dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100 motion-reduce:transition-none ${isVisible && toolbarState ? 'translate-y-0' : '-translate-y-full'
                 }`}
             style={{
                 pointerEvents: isVisible && toolbarState ? 'auto' : 'none'
@@ -79,7 +79,7 @@ const GlobalWysiwygToolbar = () => {
                 <ToolbarButtons state={toolbarState} onCommand={handleCommand} />
                 <button
                     onClick={handleClose}
-                    className="ml-4 p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded transition-colors"
+                    className="ml-4 p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded transition-colors dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
                     title="Close toolbar"
                     aria-label="Close toolbar"
                 >

@@ -3,6 +3,7 @@ import type { RenderWidgetModel, WidgetRenderComponent, WidgetRenderProps } from
 import { processNavigationItems } from '../utils/navigationItems'
 import { asArray, EmptyRender, formatDisplayDate, formatDisplayDateTime, imageUrl, ImageView, normalizeContentMediaHtml, PreviewLink, RenderFailure, SafeHtml, sanitizeHtml, TextWithBreaks, value } from './primitives'
 import { imageWidgetMediaItems, isImageCollectionReference } from '../utils/imageWidgetMedia'
+import { getBannerPresentationStyle } from '../utils/bannerConfig'
 
 const ContentRender: WidgetRenderComponent = ({ widget }) => <div>
     <SafeHtml className={`content-widget${value(widget.config, 'variantClasses') ? ` ${value(widget.config, 'variantClasses')}` : ''}${value(widget.config, 'showBorder', 'show_border') ? ' border-enabled' : ''}`} html={normalizeContentMediaHtml(value(widget.config, 'content', 'html'))} />
@@ -118,7 +119,7 @@ const BannerRender: WidgetRenderComponent = ({ widget }) => {
     return <div
         className={`banner-widget cms-content${value(config, 'showBorder', 'show_border') ? ' border-enabled' : ''}`}
         id={value(config, 'anchor') || undefined}
-        style={{ backgroundColor: value(config, 'backgroundColor', 'background_color') || '#ffffff', color: value(config, 'textColor', 'text_color') || '#000000' }}
+        style={getBannerPresentationStyle(config)}
     >
         {background && <div className="banner-background" style={{ backgroundImage: background2x ? `image-set(url('${background}') 1x, url('${background2x}') 2x)` : `url('${background}')` }} />}
         <div className={`banner-body mode-${mode} image-size-${imageSize}`}>

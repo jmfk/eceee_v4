@@ -72,6 +72,118 @@ test.describe('page editor regressions', () => {
     await expect(contentEditor(page)).toContainText('Saved rich text copy')
   })
 
+  for (const scheme of ['light', 'dark']) {
+    test(`nested banner styling persists with a compact icon toolbar in ${scheme} mode`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme })
+      await page.setViewportSize({ width: scheme === 'dark' ? 390 : 1280, height: 960 })
+      const editorState = createCollaborativeEditorState()
+      editorState.version.effectiveTheme = {
+        colors: { paper: '#ffffff', ocean: '#082f49' },
+        customCss: 'h2,h3,p{color:#b91c1c}',
+      }
+      editorState.page.effectiveTheme = editorState.version.effectiveTheme
+      const sibling = { id: 'column-sibling', type: 'easy_widgets.HeadlineWidget', config: { content: 'Keep this column' } }
+      editorState.version.widgets.main.push({
+        id: 'banner-columns', type: 'easy_widgets.TwoColumnsWidget', config: { slots: {
+          left: [sibling],
+          right: [{ id: 'nested-styled-banner', type: 'easy_widgets.BannerWidget', config: {
+            bannerMode: 'header', headerContent: 'Readable banner', textContent: '<p>Stored body</p>',
+          } }],
+        } },
+      })
+      await mockCmsApi(page, { authenticated: true, pageEditor: true, editorState })
+      await openEditor(page, editorState)
+      await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), scheme === 'dark')
+
+      const banner = page.locator('[data-widget-id="nested-styled-banner"]')
+      const editor = banner.locator('[contenteditable="true"]')
+      await expect(editor).toHaveText('Readable banner')
+      await editor.evaluate(element => { window.__bannerEditorElement = element })
+      const toolbar = banner.getByRole('toolbar', { name: 'Banner controls' })
+      await banner.hover()
+      await expect(toolbar).toBeVisible()
+      expect(await toolbar.locator('button').allTextContents()).toEqual(['', '', '', '', ''])
+      await toolbar.getByRole('button', { name: 'Text color', exact: true }).focus()
+      await expect(page.getByText('Text color', { exact: true })).toBeVisible()
+      await toolbar.getByRole('button', { name: 'Text color', exact: true }).press('Enter')
+      await expect(toolbar.getByRole('button', { name: 'Text color', exact: true })).toHaveAttribute('aria-expanded', 'true')
+      await expect(page.getByRole('group', { name: 'Text color', exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'paper', exact: true })).toBeVisible()
+      await page.getByRole('button', { name: 'paper', exact: true }).click()
+      await expect(toolbar.getByRole('button', { name: 'Text color', exact: true })).toBeFocused()
+      await toolbar.getByRole('button', { name: 'Background color', exact: true }).click()
+      const palette = page.getByRole('group', { name: 'Background color', exact: true })
+      const paletteBox = await palette.boundingBox()
+      expect(paletteBox.x).toBeGreaterThanOrEqual(0)
+      expect(paletteBox.x + paletteBox.width).toBeLessThanOrEqual(page.viewportSize().width)
+      await page.getByRole('button', { name: 'ocean', exact: true }).click()
+      await toolbar.getByRole('button', { name: 'Text outline: Off' }).click()
+      await expect(editor).toHaveCSS('color', 'rgb(255, 255, 255)')
+      await expect(banner.locator('.banner-widget')).toHaveCSS('background-color', 'rgb(8, 47, 73)')
+      await expect(editor).not.toHaveCSS('text-shadow', 'none')
+      expect(await editor.evaluate(element => element === window.__bannerEditorElement)).toBe(true)
+      await banner.screenshot({ path: `test-results/banner-styling-${scheme}.png` })
+
+      await saveCurrentVersion(page)
+      const savedColumns = getSavedVersion(editorState).widgets.main.find(widget => widget.id === 'banner-columns')
+      expect(savedColumns.config.slots.left).toEqual([sibling])
+      expect(savedColumns.config.slots.right[0].config).toMatchObject({
+        textColor: 'paper', backgroundColor: 'ocean', textOutline: 'dark', textContent: '<p>Stored body</p>',
+      })
+      await page.reload()
+      await expect(editor).toHaveCSS('color', 'rgb(255, 255, 255)')
+      await expect(editor).not.toHaveCSS('text-shadow', 'none')
+      await expect(banner.locator('.banner-widget')).toHaveCSS('background-color', 'rgb(8, 47, 73)')
+    })
+  }
+
+  test('banner presentation controls retain selected rich text and its formatting toolbar', async ({ page }) => {
+    const editorState = createCollaborativeEditorState()
+    const theme = { colors: { paper: '#ffffff', ocean: '#082f49' } }
+    editorState.version.effectiveTheme = theme
+    editorState.page.effectiveTheme = theme
+    editorState.version.widgets.main.push({
+      id: 'selected-banner', type: 'easy_widgets.BannerWidget',
+      config: { bannerMode: 'text', textContent: '<p>Readable copy</p>' },
+    })
+    await mockCmsApi(page, { authenticated: true, pageEditor: true, editorState })
+    await openEditor(page, editorState)
+    const banner = page.locator('[data-widget-id="selected-banner"]')
+    const editor = banner.locator('[contenteditable="true"]')
+    await editor.evaluate(element => {
+      element.focus()
+      const range = document.createRange()
+      range.setStart(element.querySelector('p').firstChild, 0)
+      range.setEnd(element.querySelector('p').firstChild, 8)
+      window.getSelection().removeAllRanges()
+      window.getSelection().addRange(range)
+    })
+    const toolbar = banner.getByRole('toolbar', { name: 'Banner controls' })
+    const formatting = page.locator('.global-wysiwyg-toolbar')
+    await expect(formatting).toBeInViewport()
+    await toolbar.getByRole('button', { name: 'Text color', exact: true }).click()
+    await toolbar.getByRole('button', { name: 'Text outline: Off' }).click()
+    await expect(editor).toBeFocused()
+    await toolbar.getByRole('button', { name: 'Text color', exact: true }).click()
+    // Outlast the editor's blur delay while keyboard focus is inside the palette.
+    await page.waitForTimeout(300)
+    await expect(formatting).toBeInViewport()
+    await page.getByRole('button', { name: 'paper', exact: true }).click()
+    await expect(editor).toBeFocused()
+    expect(await page.evaluate(() => window.getSelection().toString())).toBe('Readable')
+    await page.waitForTimeout(300)
+    await expect(formatting).toBeInViewport()
+    await formatting.getByRole('button', { name: 'Bold', exact: true }).click()
+    await expect(editor.locator('b,strong')).toHaveText('Readable')
+    await expect(editor).toHaveText('Readable copy')
+    // Keyboard users can close the palette and resume the same selection too.
+    await toolbar.getByRole('button', { name: 'Background color', exact: true }).focus()
+    await toolbar.getByRole('button', { name: 'Background color', exact: true }).press('Enter')
+    await page.getByRole('button', { name: 'paper', exact: true }).press('Escape')
+    await expect(editor).toBeFocused()
+    expect(await page.evaluate(() => window.getSelection().toString())).toBe('Readable')
+  })
+
   test('page settings stay in the working version until publish', async ({ page }) => {
     const editorState = await mockCmsApi(page, { authenticated: true, pageEditor: true })
     await openEditor(page, editorState)
@@ -511,7 +623,7 @@ test.describe('stable widget side panel', () => {
       window.getSelection().addRange(range)
     })
     const toolbar = page.getByRole('toolbar', { name: 'Panel content formatting' })
-    await toolbar.getByRole('button', { name: /^(Format|Paragraph|Heading [1-6])$/ }).click()
+    await toolbar.getByRole('button', { name: /^Text format:/ }).click()
     await toolbar.getByRole('button', { name: 'Heading 2', exact: true }).click()
     await expect(rich.locator('h2')).toContainText('Pasted')
     expect(await rich.locator('.highlight').evaluate(element => element.outerHTML)).toBe(untouched)
@@ -690,6 +802,7 @@ test('inline widget image controls overlay content at regular and narrow widths'
     await page.setViewportSize({ width, height: 1000 })
     for (const label of ['Content card', 'Bio', 'Image']) {
       const toolbar = page.getByRole('toolbar', { name: `${label} controls` })
+      await expect(toolbar.locator('button')).toHaveText(label === 'Image' ? [''] : ['', ''])
       await toolbar.locator('..').hover()
       await expect(toolbar).toHaveCSS('opacity', '1')
       const button = toolbar.getByRole('button', { name: 'Image', exact: true })
@@ -715,4 +828,48 @@ test('inline widget image controls overlay content at regular and narrow widths'
   await expect(card.getByRole('button', { name: 'Image size: Rectangle' })).toBeVisible()
   await saveCurrentVersion(page)
   expect(getSavedVersion(editorState).widgets.main.find(widget => widget.id === 'card-inline').config.imageSize).toBe('rectangle')
+})
+
+test('compact table controls preserve commands and fit desktop and mobile', async ({ page }) => {
+  const editorState = createCollaborativeEditorState()
+  editorState.version.widgets.main.push({
+    id: 'compact-table', type: 'easy_widgets.TableWidget', config: {
+      rows: [{ cells: [{ content: 'First cell' }, { content: 'Second cell' }] }],
+    },
+  })
+  await mockCmsApi(page, { authenticated: true, pageEditor: true, editorState })
+  await openEditor(page, editorState)
+  const table = page.locator('[data-widget-id="compact-table"] table')
+  const toolbar = page.getByRole('toolbar', { name: 'Table formatting' })
+  for (const width of [1280, 390]) {
+    await page.emulateMedia({ colorScheme: width === 390 ? 'dark' : 'light' })
+    await page.setViewportSize({ width, height: 960 })
+    await table.locator('td').first().click()
+    await expect(toolbar).toBeInViewport()
+    expect((await toolbar.locator('button').allTextContents()).every(text => text === '')).toBe(true)
+    await toolbar.getByRole('combobox', { name: 'Cell text style' }).selectOption('quote')
+    await expect(table.locator('td').first()).toHaveClass(/table-cell-quote/)
+    for (const button of await toolbar.getByRole('button').all()) {
+      const box = await button.boundingBox()
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width).toBeLessThanOrEqual(width)
+    }
+    if (width === 390) {
+      await toolbar.getByRole('button', { name: 'Colors', exact: true }).click()
+      const heading = page.getByRole('heading', { name: 'Cell Colors' })
+      await expect(heading).toHaveCSS('color', await toolbar.evaluate(element => getComputedStyle(element).color))
+      await expect(heading.locator('..')).not.toHaveCSS('background-color', 'rgb(255, 255, 255)')
+      await toolbar.getByRole('button', { name: 'Colors', exact: true }).click()
+    }
+    await page.locator('.global-table-toolbar').screenshot({ path: `test-results/table-toolbar-${width}.png` })
+  }
+  await toolbar.getByRole('button', { name: 'Add Row', exact: true }).click()
+  await expect(table.locator('tr')).toHaveCount(2)
+  await toolbar.getByRole('button', { name: 'Add Column', exact: true }).click()
+  await expect(table.locator('tr').first().locator('td')).toHaveCount(3)
+  await saveCurrentVersion(page)
+  const saved = getSavedVersion(editorState).widgets.main.find(widget => widget.id === 'compact-table').config
+  expect(saved.rows).toHaveLength(2)
+  expect(saved.rows[0].cells).toHaveLength(3)
+  expect(saved.rows[0].cells[0].fontStyle).toBe('quote')
 })

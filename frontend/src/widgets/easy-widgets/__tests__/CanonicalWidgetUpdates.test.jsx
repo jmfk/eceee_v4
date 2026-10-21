@@ -27,6 +27,7 @@ vi.mock('../SimpleTextEditorRenderer', () => ({
             }
         })
         this.destroy = vi.fn(() => this.editorElement.remove())
+        this.deactivate = vi.fn()
         this.emitChange = (html) => {
             this.editorElement.innerHTML = html
             this.options.onChange?.(html)
@@ -276,6 +277,58 @@ describe('canonical widget update ownership', () => {
         expect(config.image1.url).toBe('/inline.jpg')
         expect(config.backgroundImage.url).toBe('/background.jpg')
         backgroundAssignments.mockRestore()
+    })
+
+    it.each(['text', 'header'])('BannerWidget edits colors and outline inline without remounting its %s editor', async bannerMode => {
+        currentTheme = { colors: { paper: '#ffffff', ocean: '#082f49' } }
+        const onConfigChange = vi.fn()
+        const { container } = render(<BannerWidget mode="editor" widgetId="banner-colors" slotName="main"
+            config={{ bannerMode, headerContent: 'Heading', textContent: '<p>Body</p>' }} onConfigChange={onConfigChange} />)
+        const editor = latestRenderer()
+        const toolbar = screen.getByRole('toolbar', { name: 'Banner controls' })
+        expect(toolbar.textContent).toBe('')
+        for (const button of toolbar.querySelectorAll('button')) {
+            expect(button).toHaveAccessibleName()
+            expect(button.querySelector('svg')).toBeTruthy()
+        }
+
+        fireEvent.click(screen.getByRole('button', { name: 'Text color', exact: true }))
+        fireEvent.click(screen.getByTitle('paper'))
+        fireEvent.click(screen.getByRole('button', { name: 'Background color', exact: true }))
+        fireEvent.click(screen.getByTitle('ocean'))
+        fireEvent.click(screen.getByRole('button', { name: 'Text outline: Off' }))
+
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({
+            textColor: 'paper', backgroundColor: 'ocean', textOutline: 'dark',
+        }))
+        const element = container.querySelector('.banner-widget')
+        expect(element.style.getPropertyValue('--banner-text-color')).toBe('var(--paper, paper)')
+        expect(element.style.backgroundColor).toBe('var(--ocean, ocean)')
+        expect(element.style.getPropertyValue('--banner-text-shadow')).toContain('#000')
+        fireEvent.click(screen.getByRole('button', { name: 'Text outline: Dark' }))
+        expect(element.style.getPropertyValue('--banner-text-shadow')).toContain('#fff')
+        fireEvent.click(screen.getByRole('button', { name: 'Text outline: Light' }))
+        expect(element.style.getPropertyValue('--banner-text-shadow')).toBe('none')
+        expect(latestRenderer()).toBe(editor)
+        expect(editor.destroy).not.toHaveBeenCalled()
+        await act(async () => {})
+    })
+
+    it('BannerWidget supports direct color selection and Escape in the compact palette', async () => {
+        const onConfigChange = vi.fn()
+        const { container } = render(<BannerWidget mode="editor" widgetId="banner-custom-color" slotName="main"
+            config={{ textContent: '<p>Body</p>' }} onConfigChange={onConfigChange} />)
+        const button = screen.getByRole('button', { name: 'Text color', exact: true })
+        fireEvent.focus(button)
+        await waitFor(() => expect(screen.getByText('Text color')).toBeVisible())
+        fireEvent.click(button)
+        fireEvent.change(screen.getByLabelText('Custom text color'), { target: { value: '#fefefe' } })
+        expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({ textColor: '#fefefe' }))
+        expect(container.querySelector('.banner-widget')).toHaveStyle({ color: '#fefefe' })
+        fireEvent.keyDown(screen.getByLabelText('Custom text color'), { key: 'Escape' })
+        expect(button).toHaveAttribute('aria-expanded', 'false')
+        expect(button).toHaveFocus()
+        await act(async () => {})
     })
 
     it('BannerWidget applies image restrictions immediately when its inline mode toggle is used', async () => {

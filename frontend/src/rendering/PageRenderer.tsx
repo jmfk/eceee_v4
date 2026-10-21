@@ -41,7 +41,7 @@ export const PageRenderer = ({ model }: { model: RenderPageModel }) => {
         const styleKey = widget.config?.componentStyle || widget.config?.component_style
         const componentStyle = styleKey ? model.context.componentStyles?.[styleKey] : null
         let renderedOutput: ReactNode = output
-        if (componentStyle?.template) {
+        if (componentStyle?.template && String(componentStyle.template).trim() !== '{{passthru}}') {
             try {
                 const content = renderToStaticMarkup(output)
                 const template = String(componentStyle.template).replace(/\{\{\s*passthru\s*\}\}/g, '{{{passthru}}}')

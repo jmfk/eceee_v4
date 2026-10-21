@@ -2,15 +2,27 @@
  * Color Selector - Compact button with color palette popover
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
+import Tooltip from '../../Tooltip';
 
-const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) => {
+const ColorSelector = ({ value, onChange, colors = {}, label, className = '', icon = null, title = 'Select color', compact = false, onOpenChange, onClose }) => {
     const [showPalette, setShowPalette] = useState(false);
     const [position, setPosition] = useState({ top: 0, left: 0 });
     const buttonRef = useRef(null);
     const paletteRef = useRef(null);
+    const paletteId = useId();
     const themeColors = Object.entries(colors);
+
+    const setPaletteOpen = open => {
+        onOpenChange?.(open);
+        setShowPalette(open);
+    };
+    const closePalette = (reason, target) => {
+        setPaletteOpen(false);
+        const focusRestored = onClose?.(reason, target);
+        if (reason !== 'outside' && !focusRestored) buttonRef.current?.focus();
+    };
 
     // Get current color for display
     const getCurrentColor = () => {
@@ -37,7 +49,7 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
             
             setPosition({
                 top: shouldPositionAbove ? rect.top - paletteHeight - 8 : rect.bottom + 8,
-                left: rect.left
+                left: Math.max(8, Math.min(rect.left, window.innerWidth - (paletteRef.current.offsetWidth || 226) - 8))
             });
         } else if (buttonRef.current) {
             // Fallback if palette ref not available yet
@@ -51,7 +63,7 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
             
             setPosition({
                 top: shouldPositionAbove ? rect.top - estimatedPaletteHeight - 8 : rect.bottom + 8,
-                left: rect.left
+                left: Math.max(8, Math.min(rect.left, window.innerWidth - 226 - 8))
             });
         }
     };
@@ -64,6 +76,7 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
             
             // Recalculate after palette is rendered (to get accurate height)
             const timeoutId = setTimeout(updatePosition, 0);
+            paletteRef.current?.querySelector('button, input')?.focus();
             
             window.addEventListener('scroll', updatePosition, true);
             window.addEventListener('resize', updatePosition);
@@ -83,7 +96,7 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
                 !paletteRef.current.contains(event.target) &&
                 !buttonRef.current?.contains(event.target)
             ) {
-                setShowPalette(false);
+                closePalette('outside', event.target);
             }
         };
 
@@ -93,32 +106,59 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
         }
     }, [showPalette]);
 
+    const selectPaletteColor = color => {
+        onChange(color);
+        closePalette('select');
+    };
+
+    const colorButton = <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => showPalette ? closePalette('toggle') : setPaletteOpen(true)}
+        className={compact
+            ? 'relative inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700'
+            : 'w-10 h-10 rounded border-2 border-gray-300 hover:border-gray-400 transition-colors'}
+        style={compact ? undefined : { backgroundColor: getCurrentColor() }}
+        title={title}
+        aria-label={title}
+        aria-expanded={showPalette}
+        aria-controls={showPalette ? paletteId : undefined}
+    >
+        {icon}
+        {compact && <span className="absolute bottom-1 h-0.5 w-4 rounded-sm ring-1 ring-gray-300"
+            style={{ backgroundColor: getCurrentColor() }} />}
+    </button>;
+
     return (
         <div className={`relative ${className}`}>
             {label && <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>}
 
             {/* Color Button */}
-            <button
-                ref={buttonRef}
-                type="button"
-                onClick={() => setShowPalette(!showPalette)}
-                className="w-10 h-10 rounded border-2 border-gray-300 hover:border-gray-400 transition-colors"
-                style={{ backgroundColor: getCurrentColor() }}
-                title="Select color"
-            />
+            {compact ? <Tooltip text={title}>{colorButton}</Tooltip> : colorButton}
 
             {/* Color Palette Popover - Rendered via Portal */}
             {showPalette && createPortal(
                 <div
                     ref={paletteRef}
-                    className="fixed z-[10010] p-3 bg-white border border-gray-300 rounded-lg shadow-lg"
+                    id={paletteId}
+                    role="group"
+                    aria-label={title}
+                    onClick={event => event.stopPropagation()}
+                    onKeyDown={event => {
+                        if (event.key === 'Escape') {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            closePalette('escape');
+                        }
+                    }}
+                    className="eceee-editor-ui fixed z-[10010] p-3 bg-white border border-gray-300 rounded-lg shadow-lg dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                     style={{ 
                         minWidth: '200px',
                         top: `${position.top}px`,
                         left: `${position.left}px`
                     }}
                 >
-                    <div className="text-xs font-semibold text-gray-700 mb-2">Theme Colors</div>
+                    <div className="text-xs font-semibold text-gray-700 mb-2 dark:text-gray-200">Theme Colors</div>
                     <div className="grid grid-cols-4 gap-2">
                         {themeColors.map(([name, color]) => {
                             const isSelected = value === name || value === color;
@@ -126,7 +166,7 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
                                 <button
                                     key={name}
                                     type="button"
-                                    onClick={() => onChange(name)}
+                                    onClick={() => selectPaletteColor(name)}
                                     className={`group relative w-10 h-10 rounded border-2 transition-all ${isSelected
                                             ? 'border-blue-600 ring-2 ring-blue-200'
                                             : 'border-gray-300 hover:border-gray-400'
@@ -144,10 +184,11 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '' }) 
 
                     {/* Custom Color */}
                     <div className="mt-3 pt-3 border-t border-gray-200">
-                        <div className="text-xs font-semibold text-gray-700 mb-2">Custom</div>
+                        <div className="text-xs font-semibold text-gray-700 mb-2 dark:text-gray-200">Custom</div>
                         <input
                             type="color"
-                            value={getCurrentColor()}
+                            aria-label={`Custom ${title.toLowerCase()}`}
+                            value={/^#[a-f\d]{6}$/i.test(getCurrentColor()) ? getCurrentColor() : '#000000'}
                             onChange={(e) => onChange(e.target.value)}
                             className="w-full h-10 rounded border border-gray-300 cursor-pointer"
                         />

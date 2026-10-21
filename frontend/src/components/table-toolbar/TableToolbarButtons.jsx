@@ -6,11 +6,18 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
-    Plus, Minus, Grid3X3, Split, Palette, Square, Import, Grid2X2,
+    Rows3, Columns3, Type, Minus, Grid3X3, Split, Palette, Square, Import, Grid2X2,
     Bold, Italic, AlignLeft, AlignCenter, AlignRight,
     AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
     ArrowRightFromLine, ArrowLeftFromLine
 } from 'lucide-react';
+import Tooltip from '../Tooltip';
+
+const TableToolbarButton = ({ title, children, className = '', ...props }) => <Tooltip text={title} position="bottom">
+    <button type="button" title={title} aria-label={title}
+        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-40 dark:hover:bg-gray-700 ${className}`}
+        {...props}>{children}</button>
+</Tooltip>;
 
 const TableToolbarButtons = ({ state, onCommand }) => {
     const [showColorPicker, setShowColorPicker] = useState(false);
@@ -107,188 +114,193 @@ const TableToolbarButtons = ({ state, onCommand }) => {
     if (!state) return null;
 
     return (
-        <div className="flex items-center gap-1">
+        <div role="toolbar" aria-label="Table formatting" className="flex min-w-0 flex-1 flex-wrap items-center gap-1 dark:text-gray-100">
             {/* Structure Section */}
             <div className="flex items-center gap-1 border-r pr-2">
-                <button
+                <TableToolbarButton
                     onClick={() => onCommand('openImport')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Import Table"
                 >
                     <Import size={16} />
-                </button>
-                <button
+                </TableToolbarButton>
+                <TableToolbarButton
                     onClick={() => onCommand('addRow', 'end')}
                     className="p-2 hover:bg-gray-200 rounded flex items-center gap-1"
                     title="Add Row"
                 >
-                    <Plus size={16} />
-                    <span className="text-sm">Row</span>
-                </button>
-                <button
+                    <Rows3 size={16} />
+                </TableToolbarButton>
+                <TableToolbarButton
                     onClick={() => onCommand('removeRow')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Remove Row"
                     disabled={!state.hasSelection}
                 >
                     <Minus size={16} />
-                </button>
-                <button
+                </TableToolbarButton>
+                <TableToolbarButton
                     onClick={() => onCommand('addColumn', 'end')}
                     className="p-2 hover:bg-gray-200 rounded flex items-center gap-1"
                     title="Add Column"
                 >
-                    <Plus size={16} />
-                    <span className="text-sm">Col</span>
-                </button>
-                <button
+                    <Columns3 size={16} />
+                </TableToolbarButton>
+                <TableToolbarButton
                     onClick={() => onCommand('removeColumn')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Remove Column"
                     disabled={!state.hasSelection}
                 >
                     <Minus size={16} />
-                </button>
+                </TableToolbarButton>
             </div>
 
             {/* Cell Operations */}
             <div className="flex items-center gap-1 border-r pr-2">
-                <button
+                <TableToolbarButton
                     onClick={() => onCommand('mergeCells')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Merge Cells"
                     disabled={!state.canMerge}
                 >
                     <Grid3X3 size={16} />
-                </button>
-                <button
+                </TableToolbarButton>
+                <TableToolbarButton
                     onClick={() => onCommand('splitCell')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Split Cell"
                     disabled={!state.canSplit}
                 >
                     <Split size={16} />
-                </button>
-                <button
+                </TableToolbarButton>
+                <TableToolbarButton
                     onClick={() => onCommand('growCell')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Grow Cell (span +1)"
                     disabled={!state.canGrow}
                 >
                     <ArrowRightFromLine size={16} />
-                </button>
-                <button
+                </TableToolbarButton>
+                <TableToolbarButton
                     onClick={() => onCommand('shrinkCell')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Shrink Cell (span -1)"
                     disabled={!state.canShrink}
                 >
                     <ArrowLeftFromLine size={16} />
-                </button>
+                </TableToolbarButton>
             </div>
 
             {/* View Options */}
             <div className="flex items-center gap-1 border-r pr-2">
-                <button
+                <TableToolbarButton
                     onClick={() => onCommand('toggleGrid')}
                     className={`p-2 hover:bg-gray-200 rounded ${state.showGrid ? 'bg-blue-100 text-blue-700' : ''}`}
                     title="Toggle Grid Lines (for visibility)"
                 >
                     <Grid2X2 size={16} />
-                </button>
+                </TableToolbarButton>
             </div>
 
             {/* Text Formatting */}
             <div className="flex items-center gap-1 border-r pr-2">
-                <button
+                <TableToolbarButton
                     onClick={() => onCommand('bold')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Bold"
                 >
                     <Bold size={16} />
-                </button>
-                <button
+                </TableToolbarButton>
+                <TableToolbarButton
                     onClick={() => onCommand('italic')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Italic"
                 >
                     <Italic size={16} />
-                </button>
+                </TableToolbarButton>
             </div>
 
             {/* Horizontal Alignment */}
             <div className="flex items-center gap-1 border-r pr-2">
-                <button
+                <TableToolbarButton
                     onClick={() => onCommand('alignLeft')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Align Left"
                     disabled={!state.hasSelection}
                 >
                     <AlignLeft size={16} />
-                </button>
-                <button
+                </TableToolbarButton>
+                <TableToolbarButton
                     onClick={() => onCommand('alignCenter')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Align Center"
                     disabled={!state.hasSelection}
                 >
                     <AlignCenter size={16} />
-                </button>
-                <button
+                </TableToolbarButton>
+                <TableToolbarButton
                     onClick={() => onCommand('alignRight')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Align Right"
                     disabled={!state.hasSelection}
                 >
                     <AlignRight size={16} />
-                </button>
+                </TableToolbarButton>
             </div>
 
             {/* Vertical Alignment */}
             <div className="flex items-center gap-1 border-r pr-2">
-                <button
+                <TableToolbarButton
                     onClick={() => onCommand('alignTop')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Align Top"
                     disabled={!state.hasSelection}
                 >
                     <AlignVerticalJustifyStart size={16} />
-                </button>
-                <button
+                </TableToolbarButton>
+                <TableToolbarButton
                     onClick={() => onCommand('alignMiddle')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Align Middle"
                     disabled={!state.hasSelection}
                 >
                     <AlignVerticalJustifyCenter size={16} />
-                </button>
-                <button
+                </TableToolbarButton>
+                <TableToolbarButton
                     onClick={() => onCommand('alignBottom')}
                     className="p-2 hover:bg-gray-200 rounded"
                     title="Align Bottom"
                     disabled={!state.hasSelection}
                 >
                     <AlignVerticalJustifyEnd size={16} />
-                </button>
+                </TableToolbarButton>
             </div>
 
             {/* Font Style */}
             <div className="flex items-center gap-1 border-r pr-2">
-                <select
-                    onChange={(e) => onCommand('fontStyle', e.target.value)}
-                    className="p-2 border rounded text-sm"
-                    value={state.fontStyle || 'normal'}
-                    disabled={!state.hasSelection}
-                >
-                    <option value="normal">Normal Text</option>
-                    <option value="quote">Quote</option>
-                    <option value="caption">Caption</option>
-                </select>
+                <Tooltip text={`Cell text style: ${state.fontStyle || 'normal'}`} position="bottom">
+                    <label className={`relative inline-flex h-8 w-8 items-center justify-center rounded hover:bg-gray-200 focus-within:ring-2 focus-within:ring-blue-500 dark:hover:bg-gray-700 ${!state.hasSelection ? 'opacity-40' : ''}`}>
+                        <Type size={16} aria-hidden="true" />
+                        <select
+                            aria-label="Cell text style"
+                            title={`Cell text style: ${state.fontStyle || 'normal'}`}
+                            onChange={(e) => onCommand('fontStyle', e.target.value)}
+                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                            value={state.fontStyle || 'normal'}
+                            disabled={!state.hasSelection}
+                        >
+                            <option value="normal">Normal Text</option>
+                            <option value="quote">Quote</option>
+                            <option value="caption">Caption</option>
+                        </select>
+                    </label>
+                </Tooltip>
             </div>
 
             {/* Styling */}
             <div className="flex items-center gap-1 relative">
-                <button
+                <TableToolbarButton
                     onClick={(e) => {
                         e.stopPropagation();
                         setShowBorderPicker(!showBorderPicker);
@@ -300,20 +312,20 @@ const TableToolbarButtons = ({ state, onCommand }) => {
                     data-border-toggle
                 >
                     <Square size={16} />
-                </button>
+                </TableToolbarButton>
 
                 {showBorderPicker && (
-                    <div ref={borderPickerRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-300 shadow-lg p-3 z-50 w-72">
+                    <div ref={borderPickerRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-300 shadow-lg p-3 z-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 w-72">
                         <div className="font-medium mb-2" role="heading" aria-level="4">Border Configuration</div>
 
                         {state.selectedCellsCount > 0 && (
-                            <div className="mb-2 text-xs bg-gray-50 text-gray-600 px-2 py-1">
+                            <div className="mb-2 text-xs bg-gray-50 text-gray-600 dark:bg-gray-700 dark:text-gray-200 px-2 py-1">
                                 {state.selectedCellsCount} cell{state.selectedCellsCount !== 1 ? 's' : ''} selected
                             </div>
                         )}
 
                         <div className="mb-3">
-                            <div className="text-sm text-gray-600 mb-1">Sides:</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-300 mb-1">Sides:</div>
                             <div className="grid grid-cols-2 gap-2">
                                 {['top', 'bottom', 'left', 'right'].map(side => (
                                     <label
@@ -341,8 +353,8 @@ const TableToolbarButtons = ({ state, onCommand }) => {
                         </div>
 
                         <div className="mb-3">
-                            <div className="text-sm text-gray-600 mb-1">Width:</div>
-                            <select value={borderWidth} onChange={(e) => setBorderWidth(e.target.value)} className="w-full p-2 border text-sm">
+                            <div className="text-sm text-gray-600 dark:text-gray-300 mb-1">Width:</div>
+                            <select value={borderWidth} onChange={(e) => setBorderWidth(e.target.value)} className="w-full p-2 border text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 <option value="1px">1px</option>
                                 <option value="2px">2px</option>
                                 <option value="3px">3px</option>
@@ -350,22 +362,22 @@ const TableToolbarButtons = ({ state, onCommand }) => {
                         </div>
 
                         <div className="mb-3">
-                            <div className="text-sm text-gray-600 mb-1">Style:</div>
-                            <select value={borderStyle} onChange={(e) => setBorderStyle(e.target.value)} className="w-full p-2 border text-sm">
+                            <div className="text-sm text-gray-600 dark:text-gray-300 mb-1">Style:</div>
+                            <select value={borderStyle} onChange={(e) => setBorderStyle(e.target.value)} className="w-full p-2 border text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 <option value="solid">Solid</option>
                                 <option value="double">Double</option>
                             </select>
                         </div>
 
                         <div className="mb-3">
-                            <div className="text-sm text-gray-600 mb-1">Color:</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-300 mb-1">Color:</div>
                             <input type="color" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="w-full h-10 border cursor-pointer" />
                         </div>
                     </div>
                 )}
 
                 <div className="relative">
-                    <button
+                    <TableToolbarButton
                         onClick={(e) => {
                             e.stopPropagation();
                             setShowColorPicker(!showColorPicker);
@@ -377,14 +389,14 @@ const TableToolbarButtons = ({ state, onCommand }) => {
                         data-color-toggle
                     >
                         <Palette size={16} />
-                    </button>
+                    </TableToolbarButton>
 
                     {showColorPicker && (
-                        <div ref={colorPickerRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-300 shadow-lg p-3 z-50 w-64">
+                        <div ref={colorPickerRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-300 shadow-lg p-3 z-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 w-64">
                             <div className="font-medium mb-3 text-sm" role="heading" aria-level="4">Cell Colors</div>
 
                             <div className="mb-3">
-                                <label className="block text-xs text-gray-600 mb-1">Background</label>
+                                <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">Background</label>
                                 <input
                                     type="color"
                                     value={backgroundColor}
@@ -397,7 +409,7 @@ const TableToolbarButtons = ({ state, onCommand }) => {
                             </div>
 
                             <div className="mb-3">
-                                <label className="block text-xs text-gray-600 mb-1">Text</label>
+                                <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">Text</label>
                                 <input
                                     type="color"
                                     value={textColor}
@@ -410,7 +422,7 @@ const TableToolbarButtons = ({ state, onCommand }) => {
                             </div>
 
                             <div className="mb-3">
-                                <label className="block text-xs text-gray-600 mb-1">Hover Background</label>
+                                <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">Hover Background</label>
                                 <input
                                     type="color"
                                     value={hoverBackgroundColor}
@@ -423,7 +435,7 @@ const TableToolbarButtons = ({ state, onCommand }) => {
                             </div>
 
                             <div className="mb-0">
-                                <label className="block text-xs text-gray-600 mb-1">Hover Text</label>
+                                <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">Hover Text</label>
                                 <input
                                     type="color"
                                     value={hoverTextColor}

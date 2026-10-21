@@ -69,6 +69,26 @@ const expectCanonicalStyles = async (page) => {
   await expect(page.locator('link[data-eceee-render-font]')).toHaveCount(1)
 }
 
+test('banner palette colors and outlines override theme typography in the render frame', async ({ page }) => {
+  const theme = compileRenderStyles({ theme: {
+    colors: { paper: '#ffffff', ocean: '#082f49' },
+    customCss: '.cms-content h2,.cms-content h3,.cms-content p{color:#b91c1c}',
+  } })
+  await openRender(page, {
+    layout: 'main_layout', themeCss: theme.css,
+    context: { preview: true, componentStyles: { passthrough: { template: '{{passthru}}' } } },
+    slots: { main: [{ id: 'banner-colors', type: 'easy_widgets.BannerWidget', config: {
+      bannerMode: 'text', textContent: '<h3>Readable heading</h3><p>Readable body</p>',
+      textColor: 'paper', backgroundColor: 'ocean', textOutline: 'dark', componentStyle: 'passthrough',
+    } }] },
+  })
+  await expect(page.locator('.banner-widget')).toHaveCSS('background-color', 'rgb(8, 47, 73)')
+  for (const tag of ['h3', 'p']) {
+    await expect(page.locator(`.banner-text ${tag}`)).toHaveCSS('color', 'rgb(255, 255, 255)')
+    await expect(page.locator(`.banner-text ${tag}`)).not.toHaveCSS('text-shadow', 'none')
+  }
+})
+
 for (const viewport of viewports) {
   test(`editor and designer render the shared fixtures at ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })

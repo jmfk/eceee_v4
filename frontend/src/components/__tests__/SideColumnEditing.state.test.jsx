@@ -283,7 +283,7 @@ it.each(['paste', 'plainPaste', 'formatBlock'])('preserves unrelated body markup
     expect(ref.current.getCurrentWidgetData().config.body).toContain(plain ? '&lt;b&gt;Literal&lt;/b&gt;' : 'Pasted')
     if (plain) expect(editor.querySelector('b')).toBeNull()
   } else {
-    fireEvent.click(screen.getByRole('button', { name: 'Format', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: /^Text format:/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Heading 2', exact: true }))
     expect(ref.current.getCurrentWidgetData().config.body).toContain('<h2>Target</h2>')
   }
