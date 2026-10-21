@@ -1,14 +1,14 @@
 ---
-id: PRD-0027
+id: PRD-0029
 title: Theme-owned versioned widget types
 status: completed
 locked: true
 created: 2026-10-21
 related_adrs:
-  - ADR-0036
+  - ADR-0040
 ---
 
-# PRD-0027: Theme-owned Versioned Widget Types
+# PRD-0029: Theme-owned Versioned Widget Types
 
 ## Problem
 
@@ -57,7 +57,7 @@ Designers cannot create reusable widget types without changing application code 
 
 ## Linked ADRs
 
-- [ADR-0036](../adrs/active/0036-theme-widget-revisions.md)
+- [ADR-0040](../adrs/active/0040-theme-widget-revisions.md)
 
 ## Completion Evidence
 

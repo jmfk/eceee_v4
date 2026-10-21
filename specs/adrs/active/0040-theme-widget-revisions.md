@@ -1,15 +1,15 @@
 ---
-id: ADR-0036
+id: ADR-0040
 title: Theme-owned append-only widget releases
 status: accepted
 date: 2026-10-21
 related_prds:
-  - PRD-0027
+  - PRD-0029
 supersedes: []
 superseded_by: []
 ---
 
-# ADR-0036: Theme-owned Append-only Widget Releases
+# ADR-0040: Theme-owned Append-only Widget Releases
 
 ## Context
 
@@ -44,4 +44,4 @@ A JSON field reuses the existing theme transaction, history and portability boun
 
 ## Links
 
-- Related PRD: [PRD-0027](../../prds/0027-theme-widget-types.md)
+- Related PRD: [PRD-0029](../../prds/0029-theme-widget-types.md)

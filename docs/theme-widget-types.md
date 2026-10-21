@@ -45,7 +45,7 @@ Archiving hides a type from new selection while keeping existing instances reada
 - Types and schema lookups are scoped to tenant/theme/revision. They never mutate the global code widget registry.
 - Theme snapshots, packages and file synchronization include the widget document. Restoring a theme selects the restored active revision while retaining newer immutable releases needed by existing content. Types absent from the restored snapshot are archived.
 
-The additive migration is `webpages.0087_pagetheme_widget_types`. Existing themes receive an empty document; existing code widgets and their instance data are unchanged.
+The additive migration is `webpages.0087_pagetheme_widget_types`. Existing themes receive an empty document; existing code widgets and their instance data are unchanged. Migration `webpages.0089_merge_theme_widgets_and_outlines` joins the widget and text-outline migration branches without additional data changes.
 
 ## Verification
 

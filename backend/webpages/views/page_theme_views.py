@@ -48,7 +48,15 @@ logger = logging.getLogger(__name__)
 
 THEME_CASE_OPTIONS = {
     "no_underscore_before_number": True,
-    "ignore_fields": ("designer_preview", "designerPreview", "layouts", "text_outline_styles", "textOutlineStyles", "widget_types", "widgetTypes"),
+    "ignore_fields": (
+        "designer_preview",
+        "designerPreview",
+        "layouts",
+        "text_outline_styles",
+        "textOutlineStyles",
+        "widget_types",
+        "widgetTypes",
+    ),
 }
 
 
