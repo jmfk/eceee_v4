@@ -171,6 +171,7 @@ const FooterWidget = ({
                 contextType={contextType}
                 parentComponentId={componentId}
                 pageId={context.pageId}
+                namespace={context?.namespace || props.namespace}
                 webpageData={context.webpageData}
                 pageVersionData={context.pageVersionData}
                 versionId={context.versionId}
@@ -189,7 +190,7 @@ const FooterWidget = ({
         );
     }, [
         widgetPath, mode, onWidgetEdit, onOpenWidgetEditor, contextType,
-        componentId, context, selectedWidgets, cutWidgets, onToggleWidgetSelection,
+        componentId, context, props.namespace, selectedWidgets, cutWidgets, onToggleWidgetSelection,
         isWidgetSelected, isWidgetCut, onDeleteCutWidgets, buildWidgetPath,
         parseWidgetPath, pasteModeActive, onPasteAtPosition
     ]);
@@ -239,6 +240,7 @@ const FooterWidget = ({
                         onSlotChange={handleSlotChange}
                         parentComponentId={parentComponentId}
                         pageId={context?.pageId || props.pageId}
+                        namespace={context?.namespace || props.namespace}
                         versionId={context?.versionId || props.versionId}
                         webpageData={context?.webpageData || props.webpageData}
                         pageVersionData={context?.pageVersionData || props.pageVersionData}

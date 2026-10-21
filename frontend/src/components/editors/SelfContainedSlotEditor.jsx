@@ -25,6 +25,7 @@ const SelfContainedSlotEditor = ({
     parentWidgetId,
     parentSlotName, // Top-level slot where parent widget lives (legacy)
     contextType = 'page',
+    namespace = null,
     pageId = null,
     versionId = null,
     webpageData = null,
@@ -374,6 +375,7 @@ const SelfContainedSlotEditor = ({
                                 showControls={mode === 'editor'}
                                 widgetId={widget.id}
                                 contextType={contextType}
+                                namespace={namespace}
                                 onOpenWidgetEditor={onOpenWidgetEditor}
                                 // Pass parent context for nested widgets
                                 parentComponentId={parentComponentId}
@@ -453,6 +455,7 @@ SelfContainedSlotEditor.propTypes = {
     maxWidgets: PropTypes.number,
     parentWidgetId: PropTypes.string.isRequired,
     contextType: PropTypes.oneOf(['page', 'object']),
+    namespace: PropTypes.string,
     onWidgetEdit: PropTypes.func,
     onOpenWidgetEditor: PropTypes.func,
     onSlotChange: PropTypes.func,

@@ -301,6 +301,7 @@ const PageWidgetFactory = ({
                                 widgetType={widget.type}
                                 versionId={versionId}
                                 isPublished={isPublished}
+                                namespace={namespace}
                                 parentComponentId={parentComponentId}
                                 contextType={contextType}
                                 pageId={pageId}
@@ -573,6 +574,7 @@ const PageWidgetFactory = ({
                     // PageEditor-specific props
                     versionId={versionId}
                     isPublished={isPublished}
+                    namespace={namespace}
                     // Context props for container widgets
                     parentComponentId={parentComponentId}
                     contextType={contextType}
@@ -596,6 +598,7 @@ const PageWidgetFactory = ({
                         webpageData,
                         pageVersionData,
                         widgetPath,
+                        namespace,
                         pathVariables: pathVariables || {},
                         simulatedPath: simulatedPath,
                         onSimulatedPathChange: onSimulatedPathChange
