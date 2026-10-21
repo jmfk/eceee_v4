@@ -13,14 +13,14 @@ export default function ObjectNavigation({ instanceId, anchorId, onSelect, disab
     // API order is [self, parent, ..., root]. Direct child URLs use the same root.
     const root = path?.data?.at(-1)
     const { data: tree, isPending: treeLoading, error: treeError } = useQuery({
-        queryKey: ['objectInstance', root?.id, 'navigationTree'],
+        queryKey: ['objectInstances', 'navigationTree', root?.id],
         queryFn: () => objectInstancesApi.getTree(root.id),
         enabled: !!root?.id,
     })
     // Relations belong to the root context, so a selected supporting object stays visible.
     const relatedId = root?.id
     const { data: related, isPending: relatedLoading, error: relatedError } = useQuery({
-        queryKey: ['objectInstance', relatedId, 'navigationRelations'],
+        queryKey: ['objectInstances', 'navigationRelations', relatedId],
         queryFn: async () => {
             const [forward, reverse] = await Promise.all([
                 objectRelationshipsApi.getRelatedObjects(relatedId),
@@ -45,13 +45,19 @@ export default function ObjectNavigation({ instanceId, anchorId, onSelect, disab
     const objects = tree?.data || []
     const treeIds = new Set(objects.map(object => String(object.id)))
     const relatedObjects = (related || []).filter(object => !treeIds.has(String(object.id)))
+    const childrenByParent = new Map()
+    objects.forEach(object => {
+        const key = String(parentId(object))
+        if (!childrenByParent.has(key)) childrenByParent.set(key, [])
+        childrenByParent.get(key).push(object)
+    })
     const renderBranch = (object, seen = new Set()) => {
         if (seen.has(String(object.id))) return null
         const nextSeen = new Set([...seen, String(object.id)])
         return <li key={object.id}>
             {renderButton(object, seen.size)}
-            {objects.some(child => String(parentId(child)) === String(object.id)) && <ul>
-                {objects.filter(child => String(parentId(child)) === String(object.id)).map(child => renderBranch(child, nextSeen))}
+            {childrenByParent.has(String(object.id)) && <ul>
+                {childrenByParent.get(String(object.id)).map(child => renderBranch(child, nextSeen))}
             </ul>}
         </li>
     }

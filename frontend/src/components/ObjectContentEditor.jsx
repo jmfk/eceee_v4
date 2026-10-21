@@ -1,5 +1,5 @@
 import { useWidgetTheme } from '../contexts/WidgetThemeContext'
-import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { Layout, Plus, Settings, Trash2, Eye, Check, X, MoreHorizontal, Clipboard, Scissors, ChevronDown, ChevronUp } from 'lucide-react'
 import { ObjectWidgetFactory } from '../editors/object-editor'
 import { useWidgets, getWidgetDisplayName, createDefaultWidgetConfig } from '../hooks/useWidgets'
@@ -15,7 +15,7 @@ import ImportDialog from './ImportDialog'
 import WidgetEditorPanel from './WidgetEditorPanel'
 import { generateWidgetId, regenerateWidgetIds } from '../utils/widgetIdentity'
 
-const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context, namespace = null }) => {
+const ObjectContentEditor = forwardRef(({ objectType, widgets = {}, onWidgetChange, context, namespace = null }, ref) => {
     // 1. STATE & HOOKS (Top level)
     const [selectedWidgets, setSelectedWidgets] = useState(() => new Set())
     const [cutWidgets, setCutWidgets] = useState(() => new Set())
@@ -23,6 +23,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
     const { clipboardData, pasteModeActive, pasteModePaused, togglePasteMode, clearClipboardState, refreshClipboard } = useClipboard()
     const { useExternalChanges, publishUpdate } = useUnifiedData()
     const [widgetEditorOpen, setWidgetEditorOpen] = useState(false)
+    useImperativeHandle(ref, () => ({ isWidgetEditorOpen: () => widgetEditorOpen }), [widgetEditorOpen])
     const [editingWidget, setEditingWidget] = useState(null)
     const [widgetModalOpen, setWidgetModalOpen] = useState(false)
     const [selectedSlotForModal, setSelectedSlotForModal] = useState(null)
@@ -554,7 +555,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
             />
         </div>
     )
-}
+})
 
 ObjectContentEditor.displayName = 'ObjectContentEditor'
 export default ObjectContentEditor

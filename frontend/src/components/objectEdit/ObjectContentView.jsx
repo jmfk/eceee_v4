@@ -118,6 +118,10 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
     const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
     const formRef = useRef(null)
+    const contentEditorRef = useRef(null)
+    useImperativeHandle(ref, () => ({
+        hasOpenWidgetEditor: () => Boolean(contentEditorRef.current?.isWidgetEditorOpen()),
+    }), [])
 
     // Sync local widgets with instance
     useEffect(() => {
@@ -149,6 +153,7 @@ const ObjectContentView = forwardRef(({ objectType, instance, parentId, isNewIns
                             <div className="min-w-[280px] flex-1 space-y-6 overflow-auto p-6">
                                 <div>
                                     <ObjectContentEditor
+                                        ref={contentEditorRef}
                                         objectType={objectType}
                                         widgets={localWidgets}
                                         onWidgetChange={handleWidgetChange}

@@ -31,11 +31,17 @@ const DirtyProbe = () => {
 
     useExternalChanges('object-data-dirty-probe', forceRender)
 
-    return <div data-testid="dirty-state">{readDirty()}</div>
+    return <>
+        <div data-testid="dirty-state">{readDirty()}</div>
+        <output data-testid="workflow-state">{JSON.stringify(getState().objects?.['object-1'])}</output>
+    </>
 }
 
 const instance = {
     id: 'object-1',
+    versionId: 99,
+    editRevision: 7,
+    parent: { id: 6 },
     title: 'Original title',
     status: 'draft',
     data: { summary: 'Original summary' },
@@ -80,6 +86,19 @@ describe('ObjectDataForm dirty state', () => {
             initialState: createAppState({ objects: {}, metadata: { currentObjectId: undefined } }),
         }) })
         expect(screen.getByPlaceholderText('Enter object title...')).toHaveValue('')
+    })
+
+    it('preserves the save version and parent when the data form initializes the object', async () => {
+        renderForm()
+        fireEvent.change(screen.getByPlaceholderText('Enter object title...'), {
+            target: { value: 'Updated title' },
+        })
+        await waitFor(() => {
+            const savedState = JSON.parse(screen.getByTestId('workflow-state').textContent)
+            expect(savedState.currentVersionId).toBe('99')
+            expect(savedState.editRevision).toBe(7)
+            expect(savedState.parentId).toBe(6)
+        })
     })
 
     it('marks a top-level object field dirty immediately', async () => {

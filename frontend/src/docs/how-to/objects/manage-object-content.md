@@ -20,7 +20,7 @@ Choose an object type and create or edit its content items.
 3. Use the create action to add a new item, or open an existing item to edit it.
 4. Use the left column to navigate the root object, its sub-objects and related objects. Pure sub-object types appear here rather than in the overview.
 5. Drag either side column's divider to resize it, or focus the divider and use the arrow keys. Use the chevron to collapse or expand a column; its form state is preserved.
-6. Save pending changes before switching objects. The left navigation saves a working copy before opening another object and stays on the current object if saving fails.
+6. Save or close the widget editor before switching objects. Save pending changes before switching objects. The left navigation saves a working copy before opening another object and stays on the current object if saving fails.
 7. Review publishing and version details before making object content live.
 
 ```video
