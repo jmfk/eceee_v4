@@ -242,8 +242,12 @@ class NewsDetailWidget(BaseWidget):
         if not published_version.widgets or not context.get("renderer"):
             return {}
 
+        from webpages.theme_widgets import iter_widgets, object_widget_theme
+
         rendered_slots = {}
         renderer = context["renderer"]
+        if any(iter_widgets(published_version.widgets)):
+            context = {**context, "widget_theme": object_widget_theme(published_version.object_instance.tenant_id)}
 
         # published_version.widgets is a dict like: {"main": [...], "sidebar": [...]}
         for slot_name, widgets in published_version.widgets.items():

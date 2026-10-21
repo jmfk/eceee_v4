@@ -22,7 +22,7 @@ const normalizedBreakpoint = (breakpoint: unknown) => ({
     default: 'xs', mobile: 'xs', desktop: 'sm', tablet: 'md',
 }[String(breakpoint || 'xs')] || String(breakpoint || 'xs'))
 
-const defaultBreakpoints = { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 }
+const defaultBreakpoints: Record<string, number> = { xs: 0, sm: 640, md: 768, lg: 1024, xl: 1280 }
 
 const breakpointWidth = (breakpoint: unknown, breakpoints: Record<string, number>) => {
     const normalized = normalizedBreakpoint(breakpoint)
@@ -128,13 +128,16 @@ const collectDesignerPreviewImageReferences = (view: any) => {
 
 export const designerPreviewImageReferences = (view: any) => collectDesignerPreviewImageReferences(view).references
 
-const normalizeWidget = (widget: any, fallbackId: string, referencesByObject?: WeakMap<object, DesignerPreviewImageReference[]>): RenderWidgetModel => {
+export const normalizeWidget = (widget: any, fallbackId: string, referencesByObject?: WeakMap<object, DesignerPreviewImageReference[]>): RenderWidgetModel => {
     const config = widget?.config && typeof widget.config === 'object' ? structuredClone(widget.config) : {}
     const normalizeList = (items: unknown, prefix: string) => Array.isArray(items)
         ? items.map((item, index) => normalizeWidget(item, `${prefix}-${index}`, referencesByObject))
         : items
     if (config.slots && typeof config.slots === 'object') {
         config.slots = Object.fromEntries(Object.entries(config.slots).map(([name, items]) => [name, normalizeList(items, `${fallbackId}-${name}`)]))
+    }
+    if (widget?.type === 'easy_widgets.SectionWidget' && Array.isArray(config.widgets)) {
+        config.widgets = normalizeList(config.widgets, `${fallbackId}-widgets`)
     }
     return {
         id: String(widget?.id ?? fallbackId),

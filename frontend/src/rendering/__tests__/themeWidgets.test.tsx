@@ -31,6 +31,30 @@ describe('Theme widget rendering', () => {
         expect(container.querySelector('.person-v1')).not.toBeNull()
         expect(screen.getByRole('heading', { name: 'Nested Alex' })).toBeInTheDocument()
     })
+    it.each(['object_storage.ObjectDetailWidget', 'easy_widgets.NewsDetailWidget'])('uses object definitions inside %s without replacing page definitions', detailType => {
+        const pageTypes = structuredClone(document)
+        pageTypes.items[0].releases[0].template = '<p class="page-definition">Page: {{personName}}</p>'
+        const objectTypes = structuredClone(document)
+        objectTypes.items[0].releases[0].template = '<p class="object-definition">Object: {{personName}}</p>'
+        const model = createPageRenderModel({
+            layout: 'main_layout',
+            context: { themeWidgetTypes: pageTypes },
+            widgets: { main: [
+                { id: 'page-person', type, type_version: 1, config: { personName: 'Page Alice' } },
+                { id: 'detail', type: detailType, config: {}, data: { status: 'ready', item: {
+                    id: 'object-1', title: 'Object', objectType: { name: 'article', label: 'Article' },
+                    data: {}, theme_widget_types: objectTypes,
+                    widgets: { main: [{ id: 'columns', type: 'easy_widgets.TwoColumnsWidget', config: { slots: {
+                        left: [{ id: 'object-person', type, type_version: 1, config: { personName: 'Object Bob' } }],
+                    } } }] },
+                } } },
+            ] },
+        })
+        const { container } = render(<PageRenderer model={model} />)
+        expect(container.querySelector('.page-definition')).toHaveTextContent('Page: Page Alice')
+        expect(container.querySelector('.object-definition')).toHaveTextContent('Object: Object Bob')
+        expect(container.querySelectorAll('.page-definition')).toHaveLength(1)
+    })
     it('sanitizes raw template substitutions and exposes only schema-defined fields', () => {
         const unsafe = structuredClone(document)
         unsafe.items[0].releases[0].template = '<p>{{{personName}}}{{secret}}</p>'

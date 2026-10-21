@@ -7,6 +7,7 @@ import { normalizeCssName, RenderFailure, SafeHtml } from './primitives'
 import { renderMustache } from '../utils/mustacheRenderer'
 import { getBannerRenderConfig } from '../utils/bannerConfig'
 import type { RenderPageModel, RenderWidgetModel } from './types'
+import type { ThemeWidgetDocument } from './themeWidgets'
 import { normalizeLayoutDefinition, ThemeLayoutRender, validateLayoutDefinition } from './themeLayoutRenderer'
 
 class RenderBoundary extends Component<{ children: ReactNode, type: string }, { failed: boolean }> {
@@ -27,7 +28,7 @@ export const PageRenderer = ({ model }: { model: RenderPageModel }) => {
     const Layout = getRenderLayout(model.layout)
     const layoutDefinition = normalizeLayoutDefinition(model.layoutDefinition)
 
-    const renderWidgets = (widgets: RenderWidgetModel[]): ReactNode => (widgets || []).map((sourceWidget) => {
+    const renderWidgets = (widgets: RenderWidgetModel[], themeWidgetTypes?: ThemeWidgetDocument): ReactNode => (widgets || []).map((sourceWidget) => {
         const widget = sourceWidget.type === 'easy_widgets.BannerWidget'
             ? { ...sourceWidget, config: getBannerRenderConfig(sourceWidget.config) } : sourceWidget
         const Widget = isThemeWidget(widget.type) ? ThemeWidgetRender : getRenderWidget(widget.type, Boolean(model.designer))
@@ -39,7 +40,8 @@ export const PageRenderer = ({ model }: { model: RenderPageModel }) => {
         if (hidden) return null
         const normalized = normalizeCssName(widget.type)
         const isLayoutPreviewPlaceholder = widget.type === 'designer.LayoutSlotPlaceholder'
-        const output = <Widget widget={widget} context={model.context} renderWidgets={renderWidgets} />
+        const context = themeWidgetTypes ? { ...model.context, themeWidgetTypes } : model.context
+        const output = <Widget widget={widget} context={context} renderWidgets={(nested, nestedTypes) => renderWidgets(nested, nestedTypes || themeWidgetTypes)} />
         const styleKey = widget.config?.componentStyle || widget.config?.component_style
         const componentStyle = styleKey ? model.context.componentStyles?.[styleKey] : null
         let renderedOutput: ReactNode = output

@@ -327,6 +327,16 @@ export async function mockCmsApi(page, {
       return json(route, { access: ACCESS_TOKEN })
     }
 
+    if (method === 'GET' && (
+      url.pathname === '/api/v1/webpages/themes/default/' ||
+      url.pathname === '/api/v1/webpages/themes/1/'
+    )) {
+      return json(route, {
+        id: 1, name: 'System Default', isDefault: true,
+        widgetTypes: { version: 1, items: [] },
+      })
+    }
+
     if (url.pathname === '/api/v1/webpages/themes/' && method === 'GET') {
       return json(route, {
         count: 1,

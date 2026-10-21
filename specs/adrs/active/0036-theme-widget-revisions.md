@@ -19,9 +19,11 @@ Database-authored widget types must work without deployments while existing cont
 
 Store a format-versioned widget document on PageTheme. Each type has a UUID, mutable display metadata, immutable numbered releases and a draft-only working definition. Bind instances through type=theme_widgets.<uuid> and type_version, explicitly adapted to typeVersion in JavaScript. User field keys are frontend-owned camelCase and preserved verbatim.
 
-Resolve types per effective theme and tenant, never through mutation of the global code registry. Publish working definitions from ThemeDesignerDraft atomically with the full theme. Published definitions contain validated schema/template/source CSS and server-compiled scoped CSS. Existing releases cannot be changed or removed. Archival prevents new instances, not existing reads.
+Resolve types per effective theme and tenant, never through mutation of the global code registry. Publish working definitions from ThemeDesignerDraft atomically with the full theme. Published definitions contain validated schema/template/source CSS and server-compiled scoped CSS. Existing releases cannot be changed or removed. Archival hides the type in new-instance selection. Exact revision lookup remains available for existing reads, edits and copies.
 
 Use the existing jsonschema, Bleach, tinycss2 and Mustache infrastructure. HTML is sanitized after substitution; templates have no executable functions or external partials. CSS accepts ordinary scoped selectors and media queries, with external resources and global at-rules rejected. Missing references fail explicitly rather than choosing latest.
+
+Theme saves and page/object version writes share the tenant publication lock, so compatibility checks and new pinned references cannot race. Objects carry the default theme's widget definitions into nested rendering; page-wide fonts, colors and other shared tokens still use the rendering page theme. Ordinary theme CRUD cannot write releases; Designer publication and validated import/sync paths own that mutation. Themes with releases cannot be deleted. Inherited scheduled references are checked across known ancestor activation/expiry boundaries during their active intervals, including replacement or rescheduling of an ancestor version.
 
 ## Rationale
 

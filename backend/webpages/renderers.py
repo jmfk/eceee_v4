@@ -305,7 +305,9 @@ class WebPageRenderer:
 
             pinned_version = widget_data.get("type_version", widget_data.get("typeVersion"))
             definition = (
-                find_definition((context or {}).get("theme"), widget_type_name, pinned_version)
+                find_definition(
+                    (context or {}).get("widget_theme", (context or {}).get("theme")), widget_type_name, pinned_version
+                )
                 if type(pinned_version) is int
                 else None
             )

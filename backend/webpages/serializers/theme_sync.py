@@ -23,11 +23,25 @@ class ThemeSyncSerializer(PageThemeSerializer):
             "last_synced_at",
             "sync_source",
         ]
-        read_only_fields = [field for field in PageThemeSerializer.Meta.read_only_fields if field != "stable_key"] + [
+        read_only_fields = [
+            field for field in PageThemeSerializer.Meta.read_only_fields if field not in {"stable_key", "widget_types"}
+        ] + [
             "sync_version",
             "last_synced_at",
             "sync_source",
         ]
+
+    def validate_widget_types(self, value):
+        """Sync may import definitions, but released history remains immutable."""
+        from django.core.exceptions import ValidationError
+
+        from webpages.theme_widgets import validate_widget_types
+
+        try:
+            validate_widget_types(value, previous=self.instance.widget_types if self.instance else None)
+        except ValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
+        return value
 
     def validate(self, attrs):
         """Validate version conflict on update"""

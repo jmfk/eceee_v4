@@ -148,7 +148,7 @@ export interface ThemeLayoutDocument {
 export interface WidgetRenderProps {
     widget: RenderWidgetModel
     context: RenderContext
-    renderWidgets: (widgets: RenderWidgetModel[]) => React.ReactNode
+    renderWidgets: (widgets: RenderWidgetModel[], themeWidgetTypes?: ThemeWidgetDocument) => React.ReactNode
 }
 
 export type WidgetRenderComponent = ComponentType<WidgetRenderProps>

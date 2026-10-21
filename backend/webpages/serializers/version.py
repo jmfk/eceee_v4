@@ -12,6 +12,7 @@ Version-related serializers for the Web Page Publishing System
 from copy import deepcopy
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
 from rest_framework import serializers
 
 from ..models import PageDataSchema, PageTheme, PageVersion
@@ -236,18 +237,9 @@ class PageVersionSerializer(serializers.ModelSerializer):
     @staticmethod
     def _get_effective_theme(obj):
         """Resolve inheritance for this version, independent of the live version."""
-        if obj.theme:
-            return obj.theme
-        include_parent_drafts = not obj.is_published()
-        current = obj.page.parent
-        while current:
-            parent_version = (
-                current.get_latest_version() if include_parent_drafts else current.get_current_published_version()
-            )
-            if parent_version and parent_version.theme:
-                return parent_version.theme
-            current = current.parent
-        return PageTheme.get_default_theme(tenant=obj.page.tenant)
+        from webpages.theme_widgets import version_widget_theme
+
+        return version_widget_theme(obj)
 
     def get_theme_inheritance_info(self, obj):
         """Get metadata about where theme comes from"""
@@ -259,11 +251,12 @@ class PageVersionSerializer(serializers.ModelSerializer):
             return {"source": "none", "inherited_from": None}
 
         # Find which parent it came from
-        include_parent_drafts = not obj.is_published()
+        include_parent_drafts = obj.effective_date is None
+        at = obj.effective_date if obj.effective_date and obj.effective_date > timezone.now() else None
         current = obj.page.parent
         while current:
             current_version = (
-                current.get_latest_version() if include_parent_drafts else current.get_current_published_version()
+                current.get_latest_version() if include_parent_drafts else current.get_current_published_version(now=at)
             )
             if current_version and current_version.theme:
                 return {
@@ -285,28 +278,24 @@ class PageVersionSerializer(serializers.ModelSerializer):
         elif "code_layout" in attrs:
             attrs["layout_key"] = attrs["code_layout"]
         if self.instance:
-            effective_theme = (
-                attrs.get("theme", self.instance.theme) if attrs.get("theme", self.instance.theme) else None
+            from webpages.theme_widgets import version_widget_theme
+
+            effective_theme = version_widget_theme(
+                self.instance, theme_override=attrs.get("theme", self.instance.theme)
             )
-            if effective_theme is None:
-                current = self.instance.page.parent
-                while current and effective_theme is None:
-                    parent_version = (
-                        current.get_latest_version()
-                        if not self.instance.is_published()
-                        else current.get_current_published_version()
-                    )
-                    effective_theme = parent_version.theme if parent_version and parent_version.theme else None
-                    current = current.parent
-                effective_theme = effective_theme or PageTheme.get_default_theme(tenant=self.instance.page.tenant)
 
             effective_key = attrs.get("layout_key", self.instance.layout_key or self.instance.code_layout)
+            at = (
+                self.instance.effective_date
+                if self.instance.effective_date and self.instance.effective_date > timezone.now()
+                else None
+            )
             current = self.instance.page.parent
             while not effective_key and current:
                 parent_version = (
                     current.get_latest_version()
-                    if not self.instance.is_published()
-                    else current.get_current_published_version()
+                    if self.instance.effective_date is None
+                    else current.get_current_published_version(now=at)
                 )
                 effective_key = (parent_version.layout_key or parent_version.code_layout) if parent_version else ""
                 current = current.parent
@@ -328,12 +317,15 @@ class PageVersionSerializer(serializers.ModelSerializer):
                     validate_layout_widgets(effective_theme, effective_key, attrs.get("widgets", self.instance.widgets))
                     from webpages.theme_widgets import validate_instances
 
-                    previous_theme = self.instance.theme or self.instance.page.get_effective_theme()
+                    previous_theme = version_widget_theme(self.instance)
                     validate_instances(
                         effective_theme,
                         attrs.get("widgets", self.instance.widgets),
+                        previous_widgets=self.instance.widgets,
                         previous_theme=(
-                            previous_theme if previous_theme and previous_theme.pk != effective_theme.pk else None
+                            previous_theme
+                            if previous_theme and previous_theme.pk != getattr(effective_theme, "pk", None)
+                            else None
                         ),
                     )
                 except DjangoValidationError as exc:

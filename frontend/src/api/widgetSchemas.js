@@ -71,7 +71,8 @@ export const validateWidgetConfiguration = async (widgetType, widgetData, { them
         const query = new URLSearchParams()
         if (themeId) query.set("theme_id", themeId)
         if (typeVersion) query.set("type_version", typeVersion)
-        const response = await api.post(`/api/v1/webpages/widget-types/${encodedWidgetType}/validate/?${query}`, {
+        const suffix = query.size ? `?${query}` : ''
+        const response = await api.post(`/api/v1/webpages/widget-types/${encodedWidgetType}/validate/${suffix}`, {
             widgetData: widgetData
         })
         return response.data
