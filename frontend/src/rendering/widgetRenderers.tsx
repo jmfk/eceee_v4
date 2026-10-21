@@ -112,7 +112,8 @@ const BannerRender: WidgetRenderComponent = ({ widget }) => {
     const content = mode === 'header' ? value(config, 'headerContent', 'header_content') : value(config, 'textContent', 'text_content')
     if (!content) return null
     const imageSize = value(config, 'imageSize', 'image_size') || 'square'
-    const background = mode === 'header' && value(config, 'backgroundImageUrl', 'background_image_url')
+    const background = mode === 'header' && (value(config, 'backgroundImageUrl', 'background_image_url')
+        || imageUrl(value(config, 'backgroundImage', 'background_image')))
     const background2x = value(config, 'backgroundImageUrl2x', 'background_image_url_2x')
     const image = value(config, 'image1Url', 'image_1_url') || imageUrl(value(config, 'image1', 'image_1'))
     const image2x = value(config, 'image1Url2x', 'image_1_url_2x')

@@ -187,6 +187,15 @@ describe('PageRenderer', () => {
         expect(container.querySelector('.banner-image')).toBeNull()
     })
 
+    it.each(['backgroundImage', 'background_image'])('renders a saved banner image object from %s without a precomputed URL', field => {
+        const model = createPageRenderModel({ widgets: { main: [{ id: 'banner-background', type: 'easy_widgets.BannerWidget', config: {
+            banner_mode: 'header', header_content: 'TEXT',
+            [field]: { id: 'saved-media', imgproxy_base_url: 'https://imgproxy.example/worker.jpg', width: 800, height: 600 },
+        } }] } })
+        const { container } = render(<PageRenderer model={model} />)
+        expect((container.querySelector('.banner-background') as HTMLElement).style.backgroundImage).toContain('https://imgproxy.example/worker.jpg')
+    })
+
     it.each(['text', 'header'])('preserves named colors and text outlines in the %s banner render', bannerMode => {
         const model = createPageRenderModel({
             widgets: { main: [{ id: 'banner', type: 'easy_widgets.BannerWidget', config: {
