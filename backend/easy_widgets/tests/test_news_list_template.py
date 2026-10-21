@@ -55,6 +55,7 @@ class NewsListTemplateTests(SimpleTestCase):
         tenant = object()
         effective_date = object()
         version = SimpleNamespace(
+            content_title="Published title",
             data={"summary": "Summary"},
             effective_date=effective_date,
             is_featured=True,
@@ -74,6 +75,7 @@ class NewsListTemplateTests(SimpleTestCase):
         result = NewsListWidget()._get_news_items(config, tenant=tenant)
 
         self.assertEqual(result, [item])
+        self.assertEqual(item.title, "Published title")
         self.assertIs(item.publish_date, effective_date)
         self.assertTrue(item.is_pinned)
         published_objects.assert_called_once_with(

@@ -9,9 +9,18 @@ from django.utils import timezone
 
 from content.models import Namespace
 from core.models import Tenant
+from easy_widgets.widgets.sidebar_top_news import SidebarTopNewsWidget
+from easy_widgets.widgets.top_news_plug import TopNewsPlugWidget
 
 from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
-from .widgets import ObjectDetailConfig, ObjectDetailWidget, ObjectListConfig, ObjectListWidget
+from .widgets import (
+    ObjectChildrenConfig,
+    ObjectChildrenWidget,
+    ObjectDetailConfig,
+    ObjectDetailWidget,
+    ObjectListConfig,
+    ObjectListWidget,
+)
 
 
 class PublicObjectWidgetTest(TestCase):
@@ -68,6 +77,109 @@ class PublicObjectWidgetTest(TestCase):
         obj.current_version = version
         obj.save(update_fields=["current_version"])
         return obj, version
+
+    def test_news_plugs_render_only_live_content_for_selected_tenant(self):
+        now = timezone.now()
+        live_obj, live = self.create_object("Stored title", self.tenant, now - timedelta(hours=1))
+        live_obj.status = "draft"  # Date-based publication must not depend on this legacy flag.
+        live_obj.save(update_fields=["status"])
+        live.title = "Live title"
+        live.data = {"summary": "Live summary", "featured_image": "/live.jpg", "thumbnail": "/live-thumb.jpg"}
+        live.save(update_fields=["title", "data"])
+        draft = ObjectVersion.objects.create(
+            object_instance=live_obj,
+            version_number=2,
+            title="Draft title",
+            data={"summary": "Draft summary", "featured_image": "/draft.jpg", "thumbnail": "/draft-thumb.jpg"},
+            created_by=self.user,
+        )
+        live_obj.current_version = draft
+        live_obj.save(update_fields=["current_version"])
+        foreign_obj, _ = self.create_object("Foreign title", self.other_tenant, now - timedelta(hours=1))
+        expired_obj, expired = self.create_object("Expired title", self.tenant, now - timedelta(days=1))
+        expired.expiry_date = now - timedelta(hours=1)
+        expired.save(update_fields=["expiry_date"])
+        page = {"current_page": SimpleNamespace(tenant=self.tenant)}
+
+        top_items = TopNewsPlugWidget().prepare_template_context({"object_types": [self.object_type.name]}, page)[
+            "news_items"
+        ]
+        sidebar_items = SidebarTopNewsWidget().prepare_template_context(
+            {"object_types": [self.object_type.name], "show_excerpts": True}, page
+        )["news_items"]
+
+        self.assertEqual([item.id for item in top_items], [live_obj.id])
+        self.assertEqual([item.id for item in sidebar_items], [live_obj.id])
+        self.assertNotEqual(live_obj.id, foreign_obj.id)
+        self.assertNotEqual(live_obj.id, expired_obj.id)
+        self.assertEqual(top_items[0].title, "Live title")
+        self.assertEqual(top_items[0].excerpt_text, "Live summary")
+        self.assertEqual(top_items[0].featured_image_url, "/live.jpg")
+        self.assertEqual(sidebar_items[0].title, "Live title")
+        self.assertEqual(sidebar_items[0].excerpt_text, "Live summary")
+        self.assertEqual(sidebar_items[0].thumbnail_url, "/live-thumb.jpg")
+        live_obj.refresh_from_db()
+        self.assertEqual(live_obj.current_version_id, draft.id)
+        self.assertEqual(live_obj.title, "Stored title")
+
+    def test_children_and_detail_hierarchy_use_live_titles_and_excerpts(self):
+        now = timezone.now()
+        parent, parent_live = self.create_object("Stored parent", self.tenant, now - timedelta(days=1))
+        child, child_live = self.create_object("Stored child", self.tenant, now - timedelta(hours=1), parent=parent)
+        parent_live.title = "Live parent"
+        parent_live.save(update_fields=["title"])
+        child_live.title = "Live child"
+        child_live.data = {"summary": "Live child summary"}
+        child_live.save(update_fields=["title", "data"])
+        draft = ObjectVersion.objects.create(
+            object_instance=child,
+            version_number=2,
+            title="Draft child",
+            data={"summary": "Draft child summary"},
+            created_by=self.user,
+        )
+        child.current_version = draft
+        child.save(update_fields=["current_version"])
+        current_page = SimpleNamespace(tenant=self.tenant, cached_path="/objects/")
+        page_context = {"current_page": current_page}
+
+        children_context = ObjectChildrenWidget().get_context_data(
+            ObjectChildrenConfig(parent_object_id=parent.id), page_context
+        )
+        detail_context = ObjectDetailWidget().get_context_data(ObjectDetailConfig(object_id=parent.id), page_context)
+        self.assertEqual(children_context["parent_object"].title, "Live parent")
+        self.assertEqual([item.title for item in children_context["children"]], ["Live child"])
+        self.assertEqual(children_context["children"][0].render_data["summary"], "Live child summary")
+        self.assertEqual([item.title for item in detail_context["children"]], ["Live child"])
+        list_context = ObjectListWidget().get_context_data(
+            ObjectListConfig(object_type=self.object_type.name, show_hierarchy=True), page_context
+        )
+        listed_child = next(item for item in list_context["objects"] if item.id == child.id)
+        self.assertEqual(listed_child.render_parent.title, "Live parent")
+        child.refresh_from_db()
+        self.assertEqual(child.current_version_id, draft.id)
+        self.assertEqual(child.title, "Stored child")
+
+    def test_live_titles_control_list_and_children_order_before_limit(self):
+        now = timezone.now()
+        parent, _ = self.create_object("Parent", self.tenant, now - timedelta(days=2))
+        _first, first_live = self.create_object("A stored", self.tenant, now - timedelta(days=1), parent=parent)
+        second, second_live = self.create_object("Z stored", self.tenant, now - timedelta(days=1), parent=parent)
+        first_live.title = "Z live"
+        first_live.save(update_fields=["title"])
+        second_live.title = "A live"
+        second_live.save(update_fields=["title"])
+        page_context = {"current_page": SimpleNamespace(tenant=self.tenant)}
+
+        children = ObjectChildrenWidget().get_context_data(
+            ObjectChildrenConfig(parent_object_id=parent.id, order_by="title", limit=1), page_context
+        )["children"]
+        listed = ObjectListWidget().get_context_data(
+            ObjectListConfig(object_type=self.object_type.name, order_by="title", limit=1), page_context
+        )["objects"]
+
+        self.assertEqual([obj.id for obj in children], [second.id])
+        self.assertEqual([obj.id for obj in listed], [second.id])
 
     def test_list_uses_published_version_date_and_current_tenant(self):
         now = timezone.now()

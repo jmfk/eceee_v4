@@ -191,6 +191,7 @@ class NewsListWidget(BaseWidget):
 
                 # Add published_version to the item for template access
                 item.published_version = published_version
+                item.title = published_version.content_title
                 item.publish_date = published_version.effective_date
                 item.is_pinned = published_version.is_featured
 

@@ -5,6 +5,7 @@ Sidebar Top News Widget - Compact vertical list for sidebar placement
 from typing import List, Type
 
 from django.db.models import BooleanField, Case, Q, Value, When
+from django.utils import timezone
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -129,7 +130,8 @@ class SidebarTopNewsWidget(BaseWidget):
             }
 
         # Query news items
-        news_items = self._get_sidebar_news_items(news_config)
+        current_page = context.get("current_page") or context.get("page")
+        news_items = self._get_sidebar_news_items(news_config, getattr(current_page, "tenant", None))
 
         template_config.update(
             {
@@ -140,15 +142,26 @@ class SidebarTopNewsWidget(BaseWidget):
 
         return template_config
 
-    def _get_sidebar_news_items(self, config: SidebarTopNewsConfig):
+    def _get_sidebar_news_items(self, config: SidebarTopNewsConfig, tenant=None):
         """Query and return sidebar news items"""
-        from object_storage.models import ObjectInstance
+        from object_storage.models import ObjectInstance, ObjectTypeDefinition
+
+        if tenant is None:
+            return []
 
         try:
-            # Build queryset
-            queryset = ObjectInstance.objects.filter(
-                object_type__name__in=config.object_types, status="published"
-            ).select_related("object_type", "current_version")
+            now = timezone.now()
+            type_ids = (
+                ObjectTypeDefinition.objects.filter(name__in=config.object_types, is_active=True)
+                .filter(Q(namespace__tenant=tenant) | Q(namespace__isnull=True))
+                .values_list("id", flat=True)
+            )
+            type_ids = list(type_ids)
+            if not type_ids:
+                return []
+            queryset = ObjectInstance.get_published_objects(
+                object_type_ids=type_ids, sort_order="-publish_date", now=now, tenant=tenant
+            )
 
             # Annotate with pinned/featured status
             queryset = queryset.annotate(
@@ -162,26 +175,26 @@ class SidebarTopNewsWidget(BaseWidget):
                 )
             )
 
-            # Sort: pinned first, then by publish_date descending
-            queryset = queryset.order_by("-is_pinned", "-publish_date", "-created_at")
+            queryset = queryset.order_by("-is_pinned", "-live_effective_date", "-created_at")
 
             # Limit results
             items = list(queryset[: config.limit])
 
             # Prepare items with thumbnails
             for item in items:
-                # Get thumbnail from current version data
-                if config.show_thumbnails and item.current_version:
+                live_version = item.get_current_published_version(now)
+                if not live_version:
+                    continue
+                item.title = live_version.content_title
+                item.publish_date = live_version.effective_date
+                live_data = live_version.data
+                if config.show_thumbnails:
                     item.thumbnail_url = (
-                        item.data.get("thumbnail") or item.data.get("featured_image") or item.data.get("featuredImage")
+                        live_data.get("thumbnail") or live_data.get("featured_image") or live_data.get("featuredImage")
                     )
                 else:
                     item.thumbnail_url = None
-                item.excerpt_text = (
-                    self._get_excerpt(item.data, config.excerpt_length)
-                    if config.show_excerpts and item.current_version
-                    else ""
-                )
+                item.excerpt_text = self._get_excerpt(live_data, config.excerpt_length) if config.show_excerpts else ""
 
             return items
 

@@ -12,10 +12,11 @@ import uuid
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
@@ -34,6 +35,23 @@ from .serializers import (
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
+
+def filter_publication_status(queryset, requested_status):
+    """Filter the browser using live/scheduled versions rather than legacy status flags."""
+    if not requested_status:
+        return queryset
+    if requested_status not in {"draft", "published", "scheduled"}:
+        return queryset.filter(status=requested_status)
+    now = timezone.now()
+    live = ObjectVersion.objects.filter(object_instance_id=OuterRef("pk"), effective_date__lte=now).filter(
+        Q(expiry_date__isnull=True) | Q(expiry_date__gt=now)
+    )
+    scheduled = ObjectVersion.objects.filter(object_instance_id=OuterRef("pk"), effective_date__gt=now)
+    queryset = queryset.annotate(_has_live_version=Exists(live), _has_scheduled_version=Exists(scheduled))
+    if requested_status == "published":
+        return queryset.filter(_has_live_version=True)
+    return queryset.filter(_has_live_version=False, _has_scheduled_version=requested_status == "scheduled")
 
 
 class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
@@ -356,7 +374,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
         # Apply filters
         status_filter = request.query_params.get("status")
         if status_filter:
-            instances = instances.filter(status=status_filter)
+            instances = filter_publication_status(instances, status_filter)
 
         serializer = ObjectInstanceListSerializer(instances, many=True)
         return Response(serializer.data)
@@ -438,6 +456,24 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
             )
 
 
+class ObjectWorkflowInput(serializers.Serializer):
+    expected_version_id = serializers.IntegerField(min_value=1)
+    expected_revision = serializers.IntegerField(min_value=1)
+    expected_parent_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    expected_metadata = serializers.DictField(required=False)
+    source_version_id = serializers.IntegerField(min_value=1, required=False)
+    effective_date = serializers.DateTimeField(required=False)
+    expiry_date = serializers.DateTimeField(required=False, allow_null=True)
+    is_featured = serializers.BooleanField(required=False)
+
+
+def object_workflow_required():
+    return Response(
+        {"error": "object_workflow_required", "message": "Reload and use the Object working-copy workflow."},
+        status=status.HTTP_410_GONE,
+    )
+
+
 class ObjectInstanceViewSet(viewsets.ModelViewSet):
     """ViewSet for managing Object Instances"""
 
@@ -450,7 +486,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
     search_fields = ["title", "slug", "current_version__data"]
     ordering_fields = ["title", "created_at", "updated_at", "publish_date"]
     ordering = ["-created_at"]
-    filterset_fields = ["object_type", "status", "parent", "level"]
+    filterset_fields = ["object_type", "parent", "level"]
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
@@ -467,7 +503,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         if tenant:
             queryset = queryset.filter(tenant=tenant)
 
-        return queryset
+        return filter_publication_status(queryset, self.request.query_params.get("status"))
 
     def perform_create(self, serializer):
         """Set the created_by and tenant fields when creating"""
@@ -479,38 +515,76 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
         serializer.save(created_by=self.request.user, tenant=tenant)
 
+    def update(self, request, *args, **kwargs):
+        if {"data", "widgets", "title", "status", "publish_date", "unpublish_date", "object_type_id"}.intersection(
+            request.data
+        ):
+            return object_workflow_required()
+        return super().update(request, *args, **kwargs)
+
+    @action(detail=True, methods=["get"])
+    def workflow(self, request, pk=None):
+        from .services.version_workflow import ObjectVersionWorkflow
+
+        return Response(ObjectVersionWorkflow(self.get_object(), request.user).payload())
+
     @action(detail=True, methods=["post"])
-    def publish(self, request, pk=None):
-        """Publish the latest version of an object instance"""
-        instance = self.get_object()
+    @transaction.atomic
+    def save_working_copy(self, request, pk=None):
+        from .services.version_workflow import ObjectVersionWorkflow, ObjectWorkflowConflict
 
-        # Get or create latest version
-        latest_version = instance.get_latest_version()
-        if not latest_version:
-            # Create a version if none exists
-            latest_version = instance.create_version(request.user, change_description="Published via API")
-
-        # Set effective_date to now to publish immediately
-        effective_date = request.data.get("effective_date", timezone.now())
-        expiry_date = request.data.get("expiry_date")
-        is_featured = request.data.get("is_featured", False)
-
-        latest_version.effective_date = effective_date
-        latest_version.expiry_date = expiry_date
-        latest_version.is_featured = is_featured
-        latest_version.save(update_fields=["effective_date", "expiry_date", "is_featured"])
-
-        # Update current_version pointer
-        instance.current_version = latest_version
-        instance.save(update_fields=["current_version"])
-
-        serializer = self.get_serializer(instance)
+        obj = self.get_object()
+        tokens = ObjectWorkflowInput(data=request.data)
+        tokens.is_valid(raise_exception=True)
+        for field in ("title", "data", "widgets"):
+            if field not in request.data:
+                raise serializers.ValidationError({field: "A complete working copy is required."})
+        allowed_fields = ("title", "data", "widgets", "parent", "metadata")
+        content = {key: request.data[key] for key in allowed_fields if key in request.data}
+        serializer = self.get_serializer(obj, data=content, partial=True)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+        for field, baseline in (("parent", "expected_parent_id"), ("metadata", "expected_metadata")):
+            if field in validated and baseline not in tokens.validated_data:
+                raise serializers.ValidationError({baseline: f"Required when changing {field}."})
+        if not isinstance(validated.get("data"), dict) or not isinstance(validated.get("widgets"), dict):
+            raise serializers.ValidationError("Object data and widgets must be JSON objects.")
+        if validated.get("parent") and not validated["parent"].object_type.can_have_child_type(obj.object_type):
+            raise serializers.ValidationError({"parent": "This parent does not allow this Object type."})
+        service = ObjectVersionWorkflow(obj, request.user)
+        version = service.save(
+            version_id=tokens.validated_data["expected_version_id"],
+            revision=tokens.validated_data["expected_revision"],
+            content={
+                **validated,
+                **(
+                    {"is_featured": tokens.validated_data["is_featured"]}
+                    if "is_featured" in tokens.validated_data
+                    else {}
+                ),
+            },
+        )
+        if "parent" in validated and service.obj.parent_id != tokens.validated_data["expected_parent_id"]:
+            raise ObjectWorkflowConflict("The Object parent changed. Reload before trying again.")
+        if "metadata" in validated and service.obj.metadata != tokens.validated_data["expected_metadata"]:
+            raise ObjectWorkflowConflict("The Object metadata changed. Reload before trying again.")
+        for field in ("parent", "metadata"):
+            if field in validated:
+                setattr(service.obj, field, validated[field])
+        if any(field in validated for field in ("parent", "metadata")):
+            service.obj.save()
+        service.obj.refresh_from_db()
         return Response(
             {
-                "message": "Object published successfully",
-                "object": serializer.data,
+                "object": self.get_serializer(service.obj).data,
+                "version": ObjectVersionSerializer(version, context=self.get_serializer_context()).data,
+                "workflow": service.payload(),
             }
         )
+
+    @action(detail=True, methods=["post"])
+    def publish(self, request, pk=None):
+        return object_workflow_required()
 
     @action(detail=True, methods=["get"])
     def current_published_version(self, request, pk=None):
@@ -529,152 +603,13 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["put", "patch"])
     def update_current_version(self, request, pk=None):
-        """Update the current version without creating a new version"""
-        instance = self.get_object()
-
-        # Extract data and widgets from request
-        data = request.data.get("data")
-        widgets = request.data.get("widgets")
-        change_description = request.data.get("change_description", "Updated current version via API")
-
-        # Extract other object fields that can be updated
-        title = request.data.get("title")
-        status = request.data.get("status")
-        parent = request.data.get("parent")
-        metadata = request.data.get("metadata")
-        publish_date = request.data.get("publish_date")
-        unpublish_date = request.data.get("unpublish_date")
-
-        # Check if we have at least one field to update
-        has_version_changes = data is not None or widgets is not None
-        has_object_changes = any(
-            [
-                title is not None,
-                status is not None,
-                parent is not None,
-                metadata is not None,
-                publish_date is not None,
-                unpublish_date is not None,
-            ]
-        )
-
-        if not has_version_changes and not has_object_changes:
-            return Response(
-                {"error": "At least one field must be provided for update"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            # Update object fields first
-            object_updated = False
-            if has_object_changes:
-                if title is not None:
-                    instance.title = title
-                    object_updated = True
-                if status is not None:
-                    instance.status = status
-                    object_updated = True
-                if parent is not None:
-                    # Handle parent field (can be ID or None)
-                    if parent:
-                        try:
-                            parent_obj = self.get_queryset().get(pk=parent)
-                            instance.parent = parent_obj
-                        except ObjectInstance.DoesNotExist:
-                            return Response(
-                                {"error": f"Parent object with ID {parent} does not exist"},
-                                status=status.HTTP_400_BAD_REQUEST,
-                            )
-                    else:
-                        instance.parent = None
-                    object_updated = True
-                if metadata is not None:
-                    instance.metadata = metadata
-                    object_updated = True
-                if publish_date is not None:
-                    instance.publish_date = publish_date
-                    object_updated = True
-                if unpublish_date is not None:
-                    instance.unpublish_date = unpublish_date
-                    object_updated = True
-
-                if object_updated:
-                    instance.save()
-
-            # Update the current version if data or widgets changed
-            updated_version = None
-            if has_version_changes:
-                updated_version = instance.update_current_version(
-                    request.user,
-                    data=data,
-                    widgets=widgets,
-                    change_description=change_description,
-                )
-
-            # Return the updated instance data
-            serializer = self.get_serializer(instance)
-            response_data = {
-                "message": "Object updated successfully",
-                "object": serializer.data,
-            }
-
-            if updated_version:
-                response_data.update(
-                    {
-                        "version_id": updated_version.id,
-                        "version_number": updated_version.version_number,
-                    }
-                )
-
-            return Response(response_data)
-
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to update object: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        self.get_object()
+        return object_workflow_required()
 
     @action(detail=True, methods=["put", "patch"])
     def update_widgets(self, request, pk=None):
-        """Update only the widgets for an object instance"""
-        instance = self.get_object()
-
-        # Extract widgets from request
-        new_widgets = request.data.get("widgets")
-        if new_widgets is None:
-            return Response(
-                {"error": "No widgets data provided"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            # Validate widgets against slots
-            serializer = self.get_serializer()
-            serializer._validate_widgets_against_slots(new_widgets, instance.object_type)
-
-            # Update current version with only widgets
-            updated_version = instance.update_current_version(
-                user=request.user,
-                widgets=new_widgets,
-                change_description=request.data.get("change_description", "Widget update"),
-            )
-
-            return Response(
-                {
-                    "message": "Widgets updated successfully",
-                    "widgets": updated_version.widgets,
-                    "version_id": updated_version.id,
-                    "updated_at": updated_version.updated_at,
-                }
-            )
-
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to update widgets: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        self.get_object()
+        return object_workflow_required()
 
     @action(detail=True, methods=["get"])
     def versions(self, request, pk=None):
@@ -766,12 +701,6 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
                 instance.move_to(new_parent, "right")
             else:
                 instance.move_to(new_parent, "last-child")  # default
-
-            # Create version for the move
-            instance.create_version(
-                request.user,
-                change_description=f"Moved to new parent: {new_parent.title if new_parent else 'root'}",
-            )
 
             serializer = self.get_serializer(instance)
             return Response(serializer.data)
@@ -1151,7 +1080,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         # Filter by status
         status_filter = request.query_params.get("status")
         if status_filter and status_filter != "all":
-            instances = instances.filter(status=status_filter)
+            instances = filter_publication_status(instances, status_filter)
 
         # Filter by hierarchy level
         level = request.query_params.get("level")
@@ -1324,7 +1253,7 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         # Apply additional filters from query params
         status_filter = request.query_params.get("status")
         if status_filter:
-            instances = instances.filter(status=status_filter)
+            instances = filter_publication_status(instances, status_filter)
 
         parent_id = request.query_params.get("parent")
         if parent_id:
@@ -1347,6 +1276,9 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
 
         if not object_ids:
             return Response({"error": "Object IDs are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if operation in {"publish", "unpublish", "archive"}:
+            return object_workflow_required()
 
         # Get objects that exist and user has permission for
         objects = self.get_queryset().filter(id__in=object_ids)
@@ -1411,7 +1343,7 @@ class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = ObjectVersion.objects.select_related("object_instance", "object_instance__object_type", "created_by")
     serializer_class = ObjectVersionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasTenantAccess]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ["version_number", "created_at"]
     ordering = ["-version_number"]
@@ -1431,107 +1363,52 @@ class ObjectVersionViewSet(viewsets.ReadOnlyModelViewSet):
         return ObjectVersionSerializer
 
     def partial_update(self, request, pk=None):
-        """Allow updating specific version fields (e.g., is_featured)"""
+        self.get_object()
+        return object_workflow_required()
+
+    def _workflow_action(self, request, operation):
+        from .services.version_workflow import ObjectVersionWorkflow
+
         version = self.get_object()
-
-        # Only allow updating specific fields
-        allowed_fields = ["is_featured", "change_description"]
-
-        for field, value in request.data.items():
-            if field in allowed_fields:
-                setattr(version, field, value)
-
-        version.save(update_fields=[f for f in allowed_fields if f in request.data])
-
-        serializer = self.get_serializer(version)
-        return Response(serializer.data)
+        input_serializer = ObjectWorkflowInput(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        values = input_serializer.validated_data
+        if str(values["expected_version_id"]) != str(version.id):
+            raise serializers.ValidationError("The reviewed version must match the requested version.")
+        service = ObjectVersionWorkflow(version.object_instance, request.user)
+        arguments = {"version_id": values["expected_version_id"], "revision": values["expected_revision"]}
+        if operation == "schedule":
+            if "effective_date" not in values:
+                raise serializers.ValidationError({"effective_date": "Choose a publication time."})
+            arguments["effective_date"] = values["effective_date"]
+            if "expiry_date" in values:
+                arguments["expiry_date"] = values["expiry_date"]
+        if operation == "restore":
+            if "source_version_id" not in values:
+                raise serializers.ValidationError({"source_version_id": "Choose a historical version."})
+            arguments["source_id"] = values["source_version_id"]
+        result = getattr(service, operation)(**arguments)
+        return Response({"version": self.get_serializer(result).data, "workflow": service.payload()})
 
     @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
-        """Publish this version immediately"""
-        version = self.get_object()
-
-        # Accept is_featured parameter
-        is_featured = request.data.get("is_featured", version.is_featured)
-
-        # Set effective_date to now to publish immediately
-        version.effective_date = timezone.now()
-        version.is_featured = is_featured
-        # Don't change expiry_date - let it remain as is
-        version.save(update_fields=["effective_date", "is_featured"])
-
-        # Update the object's current_version pointer to this version if it's the latest published
-        current_published = version.object_instance.get_current_published_version()
-        if current_published and current_published.id == version.id:
-            version.object_instance.current_version = version
-            version.object_instance.save(update_fields=["current_version"])
-
-        serializer = self.get_serializer(version)
-        return Response(
-            {
-                "message": "Version published successfully",
-                "version": serializer.data,
-            }
-        )
+        return self._workflow_action(request, "publish")
 
     @action(detail=True, methods=["post"])
     def schedule(self, request, pk=None):
-        """Schedule this version for future publication"""
-        version = self.get_object()
+        return self._workflow_action(request, "schedule")
 
-        effective_date = request.data.get("effective_date")
-        expiry_date = request.data.get("expiry_date")
-        is_featured = request.data.get("is_featured", version.is_featured)
-
-        if not effective_date:
-            return Response(
-                {"error": "effective_date is required for scheduling"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            from dateutil.parser import parse
-
-            version.effective_date = parse(effective_date)
-            if expiry_date:
-                version.expiry_date = parse(expiry_date)
-            version.is_featured = is_featured
-            version.save(update_fields=["effective_date", "expiry_date", "is_featured"])
-        except (ValueError, TypeError) as e:
-            return Response(
-                {"error": f"Invalid date format: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        serializer = self.get_serializer(version)
-        return Response(
-            {
-                "message": "Version scheduled successfully",
-                "version": serializer.data,
-            }
-        )
+    @action(detail=True, methods=["post"])
+    def cancel_schedule(self, request, pk=None):
+        return self._workflow_action(request, "cancel_schedule")
 
     @action(detail=True, methods=["post"])
     def unpublish(self, request, pk=None):
-        """Unpublish this version by removing its effective_date"""
-        version = self.get_object()
+        return self._workflow_action(request, "unpublish")
 
-        version.effective_date = None
-        version.expiry_date = None
-        version.save(update_fields=["effective_date", "expiry_date"])
-
-        # Update the object's current_version pointer if needed
-        current_published = version.object_instance.get_current_published_version()
-        version.object_instance.current_version = current_published
-        version.object_instance.save(update_fields=["current_version"])
-
-        serializer = self.get_serializer(version)
-        return Response(
-            {
-                "message": "Version unpublished successfully",
-                "version": serializer.data,
-            }
-        )
+    @action(detail=True, methods=["post"])
+    def restore(self, request, pk=None):
+        return self._workflow_action(request, "restore")
 
 
 def _can_manage_object_type_icon(user, tenant, object_type):

@@ -39,21 +39,21 @@
                         {% comment %}
                         Show excerpt if available - check common excerpt fields in order
                         {% endcomment %}
-                        {% if child.data.content %}
+                        {% if child.render_data.content %}
                             <div class="child-excerpt text-sm text-gray-600 mt-1">
-                                {{ child.data.content|truncatewords:20 }}
+                                {{ child.render_data.content|truncatewords:20 }}
                             </div>
-                        {% elif child.data.description %}
+                        {% elif child.render_data.description %}
                             <div class="child-excerpt text-sm text-gray-600 mt-1">
-                                {{ child.data.description|truncatewords:20 }}
+                                {{ child.render_data.description|truncatewords:20 }}
                             </div>
-                        {% elif child.data.summary %}
+                        {% elif child.render_data.summary %}
                             <div class="child-excerpt text-sm text-gray-600 mt-1">
-                                {{ child.data.summary|truncatewords:20 }}
+                                {{ child.render_data.summary|truncatewords:20 }}
                             </div>
-                        {% elif child.data.text %}
+                        {% elif child.render_data.text %}
                             <div class="child-excerpt text-sm text-gray-600 mt-1">
-                                {{ child.data.text|truncatewords:20 }}
+                                {{ child.render_data.text|truncatewords:20 }}
                             </div>
                         {% endif %}
                     </div>

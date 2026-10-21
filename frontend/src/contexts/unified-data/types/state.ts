@@ -119,6 +119,11 @@ export interface VersionData {
  */
 export interface ObjectData {
   id: string;
+  title?: string;
+  data?: Record<string, any>;
+  widgets?: Record<string, WidgetData[]>;
+  editRevision?: number;
+  isFeatured?: boolean;
   type: string; // object type identifier/name
   slug?: string;
   name?: string;

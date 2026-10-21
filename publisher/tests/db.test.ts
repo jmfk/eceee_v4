@@ -23,6 +23,18 @@ describe('database snapshot', () => {
     delete process.env.PUBLISHER_MEDIA_BASE_URL;
   });
 
+  it('uses published title snapshots for Objects and their hierarchy', async () => {
+    await database.withSnapshot(reader => reader.publishedObjects({
+      objectTypeNames: ['article'], limit: 5, sortOrder: 'title', includeHierarchy: true,
+    }, '7', new Date('2026-10-22')));
+    const sql = mocks.query.mock.calls.find(([sql]) => sql.includes('FROM object_storage_objectinstance AS object'))?.[0];
+    expect(sql).toContain("COALESCE(NULLIF(published.title, ''), object.title) AS title");
+    for (const relation of ['parent', 'ancestor', 'child']) {
+      expect(sql).toContain(`COALESCE(NULLIF(${relation}_published.title, ''), ${relation}.title)`);
+      expect(sql).toContain(`SELECT ${relation}_version.title`);
+    }
+  });
+
   it('selects exact hosts while fallback routing is denied by default', async () => {
     await database.withSnapshot(reader => reader.root('example.org'));
 

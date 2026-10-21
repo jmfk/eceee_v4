@@ -5,6 +5,7 @@ Top News Plug Widget - Display top news in various grid layouts
 from typing import List, Type
 
 from django.db.models import BooleanField, Case, Q, Value, When
+from django.utils import timezone
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -143,7 +144,8 @@ class TopNewsPlugWidget(BaseWidget):
         items_count = self._get_items_count_for_layout(news_config.layout)
 
         # Query news items
-        news_items = self._get_top_news_items(news_config, items_count)
+        current_page = context.get("current_page") or context.get("page")
+        news_items = self._get_top_news_items(news_config, items_count, getattr(current_page, "tenant", None))
 
         template_config.update(
             {
@@ -166,15 +168,26 @@ class TopNewsPlugWidget(BaseWidget):
         }
         return layout_counts.get(layout, 3)
 
-    def _get_top_news_items(self, config: TopNewsPlugConfig, limit: int):
+    def _get_top_news_items(self, config: TopNewsPlugConfig, limit: int, tenant=None):
         """Query and return top news items"""
-        from object_storage.models import ObjectInstance
+        from object_storage.models import ObjectInstance, ObjectTypeDefinition
+
+        if tenant is None:
+            return []
 
         try:
-            # Build queryset
-            queryset = ObjectInstance.objects.filter(
-                object_type__name__in=config.object_types, status="published"
-            ).select_related("object_type", "current_version")
+            now = timezone.now()
+            type_ids = (
+                ObjectTypeDefinition.objects.filter(name__in=config.object_types, is_active=True)
+                .filter(Q(namespace__tenant=tenant) | Q(namespace__isnull=True))
+                .values_list("id", flat=True)
+            )
+            type_ids = list(type_ids)
+            if not type_ids:
+                return []
+            queryset = ObjectInstance.get_published_objects(
+                object_type_ids=type_ids, sort_order="-publish_date", now=now, tenant=tenant
+            )
 
             # Annotate with pinned/featured status
             queryset = queryset.annotate(
@@ -188,36 +201,33 @@ class TopNewsPlugWidget(BaseWidget):
                 )
             )
 
-            # Sort: pinned first, then by publish_date descending
-            queryset = queryset.order_by("-is_pinned", "-publish_date", "-created_at")
+            queryset = queryset.order_by("-is_pinned", "-live_effective_date", "-created_at")
 
             # Limit results
             items = list(queryset[:limit])
 
             # Prepare items with excerpts and images
             for item in items:
+                live_version = item.get_current_published_version(now)
+                if not live_version:
+                    continue
+                item.title = live_version.content_title
+                item.publish_date = live_version.effective_date
+                live_data = live_version.data
                 if config.show_excerpts:
-                    item.excerpt_text = self._get_excerpt(item, config.excerpt_length)
+                    item.excerpt_text = self._get_excerpt(live_data, config.excerpt_length)
                 else:
                     item.excerpt_text = None
 
-                # Get featured image from current version data
-                if item.current_version:
-                    item.featured_image_url = item.data.get("featured_image") or item.data.get("featuredImage")
-                else:
-                    item.featured_image_url = None
+                item.featured_image_url = live_data.get("featured_image") or live_data.get("featuredImage")
 
             return items
 
         except Exception:
             return []
 
-    def _get_excerpt(self, obj, max_length: int) -> str:
+    def _get_excerpt(self, data, max_length: int) -> str:
         """Extract excerpt from object data"""
-        if not obj.current_version:
-            return ""
-
-        data = obj.data
 
         # Try to find excerpt field
         excerpt = data.get("summary") or data.get("excerpt") or data.get("description") or data.get("content", "")

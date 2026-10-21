@@ -4,6 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0042 | [Canonical Object editing and publishing workflow](active/0042-canonical-object-workflow.md) | accepted | PRD-0030 |
 | ADR-0041 | [Shared declarative built-in widget contracts](active/0041-shared-widget-contract-source.md) | accepted | PRD-0028 |
 | ADR-0038 | [Publish theme outlines independently](active/0038-outline-only-theme-publication.md) | accepted | PRD-0027 |
 | ADR-0037 | [Preserve edits in stale Designer drafts](active/0037-preserve-stale-designer-draft-edits.md) | accepted | PRD-0027 |

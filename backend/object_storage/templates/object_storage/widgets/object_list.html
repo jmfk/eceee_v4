@@ -40,8 +40,8 @@
                             {% if object.render_publish_date %}
                                 <span class="object-date"> • {{ object.render_publish_date|date:"M j, Y" }}</span>
                             {% endif %}
-                            {% if config.show_hierarchy and object.parent %}
-                                <span class="object-parent"> • Child of: {{ object.parent.title }}</span>
+                            {% if config.show_hierarchy and object.render_parent %}
+                                <span class="object-parent"> • Child of: {{ object.render_parent.title }}</span>
                             {% endif %}
                         </div>
                     </div>

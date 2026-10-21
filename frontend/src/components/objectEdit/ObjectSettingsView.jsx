@@ -37,10 +37,10 @@ const ObjectSettingsView = ({ objectType, instance, isNewInstance, parentId, onS
 
     // Notify parent about unsaved changes and update UDC dirty state
     useEffect(() => {
-        if (onUnsavedChanges) {
-            onUnsavedChanges(isDirty)
+        if (isDirty) {
+            onUnsavedChanges?.(true)
+            setUDCDirty(true)
         }
-        setUDCDirty(isDirty)
     }, [isDirty, onUnsavedChanges, setUDCDirty])
 
     // Initialize form data from instance

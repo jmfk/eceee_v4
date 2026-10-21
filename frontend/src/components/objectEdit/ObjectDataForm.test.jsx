@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { useReducer } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -75,6 +75,13 @@ const renderForm = () => renderWithStateProviders(
 )
 
 describe('ObjectDataForm dirty state', () => {
+    it('renders before a page-managed Object instance exists', async () => {
+        await act(async () => { renderWithStateProviders(<ObjectDataForm objectType={objectType} initializeObject={false} />, {
+            initialState: createAppState({ objects: {}, metadata: { currentObjectId: undefined } }),
+        }) })
+        expect(screen.getByPlaceholderText('Enter object title...')).toHaveValue('')
+    })
+
     it('marks a top-level object field dirty immediately', async () => {
         renderForm()
         await waitFor(() => expect(screen.getByTestId('dirty-state')).toHaveTextContent('false'))

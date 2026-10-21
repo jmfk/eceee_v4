@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, Link, Navigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-    ArrowLeft, Layout, FileText, Settings, Calendar, Users, History,
+    ArrowLeft, Layout, FileText, Settings, Calendar, Users,
     Eye
 } from 'lucide-react'
 import { objectInstancesApi, objectTypesApi, objectVersionsApi } from '../api/objectStorage'
@@ -20,7 +20,6 @@ import ObjectContentView from '../components/objectEdit/ObjectContentView'
 import ObjectSettingsView from '../components/objectEdit/ObjectSettingsView'
 import ObjectPublishingView from '../components/objectEdit/ObjectPublishingView'
 import ObjectSubObjectsView from '../components/objectEdit/ObjectSubObjectsView'
-import ObjectVersionsView from '../components/objectEdit/ObjectVersionsView'
 
 const ObjectInstanceEditPage = () => {
     // --- 1. ALL HOOKS AT THE TOP ---
@@ -29,21 +28,27 @@ const ObjectInstanceEditPage = () => {
     const location = useLocation()
     const queryClient = useQueryClient()
     const { addNotification } = useGlobalNotifications()
-    const { useExternalChanges, publishUpdate, saveCurrentVersion } = useUnifiedData()
+    const { useExternalChanges, publishUpdate, getState, setIsDirty } = useUnifiedData()
 
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-    const [currentVersion, setCurrentVersion] = useState(null)
-    const [availableVersions, setAvailableVersions] = useState([])
     const [showEssentialFieldsModal, setShowEssentialFieldsModal] = useState(false)
     const [udcInitError, setUdcInitError] = useState(null)
     const [isSaving, setIsSaving] = useState(false)
+    const [isFeatured, setIsFeatured] = useState(false)
     
     const contentTabRef = useRef(null)
+    const initializedObjectId = useRef(null)
+    const activeInstanceId = useRef(null)
+
+    useEffect(() => {
+        activeInstanceId.current = instanceId
+        return () => { activeInstanceId.current = null }
+    }, [instanceId])
     const componentId = useMemo(() => `object-instance-editor-${instanceId || 'new'}`, [instanceId])
 
-    const handleStateChange = useCallback((state) => {
-        setHasUnsavedChanges(state.metadata.isDirty);
-    }, []);
+    const handleStateChange = useCallback(() => {
+        setHasUnsavedChanges(getState().metadata.isDirty);
+    }, [getState]);
 
     useExternalChanges(componentId, handleStateChange);
 
@@ -56,7 +61,9 @@ const ObjectInstanceEditPage = () => {
     const { data: instanceResponse, isLoading: instanceLoading } = useQuery({
         queryKey: ['objectInstance', instanceId],
         queryFn: async () => await objectInstancesApi.get(instanceId),
-        enabled: !!instanceId
+        enabled: !!instanceId,
+        staleTime: Infinity,
+        refetchOnWindowFocus: false,
     })
 
     const actualObjectTypeId = instanceResponse?.data?.objectType?.id || objectTypeId
@@ -65,12 +72,6 @@ const ObjectInstanceEditPage = () => {
         queryKey: ['objectType', actualObjectTypeId],
         queryFn: async () => await objectTypesApi.get(actualObjectTypeId),
         enabled: !!actualObjectTypeId
-    })
-
-    const { data: versionsResponse, isLoading: versionsLoading } = useQuery({
-        queryKey: ['objectInstance', instanceId, 'versions'],
-        queryFn: async () => await objectInstancesApi.getVersions(instanceId),
-        enabled: !!instanceId && !isNewInstance
     })
 
     const { data: parentResponse } = useQuery({
@@ -113,30 +114,12 @@ const ObjectInstanceEditPage = () => {
         onSuccess: (newObject) => {
             setShowEssentialFieldsModal(false)
             addNotification('Object created successfully', 'success')
-            queryClient.invalidateQueries(['objectInstances'])
+            queryClient.invalidateQueries({ queryKey: ['objectInstances'] })
             navigate(`/objects/${newObject.data.id}/edit/content`)
         },
         onError: (error) => {
             console.error('Failed to create object:', error)
             addNotification('Failed to create object', 'error')
-        }
-    })
-
-    const saveMutation = useMutation({
-        mutationFn: async (saveData) => {
-            if (saveData.createNew) return objectInstancesApi.createVersion(instanceId, saveData)
-            else return objectInstancesApi.update(instanceId, saveData)
-        },
-        onSuccess: (response, variables) => {
-            queryClient.invalidateQueries(['objectInstances'])
-            queryClient.invalidateQueries(['objectInstance'])
-            const message = variables.createNew ? 'New version created successfully' : 'Object updated successfully'
-            addNotification(message, 'success')
-            setHasUnsavedChanges(false)
-        },
-        onError: (error) => {
-            console.error('Failed to save object:', error)
-            addNotification('Failed to save object', 'error')
         }
     })
 
@@ -153,24 +136,13 @@ const ObjectInstanceEditPage = () => {
     }, [isNewInstance, instance, objectType])
 
     useEffect(() => {
-        if (versionsResponse?.data) {
-            setAvailableVersions(versionsResponse.data)
-            if (!currentVersion && instance) {
-                const current = versionsResponse.data.find(v => v.versionNumber === instance.version)
-                    || versionsResponse.data[0]
-                setCurrentVersion(current)
-            }
-        }
-    }, [versionsResponse, instance])
-
-    useEffect(() => {
-        if (!instanceId || !instance || !versionsResponse?.data) return
+        if (!instanceId || !instance || (initializedObjectId.current === instanceId && getState().metadata.isDirty)) return
         try {
             setUdcInitError(null)
-            const allVersions = Array.isArray(versionsResponse.data) ? versionsResponse.data : []
-            const currentVersionEntry = allVersions.find(v => v.versionNumber === instance.version) || allVersions[0]
-            const currentVersionId = currentVersionEntry ? String(currentVersionEntry.id) : undefined
-            const versionIds = allVersions.map(v => String(v.id))
+            initializedObjectId.current = instanceId
+            setIsFeatured(Boolean(instance.isFeatured))
+            const currentVersionId = instance.versionId ? String(instance.versionId) : undefined
+            const versionIds = currentVersionId ? [currentVersionId] : []
 
             publishUpdate(componentId, OperationTypes.INIT_OBJECT, {
                 id: String(instance.id),
@@ -180,8 +152,8 @@ const ObjectInstanceEditPage = () => {
                     type: instance?.objectType?.name || instance?.objectType?.id || 'unknown',
                     status: instance?.status || 'draft',
                     metadata: instance?.metadata || {},
-                    created_at: instance?.createdAt || new Date().toISOString(),
-                    updated_at: instance?.updatedAt || new Date().toISOString(),
+                    createdAt: instance?.createdAt,
+                    updatedAt: instance?.updatedAt,
                     parentId: instance?.parent?.id || instance?.parent || null,
                     currentVersionId: currentVersionId,
                     availableVersions: versionIds
@@ -192,20 +164,72 @@ const ObjectInstanceEditPage = () => {
             setUdcInitError(e)
             addNotification('Failed to initialize editor.', 'error')
         }
-    }, [instanceId, instance, versionsResponse, publishUpdate, componentId, addNotification])
+    }, [instanceId, instance, publishUpdate, componentId, addNotification, getState])
+
+    const refreshObject = useCallback(async () => {
+        const response = await objectInstancesApi.get(instanceId)
+        queryClient.setQueryData(['objectInstance', instanceId], response)
+        await queryClient.invalidateQueries({ queryKey: ['objectWorkflow', instanceId] })
+        return response.data
+    }, [instanceId, queryClient])
 
     const handleSave = useCallback(async () => {
-        setIsSaving(true);
+        setIsSaving(true)
+        const objectData = getState().objects[String(instanceId)]
+        const submitted = JSON.stringify(objectData)
         try {
-            await saveCurrentVersion();
-            addNotification('Current version saved', 'success');
+            const response = await objectInstancesApi.saveWorkingCopy(instanceId, objectData, {
+                id: objectData.currentVersionId,
+                editRevision: objectData.editRevision,
+            }, instance)
+            const saved = response.data.object
+            const unchanged = JSON.stringify(getState().objects[String(instanceId)]) === submitted
+            const isActive = activeInstanceId.current === instanceId
+                && String(getState().metadata.currentObjectId) === String(instanceId)
+            if (unchanged && isActive) {
+                setIsDirty(false)
+                setHasUnsavedChanges(false)
+            } else if (!unchanged) {
+                await publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, {
+                    id: String(instanceId), skipDirty: true,
+                    updates: { currentVersionId: String(saved.versionId), editRevision: saved.editRevision },
+                })
+            }
+            // Keep the successful snapshot as Undo's baseline, including when edits continued.
+            queryClient.setQueryData(['objectInstance', instanceId], { data: saved })
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['objectWorkflow', instanceId] }),
+                queryClient.invalidateQueries({ queryKey: ['objectInstance', instanceId, 'versions'] }),
+                queryClient.invalidateQueries({ queryKey: ['objectInstances'] }),
+            ])
+            addNotification('Working copy saved', 'success')
+            if (!unchanged) throw new Error('More changes were made while saving. Save them before publishing.')
+            return response.data.version
         } catch (error) {
-            console.error('Save failed:', error);
-            addNotification(`Save failed: ${error?.message || 'Unknown error'}`, 'error');
+            addNotification(error.response?.data?.message || error.response?.data?.detail || error.message || 'Could not save the working copy.', 'error')
+            throw error
         } finally {
-            setIsSaving(false);
+            setIsSaving(false)
         }
-    }, [saveCurrentVersion, addNotification]);
+    }, [instanceId, instance, getState, setIsDirty, queryClient, addNotification, publishUpdate, componentId])
+
+    const handlePublish = async () => {
+        try {
+            const version = hasUnsavedChanges ? await handleSave() : { id: instance.versionId, editRevision: instance.editRevision }
+            await objectVersionsApi.publish(version.id, version.editRevision)
+            await refreshObject()
+            await queryClient.invalidateQueries({ queryKey: ['objectInstances'] })
+            addNotification('Changes published', 'success')
+        } catch (error) {
+            addNotification(error.response?.data?.detail || error.message || 'Publishing failed.', 'error')
+        }
+    }
+
+    const handleRestored = useCallback(async () => {
+        setIsDirty(false)
+        setHasUnsavedChanges(false)
+        await refreshObject()
+    }, [setIsDirty, refreshObject])
 
     const breadcrumbItems = useMemo(() => {
         const items = [{ label: 'Objects', path: '/objects', icon: Layout }]
@@ -321,29 +345,6 @@ const ObjectInstanceEditPage = () => {
         else navigate('/objects')
     }, [parentObject, objectType, instance, navigate])
 
-    const switchToVersion = useCallback(async (versionId) => {
-        if (!versionId || versionId === instance?.id) return
-        try {
-            const response = await objectVersionsApi.get(versionId)
-            const versionData = response.data
-            const version = availableVersions.find(v => v.id === versionId)
-            setCurrentVersion(version)
-            const reconstructedInstance = {
-                ...instance,
-                data: versionData.data,
-                widgets: versionData.widgets,
-                version: versionData.versionNumber,
-                updatedAt: versionData.createdAt,
-                objectType: instance.objectType
-            }
-            queryClient.setQueryData(['objectInstance', instanceId], { data: reconstructedInstance })
-            addNotification(`Switched to version ${version?.versionNumber || 'Unknown'}`, 'info')
-        } catch (error) {
-            console.error('Failed to switch version:', error)
-            addNotification('Failed to switch version', 'error')
-        }
-    }, [instance, availableVersions, queryClient, instanceId, addNotification])
-
     const handleCreateNewObject = useCallback((essentialFields) => {
         createNewObjectMutation.mutate(essentialFields)
     }, [createNewObjectMutation])
@@ -363,13 +364,15 @@ const ObjectInstanceEditPage = () => {
                 created_at: instance?.createdAt || new Date().toISOString(),
                 updated_at: instance?.updatedAt || new Date().toISOString(),
                 parentId: instance?.parent?.id || instance?.parent || null,
-                currentVersionId: currentVersion ? String(currentVersion.id) : undefined,
-                availableVersions: availableVersions.map(v => String(v.id))
+                currentVersionId: instance.versionId ? String(instance.versionId) : undefined,
+                availableVersions: instance.versionId ? [String(instance.versionId)] : []
             }
         });
         
+        setHasUnsavedChanges(false)
+        setIsFeatured(Boolean(instance.isFeatured))
         addNotification('Changes undone', 'success');
-    }, [instance, currentVersion, availableVersions, publishUpdate, componentId, addNotification]);
+    }, [instance, publishUpdate, componentId, addNotification]);
 
     // --- 2. EARLY RETURNS ---
     if (!isNewInstance && !isEditingInstance) return <Navigate to="/objects" replace />
@@ -395,9 +398,12 @@ const ObjectInstanceEditPage = () => {
         { id: 'content', label: 'Content', icon: Layout },
         ...((objectType?.allowedChildTypes || []).length > 0 ? [{ id: 'subobjects', label: 'Sub-objects', icon: Users }] : []),
         { id: 'settings', label: 'Settings', icon: Settings },
-        { id: 'publishing', label: 'Publishing', icon: Calendar },
-        ...(isEditingInstance ? [{ id: 'versions', label: 'Versions', icon: History }] : [])
+        { id: 'publishing', label: 'Publish', icon: Calendar }
     ]
+
+    if (tab === 'versions' && instanceId) {
+        return <Navigate to={`/objects/${instanceId}/edit/publishing?panel=history`} replace />
+    }
 
     if (!tabs.find(t => t.id === tab)) {
         return <Navigate to={isNewInstance ? `/objects/new/${objectTypeId}/content` : `/objects/${instanceId}/edit/content`} replace />
@@ -407,7 +413,7 @@ const ObjectInstanceEditPage = () => {
         objectType, instance,
         parentId: parentIdFromUrl || instance?.parent?.id || instance?.parent,
         isNewInstance, onUnsavedChanges: setHasUnsavedChanges,
-        onSave: () => {}, onCancel: handleBack, context: { contextType: 'object' }
+        onSave: handleSave, onCancel: handleBack, context: { contextType: 'object' }
     }
 
     const backButtonLabel = parentObject 
@@ -423,9 +429,9 @@ const ObjectInstanceEditPage = () => {
         <div className="h-screen bg-gray-50 flex flex-col">
             <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm">
                 <div className="px-4 py-3">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                            <button onClick={handleBack} className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title={backButtonLabel}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex min-w-0 flex-1 items-center space-x-4">
+                            <button onClick={handleBack} className="flex shrink-0 items-center whitespace-nowrap px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title={backButtonLabel}>
                                 <ArrowLeft className="w-4 h-4 mr-2" />
                                 {backButtonLabel}
                             </button>
@@ -441,7 +447,7 @@ const ObjectInstanceEditPage = () => {
                             </div>
                         </div>
                         <div className="flex items-center space-x-3">
-                            <div className="hidden lg:flex items-center space-x-1">
+                            <div className="flex flex-wrap items-center gap-1">
                                 {tabs.map((tabDef) => {
                                     const Icon = tabDef.icon
                                     const isActive = tab === tabDef.id
@@ -465,22 +471,31 @@ const ObjectInstanceEditPage = () => {
                             <div className="flex-shrink-0"><svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg></div>
                             <div className="ml-3 flex-1">
                                 <div className="text-sm text-yellow-700"><span className="font-bold">Editor initialization warning:</span> Some features may not work correctly.</div>
-                                <button onClick={() => { setUdcInitError(null); queryClient.invalidateQueries(['objectInstance', instanceId]); }} className="mt-2 text-sm font-medium text-yellow-700 hover:text-yellow-600 underline">Retry initialization</button>
+                                <button onClick={() => { setUdcInitError(null); queryClient.invalidateQueries({ queryKey: ['objectInstance', instanceId] }); }} className="mt-2 text-sm font-medium text-yellow-700 hover:text-yellow-600 underline">Retry initialization</button>
                             </div>
                         </div>
                     </div>
                 )}
                 {tab === 'content' && <ObjectContentView ref={contentTabRef} {...commonTabProps} />}
                 {tab === 'settings' && <ObjectSettingsView {...commonTabProps} />}
-                {tab === 'publishing' && <ObjectPublishingView {...commonTabProps} />}
+                {tab === 'publishing' && <ObjectPublishingView {...commonTabProps} isDirty={hasUnsavedChanges} showHistory={urlParams.get('panel') === 'history'} onWorkflowChange={refreshObject} onRestored={handleRestored}
+                    isFeatured={isFeatured} onFeaturedChange={value => {
+                        setIsFeatured(value)
+                        setIsDirty(true)
+                        setHasUnsavedChanges(true)
+                        publishUpdate(componentId, OperationTypes.UPDATE_OBJECT, { id: String(instanceId), updates: { isFeatured: value } })
+                    }} />}
                 {tab === 'subobjects' && <ObjectSubObjectsView {...commonTabProps} />}
-                {tab === 'versions' && <ObjectVersionsView {...commonTabProps} />}
             </div>
             <StatusBar
-                isDirty={hasUnsavedChanges} currentVersion={currentVersion} availableVersions={availableVersions}
-                onVersionChange={switchToVersion} onSaveClick={() => handleSave()}
+                isDirty={hasUnsavedChanges}
+                onSaveClick={() => { handleSave().catch(() => {}) }}
+                onHistoryClick={() => navigate(`/objects/${instanceId}/edit/publishing?panel=history`)}
+                onScheduleClick={() => navigate(`/objects/${instanceId}/edit/publishing`)}
                 onUndoChanges={handleUndoChanges}
-                isSaving={saveMutation.isPending} isNewPage={isNewInstance}
+                onPublishClick={handlePublish}
+                canPublish={hasUnsavedChanges || Boolean(instance?.isWorkingCopy)}
+                isSaving={isSaving} isNewPage={isNewInstance}
                 customStatusContent={<div className="text-sm text-gray-600">{isNewInstance ? 'Creating' : 'Editing'} {objectType?.label} - {tabs.find(t => t.id === tab)?.label}</div>}
             />
             {showEssentialFieldsModal && (
