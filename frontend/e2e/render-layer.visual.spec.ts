@@ -90,6 +90,42 @@ test('banner palette colors and outlines override theme typography in the render
 })
 
 for (const viewport of viewports) {
+  test(`two-column spacing follows widget siblings at ${viewport.name}`, async ({ page }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height })
+    const content = (id) => ({ id, type: 'easy_widgets.ContentWidget', config: { content: '<p>Section content</p>' } })
+    const columns = (id, left = [content(`${id}-left`)]) => ({
+      id, type: 'easy_widgets.TwoColumnsWidget',
+      config: { layoutStyle: '3:3', slots: { left, right: [content(`${id}-right`)] } },
+    })
+    const section = {
+      id: 'section', type: 'easy_widgets.SectionWidget',
+      config: { slots: { content: [columns('nested-columns'), content('section-content')] } },
+    }
+    await openRender(page, {
+      layout: 'main_layout',
+      context: { preview: true, componentStyles: { wrappedColumns: { template: '<section class="custom-columns">{{{content}}}</section>' } } },
+      themeCss: compileRenderStyles({}).css,
+      slots: { main: [
+        columns('before-section'),
+        section,
+        columns('last-columns', [columns('columns-in-column'), content('after-nested-columns')]),
+      ], sidebar: [{
+        ...columns('wrapped-last-columns'),
+        config: { ...columns('wrapped-last-columns').config, componentStyle: 'wrappedColumns' },
+      }] },
+    })
+
+    const beforeSection = page.locator('[data-widget-id="before-section"] > .two-columns-widget')
+    await expect(beforeSection).toHaveCSS('margin-bottom', '30px')
+    const columnsBox = await beforeSection.boundingBox()
+    const sectionBox = await page.locator('[data-widget-id="section"]').boundingBox()
+    expect(sectionBox.y - (columnsBox.y + columnsBox.height)).toBe(30)
+    await expect(page.locator('[data-widget-id="nested-columns"] > .two-columns-widget')).toHaveCSS('margin-bottom', '30px')
+    await expect(page.locator('[data-widget-id="last-columns"] > .two-columns-widget')).toHaveCSS('margin-bottom', '0px')
+    await expect(page.locator('[data-widget-id="columns-in-column"] > .two-columns-widget')).toHaveCSS('margin-bottom', '0px')
+    await expect(page.locator('[data-widget-id="wrapped-last-columns"] .two-columns-widget')).toHaveCSS('margin-bottom', '0px')
+  })
+
   test(`editor and designer render the shared fixtures at ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
     await openRender(page, model)

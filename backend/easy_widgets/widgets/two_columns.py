@@ -67,14 +67,18 @@ class TwoColumnsWidget(BaseWidget):
     }
 
     widget_css = """
+    /* Reset per frame so component-style wrappers inherit spacing without affecting nested widgets. */
+    .widget-item {
+        --two-columns-margin-bottom: 30px;
+    }
+    .widget-item:last-child {
+        --two-columns-margin-bottom: 0px;
+    }
     .two-columns-widget {
         display: grid;
         gap: 30px;
         width: 100%;
-        margin-bottom: 30px;
-    }
-    .two-columns-widget:last-child {
-        margin-bottom: 0;
+        margin-bottom: var(--two-columns-margin-bottom, 30px);
     }
 
     .two-columns-widget.two-col-ratio-5-1 {
