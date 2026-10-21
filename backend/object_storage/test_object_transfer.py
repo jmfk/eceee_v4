@@ -2818,9 +2818,13 @@ class ObjectTransferServiceTests(TestCase):
         checkpoint.operation_result = {"restorable": True}
         checkpoint.save(update_fields=["status", "operation_result", "updated_at"])
 
+        # Inserting another root can change the cached MPTT coordinates.
+        self.child.refresh_from_db()
+        self.related.refresh_from_db()
         self.child.parent = self.related
         self.child.save(update_fields=["parent", "updated_at"])
         other_root.refresh_from_db()
+        self.assertTrue(other_root.is_leaf_node())
         other_tree_state = (other_root.tree_id, other_root.lft, other_root.rght, other_root.level)
 
         restore_object_import_checkpoint(checkpoint, self.user, storage=MemoryStorage())
