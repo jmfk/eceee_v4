@@ -605,10 +605,12 @@ div[style*="z-index"] {
   pointer-events: none;
 }
 
-/* Banner widget specific: show background when container has empty editor */
-.banner-text:has(.simple-text-editor.is-empty),
-.banner-text:has(.simple-text-editor:empty) {
-  background-color: #f9fafb;
+/* Keep empty editor placeholders from covering the banner's own background. */
+.banner-widget .banner-text:has(.simple-text-editor.is-empty),
+.banner-widget .banner-text:has(.simple-text-editor:empty),
+.banner-widget .simple-text-editor.is-empty,
+.banner-widget .simple-text-editor:empty {
+  background-color: transparent;
 }
 
 /* Slot overlay for empty slots in edit mode */
