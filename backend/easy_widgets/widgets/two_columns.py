@@ -2,152 +2,23 @@
 Simple two-column widget implementation.
 """
 
-from typing import Literal, Optional, Type
+from typing import Type
 
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import BaseModel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
-
-
-class TwoColumnsConfig(BaseModel):
-    """Configuration for simple two-column widget"""
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
-    layout_style: Optional[Literal["5:1", "4:2", "3:3", "2:4", "1:5"]] = Field(
-        "3:3",
-        description="Column width ratio",
-        json_schema_extra={
-            "component": "TwoColumnRatioSelector",
-            "order": 1,
-            "group": "Display Options",
-        },
-    )
-    component_style: str = Field(
-        "default",
-        description="Component style from theme",
-        json_schema_extra={
-            "component": "ComponentStyleSelector",
-        },
-    )
+from widget_contracts import catalog_widget
+from widget_contracts.models import TwoColumnsConfig
 
 
 @register_widget_type
+@catalog_widget
 class TwoColumnsWidget(BaseWidget):
     """Simple two-column widget with left and right slots"""
 
     app_label = "easy_widgets"
-    name = "Two Columns"
     description = "Simple two-column layout with left and right slots for widgets"
     template_name = "easy_widgets/widgets/two_column.html"
-
-    layout_parts = {
-        "two-columns-widget": {
-            "label": "Two Columns container",
-            "selector": ".two-columns-widget",
-            "properties": [
-                "width",
-                "height",
-                "min-height",
-                "padding",
-                "margin",
-                "backgroundColor",
-                "color",
-                "fontFamily",
-                "fontSize",
-                "lineHeight",
-                "gap",
-            ],
-            "designer_editable_spacing_properties": ["gap"],
-        },
-    }
-
-    widget_css = """
-    /* Reset per frame so component-style wrappers inherit spacing without affecting nested widgets. */
-    .widget-item {
-        --two-columns-margin-bottom: 30px;
-    }
-    .widget-item:last-child {
-        --two-columns-margin-bottom: 0px;
-    }
-    .two-columns-widget {
-        display: grid;
-        gap: 30px;
-        width: 100%;
-        margin-bottom: var(--two-columns-margin-bottom, 30px);
-    }
-
-    .two-columns-widget.two-col-ratio-5-1 {
-        grid-template-columns: 5fr 1fr;
-    }
-
-    .two-columns-widget.two-col-ratio-4-2 {
-        grid-template-columns: 2fr 1fr;
-    }
-
-    .two-columns-widget.two-col-ratio-3-3 {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .two-columns-widget.two-col-ratio-2-4 {
-        grid-template-columns: 1fr 2fr;
-    }
-
-    .two-columns-widget.two-col-ratio-1-5 {
-        grid-template-columns: 1fr 5fr;
-    }
-
-    .two-col-slot {
-        position: relative;
-        height: 100%;
-    }
-
-    .two-col-slot.left {
-        grid-area: 1 / 1;
-    }
-
-    .two-col-slot.right {
-        grid-area: 1 / 2;
-    }
-
-    .two-col-widget-wrapper {
-        margin-bottom: 30px;
-    }
-
-    .two-col-widget-wrapper:last-child {
-        margin-bottom: 0;
-    }
-
-    .two-col-empty-slot {
-        color: #9ca3af;
-        font-style: italic;
-        text-align: center;
-        padding: 2rem 1rem;
-        border: 1px dashed #e5e7eb;
-        background-color: #f9fafb;
-        height: 100%;
-    }
-
-    /* Responsive design */
-    @media (max-width: 768px) {
-        .two-columns-widget {
-            grid-template-columns: 1fr;
-            grid-template-rows: auto auto;
-        }
-
-        .two-col-slot.left {
-            grid-area: 1 / 1;
-        }
-
-        .two-col-slot.right {
-            grid-area: 2 / 1;
-        }
-    }
-    """
 
     css_scope = "widget"
 

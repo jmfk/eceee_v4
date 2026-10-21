@@ -2,11 +2,13 @@
 Footer widget implementation.
 """
 
-from typing import Type, Optional, Literal, Dict, List
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Dict, List, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 
 class FooterConfig(BaseModel):
@@ -27,86 +29,13 @@ class FooterConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class FooterWidget(BaseWidget):
     """Footer widget with single content slot and background styling"""
 
     app_label = "easy_widgets"
-    name = "Footer"
     description = "Footer container with content slot and background styling options"
     template_name = "easy_widgets/widgets/footer.html"
-
-    layout_parts = {
-        "footer-widget": {
-            "label": "Footer widget container",
-            "selector": ".footer-widget",
-            "properties": [
-                "width",
-                "height",
-                "backgroundColor",
-                "backgroundImage",
-                "padding",
-                "margin",
-            ],
-        },
-    }
-
-    widget_css = """
-    .widget-type-footer {
-        box-sizing: border-box;
-        width: 100%;
-        min-height: 310px;
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        background-image: var(--footer-widget-background-xs, none);
-        background-color: var(--footer-bg-color-xs, transparent);
-        color: var(--footer-text-color-xs, inherit);
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-    }
-
-    @media (min-width: 640px) {
-        .widget-type-footer {
-            background-image: var(--footer-widget-background-sm, var(--footer-widget-background-xs, none));
-            background-color: var(--footer-bg-color-sm, var(--footer-bg-color-xs, transparent));
-            color: var(--footer-text-color-sm, var(--footer-text-color-xs, inherit));
-        }
-    }
-
-    @media (min-width: 768px) {
-        .widget-type-footer {
-            background-image: var(--footer-widget-background-md, var(--footer-widget-background-sm, none));
-            background-color: var(--footer-bg-color-md, var(--footer-bg-color-sm, transparent));
-            color: var(--footer-text-color-md, var(--footer-text-color-sm, inherit));
-        }
-    }
-
-    @media (min-width: 1024px) {
-        .widget-type-footer {
-            background-image: var(--footer-widget-background-lg, none);
-            background-color: var(--footer-bg-color-lg, transparent);
-            color: var(--footer-text-color-lg, inherit);
-        }
-    }
-
-    @media (min-width: 1280px) {
-        .widget-type-footer {
-            background-image: var(--footer-widget-background-xl, none);
-            background-color: var(--footer-bg-color-xl, transparent);
-            color: var(--footer-text-color-xl, inherit);
-        }
-    }
-    
-    .empty-slot {
-        color: #9ca3af;
-        font-style: italic;
-        text-align: center;
-        font-size: 16px;
-        font-weight: 300;
-        padding: 30px;
-    }
-    """
 
     css_scope = "widget"
 
@@ -143,16 +72,12 @@ class FooterWidget(BaseWidget):
                 try:
                     # Filter out hidden widgets
                     widget_config = widget_data.get("config", {})
-                    is_visible = widget_config.get(
-                        "isVisible", widget_config.get("is_visible", True)
-                    )
+                    is_visible = widget_config.get("isVisible", widget_config.get("is_visible", True))
                     if not is_visible:
                         continue
 
                     # Filter out inactive widgets
-                    is_active = widget_config.get(
-                        "isActive", widget_config.get("is_active", True)
-                    )
+                    is_active = widget_config.get("isActive", widget_config.get("is_active", True))
                     if not is_active:
                         continue
 
@@ -160,26 +85,17 @@ class FooterWidget(BaseWidget):
                     if "sort_order" not in widget_data and "order" not in widget_data:
                         widget_data = {**widget_data, "sort_order": index}
 
-                    widget_html = context["renderer"].render_widget_json(
-                        widget_data, context
-                    )
-                    rendered_widgets.append(
-                        {"html": widget_html, "widget_data": widget_data}
-                    )
-                except Exception as e:
+                    widget_html = context["renderer"].render_widget_json(widget_data, context)
+                    rendered_widgets.append({"html": widget_html, "widget_data": widget_data})
+                except Exception:
                     continue
             rendered_slots["content"] = rendered_widgets
         else:
             # Fallback: provide raw widget data
             rendered_slots = {
-                "content": [
-                    {"html": None, "widget_data": widget}
-                    for widget in slots_data.get("content", [])
-                ]
+                "content": [{"html": None, "widget_data": widget} for widget in slots_data.get("content", [])]
             }
 
-        template_config.update(
-            {"slots_data": slots_data, "rendered_slots": rendered_slots}
-        )
+        template_config.update({"slots_data": slots_data, "rendered_slots": rendered_slots})
 
         return template_config

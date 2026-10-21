@@ -51,7 +51,12 @@ def error_page_widgets(root_page_id: int, status_code: int) -> dict:
 
 def theme_error_page_widgets(status_code: int) -> dict:
     """Portable defaults for error pages stored in a theme layout document."""
-    return _error_page_widgets("theme", status_code)
+    from widget_contracts import default_special_pages
+
+    for page in default_special_pages():
+        if page["status_code"] == status_code:
+            return page["widgets"]
+    raise KeyError(status_code)
 
 
 def _error_page_widgets(owner_key: str, status_code: int) -> dict:

@@ -56,7 +56,9 @@ jobs:
             public_e2e=false
             while IFS= read -r path; do
               case "$path" in
-                backend/webpages/tests/fixtures/pilot_baseline/*) backend=true; frontend=true ;;
+                backend/widget_contracts/*) backend=true; frontend=true; publisher=true ;;
+                backend/webpages/tests/fixtures/pilot_baseline/*) backend=true; frontend=true; publisher=true ;;
+                frontend/src/rendering/generated/render-manifest.json) backend=true; frontend=true; publisher=true ;;
                 backend/*) backend=true ;;
                 frontend/*) frontend=true ;;
                 publisher/*|deploy/scripts/tests/*|deploy/scripts/*health*|deploy/scripts/*deploy*) publisher=true ;;
@@ -167,6 +169,13 @@ jobs:
       - name: Install publisher dependencies
         working-directory: publisher
         run: npm ci
+
+      - name: Verify framework-independent widget contracts
+        run: |
+          node --test backend/widget_contracts/tests/*.test.mjs
+          node backend/widget_contracts/manifest.mjs --check
+          node backend/widget_contracts/observe.mjs backend/webpages/tests/fixtures/pilot_baseline/cases.json /tmp/widget-contract-observations.json
+          python3 scripts/pilot_baseline.py compare /tmp/widget-contract-observations.json --output /tmp/widget-contract-comparison.json
 
       - name: Audit publisher production dependencies
         working-directory: publisher

@@ -2,12 +2,13 @@
 Header widget implementation.
 """
 
-from typing import Type, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Type
+
+from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
-from utils.dict_utils import DictToObj
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 
 class HeaderConfig(BaseModel):
@@ -20,70 +21,15 @@ class HeaderConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class HeaderWidget(BaseWidget):
     """Simple header widget with image"""
 
-    name = "Header"
-    description = "Header widget - xs breakpoint shows full image (auto height), sm+ uses fixed height with cropped image"
+    description = (
+        "Header widget - xs breakpoint shows full image (auto height), sm+ uses fixed height with cropped image"
+    )
     template_name = None
     mustache_template_name = "easy_widgets/widgets/header.mustache"
-
-    layout_parts = {
-        "header-widget": {
-            "label": "Header container",
-            "selector": ".header-widget",
-            "relationship": "same-element",  # Both widget-type and header-widget classes on same element
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "margin",
-                "backgroundColor",
-                "backgroundImage",  # Composite property includes size, position, repeat, and aspect-ratio
-            ],
-        },
-    }
-
-    widget_css = """
-        /* Base mobile styles (< 640px) */
-        .widget-type-header {
-            width: 100%;
-            height: var(--header-height-xs, auto);
-            background-size: cover;
-            background-repeat: no-repeat;
-            background-position: top left;
-            aspect-ratio: var(--header-aspect-ratio-xs, 16 / 9);
-        }
-
-        /* Small devices and up (≥ 640px) - fixed height with cover */
-        @media (min-width: 640px) {
-            .widget-type-header {
-                height: var(--header-height-sm, 120px);
-                aspect-ratio: auto;
-                background-size: contain;
-            }
-        }
-
-        @media (min-width: 768px) {
-            .widget-type-header {
-                height: var(--header-height-md, 120px);
-            }
-        }
-
-        @media (min-width: 1024px) {
-            .widget-type-header {
-                height: var(--header-height-lg, 120px);
-            }
-        }
-
-        @media (min-width: 1280px) {
-            .widget-type-header {
-                height: var(--header-height-xl, 120px);
-            }
-        }
-    """
-
-    css_variables = {}
 
     css_scope = "widget"
 

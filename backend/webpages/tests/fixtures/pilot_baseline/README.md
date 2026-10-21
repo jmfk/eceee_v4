@@ -75,3 +75,7 @@ python3 -m unittest discover -s scripts/tests -p test_pilot_baseline.py -v
 This comparison covers portable contracts; the replacement must separately pass the persisted-state and end-to-end gates before it can take over writes. A comparator success alone never authorizes retirement.
 
 To revise the reference deliberately, use `run --observe-only --output <new-directory>` on the reviewed reference source, verify source provenance against its commit, inspect the observation and independent expectation differences, then review the fixture update as a code change. The capture command never writes the checked-in reference. Preserve known issues and skipped/failed results explicitly; never regenerate expectations in CI.
+
+## Shared contract candidate
+
+The [framework-independent package](../../../../widget_contracts/README.md) consumes the same case inputs. Run `python3 scripts/pilot_baseline.py run --candidate-contracts --output <new-directory>` to evaluate Node contracts and then verify Django persistence plus desktop/mobile rendering. `contractCandidate` reports this limited comparison separately; `candidateParity` still refers to a complete replacement backend and remains `not_supplied`. No frozen reference is changed by candidate runs.

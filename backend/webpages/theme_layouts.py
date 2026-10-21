@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 from django.core.exceptions import ValidationError
 
-from webpages.error_page_defaults import ERROR_PAGE_CONTENT, LEGACY_ERROR_PAGE_SLUGS, theme_error_page_widgets
+from webpages.error_page_defaults import ERROR_PAGE_CONTENT, LEGACY_ERROR_PAGE_SLUGS
 
 SCHEMA_VERSION = 1
 LAYOUT_KEY = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
@@ -545,19 +545,9 @@ def default_theme_layouts():
 
 def default_special_pages():
     """Return portable, theme-owned defaults for the standard HTTP error pages."""
-    return [
-        {
-            "id": _stable_uuid(f"special-page/error-{status_code}"),
-            "key": f"error_{status_code}",
-            "label": f"{status_code} — {title}",
-            "kind": "error",
-            "status_code": status_code,
-            "layout_key": "error_layout",
-            "route": "",
-            "widgets": theme_error_page_widgets(status_code),
-        }
-        for status_code, (title, _explanation) in ERROR_PAGE_CONTENT.items()
-    ]
+    from widget_contracts import default_special_pages as contract_defaults
+
+    return contract_defaults()
 
 
 def theme_special_pages(document):

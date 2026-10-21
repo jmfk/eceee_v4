@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 
 class HeroConfig(BaseModel):
@@ -107,147 +108,12 @@ class HeroConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class HeroWidget(BaseWidget):
     """Hero widget with header, optional before/after text, image, and color customization"""
 
-    name = "Hero"
     description = "Hero section with header text, optional before/after text, image, and customizable colors"
     template_name = "easy_widgets/widgets/hero.html"
-
-    layout_parts = {
-        "hero-widget": {
-            "label": "Hero content",
-            "selector": ".hero-widget",
-            "properties": [
-                "width",
-                "height",
-                "minHeight",
-                "padding",
-                "margin",
-                "backgroundColor",
-                "color",
-            ],
-        },
-        "hero-header": {
-            "label": "Hero header (h1)",
-            "selector": ".hero-header",
-            "properties": [
-                "fontFamily",
-                "fontSize",
-                "fontWeight",
-                "lineHeight",
-                "color",
-                "margin",
-            ],
-        },
-        "hero-before-text": {
-            "label": "Before text",
-            "selector": ".hero-before-text",
-            "properties": [
-                "fontFamily",
-                "fontSize",
-                "fontWeight",
-                "lineHeight",
-                "color",
-                "margin",
-            ],
-        },
-        "hero-after-text": {
-            "label": "After text",
-            "selector": ".hero-after-text",
-            "properties": [
-                "fontFamily",
-                "fontSize",
-                "fontWeight",
-                "lineHeight",
-                "color",
-                "margin",
-            ],
-        },
-    }
-
-    widget_css = """
-    .hero-widget {
-        box-sizing: border-box;
-        position: relative;
-        padding: 0;
-        overflow: hidden;
-        height: 310px;
-        min-height: 310px;
-        max-height: 310px;
-        width: 100%;
-        background-color: var(--hero-bg-color, #000000);
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        color: var(--hero-text-color, #ffffff);
-        margin-bottom: 30px;
-        flex-shrink: 0;
-    }
-    .hero-widget:last-child {
-        margin-bottom: 0;
-    }
-
-    .hero-content {
-        position: relative;
-        max-width: 1200px;
-        margin: 0 auto;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        height: 100%;
-        padding: 30px;
-    }
-
-    .hero-widget h1 {
-        font-family: "Source Sans 3", sans-serif;
-        font-weight: 300;
-        font-size: 50px;
-        line-height: 54px;
-        margin-top: 16px;
-        margin-bottom: 16px;
-        color: var(--hero-text-color, #ffffff);
-        background-color: rgba(0,0,0,0.4);
-        display: inline-block;
-        padding: 17px 20px 12px;
-    }
-
-    .hero-widget .before-text {
-        font-size: 24px;
-        line-height: 24px;
-        font-weight: 500;
-        margin: 0;
-        color: var(--hero-decor-color, #ffffff);
-    }
-
-    .hero-widget .after-text {
-        font-size: 24px;
-        line-height: 24px;
-        font-weight: 500;
-        margin: 0;
-        color: var(--hero-text-color, #ffffff);
-    }
-
-    @media (max-width: 768px) {
-        .hero-widget {
-            padding: 0;
-        }
-
-        .hero-widget h1 {
-            font-size: 32px;
-            line-height: 36px;
-        }
-
-        .hero-widget .before-text {
-            font-size: 18px;
-        }
-
-        .hero-widget .after-text {
-            font-size: 18px;
-        }
-    }
-    """
 
     css_scope = "widget"
 

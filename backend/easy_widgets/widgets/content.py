@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 logger = logging.getLogger(__name__)
 
@@ -140,64 +141,12 @@ class ContentConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class ContentWidget(BaseWidget):
     """Content widget that contains HTML"""
 
-    name = "Content"
     description = "Content widget that contains HTML"
     template_name = "easy_widgets/widgets/content.html"
-
-    variants = [
-        {
-            "id": "border-enabled",
-            "label": "Border Enabled",
-            "config_field": "show_border",
-            "type": "class",
-        },
-    ]
-
-    layout_parts = {
-        "content-widget": {
-            "label": "Content area",
-            "selector": ".content-widget",
-            "relationship": "descendant",
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "margin",
-                "backgroundColor",
-                "color",
-                "fontFamily",
-                "fontSize",
-                "lineHeight",
-            ],
-        },
-    }
-
-    widget_css = """
-    .content-widget {
-        box-sizing: border-box;
-        width: 100%;
-        min-height: 32px;
-        font-family: inherit;
-        line-height: 1.6;
-        color: inherit;
-        margin-bottom: 30px;
-    }
-    .content-widget.border-enabled {
-        padding-top: 50px;
-        padding-bottom: 50px;
-        outline: 1px solid rgb(0,0,0,0.3);
-    }
-    .content-widget .media-insert,
-    .content-widget .media-insert img {
-        max-width: 100%;
-    }
-    .content-widget .media-insert img {
-        height: auto;
-    }
-    """
 
     not_used = """
     .content-widget h1,

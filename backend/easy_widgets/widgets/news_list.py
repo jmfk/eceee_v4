@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 
 class NewsListConfig(BaseModel):
@@ -111,33 +112,12 @@ class NewsListConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class NewsListWidget(BaseWidget):
     """Display a list of news from selected ObjectTypes"""
 
-    name = "News List"
     description = "Display a list of news articles from selected ObjectTypes"
     template_name = "easy_widgets/widgets/news_list.html"
-
-    layout_parts = {
-        "news-list-widget": {
-            "label": "News List widget container",
-            "selector": ".news-list-widget",
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "margin",
-                "backgroundColor",
-                "color",
-            ],
-        },
-    }
-
-    widget_css = """
-    .news-list-widget .news-excerpt {
-        margin: 0;
-    }
-    """
 
     css_scope = "widget"
 

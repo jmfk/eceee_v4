@@ -1,0 +1,916 @@
+{
+  "formatVersion": 1,
+  "widgets": {
+    "easy_widgets.HeadlineWidget": "HeadlineConfig",
+    "easy_widgets.BannerWidget": "BannerConfig",
+    "easy_widgets.TwoColumnsWidget": "TwoColumnsConfig",
+    "easy_widgets.FormsWidget": "FormsConfig"
+  },
+  "models": {
+    "HeadlineConfig": {
+      "description": "Configuration for Headline widget",
+      "fields": [
+        {
+          "name": "content",
+          "alias": "content",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Header text content",
+          "schema_title": "Content",
+          "default": "",
+          "ui": {
+            "hidden": true,
+            "component": "RichTextInput",
+            "inlineOnly": true,
+            "rows": 3,
+            "order": 1,
+            "group": "Content"
+          }
+        },
+        {
+          "name": "headerLevel",
+          "alias": "headerLevel",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "HTML header level",
+          "schema_title": "Headerlevel",
+          "default": "h1",
+          "ui": {
+            "component": "SegmentedControlInput",
+            "options": [
+              {
+                "value": "h1",
+                "label": "H1"
+              },
+              {
+                "value": "h2",
+                "label": "H2"
+              },
+              {
+                "value": "h3",
+                "label": "H3"
+              },
+              {
+                "value": "h4",
+                "label": "H4"
+              },
+              {
+                "value": "h5",
+                "label": "H5"
+              },
+              {
+                "value": "h6",
+                "label": "H6"
+              }
+            ],
+            "order": 1.5,
+            "group": "Content"
+          }
+        },
+        {
+          "name": "componentStyle",
+          "alias": "componentStyle",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Component style from theme",
+          "schema_title": "Componentstyle",
+          "default": "default",
+          "ui": {
+            "component": "ComponentStyleSelector",
+            "order": 2,
+            "group": "Styling"
+          }
+        },
+        {
+          "name": "showBorder",
+          "alias": "showBorder",
+          "annotation": {
+            "type": "bool"
+          },
+          "api_type": "bool",
+          "description": "Show widget border",
+          "schema_title": "Showborder",
+          "default": true,
+          "ui": {
+            "component": "BooleanInput",
+            "variant": "toggle",
+            "order": 3,
+            "group": "Styling"
+          }
+        },
+        {
+          "name": "anchor",
+          "alias": "anchor",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Anchor ID for linking to this section",
+          "schema_title": "Anchor",
+          "default": "",
+          "ui": {
+            "component": "TextInput",
+            "placeholder": "section-name",
+            "order": 9999,
+            "group": "Advanced"
+          }
+        },
+        {
+          "name": "anchor_title",
+          "alias": "anchorTitle",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Anchor title (for navigation menus)",
+          "schema_title": "Anchortitle",
+          "default": "",
+          "ui": {
+            "component": "TextInput",
+            "placeholder": "Auto-generated from content",
+            "helpText": "Displayed in navigation menus when linking to this content",
+            "order": 10000,
+            "group": "Advanced"
+          }
+        }
+      ]
+    },
+    "BannerConfig": {
+      "description": "Configuration for Banner widget",
+      "fields": [
+        {
+          "name": "banner_mode",
+          "alias": "bannerMode",
+          "annotation": {
+            "literal": [
+              "header",
+              "text"
+            ]
+          },
+          "api_type": "Literal",
+          "description": "Banner mode: header (H2 centered with optional background image) or text (H3 + paragraph with optional image)",
+          "schema_title": "Bannermode",
+          "default": "text",
+          "ui": {
+            "component": "BannerModeSelector",
+            "order": 1,
+            "group": "Content"
+          }
+        },
+        {
+          "name": "header_content",
+          "alias": "headerContent",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Header text content (plain text, shown when in header mode)",
+          "schema_title": "Headercontent",
+          "default": "",
+          "ui": {
+            "hidden": true,
+            "component": "RichTextInput",
+            "inlineOnly": true,
+            "rows": 3,
+            "order": 2,
+            "group": "Content",
+            "conditionalOn": {
+              "bannerMode": [
+                "header"
+              ]
+            }
+          }
+        },
+        {
+          "name": "text_content",
+          "alias": "textContent",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Rich text content (shown when in text mode)",
+          "schema_title": "Textcontent",
+          "default": "",
+          "ui": {
+            "hidden": true,
+            "component": "RichTextInput",
+            "rows": 6,
+            "order": 3,
+            "group": "Content",
+            "conditionalOn": {
+              "bannerMode": [
+                "text"
+              ]
+            }
+          }
+        },
+        {
+          "name": "image_size",
+          "alias": "imageSize",
+          "annotation": {
+            "literal": [
+              "square",
+              "rectangle"
+            ]
+          },
+          "api_type": "Literal",
+          "description": "Size/shape of the image",
+          "schema_title": "Imagesize",
+          "default": "square",
+          "ui": {
+            "component": "ImageSizeSelector",
+            "order": 4,
+            "group": "Layout",
+            "conditionalOn": {
+              "bannerMode": [
+                "text"
+              ]
+            }
+          }
+        },
+        {
+          "name": "image_1",
+          "alias": "image1",
+          "annotation": {
+            "nullable": {
+              "type": "dict"
+            }
+          },
+          "api_type": "Optional",
+          "description": "MediaFile object for image",
+          "schema_title": "Image1",
+          "default": null,
+          "ui": {
+            "component": "ImageInput",
+            "mediaTypes": [
+              "image"
+            ],
+            "order": 5,
+            "group": "Images",
+            "editorPrimary": true,
+            "conditionalOn": {
+              "bannerMode": [
+                "text"
+              ]
+            }
+          }
+        },
+        {
+          "name": "background_image",
+          "alias": "backgroundImage",
+          "annotation": {
+            "nullable": {
+              "type": "dict"
+            }
+          },
+          "api_type": "Optional",
+          "description": "MediaFile object for background image (cover)",
+          "schema_title": "Backgroundimage",
+          "default": null,
+          "ui": {
+            "component": "ImageInput",
+            "mediaTypes": [
+              "image"
+            ],
+            "order": 3,
+            "group": "Content",
+            "conditionalOn": {
+              "bannerMode": [
+                "header"
+              ]
+            }
+          }
+        },
+        {
+          "name": "text_color",
+          "alias": "textColor",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Text color",
+          "schema_title": "Textcolor",
+          "default": "#000000",
+          "ui": {
+            "component": "ColorInput",
+            "order": 4,
+            "group": "Styling"
+          }
+        },
+        {
+          "name": "background_color",
+          "alias": "backgroundColor",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Background color",
+          "schema_title": "Backgroundcolor",
+          "default": "#ffffff",
+          "ui": {
+            "component": "ColorInput",
+            "order": 5,
+            "group": "Styling"
+          }
+        },
+        {
+          "name": "text_outline",
+          "alias": "textOutline",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Text outline for contrast against the banner background",
+          "schema_title": "Textoutline",
+          "default": "none",
+          "ui": {
+            "component": "TextOutlineSelect",
+            "group": "Styling",
+            "order": 6
+          }
+        },
+        {
+          "name": "component_style",
+          "alias": "componentStyle",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Component style from theme",
+          "schema_title": "Componentstyle",
+          "default": "default",
+          "ui": {
+            "component": "ComponentStyleSelector",
+            "order": 7,
+            "group": "Styling"
+          }
+        },
+        {
+          "name": "show_border",
+          "alias": "showBorder",
+          "annotation": {
+            "type": "bool"
+          },
+          "api_type": "bool",
+          "description": "Show widget border",
+          "schema_title": "Showborder",
+          "default": true,
+          "ui": {
+            "component": "BooleanInput",
+            "variant": "toggle",
+            "order": 8,
+            "group": "Styling"
+          }
+        },
+        {
+          "name": "anchor",
+          "alias": "anchor",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Anchor ID for linking to this section",
+          "schema_title": "Anchor",
+          "default": "",
+          "ui": {
+            "component": "TextInput",
+            "placeholder": "section-name",
+            "order": 9999,
+            "group": "Advanced"
+          }
+        },
+        {
+          "name": "anchor_title",
+          "alias": "anchorTitle",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Anchor title (for navigation menus)",
+          "schema_title": "Anchortitle",
+          "default": "",
+          "ui": {
+            "component": "TextInput",
+            "placeholder": "Auto-generated from content",
+            "helpText": "Displayed in navigation menus when linking to this content",
+            "order": 10000,
+            "group": "Advanced"
+          }
+        }
+      ]
+    },
+    "TwoColumnsConfig": {
+      "description": "Configuration for simple two-column widget",
+      "fields": [
+        {
+          "name": "layout_style",
+          "alias": "layoutStyle",
+          "annotation": {
+            "nullable": {
+              "literal": [
+                "5:1",
+                "4:2",
+                "3:3",
+                "2:4",
+                "1:5"
+              ]
+            }
+          },
+          "api_type": "Optional",
+          "description": "Column width ratio",
+          "schema_title": "Layoutstyle",
+          "default": "3:3",
+          "ui": {
+            "component": "TwoColumnRatioSelector",
+            "order": 1,
+            "group": "Display Options"
+          }
+        },
+        {
+          "name": "component_style",
+          "alias": "componentStyle",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Component style from theme",
+          "schema_title": "Componentstyle",
+          "default": "default",
+          "ui": {
+            "component": "ComponentStyleSelector"
+          }
+        }
+      ]
+    },
+    "FormField": {
+      "description": "Individual form field configuration",
+      "fields": [
+        {
+          "name": "name",
+          "alias": "name",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Field name",
+          "schema_title": "Name",
+          "min_length": 1
+        },
+        {
+          "name": "label",
+          "alias": "label",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Field label",
+          "schema_title": "Label",
+          "min_length": 1
+        },
+        {
+          "name": "type",
+          "alias": "type",
+          "annotation": {
+            "literal": [
+              "text",
+              "email",
+              "phone",
+              "number",
+              "textarea",
+              "select",
+              "checkbox",
+              "radio",
+              "file",
+              "date",
+              "time"
+            ]
+          },
+          "api_type": "Literal",
+          "description": "Field type",
+          "schema_title": "Type"
+        },
+        {
+          "name": "required",
+          "alias": "required",
+          "annotation": {
+            "type": "bool"
+          },
+          "api_type": "bool",
+          "description": "Required field",
+          "schema_title": "Required",
+          "default": false
+        },
+        {
+          "name": "placeholder",
+          "alias": "placeholder",
+          "annotation": {
+            "nullable": {
+              "type": "str"
+            }
+          },
+          "api_type": "Optional",
+          "description": "Placeholder text",
+          "schema_title": "Placeholder",
+          "default": null
+        },
+        {
+          "name": "default_value",
+          "alias": "defaultValue",
+          "annotation": {
+            "nullable": {
+              "type": "str"
+            }
+          },
+          "api_type": "Optional",
+          "description": "Default value",
+          "schema_title": "Defaultvalue",
+          "default": null
+        },
+        {
+          "name": "options",
+          "alias": "options",
+          "annotation": {
+            "nullable": {
+              "list": {
+                "type": "str"
+              }
+            }
+          },
+          "api_type": "Optional",
+          "description": "Options for select/radio fields",
+          "schema_title": "Options",
+          "default": null
+        },
+        {
+          "name": "validation",
+          "alias": "validation",
+          "annotation": {
+            "nullable": {
+              "dict": {
+                "type": "any"
+              }
+            }
+          },
+          "api_type": "Optional",
+          "description": "Validation rules (min_length, max_length, pattern, etc.)",
+          "schema_title": "Validation",
+          "default": null
+        },
+        {
+          "name": "help_text",
+          "alias": "helpText",
+          "annotation": {
+            "nullable": {
+              "type": "str"
+            }
+          },
+          "api_type": "Optional",
+          "description": "Help text for the field",
+          "schema_title": "Helptext",
+          "default": null
+        },
+        {
+          "name": "css_class",
+          "alias": "cssClass",
+          "annotation": {
+            "nullable": {
+              "type": "str"
+            }
+          },
+          "api_type": "Optional",
+          "description": "Additional CSS class",
+          "schema_title": "Cssclass",
+          "default": null
+        }
+      ]
+    },
+    "FormsConfig": {
+      "description": "Configuration for Forms widget",
+      "fields": [
+        {
+          "name": "title",
+          "alias": "title",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Form title",
+          "schema_title": "Title",
+          "ui": {
+            "component": "TextInput",
+            "placeholder": "Contact Form"
+          },
+          "min_length": 1
+        },
+        {
+          "name": "description",
+          "alias": "description",
+          "annotation": {
+            "nullable": {
+              "type": "str"
+            }
+          },
+          "api_type": "Optional",
+          "description": "Form description",
+          "schema_title": "Description",
+          "default": null,
+          "ui": {
+            "component": "TextareaInput",
+            "group": "Content",
+            "rows": 3,
+            "placeholder": "Optional form description..."
+          }
+        },
+        {
+          "name": "fields",
+          "alias": "fields",
+          "annotation": {
+            "list": {
+              "model": "FormField"
+            }
+          },
+          "api_type": "List",
+          "description": "Form fields",
+          "schema_title": "Fields",
+          "ui": {
+            "component": "ReorderableInput",
+            "allowAdd": true,
+            "allowRemove": true,
+            "allowReorder": true,
+            "itemTemplate": {
+              "name": "",
+              "label": "",
+              "type": "text"
+            }
+          },
+          "min_length": 1
+        },
+        {
+          "name": "submit_url",
+          "alias": "submitUrl",
+          "annotation": {
+            "nullable": {
+              "type": "str"
+            }
+          },
+          "api_type": "Optional",
+          "description": "Form submission URL",
+          "schema_title": "Submiturl",
+          "default": null,
+          "ui": {
+            "component": "URLInput",
+            "placeholder": "https://example.com/submit"
+          }
+        },
+        {
+          "name": "submit_method",
+          "alias": "submitMethod",
+          "annotation": {
+            "literal": [
+              "POST",
+              "GET"
+            ]
+          },
+          "api_type": "Literal",
+          "description": "HTTP method",
+          "schema_title": "Submitmethod",
+          "default": "POST",
+          "ui": {
+            "component": "SegmentedControlInput",
+            "variant": "default",
+            "options": [
+              {
+                "value": "POST",
+                "label": "POST"
+              },
+              {
+                "value": "GET",
+                "label": "GET"
+              }
+            ]
+          }
+        },
+        {
+          "name": "success_message",
+          "alias": "successMessage",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Success message",
+          "schema_title": "Successmessage",
+          "default": "Thank you for your submission!",
+          "ui": {
+            "component": "TextareaInput",
+            "rows": 2
+          }
+        },
+        {
+          "name": "error_message",
+          "alias": "errorMessage",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Error message",
+          "schema_title": "Errormessage",
+          "default": "There was an error submitting the form. Please try again.",
+          "ui": {
+            "component": "TextareaInput",
+            "rows": 2
+          }
+        },
+        {
+          "name": "submit_button_text",
+          "alias": "submitButtonText",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Submit button text",
+          "schema_title": "Submitbuttontext",
+          "default": "Submit",
+          "ui": {
+            "component": "TextInput",
+            "placeholder": "Submit"
+          }
+        },
+        {
+          "name": "reset_button",
+          "alias": "resetButton",
+          "annotation": {
+            "type": "bool"
+          },
+          "api_type": "bool",
+          "description": "Show reset button",
+          "schema_title": "Resetbutton",
+          "default": false,
+          "ui": {
+            "component": "BooleanInput",
+            "variant": "toggle"
+          }
+        },
+        {
+          "name": "ajax_submit",
+          "alias": "ajaxSubmit",
+          "annotation": {
+            "type": "bool"
+          },
+          "api_type": "bool",
+          "description": "Submit form via AJAX",
+          "schema_title": "Ajaxsubmit",
+          "default": true,
+          "ui": {
+            "component": "BooleanInput",
+            "variant": "toggle"
+          }
+        },
+        {
+          "name": "redirect_url",
+          "alias": "redirectUrl",
+          "annotation": {
+            "nullable": {
+              "type": "str"
+            }
+          },
+          "api_type": "Optional",
+          "description": "Redirect URL after submission",
+          "schema_title": "Redirecturl",
+          "default": null,
+          "ui": {
+            "component": "URLInput",
+            "placeholder": "https://example.com/success"
+          }
+        },
+        {
+          "name": "email_notifications",
+          "alias": "emailNotifications",
+          "annotation": {
+            "type": "bool"
+          },
+          "api_type": "bool",
+          "description": "Send email notifications",
+          "schema_title": "Emailnotifications",
+          "default": false
+        },
+        {
+          "name": "notification_email",
+          "alias": "notificationEmail",
+          "annotation": {
+            "nullable": {
+              "type": "str"
+            }
+          },
+          "api_type": "Optional",
+          "description": "Notification email address",
+          "schema_title": "Notificationemail",
+          "default": null
+        },
+        {
+          "name": "store_submissions",
+          "alias": "storeSubmissions",
+          "annotation": {
+            "type": "bool"
+          },
+          "api_type": "bool",
+          "description": "Store form submissions in database",
+          "schema_title": "Storesubmissions",
+          "default": true
+        },
+        {
+          "name": "honeypot_protection",
+          "alias": "honeypotProtection",
+          "annotation": {
+            "type": "bool"
+          },
+          "api_type": "bool",
+          "description": "Enable honeypot spam protection",
+          "schema_title": "Honeypotprotection",
+          "default": true
+        },
+        {
+          "name": "recaptcha_enabled",
+          "alias": "recaptchaEnabled",
+          "annotation": {
+            "type": "bool"
+          },
+          "api_type": "bool",
+          "description": "Enable reCAPTCHA protection",
+          "schema_title": "Recaptchaenabled",
+          "default": false
+        },
+        {
+          "name": "css_framework",
+          "alias": "cssFramework",
+          "annotation": {
+            "literal": [
+              "default",
+              "bootstrap",
+              "tailwind",
+              "custom"
+            ]
+          },
+          "api_type": "Literal",
+          "description": "CSS framework for styling",
+          "schema_title": "Cssframework",
+          "default": "default"
+        },
+        {
+          "name": "component_style",
+          "alias": "componentStyle",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Component style from theme",
+          "schema_title": "Componentstyle",
+          "default": "default",
+          "ui": {
+            "component": "ComponentStyleSelector"
+          }
+        },
+        {
+          "name": "anchor",
+          "alias": "anchor",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Anchor ID for linking to this section",
+          "schema_title": "Anchor",
+          "default": "",
+          "ui": {
+            "component": "TextInput",
+            "placeholder": "section-name",
+            "order": 9999,
+            "group": "Advanced"
+          }
+        },
+        {
+          "name": "anchor_title",
+          "alias": "anchorTitle",
+          "annotation": {
+            "type": "str"
+          },
+          "api_type": "str",
+          "description": "Anchor title (for navigation menus)",
+          "schema_title": "Anchortitle",
+          "default": "",
+          "ui": {
+            "component": "TextInput",
+            "placeholder": "Display name for navigation",
+            "helpText": "Displayed in navigation menus when linking to this form",
+            "order": 10000,
+            "group": "Advanced"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 
 class ThreeColumnsConfig(BaseModel):
@@ -37,149 +38,13 @@ class ThreeColumnsConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class ThreeColumnsWidget(BaseWidget):
     """Simple three-column widget with left, center, and right slots"""
 
     app_label = "easy_widgets"
-    name = "Three Columns"
     description = "Simple three-column layout with left, center, and right slots for widgets"
     template_name = "easy_widgets/widgets/three_columns.html"
-
-    layout_parts = {
-        "three-columns-widget": {
-            "label": "Three Columns container",
-            "selector": ".three-columns-widget",
-            "properties": [
-                "width",
-                "height",
-                "min-height",
-                "padding",
-                "margin",
-                "backgroundColor",
-                "color",
-                "fontFamily",
-                "fontSize",
-                "lineHeight",
-                "gap",
-            ],
-            "designer_editable_spacing_properties": ["gap"],
-        },
-        "three-col-widget-wrapper": {
-            "label": "Three Columns Wrappercontainer",
-            "selector": ".three-col-widget-wrapper",
-            "properties": [
-                "padding",
-                "margin",
-                "backgroundColor",
-                "color",
-            ],
-        },
-    }
-
-    widget_css = """
-    .three-columns-widget {
-        display: grid;
-        gap: 30px;
-        width: 100%;
-        min-height: 140px;
-        margin-bottom: 30px;
-    }
-    .three-columns-widget:last-child {
-        margin-bottom: 0;
-    }
-
-
-    .three-columns-widget.three-col-ratio-3-2-1 {
-        grid-template-columns: 3fr 2fr 1fr;
-    }
-
-    .three-columns-widget.three-col-ratio-2-2-2 {
-        grid-template-columns: 1fr 1fr 1fr;
-    }
-
-    .three-columns-widget.three-col-ratio-1-2-3 {
-        grid-template-columns: 1fr 2fr 3fr;
-    }
-
-    .three-columns-widget.three-col-ratio-1-4-1 {
-        grid-template-columns: 1fr 4fr 1fr;
-    }
-
-    .three-col-slot {
-        position: relative;
-        min-height: 140px;
-        height: 100%;
-    }
-
-    .three-col-slot.left {
-        grid-area: 1 / 1;
-    }
-
-    .three-col-slot.center {
-        grid-area: 1 / 2;
-    }
-
-    .three-col-slot.right {
-        grid-area: 1 / 3;
-    }
-
-    .three-col-widget-wrapper {
-        margin-bottom: 30px;
-    }
-
-    .three-col-widget-wrapper:last-child {
-        margin-bottom: 0;
-    }
-
-    .three-col-empty-slot {
-        color: #9ca3af;
-        font-style: italic;
-        text-align: center;
-        padding: 2rem 1rem;
-        border: 1px dashed #e5e7eb;
-        background-color: #f9fafb;
-        height: 100%;
-    }
-
-    /* Responsive design */
-    @media (max-width: 1024px) {
-        .three-columns-widget {
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: auto auto;
-        }
-
-        .three-col-slot.left {
-            grid-area: 1 / 1;
-        }
-
-        .three-col-slot.center {
-            grid-area: 1 / 2;
-        }
-
-        .three-col-slot.right {
-            grid-area: 2 / 1 / 2 / 3;
-        }
-    }
-
-    @media (max-width: 768px) {
-        .three-columns-widget {
-            grid-template-columns: 1fr;
-            grid-template-rows: auto auto auto;
-        }
-
-        .three-col-slot.left {
-            grid-area: 1 / 1;
-        }
-
-        .three-col-slot.center {
-            grid-area: 2 / 1;
-        }
-
-        .three-col-slot.right {
-            grid-area: 3 / 1;
-        }
-    }
-    """
 
     css_scope = "widget"
 

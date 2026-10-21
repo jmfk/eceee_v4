@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 logger = logging.getLogger(__name__)
 
@@ -142,116 +143,12 @@ class BioConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class BioWidget(BaseWidget):
     """Bio widget with image and text content"""
 
-    name = "Bio"
     description = "Biography widget with image and text"
     template_name = "easy_widgets/widgets/bio.html"
-
-    layout_parts = {
-        "bio-widget": {
-            "label": "Bio widget container",
-            "selector": ".bio-widget",
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "margin",
-                "backgroundColor",
-                "color",
-            ],
-        },
-    }
-
-    widget_css = """
-    .bio-widget {
-        display: block;
-        width: 100%;
-        height: auto;
-        margin-bottom: 30px;
-    }
-
-    .bio-widget__container {
-        width: 100%;
-    }
-
-    /* Column layout - side by side */
-    .bio-widget--column .bio-widget__container {
-        display: flex;
-        gap: 30px;
-        align-items: flex-start;
-    }
-
-    .bio-widget--column .bio-widget__image {
-        flex: 0 0 33.33%;
-        max-width: 33.33%;
-    }
-
-    .bio-widget--column .bio-widget__text {
-        flex: 1;
-        min-width: 0;
-    }
-
-    /* Flow layout - text wraps around image */
-    .bio-widget--flow .bio-widget__container {
-        display: block;
-    }
-
-    .bio-widget--flow .bio-widget__image {
-        float: left;
-        width: 33.33%;
-        max-width: 400px;
-        margin: 0 30px 30px 0;
-    }
-
-    .bio-widget--flow .bio-widget__text {
-        display: block;
-    }
-
-    /* Clear float after flow layout */
-    .bio-widget--flow .bio-widget__container::after {
-        content: "";
-        display: table;
-        clear: both;
-    }
-
-    /* Image styling */
-    .bio-widget--image-square .bio-widget__image img {
-        aspect-ratio: 1;
-        height: 100%;
-        object-fit: cover;
-    }
-    .bio-widget--image-rectangle .bio-widget__image img {
-        aspect-ratio: 2 / 1;
-        height: 100%;
-        object-fit: cover;
-    }
-    .bio-widget__image img {
-        width: 100%;
-        height: auto;
-    }
-
-    /* Responsive - stack on mobile */
-    @media (max-width: 768px) {
-        .bio-widget--column .bio-widget__container {
-            flex-direction: column;
-        }
-
-        .bio-widget--column .bio-widget__image {
-            flex: 0 0 auto;
-            max-width: 100%;
-            margin-bottom: 40px;
-        }
-
-        .bio-widget--flow .bio-widget__image {
-            float: none;
-            width: 100%;
-            max-width: 100%;
-            margin: 0 0 30px 0;
-        }
-    }
-    """
 
     css_scope = "widget"
 

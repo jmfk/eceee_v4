@@ -5,10 +5,11 @@ Displays path variables captured from URL regex patterns for debugging
 and testing the dynamic object publishing system.
 """
 
-from webpages.widget_registry import BaseWidget, widget_type_registry
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
-from typing import Optional
+
+from webpages.widget_registry import BaseWidget, widget_type_registry
+from widget_contracts import catalog_widget
 
 
 class PathDebugConfig(BaseModel):
@@ -28,6 +29,7 @@ class PathDebugConfig(BaseModel):
     )
 
 
+@catalog_widget
 class PathDebugWidget(BaseWidget):
     """
     Widget that displays captured path variables for debugging.
@@ -36,27 +38,11 @@ class PathDebugWidget(BaseWidget):
     what variables are being extracted from URLs.
     """
 
-    name = "Path Debug"
     description = "Debug widget showing captured path variables from URL patterns"
     category = "Development"
     icon = "bug"
     template_name = "easy_widgets/widgets/path_debug.html"
     configuration_model = PathDebugConfig
-
-    layout_parts = {
-        "path-debug-widget": {
-            "label": "Path Debug widget container",
-            "selector": ".path-debug-widget",
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "margin",
-                "backgroundColor",
-                "color",
-            ],
-        },
-    }
 
     # Widget is for development/debugging
     is_development_only = True
@@ -73,11 +59,7 @@ class PathDebugWidget(BaseWidget):
 
         # Do registry lookup (this is logic that shouldn't be in template)
         pattern_info = None
-        if (
-            current_page
-            and hasattr(current_page, "path_pattern_key")
-            and current_page.path_pattern_key
-        ):
+        if current_page and hasattr(current_page, "path_pattern_key") and current_page.path_pattern_key:
             from webpages.path_pattern_registry import path_pattern_registry
 
             pattern = path_pattern_registry.get_pattern(current_page.path_pattern_key)

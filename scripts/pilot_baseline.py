@@ -25,6 +25,12 @@ REQUIRED_BACKEND_SCENARIOS = {
     "webpages.tests.test_pilot_baseline.PilotPersistenceBaselineTests.test_other_tenant_and_anonymous_requests_cannot_save_pilot",
     "webpages.tests.test_pilot_baseline.PilotPersistenceBaselineTests.test_authenticated_session_without_csrf_cannot_save_pilot",
 }
+REQUIRED_CONTRACT_SCENARIOS = {
+    "webpages.tests.test_widget_contracts.WidgetContractTests.test_catalog_covers_every_builtin_without_changing_runtime_metadata",
+    "webpages.tests.test_widget_contracts.WidgetContractTests.test_node_manifest_matches_python_and_checked_in_bytes",
+    "webpages.tests.test_widget_contracts.WidgetContractTests.test_python_contracts_import_with_django_explicitly_blocked",
+    "webpages.tests.test_widget_contracts.WidgetContractTests.test_node_model_validation_matches_pydantic_field_matrix",
+}
 REQUIRED_FRONTEND_SCENARIOS = {
     "portable pilot render baseline preserves all fixture types, headings, child identities and ordering",
     "portable pilot render baseline keeps forms usable and prevents preview submission",
@@ -83,9 +89,9 @@ def browser_passes(result):
     )
 
 
-def backend_passes(result):
+def backend_passes(result, required=REQUIRED_BACKEND_SCENARIOS):
     passed = {scenario["id"] for scenario in result["scenarios"] if scenario["status"] == "passed"}
-    return REQUIRED_BACKEND_SCENARIOS <= passed and not any(
+    return required <= passed and not any(
         result.get(key, 0) for key in ("failures", "errors", "skipped", "expectedFailures", "unexpectedSuccesses")
     )
 
@@ -237,6 +243,43 @@ def run(args):
         args.backend_image,
     ]
     try:
+        if args.candidate_contracts:
+            phase(
+                "node-contracts",
+                docker
+                + [
+                    "run",
+                    "--rm",
+                    "--name",
+                    f"{identity}-contracts",
+                    "--network",
+                    "none",
+                    "--mount",
+                    f"type=bind,source={source / 'backend/widget_contracts'},target=/contracts,readonly",
+                    "--mount",
+                    f"type=bind,source={source / 'backend/webpages/tests/fixtures/pilot_baseline'},target=/fixtures,readonly",
+                    "--mount",
+                    f"type=bind,source={output},target=/pilot-output",
+                    "--entrypoint",
+                    "sh",
+                    args.contract_image,
+                    "-euc",
+                    "node --test /contracts/tests/*.test.mjs\n"
+                    "node /contracts/observe.mjs /fixtures/cases.json /pilot-output/node-observed.json",
+                ],
+            )
+            candidate = json.loads((output / "node-observed.json").read_text())
+            mismatch = compare(json.loads((FIXTURES / "reference.json").read_text()), candidate)
+            report["contractCandidate"] = {
+                "status": "failed" if mismatch else "passed",
+                "differences": mismatch,
+                "runtime": candidate["candidateRuntime"],
+                "observationCount": len(candidate["observations"]),
+                "scope": "metadata-and-validation-comparison-only",
+            }
+            write_json(output / "node-comparison.json", report["contractCandidate"])
+            if mismatch:
+                raise RuntimeError("Node contract candidate mismatch; see node-comparison.json")
         if not args.frontend_only:
             subprocess.run(
                 docker + ["network", "create", "--label", "eceee.purpose=pilot-baseline", network],
@@ -339,6 +382,17 @@ def run(args):
                     "manage.py",
                     "test",
                     "webpages.tests.test_pilot_baseline",
+                    *(
+                        [
+                            "webpages.tests.test_widget_contracts",
+                            "easy_widgets.tests",
+                            "webpages.tests.test_publisher_manifest",
+                            "webpages.tests.test_theme_layouts",
+                            "webpages.tests.test_error_pages",
+                        ]
+                        if args.candidate_contracts
+                        else []
+                    ),
                     "--keepdb",
                     "--noinput",
                     "--verbosity=2",
@@ -346,7 +400,8 @@ def run(args):
                 ],
             )
             backend_result = json.loads((output / "backend.json").read_text())
-            if not backend_passes(backend_result):
+            required = REQUIRED_BACKEND_SCENARIOS | (REQUIRED_CONTRACT_SCENARIOS if args.candidate_contracts else set())
+            if not backend_passes(backend_result, required):
                 raise RuntimeError("Missing or skipped mandatory backend scenarios")
             report["backend"] = backend_result
         if not args.backend_only:
@@ -407,7 +462,7 @@ def run(args):
         print(str(error), file=sys.stderr)
         return 1
     finally:
-        for container in (f"{identity}-backend", f"{identity}-frontend", database):
+        for container in (f"{identity}-backend", f"{identity}-frontend", f"{identity}-contracts", database):
             subprocess.run(docker + ["rm", "-f", container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(docker + ["network", "rm", network], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         write_json(output / "report.json", report)
@@ -429,6 +484,10 @@ def main():
     run_parser.add_argument("--docker-context", default="orbstack")
     run_parser.add_argument("--backend-image", default="eceee-v4-2-backend:latest")
     run_parser.add_argument("--browser-image", default="mcr.microsoft.com/playwright:v1.60.0-noble")
+    run_parser.add_argument(
+        "--candidate-contracts", action="store_true", help="Compare the standalone Node widget pilot"
+    )
+    run_parser.add_argument("--contract-image", default="node:22-alpine")
     scope = run_parser.add_mutually_exclusive_group()
     scope.add_argument("--backend-only", action="store_true")
     scope.add_argument("--frontend-only", action="store_true")

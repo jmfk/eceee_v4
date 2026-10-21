@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
+from widget_contracts import catalog_widget
 
 
 class BorderStyle(BaseModel):
@@ -127,165 +128,14 @@ class TableConfig(BaseModel):
 
 
 @register_widget_type
+@catalog_widget
 class TableWidget(BaseWidget):
     """Table widget with configurable columns and rows"""
 
-    name = "Table"
     description = "Advanced table widget with cell merging, images, styling, and responsive design"
     template_name = "easy_widgets/widgets/table.html"
     special_editor = "TableSpecialEditor"
     hide_config_form_fields = True  # Use special editor exclusively
-
-    layout_parts = {
-        "table-widget": {
-            "label": "Table widget container",
-            "selector": ".table-widget",
-            "properties": [
-                "width",
-                "height",
-                "padding",
-                "margin",
-                "backgroundColor",
-            ],
-        },
-    }
-
-    widget_css = """
-    .table-widget {
-        overflow-x: auto;
-        margin-bottom: 30px;
-    }
-    .table-widget:last-child {
-        margin-bottom: 0;
-    }
-
-    .table-widget table {
-        width: 100%;
-        border-collapse: collapse;
-        font-family: var(--table-font, inherit);
-        background-color: var(--table-bg, transparent);
-    }
-
-    .table-widget .table-caption {
-        text-align: left;
-    }
-
-    .table-widget th,
-    .table-widget td {
-        padding: var(--cell-padding, 0.75rem);
-        border: var(--cell-border, 1px solid #d1d5db);
-        text-align: var(--cell-alignment, left);
-        vertical-align: var(--cell-vertical-alignment, top);
-        transition: background-color 0.2s ease, color 0.2s ease;
-    }
-
-    .table-widget.table-no-borders th,
-    .table-widget.table-no-borders td {
-        border: none;
-    }
-
-    .table-widget th {
-        background-color: var(--header-bg, #f3f4f6);
-        color: var(--header-color, #1f2937);
-        font-weight: var(--header-font-weight, 600);
-    }
-
-    .table-widget td {
-        background-color: var(--cell-bg, transparent);
-        color: var(--cell-color, inherit);
-    }
-
-    /* Font style presets */
-    .table-cell-quote {
-        font-style: italic;
-        font-weight: 400;
-        padding-left: 1.5rem;
-        border-left: 3px solid var(--quote-border-color, #d1d5db);
-        color: var(--quote-color, #6b7280);
-    }
-
-    .table-cell-caption {
-        font-size: 0.875rem;
-        color: var(--caption-color, #6b7280);
-        font-weight: 400;
-    }
-
-    /* Alignment classes */
-    .table-widget .cell-center {
-        text-align: center;
-    }
-
-    .table-widget .cell-right {
-        text-align: right;
-    }
-
-    .table-widget .cell-left {
-        text-align: left;
-    }
-
-    /* Image cells */
-    .table-widget .cell-image {
-        padding: 0.25rem;
-    }
-
-    .table-widget .cell-image img {
-        max-width: 100%;
-        height: auto;
-        display: block;
-    }
-
-    /* Striped rows */
-    .table-widget.table-striped tr:nth-child(even) td {
-        background-color: var(--row-even-bg, #f9fafb);
-    }
-
-    /* Hover effect */
-    .table-widget.table-hover tr:hover td {
-        background-color: var(--row-hover-bg, #f3f4f6);
-    }
-
-    .table-widget .cell-hover-bg:hover {
-        background-color: var(--cell-hover-bg) !important;
-    }
-
-    .table-widget .cell-hover-text:hover {
-        color: var(--cell-hover-text) !important;
-    }
-
-    /* Responsive table */
-    @media (max-width: 768px) {
-        .table-widget.table-responsive {
-            font-size: var(--mobile-font-size, 0.875rem);
-        }
-
-        .table-widget.table-responsive th,
-        .table-widget.table-responsive td {
-            padding: var(--mobile-cell-padding, 0.5rem);
-        }
-    }
-    """
-
-    css_variables = {
-        "table-margin": "1rem 0",
-        "table-font": "inherit",
-        "table-bg": "transparent",
-        "header-bg": "#f3f4f6",
-        "header-color": "#1f2937",
-        "header-font-weight": "600",
-        "cell-padding": "0.75rem",
-        "cell-border": "1px solid #d1d5db",
-        "cell-alignment": "left",
-        "cell-vertical-alignment": "top",
-        "cell-bg": "transparent",
-        "cell-color": "inherit",
-        "row-even-bg": "#f9fafb",
-        "row-hover-bg": "#f3f4f6",
-        "quote-border-color": "#d1d5db",
-        "quote-color": "#6b7280",
-        "caption-color": "#6b7280",
-        "mobile-font-size": "0.875rem",
-        "mobile-cell-padding": "0.5rem",
-    }
 
     css_scope = "widget"
 
