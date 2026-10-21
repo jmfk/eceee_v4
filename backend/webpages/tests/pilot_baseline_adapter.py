@@ -1,10 +1,32 @@
 """Reference adapter for portable pilot cases. No snapshot is updated by a test run."""
 
+import copy
 import hashlib
 import json
+import re
 from pathlib import Path
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "pilot_baseline"
+
+
+def comparable_observations(observed):
+    """Ignore only the minor version in Pydantic 2 error documentation links."""
+    result = copy.deepcopy(observed)
+    if not isinstance(result, dict):
+        return result
+    for observation in result.values():
+        body = observation.get("body") if isinstance(observation, dict) else None
+        errors = body.get("rawErrors") if isinstance(body, dict) else None
+        if not isinstance(errors, list):
+            continue
+        for error in errors:
+            if isinstance(error, dict) and isinstance(error.get("url"), str):
+                error["url"] = re.sub(
+                    r"\Ahttps://errors\.pydantic\.dev/2\.\d+/v/([a-z_]+)\Z",
+                    r"https://errors.pydantic.dev/2.x/v/\1",
+                    error["url"],
+                )
+    return result
 
 
 def load_cases():

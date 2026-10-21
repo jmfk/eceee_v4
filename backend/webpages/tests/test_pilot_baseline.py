@@ -13,7 +13,7 @@ from rest_framework.test import APIClient
 from core.models import Tenant
 from webpages.models import WebPage
 from webpages.services.page_version_workflow import PageVersionWorkflowService
-from webpages.tests.pilot_baseline_adapter import FIXTURE_DIR, load_cases, observations
+from webpages.tests.pilot_baseline_adapter import FIXTURE_DIR, comparable_observations, load_cases, observations
 
 
 class PilotContractBaselineTests(SimpleTestCase):
@@ -23,11 +23,12 @@ class PilotContractBaselineTests(SimpleTestCase):
         self.assertEqual(actual["formatVersion"], expected["formatVersion"])
         self.assertEqual(actual["casesSha256"], expected["casesSha256"])
         self.assertEqual(set(actual["observations"]), set(expected["observations"]))
-        for case_id, value in expected["observations"].items():
+        comparable_actual = comparable_observations(actual["observations"])
+        for case_id, value in comparable_observations(expected["observations"]).items():
             with self.subTest(case=case_id):
                 # Python dict equality alone considers True == 1; the wire contract must not.
                 self.assertEqual(
-                    json.dumps(actual["observations"][case_id], sort_keys=True), json.dumps(value, sort_keys=True)
+                    json.dumps(comparable_actual[case_id], sort_keys=True), json.dumps(value, sort_keys=True)
                 )
 
     def test_independent_scenario_expectations(self):
@@ -114,6 +115,11 @@ class PilotPersistenceBaselineTests(TestCase):
         self.client.credentials(HTTP_X_TENANT_ID=self.foreign_tenant.identifier)
         rejected = self.save_pilot()
         self.assertEqual(rejected.status_code, 403)
+        # A valid member of B must also be unable to write A's page; the
+        # invalid tenant selection above stops earlier in tenant middleware.
+        self.assertTrue(self.client.login(username=self.foreign_user.username, password="pilot-fixture-only"))
+        rejected = self.save_pilot()
+        self.assertEqual(rejected.status_code, 404)
         self.client.logout()
         self.client.credentials(HTTP_X_TENANT_ID=self.tenant.identifier)
         rejected = self.save_pilot()
