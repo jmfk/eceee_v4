@@ -4,8 +4,8 @@ Theme CSS Generator Service
 Generates complete CSS from all theme components and manages caching.
 """
 
-from django.core.cache import cache
 from django.conf import settings
+from django.core.cache import cache
 
 
 class ThemeCSSGenerator:
@@ -13,9 +13,7 @@ class ThemeCSSGenerator:
 
     # Rebuild cached styles after introducing theme-owned default outlines.
     CACHE_PREFIX = "theme_css_v2_"
-    CACHE_TIMEOUT = getattr(
-        settings, "THEME_CSS_CACHE_TIMEOUT", 3600 * 24
-    )  # 24 hours default
+    CACHE_TIMEOUT = getattr(settings, "THEME_CSS_CACHE_TIMEOUT", 3600 * 24)  # 24 hours default
 
     def get_cache_key(self, theme_id, frontend_scoped=False):
         """Generate cache key for theme CSS"""
@@ -60,7 +58,7 @@ class ThemeCSSGenerator:
         # Clear non-scoped cache (for backend rendering)
         cache_key = self.get_cache_key(theme_id, frontend_scoped=False)
         cache.delete(cache_key)
-        
+
         # Clear frontend-scoped cache (for frontend/CMS editor)
         cache_key_scoped = self.get_cache_key(theme_id, frontend_scoped=True)
         cache.delete(cache_key_scoped)
@@ -164,19 +162,19 @@ class ThemeCSSGenerator:
             css_content = style.get("css", "")
             if not css_content:
                 continue
-                
+
             css_parts.append(f"/* {style.get('name', key)} */")
-            
+
             # Support both string (legacy) and object (new) formats
             if isinstance(css_content, str):
                 css_parts.append(css_content)
             elif isinstance(css_content, dict):
                 # Generate default + media queries
-                if css_content.get('default'):
-                    css_parts.append(css_content['default'])
-                
+                if css_content.get("default"):
+                    css_parts.append(css_content["default"])
+
                 # Generate media queries for each breakpoint (mobile-first)
-                for bp_key in ['sm', 'md', 'lg', 'xl']:
+                for bp_key in ["sm", "md", "lg", "xl"]:
                     if css_content.get(bp_key) and breakpoints.get(bp_key):
                         media_query = f"@media (min-width: {breakpoints[bp_key]}px) {{\n{css_content[bp_key]}\n}}"
                         css_parts.append(media_query)
@@ -195,19 +193,19 @@ class ThemeCSSGenerator:
             css_content = style.get("css", "")
             if not css_content:
                 continue
-                
+
             css_parts.append(f"/* Gallery: {style.get('name', key)} */")
-            
+
             # Support both string (legacy) and object (new) formats
             if isinstance(css_content, str):
                 css_parts.append(css_content)
             elif isinstance(css_content, dict):
                 # Generate default + media queries
-                if css_content.get('default'):
-                    css_parts.append(css_content['default'])
-                
+                if css_content.get("default"):
+                    css_parts.append(css_content["default"])
+
                 # Generate media queries for each breakpoint (mobile-first)
-                for bp_key in ['sm', 'md', 'lg', 'xl']:
+                for bp_key in ["sm", "md", "lg", "xl"]:
                     if css_content.get(bp_key) and breakpoints.get(bp_key):
                         media_query = f"@media (min-width: {breakpoints[bp_key]}px) {{\n{css_content[bp_key]}\n}}"
                         css_parts.append(media_query)
@@ -226,19 +224,19 @@ class ThemeCSSGenerator:
             css_content = style.get("css", "")
             if not css_content:
                 continue
-                
+
             css_parts.append(f"/* Carousel: {style.get('name', key)} */")
-            
+
             # Support both string (legacy) and object (new) formats
             if isinstance(css_content, str):
                 css_parts.append(css_content)
             elif isinstance(css_content, dict):
                 # Generate default + media queries
-                if css_content.get('default'):
-                    css_parts.append(css_content['default'])
-                
+                if css_content.get("default"):
+                    css_parts.append(css_content["default"])
+
                 # Generate media queries for each breakpoint (mobile-first)
-                for bp_key in ['sm', 'md', 'lg', 'xl']:
+                for bp_key in ["sm", "md", "lg", "xl"]:
                     if css_content.get(bp_key) and breakpoints.get(bp_key):
                         media_query = f"@media (min-width: {breakpoints[bp_key]}px) {{\n{css_content[bp_key]}\n}}"
                         css_parts.append(media_query)
@@ -247,7 +245,7 @@ class ThemeCSSGenerator:
 
     def _generate_widget_css(self, frontend_scoped=False):
         """Generate CSS from all registered widget types
-        
+
         Args:
             frontend_scoped: If True, prepend .cms-content to widget selectors
         """
@@ -266,12 +264,12 @@ class ThemeCSSGenerator:
 
             # Add widget CSS with optional scoping
             css_parts.append(f"/* Widget: {widget_type.name} ({widget_type.type}) */")
-            
+
             widget_css = widget_type.widget_css
             if frontend_scoped:
                 # Scope all widget selectors with .cms-content
-                widget_css = self._scope_css_selectors(widget_css, '.cms-content')
-            
+                widget_css = self._scope_css_selectors(widget_css, ".cms-content")
+
             css_parts.append(widget_css)
 
             # Collect widget CSS variables
@@ -293,73 +291,75 @@ class ThemeCSSGenerator:
 
     def _scope_css_selectors(self, css_content, scope_prefix):
         """Prepend scope prefix to all CSS selectors
-        
+
         Args:
             css_content: CSS string
             scope_prefix: Prefix to add (e.g., '.cms-content')
-            
+
         Returns:
             Scoped CSS string
         """
-        import re
-        
+
         lines = []
         in_media_query = False
         media_query_depth = 0
-        
-        for line in css_content.split('\n'):
+
+        for line in css_content.split("\n"):
             stripped = line.strip()
-            
+
             # Track media query nesting
-            if stripped.startswith('@media'):
+            if stripped.startswith("@media"):
                 in_media_query = True
-                media_query_depth += stripped.count('{') - stripped.count('}')
+                media_query_depth += stripped.count("{") - stripped.count("}")
                 lines.append(line)
                 continue
-            
+
             # Update media query depth
             if in_media_query:
-                media_query_depth += line.count('{') - line.count('}')
+                media_query_depth += line.count("{") - line.count("}")
                 if media_query_depth <= 0:
                     in_media_query = False
                     media_query_depth = 0
-            
+
             # Skip @-rules, empty lines, and closing braces
-            if (stripped.startswith('@') or 
-                not stripped or 
-                stripped == '}' or
-                stripped.startswith('/*') or
-                stripped.endswith('*/') or
-                ':' in stripped and '{' not in stripped):
+            if (
+                stripped.startswith("@")
+                or not stripped
+                or stripped == "}"
+                or stripped.startswith("/*")
+                or stripped.endswith("*/")
+                or ":" in stripped
+                and "{" not in stripped
+            ):
                 lines.append(line)
                 continue
-            
+
             # Check if this line contains a selector (has '{' and is not a property)
-            if '{' in line and not stripped.startswith('}'):
+            if "{" in line and not stripped.startswith("}"):
                 # Extract the selector part (before the '{')
-                parts = line.split('{', 1)
+                parts = line.split("{", 1)
                 if len(parts) == 2:
                     selector_part = parts[0].strip()
                     rest = parts[1]
-                    
+
                     # Split multiple selectors by comma
-                    selectors = [s.strip() for s in selector_part.split(',')]
+                    selectors = [s.strip() for s in selector_part.split(",")]
                     scoped_selectors = []
-                    
+
                     for selector in selectors:
                         # Don't scope :root or keyframe selectors
-                        if selector.startswith(':root') or '%' in selector:
+                        if selector.startswith(":root") or "%" in selector:
                             scoped_selectors.append(selector)
                         else:
                             scoped_selectors.append(f"{scope_prefix} {selector}")
-                    
+
                     # Reconstruct the line
-                    indent = line[:len(line) - len(line.lstrip())]
+                    indent = line[: len(line) - len(line.lstrip())]
                     scoped_line = f"{indent}{', '.join(scoped_selectors)} {{{rest}"
                     lines.append(scoped_line)
                 else:
                     lines.append(line)
             else:
                 lines.append(line)
-        
-        return '\n'.join(lines)
+
+        return "\n".join(lines)

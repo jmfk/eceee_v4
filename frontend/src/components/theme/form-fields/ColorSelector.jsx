@@ -144,6 +144,15 @@ const ColorSelector = ({ value, onChange, colors = {}, label, className = '', ic
                     role="group"
                     aria-label={title}
                     onClick={event => event.stopPropagation()}
+                    onBlur={event => {
+                        // Another toolbar control may restore editor focus without
+                        // a mouse click (for example a native outline selection).
+                        // Close the old palette without stealing that new focus.
+                        const target = event.relatedTarget;
+                        if (target && !event.currentTarget.contains(target) && !buttonRef.current?.contains(target)) {
+                            setPaletteOpen(false);
+                        }
+                    }}
                     onKeyDown={event => {
                         if (event.key === 'Escape') {
                             event.preventDefault();

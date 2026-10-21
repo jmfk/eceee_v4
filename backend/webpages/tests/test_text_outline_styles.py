@@ -1,4 +1,5 @@
 from copy import deepcopy
+
 from django.test import SimpleTestCase
 from rest_framework.exceptions import ValidationError
 
@@ -40,13 +41,13 @@ class TextOutlineStylesTests(SimpleTestCase):
         self.assertEqual(shadow, "0px 3px 5px #000000")
 
     def test_designer_snapshot_restores_presets(self):
+        from core.models import Tenant
         from webpages.models import PageTheme
         from webpages.services.designer_theme import (
-            theme_designer_snapshot,
-            apply_designer_snapshot,
             apply_designer_patch,
+            apply_designer_snapshot,
+            theme_designer_snapshot,
         )
-        from core.models import Tenant
 
         theme = PageTheme(name="Outline test", tenant=Tenant(name="Test", identifier="outline-test"))
         apply_designer_patch(
@@ -60,6 +61,7 @@ class TextOutlineStylesTests(SimpleTestCase):
     def test_api_casing_preserves_style_keys_and_properties(self):
         import io
         import json
+
         from webpages.views.designer_theme_views import DesignerJSONParser, DesignerJSONRenderer
         from webpages.views.page_theme_views import ThemeJSONParser, ThemeJSONRenderer
 

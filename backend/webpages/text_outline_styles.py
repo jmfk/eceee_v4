@@ -84,7 +84,9 @@ def text_outline_shadow(raw):
 
     def layer(dx, dy):
         # Suppress negative zero and keep CSS compact and deterministic.
-        fmt = lambda number: f"{0 if abs(number) < 0.0005 else number:.3f}".rstrip("0").rstrip(".")
+        def fmt(number):
+            return f"{0 if abs(number) < 0.0005 else number:.3f}".rstrip("0").rstrip(".")
+
         return f"{fmt(dx)}px {fmt(dy)}px {blur:g}px {color}"
 
     if not style["thickness"]:

@@ -88,7 +88,7 @@ export function detectConflicts(existingData, newData, section, level) {
 
     if (level === 'full') {
         // Check each section for conflicts
-        const sections = ['fonts', 'colors', 'breakpoints', 'designGroups', 'componentStyles', 'imageStyles', 'tableTemplates'];
+        const sections = ['fonts', 'colors', 'breakpoints', 'designGroups', 'componentStyles', 'imageStyles', 'textOutlineStyles', 'tableTemplates'];
 
         sections.forEach(sectionName => {
             const sectionConflicts = detectSectionConflicts(
@@ -242,7 +242,7 @@ export function mergeThemeData(existing, incoming, level, section, resolutions =
 
     if (level === 'full') {
         // Merge all sections
-        const sections = ['fonts', 'colors', 'breakpoints', 'designGroups', 'componentStyles', 'imageStyles', 'tableTemplates'];
+        const sections = ['fonts', 'colors', 'breakpoints', 'designGroups', 'componentStyles', 'imageStyles', 'textOutlineStyles', 'tableTemplates'];
 
         sections.forEach(sectionName => {
             if (incoming[sectionName]) {
