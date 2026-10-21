@@ -302,9 +302,10 @@ describe('DesignerThemeWorkspacePage', () => {
         })
         renderWithStateProviders(<DesignerThemeWorkspacePage />)
         const iframe = await screen.findByTitle('Live theme preview')
+        await waitFor(() => {
+            expect(observers.some((observer) => observer.target === iframe.parentElement)).toBe(true)
+        })
         const frameObserver = observers.find((observer) => observer.target === iframe.parentElement)
-
-        expect(frameObserver).toBeDefined()
         act(() => frameObserver.callback([{ contentRect: { width: 640 } }]))
 
         expect(iframe.style.zoom).toBe('0.5')
