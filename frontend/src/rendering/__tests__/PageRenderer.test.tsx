@@ -200,7 +200,7 @@ describe('PageRenderer', () => {
         expect(banner.style.color).toBe('var(--paper, paper)')
         expect(banner.style.backgroundColor).toBe('var(--ocean, ocean)')
         expect(banner.style.getPropertyValue('--banner-text-color')).toBe('var(--paper, paper)')
-        expect(banner.style.getPropertyValue('--banner-text-shadow')).toContain('#000')
+        expect(banner.style.getPropertyValue('--banner-text-shadow')).toBe('var(--text-outline-dark, none)')
     })
 
     it.each(['none', 'dark', 'light', '__proto__'])('renders direct banner colors safely with outline %s', textOutline => {
@@ -211,8 +211,8 @@ describe('PageRenderer', () => {
         const banner = container.querySelector('.banner-widget') as HTMLElement
         expect(banner).toHaveStyle({ color: '#ffffff', backgroundColor: '#082f49' })
         const shadow = banner.style.getPropertyValue('--banner-text-shadow')
-        if (textOutline === 'dark') expect(shadow).toContain('#000')
-        else if (textOutline === 'light') expect(shadow).toContain('#fff')
+        if (textOutline === 'dark') expect(shadow).toBe('var(--text-outline-dark, none)')
+        else if (textOutline === 'light') expect(shadow).toBe('var(--text-outline-light, none)')
         else expect(shadow).toBe('none')
     })
 

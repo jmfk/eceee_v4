@@ -11,6 +11,7 @@ import { getImgproxyUrlFromImage } from '../../utils/imgproxySecure'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
 import OptimizedImage from '../../components/media/OptimizedImage'
 import MediaSelectModal from '../../components/media/MediaSelectModal'
+import { textOutlineOptions } from '../../utils/textOutlineStyles'
 import { getBannerRenderConfig, getBannerPresentationStyle } from '../../utils/bannerConfig'
 import ColorSelector from '../../components/theme/form-fields/ColorSelector'
 import Tooltip from '../../components/Tooltip'
@@ -176,7 +177,7 @@ const BannerWidget = ({
 
     // Build inline styles for colors and background image
     const bannerStyle = {
-        ...getBannerPresentationStyle(configRef.current),
+        ...getBannerPresentationStyle(configRef.current, currentTheme || {}),
         ...(backgroundImage && backgroundImageUrl && backgroundImageUrl2x ? {
             backgroundImage: `image-set(url('${backgroundImageUrl}') 1x, url('${backgroundImageUrl2x}') 2x)`,
             backgroundSize: 'cover',
@@ -523,8 +524,8 @@ const BannerWidget = ({
         const isHeader = bannerMode === 'header'
         const isRectangle = imageSize === 'rectangle'
         const buttonClassName = 'relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700'
-        const outlineLabels = { none: 'No outline', dark: 'Dark outline', light: 'Light outline' }
-        const nextOutline = { none: 'dark', dark: 'light', light: 'none' }[textOutline] || 'dark'
+        const outlineStyles = currentTheme?.textOutlineStyles || currentTheme?.text_outline_styles || {}
+        const outlineLabels = textOutlineOptions(outlineStyles)
         return <div className="banner-widget-editor group/banner relative isolate min-h-10">
             <div ref={presentationToolbarRef} role="toolbar" aria-label="Banner controls"
                 className="eceee-editor-ui absolute right-2 top-2 z-10 flex max-w-[calc(100%-1rem)] flex-wrap items-center justify-end gap-1 opacity-0 pointer-events-none group-hover/banner:opacity-100 group-hover/banner:pointer-events-auto group-focus-within/banner:opacity-100 group-focus-within/banner:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto"
@@ -563,16 +564,23 @@ const BannerWidget = ({
                     onChange={value => handlePresentationChange('backgroundColor', value)}
                     onOpenChange={handlePaletteOpenChange} onClose={handlePaletteClose}
                     icon={<PaintBucket className="h-4 w-4" />} title="Background color" compact />
-                <Tooltip text={`Text outline: ${outlineLabels[textOutline] || 'No outline'}. Change to ${outlineLabels[nextOutline]}.`}>
-                    <button type="button" className={buttonClassName}
-                        aria-label={`Text outline: ${outlineLabels[textOutline] || 'No outline'}`}
-                        aria-pressed={textOutline === 'dark' || textOutline === 'light'}
-                        onMouseDown={event => event.preventDefault()}
-                        onClick={() => { handlePresentationChange('textOutline', nextOutline); showValue(outlineLabels[nextOutline]) }}>
-                        <ALargeSmall className="h-4 w-4" />
-                        <span className={`absolute bottom-1 h-0.5 w-4 ${textOutline === 'light' ? 'bg-white ring-1 ring-gray-400' : textOutline === 'dark' ? 'bg-black' : 'bg-transparent'}`} />
-                    </button>
-                </Tooltip>
+                <label className="relative inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 focus-within:ring-2 focus-within:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" title="Text outline style from this theme">
+                    <ALargeSmall className="h-4 w-4" aria-hidden="true" />
+                    <select aria-label="Text outline" value={textOutline} className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        onPointerDown={() => handlePaletteOpenChange(true)}
+                        onFocus={() => { if (!presentationPaletteOpenRef.current) handlePaletteOpenChange(true) }}
+                        onKeyDown={event => { if (event.key === 'Escape') { presentationPaletteOpenRef.current = false; handlePaletteClose('escape') } }}
+                        onBlur={() => { presentationPaletteOpenRef.current = false }}
+                        onChange={event => {
+                            handlePresentationChange('textOutline', event.target.value)
+                            showValue(outlineLabels[event.target.value])
+                            presentationPaletteOpenRef.current = false
+                            handlePaletteClose('select')
+                        }}>
+                        {!Object.hasOwn(outlineLabels, textOutline) && <option value={textOutline}>Missing style</option>}
+                        {Object.entries(outlineLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                    </select>
+                </label>
             </div>
             <div className="relative z-0">{content}</div>
             {valueFeedback}

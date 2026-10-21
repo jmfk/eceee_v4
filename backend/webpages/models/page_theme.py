@@ -13,6 +13,7 @@ from django.core.files.base import ContentFile
 from django.db import models
 
 from file_manager.storage import system_storage
+from webpages.text_outline_styles import default_text_outline_styles
 from webpages.theme_layouts import default_theme_layouts, validate_theme_layouts
 
 
@@ -73,6 +74,10 @@ class PageTheme(models.Model):
         blank=True,
         help_text="Versioned, validated React layout definitions owned by this theme",
     )
+    text_outline_styles = models.JSONField(
+        default=default_text_outline_styles, blank=True, help_text="Named theme-wide text effects"
+    )
+
     image_styles = models.JSONField(
         default=dict,
         blank=True,
@@ -438,6 +443,7 @@ class PageTheme(models.Model):
             "designer_preview": self.designer_preview,
             "layouts": self.layouts,
             "image_styles": self.image_styles,
+            "text_outline_styles": self.text_outline_styles,
             "gallery_styles": self.gallery_styles,  # Deprecated
             "carousel_styles": self.carousel_styles,  # Deprecated
             "table_templates": self.table_templates,
@@ -1559,7 +1565,12 @@ class PageTheme(models.Model):
             slot: Optional slot name for targeted design groups
             frontend_scoped: If True, prepend .cms-content to design group selectors (for frontend editor)
         """
-        css_parts = []
+        from webpages.text_outline_styles import text_outline_css
+
+        outline_css = text_outline_css(self.text_outline_styles)
+        if scope:
+            outline_css = outline_css.replace(":root", scope, 1)
+        css_parts = [outline_css]
 
         # CSS Variables from colors (new) or css_variables (legacy)
         colors = self.colors or self.css_variables
@@ -2695,6 +2706,7 @@ class PageTheme(models.Model):
             designer_preview=(self.designer_preview.copy() if self.designer_preview else {}),
             layouts=copy.deepcopy(self.layouts) if self.layouts else default_theme_layouts(),
             image_styles=self.image_styles.copy() if self.image_styles else {},
+            text_outline_styles=copy.deepcopy(self.text_outline_styles),
             gallery_styles=self.gallery_styles.copy() if self.gallery_styles else {},
             carousel_styles=self.carousel_styles.copy() if self.carousel_styles else {},
             table_templates=self.table_templates.copy() if self.table_templates else {},

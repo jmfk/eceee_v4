@@ -11,7 +11,8 @@ from django.conf import settings
 class ThemeCSSGenerator:
     """Service for generating and caching theme CSS"""
 
-    CACHE_PREFIX = "theme_css_"
+    # Rebuild cached styles after introducing theme-owned default outlines.
+    CACHE_PREFIX = "theme_css_v2_"
     CACHE_TIMEOUT = getattr(
         settings, "THEME_CSS_CACHE_TIMEOUT", 3600 * 24
     )  # 24 hours default

@@ -1793,6 +1793,193 @@ class DesignerThemeApiTests(TestCase):
         self.assertTrue(refreshed.data["hasDraftChanges"])
         self.assertEqual(refreshed.data["description"], "Theme for editorial sites")
 
+    def test_outline_publication_merges_stale_draft_without_publishing_other_changes(self):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+        base_styles = self.theme.text_outline_styles
+        saved = self.client.patch(
+            self.workspace_url,
+            {
+                "draftVersion": workspace["draftVersion"],
+                "description": "Keep this draft description",
+                "textOutlineStyles": {**base_styles, "draftGlow": {"name": "Draft glow", "style": "gradientBlur"}},
+            },
+            format="json",
+        )
+        self.assertEqual(saved.status_code, 200, saved.data)
+        base_version = ThemeDesignerDraft.objects.get(theme=self.theme).base_sync_version
+        self.theme.description = "Preserve live description"
+        self.theme.text_outline_styles = {**base_styles, "liveShadow": {"name": "Live shadow", "style": "dropShadow"}}
+        self.theme.save(version_created_by=self.owner)
+        published = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/outlines/publish/",
+            {"draftVersion": saved.data["draftVersion"], "liveSyncVersion": self.theme.sync_version},
+            format="json",
+        )
+        self.assertEqual(published.status_code, 200, published.data)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.description, "Preserve live description")
+        self.assertEqual(set(self.theme.text_outline_styles), {"dark", "light", "liveShadow", "draftGlow"})
+        self.assertIn("--text-outline-draftGlow:", self.theme.generate_css())
+        self.assertIn("draftGlow", self.client.get(self.workspace_url).data["liveTextOutlineStyles"])
+        draft = ThemeDesignerDraft.objects.get(theme=self.theme)
+        self.assertEqual(draft.snapshot["description"], "Keep this draft description")
+        self.assertEqual(draft.base_sync_version, base_version)
+        self.assertTrue(published.data["draftIsStale"])
+        self.assertEqual(self.theme.versions.first().snapshot["description"], "Preserve live description")
+        self.assertIn("draftGlow", self.theme.versions.first().snapshot["text_outline_styles"])
+
+    def test_outline_publication_rejects_conflicting_styles_and_obsolete_live_version(self):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+        saved = self.client.patch(
+            self.workspace_url,
+            {
+                "draftVersion": workspace["draftVersion"],
+                "textOutlineStyles": {**self.theme.text_outline_styles, "dark": {"name": "My dark", "thickness": 3}},
+            },
+            format="json",
+        )
+        self.assertEqual(saved.status_code, 200, saved.data)
+        self.theme.text_outline_styles["dark"]["thickness"] = 5
+        self.theme.save(version_created_by=self.owner)
+        url = f"/api/v1/webpages/designer/themes/{self.theme.id}/outlines/publish/"
+        for live_version in (workspace["liveSyncVersion"], self.theme.sync_version):
+            response = self.client.post(
+                url, {"draftVersion": saved.data["draftVersion"], "liveSyncVersion": live_version}, format="json"
+            )
+            self.assertEqual(response.status_code, 409, response.data)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.text_outline_styles["dark"]["thickness"], 5)
+
+    def test_outline_publication_respects_designer_assignment(self):
+        self.authenticate(self.other)
+        response = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/outlines/publish/",
+            {"draftVersion": 1, "liveSyncVersion": self.theme.sync_version},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403, response.data)
+
+    def test_stale_draft_can_save_outlines_without_overwriting_live_theme(self):
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+        initial = self.client.patch(
+            self.workspace_url,
+            {
+                "draftVersion": workspace["draftVersion"],
+                "description": "Preserve this draft",
+            },
+            format="json",
+        )
+        self.assertEqual(initial.status_code, 200, initial.data)
+        draft = ThemeDesignerDraft.objects.get(theme=self.theme)
+        base_version = draft.base_sync_version
+        self.theme.description = "Newer live change"
+        self.theme.save(version_created_by=self.owner)
+        live_outlines = self.theme.text_outline_styles
+        saved = self.client.patch(
+            self.workspace_url,
+            {
+                "draftVersion": initial.data["draftVersion"],
+                "textOutlineStyles": {"newOutline": {"name": "New outline", "style": "dropShadow"}},
+            },
+            format="json",
+        )
+        self.assertEqual(saved.status_code, 200, saved.data)
+        self.assertTrue(saved.data["draftIsStale"])
+        reloaded = self.client.get(self.workspace_url)
+        self.assertEqual(reloaded.data["textOutlineStyles"]["newOutline"]["name"], "New outline")
+        self.assertEqual(reloaded.data["description"], "Preserve this draft")
+        draft.refresh_from_db()
+        self.assertEqual(draft.base_sync_version, base_version)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.description, "Newer live change")
+        self.assertEqual(self.theme.text_outline_styles, live_outlines)
+        concurrent = self.client.patch(
+            self.workspace_url,
+            {
+                "draftVersion": initial.data["draftVersion"],
+                "textOutlineStyles": {},
+            },
+            format="json",
+        )
+        self.assertEqual(concurrent.status_code, 409, concurrent.data)
+        published = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/publish/",
+            {"draftVersion": saved.data["draftVersion"]},
+            format="json",
+        )
+        self.assertEqual(published.status_code, 409, published.data)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.description, "Newer live change")
+        self.assertEqual(self.theme.text_outline_styles, live_outlines)
+
+    def test_outline_defaults_seed_only_empty_themes_and_drafts(self):
+        import importlib
+        from django.apps import apps
+        from webpages.services.designer_theme import get_or_create_designer_draft
+        from webpages.text_outline_styles import default_text_outline_styles
+
+        self.assertEqual(self.theme.text_outline_styles, default_text_outline_styles())
+        self.theme.text_outline_styles = {"custom": {"name": "Keep custom", "style": "dropShadow"}}
+        self.theme.save()
+        self.other_theme.text_outline_styles = {}
+        self.other_theme.save()
+        draft = get_or_create_designer_draft(self.other_theme, self.owner)
+        baseline_version = draft.version
+        seed = importlib.import_module("webpages.migrations.0088_default_text_outline_styles").seed_empty_themes
+        editor = SimpleNamespace(connection=SimpleNamespace(alias="default"))
+        seed(apps, editor)
+        seed(apps, editor)
+        self.theme.refresh_from_db()
+        self.other_theme.refresh_from_db()
+        draft.refresh_from_db()
+        self.assertEqual(list(self.theme.text_outline_styles), ["custom"])
+        self.assertEqual(self.other_theme.text_outline_styles, default_text_outline_styles())
+        self.assertEqual(draft.snapshot["text_outline_styles"], self.other_theme.text_outline_styles)
+        self.assertEqual(draft.version, baseline_version)
+        self.assertFalse(draft.has_changes)
+
+    def test_outline_styles_follow_designer_draft_publish_and_undo(self):
+        baseline = self.theme.text_outline_styles
+        self.authenticate(self.designer)
+        workspace = self.client.get(self.workspace_url).data
+        saved = self.client.patch(
+            self.workspace_url,
+            {
+                "draftVersion": workspace["draftVersion"],
+                "textOutlineStyles": {
+                    "soft_glow": {"name": "Soft glow", "style": "gradientBlur", "colorMode": "complement", "radius": 8}
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(saved.status_code, 200, saved.data)
+        self.assertEqual(saved.data["textOutlineStyles"]["soft_glow"]["colorMode"], "complement")
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.text_outline_styles, baseline)
+        reloaded = self.client.get(self.workspace_url)
+        self.assertEqual(reloaded.data["textOutlineStyles"], saved.data["textOutlineStyles"])
+        published = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/publish/",
+            {"draftVersion": saved.data["draftVersion"]},
+            format="json",
+        )
+        self.assertEqual(published.status_code, 200, published.data)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.text_outline_styles["soft_glow"]["radius"], 8)
+        self.assertIn("--text-outline-soft_glow:", self.theme.generate_css())
+        self.assertEqual(self.theme.versions.first().snapshot["text_outline_styles"], self.theme.text_outline_styles)
+        restored = self.client.post(
+            f"/api/v1/webpages/designer/themes/{self.theme.id}/undo/",
+            {"draftVersion": published.data["draftVersion"], "liveSyncVersion": published.data["liveSyncVersion"]},
+            format="json",
+        )
+        self.assertEqual(restored.status_code, 200, restored.data)
+        self.theme.refresh_from_db()
+        self.assertEqual(self.theme.text_outline_styles, baseline)
+
     def test_undo_restores_and_consumes_latest_published_revision(self):
         self.authenticate(self.designer)
         workspace = self.client.get(self.workspace_url).data

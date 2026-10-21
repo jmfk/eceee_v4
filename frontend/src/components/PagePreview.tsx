@@ -1,3 +1,4 @@
+import { usePublishedThemeOutlines } from '../hooks/usePublishedThemeOutlines';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, RefreshCw, Monitor, Settings } from 'lucide-react';
@@ -104,9 +105,10 @@ const PagePreview: React.FC<PagePreviewProps> = ({
         return `/_render/${siteId}${path ? `/${path}` : ''}`;
     }, [webpageData]);
 
-    const effectiveTheme = pageVersionData?.effectiveTheme
+    const snapshotTheme = pageVersionData?.effectiveTheme
         || (typeof pageVersionData?.theme === 'object' ? pageVersionData.theme : null)
         || webpageData?.effectiveTheme;
+    const effectiveTheme = usePublishedThemeOutlines(snapshotTheme);
     const compiledStylesInput = useMemo(() => ({
         theme: effectiveTheme,
         page: webpageData,

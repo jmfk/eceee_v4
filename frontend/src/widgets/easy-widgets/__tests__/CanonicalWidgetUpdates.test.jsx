@@ -1,4 +1,5 @@
 import React from 'react'
+import { defaultTextOutlineStyles } from '../../../utils/textOutlineStyles'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -279,14 +280,29 @@ describe('canonical widget update ownership', () => {
         backgroundAssignments.mockRestore()
     })
 
+    it('offers only theme presets plus No outline and applies edited default styles', () => {
+        currentTheme = { textOutlineStyles: { dark: { name: 'Theme shadow', style: 'dropShadow', colorMode: 'rgb', color: '#123456', radius: 7 } } }
+        const { container } = render(<BannerWidget mode="editor" widgetId="theme-outline" slotName="main"
+            config={{ textContent: '<p>Theme outline</p>' }} onConfigChange={vi.fn()} />)
+        const select = screen.getByRole('combobox', { name: 'Text outline' })
+        expect(Array.from(select.options).map(option => [option.value, option.textContent])).toEqual([
+            ['none', 'No outline'], ['dark', 'Theme shadow'],
+        ])
+        fireEvent.change(select, { target: { value: 'dark' } })
+        expect(container.querySelector('.banner-widget').style.getPropertyValue('--banner-text-shadow')).toContain('#123456')
+        fireEvent.change(select, { target: { value: 'none' } })
+        expect(container.querySelector('.banner-widget').style.getPropertyValue('--banner-text-shadow')).toBe('none')
+    })
+
     it.each(['text', 'header'])('BannerWidget edits colors and outline inline without remounting its %s editor', async bannerMode => {
-        currentTheme = { colors: { paper: '#ffffff', ocean: '#082f49' } }
+        currentTheme = { colors: { paper: '#ffffff', ocean: '#082f49' }, textOutlineStyles: defaultTextOutlineStyles() }
         const onConfigChange = vi.fn()
         const { container } = render(<BannerWidget mode="editor" widgetId="banner-colors" slotName="main"
             config={{ bannerMode, headerContent: 'Heading', textContent: '<p>Body</p>' }} onConfigChange={onConfigChange} />)
         const editor = latestRenderer()
         const toolbar = screen.getByRole('toolbar', { name: 'Banner controls' })
-        expect(toolbar.textContent).toBe('')
+        expect(toolbar.cloneNode(true).querySelectorAll('select')).toHaveLength(1)
+        expect(Array.from(toolbar.childNodes).filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join('').trim()).toBe('')
         for (const button of toolbar.querySelectorAll('button')) {
             expect(button).toHaveAccessibleName()
             expect(button.querySelector('svg')).toBeTruthy()
@@ -296,7 +312,7 @@ describe('canonical widget update ownership', () => {
         fireEvent.click(screen.getByTitle('paper'))
         fireEvent.click(screen.getByRole('button', { name: 'Background color', exact: true }))
         fireEvent.click(screen.getByTitle('ocean'))
-        fireEvent.click(screen.getByRole('button', { name: 'Text outline: No outline' }))
+        fireEvent.change(screen.getByRole('combobox', { name: 'Text outline' }), { target: { value: 'dark' } })
 
         expect(onConfigChange).toHaveBeenLastCalledWith(expect.objectContaining({
             textColor: 'paper', backgroundColor: 'ocean', textOutline: 'dark',
@@ -305,9 +321,9 @@ describe('canonical widget update ownership', () => {
         expect(element.style.getPropertyValue('--banner-text-color')).toBe('var(--paper, paper)')
         expect(element.style.backgroundColor).toBe('var(--ocean, ocean)')
         expect(element.style.getPropertyValue('--banner-text-shadow')).toContain('#000')
-        fireEvent.click(screen.getByRole('button', { name: 'Text outline: Dark outline' }))
+        fireEvent.change(screen.getByRole('combobox', { name: 'Text outline' }), { target: { value: 'light' } })
         expect(element.style.getPropertyValue('--banner-text-shadow')).toContain('#fff')
-        fireEvent.click(screen.getByRole('button', { name: 'Text outline: Light outline' }))
+        fireEvent.change(screen.getByRole('combobox', { name: 'Text outline' }), { target: { value: 'none' } })
         expect(element.style.getPropertyValue('--banner-text-shadow')).toBe('none')
         expect(latestRenderer()).toBe(editor)
         expect(editor.destroy).not.toHaveBeenCalled()

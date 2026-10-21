@@ -23,8 +23,8 @@ print(f"Clearing CSS cache for {themes.count()} themes...")
 
 for theme in themes:
     # Clear both scoped and non-scoped cache
-    cache_key_frontend = f"theme_css_{theme.id}_frontend"
-    cache_key_backend = f"theme_css_{theme.id}"
+    cache_key_frontend = f"theme_css_v2_{theme.id}_frontend"
+    cache_key_backend = f"theme_css_v2_{theme.id}"
     
     cache.delete(cache_key_frontend)
     cache.delete(cache_key_backend)

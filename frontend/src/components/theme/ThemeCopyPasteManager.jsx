@@ -61,6 +61,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             componentStyles: themeData?.componentStyles || {},
             designerPreview: themeData?.designerPreview || {},
             imageStyles: themeData?.imageStyles || {},
+            textOutlineStyles: themeData?.textOutlineStyles || {},
             tableTemplates: themeData?.tableTemplates || {},
         };
 
@@ -117,6 +118,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
             componentStyles: themeData?.componentStyles || {},
             designerPreview: themeData?.designerPreview || {},
             imageStyles: themeData?.imageStyles || {},
+            textOutlineStyles: themeData?.textOutlineStyles || {},
             tableTemplates: themeData?.tableTemplates || {},
         };
 
@@ -194,6 +196,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
                 componentStyles: themeData?.componentStyles || {},
                 designerPreview: themeData?.designerPreview || {},
                 imageStyles: themeData?.imageStyles || {},
+            textOutlineStyles: themeData?.textOutlineStyles || {},
                 tableTemplates: themeData?.tableTemplates || {},
             };
         } else {
@@ -229,6 +232,7 @@ const ThemeCopyPasteManager = ({ themeData, currentTab, onUpdate }) => {
                 componentStyles: themeData?.componentStyles || {},
                 designerPreview: themeData?.designerPreview || {},
                 imageStyles: themeData?.imageStyles || {},
+            textOutlineStyles: themeData?.textOutlineStyles || {},
                 tableTemplates: themeData?.tableTemplates || {},
             };
         } else {

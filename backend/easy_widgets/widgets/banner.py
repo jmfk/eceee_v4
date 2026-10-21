@@ -12,16 +12,6 @@ from webpages.widget_registry import BaseWidget, register_widget_type
 
 logger = logging.getLogger(__name__)
 
-TEXT_OUTLINES = {
-    "none": "none",
-    **{
-        name: ", ".join(
-            f"{x}px {y}px 0 {color}" for x, y in ((-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1))
-        )
-        for name, color in (("dark", "#000"), ("light", "#fff"))
-    },
-}
-
 
 class BannerConfig(BaseModel):
     """Configuration for Banner widget"""
@@ -122,18 +112,13 @@ class BannerConfig(BaseModel):
         },
     )
 
-    text_outline: Literal["none", "dark", "light"] = Field(
+    text_outline: str = Field(
         "none",
         description="Text outline for contrast against the banner background",
         json_schema_extra={
-            "component": "SelectInput",
+            "component": "TextOutlineSelect",
             "group": "Styling",
             "order": 6,
-            "options": [
-                {"value": "none", "label": "None"},
-                {"value": "dark", "label": "Dark outline"},
-                {"value": "light", "label": "Light outline"},
-            ],
         },
     )
 
@@ -493,7 +478,13 @@ class BannerWidget(BaseWidget):
         style_parts.append(f"background-color: {background_color};")
         style_parts.append(f"color: {text_color};")
         style_parts.append(f"--banner-text-color: {text_color};")
-        style_parts.append(f"--banner-text-shadow: {TEXT_OUTLINES[config.get('text_outline', 'none')]};")
+        from webpages.text_outline_styles import STYLE_KEY, RESERVED_KEYS
+
+        outline = config.get("text_outline", "none")
+        shadow = "none"
+        if STYLE_KEY.fullmatch(outline) and outline not in RESERVED_KEYS:
+            shadow = f"var(--text-outline-{outline}, none)"
+        style_parts.append(f"--banner-text-shadow: {shadow};")
 
         # Join all style parts
         template_config["banner_style"] = " ".join(style_parts)

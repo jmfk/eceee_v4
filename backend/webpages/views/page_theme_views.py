@@ -25,6 +25,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.response import Response
 
+from webpages.text_outline_styles import default_text_outline_styles
 from core.models import Tenant
 from file_manager.storage import system_storage
 
@@ -46,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 THEME_CASE_OPTIONS = {
     "no_underscore_before_number": True,
-    "ignore_fields": ("designer_preview", "designerPreview", "layouts"),
+    "ignore_fields": ("designer_preview", "designerPreview", "layouts", "text_outline_styles", "textOutlineStyles"),
 }
 
 
@@ -108,6 +109,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "css_variables",
             "html_elements",
             "image_styles",
+            "text_outline_styles",
         ]
         for field in json_fields:
             if field in data and isinstance(data[field], str):
@@ -141,6 +143,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "css_variables",
             "html_elements",
             "image_styles",
+            "text_outline_styles",
         ]
         for field in json_fields:
             if field in data and isinstance(data[field], str):
@@ -1516,6 +1519,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 "designer_preview": theme.designer_preview,
                 "layouts": theme.layouts,
                 "image_styles": theme.image_styles,
+                "text_outline_styles": theme.text_outline_styles,
                 "gallery_styles": theme.gallery_styles,
                 "carousel_styles": theme.carousel_styles,
                 "table_templates": theme.table_templates,
@@ -1681,6 +1685,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                     ),
                     layouts=layouts,
                     image_styles=theme_data.get("image_styles", {}),
+                    text_outline_styles=theme_data.get("text_outline_styles", default_text_outline_styles()),
                     gallery_styles=theme_data.get("gallery_styles", {}),
                     carousel_styles=theme_data.get("carousel_styles", {}),
                     table_templates=theme_data.get("table_templates", {}),

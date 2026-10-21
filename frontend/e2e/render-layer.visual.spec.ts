@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { RENDER_WIDGET_FIXTURES } from '../src/rendering/fixtures'
+import { defaultTextOutlineStyles } from '../src/utils/textOutlineStyles'
 import { compileRenderStyles } from '../src/rendering/themeCssCompiler'
 
 const widgets = Object.values(RENDER_WIDGET_FIXTURES).map((widget, index) => ({
@@ -71,7 +72,7 @@ const expectCanonicalStyles = async (page) => {
 
 test('banner palette colors and outlines override theme typography in the render frame', async ({ page }) => {
   const theme = compileRenderStyles({ theme: {
-    colors: { paper: '#ffffff', ocean: '#082f49' },
+    colors: { paper: '#ffffff', ocean: '#082f49' }, textOutlineStyles: defaultTextOutlineStyles(),
     customCss: '.cms-content h2,.cms-content h3,.cms-content p{color:#b91c1c}',
   } })
   await openRender(page, {

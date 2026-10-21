@@ -198,6 +198,7 @@ export const buildDesignerTheme = workspace => {
 
     const theme = structuredClone(workspace.themeConfig)
     theme.colors = Object.fromEntries((workspace.colors || []).map(({ name, value }) => [name, value]))
+    theme.textOutlineStyles = structuredClone(workspace.textOutlineStyles || {})
     theme.layouts = structuredClone(workspace.layouts || theme.layouts)
 
     const fonts = theme.fonts || {}

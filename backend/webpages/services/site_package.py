@@ -26,6 +26,7 @@ from django.utils.dateparse import parse_datetime
 from django.utils.text import slugify
 
 from content.models import Namespace
+from webpages.text_outline_styles import default_text_outline_styles
 from core.models import Tenant
 from file_manager.models import MediaCollection, MediaFile, MediaTag
 from file_manager.storage import S3MediaStorage
@@ -593,6 +594,7 @@ def _serialize_theme(theme: PageTheme) -> Dict[str, Any]:
         "designer_preview": theme.designer_preview,
         "layouts": theme.layouts,
         "image_styles": theme.image_styles,
+        "text_outline_styles": theme.text_outline_styles,
         "gallery_styles": theme.gallery_styles,
         "carousel_styles": theme.carousel_styles,
         "table_templates": theme.table_templates,
@@ -769,6 +771,7 @@ def restore_theme_transfer_package(encoded_package: str, theme: PageTheme, stora
             "designer_preview",
             "layouts",
             "image_styles",
+            "text_outline_styles",
             "gallery_styles",
             "carousel_styles",
             "table_templates",
@@ -2300,6 +2303,7 @@ class SitePackageImporter:
             ),
             "layouts": layouts,
             "image_styles": data.get("image_styles", {}),
+            "text_outline_styles": data.get("text_outline_styles", default_text_outline_styles()),
             "gallery_styles": data.get("gallery_styles", {}),
             "carousel_styles": data.get("carousel_styles", {}),
             "table_templates": data.get("table_templates", {}),
@@ -2332,6 +2336,7 @@ class SitePackageImporter:
             ),
             "layouts": _with_compatibility_layouts(data.get("layouts"), layout_references),
             "image_styles": data.get("image_styles", {}),
+            "text_outline_styles": data.get("text_outline_styles", default_text_outline_styles()),
             "gallery_styles": data.get("gallery_styles", {}),
             "carousel_styles": data.get("carousel_styles", {}),
             "table_templates": data.get("table_templates", {}),
@@ -2506,6 +2511,7 @@ class SitePackageImporter:
                 "component_styles",
                 "layouts",
                 "image_styles",
+                "text_outline_styles",
                 "gallery_styles",
                 "carousel_styles",
                 "table_templates",

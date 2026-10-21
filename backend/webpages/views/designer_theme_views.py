@@ -43,6 +43,7 @@ from webpages.services.designer_theme import (
     import_designer_preview_from_site,
     import_designer_preview_source,
     publish_designer_draft,
+    publish_outline_draft,
     replace_designer_asset,
     replace_designer_preview_image,
     save_designer_draft,
@@ -72,7 +73,19 @@ from webpages.services.theme_versions import (
 )
 from webpages.tasks import export_designer_theme
 
-DESIGNER_CASE_OPTIONS = {"ignore_fields": ("colors", "values", "texts", "images", "layouts")}
+DESIGNER_CASE_OPTIONS = {
+    "ignore_fields": (
+        "colors",
+        "values",
+        "texts",
+        "images",
+        "layouts",
+        "text_outline_styles",
+        "textOutlineStyles",
+        "live_text_outline_styles",
+        "liveTextOutlineStyles",
+    )
+}
 
 
 class DesignerJSONParser(CamelCaseJSONParser):
@@ -560,6 +573,7 @@ class DesignerRemotePullView(APIView):
             "component_styles": "componentStyles",
             "designer_preview": "designerPreview",
             "image_styles": "imageStyles",
+            "text_outline_styles": "textOutlineStyles",
             "gallery_styles": "galleryStyles",
             "carousel_styles": "carouselStyles",
             "table_templates": "tableTemplates",
@@ -728,6 +742,28 @@ class DesignerThemePublishView(APIView):
                 request.tenant,
                 request.user,
                 request.data.get("draft_version"),
+            )
+        except PermissionError:
+            return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
+        except PageTheme.DoesNotExist:
+            return Response({"error": "Theme not found."}, status=status.HTTP_404_NOT_FOUND)
+        except DesignerDraftConflict as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(_draft_workspace(request, theme, draft))
+
+
+class DesignerThemeOutlinePublishView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    renderer_classes = [DesignerJSONRenderer]
+
+    def post(self, request, theme_id):
+        try:
+            theme, draft = publish_outline_draft(
+                theme_id,
+                request.tenant,
+                request.user,
+                request.data.get("draft_version"),
+                request.data.get("live_sync_version"),
             )
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)

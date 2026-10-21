@@ -39,6 +39,7 @@ export interface Theme {
   colors: Record<string, unknown>;
   css_variables: Record<string, unknown>;
   component_styles: Record<string, Record<string, unknown>>;
+  text_outline_styles?: Record<string, Record<string, unknown>>;
   image_styles: Record<string, Record<string, unknown>>;
   gallery_styles: Record<string, Record<string, unknown>>;
   carousel_styles: Record<string, Record<string, unknown>>;
