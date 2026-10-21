@@ -116,6 +116,24 @@ describe('Side-column editing acceptance regressions', () => {
         expect(onRealTimeUpdate.mock.calls.at(-1)[0].config).toEqual({ ...config, anchor: 'updated' })
     })
 
+    it.each([
+        ['ContentCardWidget', { header: 'Card title', content: '<p>Card body</p>' }],
+        ['BioWidget', { bioText: '<p>Biography</p>', caption: 'Portrait caption' }],
+        ['HeadlineWidget', { content: 'Headline' }],
+    ])('keeps %s text in WYSIWYG even with replacement styles', async (type, text) => {
+        const properties = Object.fromEntries(Object.keys(text).map(field => [field, {
+            type: 'string', component: 'HtmlSource', title: field, hidden: true,
+        }]))
+        properties.anchor = { type: 'string', component: 'TextInput', title: 'Anchor', editorPrimary: true }
+        render(<WidgetEditorPanel isOpen widgetData={{ ...widget, type: `easy_widgets.${type}`,
+            config: { ...text, anchor: 'section', componentStyle: 'custom' } }}
+            schema={{ properties }} pageVersionData={{ effectiveTheme: bannerTheme }} context={context}
+            showPublishingFields={false} />)
+        expect(await screen.findByRole('textbox', { name: 'Anchor', exact: true })).toBeVisible()
+        for (const field of Object.keys(text)) expect(screen.queryByText(field, { exact: true })).toBeNull()
+        expect(screen.queryByText('Open HTML Editor')).toBeNull()
+    })
+
     it.each(['header', 'text'])('keeps the active text field editable for a custom banner style in %s mode', async (bannerMode) => {
         const onRealTimeUpdate = vi.fn()
         const config = { bannerMode, componentStyle: 'custom', headerContent: 'Heading', textContent: 'Body' }

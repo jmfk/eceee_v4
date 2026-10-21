@@ -2,13 +2,13 @@
 Bio widget implementation.
 """
 
-from typing import Type, Optional, Literal
-from pydantic import BaseModel, Field, ConfigDict
+import logging
+from typing import Literal, Optional, Type
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from webpages.widget_registry import BaseWidget, register_widget_type
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +23,7 @@ class BioMediaItem(BaseModel):
 
     id: Optional[str] = Field(None, description="Media file ID")
     url: str = Field(..., description="Media URL")
-    altText: str = Field(
-        ..., min_length=1, description="Alternative text for accessibility"
-    )
+    altText: str = Field(..., min_length=1, description="Alternative text for accessibility")
     caption: Optional[str] = Field(None, description="Optional caption")
     title: Optional[str] = Field(None, description="Image title")
     width: Optional[int] = Field(None, description="Image width")
@@ -44,16 +42,33 @@ class BioConfig(BaseModel):
         None,
         description="MediaFile object for bio image",
         json_schema_extra={
+            "editorPrimary": True,
             "component": "ImageInput",
             "mediaTypes": ["image"],
             "order": 0,
             "group": "Content",
         },
     )
+    image_size: Literal["original", "square", "rectangle"] = Field(
+        "original",
+        description="Size/shape of the bio image",
+        json_schema_extra={
+            "component": "SegmentedControlInput",
+            "editorPrimary": True,
+            "options": [
+                {"value": "original", "label": "Original"},
+                {"value": "square", "label": "Square"},
+                {"value": "rectangle", "label": "Rectangle"},
+            ],
+            "order": 0.5,
+            "group": "Layout",
+        },
+    )
     bioText: str = Field(
         "",
         description="Biography text content (HTML)",
         json_schema_extra={
+            "hidden": True,
             "component": "HtmlSource",
             "rows": 6,
             "order": 1,
@@ -64,6 +79,7 @@ class BioConfig(BaseModel):
         "",
         description="Caption text for the bio",
         json_schema_extra={
+            "hidden": True,
             "component": "TextInput",
             "placeholder": "Enter caption text",
             "order": 2,
@@ -155,69 +171,79 @@ class BioWidget(BaseWidget):
         height: auto;
         margin-bottom: 30px;
     }
-    
+
     .bio-widget__container {
         width: 100%;
     }
-    
+
     /* Column layout - side by side */
     .bio-widget--column .bio-widget__container {
         display: flex;
         gap: 30px;
         align-items: flex-start;
     }
-    
+
     .bio-widget--column .bio-widget__image {
         flex: 0 0 33.33%;
         max-width: 33.33%;
     }
-    
+
     .bio-widget--column .bio-widget__text {
         flex: 1;
         min-width: 0;
     }
-    
+
     /* Flow layout - text wraps around image */
     .bio-widget--flow .bio-widget__container {
         display: block;
     }
-    
+
     .bio-widget--flow .bio-widget__image {
         float: left;
         width: 33.33%;
         max-width: 400px;
         margin: 0 30px 30px 0;
     }
-    
+
     .bio-widget--flow .bio-widget__text {
         display: block;
     }
-    
+
     /* Clear float after flow layout */
     .bio-widget--flow .bio-widget__container::after {
         content: "";
         display: table;
         clear: both;
     }
-    
+
     /* Image styling */
+    .bio-widget--image-square .bio-widget__image img {
+        aspect-ratio: 1;
+        height: 100%;
+        object-fit: cover;
+    }
+    .bio-widget--image-rectangle .bio-widget__image img {
+        aspect-ratio: 2 / 1;
+        height: 100%;
+        object-fit: cover;
+    }
     .bio-widget__image img {
         width: 100%;
         height: auto;
-    }   
-   
+    }
+
     /* Responsive - stack on mobile */
     @media (max-width: 768px) {
         .bio-widget--column .bio-widget__container {
             flex-direction: column;
         }
-        
+
         .bio-widget--column .bio-widget__image {
             flex: 0 0 auto;
             max-width: 100%;
             margin-bottom: 40px;
         }
-        
+
         .bio-widget--flow .bio-widget__image {
             float: none;
             width: 100%;
@@ -238,25 +264,20 @@ class BioWidget(BaseWidget):
         Prepare template context with processed media and text.
         """
         from webpages.services.link_resolver import resolve_links_in_html
-        
+
         template_config = super().prepare_template_context(config, context)
         context = context if context else {}
 
         # Resolve links in bio text
         bio_text = config.get("bio_text", config.get("bioText", ""))
         if bio_text:
-            template_config["bio_text"] = resolve_links_in_html(
-                bio_text, 
-                context.get("request")
-            )
+            template_config["bio_text"] = resolve_links_in_html(bio_text, context.get("request"))
         else:
             template_config["bio_text"] = ""
 
         # Get snake_case fields for template
         template_config["text_layout"] = config.get("text_layout", "column")
-        template_config["use_content_margins"] = config.get(
-            "use_content_margins", False
-        )
+        template_config["use_content_margins"] = config.get("use_content_margins", False)
 
         # Handle image (now a dict MediaFile object)
         image = config.get("image")
@@ -267,6 +288,8 @@ class BioWidget(BaseWidget):
         else:
             template_config["image_url"] = None
         template_config["image"] = image
+
+        template_config["image_size"] = config.get("imageSize", config.get("image_size", "original"))
 
         # Add caption
         template_config["caption"] = config.get("caption", "")

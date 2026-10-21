@@ -1,5 +1,5 @@
 import React from 'react'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let externalChangeCallbacks = []
@@ -30,6 +30,14 @@ vi.mock('../../../utils/imgproxySecure', () => ({
 
 vi.mock('../../../api/media', () => ({
     mediaCollectionsApi,
+}))
+
+vi.mock('../../../components/media/MediaSelectModal', () => ({
+    default: ({ onSelect, onClose }) => <div role="dialog">
+        <button onClick={() => onSelect([{ id: 'new', url: '/new.jpg', title: 'New image' }])}>Choose image</button>
+        <button onClick={() => onSelect(null)}>Remove image</button>
+        <button onClick={onClose}>Close</button>
+    </div>
 }))
 
 import ImageWidget from '../ImageWidget'
@@ -252,5 +260,41 @@ describe('ImageWidget', () => {
             'src',
             '/imgproxy/resize:fit//partner-logo.png'
         )
+    })
+})
+
+
+describe('ImageWidget inline selection', () => {
+    beforeEach(() => {
+        vi.useRealTimers()
+        vi.clearAllMocks()
+        imgproxyApi.getUrl.mockImplementation(url => Promise.resolve(url))
+    })
+
+    it('offers image selection from the empty placeholder without a size control', async () => {
+        const onConfigChange = vi.fn()
+        render(<ImageWidget mode="editor" config={{}} onConfigChange={onConfigChange} />)
+        expect(screen.getByRole('img', { name: 'No image selected' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /Image size/ })).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Image' }))
+        fireEvent.click(screen.getByText('Choose image'))
+        expect(await screen.findByRole('img', { name: 'New image' })).toHaveAttribute('src', '/new.jpg')
+        expect(onConfigChange).toHaveBeenCalledTimes(1)
+        expect(onConfigChange.mock.calls[0][0].image.id).toBe('new')
+    })
+
+    it('clears cached sources when removing an image', async () => {
+        const onConfigChange = vi.fn()
+        render(<ImageWidget mode="editor" config={{ image: { url: '/old.jpg' }, mediaItems: [{ url: '/stale.jpg' }], imageUrl: '/cached.jpg' }} onConfigChange={onConfigChange} />)
+        fireEvent.click(screen.getByRole('button', { name: 'Image' }))
+        fireEvent.click(screen.getByText('Remove image'))
+        expect(await screen.findByRole('img', { name: 'No image selected' })).toBeInTheDocument()
+        expect(onConfigChange).toHaveBeenCalledWith({ image: null })
+    })
+
+    it('does not publish the editor placeholder or controls', () => {
+        render(<ImageWidget mode="preview" config={{}} />)
+        expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
+        expect(screen.queryByRole('img', { name: 'No image selected' })).not.toBeInTheDocument()
     })
 })

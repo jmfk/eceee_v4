@@ -13,6 +13,8 @@ import { useEditorContext } from '../../contexts/unified-data/hooks'
 import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 import OptimizedImage from '../../components/media/OptimizedImage'
 import MediaSelectModal from '../../components/media/MediaSelectModal'
+import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
+import WidgetEditorControls, { WidgetEditorButton, ImageSizeButton } from './WidgetEditorControls'
 
 /**
  * Vanilla JS Editor Wrapper Component for Bio Text
@@ -114,6 +116,20 @@ const BioTextEditor = memo(({ content, contentUpdateSource = 'external', onChang
     return <div ref={containerRef} className="bio-widget__text" />
 })
 
+const BioCaptionEditor = ({ content, onChange }) => {
+    const container = useRef(null)
+    const renderer = useRef(null)
+    useEffect(() => {
+        renderer.current = new SimpleTextEditorRenderer(container.current, {
+            content, onChange, mode: 'inline-plain', element: 'p', placeholder: 'Add a caption...',
+        })
+        renderer.current.render()
+        return () => { renderer.current.destroy(); renderer.current = null }
+    }, [])
+    useEffect(() => { renderer.current?.updateConfig({ content, onChange }) }, [content, onChange])
+    return <div ref={container} className="bio-widget__caption" />
+}
+
 /**
  * Bio Widget Component
  * Renders image and biography text with inline WYSIWYG editing
@@ -150,7 +166,6 @@ const BioWidget = memo(({
 
     // State for image edit modal
     const [showImageModal, setShowImageModal] = useState(false)
-    const [editingField, setEditingField] = useState(null)
 
     const syncIncomingConfig = useCallback((nextConfig) => {
         const nextBioText = nextConfig?.bioText
@@ -232,6 +247,9 @@ const BioWidget = memo(({
         onConfigChange?.(updatedConfig)
     }, [onConfigChange])
 
+    const imageSize = configRef.current.imageSize || 'original'
+    const imageStyle = imageSize === 'original' ? undefined : { aspectRatio: imageSize === 'rectangle' ? '2 / 1' : '1' }
+    const imageClass = imageSize === 'original' ? 'w-full h-auto' : 'w-full object-cover'
     const image = configRef.current.image
     const bioText = configRef.current.bioText || ''
     const textLayout = configRef.current.textLayout || 'column'
@@ -240,37 +258,35 @@ const BioWidget = memo(({
 
     if (mode === 'editor') {
         return (
+            <WidgetEditorControls mode={mode} label="Bio" controls={<>
+                <WidgetEditorButton title="Edit bio image" onClick={() => setShowImageModal(true)}><ImagePlus className="h-4 w-4" />Image</WidgetEditorButton>
+                <ImageSizeButton value={imageSize} allowOriginal onChange={value => handleImageChange('imageSize', value)} />
+            </>} picker={showImageModal && <MediaSelectModal isOpen onClose={() => setShowImageModal(false)}
+                onSelect={selected => {
+                    if (selected === null) handleImageChange('image', null)
+                    else if (selected?.length) handleImageChange('image', selected[0])
+                    setShowImageModal(false)
+                }} mediaTypes={['image']} allowCollections={false} currentSelection={image}
+                namespace={namespace || context?.namespace} pageId={context?.pageId} customTitle="Edit Bio Image" />}>
             <div
-                className={`bio-widget bio-widget--${textLayout} relative group`}
+                className={`bio-widget bio-widget--${textLayout} bio-widget--image-${imageSize}`}
                 {...(anchor && { id: anchor })}
             >
                 <div className="bio-widget__container">
                     {image && (image.url || image.imgproxyBaseUrl || image.fileUrl) && (
                         <div className="bio-widget__image relative group/image">
-                            {/* Image edit icon */}
-                            <button
-                                onClick={() => {
-                                    setEditingField('image')
-                                    setShowImageModal(true)
-                                }}
-                                className="eceee-editor-ui absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-lg shadow-lg opacity-0 group-hover/image:opacity-100 transition-opacity z-10"
-                                title="Edit bio image"
-                            >
-                                <ImagePlus className="w-5 h-5 text-gray-700" />
-                            </button>
                             <OptimizedImage
                                 src={image.imgproxyBaseUrl || image.fileUrl || image.url}
                                 alt={image.altText || image.alt || ''}
                                 responsive={true}
                                 slotDimensions={slotConfig?.dimensions}
                                 widthMultiplier={textLayout === 'row' ? 0.5 : 1.0}
-                                resizeType="fit"
+                                resizeType={imageSize === 'original' ? 'fit' : 'fill'}
                                 loading="lazy"
-                                className="w-full h-auto"
+                                className={imageClass}
+                                style={imageStyle}
                             />
-                            {caption && (
-                                <div className="bio-widget__caption"><p>{caption}</p></div>
-                            )}
+                            <BioCaptionEditor content={caption} onChange={value => handleImageChange('caption', value)} />
                         </div>
                     )}
                     <BioTextEditor
@@ -284,39 +300,15 @@ const BioWidget = memo(({
                         siteRootId={context?.siteRootId}
                     />
                 </div>
-                {/* Media Insert Modal */}
-                {showImageModal && (
-                    <MediaSelectModal
-                        isOpen={showImageModal}
-                        onClose={() => {
-                            setShowImageModal(false)
-                            setEditingField(null)
-                        }}
-                        onSelect={(selectedItems) => {
-                            if (selectedItems === null) {
-                                // Handle remove - set to null
-                                handleImageChange(editingField, null)
-                            } else if (selectedItems && selectedItems.length > 0) {
-                                handleImageChange(editingField, selectedItems[0])
-                            }
-                            setShowImageModal(false)
-                            setEditingField(null)
-                        }}
-                        mediaTypes={['image']}
-                        allowCollections={false}
-                        currentSelection={image}
-                        namespace={namespace || context?.namespace}
-                        pageId={context?.pageId}
-                        customTitle="Edit Bio Image"
-                    />
-                )}
+
             </div>
+            </WidgetEditorControls>
         )
     }
 
     return (
         <div
-            className={`bio-widget bio-widget--${textLayout}`}
+            className={`bio-widget bio-widget--${textLayout} bio-widget--image-${imageSize}`}
             {...(anchor && { id: anchor })}
         >
             <div className="bio-widget__container">
@@ -328,9 +320,10 @@ const BioWidget = memo(({
                             responsive={true}
                             slotDimensions={slotConfig?.dimensions}
                             widthMultiplier={textLayout === 'row' ? 0.5 : 1.0}
-                            resizeType="fit"
+                            resizeType={imageSize === 'original' ? 'fit' : 'fill'}
                             loading="lazy"
-                            className="w-full h-auto"
+                            className={imageClass}
+                                style={imageStyle}
                         />
                         {caption && (
                             <div className="bio-widget__caption">{caption}</div>
@@ -346,8 +339,9 @@ const BioWidget = memo(({
 }, (prevProps, nextProps) => {
     return (
         prevProps.config?.bioText === nextProps.config?.bioText &&
-        prevProps.config?.image?.url === nextProps.config?.image?.url &&
+        prevProps.config?.image === nextProps.config?.image &&
         prevProps.config?.textLayout === nextProps.config?.textLayout &&
+        prevProps.config?.imageSize === nextProps.config?.imageSize &&
         prevProps.config?.caption === nextProps.config?.caption &&
         prevProps.config?.anchor === nextProps.config?.anchor &&
         prevProps.mode === nextProps.mode &&
@@ -370,6 +364,7 @@ BioWidget.defaultConfig = {
     image: null,
     bioText: '<p>Enter biography text here. You can use the toolbar to format your text.</p>',
     caption: '',
+    imageSize: 'original',
     textLayout: 'column'
 }
 

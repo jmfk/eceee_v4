@@ -25,6 +25,7 @@ class ContentCardConfig(BaseModel):
         "",
         description="Header text (supports line breaks)",
         json_schema_extra={
+            "hidden": True,
             "component": "TextareaInput",
             "placeholder": "Enter header text...",
             "rows": 2,
@@ -36,6 +37,7 @@ class ContentCardConfig(BaseModel):
         "",
         description="Rich text content for the text block",
         json_schema_extra={
+            "hidden": True,
             "component": "RichTextInput",
             "rows": 6,
             "order": 2,
@@ -46,6 +48,7 @@ class ContentCardConfig(BaseModel):
         "square",
         description="Size/shape of the image",
         json_schema_extra={
+            "editorPrimary": True,
             "component": "ImageSizeSelector",
             "order": 3,
             "group": "Layout",
@@ -55,6 +58,7 @@ class ContentCardConfig(BaseModel):
         None,
         description="MediaFile object for image",
         json_schema_extra={
+            "editorPrimary": True,
             "component": "ImageInput",
             "mediaTypes": ["image"],
             "order": 4,
@@ -309,7 +313,7 @@ class ContentCardWidget(BaseWidget):
         template_config = config.copy() if config else {}
 
         # Ensure snake_case fields for template
-        template_config["image_size"] = config.get("image_size", "square")
+        template_config["image_size"] = config.get("imageSize", config.get("image_size", "square"))
         template_config["component_style"] = config.get("component_style", "default")
         template_config["show_border"] = config.get("show_border", True)
 

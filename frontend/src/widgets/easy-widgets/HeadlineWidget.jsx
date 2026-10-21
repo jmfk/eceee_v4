@@ -7,6 +7,7 @@ import { lookupWidget, hasWidgetContentChanged } from '../../utils/widgetUtils'
 import { renderMustache, prepareComponentContext } from '../../utils/mustacheRenderer'
 import ComponentStyleRenderer from '../../components/ComponentStyleRenderer'
 import { SimpleTextEditorRenderer } from './SimpleTextEditorRenderer'
+import WidgetEditorControls, { WidgetEditorButton } from './WidgetEditorControls'
 
 /**
  * EASY Headline Widget Component
@@ -77,6 +78,28 @@ const HeadlineWidget = ({
     const contentEditorRef = useRef(null)
     const contentContainerRef = useRef(null)
 
+    const [editingStyledText, setEditingStyledText] = useState(false)
+    const componentStyle = configRef.current.componentStyle || 'default'
+    const style = currentTheme?.componentStyles?.[componentStyle]
+    const usesCustomMarkup = componentStyle !== 'default' && Boolean(style) && style.template?.trim() !== '{{passthru}}'
+    const canEditInline = !usesCustomMarkup || editingStyledText
+    useEffect(() => { setEditingStyledText(false) }, [componentStyle])
+    useEffect(() => {
+        if (hasWidgetContentChanged(configRef.current, config)) {
+            setConfig(config)
+            forceRerender({})
+        }
+    }, [config])
+
+    function renderWithEditorControls(content) {
+        if (!usesCustomMarkup) return content
+        return <WidgetEditorControls mode={mode} label="Headline" controls={
+            <WidgetEditorButton onClick={() => setEditingStyledText(value => !value)}>
+                <Type className="h-4 w-4" />{editingStyledText ? 'Preview style' : 'Edit text'}
+            </WidgetEditorButton>
+        }>{content}</WidgetEditorControls>
+    }
+
     // Initialize from UDC state on mount
     useEffect(() => {
         if (!widgetId || !slotName) {
@@ -139,7 +162,7 @@ const HeadlineWidget = ({
 
     // Initialize editor in editor mode
     useEffect(() => {
-        if (mode === 'editor') {
+        if (mode === 'editor' && canEditInline) {
             if (contentContainerRef.current && !contentEditorRef.current) {
                 // Use SimpleTextEditorRenderer with inline-rich mode (same as Banner header mode)
                 contentEditorRef.current = new SimpleTextEditorRenderer(contentContainerRef.current, {
@@ -163,7 +186,7 @@ const HeadlineWidget = ({
                 contentEditorRef.current = null
             }
         }
-    }, [mode])
+    }, [mode, componentStyle, canEditInline])
 
     // Separate effect for onChange, pageId, and siteRootId updates
     useEffect(() => {
@@ -190,10 +213,9 @@ const HeadlineWidget = ({
     }, [configRef.current.content, configRef.current.headerLevel, mode])
 
     // Check if using component style with Mustache template
-    const componentStyle = configRef.current.componentStyle || 'default'
     const useCustomStyle = componentStyle && componentStyle !== 'default' && currentTheme?.componentStyles
 
-    if (useCustomStyle) {
+    if (useCustomStyle && !(mode === 'editor' && editingStyledText)) {
         const style = currentTheme.componentStyles[componentStyle]
 
         if (style) {
@@ -213,7 +235,7 @@ const HeadlineWidget = ({
                     // Use ComponentStyleRenderer for consistent scoped rendering
                     const styleId = `headline-${widgetId || 'preview'}-${componentStyle}`
 
-                    return (
+                    return renderWithEditorControls(
                         <ComponentStyleRenderer
                             template={style.template}
                             context={mustacheContext}
@@ -227,7 +249,7 @@ const HeadlineWidget = ({
                 // Passthru mode: render default with custom CSS
                 const styleId = `headline-${widgetId || 'preview'}-${componentStyle}`
 
-                return (
+                return renderWithEditorControls(
                     <div data-style-id={styleId}>
                         {style.css && <style>{`[data-style-id="${styleId}"] { ${style.css} }`}</style>}
                         {renderDefaultHeadline()}
@@ -235,7 +257,7 @@ const HeadlineWidget = ({
                 )
             } catch (error) {
                 console.error('Error rendering custom component style:', error)
-                return (
+                return renderWithEditorControls(
                     <div>
                         <div className="text-red-500 text-sm p-2">Error rendering custom style</div>
                     </div>
@@ -279,7 +301,7 @@ const HeadlineWidget = ({
     const hasContent = configRef.current.content
 
     if (mode === 'editor') {
-        return renderDefaultHeadline()
+        return renderWithEditorControls(renderDefaultHeadline())
     }
 
     // Preview mode

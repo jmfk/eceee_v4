@@ -133,8 +133,9 @@ const BioRender: WidgetRenderComponent = ({ widget }) => {
     const image = value(config, 'image')
     const caption = value(config, 'caption')
     const textLayout = value(config, 'textLayout', 'text_layout') || 'column'
+    const imageSize = value(config, 'imageSize', 'image_size') || 'original'
     return <div
-        className={`bio-widget bio-widget--${textLayout}`}
+        className={`bio-widget bio-widget--${textLayout} bio-widget--image-${imageSize}`}
         id={value(config, 'anchor') || undefined}
     >
         <div className="bio-widget__container">
