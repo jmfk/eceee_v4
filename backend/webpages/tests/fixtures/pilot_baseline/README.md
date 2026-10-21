@@ -4,7 +4,7 @@ This is the executable first step of the Django retirement investigation. It fre
 
 ## Scope and provenance
 
-- Reference product source: `9da0eb18451db16f5b8406f1c0c6c5a4f108483d`.
+- Reference product source: `e80248dc4588ef90bcb6c7ef5b2d84759de9d16a`.
 - `cases.json`: 51 portable DRF requests, explicit semantic expectations, four populated widgets with nested child identities, the expected database representation and a known reference issue.
 - `reference.json`: reviewed frozen responses for those requests plus the full render catalog's sorted identities and canonical SHA-256. Its runtime metadata records the Python/Django/Pydantic versions used to freeze it.
 - Code widget types: Headline, Banner, TwoColumns and Forms. Theme-authored widgets and other CMS domains remain outside this first baseline.
@@ -12,6 +12,8 @@ This is the executable first step of the Django retirement investigation. It fre
 Wire JSON uses the observed `camelCase` contract; `storedWidgets` explicitly describes the observed `snake_case` configuration stored by the page API. Tests check both rather than mechanically normalizing the comparison. List ordering and nested widget IDs are significant.
 
 Comparison ignores only the Pydantic 2 minor version in `body.rawErrors[].url` documentation links (`https://errors.pydantic.dev/2.<minor>/v/<error_type>`). CI installs a newer compatible Pydantic than the original capture; this documentation version is not widget functionality. The raw reference/captures remain unchanged, and URL presence, domain, major version, error type/path, message, input, context and every other field remain strict. The backend assertion and standalone comparator share this rule.
+
+The initial capture used `9da0eb18451db16f5b8406f1c0c6c5a4f108483d`. Before merge, reviewed changes already on main introduced theme-owned outline names (PRD-0027 / ADR-0036). The reference was deliberately recaptured at `e80248dc4588ef90bcb6c7ef5b2d84759de9d16a`: Banner's `textOutline` schema/UI now uses a string and `TextOutlineSelect` instead of a fixed enum/options, and a custom name is valid and retained (`banner-custom-outline`, previously `banner-invalid`). All other observations and the manifest digest are unchanged apart from diagnostic Pydantic URL versions. Null/invalid-type coverage remains. This is an explicit baseline revision for an accepted product change, not automatic snapshot regeneration.
 
 Known reference issue: the metadata validation endpoint parses `headerLevel` as `header_level`, while `HeadlineConfig` names its field `headerLevel`. It silently returns the default `h1` for a nondefault requested value. The fixture characterizes this defect and the report names it; it does not approve copying the defect into a replacement. Fixing it requires a separate reviewed product change and explicit baseline diff. Invalid widget configurations currently return HTTP 200 with `isValid: false`; that existing API convention is also captured.
 

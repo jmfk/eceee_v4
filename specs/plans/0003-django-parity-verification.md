@@ -4,7 +4,7 @@ title: Verifiera bibehållen funktion vid avveckling av Django
 status: baseline-established
 date: 2026-10-21
 related_prds:
-  - PRD-0027
+  - PRD-0028
 ---
 
 # PLAN-0003: Verifiera bibehållen funktion vid avveckling av Django
@@ -23,7 +23,7 @@ Detta preciserar ägarens krav från 2026-10-21 på att kunna testa och verifier
 4. Skapa ett gemensamt testfallformat för indata och förväntat utfall, med små adaptrar för referens och kandidat. De adapteroberoende scenarierna ska kunna köras mot båda implementationerna. Undvik ett nytt generiskt testplattformssystem.
 5. Visa en första rapport från referenskörningen, inklusive vilka jämförelser som ännu saknar en kandidat. **Referens godkänd** är inte samma status som **ersättare verifierad**.
 
-Först därefter flyttas katalogen och pilotens schemaimplementation enligt PRD-0027. Den större API-porten följer samma metod.
+Först därefter flyttas katalogen och pilotens schemaimplementation enligt PRD-0028. Den större API-porten följer samma metod.
 
 ## Vilka jämförelser som krävs
 
@@ -109,7 +109,7 @@ Detta ger konkreta bevis för bevarat beteende inom kartlagt scope. Det gör int
 
 ## Genomförd pilotbaslinje, 2026-10-21
 
-Baslinjen är nu implementerad i separat worktree `django-pilot-baseline`, på branch `codex/django-pilot-baseline`. [Körinstruktioner och avgränsningar](../../backend/webpages/tests/fixtures/pilot_baseline/README.md) och [ADR-0036](../adrs/active/0036-frozen-pilot-behavior-baseline.md) beskriver den faktiska lösningen. Ingen widget-/API-implementation har flyttats.
+Baslinjen är nu implementerad i separat worktree `django-pilot-baseline`, på branch `codex/django-pilot-baseline`. [Körinstruktioner och avgränsningar](../../backend/webpages/tests/fixtures/pilot_baseline/README.md) och [ADR-0039](../adrs/active/0039-frozen-pilot-behavior-baseline.md) beskriver den faktiska lösningen. Ingen widget-/API-implementation har flyttats.
 
 | Kontroll | Lokalt resultat |
 | --- | --- |
@@ -123,6 +123,8 @@ Baslinjen är nu implementerad i separat worktree `django-pilot-baseline`, på b
 Samlad körning: `python3 scripts/pilot_baseline.py run --output /tmp/eceee-pilot-baseline-verified`. Rapporten anger `passed_with_known_reference_issues` och `candidateParity: not_supplied`. Körningen gjordes före implementationscommit; dess rapport visar dåvarande föräldra-HEAD och en smutsig arbetskatalog. Containers läste en separat källkodssnapshot under hela körningen.
 
 Runtime: Python 3.11.17, Django 4.2.30, Pydantic 2.13.5, PostgreSQL 17.11, Node 24.15.0, React 19.1.0, Vitest 3.2.7 och Playwright 1.60.0. Referensproduktkoden är `9da0eb18451db16f5b8406f1c0c6c5a4f108483d` och oförändrad i denna batch.
+
+Inför merge uppdaterades baslinjen uttryckligen till `e80248dc4588ef90bcb6c7ef5b2d84759de9d16a`, eftersom mergad main nu accepterar temadefinierade Banner-outline-namn. Fixture-README redovisar de granskade schema-/UI-/valideringsskillnaderna. Pilotens dokumentnummer blev PRD-0028 / ADR-0039 för att undvika kollision med mains temabeslut. De historiska körresultaten ovan gäller den första referensen.
 
 En befintlig avvikelse är synlig: Headline-valideringsendpointen tappar `headerLevel` genom snake/camel-gränsen och återgår till `h1`. Den är ett känt referensfel, inte ett godkänt beteende för nästa implementation. Sidornas sparade konfiguration och svarscasing testas separat; den nuvarande read-serializerns `activeVariants`-berikning av toppwidgets är en explicit förväntning.
 

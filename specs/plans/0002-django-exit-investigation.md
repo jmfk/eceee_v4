@@ -5,7 +5,7 @@ status: investigated
 date: 2026-10-21
 source_commit: 9da0eb18451db16f5b8406f1c0c6c5a4f108483d
 related_prds:
-  - PRD-0027
+  - PRD-0028
 ---
 
 # PLAN-0002: Utredning om att avveckla Django
@@ -18,7 +18,7 @@ Avveckla Django områdesvis och behåll PostgreSQL, lagrade ID:n, innehåll och 
 
 **Bibehållen funktionalitet är ett villkor för avveckling.** [PLAN-0003](0003-django-parity-verification.md) anger funktionsmatris, jämförelse av gammal/ny implementation och kraven för att koppla bort en Django-del. Gröna tester för ett urval ger inte tillstånd att ta bort funktioner som ännu inte har kartlagts och verifierats.
 
-Detta är en utredning och ett implementeringsförslag. Inget nytt backendramverk, databasformat eller ersättande ADR är antaget. [PRD-0027](../prds/0027-framework-independent-content-contract.md) är ett redigerbart utkast för den första batchen.
+Detta är en utredning och ett implementeringsförslag. Inget nytt backendramverk, databasformat eller ersättande ADR är antaget. [PRD-0028](../prds/0028-framework-independent-content-contract.md) är ett redigerbart utkast för den första batchen.
 
 ## Underlag och avgränsning
 
@@ -128,7 +128,7 @@ Inför inte samtidigt ett nytt generiskt dokumentlager, event sourcing, CRDT, ny
 | Etapp | Leverans och ägarskap | Kontroll före nästa steg |
 | --- | --- | --- |
 | 0. Verifieringsbaslinje | Funktionsmatris, syntetiska fixtures, känd referensversion och körbara kontrakts-/scenariotester för första delen. | Dokumenterad referenskörning, synliga täckningsluckor och jämförelseformat innan kodflytten börjar. Utökas inför varje senare etapp. |
-| 1. Gemensamma kontrakt | Fristående renderkatalog och schemapilot enligt PRD-0027. Django äger fortfarande produktskrivningar och schema. | Node kan regenerera hela manifestet; pilotens normalisering, validering och rendering matchar. |
+| 1. Gemensamma kontrakt | Fristående renderkatalog och schemapilot enligt PRD-0028. Django äger fortfarande produktskrivningar och schema. | Node kan regenerera hela manifestet; pilotens normalisering, validering och rendering matchar. |
 | 2. Isolerat sidprov | Ny CMS-domän/API med verklig identitet, tenantkontroll och läsa/spara/publicera. Endast syntetisk separat databas. | Fullt provflöde fungerar med Django stoppat; negativ tenant- och konflikttestning på PostgreSQL. |
 | 3. Komplett sidägande | Flytta hela sidaggregatet, inklusive scheman, restore, struktur, publiceringsjobb och post-commit-notifiering. | En enda skrivägare för dessa operationer; in-flight requests/jobb dräneras vid byte. Ingen Django-worker får skriva vidare bakom API:t. |
 | 4. Teman, objekt och media | Flytta sammanhängande områden med befintliga relationer, versioner och behörigheter. | Både mänskliga klienter, maskinklienter och framtida agentverktyg använder samma domänoperationer. |
@@ -169,10 +169,10 @@ Ingen tillförlitlig totaltidsuppskattning kan göras från antal filer. Använd
 ## Lokal verifiering och handoff
 
 - Batchmål: evidensbaserad avvecklingsordning och ett genomförbart nästa steg.
-- Ändringar: denna utredning, PRD-0027 och respektive index. Ingen runtimekod, databas, miljökonfiguration eller deploy har ändrats.
+- Ändringar: denna utredning, PRD-0028 och respektive index. Ingen runtimekod, databas, miljökonfiguration eller deploy har ändrats.
 - Statisk inventering genomförd mot den angivna bascommiten.
 - Dokumentverifiering: `git diff --check`, specs-validatorn och kontroll av lokala Markdown-länkar.
 - Applikationstester har inte körts: inga applikationsändringar har gjorts. Befintliga testfiler har lästs som kontraktsunderlag; det räknas inte som ett nytt godkänt testresultat.
 - Ingen push, PR, CI-körning eller produktionsoperation ingår. Worktree och utkast behålls för fortsatt arbete.
-- 2026-10-21: Ägarens krav på verifierat bibehållen funktion har preciserats i PLAN-0003 och PRD-0027. Testkällor har kartlagts; körbar baslinje och kandidatjämförelse återstår. Detta är inte ett godkänt applikationstestresultat.
+- 2026-10-21: Ägarens krav på verifierat bibehållen funktion har preciserats i PLAN-0003 och PRD-0028. Testkällor har kartlagts; körbar baslinje och kandidatjämförelse återstår. Detta är inte ett godkänt applikationstestresultat.
 - 2026-10-21: Pilotens första körbara referensbaslinje är därefter implementerad och lokalt verifierad i separat worktree `django-pilot-baseline`, branch `codex/django-pilot-baseline`. Se [PLAN-0003:s körresultat](0003-django-parity-verification.md#genomförd-pilotbaslinje-2026-10-21). Någon Django-fri ersättare har ännu inte verifierats.
