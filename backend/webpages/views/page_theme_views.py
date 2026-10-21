@@ -124,7 +124,10 @@ class PageThemeViewSet(viewsets.ModelViewSet):
         # Create serializer with processed data
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
+        try:
+            self.perform_create(serializer)
+        except ValidationError as exc:
+            return Response({"widgets": exc.messages}, status=status.HTTP_400_BAD_REQUEST)
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
@@ -164,7 +167,10 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             instance = self._get_object_for_update()
             serializer = self.get_serializer(instance, data=data, partial=partial)
             serializer.is_valid(raise_exception=True)
-            self.perform_update(serializer)
+            try:
+                self.perform_update(serializer)
+            except ValidationError as exc:
+                return Response({"widgets": exc.messages}, status=status.HTTP_400_BAD_REQUEST)
 
             if getattr(instance, "_prefetched_objects_cache", None):
                 # If 'prefetch_related' has been applied to a queryset, we need to
@@ -174,6 +180,14 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             response_data = serializer.data
 
         return Response(response_data)
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import ValidationError as APIValidationError
+
+        try:
+            instance.delete()
+        except ValidationError as exc:
+            raise APIValidationError({"widgets": exc.messages}) from exc
 
     def perform_create(self, serializer):
         tenant = getattr(self.request, "tenant", None)
@@ -397,11 +411,16 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Clear any existing default themes and set this one
-        self.get_queryset().filter(is_default=True).update(is_default=False)
-        theme.is_default = True
-        theme.save(update_fields=["is_default", "updated_at"])
-        theme.refresh_from_db()
+        try:
+            with transaction.atomic():
+                Tenant.objects.select_for_update().get(pk=theme.tenant_id)
+                theme = self._get_object_for_update()
+                theme.is_default = True
+                # Model validation must see the previous default before it is cleared.
+                theme.save(update_fields=["is_default", "updated_at"])
+                theme.refresh_from_db()
+        except ValidationError as exc:
+            return Response({"widgets": exc.messages}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = PageThemeSerializer(theme)
         return Response(
@@ -414,7 +433,20 @@ class PageThemeViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"])
     def clear_default(self, request):
         """Clear the default theme setting"""
-        self.get_queryset().filter(is_default=True).update(is_default=False)
+        from webpages.theme_widgets import validate_default_theme_change
+
+        try:
+            with transaction.atomic():
+                tenant = getattr(request, "tenant", None)
+                if tenant is None or not tenant.user_has_access(request.user):
+                    return Response({"error": "Tenant access required"}, status=status.HTTP_403_FORBIDDEN)
+                Tenant.objects.select_for_update().get(pk=tenant.pk)
+                current = self.get_queryset().filter(is_default=True).first()
+                if current:
+                    validate_default_theme_change(None, previous_theme=current)
+                self.get_queryset().filter(is_default=True).update(is_default=False)
+        except ValidationError as exc:
+            return Response({"widgets": exc.messages}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"message": "Default theme cleared"})
 
     @action(detail=False, methods=["post"])

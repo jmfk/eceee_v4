@@ -7,7 +7,7 @@ Version control system for pages. Stores complete page state snapshots.
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 
@@ -216,8 +216,13 @@ class PageVersion(models.Model):
                 f"Create or update a working copy instead. Changed fields: {', '.join(changed_fields)}"
             )
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
         """Protect published snapshots and update their media references."""
+        from core.models import Tenant
+
+        # Theme publication/switches must not race a new pinned widget reference.
+        Tenant.objects.select_for_update().get(pk=self.page.tenant_id)
         update_fields = kwargs.get("update_fields")
         if update_fields and "layout_key" in update_fields and "code_layout" not in update_fields:
             self.code_layout = self.layout_key

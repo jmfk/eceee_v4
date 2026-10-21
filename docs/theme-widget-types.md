@@ -28,11 +28,11 @@ Use a rich-text field for `biography`. HTML is sanitized after substitution, inc
 
 ## Use and upgrade
 
-Published active types appear in widget selection on pages and objects, subject to the existing slot restrictions. Pages use their effective theme; objects use the tenant's default theme. Templates and definitions must be present in the theme used for public rendering as well.
+Published active types appear in widget selection on pages and objects, subject to the existing slot restrictions. Pages use their effective theme; objects use the tenant's default theme. Embedded object widgets carry definitions from the tenant default theme even when the containing page uses a different theme. Shared page colors and fonts still apply.
 
 New instances select the active published revision. Each instance stores its own content and an explicit type revision. Publishing a later revision does not alter existing instances. Open an instance and choose **Upgrade to version …** to review the new fields, retained values, removed values and validation errors. The upgrade applies only when **Save widget** succeeds. There is no bulk upgrade in v1.
 
-Archiving hides a type from new selection while keeping existing instances readable and editable. Theme changes are rejected when the target lacks matching referenced revisions. Theme-wide fonts, colors and design rules remain shared rather than version-pinned.
+Archiving hides a type from new selection while keeping existing instances readable and editable. Themes containing published widget types cannot be deleted; archive types instead. Theme changes are rejected when the target lacks matching referenced revisions. Working copies inherit draft ancestors; published and scheduled versions use the published chain at the relevant time. Validation covers known ancestor activation and expiry boundaries throughout a scheduled version’s active interval, including rescheduling. Theme-wide fonts, colors and design rules remain shared rather than version-pinned.
 
 ## Storage and API
 

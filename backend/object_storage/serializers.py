@@ -7,6 +7,7 @@ following camelCase API conventions and existing patterns.
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -353,6 +354,7 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
             if not isinstance(value["slots"], list):
                 raise serializers.ValidationError("Slot configuration 'slots' must be an array")
 
+            available_widgets = self._available_widget_types()
             slot_names = set()
             for slot in value["slots"]:
                 if not isinstance(slot, dict):
@@ -366,15 +368,45 @@ class ObjectTypeDefinitionSerializer(serializers.ModelSerializer):
                 slot_names.add(slot["name"])
 
                 # Validate widget type restrictions
-                self._validate_widget_restrictions(slot)
+                self._validate_widget_restrictions(slot, available_widgets)
 
         return value
 
-    def _validate_widget_restrictions(self, slot):
-        """Validate widget type restrictions for a slot."""
+    def _available_widget_types(self):
+        """Include published types from the selected namespace's tenant default theme."""
         from webpages.widget_registry import widget_type_registry
 
         available_widgets = {widget.type for widget in widget_type_registry.list_widget_types()}
+        if "namespace_id" in self.initial_data:
+            namespace_id = self.initial_data["namespace_id"]
+        elif "namespaceId" in self.initial_data:
+            namespace_id = self.initial_data["namespaceId"]
+        elif self.instance is not None:
+            namespace_id = self.instance.namespace_id
+        else:
+            namespace_id = None
+        try:
+            namespace = Namespace.objects.filter(pk=namespace_id).first() if namespace_id else None
+        except (TypeError, ValueError):
+            namespace = None
+        request = self.context.get("request")
+        if namespace is None or (request and getattr(request, "tenant", None) != namespace.tenant):
+            return available_widgets
+
+        from webpages.models import PageTheme
+        from webpages.theme_widgets import PREFIX
+
+        theme = PageTheme.objects.filter(tenant=namespace.tenant, is_default=True, is_active=True).first()
+        if theme:
+            available_widgets.update(
+                PREFIX + item["id"]
+                for item in (theme.widget_types or {}).get("items", [])
+                if item.get("active_version") and item.get("status", "active") == "active" and item.get("releases")
+            )
+        return available_widgets
+
+    def _validate_widget_restrictions(self, slot, available_widgets):
+        """Validate widget type restrictions for a slot."""
         # Validate widget_controls (new field)
         if "widget_controls" in slot:
             if not isinstance(slot["widget_controls"], list):
@@ -802,6 +834,11 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         else:
             data["widgets"] = instance.widgets
 
+        from webpages.theme_widgets import empty_widget_types, iter_widgets, object_widget_theme
+
+        if any(iter_widgets(instance.widgets)):
+            theme = object_widget_theme(instance.tenant_id)
+            data["theme_widget_types"] = theme.widget_types if theme else empty_widget_types()
         return data
 
     def validate_object_type_id(self, value):
@@ -824,6 +861,15 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         """Validate widgets configuration"""
         if not isinstance(value, dict):
             raise serializers.ValidationError("Widgets must be a JSON object")
+        from webpages.theme_widgets import iter_widgets, object_widget_theme, validate_instances
+
+        if not any(iter_widgets(value)):
+            return value
+        tenant = self._tenant()
+        try:
+            validate_instances(object_widget_theme(tenant.pk) if tenant else None, value)
+        except ValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
         return value
 
     def validate_relationships(self, value):
@@ -923,6 +969,7 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         # This allows for flexibility and prevents data loss when object type
         # definitions change
 
+    @transaction.atomic
     def create(self, validated_data):
         """Create new object instance with version tracking"""
         user = self.context["request"].user
@@ -932,13 +979,16 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
         widgets = validated_data.pop("widgets", {})
 
         validated_data["created_by"] = user
-        instance = super().create(validated_data)
-
-        # Create initial version with the data and widgets
-        instance.create_version(user, data=data, widgets=widgets, change_description="Initial version")
+        try:
+            instance = super().create(validated_data)
+            # Include initial widgets in the same transaction as the object itself.
+            instance.create_version(user, data=data, widgets=widgets, change_description="Initial version")
+        except ValidationError as exc:
+            raise serializers.ValidationError({"widgets": exc.messages}) from exc
 
         return instance
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         """Update object instance with version tracking"""
         user = self.context["request"].user
@@ -960,12 +1010,15 @@ class ObjectInstanceSerializer(serializers.ModelSerializer):
             version_data = new_data if new_data is not None else instance.data
             version_widgets = new_widgets if new_widgets is not None else instance.widgets
 
-            instance.create_version(
-                user,
-                data=version_data,
-                widgets=version_widgets,
-                change_description="Update via API",
-            )
+            try:
+                instance.create_version(
+                    user,
+                    data=version_data,
+                    widgets=version_widgets,
+                    change_description="Update via API",
+                )
+            except ValidationError as exc:
+                raise serializers.ValidationError({"widgets": exc.messages}) from exc
 
         return instance
 
@@ -1141,7 +1194,11 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
 
         # Update data field with populated values
         data["data"] = instance.data
+        from webpages.theme_widgets import empty_widget_types, iter_widgets, object_widget_theme
 
+        if any(iter_widgets(instance.widgets)):
+            theme = object_widget_theme(instance.object_instance.tenant_id)
+            data["theme_widget_types"] = theme.widget_types if theme else empty_widget_types()
         return data
 
 

@@ -459,6 +459,13 @@ class ObjectDetailWidget(BaseWidget):
         obj = prepared.get("object")
         published_version = prepared.get("published_version")
         if obj and published_version and parsed.show_widgets and context and context.get("renderer"):
+            from webpages.theme_widgets import iter_widgets, object_widget_theme
+
+            widget_context = (
+                {**context, "widget_theme": object_widget_theme(obj.tenant_id)}
+                if any(iter_widgets(published_version.widgets))
+                else context
+            )
             rendered_widgets = {}
             for slot_name, widgets in published_version.widgets.items():
                 rendered_widgets[slot_name] = []
@@ -490,7 +497,9 @@ class ObjectDetailWidget(BaseWidget):
                     if not config_visible or not is_active:
                         continue
                     try:
-                        rendered_widgets[slot_name].append(context["renderer"].render_widget_json(widget_data, context))
+                        rendered_widgets[slot_name].append(
+                            context["renderer"].render_widget_json(widget_data, widget_context)
+                        )
                     except Exception:
                         continue
             prepared["rendered_widgets"] = rendered_widgets

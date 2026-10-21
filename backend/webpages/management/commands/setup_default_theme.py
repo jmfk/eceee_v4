@@ -52,9 +52,6 @@ class Command(BaseCommand):
             try:
                 theme = PageTheme.objects.get(tenant=tenant, name=theme_name, is_active=True)
 
-                # Clear existing default
-                PageTheme.objects.filter(tenant=tenant, is_default=True).update(is_default=False)
-
                 # Set new default
                 theme.is_default = True
                 theme.save()
@@ -68,11 +65,12 @@ class Command(BaseCommand):
             # Use the automatic default theme creation
             if current_default and force:
                 self.stdout.write(self.style.WARNING(f"Replacing existing default theme: '{current_default.name}'"))
-                # Clear existing default
-                PageTheme.objects.filter(tenant=tenant, is_default=True).update(is_default=False)
-
             # This will trigger the automatic creation
-            default_theme = PageTheme.get_default_theme(tenant)
+            default_theme = (
+                PageTheme._ensure_default_theme_exists(tenant=tenant)
+                if current_default and force
+                else PageTheme.get_default_theme(tenant)
+            )
 
             if default_theme:
                 self.stdout.write(self.style.SUCCESS(f"Default theme ensured: '{default_theme.name}'"))

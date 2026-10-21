@@ -4,6 +4,8 @@ import { processNavigationItems } from '../utils/navigationItems'
 import { asArray, EmptyRender, formatDisplayDate, formatDisplayDateTime, imageUrl, ImageView, normalizeContentMediaHtml, PreviewLink, RenderFailure, SafeHtml, sanitizeHtml, TextWithBreaks, value } from './primitives'
 import { imageWidgetMediaItems, isImageCollectionReference } from '../utils/imageWidgetMedia'
 import { getBannerPresentationStyle } from '../utils/bannerConfig'
+import { normalizeWidget } from './adapters'
+import { emptyThemeWidgets } from './themeWidgets'
 
 const ContentRender: WidgetRenderComponent = ({ widget }) => <div>
     <SafeHtml className={`content-widget${value(widget.config, 'variantClasses') ? ` ${value(widget.config, 'variantClasses')}` : ''}${value(widget.config, 'showBorder', 'show_border') ? ' border-enabled' : ''}`} html={normalizeContentMediaHtml(value(widget.config, 'content', 'html'))} />
@@ -705,7 +707,7 @@ const NewsDetailRender: WidgetRenderComponent = ({ widget, context, renderWidget
         {configEnabled(widget.config, true, 'showFeaturedImage', 'show_featured_image') && <div className="news-featured-image"><ImageView source={fields.image} alt={item.title || ''} /></div>}
         {summary && <p className="news-summary">{summary}</p>}
         {!hasStructuredWidgets && <SafeHtml className="news-content" html={data.content || data.body || data.text || item.content} />}
-        {hasStructuredWidgets && <div className="news-object-widgets">{Object.entries(slots).map(([slotName, widgets]) => <div className={`news-widget-slot news-widget-slot-${slotName}`} data-slot={slotName} data-widget-slot={slotName} data-owner-widget-type={widget.type} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)}</div>}
+        {hasStructuredWidgets && <div className="news-object-widgets">{Object.entries(slots).map(([slotName, widgets]) => <div className={`news-widget-slot news-widget-slot-${slotName}`} data-slot={slotName} data-widget-slot={slotName} data-owner-widget-type={widget.type} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => normalizeWidget(nested, `${slotName}-${index}`)), item.themeWidgetTypes || item.theme_widget_types || emptyThemeWidgets())}</div>)}</div>}
         {externalUrl && <div className="news-external-source"><PreviewLink href={externalUrl} rel="noopener noreferrer">Read the original source</PreviewLink></div>}
     </article>
 }
@@ -746,7 +748,7 @@ const ObjectDetailRender: WidgetRenderComponent = ({ widget, renderWidgets }) =>
             {showHierarchy && ancestors.length > 0 && <div className="object-hierarchy"><h4>Location in hierarchy:</h4><div className="breadcrumb">{ancestors.map((ancestor, index) => <React.Fragment key={ancestor.id || index}><PreviewLink href={ancestor.path}>{ancestor.title}</PreviewLink><span>→</span></React.Fragment>)}<span>{item.title}</span></div></div>}
         </header>
         <div className="object-content">{showWidgets && hasWidgetSlots
-            ? Object.entries(slots).map(([slotName, widgets]) => <div className="widget-slot" data-slot={slotName} data-widget-slot={slotName} data-owner-widget-type={widget.type} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => ({ ...nested, id: String(nested.id || `${slotName}-${index}`), type: nested.type || nested.widget_type, config: nested.config || {} })))}</div>)
+            ? Object.entries(slots).map(([slotName, widgets]) => <div className="widget-slot" data-slot={slotName} data-widget-slot={slotName} data-owner-widget-type={widget.type} key={slotName}>{renderWidgets(asArray<any>(widgets).map((nested, index) => normalizeWidget(nested, `${slotName}-${index}`)), item.themeWidgetTypes || item.theme_widget_types || emptyThemeWidgets())}</div>)
             : dataEntries.map(([fieldName, fieldValue]) => <div className="object-field" key={fieldName}><h4 className="field-label">{fieldName.replaceAll('_', ' ')}</h4><div className="field-value">{typeof fieldValue === 'object' ? JSON.stringify(fieldValue) : String(fieldValue)}</div></div>)}</div>
         {showHierarchy && children.length > 0 && <section className="object-children"><h3>Related Content</h3><div className="children-grid">{children.map((child, index) => {
             const childFields = newsFields(child)

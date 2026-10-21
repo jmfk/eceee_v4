@@ -15,7 +15,7 @@ import uuid
 from django.contrib.auth.models import User
 from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Case, When
 from django.utils import timezone
 from django.utils.text import slugify
@@ -1727,12 +1727,15 @@ class ObjectVersion(models.Model):
                 # Populate the field
                 self.data[field_name] = related_ids
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
         """
         Override save to sync relationships from data.
         """
+        from core.models import Tenant
         from webpages.theme_widgets import validate_version_widgets
 
+        Tenant.objects.select_for_update().get(pk=self.object_instance.tenant_id)
         validate_version_widgets(self)
         # Call parent save first
         super().save(*args, **kwargs)

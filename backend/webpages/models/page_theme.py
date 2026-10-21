@@ -10,7 +10,7 @@ import uuid
 
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
-from django.db import models
+from django.db import models, transaction
 
 from file_manager.storage import system_storage
 from webpages.text_outline_styles import default_text_outline_styles
@@ -463,15 +463,20 @@ class PageTheme(models.Model):
             "created_by": self.created_by.username if self.created_by else None,
         }
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
-        """Override save to ensure only one default theme exists, increment sync version, and invalidate CSS cache"""
-        validate_theme_layouts(self.layouts)
-        previous_widgets = (
-            type(self).objects.filter(pk=self.pk).values_list("widget_types", flat=True).first() if self.pk else None
-        )
-        validate_widget_types(self.widget_types, previous=previous_widgets)
+        """Validate and persist theme history under the tenant's publication lock."""
+        from core.models import Tenant
         from webpages.theme_widgets import validate_default_theme_change
 
+        # Serialize all writers, including file sync/import, with Designer publication.
+        Tenant.objects.select_for_update().get(pk=self.tenant_id)
+        persisted = type(self).objects.filter(pk=self.pk).first() if self.pk else None
+        validate_theme_layouts(self.layouts)
+        previous_widgets = persisted.widget_types if persisted else None
+        validate_widget_types(self.widget_types, previous=previous_widgets)
+        if persisted and persisted.is_default and persisted.is_active and (not self.is_default or not self.is_active):
+            validate_default_theme_change(None, previous_theme=persisted)
         validate_default_theme_change(self)
         if self.is_default:
             # A default is unique within its tenant, not across the whole installation.
@@ -2670,9 +2675,19 @@ class PageTheme(models.Model):
         update_value(updated_groups)
         return updated_groups
 
+    @transaction.atomic
     def delete(self, *args, **kwargs):
-        """Delete theme and cleanup design group images from object storage"""
+        """Delete theme and cleanup design group images from object storage."""
         import logging
+
+        from django.core.exceptions import ValidationError
+
+        from core.models import Tenant
+
+        Tenant.objects.select_for_update().get(pk=self.tenant_id)
+        persisted = type(self).objects.get(pk=self.pk)
+        if any(item.get("releases") for item in persisted.widget_types.get("items", [])):
+            raise ValidationError("Themes with published widget types cannot be deleted. Archive the types instead.")
 
         from file_manager.storage import system_storage
 
@@ -2715,6 +2730,7 @@ class PageTheme(models.Model):
             component_styles=(self.component_styles.copy() if self.component_styles else {}),
             designer_preview=(self.designer_preview.copy() if self.designer_preview else {}),
             layouts=copy.deepcopy(self.layouts) if self.layouts else default_theme_layouts(),
+            widget_types=copy.deepcopy(self.widget_types) if self.widget_types else empty_widget_types(),
             image_styles=self.image_styles.copy() if self.image_styles else {},
             text_outline_styles=copy.deepcopy(self.text_outline_styles),
             gallery_styles=self.gallery_styles.copy() if self.gallery_styles else {},

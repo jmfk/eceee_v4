@@ -120,6 +120,13 @@ class ThemeWidgetContractTests(unittest.TestCase):
                 SimpleNamespace(widget_types=other), [widget], previous_theme=SimpleNamespace(widget_types=first)
             )
 
+    def test_new_instances_during_theme_switch_need_only_the_target_definition(self):
+        theme = SimpleNamespace(widget_types=publish_widget_types(working_document(), empty_widget_types()))
+        widget = {"id": "new-person", "type": TYPE, "type_version": 1, "config": {"personName": "Alex"}}
+        validate_instances(
+            theme, [widget], previous_theme=SimpleNamespace(widget_types=empty_widget_types()), previous_widgets=[]
+        )
+
     def test_css_scopes_comma_selectors_and_media_without_external_resources(self):
         css = compile_css(
             ".person, :is(h2, p) { color: var(--accent); } @media (min-width: 600px) { p { padding: 2px; } }",
@@ -130,6 +137,8 @@ class ThemeWidgetContractTests(unittest.TestCase):
         self.assertIn(f'[data-theme-widget="{TYPE_ID}:1"] :is(h2, p)', css)
         for unsafe in [
             '@import "https://evil.test/style.css";',
+            "+ * { color: red; }",
+            "/* sibling */ ~ p { display: none; }",
             "p {background: url(https://evil.test)}",
             ":root { color:red }",
             "@font-face { font-family:x; }",

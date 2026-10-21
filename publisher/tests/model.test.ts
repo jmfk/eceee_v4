@@ -757,6 +757,36 @@ describe('public resolution', () => {
     expect(publishedObjects.mock.calls.every(([query]) => query.activeTypeOnly)).toBe(true);
   });
 
+  it('keeps object widget definitions from the tenant default theme on a differently themed page', async () => {
+    const typeId = '2bf85f1b-26cc-4801-8cfa-bb680f93e256';
+    const widgetType = `theme_widgets.${typeId}`;
+    const release = (label: string) => ({ version: 1, schema: { type: 'object', properties: { personName: { type: 'string' } } },
+      template: `<p>${label}: {{personName}}</p>`, css: '', compiled_css: '', defaults: {} });
+    const pageTypes = { version: 1, items: [{ id: typeId, name: 'Person', active_version: 1, releases: [release('Page')] }] };
+    const objectTypes = { version: 1, items: [{ id: typeId, name: 'Person', active_version: 1, releases: [release('Object')] }] };
+    const defaultTheme = vi.fn(async () => ({ ...theme, id: '21', widget_types: objectTypes }));
+    const objectReader: PageReader = {
+      ...reader,
+      theme: async (id, tenant) => id === theme.id && tenant === theme.tenant_id ? { ...theme, widget_types: pageTypes } : null,
+      defaultTheme,
+      version: async (id, at) => id === child.id ? version({ id: '11', page_id: child.id, widgets: { main: [
+        { id: 'page-person', type: widgetType, type_version: 1, config: { personName: 'Page Alice' } },
+        { id: 'detail-one', type: 'object_storage.ObjectDetailWidget', config: { objectId: 41 } },
+        { id: 'detail-two', type: 'object_storage.ObjectDetailWidget', config: { objectId: 42 } },
+      ] } }) : reader.version(id, at),
+      publishedObjects: async () => [{ id: '41', title: 'Object', slug: 'object', objectType: { id: '5', name: 'article', label: 'Article', pluralLabel: 'Articles' },
+        data: {}, metadata: {}, publishDate: '2026-05-01T00:00:00Z', isFeatured: false,
+        widgets: { main: [{ id: 'object-person', type: widgetType, type_version: 1, config: { personName: 'Object Bob' } }] } }],
+    };
+    const model = await buildPublishedPageModel({ withSnapshot: async read => read(objectReader) }, 'example.org', '/news', new Date('2026-06-01'));
+    expect(model?.context.themeWidgetTypes).toEqual(pageTypes);
+    expect(model?.slots.main[0].typeVersion).toBe(1);
+    const item = model?.slots.main[1].data?.item as { themeWidgetTypes: typeof objectTypes; widgets: { main: Array<{ typeVersion: number }> } };
+    expect(item.themeWidgetTypes).toEqual(objectTypes);
+    expect(item.widgets.main[0].typeVersion).toBe(1);
+    expect(defaultTheme).toHaveBeenCalledTimes(1);
+  });
+
   it('re-resolves persisted object widget data against current publication state', async () => {
     const publishedObjects = vi.fn(async () => []);
     const staleReader: PageReader = {

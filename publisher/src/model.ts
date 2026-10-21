@@ -75,6 +75,7 @@ export interface PublishedObject {
   objectType: { id: DbId; name: string; label: string; pluralLabel: string };
   data: Record<string, unknown>;
   widgets: Record<string, unknown>;
+  themeWidgetTypes?: import("../../frontend/src/rendering/themeWidgets").ThemeWidgetDocument;
   metadata: Record<string, unknown>;
   publishDate: string;
   isFeatured: boolean;
@@ -732,6 +733,11 @@ async function resolvePublishedData(
   pagePath: string,
   pathVariables: Record<string, string>,
 ): Promise<Record<string, Widget[]>> {
+  let defaultThemePromise: Promise<Theme | null> | undefined;
+  const objectWidgetTypes = async () => {
+    defaultThemePromise ??= reader.defaultTheme(tenantId);
+    return (await defaultThemePromise)?.widget_types ?? { version: 1, items: [] };
+  };
   const resolve = async (widget: Widget, objectStack = new Set<string>()): Promise<Widget> => {
     const resolveNested = async (candidate: unknown, activeObjectStack = objectStack): Promise<unknown> => {
       if (Array.isArray(candidate)) {
@@ -849,6 +855,7 @@ async function resolvePublishedData(
         const normalizedItem = normalizeNestedItem(item, at, `published-object-${objectId}`);
         item = {
           ...item,
+          themeWidgetTypes: await objectWidgetTypes(),
           widgets: isCycle ? {} : await resolveNested(normalizedItem.widgets, nestedObjectStack) as Record<string, unknown>,
           ancestors: item.ancestors?.map(withPath),
           children: item.children?.map(withPath),

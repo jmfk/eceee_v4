@@ -108,6 +108,9 @@ def compile_css(css, type_id, version):
                 groups.append(current)
                 selectors = []
                 for group in groups:
+                    meaningful = [token for token in group if token.type not in {"whitespace", "comment"}]
+                    if meaningful and meaningful[0].type == "literal" and meaningful[0].value in {"+", "~"}:
+                        raise ValidationError("CSS selectors cannot target widget siblings.")
                     selector = tinycss2.serialize(group).strip()
                     if not selector or re.search(r":(?:root|host|global)|[{}@]", selector, re.I):
                         raise ValidationError("Unsupported CSS selector.")
@@ -496,8 +499,20 @@ def iter_widgets(value):
                 yield from iter_widgets(child)
 
 
-def validate_instances(theme, widgets, *, previous_theme=None):
+def validate_instances(theme, widgets, *, previous_theme=None, previous_widgets=None):
     errors = []
+    previous_references = (
+        None
+        if previous_widgets is None
+        else {
+            (
+                str(widget.get("id")),
+                widget.get("type") or widget.get("widget_type"),
+                widget.get("type_version", widget.get("typeVersion")),
+            )
+            for widget in iter_widgets(previous_widgets)
+        }
+    )
     for widget in iter_widgets(widgets):
         widget_type = widget.get("type") or widget.get("widget_type")
         version = widget.get("type_version", widget.get("typeVersion"))
@@ -508,7 +523,8 @@ def validate_instances(theme, widgets, *, previous_theme=None):
         if definition is None:
             errors.append(f"Widget {label}: missing type revision {widget_type} v{version} in the effective theme.")
             continue
-        if previous_theme is not None:
+        reference = (str(widget.get("id")), widget_type, version)
+        if previous_theme is not None and (previous_references is None or reference in previous_references):
             old = find_definition(previous_theme, widget_type, version)
             if old is None or old.release != definition.release:
                 errors.append(f"Widget {label}: target theme has a different definition of {widget_type} v{version}.")
@@ -548,39 +564,105 @@ def retain_released_history(restored, current):
     return result
 
 
+_INHERIT_THEME = object()
+
+
+def version_widget_theme(
+    instance, *, theme_override=_INHERIT_THEME, ancestor_override=None, at=None, published_ancestors=None
+):
+    """Use draft ancestors for working versions and published ancestors for live versions."""
+    from django.utils import timezone
+
+    from webpages.models import PageTheme
+
+    if at is None and instance.effective_date is not None and instance.effective_date > timezone.now():
+        at = instance.effective_date
+    published_ancestors = instance.effective_date is not None if published_ancestors is None else published_ancestors
+    explicit = instance.theme if theme_override is _INHERIT_THEME else theme_override
+    if explicit is not None:
+        return explicit
+    current = instance.page.parent
+    while current:
+        if ancestor_override is not None and current.pk == ancestor_override[0]:
+            return ancestor_override[1]
+        version = current.get_current_published_version(now=at) if published_ancestors else current.get_latest_version()
+        if version and version.theme_id:
+            return version.theme
+        current = current.parent
+    return PageTheme.objects.filter(tenant_id=instance.page.tenant_id, is_default=True, is_active=True).first()
+
+
+def version_theme_boundaries(instance, *, extra=()):
+    """Known ancestor activations/expiries while this published or scheduled version is active."""
+    from django.utils import timezone
+
+    if instance.effective_date is None:
+        return [None]
+    start = max(timezone.now(), instance.effective_date)
+    end = instance.expiry_date
+    if end is not None and end <= start:
+        return []
+    points = {start}
+    current = instance.page.parent
+    while current:
+        for effective, expiry in current.versions.values_list("effective_date", "expiry_date"):
+            for point in (effective, expiry):
+                if point is not None and point >= start and (end is None or point < end):
+                    points.add(point)
+        current = current.parent
+    points.update(point for point in extra if point is not None and point >= start and (end is None or point < end))
+    return sorted(points)
+
+
+def proposed_page_theme(instance, at):
+    """Resolve the ancestor selection after replacing/inserting one page version."""
+    from django.db.models import Q
+
+    versions = type(instance).objects.filter(page_id=instance.page_id).exclude(pk=instance.pk)
+    if at is None:
+        selected = versions.order_by("-version_number").first()
+        if selected is None or instance.version_number >= selected.version_number:
+            selected = instance
+    else:
+        selected = (
+            versions.filter(effective_date__lte=at)
+            .filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=at))
+            .order_by("-effective_date", "-version_number")
+            .first()
+        )
+        candidate_active = (
+            instance.effective_date is not None
+            and instance.effective_date <= at
+            and (instance.expiry_date is None or instance.expiry_date > at)
+        )
+        if candidate_active and (
+            selected is None
+            or (instance.effective_date, instance.version_number) >= (selected.effective_date, selected.version_number)
+        ):
+            selected = instance
+    return version_widget_theme(
+        instance,
+        theme_override=selected.theme if selected else None,
+        at=at,
+        published_ancestors=at is not None,
+    )
+
+
 def validate_version_widgets(instance):
     if not any(iter_widgets(instance.widgets)):
         return
     from webpages.models import PageTheme
 
     if hasattr(instance, "page_id"):
-        theme = (
-            instance.theme
-            if instance.theme_id
-            else (
-                instance.page.parent.get_effective_theme()
-                if instance.page.parent_id
-                else PageTheme.objects.filter(
-                    tenant_id=instance.page.tenant_id, is_default=True, is_active=True
-                ).first()
-            )
-        )
+        theme = version_widget_theme(instance)
         previous = (
-            type(instance).objects.filter(pk=instance.pk).select_related("theme").first() if instance.pk else None
+            type(instance).objects.filter(pk=instance.pk).select_related("theme").first()
+            if instance.pk
+            else instance.page.get_latest_version()
         )
         previous_theme = None
         if previous:
-            old_theme = (
-                previous.theme
-                if previous.theme_id
-                else (
-                    previous.page.parent.get_effective_theme()
-                    if previous.page.parent_id
-                    else PageTheme.objects.filter(
-                        tenant_id=previous.page.tenant_id, is_default=True, is_active=True
-                    ).first()
-                )
-            )
+            old_theme = version_widget_theme(previous)
             if getattr(old_theme, "id", None) != getattr(theme, "id", None):
                 previous_theme = old_theme
         if theme is not None and theme.tenant_id != instance.page.tenant_id:
@@ -590,56 +672,76 @@ def validate_version_widgets(instance):
             tenant_id=instance.object_instance.tenant_id, is_default=True, is_active=True
         ).first()
         previous_theme = None
-    validate_instances(theme, instance.widgets, previous_theme=previous_theme)
+    validate_instances(
+        theme,
+        instance.widgets,
+        previous_theme=previous_theme,
+        previous_widgets=previous.widgets if hasattr(instance, "page_id") and previous else None,
+    )
+    if hasattr(instance, "page_id"):
+        for at in version_theme_boundaries(instance):
+            future_theme = version_widget_theme(instance, at=at)
+            if getattr(future_theme, "pk", None) != getattr(theme, "pk", None):
+                validate_instances(future_theme, instance.widgets, previous_theme=theme)
 
 
-def validate_default_theme_change(theme):
+def validate_default_theme_change(theme, *, previous_theme=None):
     """A default-theme switch also affects objects and pages without an explicit theme."""
-    if not theme.is_default:
+    if theme is not None and not theme.is_default:
         return
     from object_storage.models import ObjectVersion
     from webpages.models import PageTheme, PageVersion
 
-    old = PageTheme.objects.filter(tenant_id=theme.tenant_id, is_default=True).exclude(pk=theme.pk).first()
+    old = previous_theme or (
+        PageTheme.objects.filter(tenant_id=theme.tenant_id, is_default=True).exclude(pk=theme.pk).first()
+        if theme is not None
+        else None
+    )
     if old is None:
         return
-    for version in ObjectVersion.objects.filter(object_instance__tenant_id=theme.tenant_id).only("widgets").iterator():
+    for version in ObjectVersion.objects.filter(object_instance__tenant_id=old.tenant_id).only("widgets").iterator():
         validate_instances(theme, version.widgets, previous_theme=old)
     for version in (
-        PageVersion.objects.filter(page__tenant_id=theme.tenant_id, theme__isnull=True)
+        PageVersion.objects.filter(page__tenant_id=old.tenant_id, theme__isnull=True)
         .select_related("page__parent")
         .iterator()
     ):
-        inherited = version.page.parent.get_effective_theme() if version.page.parent_id else old
-        if inherited and inherited.pk == old.pk:
-            validate_instances(theme, version.widgets, previous_theme=old)
+        if not any(iter_widgets(version.widgets)):
+            continue
+        for at in [None, *version_theme_boundaries(version)]:
+            inherited = version_widget_theme(version, at=at)
+            if inherited and inherited.pk == old.pk:
+                validate_instances(theme, version.widgets, previous_theme=old)
+                break
 
 
 def validate_page_theme_change(instance):
-    """Check descendant widgets before changing an inherited theme boundary."""
-    from webpages.models import PageTheme
-
-    previous = (
-        type(instance).objects.filter(pk=instance.pk).first() if instance.pk else instance.page.get_latest_version()
-    )
-    if not previous or previous.theme_id == instance.theme_id:
+    """Preflight every known inherited theme boundary affected by this version write."""
+    previous = type(instance).objects.filter(pk=instance.pk).first() if instance.pk else None
+    if previous and (previous.theme_id, previous.effective_date, previous.expiry_date) == (
+        instance.theme_id,
+        instance.effective_date,
+        instance.expiry_date,
+    ):
         return
-    theme = (
-        instance.theme
-        if instance.theme_id
-        else (
-            instance.page.parent.get_effective_theme()
-            if instance.page.parent_id
-            else PageTheme.objects.filter(tenant_id=instance.page.tenant_id, is_default=True, is_active=True).first()
-        )
-    )
+    extra = (instance.effective_date, instance.expiry_date)
     pending = list(instance.page.children.filter(tenant_id=instance.page.tenant_id))
     while pending:
         child = pending.pop()
-        latest = child.get_latest_version()
-        if latest and latest.theme_id:
-            continue
-        old_theme = child.parent.get_effective_theme()
-        for version in type(instance).objects.filter(page=child, theme__isnull=True).only("widgets").iterator():
-            validate_instances(theme, version.widgets, previous_theme=old_theme)
+        for version in type(instance).objects.filter(page=child, theme__isnull=True).select_related("page__parent"):
+            if not any(iter_widgets(version.widgets)):
+                continue
+            for at in version_theme_boundaries(version, extra=extra):
+                old_theme = version_widget_theme(version, at=at)
+                proposed = proposed_page_theme(instance, at)
+                target = version_widget_theme(version, ancestor_override=(instance.page_id, proposed), at=at)
+                if getattr(target, "pk", None) != getattr(old_theme, "pk", None):
+                    validate_instances(target, version.widgets, previous_theme=old_theme)
         pending.extend(child.children.filter(tenant_id=instance.page.tenant_id))
+
+
+def object_widget_theme(tenant_id):
+    """Object definitions follow their tenant default; page-wide tokens stay on the page theme."""
+    from webpages.models import PageTheme
+
+    return PageTheme.objects.filter(tenant_id=tenant_id, is_default=True, is_active=True).first()
