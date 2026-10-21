@@ -27,11 +27,12 @@ REQUIRED_BACKEND_SCENARIOS = {
 }
 REQUIRED_CONTRACT_SCENARIOS = {
     "webpages.tests.test_widget_contracts.WidgetContractTests.test_catalog_covers_every_builtin_without_changing_runtime_metadata",
-    "webpages.tests.test_widget_contracts.WidgetContractTests.test_node_manifest_matches_python_and_checked_in_bytes",
+    "webpages.tests.test_widget_contracts.WidgetContractTests.test_node_manifest_matches_python_without_frontend_checkout",
     "webpages.tests.test_widget_contracts.WidgetContractTests.test_python_contracts_import_with_django_explicitly_blocked",
     "webpages.tests.test_widget_contracts.WidgetContractTests.test_node_model_validation_matches_pydantic_field_matrix",
 }
 REQUIRED_FRONTEND_SCENARIOS = {
+    "buildEditorThemeCSS keeps the frontend widget baseline aligned with the canonical widget catalog",
     "portable pilot render baseline preserves all fixture types, headings, child identities and ordering",
     "portable pilot render baseline keeps forms usable and prevents preview submission",
     "portable pilot render baseline does not mutate stored fixture data when preview state changes",
@@ -438,6 +439,7 @@ def run(args):
                     "playwright:require('@playwright/test/package.json').version,vitest:require('vitest/package.json').version}))\"\n"
                     "npx eslint e2e/pilot-baseline.spec.js playwright.pilot.config.js vite.pilot.config.js\n"
                     "npm run test:run -- src/rendering/__tests__/pilotBaseline.test.tsx "
+                    "src/utils/__tests__/editorThemeCSS.test.js "
                     "src/rendering/__tests__/registryParity.test.ts src/components/__tests__/PagePreview.iframe.test.jsx "
                     "--maxWorkers=2 --reporter=json --outputFile=/pilot-output/frontend.json\n"
                     "npx playwright test --config playwright.pilot.config.js",
