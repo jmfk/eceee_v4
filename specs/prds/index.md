@@ -3,6 +3,7 @@
 | ID | Title | Status | Related ADRs |
 | --- | --- | --- | --- |
 | PRD-0027 | [Theme text outline styles](0027-theme-text-outline-styles.md) | completed | [ADR-0036](../adrs/active/0036-theme-text-effects.md), [ADR-0037](../adrs/active/0037-preserve-stale-designer-draft-edits.md), [ADR-0038](../adrs/active/0038-outline-only-theme-publication.md) |
+| PRD-0027 | [Framework-independent render catalog and widget schema pilot](0027-framework-independent-content-contract.md) | draft | - |
 | PRD-0026 | [Inline banner styling](0026-inline-banner-styling.md) | completed | [ADR-0034](../adrs/archive/0034-banner-presentation-overrides.md), [ADR-0035](../adrs/active/0035-plain-banner-text.md) |
 | PRD-0025 | [Stable widget field editing](0025-stable-widget-field-editing.md) | completed | [ADR-0033](../adrs/active/0033-widget-editor-session-and-field-ownership.md) |
 | PRD-0001 | [Simplified page versioning](0001-simplified-page-versioning.md) | started | [ADR-0001](../adrs/active/0001-canonical-page-version-workflow.md) |
