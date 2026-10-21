@@ -23,3 +23,18 @@ Asset requests can specify a descriptive name, exact full-size width and height,
 The asset book is rendered from escaped server HTML and the real theme CSS by the Playwright service. If that service is unavailable, the backend produces a simpler PDF containing the same required inventory sections. Export creation is limited to 10 requests per user per hour. Downloads expire after 24 hours, and an hourly maintenance task deletes expired ZIP objects and database snapshots. Immutable draft assets are deleted after they are no longer referenced by the live theme, current draft, a revision, or an export snapshot.
 
 The Playwright service must expose its internal `POST /render-pdf` endpoint at `PLAYWRIGHT_SERVICE_URL`. The endpoint disables JavaScript and permits network requests only to Google Fonts domains.
+
+
+## Text outline styles
+
+Open **Designer → theme → Text outline styles** to create named, theme-wide text effects. Styles support Outline, Gradient blur (a soft halo), and Drop shadow. Choose the text's own color, white, black, its RGB complement, or a custom RGB color. Thickness and opacity are shared; blur radius applies to soft effects, and drop shadows also expose clockwise angle (0° points right) and pixel offset. Light and dark samples update immediately.
+
+Changes use the normal Designer draft, publish and undo flow. Select the named effect with the banner's Text outline icon or its configuration field. Display names can change without breaking references. Removing a style offers Undo; widgets referencing a missing style render without an effect. No outline is always available without a theme definition. New themes and existing empty themes receive editable Dark outline and Light outline presets; non-empty preset dictionaries are preserved. Banners use the theme definitions even for dark/light selections. Styles travel with theme versions, clones and exports.
+
+The additive `0087` theme migration must run before starting a publisher version that reads `text_outline_styles`.
+
+Migration `0088` initializes these defaults for empty themes and their empty Designer drafts without changing custom presets.
+
+If the live theme changed after a saved Designer draft was started, **Save draft** still preserves new theme setting edits, including outlines. Publishing remains blocked while that draft is stale. Saving retains the previous draft edits and does not change live data. Export the draft before discarding it if that work must be kept.
+
+To use a saved outline in page editing, choose **Publish outlines** in the Text outline styles section. Save draft alone keeps it in Designer. The scoped action publishes only outline differences, preserves independent live styles and other draft edits, and rejects conflicting edits to the same style. The page editor refreshes published outlines when you return from Designer. Whole-draft publication remains blocked for stale drafts.

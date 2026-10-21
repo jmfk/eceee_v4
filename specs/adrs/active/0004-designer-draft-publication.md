@@ -30,7 +30,7 @@ This is the smallest model that provides persistent reviewable work, prevents pa
 - All assigned designers for a theme see the same draft and receive conflicts for stale edits.
 - Staged objects may need later lifecycle cleanup when drafts are discarded or assets are replaced.
 - Unused library assets remain read-only in the first version because replacing a fixed object key cannot satisfy the atomic publication boundary.
-- Advanced live-theme edits make an existing draft stale; the designer must discard or explicitly rebase in a future workflow.
+- Advanced live-theme edits make an existing draft stale. Theme setting edits can still be saved to that draft; publication requires discarding or explicitly rebasing it in a future workflow. See [ADR-0037](0037-preserve-stale-designer-draft-edits.md).
 
 ## Alternatives Considered
 

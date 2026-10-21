@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { defaultTextOutlineStyles } from '../src/utils/textOutlineStyles'
 import { createCollaborativeEditorState, mockCmsApi, seedAuthenticatedSession } from './fixtures/apiMocks'
 import { openCmsPage } from './fixtures/navigation'
 
@@ -78,7 +79,7 @@ test.describe('page editor regressions', () => {
       await page.setViewportSize({ width: scheme === 'dark' ? 390 : 1280, height: 960 })
       const editorState = createCollaborativeEditorState()
       editorState.version.effectiveTheme = {
-        colors: { paper: '#ffffff', ocean: '#082f49' },
+        colors: { paper: '#ffffff', ocean: '#082f49' }, textOutlineStyles: defaultTextOutlineStyles(),
         customCss: 'h2,h3,p{color:#b91c1c}',
       }
       editorState.page.effectiveTheme = editorState.version.effectiveTheme
@@ -102,7 +103,7 @@ test.describe('page editor regressions', () => {
       const toolbar = banner.getByRole('toolbar', { name: 'Banner controls' })
       await banner.hover()
       await expect(toolbar).toBeVisible()
-      expect(await toolbar.locator('button').allTextContents()).toEqual(['', '', '', '', ''])
+      expect(await toolbar.locator('button').allTextContents()).toEqual(['', '', '', ''])
       await toolbar.getByRole('button', { name: 'Text color', exact: true }).focus()
       await expect(page.getByText('Text color', { exact: true })).toBeVisible()
       await toolbar.getByRole('button', { name: 'Text color', exact: true }).press('Enter')
@@ -117,7 +118,7 @@ test.describe('page editor regressions', () => {
       expect(paletteBox.x).toBeGreaterThanOrEqual(0)
       expect(paletteBox.x + paletteBox.width).toBeLessThanOrEqual(page.viewportSize().width)
       await page.getByRole('button', { name: 'ocean', exact: true }).click()
-      await toolbar.getByRole('button', { name: 'Text outline: No outline' }).click()
+      await toolbar.getByRole('combobox', { name: 'Text outline' }).selectOption('dark')
       await expect(editor).toHaveCSS('color', 'rgb(255, 255, 255)')
       await expect(banner.locator('.banner-widget')).toHaveCSS('background-color', 'rgb(8, 47, 73)')
       await expect(editor).not.toHaveCSS('text-shadow', 'none')
@@ -140,7 +141,7 @@ test.describe('page editor regressions', () => {
 
   test('banner presentation controls retain selected rich text and its formatting toolbar', async ({ page }) => {
     const editorState = createCollaborativeEditorState()
-    const theme = { colors: { paper: '#ffffff', ocean: '#082f49' } }
+    const theme = { colors: { paper: '#ffffff', ocean: '#082f49' }, textOutlineStyles: defaultTextOutlineStyles() }
     editorState.version.effectiveTheme = theme
     editorState.page.effectiveTheme = theme
     editorState.version.widgets.main.push({
@@ -163,7 +164,7 @@ test.describe('page editor regressions', () => {
     const formatting = page.locator('.global-wysiwyg-toolbar')
     await expect(formatting).toBeInViewport()
     await toolbar.getByRole('button', { name: 'Text color', exact: true }).click()
-    await toolbar.getByRole('button', { name: 'Text outline: No outline' }).click()
+    await toolbar.getByRole('combobox', { name: 'Text outline' }).selectOption('dark')
     await expect(editor).toBeFocused()
     await toolbar.getByRole('button', { name: 'Text color', exact: true }).click()
     // Outlast the editor's blur delay while keyboard focus is inside the palette.

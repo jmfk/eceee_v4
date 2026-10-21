@@ -109,6 +109,7 @@ export const FIELD_COMPONENTS = {
     ColorSelectorField: () => import('./ColorSelectorField'),
     SliderInput: () => import('./SliderInput'),
     DateRangeInput: () => import('./DateRangeInput'),
+    TextOutlineSelect: () => import('./TextOutlineSelect'),
     ImageStyleSelect: () => import('./ImageStyleSelect'),
     ComponentStyleSelect: () => import('./ComponentStyleSelector'),
     ComponentStyleSelector: () => import('./ComponentStyleSelector'),

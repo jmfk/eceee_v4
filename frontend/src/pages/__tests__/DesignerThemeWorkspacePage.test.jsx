@@ -6,7 +6,7 @@ import { renderWithStateProviders } from '../../test/testUtils'
 import DesignerThemeWorkspacePage from '../DesignerThemeWorkspacePage'
 
 const mocks = vi.hoisted(() => ({
-    workspace: vi.fn(), preview: vi.fn(), save: vi.fn(), publish: vi.fn(), undo: vi.fn(), discard: vi.fn(),
+    workspace: vi.fn(), preview: vi.fn(), save: vi.fn(), publish: vi.fn(), publishOutlines: vi.fn(), undo: vi.fn(), discard: vi.fn(),
     replaceAsset: vi.fn(), createPlaceholder: vi.fn(), savePreviewContent: vi.fn(),
     importPreviewSource: vi.fn(), deletePreviewContent: vi.fn(), replacePreviewImage: vi.fn(),
     loadPreviewPage: vi.fn(), loadPreviewObject: vi.fn(), buildResolvedRenderModel: vi.fn(),
@@ -206,6 +206,61 @@ describe('DesignerThemeWorkspacePage', () => {
             context: { preview: true, tenantId: 'theme-tenant', pageId: 42, versionId: 9 },
         })
         vi.spyOn(window, 'confirm').mockReturnValue(true)
+    })
+
+    it('publishes only outlines from a stale draft after saving local style edits', async () => {
+        const stale = { ...structuredClone(workspace), draftIsStale: true, hasDraftChanges: true, textOutlineStyles: {}, liveTextOutlineStyles: {} }
+        mocks.workspace.mockResolvedValue(stale)
+        mocks.save.mockImplementation(async (_themeId, patch) => ({ ...stale, textOutlineStyles: patch.textOutlineStyles, draftVersion: 3 }))
+        mocks.publishOutlines.mockImplementation(async () => ({ ...stale, draftVersion: 4, textOutlineStyles: mocks.save.mock.calls[0][1].textOutlineStyles, liveTextOutlineStyles: mocks.save.mock.calls[0][1].textOutlineStyles }))
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        fireEvent.click(await screen.findByRole('button', { name: 'Text outline styles' }))
+        expect(screen.getByRole('button', { name: 'Publish outlines' })).toBeDisabled()
+        fireEvent.click(screen.getByRole('button', { name: 'Add text outline style' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Publish outlines' }))
+        await waitFor(() => expect(mocks.publishOutlines).toHaveBeenCalledWith('7', 3, 4))
+        expect(mocks.save).toHaveBeenCalledTimes(1)
+        expect(mocks.publish).not.toHaveBeenCalled()
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Publish outlines' })).toBeDisabled())
+        expect(screen.getByRole('button', { name: 'Publish changes' })).toBeDisabled()
+    })
+
+    it('saves new outlines in a stale Designer draft while keeping publication blocked', async () => {
+        const staleWorkspace = { ...structuredClone(workspace), draftIsStale: true, hasDraftChanges: true }
+        mocks.workspace.mockResolvedValue(staleWorkspace)
+        mocks.save.mockImplementation(async (_themeId, payload) => ({
+            ...staleWorkspace, textOutlineStyles: payload.textOutlineStyles, draftVersion: 3,
+        }))
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        fireEvent.click(await screen.findByRole('button', { name: 'Text outline styles' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Add text outline style' }))
+        fireEvent.change(screen.getByLabelText('Style name'), { target: { value: 'Saved outline' } })
+        expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Publish changes' })).toBeDisabled()
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
+        expect(Object.values(mocks.save.mock.calls[0][1].textOutlineStyles)).toEqual([
+            expect.objectContaining({ name: 'Saved outline' }),
+        ])
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled())
+        expect(screen.getByLabelText('Style name')).toHaveValue('Saved outline')
+        expect(screen.getByRole('button', { name: 'Publish changes' })).toBeDisabled()
+        expect(screen.getByRole('alert')).toHaveTextContent('You can save your edits as a draft.')
+        expect(mocks.publish).not.toHaveBeenCalled()
+    })
+
+    it('edits text outline styles in Designer and saves them with the draft', async () => {
+        renderWithStateProviders(<DesignerThemeWorkspacePage />)
+        await screen.findByRole('button', { name: 'Text outline styles' })
+        fireEvent.click(screen.getByRole('button', { name: 'Text outline styles' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Add text outline style' }))
+        fireEvent.change(screen.getByLabelText('Style name'), { target: { value: 'Soft halo' } })
+        fireEvent.change(screen.getByLabelText('Effect'), { target: { value: 'gradientBlur' } })
+        fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
+        await waitFor(() => expect(mocks.save).toHaveBeenCalledWith('7', expect.objectContaining({
+            textOutlineStyles: expect.any(Object),
+        })))
+        expect(Object.values(mocks.save.mock.calls[0][1].textOutlineStyles)).toEqual([expect.objectContaining({ name: 'Soft halo', style: 'gradientBlur' })])
     })
 
     it('uses the isolated React render frame without exposing internal theme concepts', async () => {
@@ -2925,7 +2980,7 @@ describe('DesignerThemeWorkspacePage', () => {
         expect(mocks.preview).not.toHaveBeenCalled()
         fireEvent.click(screen.getByRole('button', { name: /save draft/i }))
         await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
-        expect(Object.keys(mocks.save.mock.calls[0][1]).sort()).toEqual(['colors', 'description', 'draftVersion', 'fonts', 'name', 'spacing', 'typography'])
+        expect(Object.keys(mocks.save.mock.calls[0][1]).sort()).toEqual(['colors', 'description', 'draftVersion', 'fonts', 'name', 'spacing', 'textOutlineStyles', 'typography'])
         const publishButton = screen.getByRole('button', { name: /publish changes/i })
         await waitFor(() => expect(publishButton).toBeEnabled())
         fireEvent.click(publishButton)

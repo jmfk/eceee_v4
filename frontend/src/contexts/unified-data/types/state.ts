@@ -63,6 +63,7 @@ export interface ThemeData {
   styles?: Record<string, any>;        // DEPRECATED: Component-specific styles
   cssVariables?: Record<string, string>;
   htmlElements?: Record<string, any>;
+  textOutlineStyles?: Record<string, any>;
   imageStyles?: Record<string, any>;
   customCss?: string;
   // Metadata

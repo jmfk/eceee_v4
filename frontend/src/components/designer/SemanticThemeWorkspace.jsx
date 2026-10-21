@@ -8,6 +8,7 @@ import { getBreakpoints, mapBreakpointName } from '../../utils/themeUtils'
 import { resolvePagePreviewModel } from '../resolvePagePreviewModel'
 import { designerPreviewWidth, themeBreakpointDefinition } from '../theme/breakpointConfig'
 import { inheritedLayoutStyle } from './layoutStyleInheritance'
+import TextOutlineStylesEditor from './TextOutlineStylesEditor'
 import { ThemeColorField, ThemeFontField, ThemeFontsEditor, ThemePaletteEditor } from './ThemeDesignTokens'
 const typographyLabels = {
     fontFamily: 'Font family', fontSize: 'Size', fontWeight: 'Weight', fontStyle: 'Style',
@@ -657,7 +658,7 @@ const SemanticThemeWorkspace = ({
     placeholderDrafts, setPlaceholderDrafts,
     loadPageContent, loadObjectContent, importPreviewSource, deletePreviewContent,
     savePreviewText, replacePreviewImage, pendingPreviewTextsRef, onPendingPreviewTextsChange,
-    previewTextResetVersion, disabled, mobilePane,
+    previewTextResetVersion, disabled, mobilePane, onPublishOutlines,
 }) => {
     const initialViews = workspace.previewContent?.views || workspace.catalog.previewViews || []
     const initialExternalContent = [
@@ -2639,6 +2640,7 @@ const SemanticThemeWorkspace = ({
                                 </button>
                                 : contentMode === 'demo' && previewContent.views.map((view) => <button type="button" key={view.id} aria-label={view.label} onClick={() => { setWorkspaceView('preview'); setViewId(view.id); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'preview' && view.id === viewId)}>{view.kind === 'object' ? <Box className="h-4 w-4 shrink-0" /> : <FileText className="h-4 w-4 shrink-0" />}<TruncatedNavigationText value={view.label} /></button>)}
                             <button type="button" onClick={() => { setWorkspaceView('details'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'details')}><Settings2 className="h-4 w-4 shrink-0" />Theme details</button>
+                            <button type="button" onClick={() => { setWorkspaceView('outlines'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'outlines')}><Palette className="h-4 w-4 shrink-0" />Text outline styles</button>
                             <button type="button" onClick={() => { setWorkspaceView('palette'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'palette')}><Palette className="h-4 w-4 shrink-0" />Theme palette</button>
                             <button type="button" onClick={() => { setWorkspaceView('fonts'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'fonts')}><Type className="h-4 w-4 shrink-0" />Theme fonts</button>
                             <button type="button" onClick={() => { setWorkspaceView('images'); setSelectedTarget(null) }} className={navigationButtonClass(workspaceView === 'images')}><ImageIcon className="h-4 w-4 shrink-0" />Theme images</button>
@@ -2730,6 +2732,11 @@ const SemanticThemeWorkspace = ({
                 <fieldset disabled={disabled} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-2">
                     {workspaceView === 'details'
                         ? themeDetailsEditor
+                        : workspaceView === 'outlines'
+                            ? <div className="space-y-4"><TextOutlineStylesEditor styles={workspace.textOutlineStyles || {}} onChange={styles => updateWorkspace(next => { next.textOutlineStyles = styles; return next })} />
+                                <p className="text-xs text-gray-500">Save draft keeps these styles in Designer. Publish outlines makes them available in WYSIWYG and public rendering without publishing other draft changes.</p>
+                                <button type="button" disabled={disabled || JSON.stringify(workspace.textOutlineStyles || {}) === JSON.stringify(workspace.liveTextOutlineStyles || {})} onClick={onPublishOutlines} className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-40">Publish outlines</button>
+                            </div>
                         : workspaceView === 'palette'
                             ? <ThemePaletteEditor colors={workspace.colors} onChange={updateThemeColor} onAdd={addThemeColor} />
                             : workspaceView === 'fonts'

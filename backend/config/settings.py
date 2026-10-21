@@ -433,7 +433,7 @@ REST_FRAMEWORK = {
         "no_underscore_before_number": True,
         # Exclude schema and pageData fields from case conversion
         # "ignore_fields": ["schema", "page_data", "pageData"],
-        "ignore_fields": [],
+        "ignore_fields": ["text_outline_styles", "textOutlineStyles"],
     },
 }
 

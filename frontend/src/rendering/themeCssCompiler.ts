@@ -1,3 +1,4 @@
+import { textOutlineCss } from '../utils/textOutlineStyles'
 import manifest from './generated/render-manifest.json' with { type: 'json' }
 import { PUBLIC_RENDER_CSS } from './publicRenderCss'
 import { generateDesignGroupsCSS, getBreakpoints } from '../utils/themeUtils'
@@ -283,6 +284,7 @@ export const compileRenderStyles = ({
             widgetCss(),
             variablesCss(variables),
             themeRootCss(theme.fonts),
+            textOutlineCss(rawTheme?.textOutlineStyles ?? rawTheme?.text_outline_styles),
             designCss,
             styleCollectionCss(theme.componentStyles, theme.breakpoints),
             styleCollectionCss(theme.imageStyles, theme.breakpoints),

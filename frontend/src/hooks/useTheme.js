@@ -1,5 +1,6 @@
 /** Theme data and editor-only stylesheet hooks. */
 
+import { usePublishedThemeOutlines } from './usePublishedThemeOutlines'
 import { useContext, useEffect, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { pagesApi } from '../api'
@@ -37,7 +38,7 @@ export const useThemeData = ({ pageId = null, enabled = true } = {}) => {
         return version?.effectiveTheme || (version?.theme ? state.themes[version.theme] : null)
     }, [udcContext])
 
-    const theme = udcTheme || pageData?.effectiveTheme
+    const theme = usePublishedThemeOutlines(udcTheme || pageData?.effectiveTheme, enabled)
     return {
         theme,
         currentTheme: theme,
@@ -62,7 +63,8 @@ export const useEditorThemeStyles = ({
         ? new Error('This browser cannot safely isolate site CSS. Theme styling is disabled in the editor.')
         : null
 
-    const renderStylesInput = useMemo(() => ({ theme, page, version }), [page, theme, version])
+    const refreshedTheme = usePublishedThemeOutlines(theme, enabled)
+    const renderStylesInput = useMemo(() => ({ theme: refreshedTheme, page, version }), [page, refreshedTheme, version])
     const renderStyles = useBrowserRenderStyles(renderStylesInput)
     const { css, compileError } = useMemo(() => {
         if (!enabled || !styleKey || !scopeSupported) return { css: '', compileError: null }

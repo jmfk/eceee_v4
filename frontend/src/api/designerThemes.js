@@ -44,6 +44,7 @@ export const designerThemesApi = {
     loadPreviewPage: async (themeId, sourcePageId) => unwrap(await api.post(`${base}/themes/${themeId}/preview-content/from-page/`, { sourcePageId })),
     loadPreviewObject: async (themeId, sourceObjectId) => unwrap(await api.post(`${base}/themes/${themeId}/preview-content/from-object/`, { sourceObjectId })),
     save: async (themeId, patch) => unwrap(await api.patch(`${base}/themes/${themeId}/workspace/`, patch)),
+    publishOutlines: async (themeId, draftVersion, liveSyncVersion) => unwrap(await api.post(`${base}/themes/${themeId}/outlines/publish/`, { draftVersion, liveSyncVersion })),
     publish: async (themeId, draftVersion) => unwrap(await api.post(`${base}/themes/${themeId}/publish/`, { draftVersion })),
     undo: async (themeId, draftVersion, liveSyncVersion) => unwrap(await api.post(`${base}/themes/${themeId}/undo/`, { draftVersion, liveSyncVersion })),
     discard: async (themeId, draftVersion) => unwrap(await api.post(`${base}/themes/${themeId}/discard/`, { draftVersion })),

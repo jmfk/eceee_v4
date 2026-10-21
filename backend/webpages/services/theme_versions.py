@@ -21,6 +21,7 @@ SNAPSHOT_FIELDS = (
     "designer_preview",
     "layouts",
     "image_styles",
+    "text_outline_styles",
     "gallery_styles",
     "carousel_styles",
     "table_templates",
@@ -102,6 +103,8 @@ def restore_theme_version(theme, version, *, user):
     from webpages.services.theme_preview_content import materialize_legacy_preview_collections
 
     for field in SNAPSHOT_FIELDS:
+        if field == "text_outline_styles" and field not in version.snapshot:
+            theme.text_outline_styles = {}
         if field in version.snapshot:
             value = version.snapshot[field]
             if field == "designer_preview":

@@ -1,4 +1,5 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Download, LayoutTemplate, Loader2, RotateCcw, Save, Send, Undo2 } from 'lucide-react'
 
@@ -16,6 +17,7 @@ const workspaceDraftPayload = (workspace) => workspace ? ({
     draftVersion: workspace.draftVersion,
     name: workspace.name,
     description: workspace.description || '',
+    textOutlineStyles: workspace.textOutlineStyles || {},
     colors: Object.fromEntries(workspace.colors.map((color) => [color.name, color.value])),
     fonts: workspace.fonts.filter((font) => font.family.trim()).map((font) => ({ family: font.family, variants: font.variants, display: font.display })),
     typography: workspace.typography.map((row) => ({ groupIndex: row.groupIndex, element: row.element, values: row.values })),
@@ -31,6 +33,7 @@ const workspaceSignature = (workspace) => JSON.stringify(workspaceDraftPayload(w
 
 const DesignerThemeWorkspacePage = () => {
     const { themeId } = useParams()
+    const queryClient = useQueryClient()
     const navigate = useNavigate()
     const { addNotification } = useGlobalNotifications()
     const [workspace, setWorkspace] = useState(null)
@@ -141,6 +144,22 @@ const DesignerThemeWorkspacePage = () => {
             addNotification({ type: 'success', message: 'Designer draft published atomically' })
         } catch (err) {
             addNotification({ type: 'error', message: err.message || 'Draft could not be published' })
+        } finally {
+            setPublishing(false)
+        }
+    }
+
+    const publishOutlines = async () => {
+        const current = dirty ? await saveDraft({ silent: true, persistPreviewTexts: false }) : workspace
+        if (!current) return
+        setPublishing(true)
+        try {
+            const result = await designerThemesApi.publishOutlines(themeId, current.draftVersion, current.liveSyncVersion)
+            acceptWorkspace(result)
+            await queryClient.invalidateQueries({ queryKey: ['published-theme-outlines', String(themeId)] })
+            addNotification({ type: 'success', message: 'Outlines published and available in the page editor' })
+        } catch (err) {
+            addNotification({ type: 'error', message: err.response?.data?.error || err.message || 'Outlines could not be published' })
         } finally {
             setPublishing(false)
         }
@@ -366,14 +385,14 @@ const DesignerThemeWorkspacePage = () => {
                     <button type="button" onClick={exportPackage} disabled={exporting} title={exportProgress?.message} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-50">{exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{exporting ? `Export ${exportProgress?.percent || 0}%` : 'Export'}</button>
                     <button type="button" onClick={undoPublish} disabled={!workspace.canUndo || hasDraftChanges || workspace.draftIsStale || controlsDisabled} title={hasDraftChanges ? 'Publish or discard draft changes before restoring' : 'Restore the version before the latest Designer publish'} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-40">{restoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}Undo publish</button>
                     <button type="button" onClick={discardDraft} disabled={(!hasDraftChanges && !workspace.draftIsStale) || controlsDisabled} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-40"><RotateCcw className="h-4 w-4" />Discard draft</button>
-                    <button type="button" onClick={() => saveDraft()} disabled={!hasUnsavedLocalChanges || themeNameMissing || workspace.draftIsStale || controlsDisabled} className="inline-flex items-center gap-2 rounded-md border border-blue-600 bg-white px-3 py-2 text-sm font-medium text-blue-700 disabled:opacity-40">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save draft</button>
+                    <button type="button" onClick={() => saveDraft()} disabled={!hasUnsavedLocalChanges || themeNameMissing || controlsDisabled} className="inline-flex items-center gap-2 rounded-md border border-blue-600 bg-white px-3 py-2 text-sm font-medium text-blue-700 disabled:opacity-40">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save draft</button>
                     <button type="button" onClick={publish} disabled={!hasDraftChanges || themeNameMissing || workspace.draftIsStale || controlsDisabled} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">{publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Publish changes</button>
                 </div>
             </header>
-            {workspace.draftIsStale && <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:px-6">The live theme changed after this draft was started. Discard the draft to reload the current live version before making or publishing more changes.</div>}
+            {workspace.draftIsStale && <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:px-6">The live theme changed after this draft was started. You can save your edits as a draft. Publishing the whole draft is blocked to protect newer live changes. You can publish outline styles separately in Text outline styles. Export the draft before discarding it if you need to keep that work.</div>}
             <div className="flex border-b border-gray-200 bg-white xl:hidden"><button type="button" onClick={() => setMobilePane('edit')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'edit' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Edit</button><button type="button" onClick={() => setMobilePane('preview')} className={`flex-1 px-4 py-2 text-sm ${mobilePane === 'preview' ? 'border-b-2 border-blue-600 font-medium' : ''}`}>Preview</button></div>
-            <SemanticThemeWorkspace workspace={workspace} preview={preview} viewport={viewport} onViewportChange={setViewport} mobilePane={mobilePane} updateWorkspace={updateWorkspace} replaceAsset={replaceAsset} createPlaceholder={createPlaceholder} placeholderDrafts={placeholderDrafts} setPlaceholderDrafts={setPlaceholderDrafts} loadPageContent={loadPageContent} loadObjectContent={loadObjectContent} importPreviewSource={importPreviewSource} deletePreviewContent={deletePreviewContent} savePreviewText={savePreviewText} replacePreviewImage={replacePreviewImage} pendingPreviewTextsRef={pendingPreviewTextsRef} onPendingPreviewTextsChange={refreshPendingPreviewTextState} previewTextResetVersion={previewTextResetVersion} disabled={controlsDisabled} />
-            <StatusBar customStatusContent={<span>{workspace.draftIsStale ? 'Draft is stale · discard to reload' : hasUnsavedLocalChanges ? 'Unsaved local draft changes' : workspace.hasDraftChanges ? 'Draft saved · not published' : 'Draft matches the live theme'}</span>} />
+            <SemanticThemeWorkspace onPublishOutlines={publishOutlines} workspace={workspace} preview={preview} viewport={viewport} onViewportChange={setViewport} mobilePane={mobilePane} updateWorkspace={updateWorkspace} replaceAsset={replaceAsset} createPlaceholder={createPlaceholder} placeholderDrafts={placeholderDrafts} setPlaceholderDrafts={setPlaceholderDrafts} loadPageContent={loadPageContent} loadObjectContent={loadObjectContent} importPreviewSource={importPreviewSource} deletePreviewContent={deletePreviewContent} savePreviewText={savePreviewText} replacePreviewImage={replacePreviewImage} pendingPreviewTextsRef={pendingPreviewTextsRef} onPendingPreviewTextsChange={refreshPendingPreviewTextState} previewTextResetVersion={previewTextResetVersion} disabled={controlsDisabled} />
+            <StatusBar customStatusContent={<span>{workspace.draftIsStale ? hasUnsavedLocalChanges ? 'Unsaved draft changes · live theme changed' : 'Draft saved · publishing blocked by live changes' : hasUnsavedLocalChanges ? 'Unsaved local draft changes' : workspace.hasDraftChanges ? 'Draft saved · not published' : 'Draft matches the live theme'}</span>} />
         </div>
     )
 }

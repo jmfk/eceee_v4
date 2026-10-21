@@ -180,6 +180,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "designer_preview",
             "layouts",
             "image_styles",
+            "text_outline_styles",
             "gallery_styles",
             "carousel_styles",
             "table_templates",
@@ -319,6 +320,11 @@ class PageThemeSerializer(serializers.ModelSerializer):
         if self.instance is not None:
             normalized = materialize_legacy_preview_collections(normalized, self.instance.tenant)
         return normalized
+
+    def validate_text_outline_styles(self, value):
+        from webpages.text_outline_styles import validate_text_outline_styles
+
+        return validate_text_outline_styles(value)
 
     def validate_image_styles(self, value):
         """Validate image_styles configuration (unified gallery and carousel)"""

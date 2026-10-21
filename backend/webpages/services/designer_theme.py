@@ -905,6 +905,7 @@ def theme_designer_snapshot(theme):
         "name": theme.name,
         "description": theme.description,
         "colors": copy.deepcopy(theme.colors),
+        "text_outline_styles": copy.deepcopy(theme.text_outline_styles),
         "fonts": copy.deepcopy(theme.fonts),
         "design_groups": copy.deepcopy(theme.design_groups),
         "designer_preview": copy.deepcopy(theme.designer_preview),
@@ -983,6 +984,7 @@ def apply_designer_snapshot(theme, snapshot):
     theme.name = snapshot.get("name", theme.name)
     theme.description = snapshot.get("description", theme.description)
     theme.colors = copy.deepcopy(snapshot.get("colors", {}))
+    theme.text_outline_styles = copy.deepcopy(snapshot.get("text_outline_styles", {}))
     theme.fonts = copy.deepcopy(snapshot.get("fonts", {}))
     theme.design_groups = copy.deepcopy(snapshot.get("design_groups", {}))
     theme.designer_preview = materialize_theme_preview_page_links(
@@ -1042,6 +1044,7 @@ def build_draft_workspace(theme, draft, include_tenant_content=False):
     workspace.update(
         {
             "liveSyncVersion": theme.sync_version,
+            "liveTextOutlineStyles": copy.deepcopy(theme.text_outline_styles),
             "draftVersion": draft.version,
             "hasDraftChanges": draft.has_changes,
             "draftUpdatedAt": draft.updated_at,
@@ -1410,6 +1413,7 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
         "themeConfig": theme_config,
         "syncVersion": theme.sync_version,
         "colors": colors,
+        "textOutlineStyles": copy.deepcopy(theme.text_outline_styles),
         "fonts": fonts,
         "typography": typography,
         "spacing": spacing,
@@ -1467,7 +1471,17 @@ def _integer(value, field_name):
 def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=True):
     if not isinstance(payload, dict):
         raise ValidationError("Designer patch must be an object.")
-    allowed_top = {"sync_version", "name", "description", "colors", "fonts", "typography", "spacing", "layouts"}
+    allowed_top = {
+        "sync_version",
+        "name",
+        "description",
+        "colors",
+        "fonts",
+        "typography",
+        "spacing",
+        "layouts",
+        "text_outline_styles",
+    }
     unknown = set(payload) - allowed_top
     if unknown:
         raise ValidationError(f"Unsupported designer fields: {', '.join(sorted(unknown))}")
@@ -1519,6 +1533,13 @@ def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=Tr
         serializer = PageThemeSerializer(theme, data={"colors": colors}, partial=True)
         serializer.is_valid(raise_exception=True)
         theme.colors = colors
+
+    if "text_outline_styles" in payload:
+        serializer = PageThemeSerializer(
+            theme, data={"text_outline_styles": payload["text_outline_styles"]}, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        theme.text_outline_styles = serializer.validated_data["text_outline_styles"]
 
     if "fonts" in payload:
         fonts = payload["fonts"]
@@ -1710,8 +1731,8 @@ def save_designer_draft(theme_id, tenant, user, payload):
             raise PermissionError
         draft = get_or_create_designer_draft(theme, user)
         draft = ThemeDesignerDraft.objects.select_for_update().get(pk=draft.pk)
-        if draft.base_sync_version != theme.sync_version:
-            raise DesignerDraftConflict("The live theme changed after this draft was started.")
+        # Staleness against the live theme blocks publication, not preservation
+        # of work in the separate draft. Keep its original base version intact.
         if _integer(payload.get("draft_version", -1), "draftVersion") != draft.version:
             raise DesignerDraftConflict("The Designer draft changed after you opened it.")
         patch = {key: value for key, value in payload.items() if key != "draft_version"}
@@ -1757,6 +1778,7 @@ def publish_designer_draft(theme_id, tenant, user, draft_version):
                         "description",
                         "colors",
                         "fonts",
+                        "text_outline_styles",
                         "design_groups",
                         "designer_preview",
                         "layouts",
@@ -1785,6 +1807,73 @@ def publish_designer_draft(theme_id, tenant, user, draft_version):
                 "updated_by",
                 "updated_at",
             ]
+        )
+        return theme, draft
+
+
+def publish_outline_draft(theme_id, tenant, user, draft_version, live_sync_version):
+    """Publish only outline edits, preserving unrelated live and draft changes."""
+    from webpages.models import ThemeVersion
+    from webpages.text_outline_styles import default_text_outline_styles, validate_text_outline_styles
+
+    with transaction.atomic():
+        Tenant.objects.select_for_update().get(pk=tenant.pk)
+        theme = PageTheme.objects.select_for_update().get(id=theme_id, tenant=tenant)
+        if not user_can_design_theme(user, theme):
+            raise PermissionError
+        draft = ThemeDesignerDraft.objects.select_for_update().filter(theme=theme).first()
+        if not draft or draft.version != _integer(draft_version, "draftVersion"):
+            raise DesignerDraftConflict("The outline draft changed. Reload Designer before publishing.")
+        if theme.sync_version != _integer(live_sync_version, "liveSyncVersion"):
+            raise DesignerDraftConflict("The live theme changed. Reload Designer before publishing outlines.")
+        was_stale = draft.base_sync_version != theme.sync_version
+        if was_stale:
+            base = ThemeVersion.objects.filter(theme=theme, sync_version=draft.base_sync_version).first()
+            if not base:
+                raise DesignerDraftConflict(
+                    "This draft's original version is unavailable. Export it before starting a new draft."
+                )
+            base_styles = base.snapshot.get("text_outline_styles", default_text_outline_styles())
+        else:
+            base_styles = theme.text_outline_styles
+        desired = validate_text_outline_styles(draft.snapshot.get("text_outline_styles", {}))
+        merged = copy.deepcopy(theme.text_outline_styles)
+        missing = object()
+        for key in set(base_styles) | set(desired):
+            before, after = base_styles.get(key, missing), desired.get(key, missing)
+            if before == after:
+                continue
+            current = merged.get(key, missing)
+            if current != before and current != after:
+                raise DesignerDraftConflict(
+                    f"Outline '{key}' also changed in the live theme. Resolve that style before publishing."
+                )
+            if after is missing:
+                merged.pop(key, None)
+            else:
+                merged[key] = after
+        merged = validate_text_outline_styles(merged)
+        if merged == theme.text_outline_styles:
+            raise DesignerDraftConflict("There are no outline changes to publish.")
+        # A normal theme save records recoverable history and invalidates theme CSS.
+        theme.text_outline_styles = merged
+        theme.sync_source = "web"
+        theme.save(
+            update_fields=["text_outline_styles", "sync_source", "updated_at"],
+            version_created_by=user,
+            version_source_label="Publish text outline styles",
+        )
+        draft.snapshot["text_outline_styles"] = copy.deepcopy(merged)
+        draft.version += 1
+        draft.has_changes = theme_designer_snapshot(theme_from_designer_draft(theme, draft)) != theme_designer_snapshot(
+            theme
+        )
+        # Never rebase unrelated stale work just because the outlines were published.
+        if not was_stale or not draft.has_changes:
+            draft.base_sync_version = theme.sync_version
+        draft.updated_by = user
+        draft.save(
+            update_fields=["snapshot", "version", "has_changes", "base_sync_version", "updated_by", "updated_at"]
         )
         return theme, draft
 
@@ -1892,6 +1981,7 @@ def undo_designer_publish(theme_id, tenant, user, draft_version, live_sync_versi
                         "description",
                         "colors",
                         "fonts",
+                        "text_outline_styles",
                         "design_groups",
                         "designer_preview",
                         "layouts",

@@ -9,6 +9,7 @@
  * 5. Table Templates - Predefined table templates
  */
 
+import { defaultTextOutlineStyles } from '../utils/textOutlineStyles'
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -42,6 +43,7 @@ import DesignerAccessPanel from './theme/DesignerAccessPanel';
 import PreviewViewsTab from './theme/PreviewViewsTab';
 import ThemeVersionsTab from './theme/ThemeVersionsTab';
 import LayoutEditor from './LayoutEditor';
+import TextOutlineStylesEditor from './designer/TextOutlineStylesEditor'
 import ThemeEditorNavigation from './theme/ThemeEditorNavigation';
 
 const ThemeEditor = ({ onSave }) => {
@@ -144,6 +146,7 @@ const ThemeEditor = ({ onSave }) => {
                 componentStyles: {},
                 designerPreview: { views: [] },
                 imageStyles: {},
+                textOutlineStyles: defaultTextOutlineStyles(),
                 tableTemplates: {},
                 isActive: true,
                 isDefault: false,
@@ -166,6 +169,7 @@ const ThemeEditor = ({ onSave }) => {
                 componentStyles: normalizedData.componentStyles || {},
                 designerPreview: normalizedData.designerPreview || { views: [] },
                 imageStyles: normalizedData.imageStyles || {},
+                textOutlineStyles: normalizedData.textOutlineStyles || {},
                 tableTemplates: normalizedData.tableTemplates || {},
                 image: normalizedData.image || null,
                 siteIcon: normalizedData.siteIcon || null,
@@ -407,6 +411,7 @@ const ThemeEditor = ({ onSave }) => {
                 componentStyles: pastedData.componentStyles || {},
                 designerPreview: pastedData.designerPreview || {},
                 imageStyles: pastedData.imageStyles || {},
+                textOutlineStyles: pastedData.textOutlineStyles || {},
                 tableTemplates: pastedData.tableTemplates || {},
             };
 
@@ -675,6 +680,7 @@ const ThemeEditor = ({ onSave }) => {
             id: 'components', label: 'Components', items: [
                 { id: 'component-styles', label: 'Component Styles' },
                 { id: 'image-styles', label: 'Image Styles' },
+                { id: 'text-outline-styles', label: 'Text Outline Styles' },
                 { id: 'table-templates', label: 'Table Templates' },
             ],
         },
@@ -818,6 +824,7 @@ const ThemeEditor = ({ onSave }) => {
                                                             componentStyles: theme.componentStyles || {},
                                                             designerPreview: theme.designerPreview || {},
                                                             imageStyles: theme.imageStyles || {},
+                                                            textOutlineStyles: theme.textOutlineStyles || {},
                                                             tableTemplates: theme.tableTemplates || {},
                                                             image: theme.image || null,
                                                         }}
@@ -1184,6 +1191,7 @@ const ThemeEditor = ({ onSave }) => {
                         />
                     )}
 
+                    {activeTab === 'text-outline-styles' && <TextOutlineStylesEditor styles={themeData?.textOutlineStyles || {}} onChange={styles => updateThemeField('textOutlineStyles', styles)} />}
                     {activeTab === 'image-styles' && (
                         <ImageStylesTab
                             ref={imageStylesTabRef}
