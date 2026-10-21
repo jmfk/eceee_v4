@@ -281,6 +281,7 @@ const SectionWidget = ({
                     parentComponentId={componentId}
                     contextType={contextType}
                     pageId={context.pageId}
+                    namespace={context?.namespace || props.namespace}
                     webpageData={context.webpageData}
                     pageVersionData={context.pageVersionData}
                     versionId={context.versionId}
@@ -290,7 +291,7 @@ const SectionWidget = ({
                 />
             </>
         );
-    }, [widgetPath, componentId, contextType, context, pasteModeActive, onPasteAtPosition]);
+    }, [widgetPath, componentId, contextType, context, props.namespace, pasteModeActive, onPasteAtPosition]);
 
     // Show loading state while fetching widget types
     if (mode === 'editor' && isLoadingTypes) {
@@ -380,6 +381,7 @@ const SectionWidget = ({
                         onSlotChange={handleSlotChange}
                         parentComponentId={parentComponentId}
                         pageId={context?.pageId || props.pageId}
+                        namespace={context?.namespace || props.namespace}
                         versionId={context?.versionId || props.versionId}
                         webpageData={context?.webpageData || props.webpageData}
                         pageVersionData={context?.pageVersionData || props.pageVersionData}

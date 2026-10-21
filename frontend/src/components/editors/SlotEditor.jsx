@@ -18,6 +18,7 @@ const SlotEditor = forwardRef(({
     parentWidgetId,
     parentSlotName, // Top-level slot where parent widget lives (legacy)
     contextType = 'page',
+    namespace = null,
     pageId = null,
     versionId = null,
     webpageData = null,
@@ -81,6 +82,7 @@ const SlotEditor = forwardRef(({
                 parentWidgetId={parentWidgetId}
                 parentSlotName={parentSlotName}
                 contextType={contextType}
+                namespace={namespace}
                 pageId={pageId}
                 versionId={versionId}
                 webpageData={webpageData}
@@ -127,6 +129,7 @@ SlotEditor.propTypes = {
     maxWidgets: PropTypes.number,
     parentWidgetId: PropTypes.string.isRequired,
     contextType: PropTypes.oneOf(['page', 'object']),
+    namespace: PropTypes.string,
     onWidgetEdit: PropTypes.func,
     onOpenWidgetEditor: PropTypes.func,
     onSlotChange: PropTypes.func,
