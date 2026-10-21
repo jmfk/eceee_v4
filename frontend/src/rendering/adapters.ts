@@ -139,6 +139,7 @@ const normalizeWidget = (widget: any, fallbackId: string, referencesByObject?: W
     return {
         id: String(widget?.id ?? fallbackId),
         type: String(widget?.type || widget?.widget_type || ''),
+        typeVersion: widget?.typeVersion ?? widget?.type_version,
         config,
         data: widget?.data || widget?.resolvedData,
         inheritedFrom: widget?.inheritedFrom || widget?.inherited_from || null,
@@ -407,6 +408,7 @@ export const createDesignerRenderModel = ({
                 objectType,
             } : {}),
             preview: true,
+            themeWidgetTypes: workspace?.widgetTypes || workspace?.themeConfig?.widget_types || workspace?.themeConfig?.widgetTypes,
             componentStyles: Object.fromEntries((workspace?.catalog?.componentStyles || []).map((style: any) => [style.key, style])),
         },
         themeCss: themeCss || '',

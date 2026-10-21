@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import type { ThemeWidgetDocument } from './themeWidgets'
 
 export type RenderStatus = 'ready' | 'loading' | 'empty' | 'error'
 
@@ -13,6 +14,7 @@ export interface ResolvedRenderData {
 export interface RenderWidgetModel {
     id: string
     type: string
+    typeVersion?: number
     config: Record<string, any>
     data?: ResolvedRenderData
     inheritedFrom?: Record<string, unknown> | null
@@ -27,6 +29,7 @@ export interface DesignerPreviewImageReference {
 }
 
 export interface RenderContext {
+    themeWidgetTypes?: ThemeWidgetDocument
     tenantId?: string
     siteId?: string | number
     siteHostnames?: string[]

@@ -909,6 +909,7 @@ def theme_designer_snapshot(theme):
         "fonts": copy.deepcopy(theme.fonts),
         "design_groups": copy.deepcopy(theme.design_groups),
         "designer_preview": copy.deepcopy(theme.designer_preview),
+        "widget_types": copy.deepcopy(theme.widget_types),
         "layouts": {
             **copy.deepcopy(theme.layouts),
             "special_pages": theme_special_pages(theme.layouts),
@@ -981,6 +982,7 @@ def apply_designer_snapshot(theme, snapshot):
         materialize_theme_preview_page_links,
     )
 
+    theme.widget_types = copy.deepcopy(snapshot.get("widget_types", theme.widget_types))
     theme.name = snapshot.get("name", theme.name)
     theme.description = snapshot.get("description", theme.description)
     theme.colors = copy.deepcopy(snapshot.get("colors", {}))
@@ -1041,12 +1043,14 @@ def build_draft_workspace(theme, draft, include_tenant_content=False):
         theme_from_designer_draft(theme, draft),
         include_tenant_content=include_tenant_content,
     )
+    live_snapshot = theme_designer_snapshot(theme)
     workspace.update(
         {
             "liveSyncVersion": theme.sync_version,
             "liveTextOutlineStyles": copy.deepcopy(theme.text_outline_styles),
             "draftVersion": draft.version,
             "hasDraftChanges": draft.has_changes,
+            "draftChangedAreas": [key for key, value in draft.snapshot.items() if live_snapshot.get(key) != value],
             "draftUpdatedAt": draft.updated_at,
             "draftUpdatedBy": draft.updated_by.username,
             "draftIsStale": draft.base_sync_version != theme.sync_version,
@@ -1419,6 +1423,7 @@ def build_workspace(theme: PageTheme, include_tenant_content=False):
         "spacing": spacing,
         "assets": assets,
         "breakpoints": theme.get_breakpoints(),
+        "widgetTypes": copy.deepcopy(theme.widget_types),
         "layouts": copy.deepcopy(theme.layouts),
         "layoutUsage": theme_layout_usage(theme),
         "catalog": catalog,
@@ -1481,12 +1486,19 @@ def apply_designer_patch(theme: PageTheme, payload: dict, *, validate_version=Tr
         "spacing",
         "layouts",
         "text_outline_styles",
+        "widget_types",
     }
     unknown = set(payload) - allowed_top
     if unknown:
         raise ValidationError(f"Unsupported designer fields: {', '.join(sorted(unknown))}")
     if validate_version and _integer(payload.get("sync_version", -1), "syncVersion") != theme.sync_version:
         raise ValueError("stale")
+
+    if "widget_types" in payload:
+        from webpages.theme_widgets import validate_widget_types
+
+        validate_widget_types(payload["widget_types"], previous=theme.widget_types, draft=True)
+        theme.widget_types = copy.deepcopy(payload["widget_types"])
 
     if "name" in payload:
         if not isinstance(payload["name"], str):
@@ -1766,7 +1778,13 @@ def publish_designer_draft(theme_id, tenant, user, draft_version):
         validate_theme_layouts(draft_layouts)
         validate_layout_compatibility(theme, draft_layouts)
         create_revision(theme, user, "Publish Designer draft")
+        from webpages.theme_widgets import publish_widget_types
+
+        published_widgets = publish_widget_types(
+            draft.snapshot.get("widget_types", theme.widget_types), theme.widget_types
+        )
         apply_designer_snapshot(theme, draft.snapshot)
+        theme.widget_types = published_widgets
         if PageTheme.objects.filter(tenant=theme.tenant, name=theme.name).exclude(pk=theme.pk).exists():
             raise DesignerDraftConflict("Another theme now uses this name. Choose a different name before publishing.")
         theme.sync_source = "web"
@@ -1782,6 +1800,7 @@ def publish_designer_draft(theme_id, tenant, user, draft_version):
                         "design_groups",
                         "designer_preview",
                         "layouts",
+                        "widget_types",
                         "image",
                         "site_icon",
                         "sync_source",
@@ -1974,7 +1993,11 @@ def undo_designer_publish(theme_id, tenant, user, draft_version, live_sync_versi
         restored_layouts = revision.snapshot.get("layouts", theme.layouts)
         validate_theme_layouts(restored_layouts)
         validate_layout_compatibility(theme, restored_layouts)
+        from webpages.theme_widgets import retain_released_history
+
+        restored_widgets = retain_released_history(revision.snapshot.get("widget_types"), theme.widget_types)
         apply_designer_snapshot(theme, revision.snapshot)
+        theme.widget_types = restored_widgets
         if PageTheme.objects.filter(tenant=theme.tenant, name=theme.name).exclude(id=theme.id).exists():
             raise DesignerDraftConflict("Another theme now uses this name. Rename it before restoring.")
         theme.sync_source = "web"
@@ -1990,6 +2013,7 @@ def undo_designer_publish(theme_id, tenant, user, draft_version, live_sync_versi
                         "design_groups",
                         "designer_preview",
                         "layouts",
+                        "widget_types",
                         "image",
                         "site_icon",
                         "sync_source",

@@ -90,6 +90,7 @@ export const buildResolvedRenderModel = async ({
             pathVariables,
             simulatedPath,
             renderRoutePrefix: `/_render/${resolved.siteId}`,
+            themeWidgetTypes: theme?.widgetTypes || theme?.widget_types,
             componentStyles: theme?.componentStyles
                 || theme?.component_styles
                 || {},

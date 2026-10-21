@@ -295,6 +295,7 @@ const PageWidgetFactory = ({
                         >
                             <CoreWidgetComponent
                                 config={widget.config || {}}
+                                typeVersion={widget.typeVersion ?? widget.type_version}
                                 mode="display"
                                 widgetId={actualWidgetId}
                                 slotName={actualSlotName}
@@ -498,6 +499,7 @@ const PageWidgetFactory = ({
                 >
                     <CoreWidgetComponent
                         config={widget.config || {}}
+                        typeVersion={widget.typeVersion ?? widget.type_version}
                         mode="editor"
                         onConfigChange={stableConfigChangeHandler}
                         widgetId={actualWidgetId}
@@ -566,6 +568,7 @@ const PageWidgetFactory = ({
             >
                 <CoreWidgetComponent
                     config={widget.config || {}}
+                    typeVersion={widget.typeVersion ?? widget.type_version}
                     mode={mode}
                     onConfigChange={stableConfigChangeHandler}
                     widgetId={actualWidgetId}

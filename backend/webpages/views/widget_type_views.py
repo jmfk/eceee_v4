@@ -2,18 +2,18 @@
 WidgetType ViewSet for managing code-based widget types.
 """
 
-import json
 import importlib
 import inspect
-from rest_framework import viewsets, status, permissions
+
+from pydantic import BaseModel, ValidationError
+from pydantic.fields import PydanticUndefined
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import (
     action,
     api_view,
-    permission_classes as dec_permission_classes,
 )
+from rest_framework.decorators import permission_classes as dec_permission_classes
 from rest_framework.response import Response
-from pydantic import ValidationError, BaseModel
-from pydantic.fields import PydanticUndefined
 
 
 def format_pydantic_errors(pydantic_errors):
@@ -35,7 +35,7 @@ def format_pydantic_errors(pydantic_errors):
 
         # Create user-friendly error messages
         if error_type == "missing":
-            message = f"This field is required"
+            message = "This field is required"
         elif error_type == "string_too_short":
             min_length = error.get("ctx", {}).get("limit_value", "specified")
             message = f"Must be at least {min_length} characters long"
@@ -57,6 +57,55 @@ def format_pydantic_errors(pydantic_errors):
     return formatted_errors
 
 
+def request_theme(request):
+    from django.shortcuts import get_object_or_404
+    from rest_framework.exceptions import PermissionDenied
+
+    from webpages.models import PageTheme
+
+    theme_id = request.query_params.get("theme_id")
+    if not theme_id:
+        return None
+    tenant = getattr(request, "tenant", None)
+    if tenant is None or not tenant.user_has_access(request.user):
+        raise PermissionDenied("Theme access denied.")
+    try:
+        theme_id = int(theme_id)
+    except (TypeError, ValueError) as exc:
+        from rest_framework.exceptions import ValidationError
+
+        raise ValidationError("theme_id must be an integer.") from exc
+    return get_object_or_404(PageTheme, pk=theme_id, tenant=tenant)
+
+
+def request_widget(request, identifier):
+    from webpages.theme_widgets import resolve_widget
+
+    version = request.query_params.get("type_version")
+    if version is not None:
+        from rest_framework.exceptions import ValidationError
+
+        try:
+            version = int(version)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError("type_version must be an integer.") from exc
+    return resolve_widget(request_theme(request), identifier, version)
+
+
+def theme_type_metadata(request, active_only=True):
+    from webpages.theme_widgets import ThemeWidget
+
+    theme = request_theme(request)
+    if theme is None:
+        return []
+    result = []
+    for item in theme.widget_types["items"]:
+        version = item.get("active_version", len(item.get("releases", [])))
+        if version and (not active_only or item.get("status", "active") == "active"):
+            result.append(ThemeWidget(item, item["releases"][version - 1]).to_dict())
+    return result
+
+
 class WidgetTypeViewSet(viewsets.ViewSet):
     """ViewSet for code-based widget types."""
 
@@ -67,12 +116,12 @@ class WidgetTypeViewSet(viewsets.ViewSet):
         from ..widget_registry import widget_type_registry
 
         active_only = request.query_params.get("active", "true").lower() == "true"
-        include_template_json = (
-            request.query_params.get("include_template_json", "true").lower() == "true"
-        )
+        include_template_json = request.query_params.get("include_template_json", "true").lower() == "true"
         widget_types = widget_type_registry.to_dict(
             active_only=active_only, include_template_json=include_template_json
         )
+
+        widget_types.extend(theme_type_metadata(request, active_only))
 
         # Apply search filter if provided
         search = request.query_params.get("search")
@@ -81,8 +130,7 @@ class WidgetTypeViewSet(viewsets.ViewSet):
             widget_types = [
                 wt
                 for wt in widget_types
-                if search_lower in wt["name"].lower()
-                or search_lower in wt["description"].lower()
+                if search_lower in wt["name"].lower() or search_lower in wt["description"].lower()
             ]
 
         # Apply ordering
@@ -101,19 +149,15 @@ class WidgetTypeViewSet(viewsets.ViewSet):
     def retrieve(self, request, pk=None):
         """Get a specific widget type by slug or name"""
 
-        from ..widget_registry import widget_type_registry
-
         # Try flexible lookup: type, name, or slug
-        widget_type = widget_type_registry.get_widget_type_flexible(pk)
+        widget_type = request_widget(request, pk)
         if not widget_type:
             return Response(
                 {"error": f"Widget type '{pk}' not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        include_template_json = (
-            request.query_params.get("include_template_json", "true").lower() == "true"
-        )
+        include_template_json = request.query_params.get("include_template_json", "true").lower() == "true"
         data = widget_type.to_dict(include_template_json=include_template_json)
         return Response(data)
 
@@ -122,21 +166,17 @@ class WidgetTypeViewSet(viewsets.ViewSet):
         """Get only active widget types"""
         from ..widget_registry import widget_type_registry
 
-        include_template_json = (
-            request.query_params.get("include_template_json", "true").lower() == "true"
-        )
-        active_types = widget_type_registry.to_dict(
-            active_only=True, include_template_json=include_template_json
-        )
+        include_template_json = request.query_params.get("include_template_json", "true").lower() == "true"
+        active_types = widget_type_registry.to_dict(active_only=True, include_template_json=include_template_json)
+        active_types.extend(theme_type_metadata(request))
         return Response(active_types)
 
     @action(detail=True, methods=["post"], url_path="validate")
     def validate_widget_config(self, request, pk=None):
         """Validate widget configuration using Pydantic models"""
-        from ..widget_registry import widget_type_registry
 
         # Try flexible lookup: type, name, or slug
-        widget_type = widget_type_registry.get_widget_type_flexible(pk)
+        widget_type = request_widget(request, pk)
         if not widget_type:
             return Response(
                 {"error": f"Widget type '{pk}' not found"},
@@ -145,6 +185,12 @@ class WidgetTypeViewSet(viewsets.ViewSet):
 
         # Support both 'widget_data' and 'configuration' keys for backward compatibility
         widget_data = request.data.get("widget_data") or request.data.get("configuration", {})
+
+        from webpages.theme_widgets import ThemeWidget
+
+        if isinstance(widget_type, ThemeWidget):
+            errors = widget_type.errors(widget_data)
+            return Response({"is_valid": not errors, "errors": errors, "warnings": {}, "validated_data": widget_data})
 
         try:
             # Use Pydantic model for validation
@@ -175,10 +221,9 @@ class WidgetTypeViewSet(viewsets.ViewSet):
     @action(detail=True, methods=["get"], url_path="configuration-defaults")
     def configuration_defaults(self, request, pk=None):
         """Return default configuration values and schema for a widget type"""
-        from ..widget_registry import widget_type_registry
 
         # Try flexible lookup: type, name, or slug
-        widget_type = widget_type_registry.get_widget_type_flexible(pk)
+        widget_type = request_widget(request, pk)
         if not widget_type:
             return Response(
                 {"error": f"Widget type '{pk}' not found"},
@@ -186,26 +231,34 @@ class WidgetTypeViewSet(viewsets.ViewSet):
             )
 
         defaults = widget_type.get_configuration_defaults()
-        schema = widget_type.configuration_model.model_json_schema()
+        from webpages.theme_widgets import ThemeWidget
+
+        schema = (
+            widget_type.release["schema"]
+            if isinstance(widget_type, ThemeWidget)
+            else widget_type.configuration_model.model_json_schema()
+        )
         return Response({"defaults": defaults, "schema": schema})
 
     @action(detail=True, methods=["get"], url_path="schema")
     def schema(self, request, pk=None):
         """Return JSON schema for a widget type configuration"""
-        from ..widget_registry import widget_type_registry
 
         # Try flexible lookup: type, name, or slug
-        widget_type = widget_type_registry.get_widget_type_flexible(pk)
+        widget_type = request_widget(request, pk)
         if not widget_type:
             return Response(
                 {"error": f"Widget type '{pk}' not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        return Response({
-            "widget_type": widget_type.name,
-            "schema": widget_type.configuration_model.model_json_schema()
-        })
+        from webpages.theme_widgets import ThemeWidget
+
+        if isinstance(widget_type, ThemeWidget):
+            return Response(widget_type.to_dict())
+        return Response(
+            {"widget_type": widget_type.name, "schema": widget_type.configuration_model.model_json_schema()}
+        )
 
     @action(detail=True, methods=["get"], url_path="config-ui-schema")
     def config_ui_schema(self, request, pk=None):
@@ -213,14 +266,26 @@ class WidgetTypeViewSet(viewsets.ViewSet):
         Return enhanced configuration schema with UI metadata for building forms.
         Includes field-level json_schema_extra data for UI component mapping.
         """
-        from ..widget_registry import widget_type_registry
 
         # Try flexible lookup: type, name, or slug
-        widget_type = widget_type_registry.get_widget_type_flexible(pk)
+        widget_type = request_widget(request, pk)
         if not widget_type:
             return Response(
                 {"error": f"Widget type '{pk}' not found"},
                 status=status.HTTP_404_NOT_FOUND,
+            )
+
+        from webpages.theme_widgets import ThemeWidget
+
+        if isinstance(widget_type, ThemeWidget):
+            return Response(
+                {
+                    **widget_type.to_dict(),
+                    "widget_type": widget_type.type,
+                    "widget_name": widget_type.name,
+                    "fields": {},
+                    "required": widget_type.release["schema"].get("required", []),
+                }
             )
 
         # Get the base JSON schema
@@ -264,10 +329,7 @@ class WidgetTypeViewSet(viewsets.ViewSet):
                         field_meta["ui"] = extra_dict
 
                 # Add validation constraints from the schema
-                if (
-                    "properties" in base_schema
-                    and field_name in base_schema["properties"]
-                ):
+                if "properties" in base_schema and field_name in base_schema["properties"]:
                     prop_schema = base_schema["properties"][field_name]
                     if "minimum" in prop_schema:
                         field_meta["minimum"] = prop_schema["minimum"]

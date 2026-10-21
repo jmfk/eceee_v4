@@ -258,6 +258,18 @@ class ObjectTypeDefinition(models.Model):
         from webpages.widget_registry import widget_type_registry
 
         available_widgets = {widget.type for widget in widget_type_registry.list_widget_types()}
+        from webpages.models import PageTheme
+        from webpages.theme_widgets import PREFIX
+
+        theme = None
+        if self.namespace_id and any(str(widget_type).startswith(PREFIX) for widget_type in widget_types):
+            theme = PageTheme.objects.filter(
+                tenant_id=self.namespace.tenant_id, is_default=True, is_active=True
+            ).first()
+        if theme:
+            available_widgets.update(
+                PREFIX + item["id"] for item in theme.widget_types["items"] if item.get("releases")
+            )
 
         for widget_type in widget_types:
             if widget_type not in available_widgets:
@@ -304,11 +316,22 @@ class ObjectTypeDefinition(models.Model):
             return []
 
         all_widgets = widget_type_registry.list_widget_types()
+        from webpages.models import PageTheme
+        from webpages.theme_widgets import ThemeWidget
+
+        theme = PageTheme.objects.filter(
+            tenant_id=self.namespace.tenant_id if self.namespace_id else None, is_default=True, is_active=True
+        ).first()
+        if theme:
+            for item in theme.widget_types["items"]:
+                active = item.get("active_version", 0)
+                if active and item.get("status", "active") == "active":
+                    all_widgets.append(ThemeWidget(item, item["releases"][active - 1]))
 
         # New format: use widgetControls
         if "widgetControls" in slot:
             allowed_slugs = {control["widgetType"] for control in slot["widgetControls"]}
-            return [w for w in all_widgets if w.slug in allowed_slugs]
+            return [w for w in all_widgets if w.slug in allowed_slugs or w.type in allowed_slugs]
 
         # Otherwise, all widgets are allowed
         return all_widgets
@@ -694,8 +717,10 @@ class ObjectInstance(MPTTModel):
 
         from django.utils import timezone
 
-        from webpages.widget_registry import widget_type_registry
+        from webpages.models import PageTheme
+        from webpages.theme_widgets import resolve_widget
 
+        theme = PageTheme.objects.filter(tenant_id=self.tenant_id, is_default=True, is_active=True).first()
         slots = self.object_type.get_slots()
         pre_widgets = {}
 
@@ -714,7 +739,9 @@ class ObjectInstance(MPTTModel):
                         continue
 
                     # Get widget type from registry (supports multiple formats for compatibility)
-                    widget_instance = widget_type_registry.get_widget_type_flexible(widget_type)
+                    widget_instance = resolve_widget(
+                        theme, widget_type, widget_control.get("typeVersion", widget_control.get("type_version"))
+                    )
                     if not widget_instance:
                         continue
 
@@ -727,6 +754,11 @@ class ObjectInstance(MPTTModel):
                     widget_data = {
                         "id": str(uuid.uuid4()),
                         "type": widget_instance.type,
+                        **(
+                            {"type_version": widget_instance.release["version"]}
+                            if hasattr(widget_instance, "release")
+                            else {}
+                        ),
                         "config": merged_config,
                         "order": len(slot_widgets),
                         "created_at": timezone.now().isoformat(),
@@ -745,7 +777,9 @@ class ObjectInstance(MPTTModel):
                         continue
 
                     # Get widget type from registry (supports multiple formats for compatibility)
-                    widget_instance = widget_type_registry.get_widget_type_flexible(widget_type)
+                    widget_instance = resolve_widget(
+                        theme, widget_type, pre_widget_config.get("typeVersion", pre_widget_config.get("type_version"))
+                    )
                     if not widget_instance:
                         continue
 
@@ -753,6 +787,11 @@ class ObjectInstance(MPTTModel):
                     widget_data = {
                         "id": str(uuid.uuid4()),
                         "type": widget_instance.type,
+                        **(
+                            {"type_version": widget_instance.release["version"]}
+                            if hasattr(widget_instance, "release")
+                            else {}
+                        ),
                         "config": widget_instance.get_configuration_defaults(),
                         "order": len(slot_widgets),
                         "created_at": timezone.now().isoformat(),
@@ -1692,6 +1731,9 @@ class ObjectVersion(models.Model):
         """
         Override save to sync relationships from data.
         """
+        from webpages.theme_widgets import validate_version_widgets
+
+        validate_version_widgets(self)
         # Call parent save first
         super().save(*args, **kwargs)
 

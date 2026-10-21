@@ -1,3 +1,5 @@
+import ThemeWidgetInstanceEditor from './ThemeWidgetInstanceEditor'
+import { isThemeWidget } from '../rendering/themeWidgets'
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react'
 import { X, RefreshCw, Save, HelpCircle } from 'lucide-react'
 import { getWidgetSchema } from '../api/widgetSchemas.js'
@@ -567,4 +569,6 @@ const WidgetEditorPanel = forwardRef(({
 // Add display name for debugging
 WidgetEditorPanel.displayName = 'WidgetEditorPanel'
 
-export default WidgetEditorPanel
+export default forwardRef(function WidgetEditorRouter(props, ref) {
+    return isThemeWidget(props.widgetData?.type) ? <ThemeWidgetInstanceEditor {...props} ref={ref} /> : <WidgetEditorPanel {...props} ref={ref} />
+})

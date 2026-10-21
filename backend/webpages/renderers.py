@@ -298,6 +298,28 @@ class WebPageRenderer:
 
         # Get widget type from registry - support both old and new formats
         widget_type_name = widget_data.get("widget_type") or widget_data.get("type")
+        from webpages.theme_widgets import find_definition, is_theme_widget
+
+        if is_theme_widget(widget_type_name):
+            from django.utils.html import format_html
+
+            pinned_version = widget_data.get("type_version", widget_data.get("typeVersion"))
+            definition = (
+                find_definition((context or {}).get("theme"), widget_type_name, pinned_version)
+                if type(pinned_version) is int
+                else None
+            )
+            if definition is None:
+                return format_html('<div role="alert">Missing widget revision: {}</div>', widget_type_name)
+            from django.utils.safestring import mark_safe
+
+            return format_html(
+                '<div data-theme-widget="{}:{}"><style>{}</style>{}</div>',
+                definition.item["id"],
+                definition.release["version"],
+                mark_safe(definition.release["compiled_css"]),
+                mark_safe(definition.render(widget_data.get("config", {}))),
+            )
         widget_type = widget_type_registry.get_widget_type_flexible(widget_type_name) if widget_type_name else None
 
         if not widget_type:

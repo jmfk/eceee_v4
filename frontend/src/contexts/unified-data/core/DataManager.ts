@@ -758,6 +758,7 @@ export class DataManager {
                         const newWidget = {
                             id: payload.id,
                             type: payload.type,
+                            ...(payload.typeVersion !== undefined ? { typeVersion: payload.typeVersion } : {}),
                             config: payload.config || {}
                         };
 

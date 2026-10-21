@@ -47,6 +47,7 @@ export interface Theme {
   custom_css: string;
   design_groups: Record<string, unknown>;
   layouts?: ThemeLayoutDocument;
+  widget_types?: import("../../frontend/src/rendering/themeWidgets").ThemeWidgetDocument;
   html_elements: Record<string, unknown>;
   sync_version: number;
   updated_at: string;
@@ -146,6 +147,7 @@ export interface ReadDb {
 }
 
 export interface Widget {
+  typeVersion?: number;
   id: string;
   type: string;
   config: Record<string, unknown>;
@@ -169,6 +171,7 @@ export interface PublishedPageModel {
     versionId: DbId;
     pathVariables: Record<string, string>;
     simulatedPath: string;
+    themeWidgetTypes?: import("../../frontend/src/rendering/themeWidgets").ThemeWidgetDocument;
     componentStyles: Record<string, Record<string, unknown>>;
     publicForms: {
       endpointBase: string;
@@ -307,6 +310,7 @@ function normalizeWidget(input: RawWidget, id: string, inheritedFrom: Page | nul
   return {
     id: String(input.id ?? id),
     type,
+    typeVersion: typeof (input.type_version ?? input.typeVersion) === "number" ? Number(input.type_version ?? input.typeVersion) : undefined,
     config: normalizeWidgetConfig(type, input.config, at, String(input.id ?? id)),
     ...(Object.keys(normalizedData).length ? { data: { ...normalizedData, status } } : {}),
     ...(inheritedFrom ? { inheritedFrom: { id: inheritedFrom.id, title: inheritedFrom.title, depth } } : {}),
@@ -945,6 +949,7 @@ async function buildSpecialPageModel(
       versionId: themeOnlyVersion.id,
       pathVariables: {},
       simulatedPath: normalizedPath + (normalizedPath === '/' ? '' : '/'),
+      themeWidgetTypes: theme?.widget_types,
       componentStyles: theme?.component_styles ?? {},
       publicForms: {
         endpointBase: `/api/forms/${encodeURIComponent(root.id)}`,
@@ -1068,7 +1073,8 @@ export async function buildPublishedPageModel(db: ReadDb, hostname: string, path
         versionId: currentVersion.id,
         pathVariables: pathVariables || {},
         simulatedPath: '/' + segments.join('/') + (segments.length ? '/' : ''),
-        componentStyles: theme?.component_styles ?? {},
+        themeWidgetTypes: theme?.widget_types,
+      componentStyles: theme?.component_styles ?? {},
         publicForms: {
           endpointBase: `/api/forms/${encodeURIComponent(current.id)}`,
           pagePath: '/' + segments.join('/'),

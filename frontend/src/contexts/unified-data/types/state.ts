@@ -26,6 +26,7 @@ export interface PageMetadata {
 }
 
 export interface WidgetData {
+  typeVersion?: number;
   id: string;
   type: string;
   config: WidgetConfig;

@@ -326,6 +326,16 @@ class PageVersionSerializer(serializers.ModelSerializer):
 
                 try:
                     validate_layout_widgets(effective_theme, effective_key, attrs.get("widgets", self.instance.widgets))
+                    from webpages.theme_widgets import validate_instances
+
+                    previous_theme = self.instance.theme or self.instance.page.get_effective_theme()
+                    validate_instances(
+                        effective_theme,
+                        attrs.get("widgets", self.instance.widgets),
+                        previous_theme=(
+                            previous_theme if previous_theme and previous_theme.pk != effective_theme.pk else None
+                        ),
+                    )
                 except DjangoValidationError as exc:
                     raise serializers.ValidationError({"widgets": exc.messages}) from exc
         if "page_data" in attrs:

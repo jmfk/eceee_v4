@@ -1,6 +1,8 @@
 import React, { Component, type ErrorInfo, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { getRenderLayout, getRenderWidget } from './registry'
+import { ThemeWidgetRender } from './ThemeWidgetRender'
+import { isThemeWidget } from './themeWidgets'
 import { normalizeCssName, RenderFailure, SafeHtml } from './primitives'
 import { renderMustache } from '../utils/mustacheRenderer'
 import { getBannerRenderConfig } from '../utils/bannerConfig'
@@ -28,7 +30,7 @@ export const PageRenderer = ({ model }: { model: RenderPageModel }) => {
     const renderWidgets = (widgets: RenderWidgetModel[]): ReactNode => (widgets || []).map((sourceWidget) => {
         const widget = sourceWidget.type === 'easy_widgets.BannerWidget'
             ? { ...sourceWidget, config: getBannerRenderConfig(sourceWidget.config) } : sourceWidget
-        const Widget = getRenderWidget(widget.type, Boolean(model.designer))
+        const Widget = isThemeWidget(widget.type) ? ThemeWidgetRender : getRenderWidget(widget.type, Boolean(model.designer))
         if (!Widget) return <RenderFailure key={widget.id} message={`Unsupported widget: ${widget.type}`} />
         const hidden = widget.config?.is_visible === false
             || widget.config?.isVisible === false

@@ -64,11 +64,14 @@ export const getWidgetConfigurationDefaults = async (widgetType) => {
  * @param {Object} widgetData - The widget data to validate
  * @returns {Promise<Object>} Validation result with isValid, errors, and warnings properties
  */
-export const validateWidgetConfiguration = async (widgetType, widgetData) => {
+export const validateWidgetConfiguration = async (widgetType, widgetData, { themeId, typeVersion } = {}) => {
     try {
         // Properly encode the widget type to handle dots and spaces
         const encodedWidgetType = encodeURIComponent(widgetType)
-        const response = await api.post(`/api/v1/webpages/widget-types/${encodedWidgetType}/validate/`, {
+        const query = new URLSearchParams()
+        if (themeId) query.set("theme_id", themeId)
+        if (typeVersion) query.set("type_version", typeVersion)
+        const response = await api.post(`/api/v1/webpages/widget-types/${encodedWidgetType}/validate/?${query}`, {
             widgetData: widgetData
         })
         return response.data

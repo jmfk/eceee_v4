@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 THEME_CASE_OPTIONS = {
     "no_underscore_before_number": True,
-    "ignore_fields": ("designer_preview", "designerPreview", "layouts", "text_outline_styles", "textOutlineStyles"),
+    "ignore_fields": ("designer_preview", "designerPreview", "layouts", "text_outline_styles", "textOutlineStyles", "widget_types", "widgetTypes"),
 }
 
 
@@ -106,6 +106,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "component_styles",
             "designer_preview",
             "layouts",
+            "widget_types",
             "table_templates",
             "css_variables",
             "html_elements",
@@ -140,6 +141,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
             "component_styles",
             "designer_preview",
             "layouts",
+            "widget_types",
             "table_templates",
             "css_variables",
             "html_elements",
@@ -1519,6 +1521,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                 "component_styles": theme.component_styles,
                 "designer_preview": theme.designer_preview,
                 "layouts": theme.layouts,
+                "widget_types": theme.widget_types,
                 "image_styles": theme.image_styles,
                 "text_outline_styles": theme.text_outline_styles,
                 "gallery_styles": theme.gallery_styles,
@@ -1685,6 +1688,7 @@ class PageThemeViewSet(viewsets.ModelViewSet):
                         theme_data.get("designer_preview", {}), request.tenant
                     ),
                     layouts=layouts,
+                    widget_types=theme_data.get("widget_types", {"version": 1, "items": []}),
                     image_styles=theme_data.get("image_styles", {}),
                     text_outline_styles=validate_text_outline_styles(
                         theme_data.get("text_outline_styles", default_text_outline_styles())

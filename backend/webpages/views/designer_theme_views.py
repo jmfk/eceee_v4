@@ -84,6 +84,9 @@ DESIGNER_CASE_OPTIONS = {
         "textOutlineStyles",
         "live_text_outline_styles",
         "liveTextOutlineStyles",
+        "widget_types",
+        "widgetTypes",
+        "definition",
     )
 }
 
@@ -719,6 +722,8 @@ class DesignerThemeWorkspaceView(APIView):
     def patch(self, request, theme_id):
         try:
             theme, draft = save_designer_draft(theme_id, request.tenant, request.user, request.data)
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages) from exc
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
         except PageTheme.DoesNotExist:
@@ -743,6 +748,8 @@ class DesignerThemePublishView(APIView):
                 request.user,
                 request.data.get("draft_version"),
             )
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages) from exc
         except PermissionError:
             return Response({"error": "Designer access denied."}, status=status.HTTP_403_FORBIDDEN)
         except PageTheme.DoesNotExist:
@@ -1183,3 +1190,27 @@ class DesignerThemeExportDownloadView(APIView):
         filename = designer_export_filename(job.theme)
         url = S3MediaStorage().generate_signed_url(job.object_key, expires=3600, response_filename=filename)
         return Response({"downloadUrl": url, "filename": filename, "expiresIn": 3600})
+
+
+class DesignerWidgetPreviewView(APIView):
+    """Validate and compile an unsaved definition without mutating a theme/draft."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [DesignerJSONParser]
+    renderer_classes = [DesignerJSONRenderer]
+
+    def post(self, request, theme_id):
+        from uuid import UUID
+
+        from webpages.theme_widgets import compile_definition
+
+        theme = _theme(request, theme_id)
+        try:
+            type_id = str(UUID(request.data.get("type_id", "")))
+            definition = request.data.get("definition", {})
+            item = next((item for item in theme.widget_types["items"] if item["id"] == type_id), None)
+            version = len(item["releases"]) + 1 if item else 1
+            compiled = compile_definition(definition, type_id, version)
+        except (DjangoValidationError, ValueError, TypeError, AttributeError) as exc:
+            raise ValidationError(getattr(exc, "messages", [str(exc)])) from exc
+        return Response({"definition": compiled})

@@ -1073,6 +1073,22 @@ class ObjectVersionSerializer(serializers.ModelSerializer):
         """Get human-readable publication status based on dates"""
         return obj.get_publication_status()
 
+    def validate_widgets(self, value):
+        if self.instance:
+            from django.core.exceptions import ValidationError as DjangoValidationError
+
+            from webpages.models import PageTheme
+            from webpages.theme_widgets import validate_instances
+
+            theme = PageTheme.objects.filter(
+                tenant=self.instance.object_instance.tenant, is_default=True, is_active=True
+            ).first()
+            try:
+                validate_instances(theme, value)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError(exc.messages) from exc
+        return value
+
     def validate_data(self, value):
         """Validate data field including object_reference fields"""
         if not isinstance(value, dict):

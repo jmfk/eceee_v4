@@ -50,7 +50,7 @@ const ThreeColumnsWidget = ({
     const { useExternalChanges, publishUpdate } = useUnifiedData();
 
     // Get all available widget types from the system
-    const { widgetTypes, isLoadingTypes, typesError } = useWidgets();
+    const { widgetTypes, isLoadingTypes, typesError } = useWidgets({}, context?.pageVersionData?.effectiveTheme || context?.theme);
 
     // Get current theme for component styles
     const { currentTheme } = useTheme({ pageId: context?.pageId, enabled: !!context?.pageId });

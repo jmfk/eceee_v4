@@ -8,6 +8,7 @@ import {
     Code
 } from 'lucide-react'
 import { widgetsApi } from '../api'
+import { useWidgetTheme } from '../contexts/WidgetThemeContext'
 import { getAvailableWidgetTypes } from '../utils/widgetTypeValidation'
 import {
     getWidgetIcon,
@@ -19,6 +20,7 @@ import {
 } from '../widgets'
 
 const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
+    const theme = useWidgetTheme()
     const [searchTerm, setSearchTerm] = useState('')
     const [filterCategory, setFilterCategory] = useState('all')
     const [availableWidgetTypes, setAvailableWidgetTypes] = useState([])
@@ -29,7 +31,8 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
         const fetchAvailableTypes = async () => {
             setIsLoadingAvailable(true)
             try {
-                const types = await getAvailableWidgetTypes()
+                const response = await widgetsApi.getTypes(true, theme?.id)
+                const types = response.data || response
                 // Filter active ones and ensure they have required properties
                 const activeTypes = types.filter(widget =>
                     widget.isActive !== false && // Include if isActive is undefined or true
@@ -46,7 +49,7 @@ const WidgetLibrary = ({ onSelectWidget, selectedWidgetTypes = [] }) => {
         }
 
         fetchAvailableTypes()
-    }, [])
+    }, [theme?.id, theme?.updatedAt])
 
     // Use the validated available widget types
     const widgetTypes = availableWidgetTypes

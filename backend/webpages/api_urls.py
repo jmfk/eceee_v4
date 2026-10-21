@@ -64,6 +64,7 @@ from .views.designer_theme_views import (
     DesignerThemeVersionDetailView,
     DesignerThemeVersionsView,
     DesignerThemeWorkspaceView,
+    DesignerWidgetPreviewView,
     ThemeDesignerAssignmentView,
 )
 from .views.layout_workspace_views import LayoutDiscardView, LayoutPublishView, LayoutWorkspaceView
@@ -164,6 +165,11 @@ urlpatterns = [
         "remote-sites/access-keys/<uuid:access_key_id>/revoke/",
         RemoteAccessKeyRevokeView.as_view(),
         name="remote-access-key-revoke",
+    ),
+    path(
+        "designer/themes/<int:theme_id>/widget-preview/",
+        DesignerWidgetPreviewView.as_view(),
+        name="designer-widget-preview",
     ),
     path("designer/themes/", DesignerThemeListView.as_view(), name="designer-theme-list"),
     path("designer/themes/compare/", DesignerThemeCompareView.as_view(), name="designer-theme-compare"),
