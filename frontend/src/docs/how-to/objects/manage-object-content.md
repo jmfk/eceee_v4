@@ -16,9 +16,12 @@ Choose an object type and create or edit its content items.
 <!-- narration: Select an object type, create or edit an item, and check version and publishing status before making structured content live. -->
 
 1. Open Objects from the main navigation.
-2. Choose the object type you want to manage.
+2. Choose a main object type on Main, or open Supporting objects to find supporting types grouped by their main type.
 3. Use the create action to add a new item, or open an existing item to edit it.
-4. Review publishing and version details before making object content live.
+4. Use the left column to navigate the root object, its sub-objects and related objects. Pure sub-object types appear here rather than in the overview.
+5. Drag either side column's divider to resize it, or focus the divider and use the arrow keys. Use the chevron to collapse or expand a column; its form state is preserved.
+6. Save pending changes before switching objects. The left navigation saves a working copy before opening another object and stays on the current object if saving fails.
+7. Review publishing and version details before making object content live.
 
 ```video
 [

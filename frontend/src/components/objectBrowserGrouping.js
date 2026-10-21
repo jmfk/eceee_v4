@@ -1,6 +1,7 @@
 const compareObjectTypes = (a, b) => (a.label || a.name || '').localeCompare(b.label || b.name || '')
 
 export const buildObjectTypeGroups = (objectTypes) => {
+    objectTypes = objectTypes.filter(type => type.hierarchyLevel !== 'sub_object_only')
     const typesById = new Map(objectTypes.map(type => [String(type.id), type]))
     const groupsById = new Map()
 
