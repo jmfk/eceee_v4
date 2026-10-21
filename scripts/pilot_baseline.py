@@ -13,6 +13,9 @@ import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "backend"))
+from webpages.tests.pilot_baseline_adapter import comparable_observations  # noqa: E402
+
 FIXTURES = ROOT / "backend/webpages/tests/fixtures/pilot_baseline"
 REQUIRED_BACKEND_SCENARIOS = {
     "webpages.tests.test_pilot_baseline.PilotContractBaselineTests.test_frozen_wire_contracts_and_complete_render_catalog",
@@ -22,6 +25,62 @@ REQUIRED_BACKEND_SCENARIOS = {
     "webpages.tests.test_pilot_baseline.PilotPersistenceBaselineTests.test_other_tenant_and_anonymous_requests_cannot_save_pilot",
     "webpages.tests.test_pilot_baseline.PilotPersistenceBaselineTests.test_authenticated_session_without_csrf_cannot_save_pilot",
 }
+REQUIRED_FRONTEND_SCENARIOS = {
+    "portable pilot render baseline preserves all fixture types, headings, child identities and ordering",
+    "portable pilot render baseline keeps forms usable and prevents preview submission",
+    "portable pilot render baseline does not mutate stored fixture data when preview state changes",
+    "portable pilot render baseline omits invisible widgets including their nested children",
+    "portable pilot render baseline sanitizes rich banner content without losing safe content",
+    "render registry parity covers every editable widget with a renderer and deterministic fixture",
+    "render registry parity covers both production layouts",
+    "PagePreview iframe keeps the configured viewport and allows vertical scrolling",
+    "PagePreview iframe sends unsaved local widgets to the React frame",
+    "PagePreview iframe resolves dynamic preview data again when refreshed",
+    "PagePreview iframe builds theme CSS locally for the unsaved preview",
+}
+REQUIRED_BROWSER_SCENARIOS = {
+    (project, title)
+    for project in ("desktop", "mobile")
+    for title in (
+        "all four types retain content, ordering, nesting and responsive columns",
+        "form controls work while preview submission stays inert",
+        "unsaved preview changes do not overwrite the saved fixture",
+    )
+}
+
+
+def frontend_passes(result):
+    assertions = [assertion for suite in result["testResults"] for assertion in suite["assertionResults"]]
+    passed = {assertion["fullName"] for assertion in assertions if assertion["status"] == "passed"}
+    return (
+        result["success"]
+        and REQUIRED_FRONTEND_SCENARIOS <= passed
+        and all(assertion["status"] == "passed" for assertion in assertions)
+        and not any(result.get(key, 0) for key in ("numFailedTests", "numPendingTests", "numTodoTests"))
+    )
+
+
+def browser_passes(result):
+    passed = set()
+
+    def collect(suites):
+        for suite in suites:
+            for spec in suite.get("specs", []):
+                for test in spec.get("tests", []):
+                    runs = test.get("results", [])
+                    if (
+                        test.get("expectedStatus") == "passed"
+                        and test.get("status") == "expected"
+                        and len(runs) == 1
+                        and runs[0].get("status") == "passed"
+                    ):
+                        passed.add((test["projectName"], spec["title"]))
+            collect(suite.get("suites", []))
+
+    collect(result["suites"])
+    return REQUIRED_BROWSER_SCENARIOS <= passed and not (
+        result.get("errors") or any(result["stats"].get(key, 0) for key in ("unexpected", "skipped", "flaky"))
+    )
 
 
 def backend_passes(result):
@@ -50,13 +109,17 @@ def differences(expected, actual, path="$"):
 
 
 def compare(reference, candidate):
-    # Runtime/provenance belongs in the report, never in semantic normalization.
+    # Keep raw captures intact; only versioned diagnostic documentation is incidental.
+    expected = {key: reference[key] for key in ("formatVersion", "casesSha256", "observations")}
+    actual = {
+        key: candidate.get(key) if isinstance(candidate, dict) else None
+        for key in ("formatVersion", "casesSha256", "observations")
+    }
+    expected["observations"] = comparable_observations(expected["observations"])
+    actual["observations"] = comparable_observations(actual["observations"])
     return differences(
-        {key: reference[key] for key in ("formatVersion", "casesSha256", "observations")},
-        {
-            key: candidate.get(key) if isinstance(candidate, dict) else None
-            for key in ("formatVersion", "casesSha256", "observations")
-        },
+        expected,
+        actual,
     )
 
 
@@ -64,10 +127,23 @@ def write_json(path, value):
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
-def run(args):
-    output = args.output.resolve() if args.output else Path(tempfile.mkdtemp(prefix="eceee-pilot-baseline-"))
-    output.mkdir(parents=True, exist_ok=True)
+def create_output(directory):
+    if directory is None:
+        output = Path(tempfile.mkdtemp(prefix="eceee-pilot-baseline-"))
+    else:
+        output = directory.resolve()
+        # Never change permissions or overwrite artifacts in an existing directory.
+        output.mkdir(parents=True, exist_ok=False)
     output.chmod(0o777)  # Synthetic test artifacts, writable by container appuser.
+    return output
+
+
+def run(args):
+    try:
+        output = create_output(args.output)
+    except OSError as error:
+        print(f"Cannot create a new pilot output directory: {error}", file=sys.stderr)
+        return 1
     # Snapshot tracked/new nonignored test sources once. Never mount operator env,
     # credentials, existing node_modules or a changing checkout into the containers.
     source_temp = tempfile.TemporaryDirectory(prefix="eceee-pilot-source-")
@@ -313,19 +389,13 @@ def run(args):
                 ],
             )
             frontend_result = json.loads((output / "frontend.json").read_text())
-            browser_result = json.loads((output / "browser.json").read_text())["stats"]
-            if (
-                not frontend_result["success"]
-                or frontend_result.get("numPendingTests", 0)
-                or frontend_result["numPassedTests"] < 11
-                or browser_result["expected"] != 6
-                or any(browser_result.get(key, 0) for key in ("unexpected", "skipped", "flaky"))
-            ):
+            browser_result = json.loads((output / "browser.json").read_text())
+            if not frontend_passes(frontend_result) or not browser_passes(browser_result):
                 raise RuntimeError("Missing, failed, skipped or flaky mandatory frontend scenarios")
             report["frontend"] = {
                 key: frontend_result[key] for key in ("numPassedTests", "numFailedTests", "numPendingTests")
             }
-            report["browser"] = browser_result
+            report["browser"] = browser_result["stats"]
             report["frontendRuntime"] = json.loads((output / "frontend-runtime.json").read_text())
         report["status"] = "passed" if not (args.backend_only or args.frontend_only) else "partial_passed"
         if report["status"] == "passed" and report["knownReferenceIssues"]:

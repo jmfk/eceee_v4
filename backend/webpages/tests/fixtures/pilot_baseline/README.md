@@ -11,6 +11,8 @@ This is the executable first step of the Django retirement investigation. It fre
 
 Wire JSON uses the observed `camelCase` contract; `storedWidgets` explicitly describes the observed `snake_case` configuration stored by the page API. Tests check both rather than mechanically normalizing the comparison. List ordering and nested widget IDs are significant.
 
+Comparison ignores only the Pydantic 2 minor version in `body.rawErrors[].url` documentation links (`https://errors.pydantic.dev/2.<minor>/v/<error_type>`). CI installs a newer compatible Pydantic than the original capture; this documentation version is not widget functionality. The raw reference/captures remain unchanged, and URL presence, domain, major version, error type/path, message, input, context and every other field remain strict. The backend assertion and standalone comparator share this rule.
+
 Known reference issue: the metadata validation endpoint parses `headerLevel` as `header_level`, while `HeadlineConfig` names its field `headerLevel`. It silently returns the default `h1` for a nondefault requested value. The fixture characterizes this defect and the report names it; it does not approve copying the defect into a replacement. Fixing it requires a separate reviewed product change and explicit baseline diff. Invalid widget configurations currently return HTTP 200 with `isValid: false`; that existing API convention is also captured.
 
 ## Run locally
@@ -48,12 +50,14 @@ The browser harness is **not** the complete page editor or live publisher. The d
 
 ## Artifacts and outcomes
 
-The chosen output directory contains `report.json`, phase logs, observed/frozen comparison results, per-test backend results, Vitest JSON, Playwright JSON and failure traces/screenshots. Reports record reference/tested commit, dirty working-tree state, runtime versions and exact commands. Run outputs are temporary artifacts, not new frozen fixtures to commit.
+The chosen output directory must not already exist; choose a fresh path for each run. The runner refuses existing paths without changing their permissions or contents. Newly created artifact directories are writable by the container user and contain only synthetic test data. The output contains `report.json`, phase logs, observed/frozen comparison results, per-test backend results, Vitest JSON, Playwright JSON and failure traces/screenshots. Reports record reference/tested commit, dirty working-tree state, runtime versions and exact commands. Run outputs are temporary artifacts, not new frozen fixtures to commit.
 
 - `passed_with_known_reference_issues`: all required baseline checks passed, with the documented reference defect still present.
 - `partial_passed`: only a selected layer ran.
 - `observed_only`: capture for review; no baseline pass claimed.
 - `failed`: differences, failed/missing/skipped tests, flaky browser results or execution failure. Missing prerequisites are failures, not skipped successes.
+
+Mandatory backend and React test names and browser title/project pairs are checked explicitly. Passing counts alone cannot replace a required scenario. Shared fixture changes select both backend and frontend CI checks.
 
 `candidateParity: not_supplied` remains explicit until an actual replacement adapter is implemented. Normal runs never overwrite `reference.json`. Reading an existing test or comparing the old adapter to its own frozen outputs does not establish replacement parity.
 
