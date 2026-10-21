@@ -7,7 +7,7 @@ import { objectInstancesApi } from '../../../api/objectStorage';
 import { StateChangeCallback, VersionData, PageData } from '../types/state';
 import { defaultEqualityFn } from '../utils/equality';
 import { normalizeThemeData } from '../../../utils/themeDataNormalizer';
-import { buildVersionedPageData } from '../../../utils/smartSaveUtils';
+import { buildWorkingCopyPayload } from '../../../utils/smartSaveUtils';
 
 // Create the context
 const UnifiedDataContext = createContext<UnifiedDataContextValue | null>(null);
@@ -256,10 +256,7 @@ export function UnifiedDataProvider({
 
             const versionResult = await versionsApi.saveWorkingCopy(
                 currentVersionId,
-                {
-                    ...versionData,
-                    pageData: buildVersionedPageData((versionData as any).pageData, pageData),
-                },
+                buildWorkingCopyPayload(versionData, pageData),
                 versionData.updatedAt,
                 versionData.editRevision,
             );
