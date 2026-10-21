@@ -1,0 +1,833 @@
+{
+  "formatVersion": 1,
+  "referenceCommit": "9da0eb18451db16f5b8406f1c0c6c5a4f108483d",
+  "scope": [
+    "easy_widgets.HeadlineWidget",
+    "easy_widgets.BannerWidget",
+    "easy_widgets.TwoColumnsWidget",
+    "easy_widgets.FormsWidget"
+  ],
+  "contracts": [
+    {
+      "id": "headline-schema",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.HeadlineWidget/schema/",
+      "expectStatus": 200
+    },
+    {
+      "id": "headline-configuration-defaults",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.HeadlineWidget/configuration-defaults/",
+      "expectStatus": 200
+    },
+    {
+      "id": "headline-config-ui-schema",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.HeadlineWidget/config-ui-schema/",
+      "expectStatus": 200
+    },
+    {
+      "id": "headline-anonymous-schema",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.HeadlineWidget/schema/",
+      "expectStatus": 403,
+      "anonymous": true
+    },
+    {
+      "id": "headline-populated",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.HeadlineWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "content": "Pilot heading",
+          "headerLevel": "h2",
+          "showBorder": false
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "headline-missing",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.HeadlineWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {}
+      },
+      "expectValid": true
+    },
+    {
+      "id": "headline-extra",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.HeadlineWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "content": "Pilot heading",
+          "headerLevel": "h2",
+          "showBorder": false,
+          "unknownPilotField": "must be discarded"
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "headline-null",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.HeadlineWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "content": null
+        }
+      },
+      "expectValid": false
+    },
+    {
+      "id": "headline-invalid",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.HeadlineWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "content": []
+        }
+      },
+      "expectValid": false
+    },
+    {
+      "id": "headline-empty",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.HeadlineWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "content": ""
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "headline-snake-alias",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.HeadlineWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "anchor_title": "Snake title"
+        }
+      },
+      "expectValid": true,
+      "expectNormalized": {
+        "anchorTitle": "Snake title"
+      }
+    },
+    {
+      "id": "headline-coercion",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.HeadlineWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "widgetData": {
+          "showBorder": "false"
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "banner-schema",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.BannerWidget/schema/",
+      "expectStatus": 200
+    },
+    {
+      "id": "banner-configuration-defaults",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.BannerWidget/configuration-defaults/",
+      "expectStatus": 200
+    },
+    {
+      "id": "banner-config-ui-schema",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.BannerWidget/config-ui-schema/",
+      "expectStatus": 200
+    },
+    {
+      "id": "banner-anonymous-schema",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.BannerWidget/schema/",
+      "expectStatus": 403,
+      "anonymous": true
+    },
+    {
+      "id": "banner-populated",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.BannerWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "bannerMode": "text",
+          "textContent": "<h3>Pilot banner</h3><p>Banner body</p>",
+          "textColor": "#123456",
+          "backgroundColor": "#ffffff",
+          "textOutline": "none",
+          "showBorder": false
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "banner-missing",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.BannerWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {}
+      },
+      "expectValid": true
+    },
+    {
+      "id": "banner-extra",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.BannerWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "bannerMode": "text",
+          "textContent": "<h3>Pilot banner</h3><p>Banner body</p>",
+          "textColor": "#123456",
+          "backgroundColor": "#ffffff",
+          "textOutline": "none",
+          "showBorder": false,
+          "unknownPilotField": "must be discarded"
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "banner-null",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.BannerWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "textContent": null
+        }
+      },
+      "expectValid": false
+    },
+    {
+      "id": "banner-invalid",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.BannerWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "textOutline": "invalid"
+        }
+      },
+      "expectValid": false
+    },
+    {
+      "id": "banner-empty",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.BannerWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "textContent": ""
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "banner-snake-alias",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.BannerWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "banner_mode": "header",
+          "header_content": "Snake banner"
+        }
+      },
+      "expectValid": true,
+      "expectNormalized": {
+        "bannerMode": "header",
+        "headerContent": "Snake banner"
+      }
+    },
+    {
+      "id": "banner-coercion",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.BannerWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "widgetData": {
+          "showBorder": "false"
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "twocolumns-schema",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.TwoColumnsWidget/schema/",
+      "expectStatus": 200
+    },
+    {
+      "id": "twocolumns-configuration-defaults",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.TwoColumnsWidget/configuration-defaults/",
+      "expectStatus": 200
+    },
+    {
+      "id": "twocolumns-config-ui-schema",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.TwoColumnsWidget/config-ui-schema/",
+      "expectStatus": 200
+    },
+    {
+      "id": "twocolumns-anonymous-schema",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.TwoColumnsWidget/schema/",
+      "expectStatus": 403,
+      "anonymous": true
+    },
+    {
+      "id": "twocolumns-populated",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.TwoColumnsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "layoutStyle": "4:2",
+          "slots": {
+            "left": [
+              {
+                "id": "pilot-left",
+                "type": "easy_widgets.HeadlineWidget",
+                "config": {
+                  "content": "Pilot left",
+                  "headerLevel": "h3"
+                }
+              }
+            ],
+            "right": [
+              {
+                "id": "pilot-right",
+                "type": "easy_widgets.HeadlineWidget",
+                "config": {
+                  "content": "Pilot right",
+                  "headerLevel": "h3"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "twocolumns-missing",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.TwoColumnsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {}
+      },
+      "expectValid": true
+    },
+    {
+      "id": "twocolumns-extra",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.TwoColumnsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "layoutStyle": "4:2",
+          "slots": {
+            "left": [
+              {
+                "id": "pilot-left",
+                "type": "easy_widgets.HeadlineWidget",
+                "config": {
+                  "content": "Pilot left",
+                  "headerLevel": "h3"
+                }
+              }
+            ],
+            "right": [
+              {
+                "id": "pilot-right",
+                "type": "easy_widgets.HeadlineWidget",
+                "config": {
+                  "content": "Pilot right",
+                  "headerLevel": "h3"
+                }
+              }
+            ]
+          },
+          "unknownPilotField": "must be discarded"
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "twocolumns-null",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.TwoColumnsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "layoutStyle": null
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "twocolumns-invalid",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.TwoColumnsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "layoutStyle": "9:9"
+        }
+      },
+      "expectValid": false
+    },
+    {
+      "id": "twocolumns-empty",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.TwoColumnsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "layoutStyle": ""
+        }
+      },
+      "expectValid": false
+    },
+    {
+      "id": "twocolumns-snake-alias",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.TwoColumnsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "layout_style": "1:5"
+        }
+      },
+      "expectValid": true,
+      "expectNormalized": {
+        "layoutStyle": "1:5"
+      }
+    },
+    {
+      "id": "twocolumns-coercion",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.TwoColumnsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "widgetData": {
+          "layoutStyle": "2:4"
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "forms-schema",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.FormsWidget/schema/",
+      "expectStatus": 200
+    },
+    {
+      "id": "forms-configuration-defaults",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.FormsWidget/configuration-defaults/",
+      "expectStatus": 200
+    },
+    {
+      "id": "forms-config-ui-schema",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.FormsWidget/config-ui-schema/",
+      "expectStatus": 200
+    },
+    {
+      "id": "forms-anonymous-schema",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.FormsWidget/schema/",
+      "expectStatus": 403,
+      "anonymous": true
+    },
+    {
+      "id": "forms-populated",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.FormsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "title": "Pilot contact",
+          "fields": [
+            {
+              "name": "name",
+              "label": "Your name",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "topic",
+              "label": "Topic",
+              "type": "select",
+              "options": [
+                "General",
+                "Press"
+              ]
+            }
+          ],
+          "submitButtonText": "Send pilot"
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "forms-missing",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.FormsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {}
+      },
+      "expectValid": false
+    },
+    {
+      "id": "forms-extra",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.FormsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "title": "Pilot contact",
+          "fields": [
+            {
+              "name": "name",
+              "label": "Your name",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "topic",
+              "label": "Topic",
+              "type": "select",
+              "options": [
+                "General",
+                "Press"
+              ]
+            }
+          ],
+          "submitButtonText": "Send pilot",
+          "unknownPilotField": "must be discarded"
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "forms-null",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.FormsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "title": null,
+          "fields": null
+        }
+      },
+      "expectValid": false
+    },
+    {
+      "id": "forms-invalid",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.FormsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "title": "Pilot",
+          "fields": [
+            {
+              "name": "bad",
+              "label": "Bad",
+              "type": "invalid"
+            }
+          ]
+        }
+      },
+      "expectValid": false
+    },
+    {
+      "id": "forms-empty",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.FormsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "title": "",
+          "fields": []
+        }
+      },
+      "expectValid": false
+    },
+    {
+      "id": "forms-snake-alias",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.FormsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "title": "Snake form",
+          "fields": [
+            {
+              "name": "name",
+              "label": "Name",
+              "type": "text"
+            }
+          ],
+          "submit_button_text": "Snake send"
+        }
+      },
+      "expectValid": true,
+      "expectNormalized": {
+        "submitButtonText": "Snake send"
+      }
+    },
+    {
+      "id": "forms-coercion",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.FormsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "widgetData": {
+          "title": "Coercion",
+          "fields": [
+            {
+              "name": "name",
+              "label": "Name",
+              "type": "text",
+              "required": "true"
+            }
+          ]
+        }
+      },
+      "expectValid": true
+    },
+    {
+      "id": "unknown-widget",
+      "method": "GET",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.MissingPilotWidget/schema/",
+      "expectStatus": 404
+    },
+    {
+      "id": "headline-camel-header-level-parser-gap",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.HeadlineWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "headerLevel": "nonstandard"
+        }
+      },
+      "expectValid": true,
+      "expectNormalized": {
+        "headerLevel": "h1"
+      }
+    },
+    {
+      "id": "columns-alias-precedence",
+      "method": "POST",
+      "path": "/api/v1/webpages/widget-types/easy_widgets.TwoColumnsWidget/validate/",
+      "expectStatus": 200,
+      "body": {
+        "configuration": {
+          "layout_style": "1:5",
+          "layoutStyle": "4:2"
+        }
+      },
+      "expectValid": true,
+      "expectNormalized": {
+        "layoutStyle": "4:2"
+      }
+    }
+  ],
+  "widgets": {
+    "main": [
+      {
+        "id": "pilot-headline",
+        "type": "easy_widgets.HeadlineWidget",
+        "config": {
+          "content": "Pilot heading",
+          "headerLevel": "h2",
+          "showBorder": false
+        }
+      },
+      {
+        "id": "pilot-banner",
+        "type": "easy_widgets.BannerWidget",
+        "config": {
+          "bannerMode": "text",
+          "textContent": "<h3>Pilot banner</h3><p>Banner body</p>",
+          "textColor": "#123456",
+          "backgroundColor": "#ffffff",
+          "textOutline": "none",
+          "showBorder": false
+        }
+      },
+      {
+        "id": "pilot-columns",
+        "type": "easy_widgets.TwoColumnsWidget",
+        "config": {
+          "layoutStyle": "4:2",
+          "slots": {
+            "left": [
+              {
+                "id": "pilot-left",
+                "type": "easy_widgets.HeadlineWidget",
+                "config": {
+                  "content": "Pilot left",
+                  "headerLevel": "h3"
+                }
+              }
+            ],
+            "right": [
+              {
+                "id": "pilot-right",
+                "type": "easy_widgets.HeadlineWidget",
+                "config": {
+                  "content": "Pilot right",
+                  "headerLevel": "h3"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "pilot-form",
+        "type": "easy_widgets.FormsWidget",
+        "config": {
+          "title": "Pilot contact",
+          "fields": [
+            {
+              "name": "name",
+              "label": "Your name",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "topic",
+              "label": "Topic",
+              "type": "select",
+              "options": [
+                "General",
+                "Press"
+              ]
+            }
+          ],
+          "submitButtonText": "Send pilot"
+        }
+      }
+    ]
+  },
+  "expectedHeadings": [
+    "Pilot heading",
+    "Pilot banner",
+    "Pilot left",
+    "Pilot right",
+    "Pilot contact"
+  ],
+  "knownReferenceIssues": [
+    {
+      "id": "headline-camel-header-level-parser-gap",
+      "description": "The wire parser maps headerLevel to header_level, while HeadlineConfig names its field headerLevel. The validation endpoint silently returns the h1 default for a nondefault headerLevel. This characterizes the existing bug; it does not approve it for the replacement."
+    }
+  ],
+  "storedWidgets": {
+    "main": [
+      {
+        "id": "pilot-headline",
+        "type": "easy_widgets.HeadlineWidget",
+        "config": {
+          "content": "Pilot heading",
+          "header_level": "h2",
+          "show_border": false
+        }
+      },
+      {
+        "id": "pilot-banner",
+        "type": "easy_widgets.BannerWidget",
+        "config": {
+          "banner_mode": "text",
+          "text_content": "<h3>Pilot banner</h3><p>Banner body</p>",
+          "text_color": "#123456",
+          "background_color": "#ffffff",
+          "text_outline": "none",
+          "show_border": false
+        }
+      },
+      {
+        "id": "pilot-columns",
+        "type": "easy_widgets.TwoColumnsWidget",
+        "config": {
+          "layout_style": "4:2",
+          "slots": {
+            "left": [
+              {
+                "id": "pilot-left",
+                "type": "easy_widgets.HeadlineWidget",
+                "config": {
+                  "content": "Pilot left",
+                  "header_level": "h3"
+                }
+              }
+            ],
+            "right": [
+              {
+                "id": "pilot-right",
+                "type": "easy_widgets.HeadlineWidget",
+                "config": {
+                  "content": "Pilot right",
+                  "header_level": "h3"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "pilot-form",
+        "type": "easy_widgets.FormsWidget",
+        "config": {
+          "title": "Pilot contact",
+          "fields": [
+            {
+              "name": "name",
+              "label": "Your name",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "topic",
+              "label": "Topic",
+              "type": "select",
+              "options": [
+                "General",
+                "Press"
+              ]
+            }
+          ],
+          "submit_button_text": "Send pilot"
+        }
+      }
+    ]
+  }
+}

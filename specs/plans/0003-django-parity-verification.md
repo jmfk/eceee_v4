@@ -1,7 +1,7 @@
 ---
 id: PLAN-0003
 title: Verifiera bibehållen funktion vid avveckling av Django
-status: proposed
+status: baseline-established
 date: 2026-10-21
 related_prds:
   - PRD-0027
@@ -106,3 +106,24 @@ Detta ger konkreta bevis för bevarat beteende inom kartlagt scope. Det gör int
 - Funktionskravet och verifieringsmetoden är dokumenterade; baslinjekörning och jämförelseharness är **inte implementerade eller körda**.
 - Befintliga testkällor har undersökts. Inga applikationsresultat hävdas från läsningen.
 - Nästa implementationsbatch börjar med den körbara pilotbaslinjen. Kodflytten och byte av auktoritativ validator följer först när den baslinjen går att köra och bedöma.
+
+## Genomförd pilotbaslinje, 2026-10-21
+
+Baslinjen är nu implementerad i separat worktree `django-pilot-baseline`, på branch `codex/django-pilot-baseline`. [Körinstruktioner och avgränsningar](../../backend/webpages/tests/fixtures/pilot_baseline/README.md) och [ADR-0036](../adrs/active/0036-frozen-pilot-behavior-baseline.md) beskriver den faktiska lösningen. Ingen widget-/API-implementation har flyttats.
+
+| Kontroll | Lokalt resultat |
+| --- | --- |
+| Frysta DRF-kontrakt | 51 requestfall och katalogobservation överensstämmer med granskad referens; oberoende status-/valideringsförväntningar passerar. |
+| Backend | 6 tester passerar, inklusive faktisk PostgreSQL-lagring, session/tenant/CSRF, omladdning, liveisolering och stale-write-avslag utan mutation/notifiering. |
+| Frontend | 11 tester passerar: pilotrendering, registryparitet och befintlig PagePreview-iframe-integration. |
+| Chromium | 6 tester passerar, tre flöden vardera på desktop/mobil. Ingen retry, inga överhoppade eller flaky fall. |
+| Jämförelse-/rapportspärrar | 4 tester passerar; saknade/förändrade kontrakt och saknade/överhoppade obligatoriska backendfall avvisas. |
+| Statiskt | Black/isort/flake8 för ändrade backendfiler, fokuserad frontend-ESLint, CI-YAML, specs, lokala länkar och whitespacekontroll passerar. |
+
+Samlad körning: `python3 scripts/pilot_baseline.py run --output /tmp/eceee-pilot-baseline-verified`. Rapporten anger `passed_with_known_reference_issues` och `candidateParity: not_supplied`. Körningen gjordes före implementationscommit; dess rapport visar dåvarande föräldra-HEAD och en smutsig arbetskatalog. Containers läste en separat källkodssnapshot under hela körningen.
+
+Runtime: Python 3.11.17, Django 4.2.30, Pydantic 2.13.5, PostgreSQL 17.11, Node 24.15.0, React 19.1.0, Vitest 3.2.7 och Playwright 1.60.0. Referensproduktkoden är `9da0eb18451db16f5b8406f1c0c6c5a4f108483d` och oförändrad i denna batch.
+
+En befintlig avvikelse är synlig: Headline-valideringsendpointen tappar `headerLevel` genom snake/camel-gränsen och återgår till `h1`. Den är ett känt referensfel, inte ett godkänt beteende för nästa implementation. Sidornas sparade konfiguration och svarscasing testas separat; den nuvarande read-serializerns `activeVariants`-berikning av toppwidgets är en explicit förväntning.
+
+Detta etablerar första referensbaslinjen. Verifiering av en ersättare, verkliga samtidiga skrivrace, publicerings-/historikflöden och övriga CMS-domäner är fortfarande kommande gater enligt planen ovan. Ingen produktion, operatörsmiljöfil eller befintlig utvecklingsdatabas har använts.

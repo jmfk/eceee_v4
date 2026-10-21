@@ -7,6 +7,7 @@
 | ADR-0038 | [Publish theme outlines independently](active/0038-outline-only-theme-publication.md) | accepted | PRD-0027 |
 | ADR-0037 | [Preserve edits in stale Designer drafts](active/0037-preserve-stale-designer-draft-edits.md) | accepted | PRD-0027 |
 | ADR-0036 | [Theme-owned named text effects](active/0036-theme-text-effects.md) | accepted | PRD-0027 |
+| ADR-0036 | [Frozen pilot contracts and isolated reference verification](active/0036-frozen-pilot-behavior-baseline.md) | accepted | PRD-0027 |
 | ADR-0035 | [Plain banner text](active/0035-plain-banner-text.md) | accepted | PRD-0026 |
 | ADR-0033 | [Widget editor session and field ownership](active/0033-widget-editor-session-and-field-ownership.md) | accepted | PRD-0025 |
 | ADR-0001 | [Canonical page version workflow](active/0001-canonical-page-version-workflow.md) | accepted | PRD-0001 |
