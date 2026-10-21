@@ -20,6 +20,7 @@ SNAPSHOT_FIELDS = (
     "component_styles",
     "designer_preview",
     "layouts",
+    "widget_types",
     "image_styles",
     "text_outline_styles",
     "gallery_styles",
@@ -107,6 +108,10 @@ def restore_theme_version(theme, version, *, user):
             theme.text_outline_styles = {}
         if field in version.snapshot:
             value = version.snapshot[field]
+            if field == "widget_types":
+                from webpages.theme_widgets import retain_released_history
+
+                value = retain_released_history(value, theme.widget_types)
             if field == "designer_preview":
                 value = materialize_legacy_preview_collections(value, theme.tenant)
             setattr(theme, field, value)

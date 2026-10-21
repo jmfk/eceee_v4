@@ -53,6 +53,7 @@ import SessionExpiredOverlay from './components/SessionExpiredOverlay'
 import AppVersionReloadGuard from './components/AppVersionReloadGuard'
 import DesignerThemesPage from './pages/DesignerThemesPage'
 import DesignerThemeWorkspacePage from './pages/DesignerThemeWorkspacePage'
+import DesignerWidgetTypesPage from './pages/DesignerWidgetTypesPage'
 import DesignerLayoutWorkspacePage from './pages/DesignerLayoutWorkspacePage'
 import LayoutWorkspacePage from './pages/LayoutWorkspacePage'
 import DesignerRoute from './components/DesignerRoute'
@@ -385,6 +386,7 @@ export const AppRoutes = () => {
             <DesignerThemeWorkspacePage />
           </DesignerRoute>
         } />
+        <Route path="/designer/themes/:themeId/widgets/:widgetTypeId?" element={<DesignerRoute><DesignerWidgetTypesPage /></DesignerRoute>} />
         <Route path="/designer/themes/:themeId/layouts" element={
           <DesignerRoute>
             <DesignerLayoutWorkspacePage />

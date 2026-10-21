@@ -1,3 +1,4 @@
+import { useWidgetTheme } from '../contexts/WidgetThemeContext'
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { Layout, Plus, Settings, Trash2, Eye, Check, X, MoreHorizontal, Clipboard, Scissors, ChevronDown, ChevronUp } from 'lucide-react'
 import { ObjectWidgetFactory } from '../editors/object-editor'
@@ -41,7 +42,8 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
     const normalizedWidgets = useMemo(() => internalWidgets, [internalWidgets])
     const normalizedWidgetsRef = useRef(internalWidgets)
     const onWidgetChangeRef = useRef(onWidgetChange)
-    const { widgetTypes } = useWidgets(internalWidgets)
+    const effectiveTheme = useWidgetTheme(context?.theme)
+    const { widgetTypes } = useWidgets(internalWidgets, effectiveTheme)
     const [filteredWidgetTypes, setFilteredWidgetTypes] = useState([])
     const [isFilteringTypes, setIsFilteringTypes] = useState(false)
 
@@ -123,10 +125,10 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
             try {
                 if (rawAvailableWidgetTypes.length === 0) {
                     const { widgetsApi } = await import('../api')
-                    const allWidgets = await widgetsApi.getTypes(true)
+                    const allWidgets = await widgetsApi.getTypes(true, effectiveTheme?.id)
                     setFilteredWidgetTypes(allWidgets || [])
                 } else {
-                    const filtered = await filterAvailableWidgetTypes(rawAvailableWidgetTypes)
+                    const filtered = rawAvailableWidgetTypes.filter(type => widgetTypes.some(available => available.type === type.type))
                     setFilteredWidgetTypes(filtered)
                 }
             } catch (error) {
@@ -137,7 +139,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
             }
         }
         filterTypes()
-    }, [rawAvailableWidgetTypes])
+    }, [rawAvailableWidgetTypes, widgetTypes, effectiveTheme?.id])
 
     useEffect(() => {
         const handleEscape = (e) => { if (e.key === 'Escape' && pasteModeActive && !pasteModePaused) togglePasteMode() }
@@ -219,13 +221,14 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
         const widgetConfig = widgetControl?.defaultConfig || createDefaultWidgetConfig(widgetType)
         const newWidget = {
             id: generateWidgetId(),
-            type: widgetType, config: widgetConfig,
+            type: widgetType, config: { ...(widgetTypes.find(type => type.type === widgetType)?.defaults || {}), ...widgetConfig },
+            ...(widgetType.startsWith("theme_widgets.") ? { typeVersion: widgetTypes.find(type => type.type === widgetType)?.typeVersion } : {}),
             name: getWidgetDisplayName(widgetType, widgetTypes) || widgetType
         }
         const currentSlotWidgets = internalWidgetsRef.current[slotName] || []
         setInternalWidgets(prev => ({ ...prev, [slotName]: [...(prev[slotName] || []), newWidget] }))
         await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
-            id: newWidget.id, type: newWidget.type, config: newWidget.config,
+            id: newWidget.id, type: newWidget.type, typeVersion: newWidget.typeVersion, config: newWidget.config,
             slot: slotName, ...widgetContext, order: currentSlotWidgets.length
         })
     }, [objectType, widgetTypes, componentId, widgetContext, publishUpdate])
@@ -253,7 +256,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
             [slotName]: (prev[slotName] || []).map(widget => widget.id === updatedWidget.id ? updatedWidget : widget),
         }))
         await publishUpdate(componentId, OperationTypes.UPDATE_WIDGET_CONFIG, {
-            id: updatedWidget.id, slotName, ...widgetContext, config: updatedWidget.config
+            id: updatedWidget.id, slotName, ...widgetContext, config: updatedWidget.config, widgetUpdates: updatedWidget.widgetUpdates
         })
         handleCloseWidgetEditor()
     }, [editingWidget, componentId, widgetContext, handleCloseWidgetEditor, publishUpdate])
@@ -382,7 +385,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
             const current = internalWidgetsRef.current[slotName] || []
             setInternalWidgets(prev => ({ ...prev, [slotName]: [...(prev[slotName] || []), newWidget] }))
             await publishUpdate(componentId, OperationTypes.ADD_WIDGET, {
-                id: newWidget.id, type: newWidget.type, config: newWidget.config,
+                id: newWidget.id, type: newWidget.type, typeVersion: newWidget.typeVersion, config: newWidget.config,
                 slot: slotName, ...widgetContext, order: current.length
             })
         }
@@ -442,7 +445,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
                     mode="editor" showControls={true} objectType={objectType} slotConfig={slot}
                     onSlotAction={handleSlotAction} allowedWidgetTypes={filteredWidgetTypes?.map(w => w.type) || []}
                     maxWidgets={slot?.maxWidgets} widgetId={widget.id} className="mb-2"
-                    context={{ ...context, componentId, instanceId }}
+                    context={{ ...context, componentId, instanceId, theme: effectiveTheme }}
                     isWidgetSelected={isWidgetSelected(slotName, widget.id)}
                     isWidgetCut={isWidgetCut(slotName, widget.id)}
                     onToggleWidgetSelection={toggleWidgetSelection}
@@ -461,7 +464,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
                     slotName={slot.name} slot={slot} availableWidgetTypes={filteredWidgetTypes}
                     isFilteringTypes={isFilteringTypes} onAddWidget={handleAddWidget}
                     onClearSlot={handleClearSlot} onShowWidgetModal={handleShowWidgetModal}
-                    onImportContent={handleImportContent} context={context}
+                    onImportContent={handleImportContent} context={{ ...context, theme: effectiveTheme }}
                     pasteModeActive={pasteModeActive} onPasteAtPosition={handlePasteAtPosition}
                 />
                 <div className="flex items-center justify-between mb-3">
@@ -533,7 +536,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
             <WidgetSelectionModal
                 isOpen={widgetModalOpen} onClose={handleCloseWidgetModal}
                 onSelectWidget={handleWidgetSelection} slot={selectedSlotForModal}
-                availableWidgetTypes={filteredWidgetTypes} isFilteringTypes={isFilteringTypes} context={context}
+                availableWidgetTypes={filteredWidgetTypes} isFilteringTypes={isFilteringTypes} context={{ ...context, theme: effectiveTheme }}
             />
             <ImportDialog
                 isOpen={importDialogOpen} onClose={() => { setImportDialogOpen(false); setImportSlotName(null) }}
@@ -546,7 +549,7 @@ const ObjectContentEditor = ({ objectType, widgets = {}, onWidgetChange, context
                 widgetData={editingWidget}
                 title={editingWidget ? `Edit ${getWidgetDisplayName(editingWidget.type, widgetTypes)}` : 'Edit widget'}
                 autoOpenSpecialEditor
-                context={{ ...context, instanceId }}
+                context={{ ...context, instanceId, theme: effectiveTheme }}
                 namespace={namespace}
             />
         </div>

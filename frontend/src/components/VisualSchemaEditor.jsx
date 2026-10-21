@@ -525,7 +525,7 @@ function PropertyConfig({ property, index, totalCount, onUpdate, onDelete, onMov
 }
 
 // Property type selector
-function PropertyTypeSelector({ onAddProperty, existingProperties = [] }) {
+function PropertyTypeSelector({ onAddProperty, existingProperties = [], allowedFieldTypes }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const handleAddProperty = (typeKey) => {
@@ -591,7 +591,7 @@ function PropertyTypeSelector({ onAddProperty, existingProperties = [] }) {
           <div className="p-4">
             <div className="text-sm font-semibold text-gray-900 mb-3 text-center">Select Property Type</div>
             <div className="grid grid-cols-1 gap-2">
-              {getAllFieldTypes().map((fieldType) => {
+              {getAllFieldTypes().filter(fieldType => !allowedFieldTypes || allowedFieldTypes.includes(fieldType.key)).map((fieldType) => {
                 const Icon = fieldType.icon
                 return (
                   <button
@@ -626,7 +626,7 @@ function PropertyTypeSelector({ onAddProperty, existingProperties = [] }) {
 }
 
 // Main Visual Schema Editor component
-export default function VisualSchemaEditor({ schema, onChange }) {
+export default function VisualSchemaEditor({ schema, onChange, allowedFieldTypes }) {
   const [properties, setProperties] = useState(() => {
     // Convert schema properties to internal format
     const schemaProps = schema?.properties || {}
@@ -862,7 +862,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
                 <div className="text-gray-500 text-sm">Add your first property to start building your schema</div>
               </div>
               <div className="flex justify-center pt-4 border-t border-gray-100">
-                <PropertyTypeSelector onAddProperty={handleAddProperty} existingProperties={properties} />
+                <PropertyTypeSelector allowedFieldTypes={allowedFieldTypes} onAddProperty={handleAddProperty} existingProperties={properties} />
               </div>
             </div>
           ) : (
@@ -886,7 +886,7 @@ export default function VisualSchemaEditor({ schema, onChange }) {
 
               {/* Add property button */}
               <div className="flex justify-center pt-4 border-t border-gray-100">
-                <PropertyTypeSelector onAddProperty={handleAddProperty} existingProperties={properties} />
+                <PropertyTypeSelector allowedFieldTypes={allowedFieldTypes} onAddProperty={handleAddProperty} existingProperties={properties} />
               </div>
             </>
           )}

@@ -8,9 +8,11 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, Package, Grid } from 'lucide-react';
 import { widgetsApi } from '../../api';
+import { useWidgetTheme } from '../../contexts/WidgetThemeContext';
 
 const PageWidgetSelectionModal = ({
     isOpen,
+    theme: providedTheme,
     onClose,
     onWidgetSelect,
     slotName,
@@ -18,6 +20,7 @@ const PageWidgetSelectionModal = ({
     allowedWidgetTypes = ['*'], // Default to all widgets
     disallowedWidgetTypes = null // Blacklist (only used if allowedWidgetTypes is ['*'])
 }) => {
+    const theme = useWidgetTheme(providedTheme);
     const [availableWidgets, setAvailableWidgets] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -28,12 +31,12 @@ const PageWidgetSelectionModal = ({
         if (isOpen) {
             fetchAvailableWidgets();
         }
-    }, [isOpen]);
+    }, [isOpen, theme?.id, theme?.updatedAt, theme?.syncVersion]);
 
     const fetchAvailableWidgets = async () => {
         setLoading(true);
         try {
-            const data = await widgetsApi.getTypes(true); // Include template JSON
+            const data = await widgetsApi.getTypes(true, theme?.id); // Include template JSON
             setAvailableWidgets(data || []);
         } catch (error) {
             setAvailableWidgets([]);

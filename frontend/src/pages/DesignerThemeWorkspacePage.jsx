@@ -21,6 +21,7 @@ const workspaceDraftPayload = (workspace) => workspace ? ({
     colors: Object.fromEntries(workspace.colors.map((color) => [color.name, color.value])),
     fonts: workspace.fonts.filter((font) => font.family.trim()).map((font) => ({ family: font.family, variants: font.variants, display: font.display })),
     typography: workspace.typography.map((row) => ({ groupIndex: row.groupIndex, element: row.element, values: row.values })),
+    ...(workspace.widgetTypes ? { widgetTypes: workspace.widgetTypes } : {}),
     ...(workspace.layouts ? { layouts: workspace.layouts } : {}),
     spacing: workspace.spacing.map((row) => ({
         scope: row.scope, groupIndex: row.groupIndex, element: row.element, part: row.part,
@@ -381,6 +382,7 @@ const DesignerThemeWorkspacePage = () => {
                             return <button type="button" key={key} onClick={() => setViewport(key)} aria-label={`${label} preview at ${width}px`} aria-pressed={viewport === key} title={`${label} · ${width}px`} className={`rounded p-1.5 ${viewport === key ? 'bg-gray-200 text-gray-900' : 'text-gray-500'}`}>{key === 'xs' ? <span aria-hidden="true" className="flex h-4 w-4 items-center justify-center rounded-[2px] border border-current text-[8px] font-bold leading-none">B</span> : createElement(icon, { className: 'h-4 w-4' })}</button>
                         })}
                     </div>
+                    <button type="button" disabled={hasUnsavedLocalChanges || controlsDisabled} onClick={() => navigate(`/designer/themes/${themeId}/widgets`)} className="px-3 py-2 border border-gray-300">Widget types</button>
                     <button type="button" onClick={() => navigate(`/designer/themes/${themeId}/layouts`)} disabled={hasUnsavedLocalChanges || controlsDisabled} title={hasUnsavedLocalChanges ? 'Save or discard local Designer changes before editing layout structure' : 'Edit layout structure and slots'} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-40"><LayoutTemplate className="h-4 w-4" />Edit layouts</button>
                     <button type="button" onClick={exportPackage} disabled={exporting} title={exportProgress?.message} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-50">{exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{exporting ? `Export ${exportProgress?.percent || 0}%` : 'Export'}</button>
                     <button type="button" onClick={undoPublish} disabled={!workspace.canUndo || hasDraftChanges || workspace.draftIsStale || controlsDisabled} title={hasDraftChanges ? 'Publish or discard draft changes before restoring' : 'Restore the version before the latest Designer publish'} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-40">{restoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}Undo publish</button>

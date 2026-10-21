@@ -6,6 +6,8 @@
  */
 
 import widgetRegistryManager from './WidgetRegistryManager';
+import ThemeWidgetEditor from './ThemeWidgetEditor';
+import { isThemeWidget } from '../rendering/themeWidgets';
 import { EASY_WIDGET_REGISTRY } from './easy-widgets';
 
 // Register easy widgets registry
@@ -20,7 +22,7 @@ export * from './easy-widgets';
 
 // Export the unified widget functions that support overrides
 export const getWidgetComponent = (widgetType) => {
-    return widgetRegistryManager.getWidgetComponent(widgetType);
+    return isThemeWidget(widgetType) ? ThemeWidgetEditor : widgetRegistryManager.getWidgetComponent(widgetType);
 };
 
 export const getWidgetMetadata = (widgetType) => {

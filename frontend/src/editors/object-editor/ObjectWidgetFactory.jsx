@@ -258,11 +258,13 @@ const ObjectWidgetFactory = ({
                     <div>
                         <CoreWidgetComponent
                             config={widget.config || {}}
+                            typeVersion={widget.typeVersion ?? widget.type_version}
                             mode="editor"
                             onConfigChange={stableConfigChangeHandler}
                             widgetId={actualWidgetId}
                             slotName={actualSlotName}
                             widgetType={widget.type}
+                            context={context}
                             objectType={objectType}
                             slotConfig={slotConfig}
                             isRequired={slotConfig?.required}
@@ -349,11 +351,13 @@ const ObjectWidgetFactory = ({
             <div>
                 <CoreWidgetComponent
                     config={widget.config || {}}
+                    typeVersion={widget.typeVersion ?? widget.type_version}
                     mode={mode}
                     onConfigChange={stableConfigChangeHandler}
                     widgetId={actualWidgetId}
                     slotName={actualSlotName}
                     widgetType={widget.type}
+                            context={context}
                     // ObjectEditor-specific props
                     objectType={objectType}
                     slotConfig={slotConfig}

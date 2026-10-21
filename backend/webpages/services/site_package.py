@@ -593,6 +593,7 @@ def _serialize_theme(theme: PageTheme) -> Dict[str, Any]:
         "component_styles": theme.component_styles,
         "designer_preview": theme.designer_preview,
         "layouts": theme.layouts,
+        "widget_types": theme.widget_types,
         "image_styles": theme.image_styles,
         "text_outline_styles": theme.text_outline_styles,
         "gallery_styles": theme.gallery_styles,
@@ -2302,6 +2303,7 @@ class SitePackageImporter:
                 data.get("designer_preview", {}), destination_tenant
             ),
             "layouts": layouts,
+            "widget_types": data.get("widget_types", {"version": 1, "items": []}),
             "image_styles": data.get("image_styles", {}),
             "text_outline_styles": validate_text_outline_styles(
                 data.get("text_outline_styles", default_text_outline_styles())
@@ -2337,6 +2339,7 @@ class SitePackageImporter:
                 data.get("designer_preview", {}), self._destination_tenant()
             ),
             "layouts": _with_compatibility_layouts(data.get("layouts"), layout_references),
+            "widget_types": data.get("widget_types", {"version": 1, "items": []}),
             "image_styles": data.get("image_styles", {}),
             "text_outline_styles": validate_text_outline_styles(
                 data.get("text_outline_styles", default_text_outline_styles())

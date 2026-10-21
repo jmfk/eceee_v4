@@ -237,6 +237,10 @@ class PageVersion(models.Model):
             effective_key = self.layout_key or self.code_layout
             self.layout_key = effective_key
             self.code_layout = effective_key
+        from webpages.theme_widgets import validate_page_theme_change, validate_version_widgets
+
+        validate_version_widgets(self)
+        validate_page_theme_change(self)
         self._assert_published_snapshot_immutable(kwargs.get("update_fields"))
         # First do the actual save
         super().save(*args, **kwargs)

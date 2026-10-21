@@ -67,7 +67,7 @@ const SelfContainedSlotEditor = ({
     const topSlot = isNestedSlot ? widgetPath[0] : null;
     const containerId = isNestedSlot ? widgetPath[1] : null;
     // Use the widgets hook for proper widget management
-    const { addWidget, generateWidgetId } = useWidgets();
+    const { addWidget, generateWidgetId, widgetTypes } = useWidgets({}, pageVersionData?.effectiveTheme || webpageData?.effectiveTheme);
 
     // State
     const [widgets, setWidgets] = useState([...initialWidgets]);
@@ -119,7 +119,8 @@ const SelfContainedSlotEditor = ({
             id: generateWidgetId(),
             name: getWidgetDisplayName(widgetType),
             type: widgetType,
-            config: widgetConfig,
+            ...(widgetType.startsWith("theme_widgets.") ? { typeVersion: widgetTypes.find(type => type.type === widgetType)?.typeVersion } : {}),
+            config: { ...(widgetTypes.find(type => type.type === widgetType)?.defaults || {}), ...widgetConfig },
             slotName: slotName
         };
 
@@ -433,7 +434,7 @@ const SelfContainedSlotEditor = ({
             </div>
 
             {/* Widget Selection Modal */}
-            <PageWidgetSelectionModal
+            <PageWidgetSelectionModal theme={pageVersionData?.effectiveTheme || webpageData?.effectiveTheme}
                 isOpen={isWidgetModalOpen}
                 onClose={handleCloseWidgetModal}
                 onWidgetSelect={handleWidgetSelection}

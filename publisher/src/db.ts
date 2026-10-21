@@ -66,11 +66,11 @@ function reader(client: PoolClient): PageReader {
       return result.rows[0] ?? null;
     },
     async theme(themeId, tenantId) {
-      const result = await client.query<Theme>('SELECT id, tenant_id, name, fonts, colors, css_variables, design_groups, html_elements, component_styles, text_outline_styles, image_styles, gallery_styles, carousel_styles, breakpoints, layouts, custom_css, sync_version, updated_at FROM webpages_pagetheme WHERE id = $1 AND tenant_id = $2 LIMIT 1', [themeId, tenantId]);
+      const result = await client.query<Theme>('SELECT id, tenant_id, name, fonts, colors, css_variables, design_groups, html_elements, component_styles, text_outline_styles, image_styles, gallery_styles, carousel_styles, breakpoints, layouts, widget_types, custom_css, sync_version, updated_at FROM webpages_pagetheme WHERE id = $1 AND tenant_id = $2 LIMIT 1', [themeId, tenantId]);
       return result.rows[0] ?? null;
     },
     async defaultTheme(tenantId) {
-      const result = await client.query<Theme>('SELECT id, tenant_id, name, fonts, colors, css_variables, design_groups, html_elements, component_styles, text_outline_styles, image_styles, gallery_styles, carousel_styles, breakpoints, layouts, custom_css, sync_version, updated_at FROM webpages_pagetheme WHERE tenant_id = $1 AND is_default = true AND is_active = true ORDER BY created_at, id LIMIT 1', [tenantId]);
+      const result = await client.query<Theme>('SELECT id, tenant_id, name, fonts, colors, css_variables, design_groups, html_elements, component_styles, text_outline_styles, image_styles, gallery_styles, carousel_styles, breakpoints, layouts, widget_types, custom_css, sync_version, updated_at FROM webpages_pagetheme WHERE tenant_id = $1 AND is_default = true AND is_active = true ORDER BY created_at, id LIMIT 1', [tenantId]);
       return result.rows[0] ?? null;
     },
     async publishedPageReferences(pageIds, tenantId, rootId, at) {

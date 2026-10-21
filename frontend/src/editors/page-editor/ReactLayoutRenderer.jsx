@@ -198,7 +198,7 @@ const ReactLayoutRenderer = forwardRef(({
     // Use shared widget hook
     const {
         addWidget
-    } = useWidgets(widgets);
+    } = useWidgets(widgets, pageVersionData?.effectiveTheme || webpageData?.effectiveTheme);
 
     // Widget modal state
     const [widgetModalOpen, setWidgetModalOpen] = useState(false);
@@ -434,6 +434,7 @@ const ReactLayoutRenderer = forwardRef(({
                     await publishWidgetOperation(OperationTypes.ADD_WIDGET, {
                         id: newWidget.id,
                         type: newWidget.type,
+                        typeVersion: newWidget.typeVersion,
                         config: newWidget.config,
                         slot: slotName,
                         order: widgetOrder
@@ -1778,6 +1779,7 @@ const ReactLayoutRenderer = forwardRef(({
                 onWidgetSelect={handleWidgetSelection}
                 slotName={selectedSlotForModal}
                 slotLabel={selectedSlotMetadata?.label || selectedSlotForModal}
+                theme={pageVersionData?.effectiveTheme || webpageData?.effectiveTheme}
                 allowedWidgetTypes={selectedSlotMetadata?.allowedWidgetTypes}
                 disallowedWidgetTypes={selectedSlotMetadata?.disallowedWidgetTypes}
             />

@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { widgetsApi } from '../api'
+import { useWidgetTheme } from '../contexts/WidgetThemeContext'
+import { getCurrentTenantId } from '../utils/tenant'
 import {
     getWidgetDisplayName as getDisplayNameFromRegistry,
     getWidgetDefaultConfig
@@ -13,13 +15,16 @@ import { generateWidgetId as createWidgetId } from '../utils/widgetIdentity'
  */
 
 // Helper function to filter valid widgets
+const EMPTY_WIDGET_TYPES = []
+
 const filterValidWidgets = (widgets) => {
     return Array.isArray(widgets)
         ? widgets.filter(w => w != null && typeof w === 'object' && w.id != null)
         : []
 }
 
-export const useWidgets = (initialWidgets = {}) => {
+export const useWidgets = (initialWidgets = {}, providedTheme = null) => {
+    const activeTheme = useWidgetTheme(providedTheme)
     // Filter initial widgets to ensure no undefined entries
     const filteredInitial = {}
     Object.keys(initialWidgets).forEach(slotName => {
@@ -29,15 +34,15 @@ export const useWidgets = (initialWidgets = {}) => {
 
     // Fetch available widget types from API
     const {
-        data: widgetTypes = [],
+        data: widgetTypes = EMPTY_WIDGET_TYPES,
         isLoading: isLoadingTypes,
         error: typesError,
         refetch: refetchTypes
     } = useQuery({
-        queryKey: ['widget-types'],
+        queryKey: ['widget-types', getCurrentTenantId(), activeTheme?.id, activeTheme?.syncVersion || activeTheme?.updatedAt],
         queryFn: async () => {
             try {
-                const response = await widgetsApi.getTypes(true) // Include template JSON
+                const response = await widgetsApi.getTypes(true, activeTheme?.id) // Include template JSON
 
                 // Check if response has data property or is direct array
                 let widgetData = null
@@ -74,7 +79,8 @@ export const useWidgets = (initialWidgets = {}) => {
             id: generateWidgetId(),
             name: getDisplayNameFromRegistry(widgetType, widgetTypes),
             type: widgetType,
-            config: config,
+            config: { ...(widgetTypes.find(type => type.type === widgetType)?.defaults || {}), ...config },
+            ...(widgetType.startsWith("theme_widgets.") ? { typeVersion: widgetTypes.find(type => type.type === widgetType)?.typeVersion } : {}),
             slotName: slotName
         }
 
@@ -220,8 +226,8 @@ export const useWidgets = (initialWidgets = {}) => {
 }
 
 // Helper function to get display name for widget types (uses registry)
-export const getWidgetDisplayName = (widgetType) => {
-    return getDisplayNameFromRegistry(widgetType)
+export const getWidgetDisplayName = (widgetType, widgetTypes = []) => {
+    return getDisplayNameFromRegistry(widgetType, widgetTypes)
 }
 
 // Helper function to create default widget config (uses registry)

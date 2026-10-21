@@ -179,6 +179,7 @@ class PageThemeSerializer(serializers.ModelSerializer):
             "component_styles",
             "designer_preview",
             "layouts",
+            "widget_types",
             "image_styles",
             "text_outline_styles",
             "gallery_styles",
@@ -281,6 +282,24 @@ class PageThemeSerializer(serializers.ModelSerializer):
         if "groups" in value and not isinstance(value["groups"], list):
             raise serializers.ValidationError("Typography groups must be a list")
 
+        return value
+
+    def validate_widget_types(self, value):
+        from webpages.services.designer_theme import user_can_design_theme
+        from webpages.theme_widgets import validate_widget_types
+
+        request = self.context.get("request")
+        if request and self.instance and value != self.instance.widget_types:
+            if not user_can_design_theme(request.user, self.instance):
+                raise serializers.ValidationError("Only theme designers may change widget definitions.")
+        try:
+            validate_widget_types(value, previous=self.instance.widget_types if self.instance else None)
+        except Exception as exc:
+            from django.core.exceptions import ValidationError
+
+            if not isinstance(exc, ValidationError):
+                raise
+            raise serializers.ValidationError(exc.messages) from exc
         return value
 
     def validate_component_styles(self, value):

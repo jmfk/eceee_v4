@@ -15,6 +15,7 @@ from django.db import models
 from file_manager.storage import system_storage
 from webpages.text_outline_styles import default_text_outline_styles
 from webpages.theme_layouts import default_theme_layouts, validate_theme_layouts
+from webpages.theme_widgets import empty_widget_types, validate_widget_types
 
 
 class PageTheme(models.Model):
@@ -69,6 +70,7 @@ class PageTheme(models.Model):
             "reference a registered layout while keeping their demo text and images separate from live content."
         ),
     )
+    widget_types = models.JSONField(default=empty_widget_types, blank=True)
     layouts = models.JSONField(
         default=default_theme_layouts,
         blank=True,
@@ -442,6 +444,7 @@ class PageTheme(models.Model):
             "component_styles": self.component_styles,
             "designer_preview": self.designer_preview,
             "layouts": self.layouts,
+            "widget_types": self.widget_types,
             "image_styles": self.image_styles,
             "text_outline_styles": self.text_outline_styles,
             "gallery_styles": self.gallery_styles,  # Deprecated
@@ -463,6 +466,13 @@ class PageTheme(models.Model):
     def save(self, *args, **kwargs):
         """Override save to ensure only one default theme exists, increment sync version, and invalidate CSS cache"""
         validate_theme_layouts(self.layouts)
+        previous_widgets = (
+            type(self).objects.filter(pk=self.pk).values_list("widget_types", flat=True).first() if self.pk else None
+        )
+        validate_widget_types(self.widget_types, previous=previous_widgets)
+        from webpages.theme_widgets import validate_default_theme_change
+
+        validate_default_theme_change(self)
         if self.is_default:
             # A default is unique within its tenant, not across the whole installation.
             PageTheme.objects.filter(tenant_id=self.tenant_id, is_default=True).exclude(id=self.id).update(

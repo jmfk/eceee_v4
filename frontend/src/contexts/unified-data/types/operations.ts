@@ -55,6 +55,7 @@ export type WidgetContext =
   | { contextType: 'object'; objectId: string };
 
 export type AddWidgetPayload = WidgetContext & {
+  typeVersion?: number;
   id: string;
   type: string; // widget type
   config?: Partial<WidgetConfig>;
@@ -67,6 +68,7 @@ export type UpdateWidgetConfigPayload = WidgetContext & {
   config?: Partial<WidgetConfig>;
   // Widget-level updates (publishing, inheritance, etc.) - camelCase for frontend
   widgetUpdates?: {
+    typeVersion?: number;
     isPublished?: boolean;
     inheritanceLevel?: number;
     inheritFromParent?: boolean;

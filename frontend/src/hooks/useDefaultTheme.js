@@ -11,6 +11,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { themesApi } from '../api'
+import { getCurrentTenantId } from '../utils/tenant'
 
 export const useDefaultTheme = ({
     enabled = true
@@ -22,7 +23,7 @@ export const useDefaultTheme = ({
         error,
         refetch
     } = useQuery({
-        queryKey: ['themes', 'default'],
+        queryKey: ['themes', 'default', getCurrentTenantId()],
         queryFn: async () => {
             try {
                 const response = await themesApi.getDefault()

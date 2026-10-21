@@ -83,11 +83,11 @@ export const widgetsApi = {
      * @param {boolean} includeTemplateJson - Whether to include template JSON
      * @returns {Promise<Object>} Widget types response
      */
-    getTypes: wrapApiCall(async (includeTemplateJson = false) => {
+    getTypes: wrapApiCall(async (includeTemplateJson = false, themeId = null) => {
         const endpoint = includeTemplateJson
             ? endpoints.widgets.typesWithJson
             : endpoints.widgets.types
-        return api.get(endpoint)
+        return api.get(endpoint, themeId ? { params: { theme_id: themeId } } : undefined)
     }, 'widgets.getTypes')
 }
 

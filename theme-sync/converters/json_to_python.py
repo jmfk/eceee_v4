@@ -291,6 +291,8 @@ def generate_theme_class_code(
             lines.append("    table_templates = TableTemplates")
         if theme_data.get("breakpoints"):
             lines.append("    breakpoints = Breakpoints")
+        if "widget_types" in theme_data:
+            lines.append(f"    widget_types = {_format_dict(theme_data['widget_types'], indent=4)}")
     else:
         # Legacy: inline all data
         field_order = [
@@ -301,6 +303,7 @@ def generate_theme_class_code(
             "image_styles",
             "table_templates",
             "breakpoints",
+            "widget_types",
         ]
 
         for field in field_order:
