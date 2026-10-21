@@ -51,4 +51,14 @@ The additive migration is `webpages.0087_pagetheme_widget_types`. Existing theme
 
 Focused coverage lives in `webpages.tests.test_theme_widgets`, `webpages.tests.test_theme_widget_integration`, frontend theme widget render/author/upgrade tests and `publisher/tests/theme-widgets.test.ts`. The implementation batch also checks existing theme-version tests, code widget registry parity, nested editor operations, page rendering and publisher model normalization.
 
-Browser verification uses synthetic person-card and fact-box data at desktop and mobile sizes. Production migration/deployment remains subject to the repository's separate owner gates.
+Live browser verification on 2026-10-21 used real authentication, an isolated PostgreSQL database, the Django API and the Next publisher, without mocked API responses. It covered:
+
+- Visual field authoring with a camelCase key, draft save/reload and theme publication.
+- Page and object instance save/reopen and published Next rendering.
+- Revision 2 publication retaining revision 1 on existing instances; new instances selecting revision 2.
+- Explicit upgrade showing removed values and rejecting a missing required field before saving.
+- Archiving hiding new selection while preserving existing rendering and editing.
+- An incompatible page-theme change being rejected without losing saved content.
+- Person-card and fact-box rendering at 375px and 1280px without horizontal overflow, plus reachable instance-editor save controls at both widths.
+
+The live check found slot toolbars overlapping the new instance editor. Its layer now matches the existing widget editor panel; ordinary browser clicks successfully save page and object instances. Focused instance-editor and widget-panel tests also pass. Production migration/deployment remains subject to the repository's separate owner gates.
