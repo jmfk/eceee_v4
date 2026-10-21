@@ -4,11 +4,13 @@ import copy
 import json
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
 
 from django.test import SimpleTestCase
 from pydantic import ValidationError
 
-from webpages.publisher_manifest import build_publisher_manifest
+from webpages.publisher_manifest import build_publisher_manifest, serialize_publisher_manifest
 from webpages.widget_registry import widget_type_registry
 from widget_contracts import CONTRACT_ROOT, build_render_manifest, pilot_models, render_catalog, render_metadata
 from widget_contracts.models import _MODELS
@@ -32,9 +34,19 @@ class WidgetContractTests(SimpleTestCase):
         metadata["layoutParts"].clear()
         self.assertTrue(render_metadata("easy_widgets.HeadlineWidget")["layoutParts"])
 
-    def test_node_manifest_matches_python_and_checked_in_bytes(self):
-        generated = subprocess.check_output(["node", str(CONTRACT_ROOT / "manifest.mjs"), "--check"], text=True)
-        self.assertIn("no Django", generated)
+    def test_node_manifest_matches_python_without_frontend_checkout(self):
+        # Backend-only CI mounts /app, not /frontend. Checked-in file drift is
+        # verified separately by the Node CLI in the publisher CI job.
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "manifest.json"
+            subprocess.run(
+                ["node", str(CONTRACT_ROOT / "manifest.mjs"), "--output", str(output)],
+                cwd=directory,
+                check=True,
+                capture_output=True,
+                timeout=30,
+            )
+            self.assertEqual(output.read_bytes(), serialize_publisher_manifest().encode("utf-8"))
 
     def test_python_contracts_import_with_django_explicitly_blocked(self):
         script = """

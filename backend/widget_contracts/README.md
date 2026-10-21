@@ -57,3 +57,5 @@ The initial implementation was verified on the working tree based on `2f11baef` 
 - The original source and shared catalog match for every moved field of all 25 widgets; all five generated Pydantic schemas match their original models. The frozen fixture files and generated renderer manifest are unchanged.
 
 Runtime: Node 22.23.4 in the standalone no-Python/no-Django container; Python 3.11.17, Django 4.2.30 and Pydantic 2.14.1 in the backend; PostgreSQL 17.11. Reports retain the known reference issue and do not claim replacement-backend parity.
+
+CI integration follow-up: the CSS parity test now reads the canonical catalog and is mandatory in the local pilot command (27 React tests plus 6 browser tests). The backend manifest test compares temporary Node output with Python bytes without requiring a frontend checkout; the publisher CI job still checks the committed manifest for drift. All four backend contract tests, including the 714-configuration matrix, pass with only the backend mounted and no network/database.

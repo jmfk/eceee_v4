@@ -1,15 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync, readdirSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import catalog from '../../../../backend/widget_contracts/render_catalog.json'
 import { PUBLIC_RENDER_CSS } from '../../rendering/publicRenderCss'
 import manifest from '../../rendering/generated/render-manifest.json'
 import { compileRenderStyles } from '../../rendering/themeCssCompiler'
 import { buildDesignerTheme, buildEditorThemeCSS, compileEditorCSS } from '../editorThemeCSS'
 
-const testDir = dirname(fileURLToPath(import.meta.url))
-const frontendRoot = resolve(testDir, '../../..')
-const widgetSourcesDir = resolve(frontendRoot, '../backend/easy_widgets/widgets')
 const editorWidgetBaseCSS = Object.values(manifest.widgets).map(widget => [
     ...Object.entries(widget.cssVariables || {}).map(([name, value]) => `--${name}: ${value};`),
     widget.css || '',
@@ -112,25 +107,25 @@ describe('buildEditorThemeCSS', () => {
         expect(editorWidgetBaseCSS).toMatch(/\.hero-content\s*\{[^}]*padding:\s*30px;/)
     })
 
-    it('keeps the frontend widget baseline aligned with backend widget definitions', () => {
+    it('keeps the frontend widget baseline aligned with the canonical widget catalog', () => {
         const normalizedBaseline = normalizeCSS(editorWidgetBaseCSS)
         let widgetCSSCount = 0
         let variableCount = 0
 
-        for (const filename of readdirSync(widgetSourcesDir).filter(name => name.endsWith('.py'))) {
-            const source = readFileSync(resolve(widgetSourcesDir, filename), 'utf8')
-            const widgetCSSMatch = source.match(/^\s{4}widget_css\s*=\s*(?:"""([\s\S]*?)"""|'''([\s\S]*?)''')/m)
-            const widgetCSS = normalizeCSS(widgetCSSMatch?.[1] || widgetCSSMatch?.[2] || '')
+        expect(Object.keys(manifest.widgets).sort()).toEqual(Object.keys(catalog.widgets).sort())
+        for (const [typeId, widget] of Object.entries(catalog.widgets)) {
+            expect(manifest.widgets[typeId].css, `${typeId} CSS`).toBe(widget.css)
+            expect(manifest.widgets[typeId].cssVariables, `${typeId} variables`).toEqual(widget.cssVariables)
+            const widgetCSS = normalizeCSS(widget.css)
 
             if (widgetCSS) {
                 widgetCSSCount += 1
-                expect(normalizedBaseline, `${filename} widget_css`).toContain(widgetCSS)
+                expect(normalizedBaseline, `${typeId} CSS`).toContain(widgetCSS)
             }
 
-            const variablesMatch = source.match(/^\s{4}css_variables\s*=\s*\{([\s\S]*?)^\s{4}\}/m)
-            for (const match of variablesMatch?.[1]?.matchAll(/["']([^"']+)["']\s*:\s*["']([^"']*)["']/g) || []) {
+            for (const [name, value] of Object.entries(widget.cssVariables)) {
                 variableCount += 1
-                expect(editorWidgetBaseCSS, `${filename} css_variables`).toContain(`--${match[1]}: ${match[2]};`)
+                expect(editorWidgetBaseCSS, `${typeId} variables`).toContain(`--${name}: ${value};`)
             }
         }
 

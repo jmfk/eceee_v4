@@ -108,7 +108,7 @@ class PilotComparisonTests(unittest.TestCase):
     def test_frontend_scenario_identity_is_required_even_when_counts_match(self):
         result = {
             "success": True,
-            "numPassedTests": 11,
+            "numPassedTests": len(pilot.REQUIRED_FRONTEND_SCENARIOS),
             "testResults": [
                 {
                     "assertionResults": [
