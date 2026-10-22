@@ -61,6 +61,21 @@ const titleInput = () => screen.getByPlaceholderText('Enter object title...')
 const editTitle = title => fireEvent.change(titleInput(), { target: { value: title } })
 
 describe('Object editor working-copy integration', () => {
+    it('keeps the right data panel resizable and collapsible for types without widget slots', async () => {
+        mount()
+        await screen.findByDisplayValue('Object 1')
+        await act(async () => { editTitle('Unsaved panel edit') })
+        const divider = screen.getByRole('separator', { name: 'Resize Object data' })
+        fireEvent.keyDown(divider, { key: 'ArrowLeft' })
+        expect(divider).toHaveAttribute('aria-valuenow', '440')
+        fireEvent.click(screen.getByRole('button', { name: 'Collapse Object data' }))
+        expect(screen.getByDisplayValue('Unsaved panel edit')).not.toBeVisible()
+        fireEvent.click(screen.getByRole('button', { name: 'Expand Object data' }))
+        expect(screen.getByDisplayValue('Unsaved panel edit')).toBeVisible()
+        expect(mocks.state().objects['1'].title).toBe('Unsaved panel edit')
+        expect(mocks.state().metadata.isDirty).toBe(true)
+    })
+
     it('preserves unsaved content and the reviewed token when returning to Content', async () => {
         mount()
         await screen.findByDisplayValue('Object 1')
