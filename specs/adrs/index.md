@@ -4,6 +4,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0049 | [Replayable legacy media with transaction-safe placeholder repairs](active/0049-transaction-safe-legacy-media-repairs.md) | accepted | PRD-0012, PRD-0034 |
 | ADR-0047 | [Portable editorial definitions and checkpointed draft imports](active/0047-portable-editorial-definitions-and-draft-import.md) | accepted | PRD-0034, PRD-0031 |
 | ADR-0046 | [Gemensam Artikel och avgränsad legacyimport](active/0046-unified-articles-and-bounded-legacy-import.md) | accepted | PRD-0034, PRD-0012, PRD-0031 |
 | ADR-0043 | [Classification governance and staged cutover](active/0043-classification-governance.md) | accepted | PRD-0031 |
@@ -36,7 +37,6 @@
 | ADR-0018 | [Assess imports and scope replacement to imported bindings](active/0018-assessed-import-plans.md) | accepted | PRD-0016 |
 | ADR-0020 | [Bounded asynchronous remote object packages](active/0020-bounded-remote-object-packages.md) | accepted | PRD-0018 |
 | ADR-0021 | [Destination-owned transfer checkpoints](active/0021-destination-owned-transfer-checkpoints.md) | accepted | PRD-0019 |
-| ADR-0022 | [Serialize legacy News imports and use replayable media keys](active/0022-replayable-legacy-news-media-imports.md) | accepted | PRD-0012 |
 | ADR-0023 | [Reconcile legacy News links and retain disabled link evidence](active/0023-reconcilable-legacy-news-links.md) | accepted | PRD-0012 |
 | ADR-0025 | [Authenticated legacy migration API for tenant import plugins](active/0025-authenticated-legacy-migration-api.md) | accepted | PRD-0012, PRD-0020, PRD-0021 |
 | ADR-0026 | [One agent runtime with capability-scoped profiles](active/0026-capability-scoped-agent-profiles.md) | accepted | PRD-0022, PRD-0023, PRD-0024 |
@@ -51,6 +51,7 @@
 
 | ID | Title | Status | Related PRDs |
 | --- | --- | --- | --- |
+| ADR-0022 | [Serialize legacy News imports and use replayable media keys](archive/0022-replayable-legacy-news-media-imports.md) | superseded | PRD-0012 |
 | ADR-0034 | [Banner presentation overrides](archive/0034-banner-presentation-overrides.md) | superseded | PRD-0026 |
 | ADR-0006 | [Immutable theme snapshots with request-scoped remote credentials](archive/0006-theme-version-lineage.md) | superseded | PRD-0005 |
 | ADR-0012 | [Validate the publisher through an isolated hostname alias](archive/0012-isolated-publisher-test-host.md) | superseded | PRD-0010, PRD-0011 |

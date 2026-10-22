@@ -5,6 +5,7 @@ status: started
 locked: true
 created: 2026-09-30
 related_adrs:
+  - ADR-0049
   - ADR-0013
   - ADR-0022
   - ADR-0023
@@ -67,7 +68,7 @@ The full database import must not begin until the golden sample evidence is acce
 ## Linked ADRs
 
 - [ADR-0013: Gate the legacy News migration through canonical golden samples](../adrs/archive/0013-legacy-news-golden-sample-gate.md) (superseded)
-- [ADR-0022: Serialize legacy News imports and use replayable media keys](../adrs/active/0022-replayable-legacy-news-media-imports.md)
+- [ADR-0022: Serialize legacy News imports and use replayable media keys](../adrs/archive/0022-replayable-legacy-news-media-imports.md)
 - [ADR-0023: Reconcile legacy News links and retain disabled link evidence](../adrs/active/0023-reconcilable-legacy-news-links.md)
 - [ADR-0025: Authenticated legacy migration API for tenant import plugins](../adrs/active/0025-authenticated-legacy-migration-api.md)
 
@@ -83,3 +84,7 @@ The full database import must not begin until the golden sample evidence is acce
 - 2026-10-12: Added destination-aware body-link reconciliation. Published v4 targets receive relative links; unresolved internal targets and external HEAD failures remain reparsable marked spans with sanitized source attributes.
 - 2026-10-14: PRD-0021 and ADR-0025 supersede the locked tunnel-specific source requirements with the read-only legacy migration API; the golden-sample and transformation requirements remain in force.
 - 2026-10-22: [PRD-0034](0034-simplified-legacy-content-import.md), [ADR-0046](../adrs/active/0046-unified-articles-and-bounded-legacy-import.md) and [PLAN-0004](../plans/0004-simplified-legacy-content-import.md) define the next, bounded content migration: News and Columns become one `article` type with shared hierarchical classification, alongside columnists, events, publications and public organizations. Proceedings and membership are excluded. At that import's verified cutover, its new article/classification contract replaces this PRD's `news`/five-object target contract for the new path; existing sample, media, link and resumability safeguards remain. This planning decision does not switch the existing importer or rewrite these locked requirements.
+
+## Additional implementation decision
+
+[ADR-0049](../adrs/active/0049-transaction-safe-legacy-media-repairs.md) supersedes ADR-0022: repaired placeholders retain their media ID and adopt a content-addressed file path, preserving old bytes if the import transaction rolls back. Existing literal URLs require explicit refresh; old blobs are retained.

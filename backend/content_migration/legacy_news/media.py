@@ -101,9 +101,15 @@ class LegacyMediaImporter:
         if placeholder:
             filename = f"unavailable-{hashlib.sha256(source_url.encode()).hexdigest()[:12]}.png"
         uploaded = SimpleUploadedFile(filename, content, content_type=content_type)
+        content_hash = hashlib.sha256(content).hexdigest()
 
         if existing and is_placeholder and not placeholder:
-            result = storage.overwrite_file(existing.file_path, uploaded)
+            # Object storage cannot roll back with the caller's database transaction.
+            # Leave the referenced placeholder intact until the new path is committed.
+            repair_path = f"{self._storage_path(source_url)}/repair-{content_hash}"
+            result = storage.overwrite_file(repair_path, uploaded)
+            existing.file_path = result["file_path"]
+            existing.file_url = storage.get_public_url(result["file_path"])
             existing.original_filename = filename
             existing.file_size = result["file_size"]
             existing.content_type = result["content_type"]
@@ -120,7 +126,6 @@ class LegacyMediaImporter:
             self._apply_tags(existing, placeholder=False)
             return existing
 
-        content_hash = hashlib.sha256(content).hexdigest()
         duplicate = MediaFile.objects.filter(file_hash=content_hash).first()
         if duplicate:
             if duplicate.tenant_id != self.tenant.id or duplicate.namespace_id != self.namespace.id:
