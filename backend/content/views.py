@@ -214,7 +214,19 @@ class TagViewSet(viewsets.ModelViewSet):
             from rest_framework.exceptions import ValidationError
 
             raise ValidationError("Tenant is required. Provide X-Tenant-ID header.")
-        serializer.save(tenant=tenant)
+        from taxonomy.legacy import create_legacy
+
+        create_legacy(serializer, self.request.user, tenant=tenant)
+
+    def perform_update(self, serializer):
+        from taxonomy.legacy import update_legacy
+
+        update_legacy(serializer, self.request.user)
+
+    def perform_destroy(self, instance):
+        from taxonomy.legacy import archive_legacy
+
+        archive_legacy(instance, self.request.user)
 
     @action(detail=False, methods=["get"])
     def popular(self, request):
@@ -283,7 +295,21 @@ class TagViewSet(viewsets.ModelViewSet):
         else:
             namespace = Namespace.get_default(tenant=tenant)
 
-        tag, created = Tag.get_or_create_tag(name=name, namespace=namespace, tenant=tenant)
+        from django.db import transaction
+
+        from taxonomy.legacy import canonical_for, definition_for
+        from taxonomy.services import require
+
+        definition = definition_for(namespace, request.user)
+        existing = Tag.objects.filter(name=name, namespace=namespace, tenant=tenant).first()
+        require(request.user, definition, "use" if existing else "create")
+        with transaction.atomic():
+            tag, created = Tag.get_or_create_tag(name=name, namespace=namespace, tenant=tenant)
+            term = canonical_for(tag, request.user)
+            if term.status != "approved":
+                from rest_framework.exceptions import ValidationError
+
+                raise ValidationError("Choose an approved active classification.")
 
         serializer = self.get_serializer(tag)
         return Response(

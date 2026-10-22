@@ -21,6 +21,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
+from core.models import MachineAPIKey
 from core.permissions import HasTenantAccess
 
 from .models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
@@ -68,6 +69,43 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
     ordering = ["label"]
     filterset_fields = ["is_active", "hierarchy_level"]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # Definition writers are limited to their selected tenant; global types
+        # remain an explicitly privileged server operation.
+        if self.request.method not in permissions.SAFE_METHODS and isinstance(
+            getattr(self.request, "auth", None), MachineAPIKey
+        ):
+            from core.machine_api_keys import SERVER_FULL_ACCESS
+
+            if SERVER_FULL_ACCESS not in getattr(self.request.auth, "scopes", []):
+                queryset = queryset.filter(namespace__tenant=getattr(self.request, "tenant", None))
+        return queryset
+
+    def _validate_machine_definition_scope(self, serializer):
+        if not isinstance(getattr(self.request, "auth", None), MachineAPIKey):
+            return
+        from core.machine_api_keys import SERVER_FULL_ACCESS
+
+        if SERVER_FULL_ACCESS in getattr(self.request.auth, "scopes", []):
+            return
+        namespace = serializer.validated_data.get("namespace", getattr(serializer.instance, "namespace", None))
+        if namespace is None or namespace.tenant_id != getattr(self.request.tenant, "pk", None):
+            raise serializers.ValidationError({"namespace_id": "Definition must belong to the selected tenant."})
+        for field in ("browser_group",):
+            related = serializer.validated_data.get(field)
+            if related and (not related.namespace_id or related.namespace.tenant_id != self.request.tenant.pk):
+                raise serializers.ValidationError({field: "Related definition belongs to another tenant."})
+        for related in serializer.validated_data.get("allowed_child_types", []):
+            if not related.namespace_id or related.namespace.tenant_id != self.request.tenant.pk:
+                raise serializers.ValidationError(
+                    {"allowed_child_types": "Related definition belongs to another tenant."}
+                )
+
+    def perform_update(self, serializer):
+        self._validate_machine_definition_scope(serializer)
+        serializer.save()
+
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
         if self.action == "list":
@@ -76,6 +114,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """Set the created_by field when creating"""
+        self._validate_machine_definition_scope(serializer)
         serializer.save(created_by=self.request.user)
 
     def destroy(self, request, *args, **kwargs):
@@ -459,6 +498,7 @@ class ObjectTypeDefinitionViewSet(viewsets.ModelViewSet):
 class ObjectWorkflowInput(serializers.Serializer):
     expected_version_id = serializers.IntegerField(min_value=1)
     expected_revision = serializers.IntegerField(min_value=1)
+    classification_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
     expected_parent_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     expected_metadata = serializers.DictField(required=False)
     source_version_id = serializers.IntegerField(min_value=1, required=False)
@@ -503,6 +543,9 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
         if tenant:
             queryset = queryset.filter(tenant=tenant)
 
+        from taxonomy.services import requested_classifications
+
+        queryset = requested_classifications(self.request, queryset, "current_version__canonical_tag_links__tag_id")
         return filter_publication_status(queryset, self.request.query_params.get("status"))
 
     def perform_create(self, serializer):
@@ -557,6 +600,11 @@ class ObjectInstanceViewSet(viewsets.ModelViewSet):
             revision=tokens.validated_data["expected_revision"],
             content={
                 **validated,
+                **(
+                    {"classification_ids": tokens.validated_data["classification_ids"]}
+                    if "classification_ids" in tokens.validated_data
+                    else {}
+                ),
                 **(
                     {"is_featured": tokens.validated_data["is_featured"]}
                     if "is_featured" in tokens.validated_data

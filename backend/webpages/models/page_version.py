@@ -469,6 +469,9 @@ class PageVersion(models.Model):
             last_edited_by=user,
         )
 
+        from taxonomy.assignments import copy_assignments
+
+        copy_assignments(self, draft)
         return draft
 
 

@@ -6,15 +6,18 @@ following the existing API patterns and camelCase conversion.
 """
 
 from django.conf import settings
+from django.db import transaction
 from rest_framework import serializers
 
 from content.models import Namespace
+from taxonomy.serializers import ClassificationIdsField
 from utils.serializers import UserSerializer
 
 from .models import MediaCollection, MediaFile, MediaTag, MediaUsage, PendingMediaFile
 from .security import get_pending_preview_url
 
 
+@transaction.atomic
 def convert_tag_names_to_ids(tag_items, namespace, user):
     """
     Convert a list of tag names/IDs to actual tag IDs.
@@ -30,6 +33,13 @@ def convert_tag_names_to_ids(tag_items, namespace, user):
     """
     import uuid
 
+    from taxonomy.legacy import definition_for, validate_media_tag_ids
+    from taxonomy.services import require
+
+    if not tag_items:
+        return []
+    definition = definition_for(namespace, user)
+    require(user, definition, "use")
     tag_ids = []
 
     for tag_item in tag_items:
@@ -41,12 +51,24 @@ def convert_tag_names_to_ids(tag_items, namespace, user):
         try:
             uuid.UUID(tag_item)
             # It's a valid UUID, check if tag exists
-            if MediaTag.objects.filter(id=tag_item, namespace=namespace).exists():
+            from taxonomy.models import Tag as TaxonomyTag
+            from taxonomy.projections import media_alias
+
+            term = TaxonomyTag.objects.filter(pk=tag_item, namespace=namespace).first()
+            if term:
+                from taxonomy.context import projection_context
+
+                with projection_context():
+                    source = media_alias(term, user)
+                tag_ids.append(str(source.pk))
+            elif MediaTag.objects.filter(id=tag_item, namespace=namespace).exists():
                 tag_ids.append(tag_item)
             else:
-                raise serializers.ValidationError(f"Tag with ID {tag_item} not found.")
+                raise serializers.ValidationError("Selected taxonomy term was not found in this namespace.")
         except ValueError:
             # It's a tag name, find or create the tag
+            if not MediaTag.objects.filter(name=tag_item, namespace=namespace).exists():
+                require(user, definition, "create")
             tag, created = MediaTag.objects.get_or_create(
                 name=tag_item,
                 namespace=namespace,
@@ -57,6 +79,7 @@ def convert_tag_names_to_ids(tag_items, namespace, user):
             )
             tag_ids.append(str(tag.id))
 
+    validate_media_tag_ids(tag_ids, namespace, user)
     return tag_ids
 
 
@@ -66,6 +89,28 @@ class MediaTagSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source="created_by.username", read_only=True)
     namespace = serializers.CharField(source="namespace.slug", required=False)
     usage_count = serializers.SerializerMethodField()
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        from taxonomy.models import LegacyTagMapping
+        from taxonomy.services import resolve_term
+
+        mapping = (
+            LegacyTagMapping.objects.filter(source_kind="media", source_id=str(instance.pk))
+            .select_related("canonical_tag")
+            .first()
+        )
+        if mapping:
+            term = resolve_term(mapping.canonical_tag)
+            data.update(
+                classification_id=str(term.pk),
+                name=term.name,
+                slug=term.slug,
+                description=term.description,
+                status=term.status,
+                tag_type=term.tag_type,
+            )
+        return data
 
     def get_usage_count(self, obj):
         """Get the number of files using this tag."""
@@ -168,9 +213,12 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
     sample_images = serializers.SerializerMethodField()
     slug = serializers.SlugField(required=False, allow_blank=True)
 
+    classification_ids = ClassificationIdsField(required=False)
+
     class Meta:
         model = MediaCollection
         fields = [
+            "classification_ids",
             "id",
             "title",
             "slug",
@@ -233,11 +281,17 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
             )
         return value
 
+    @transaction.atomic
     def create(self, validated_data):
         """Create collection with tags."""
         from content.models import Namespace
 
+        classification_ids = validated_data.pop("classification_ids", None)
         tag_ids = validated_data.pop("tag_ids", [])
+        if classification_ids is None and not tag_ids:
+            raise serializers.ValidationError(
+                {"classification_ids": "At least one approved taxonomy term is required."}
+            )
         validated_data["created_by"] = self.context["request"].user
         validated_data["last_modified_by"] = self.context["request"].user
 
@@ -259,28 +313,55 @@ class MediaCollectionSerializer(serializers.ModelSerializer):
         collection = super().create(validated_data)
 
         if tag_ids:
-            tags = MediaTag.objects.filter(id__in=tag_ids, namespace=collection.namespace)
+            from taxonomy.legacy import validate_media_tag_ids
+
+            tags = validate_media_tag_ids(
+                tag_ids,
+                collection.namespace,
+                self.context["request"].user,
+                existing_ids=collection.tags.values_list("pk", flat=True),
+            )
             collection.tags.set(tags)
 
+        if classification_ids is not None:
+            from taxonomy.assignments import replace_assignments
+
+            replace_assignments(collection, classification_ids, self.context["request"].user)
         return collection
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         """Update collection with tags."""
+        classification_ids = validated_data.pop("classification_ids", None)
         tag_ids = validated_data.pop("tag_ids", None)
         validated_data["last_modified_by"] = self.context["request"].user
 
         collection = super().update(instance, validated_data)
 
-        if tag_ids is not None:
-            tags = MediaTag.objects.filter(id__in=tag_ids, namespace=collection.namespace)
+        if tag_ids is not None and classification_ids is None:
+            if not tag_ids:
+                raise serializers.ValidationError({"classification_ids": "Media classification is mandatory."})
+            from taxonomy.legacy import validate_media_tag_ids
+
+            tags = validate_media_tag_ids(
+                tag_ids,
+                collection.namespace,
+                self.context["request"].user,
+                existing_ids=collection.tags.values_list("pk", flat=True),
+            )
             collection.tags.set(tags)
 
+        if classification_ids is not None:
+            from taxonomy.assignments import replace_assignments
+
+            replace_assignments(collection, classification_ids, self.context["request"].user)
         return collection
 
 
 class MediaFileListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for media file lists."""
 
+    classification_ids = ClassificationIdsField(read_only=True)
     tags = MediaTagSerializer(many=True, read_only=True)
     created_by_name = serializers.CharField(source="created_by.username", read_only=True)
     namespace = serializers.CharField(source="namespace.slug", read_only=True)
@@ -298,6 +379,7 @@ class MediaFileListSerializer(serializers.ModelSerializer):
     class Meta:
         model = MediaFile
         fields = [
+            "classification_ids",
             "id",
             "title",
             "slug",
@@ -396,9 +478,12 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
     annotation = serializers.CharField(required=False, allow_blank=True)
     replaced_by = serializers.UUIDField(source="replaced_by_id", read_only=True)
 
+    classification_ids = ClassificationIdsField(required=False)
+
     class Meta:
         model = MediaFile
         fields = [
+            "classification_ids",
             "id",
             "title",
             "slug",
@@ -520,8 +605,10 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
 
         return cleaned_slug
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         """Update media file with tags and collections."""
+        classification_ids = validated_data.pop("classification_ids", None)
         tag_ids = validated_data.pop("tag_ids", None)
         collection_ids = validated_data.pop("collection_ids", None)
         annotation = validated_data.pop("annotation", None)
@@ -536,14 +623,27 @@ class MediaFileDetailSerializer(serializers.ModelSerializer):
 
         media_file = super().update(instance, validated_data)
 
-        if tag_ids is not None:
-            tags = MediaTag.objects.filter(id__in=tag_ids, namespace=media_file.namespace)
+        if tag_ids is not None and classification_ids is None:
+            if not tag_ids:
+                raise serializers.ValidationError({"classification_ids": "Media classification is mandatory."})
+            from taxonomy.legacy import validate_media_tag_ids
+
+            tags = validate_media_tag_ids(
+                tag_ids,
+                media_file.namespace,
+                self.context["request"].user,
+                existing_ids=media_file.tags.values_list("pk", flat=True),
+            )
             media_file.tags.set(tags)
 
         if collection_ids is not None:
             collections = MediaCollection.objects.filter(id__in=collection_ids, namespace=media_file.namespace)
             media_file.collections.set(collections)
 
+        if classification_ids is not None:
+            from taxonomy.assignments import replace_assignments
+
+            replace_assignments(media_file, classification_ids, self.context["request"].user)
         return media_file
 
     def get_imgproxy_base_url(self, obj):
@@ -894,10 +994,24 @@ class MediaFileApprovalSerializer(serializers.Serializer):
     slug = serializers.SlugField(max_length=255, required=False, allow_blank=True)
     description = serializers.CharField(required=False, allow_blank=True)
     annotation = serializers.CharField(required=False, allow_blank=True)
-    tag_ids = serializers.ListField(child=serializers.CharField(), required=True, allow_empty=False)
+    tag_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=False)
+    classification_ids = serializers.ListField(child=serializers.UUIDField(), required=False, allow_empty=False)
     access_level = serializers.ChoiceField(choices=MediaFile.ACCESS_LEVEL_CHOICES, default="public")
     collection_id = serializers.UUIDField(required=False, allow_null=True)
     collection_name = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+
+    def validate(self, attrs):
+        if not attrs.get("classification_ids") and not attrs.get("tag_ids"):
+            raise serializers.ValidationError(
+                {"classification_ids": "At least one approved taxonomy term is required."}
+            )
+        if attrs.get("classification_ids"):
+            from taxonomy.assignments import validate_media_selection
+
+            attrs["classification_ids"] = validate_media_selection(
+                self.context["namespace"], self.context["user"], attrs["classification_ids"]
+            )
+        return attrs
 
     def validate_title(self, value):
         """Validate title is not empty."""
@@ -934,8 +1048,16 @@ class BulkApprovalItemSerializer(serializers.Serializer):
     slug = serializers.SlugField(max_length=255, required=False, allow_blank=True)
     description = serializers.CharField(required=False, allow_blank=True)
     annotation = serializers.CharField(required=False, allow_blank=True)
-    tag_ids = serializers.ListField(child=serializers.CharField(), required=True, allow_empty=False)
+    tag_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=False)
+    classification_ids = serializers.ListField(child=serializers.UUIDField(), required=False, allow_empty=False)
     access_level = serializers.ChoiceField(choices=MediaFile.ACCESS_LEVEL_CHOICES, default="public")
+
+    def validate(self, attrs):
+        if not attrs.get("classification_ids") and not attrs.get("tag_ids"):
+            raise serializers.ValidationError(
+                {"classification_ids": "At least one approved taxonomy term is required."}
+            )
+        return attrs
 
     def validate_tag_ids(self, value):
         """Validate that at least one tag is provided and convert tag names to IDs."""

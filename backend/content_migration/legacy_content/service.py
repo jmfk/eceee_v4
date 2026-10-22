@@ -1,0 +1,465 @@
+"""One-item transactions, stable source bindings and draft-only editorial import."""
+
+import hashlib
+from collections import Counter
+from contextlib import contextmanager
+from copy import deepcopy
+
+from django.db import connection, transaction
+from django.utils.text import slugify
+from rest_framework.exceptions import PermissionDenied
+
+from content_migration.legacy_news.media import LegacyMediaImporter
+from content_migration.models import EditorialImportBinding, EditorialImportItem, EditorialImportRun
+from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
+from taxonomy.assignments import classification_ids, replace_assignments
+from taxonomy.context import actor_context
+from taxonomy.models import ClassificationType, Tag
+from taxonomy.services import require
+
+from .profile import OBJECT_TYPES, PROFILE
+from .source import validate_record
+from .transform import BlockedRecord, checksum, normalize
+
+PIPELINE_VERSION = "1"
+TAXONOMY = {
+    "types": "news_type",
+    "categories": "news_category",
+    "sources": "news_source",
+    "topics": "news_topic",
+    "keywords": "news_keyword",
+    "eceeeCategories": "general",
+    "publicationCategories": "publication_category",
+    "organizationCategories": "organization_category",
+    "affiliations": "organization_affiliation",
+}
+
+
+def preflight(tenant, namespace, user):
+    if namespace.tenant_id != tenant.pk or not tenant.user_has_access(user):
+        raise PermissionDenied("Import scope is not authorized")
+    types = {
+        d.name: d
+        for d in ObjectTypeDefinition.objects.filter(name__in=OBJECT_TYPES, namespace=namespace, is_active=True)
+    }
+    if set(types) != set(OBJECT_TYPES):
+        raise BlockedRecord("missing_editorial_definitions")
+    for definition in types.values():
+        if definition.metadata.get("content_profile", {}).get("id") != PROFILE:
+            raise BlockedRecord("definition_profile_mismatch")
+        if not any(s.get("name") == "main" for s in definition.get_slots()):
+            raise BlockedRecord("definition_main_slot_missing")
+    facets = {d.key: d for d in ClassificationType.objects.filter(namespace=namespace, tenant=tenant)}
+    if "article_kind" not in facets:
+        raise BlockedRecord("article_kind_missing")
+    for d in facets.values():
+        require(user, d, "use")
+    fingerprint = checksum(
+        {
+            name: {"schema": d.schema, "slots": d.slot_configuration, "profile": d.metadata.get("content_profile")}
+            for name, d in types.items()
+        }
+    )
+    return types, facets, fingerprint
+
+
+def stage(*, tenant, namespace, user, source_scope, records, preset="dev", configuration=None):
+    types, facets, definition_hash = preflight(tenant, namespace, user)
+    prepared = []
+    identities = set()
+    for resource, row in records:
+        validate_record(row, resource)
+        identity = (resource, str(row["legacyId"]))
+        if identity in identities:
+            raise BlockedRecord("duplicate_source_identity")
+        identities.add(identity)
+        prepared.append((resource, deepcopy(row)))
+    config = {**(configuration or {}), "pipeline": PIPELINE_VERSION, "definitionHash": definition_hash}
+    manifest_hash = checksum({"scope": source_scope, "configuration": config, "records": prepared})
+    with transaction.atomic():
+        run = EditorialImportRun.objects.create(
+            tenant=tenant,
+            namespace=namespace,
+            source_scope=source_scope,
+            preset=preset,
+            configuration=config,
+            manifest_hash=manifest_hash,
+            created_by=user,
+        )
+        EditorialImportItem.objects.bulk_create(
+            [
+                EditorialImportItem(
+                    run=run, resource=resource, source_id=str(row["legacyId"]), record=row, source_hash=checksum(row)
+                )
+                for resource, row in prepared
+            ]
+        )
+    return run
+
+
+def snapshot_hash(obj):
+    version = obj.current_version
+    return checksum(
+        {
+            "title": version.content_title if version else obj.title,
+            "data": version.data if version else {},
+            "widgets": version.widgets if version else {},
+            "classifications": classification_ids(version) if version else [],
+            "version": version.pk if version else None,
+            "revision": version.edit_revision if version else None,
+            "parent": obj.parent_id,
+            "relationships": obj.relationships,
+            "metadata": obj.metadata,
+            "slug": obj.slug,
+        }
+    )
+
+
+@contextmanager
+def import_lock(run):
+    key = int.from_bytes(
+        hashlib.sha256(f"editorial:{run.tenant_id}:{run.namespace_id}".encode()).digest()[:8], "big", signed=True
+    )
+    if connection.vendor == "postgresql":
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_try_advisory_lock(%s)", [key])
+            if not cursor.fetchone()[0]:
+                raise BlockedRecord("another_import_is_running")
+    try:
+        yield
+    finally:
+        if connection.vendor == "postgresql":
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_advisory_unlock(%s)", [key])
+
+
+def _term(user, definition, name, slug=None, parent=None):
+    slug = slug or slugify(name)
+    term = Tag.objects.filter(
+        tenant=definition.tenant, namespace=definition.namespace, classification_type=definition, slug=slug
+    ).first()
+    if term:
+        if term.name != name or (parent is not None and term.parent_id != parent.pk):
+            raise BlockedRecord("taxonomy_identity_conflict")
+        if term.status != "approved":
+            raise BlockedRecord("taxonomy_not_approved")
+        return term
+    # Taxonomy preparation is a separate, reviewed operation, never an import side effect.
+    raise BlockedRecord("unprepared_taxonomy_term")
+
+
+def terms_for(row, resource, facets, user, config):
+    result = []
+    if resource in {"news", "columns"}:
+        kind = "column" if resource == "columns" else "news"
+        if resource == "news" and set(config.get("pressReleaseSourceTerms", [])) & {
+            str(t.get("id")) for t in row.get("taxonomy", {}).get("types", []) if isinstance(t, dict)
+        }:
+            kind = "press-release"
+        result.append(Tag.objects.get(classification_type=facets["article_kind"], slug=kind, status="approved"))
+    approved = config.get("approvedTermMap", {})
+    for source_key, values in row.get("taxonomy", {}).items():
+        key = TAXONOMY.get(source_key)
+        if source_key == "categories" and resource != "news":
+            key = "general"
+        if not key or key not in facets:
+            raise BlockedRecord("unmapped_taxonomy_dimension")
+        for value in values:
+            if not isinstance(value, dict) or not value.get("model") or not value.get("id") or not value.get("name"):
+                raise BlockedRecord("taxonomy_source_identity_missing")
+            identity = f"{value['model']}:{value['id']}"
+            if identity in approved:
+                term = Tag.objects.filter(
+                    pk=approved[identity],
+                    classification_type=facets[key],
+                    namespace=facets[key].namespace,
+                    tenant=facets[key].tenant,
+                    status="approved",
+                ).first()
+                if term is None:
+                    raise BlockedRecord("taxonomy_mapping_wrong_facet_or_unavailable")
+            else:
+                if value.get("parentId"):
+                    raise BlockedRecord("hierarchical_source_requires_term_map")
+                # Legacy dimensions retain their identity rather than being merged by label.
+                suffix = hashlib.sha256(identity.encode()).hexdigest()[:10]
+                term = _term(user, facets[key], value["name"], slug=f"{slugify(value['name'])[:220]}-{suffix}")
+            result.append(term)
+    if resource == "events":
+        if row["data"].get("eventType"):
+            result.append(_term(user, facets["event_type"], row["data"]["eventType"]))
+        for value in row["data"].get("eventCategories", []):
+            result.append(_term(user, facets["event_category"], value))
+    return list(dict.fromkeys(str(t.pk) for t in result))
+
+
+def _slug(definition, row, resource, tenant):
+    preferred = slugify(row["slug"].split("/")[-1]) or f'{resource}-{row["legacyId"]}'
+    if not ObjectInstance.objects.filter(tenant=tenant, object_type=definition, slug=preferred).exists():
+        return preferred
+    fallback = f'{preferred[:260]}-{resource}-{row["legacyId"]}'
+    if ObjectInstance.objects.filter(tenant=tenant, object_type=definition, slug=fallback).exists():
+        raise BlockedRecord("destination_slug_conflict")
+    return fallback
+
+
+def _attachments(row, media_importer):
+    # Public URLs only, fetched through the same pinned/bounded transport as images.
+    from pathlib import PurePosixPath
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from content_migration.legacy_news.remote import get_public_url
+    from file_manager.models import MediaFile
+    from file_manager.storage import storage
+
+    results = []
+    for attachment in row.get("attachments", []):
+        if not attachment.get("url"):
+            results.append(dict(attachment))
+            continue
+        url = attachment["url"]
+        existing = MediaFile.objects.filter(
+            tenant=media_importer.tenant, namespace=media_importer.namespace, metadata__legacy_attachment_url=url
+        ).first()
+        if not existing:
+            response = get_public_url(url, max_bytes=50 * 1024 * 1024)
+            if response.status_code != 200:
+                raise BlockedRecord("attachment_download_failed")
+            content = response.content
+            content_type = response.headers.get("content-type", "application/octet-stream").split(";")[0]
+            if not content or content_type in {"text/html", "application/xhtml+xml"}:
+                raise BlockedRecord("attachment_response_is_not_file")
+            filename = PurePosixPath(url.split("?")[0]).name or "document"
+            if filename.lower().endswith(".pdf") and not content.startswith(b"%PDF-"):
+                raise BlockedRecord("attachment_pdf_invalid")
+            content_hash = hashlib.sha256(content).hexdigest()
+            existing = MediaFile.objects.filter(file_hash=content_hash).first()
+            if existing and (
+                existing.tenant_id != media_importer.tenant.pk or existing.namespace_id != media_importer.namespace.pk
+            ):
+                raise BlockedRecord("attachment_scope_conflict")
+            if not existing:
+                path = (
+                    f"legacy-content/{media_importer.tenant.pk}/{media_importer.namespace.pk}/"
+                    f"{hashlib.sha256(url.encode()).hexdigest()}/{filename}"
+                )
+                uploaded = storage.overwrite_file(
+                    path, SimpleUploadedFile(filename, content, content_type=content_type)
+                )
+                existing = MediaFile.objects.create(
+                    tenant=media_importer.tenant,
+                    namespace=media_importer.namespace,
+                    title=attachment.get("title") or filename,
+                    slug=f"legacy-file-{hashlib.sha256(url.encode()).hexdigest()[:24]}",
+                    file_path=uploaded["file_path"],
+                    file_url=storage.get_public_url(uploaded["file_path"]),
+                    original_filename=filename,
+                    file_size=uploaded["file_size"],
+                    content_type=uploaded["content_type"],
+                    file_hash=content_hash,
+                    file_type="document",
+                    access_level="public",
+                    created_by=media_importer.user,
+                    uploaded_by=media_importer.user,
+                    last_modified_by=media_importer.user,
+                    metadata={"legacy_attachment_url": url},
+                )
+        results.append({**attachment, "sourceUrl": url, "url": existing.file_url, "mediaId": str(existing.pk)})
+    return results
+
+
+@transaction.atomic
+def apply_item(run, item, user, types, facets):
+    item = EditorialImportItem.objects.select_for_update().get(pk=item.pk)
+    if item.status in {"imported", "unchanged", "excluded"}:
+        return item.status
+    row = item.record
+    if checksum(row) != item.source_hash:
+        raise BlockedRecord("manifest_entry_changed")
+    config = run.configuration
+    identity = {
+        "tenant": run.tenant,
+        "namespace": run.namespace,
+        "source_scope": run.source_scope,
+        "resource": item.resource,
+        "source_id": item.source_id,
+    }
+    binding = (
+        EditorialImportBinding.objects.select_for_update(of=("self",))
+        .filter(**identity)
+        .select_related("object_instance__current_version")
+        .first()
+    )
+    # Refetch only after acquiring the same tenant/Object locks as authoring.
+    # A previously selected version can become stale while waiting for an editor.
+    obj = None
+    if binding:
+        from core.models import Tenant
+
+        Tenant.objects.select_for_update().get(pk=run.tenant_id)
+        obj = (
+            ObjectInstance.objects.select_for_update(of=("self",))
+            .select_related("current_version")
+            .get(pk=binding.object_instance_id, tenant_id=run.tenant_id)
+        )
+    if binding and snapshot_hash(obj) != binding.target_hash:
+        item.status = "conflict"
+        item.error_category = "destination_changed"
+        item.save()
+        return item.status
+    # Raw source equality is insufficient when a reviewed mapping or profile changes.
+    mapping_keys = ("approvedTermMap", "pressReleaseSourceTerms", "pipeline", "definitionHash")
+    mapping = {key: config.get(key) for key in mapping_keys}
+    previous_mapping = {key: binding.last_run.configuration.get(key) for key in mapping_keys} if binding else None
+    if binding and binding.source_hash == item.source_hash and mapping == previous_mapping:
+        item.status = "unchanged"
+        item.object_instance = obj
+        item.error_category = ""
+        item.save()
+        return item.status
+    exclusions = config.get("excludedSources", [])
+    if f"{item.resource}:{item.source_id}" in exclusions:
+        item.status = "excluded"
+        item.error_category = "reviewed_exclusion"
+        item.save()
+        return item.status
+    author_ids = {
+        b.source_id: b.object_instance_id
+        for b in EditorialImportBinding.objects.filter(
+            tenant=run.tenant, namespace=run.namespace, source_scope=run.source_scope, resource="columnists"
+        )
+    }
+    payload = normalize(row, item.resource, author_ids=author_ids)
+    tags = terms_for(row, item.resource, facets, user, config)
+    importer = LegacyMediaImporter(namespace=run.namespace, tenant=run.tenant, user=user)
+    media = {
+        url: importer.import_image(url, article_identity=f"{item.resource}:{item.source_id}", resume=True)
+        for url in payload["images"]
+    }
+    working_row = deepcopy(row)
+    working_row["attachments"] = _attachments(row, importer)
+    payload = normalize(working_row, item.resource, author_ids=author_ids, media_by_url=media)
+    media_warnings = [url for url, m in media.items() if m.metadata.get("migration_placeholder")]
+    data = {k: v for k, v in payload["data"].items() if v is not None}
+    # Serialized payload fields are camelCase; ObjectVersion data remains Python-owned snake_case.
+    from object_storage.serializers import ObjectTypeDefinitionSerializer
+
+    data = {ObjectTypeDefinitionSerializer()._camel_to_snake(k): v for k, v in data.items()}
+    if obj is None:
+        obj = ObjectInstance.objects.create(
+            tenant=run.tenant,
+            object_type=types[payload["target"]],
+            title=payload["title"],
+            slug=_slug(types[payload["target"]], row, item.resource, run.tenant),
+            created_by=user,
+            metadata={
+                "legacy_editorial": {
+                    "scope": run.source_scope,
+                    "resource": item.resource,
+                    "id": item.source_id,
+                    "source_url": row["sourceUrl"],
+                }
+            },
+        )
+    latest = obj.versions.order_by("-version_number").first()
+    version = ObjectVersion.objects.create(
+        object_instance=obj,
+        version_number=(latest.version_number + 1 if latest else 1),
+        title=payload["title"],
+        data=data,
+        widgets=payload["widgets"],
+        is_featured=bool(row.get("featured")),
+        created_by=user,
+        change_description="Legacy editorial import (draft)",
+        workflow_metadata={
+            "legacy_editorial": {
+                "run_id": str(run.pk),
+                "source_hash": item.source_hash,
+                "source_publish_date": row.get("publishDate"),
+                "source_expiry_date": row.get("expiryDate"),
+                "attachments": payload["attachments"],
+                "placeholder_images": media_warnings,
+            }
+        },
+    )
+    replace_assignments(version, tags, user)
+    obj.current_version = version
+    obj.version = version.version_number
+    obj.save(update_fields=["current_version", "version", "updated_at"])
+    if binding:
+        binding.source_hash = item.source_hash
+        binding.target_hash = snapshot_hash(obj)
+        binding.last_run = run
+        binding.source_url = row["sourceUrl"]
+        binding.save()
+    else:
+        EditorialImportBinding.objects.create(
+            **identity,
+            object_instance=obj,
+            source_hash=item.source_hash,
+            target_hash=snapshot_hash(obj),
+            source_url=row["sourceUrl"],
+            last_run=run,
+        )
+    item.object_instance = obj
+    item.status = "imported"
+    item.error_category = ""
+    item.save()
+    return item.status
+
+
+def apply_run(run, user):
+    types, facets, definition_hash = preflight(run.tenant, run.namespace, user)
+    if definition_hash != run.configuration["definitionHash"]:
+        raise BlockedRecord("definitions_changed_since_staging")
+    records = [(i.resource, i.record) for i in run.items.order_by("pk")]
+    if (
+        checksum({"scope": run.source_scope, "configuration": run.configuration, "records": records})
+        != run.manifest_hash
+    ):
+        raise BlockedRecord("manifest_changed")
+    if run.preset == "all":
+        sample = EditorialImportRun.objects.filter(
+            pk=run.configuration.get("acceptedSampleRun"),
+            tenant=run.tenant,
+            namespace=run.namespace,
+            source_scope=run.source_scope,
+            reviewed_at__isnull=False,
+            preset="dev",
+            status="complete",
+        ).first()
+        if (
+            not sample
+            or sample.configuration.get("compatibility")
+            or sample.configuration.get("sourceScopeVerified") is False
+            or sample.configuration.get("definitionHash") != definition_hash
+            or sample.configuration.get("pipeline") != PIPELINE_VERSION
+            or sample.configuration.get("mappingHash") != run.configuration.get("mappingHash")
+            or set(sample.configuration.get("resources", [])) != set(run.configuration.get("resources", []))
+        ):
+            raise BlockedRecord("reviewed_sample_required_before_full_import")
+    with import_lock(run), actor_context(user):
+        run.status = "running"
+        run.save(update_fields=["status", "updated_at"])
+        # Dependencies always precede referencing articles, independent of manifest order.
+        for resource in ("columnists", "organizations", "news", "columns", "events", "publications"):
+            for item in run.items.filter(resource=resource).order_by("pk").iterator():
+                try:
+                    apply_item(run, item, user, types, facets)
+                except BlockedRecord as error:
+                    item.status = "blocked"
+                    item.error_category = str(error)
+                    item.save(update_fields=["status", "error_category", "updated_at"])
+                except Exception as error:
+                    item.status = "failed"
+                    item.error_category = error.__class__.__name__
+                    item.save(update_fields=["status", "error_category", "updated_at"])
+        run.report = dict(Counter(run.items.values_list("status", flat=True)))
+        run.status = (
+            "needs_attention"
+            if any(run.report.get(k) for k in ("failed", "blocked", "conflict", "pending"))
+            else "complete"
+        )
+        run.save(update_fields=["report", "status", "updated_at"])
+    return run.report

@@ -108,7 +108,19 @@ class MediaTagViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set created_by when creating tag."""
         _validate_create_namespace(serializer, self.request)
-        serializer.save(created_by=self.request.user)
+        from taxonomy.legacy import create_legacy
+
+        create_legacy(serializer, self.request.user, created_by=self.request.user)
+
+    def perform_update(self, serializer):
+        from taxonomy.legacy import update_legacy
+
+        update_legacy(serializer, self.request.user)
+
+    def perform_destroy(self, instance):
+        from taxonomy.legacy import archive_legacy
+
+        archive_legacy(instance, self.request.user)
 
     @action(detail=True, methods=["get"])
     def files(self, request, pk=None):
@@ -173,114 +185,26 @@ class MediaTagViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"])
     def merge_tags(self, request):
         """Merge multiple tags into one target tag."""
-        target_tag_id = request.data.get("target_tag_id")
-        source_tag_ids = request.data.get("source_tag_ids", [])
+        from taxonomy.legacy import merge_legacy
 
-        if not target_tag_id:
-            return Response(
-                {"error": "target_tag_id is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not source_tag_ids or len(source_tag_ids) == 0:
-            return Response(
-                {"error": "source_tag_ids is required and must contain at least one tag"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Get target tag
-        accessible_tags = self.get_queryset()
-        try:
-            target_tag = accessible_tags.get(id=target_tag_id)
-        except MediaTag.DoesNotExist:
-            return Response({"error": "Target tag not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        # Get source tags
-        source_tags = accessible_tags.filter(id__in=source_tag_ids)
-        if source_tags.count() != len(source_tag_ids):
-            return Response(
-                {"error": "One or more source tags not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        # Ensure all tags are in the same namespace
-        namespaces = set([target_tag.namespace_id] + list(source_tags.values_list("namespace_id", flat=True)))
-        if len(namespaces) > 1:
-            return Response(
-                {"error": "All tags must be in the same namespace"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Transfer all file associations from source tags to target tag
-        files_transferred = 0
-        for source_tag in source_tags:
-            files = MediaFile.objects.filter(tags=source_tag)
-            for file in files:
-                # Add target tag if not already present
-                if not file.tags.filter(id=target_tag.id).exists():
-                    file.tags.add(target_tag)
-                    files_transferred += 1
-                # Remove source tag
-                file.tags.remove(source_tag)
-
-        # Delete source tags
-        source_tags_count = source_tags.count()
-        source_tags.delete()
-
-        return Response(
-            {
-                "message": f"Successfully merged {source_tags_count} tags into '{target_tag.name}'",
-                "target_tag": MediaTagSerializer(target_tag).data,
-                "files_transferred": files_transferred,
-                "tags_deleted": source_tags_count,
-            }
-        )
+        return merge_legacy(self, request)
 
     @action(detail=False, methods=["post"])
     def bulk_delete(self, request):
         """Delete multiple tags at once."""
-        tag_ids = request.data.get("tag_ids", [])
+        from taxonomy.legacy import bulk_archive_legacy
 
-        if not tag_ids or len(tag_ids) == 0:
-            return Response(
-                {"error": "tag_ids is required and must contain at least one tag"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Get tags
-        tags = MediaTag.objects.filter(id__in=tag_ids)
-        if tags.count() != len(tag_ids):
-            return Response(
-                {"error": "One or more tags not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        # Verify user has permission to delete these tags (same namespace check from get_queryset)
-        user_tags = self.get_queryset().filter(id__in=tag_ids)
-        if user_tags.count() != len(tag_ids):
-            return Response(
-                {"error": "You don't have permission to delete one or more of these tags"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        # Remove all file associations and delete tags
-        tags_count = tags.count()
-        for tag in tags:
-            # Remove from all files
-            tag.mediafile_set.clear()
-
-        # Delete tags
-        tags.delete()
-
-        return Response(
-            {
-                "message": f"Successfully deleted {tags_count} tags",
-                "deleted_count": tags_count,
-            }
-        )
+        return bulk_archive_legacy(self, request)
 
 
 class MediaCollectionViewSet(viewsets.ModelViewSet):
+    def filter_queryset(self, queryset):
+        from taxonomy.services import requested_classifications
+
+        return requested_classifications(
+            self.request, super().filter_queryset(queryset), "classification_links__tag_id"
+        )
+
     """ViewSet for managing media collections."""
 
     serializer_class = MediaCollectionSerializer
@@ -355,7 +279,7 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
         # Validate that at least one tag is provided
         # Check both snake_case and camelCase to handle case conversion
         tag_ids = request.data.get("tag_ids") or request.data.get("tagIds", [])
-        if not tag_ids or len(tag_ids) == 0:
+        if not tag_ids and not (request.data.get("classification_ids") or request.data.get("classificationIds")):
             return Response(
                 {
                     "error": "At least one tag is required to create a collection",
@@ -493,7 +417,7 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
         collection = self.get_object()
 
         # Validate collection has tags
-        if not collection.tags.exists():
+        if not collection.can_accept_uploads():
             return Response(
                 {
                     "error": "Collection must have at least one tag before uploading files",
@@ -523,7 +447,9 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
         errors = []
 
         # Get collection tags for auto-assignment
-        collection_tag_ids = list(collection.tags.values_list("id", flat=True))
+        from taxonomy.assignments import collection_upload_ids
+
+        collection_ids = collection_upload_ids(collection, request.user)
 
         # Process each file
         for uploaded_file in files:
@@ -558,7 +484,8 @@ class MediaCollectionViewSet(viewsets.ModelViewSet):
                             title=pending_file.ai_suggested_title or pending_file.original_filename,
                             slug=None,  # Auto-generate slug
                             description="",
-                            tags=collection_tag_ids,
+                            classification_ids=collection_ids,
+                            user=request.user,
                             access_level="public",
                         )
 

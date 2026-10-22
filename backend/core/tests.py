@@ -25,6 +25,7 @@ from core.machine_api_keys import (
     LAYOUT_READ,
     MEDIA_READ,
     MEDIA_WRITE,
+    OBJECT_DEFINITION_WRITE,
     OBJECT_PUBLISH,
     OBJECT_READ,
     OBJECT_TRANSFER,
@@ -334,6 +335,39 @@ class MachineAPIKeyAuthenticationTest(TestCase):
         self.assertEqual(object_type.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(page_schema.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_definition_write_is_scoped_to_selected_tenant_and_never_deletes(self):
+        from content.models import Namespace
+        from object_storage.models import ObjectTypeDefinition
+
+        own = Namespace.objects.create(
+            name="Definition own", slug="definitions-own", tenant=self.tenant, created_by=self.admin
+        )
+        foreign = Namespace.objects.create(
+            name="Definition foreign", slug="definitions-foreign", tenant=self.other_tenant, created_by=self.admin
+        )
+        definition = ObjectTypeDefinition.objects.create(
+            name="scoped_definition", label="Scoped", plural_label="Scoped", namespace=own, created_by=self.admin
+        )
+        other = ObjectTypeDefinition.objects.create(
+            name="foreign_definition", label="Foreign", plural_label="Foreign", namespace=foreign, created_by=self.admin
+        )
+        raw_key, _ = self.create_key([OBJECT_DEFINITION_WRITE])
+        self.authorize(raw_key)
+        updated = self.client.patch(
+            f"/api/v1/objects/object-types/{definition.pk}/", {"label": "Updated"}, format="json"
+        )
+        moved = self.client.patch(
+            f"/api/v1/objects/object-types/{definition.pk}/", {"namespace_id": foreign.pk}, format="json"
+        )
+        foreign_edit = self.client.patch(f"/api/v1/objects/object-types/{other.pk}/", {"label": "Wrong"}, format="json")
+        deleted = self.client.delete(f"/api/v1/objects/object-types/{definition.pk}/")
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(moved.status_code, 400)
+        self.assertEqual(foreign_edit.status_code, 404)
+        self.assertEqual(deleted.status_code, 403)
+        definition.refresh_from_db()
+        self.assertEqual(definition.namespace_id, own.pk)
+
     def test_theme_read_key_can_reach_designer_theme_list(self):
         raw_key, _ = self.create_key([THEME_READ])
         self.authorize(raw_key)
@@ -509,7 +543,8 @@ class MachineAPIKeyAuthenticationTest(TestCase):
             ("GET", "/api/v1/objects/objects/", OBJECT_READ),
             ("PATCH", "/api/v1/objects/objects/2/", OBJECT_WRITE),
             ("GET", "/api/v1/objects/object-types/", OBJECT_READ),
-            ("PATCH", "/api/v1/objects/object-types/2/", SERVER_FULL_ACCESS),
+            ("PATCH", "/api/v1/objects/object-types/2/", OBJECT_DEFINITION_WRITE),
+            ("DELETE", "/api/v1/objects/object-types/2/", SERVER_FULL_ACCESS),
             ("POST", "/api/v1/objects/versions/2/publish/", OBJECT_PUBLISH),
             ("POST", "/api/v1/objects/versions/2/schedule/", OBJECT_PUBLISH),
             ("POST", "/api/v1/objects/objects/bulk-operations/", SERVER_FULL_ACCESS),

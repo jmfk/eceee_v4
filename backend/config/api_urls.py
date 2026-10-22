@@ -35,6 +35,7 @@ urlpatterns = [
     # path('users/', include('apps.users.urls')),
     # path('core/', include('apps.core.urls')),
     path("webpages/", include("webpages.api_urls")),
+    path("taxonomy/", include("taxonomy.urls")),
     path("content/", include("content.urls")),
     path("content-import/", include("content_import.urls")),
     path("kanban/", include("kanban.urls")),

@@ -22,6 +22,7 @@ KANBAN_WRITE = "kanban.write"
 MEDIA_READ = "media.read"
 MEDIA_WRITE = "media.write"
 OBJECT_WRITE = "object.write"
+OBJECT_DEFINITION_WRITE = "object.definition.write"
 OBJECT_PUBLISH = "object.publish"
 LAYOUT_READ = "layout.read"
 SITE_READ = "site.read"
@@ -44,6 +45,7 @@ ALLOWED_SCOPES = {
     MEDIA_READ,
     MEDIA_WRITE,
     OBJECT_WRITE,
+    OBJECT_DEFINITION_WRITE,
     OBJECT_PUBLISH,
     LAYOUT_READ,
     SITE_READ,
@@ -168,14 +170,18 @@ def _required_scope(request):
 
     if request.path.startswith("/api/v1/objects/"):
         if request.path.startswith("/api/v1/objects/object-types/"):
-            return OBJECT_READ if request.method in SAFE_METHODS else SERVER_FULL_ACCESS
+            return (
+                OBJECT_READ
+                if request.method in SAFE_METHODS
+                else (SERVER_FULL_ACCESS if request.method == "DELETE" else OBJECT_DEFINITION_WRITE)
+            )
         if request.path.rstrip("/") in OBJECT_FULL_ACCESS_PATHS:
             return SERVER_FULL_ACCESS
         if request.method not in SAFE_METHODS and _path_has_action(request.path, OBJECT_PUBLISH_ACTIONS):
             return OBJECT_PUBLISH
         return _read_or_write_scope(request, OBJECT_READ, OBJECT_WRITE)
 
-    if request.path.startswith("/api/v1/content/"):
+    if request.path.startswith(("/api/v1/content/", "/api/v1/taxonomy/")):
         return _read_or_write_scope(request, CONTENT_READ, CONTENT_WRITE)
     return SERVER_FULL_ACCESS
 

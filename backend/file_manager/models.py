@@ -10,7 +10,7 @@ import uuid
 from typing import Optional
 
 from django.contrib.auth.models import User
-from django.db import models
+from django.db import models, transaction
 from django.utils.text import slugify
 
 from content.models import Namespace
@@ -125,7 +125,16 @@ class MediaCollection(models.Model):
     @property
     def has_tags(self):
         """Check if collection has at least one tag."""
-        return self.tags.exists()
+        if self.classification_links.exists():
+            from taxonomy.services import resolved_terms
+
+            return any(
+                term.status == "approved"
+                for term in resolved_terms(link.tag for link in self.classification_links.select_related("tag"))
+            )
+        from taxonomy.signals import canonical_phase
+
+        return not canonical_phase(self.namespace_id) and self.tags.exists()
 
     def can_accept_uploads(self):
         """
@@ -224,8 +233,17 @@ class PendingMediaFile(models.Model):
     def __str__(self):
         return f"{self.original_filename} ({self.status})"
 
+    @transaction.atomic
     def approve_and_create_media_file(
-        self, title, slug=None, description="", annotation="", tags=None, access_level="public"
+        self,
+        title,
+        slug=None,
+        description="",
+        annotation="",
+        tags=None,
+        access_level="public",
+        classification_ids=None,
+        user=None,
     ):
         """
         Approve this pending file and create a MediaFile instance.
@@ -249,6 +267,19 @@ class PendingMediaFile(models.Model):
             # Ensure we have a namespace
             if not self.namespace:
                 raise ValueError("PendingMediaFile has no namespace. Cannot approve without a namespace.")
+
+            from taxonomy.assignments import replace_assignments, validate_media_selection
+            from taxonomy.context import current_actor
+            from taxonomy.projections import legacy_media_ids
+
+            actor = user or current_actor() or self.uploaded_by
+            if classification_ids is None:
+                # The legacy UUID list is an input adapter, not another registry.
+                from types import SimpleNamespace
+
+                owner = SimpleNamespace(namespace=self.namespace)
+                classification_ids = legacy_media_ids(owner, [getattr(tag, "pk", tag) for tag in (tags or [])], actor)
+            classification_ids = validate_media_selection(self.namespace, actor, classification_ids)
 
             # Create the MediaFile using atomic helper
             # This will handle any soft-deleted files with the same hash
@@ -282,9 +313,7 @@ class PendingMediaFile(models.Model):
                 media_file.metadata["annotation"] = annotation
                 media_file.save()
 
-            # Associate tags if provided
-            if tags:
-                media_file.tags.set(tags)
+            replace_assignments(media_file, classification_ids, actor)
 
             # Update status
             self.status = "approved"

@@ -154,6 +154,7 @@ export const objectInstancesApi = {
             title: content.title,
             data: content.data,
             widgets: content.widgets,
+            ...(content.classificationIds !== undefined ? { classification_ids: content.classificationIds } : {}),
             is_featured: content.isFeatured || false,
             expected_version_id: version.id,
             expected_revision: version.editRevision,

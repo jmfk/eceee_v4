@@ -9,6 +9,7 @@ related_adrs:
   - ADR-0022
   - ADR-0023
   - ADR-0025
+  - ADR-0046
 ---
 
 # PRD-0012: Legacy News Golden Samples and Migration
@@ -81,3 +82,4 @@ The full database import must not begin until the golden sample evidence is acce
 - 2026-10-12: Serialized write-mode imports and made new media storage keys replayable across interruptions; dev verification confirmed rewritten references and HTTP-loadable rendered images.
 - 2026-10-12: Added destination-aware body-link reconciliation. Published v4 targets receive relative links; unresolved internal targets and external HEAD failures remain reparsable marked spans with sanitized source attributes.
 - 2026-10-14: PRD-0021 and ADR-0025 supersede the locked tunnel-specific source requirements with the read-only legacy migration API; the golden-sample and transformation requirements remain in force.
+- 2026-10-22: [PRD-0034](0034-simplified-legacy-content-import.md), [ADR-0046](../adrs/active/0046-unified-articles-and-bounded-legacy-import.md) and [PLAN-0004](../plans/0004-simplified-legacy-content-import.md) define the next, bounded content migration: News and Columns become one `article` type with shared hierarchical classification, alongside columnists, events, publications and public organizations. Proceedings and membership are excluded. At that import's verified cutover, its new article/classification contract replaces this PRD's `news`/five-object target contract for the new path; existing sample, media, link and resumability safeguards remain. This planning decision does not switch the existing importer or rewrite these locked requirements.

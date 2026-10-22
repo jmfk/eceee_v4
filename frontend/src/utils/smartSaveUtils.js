@@ -33,7 +33,8 @@ const VERSION_FIELDS = new Set([
     'expiryDate',
     'metaTitle',
     'metaDescription',
-    'tags'
+    'tags',
+    'classificationIds'
 ]);
 
 // Fields that are metadata/computed (don't save)
@@ -67,6 +68,11 @@ export function processLoadedVersionData(versionData) {
     if (!versionData) return versionData;
 
     const processed = { ...versionData };
+
+    if (processed.classification_ids !== undefined) {
+        processed.classificationIds = processed.classification_ids;
+        delete processed.classification_ids;
+    }
 
     // Convert snake_case meta fields from backend to camelCase for frontend
     if (processed.meta_title !== undefined) {
@@ -121,6 +127,7 @@ const WRITABLE_VERSION_FIELDS = [
     'metaTitle',
     'metaDescription',
     'tags',
+    'classificationIds',
     'pageCssVariables',
     'pageCustomCss',
     'enableCssInjection',
@@ -256,7 +263,7 @@ export function analyzeChanges(originalWebpageData = {}, currentWebpageData = {}
                     changes.changedFieldNames.push('title');
                 }
             }
-        } else if (field === 'tags') {
+        } else if (field === 'tags' || field === 'classificationIds') {
             if (JSON.stringify(originalPageVersionData[field] || []) !== JSON.stringify(currentPageVersionData[field] || [])) {
                 changes.versionFields[field] = currentPageVersionData[field];
                 changes.hasVersionChanges = true;

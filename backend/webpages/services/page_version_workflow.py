@@ -331,7 +331,7 @@ class PageVersionWorkflowService:
                 "widgets": {},
             }
         )
-        return PageVersion.objects.create(
+        version = PageVersion.objects.create(
             page=self.page,
             version_number=(latest.version_number + 1) if latest else 1,
             version_title=title,
@@ -340,6 +340,11 @@ class PageVersionWorkflowService:
             last_edited_by=self.user,
             **values,
         )
+        if source:
+            from taxonomy.assignments import copy_assignments
+
+            copy_assignments(source, version)
+        return version
 
     @transaction.atomic
     def get_or_create_working_copy(self):
@@ -504,6 +509,9 @@ class PageVersionWorkflowService:
             expected_updated_at=expected_updated_at,
             required=False,
         )
+        from taxonomy.assignments import assert_publishable
+
+        assert_publishable(version)
         self.assert_page_attributes_publishable(version, lock_namespace=True)
         now = timezone.now()
         previous_live = self.live_version(lock=True)
@@ -554,6 +562,9 @@ class PageVersionWorkflowService:
             expected_updated_at=expected_updated_at,
             required=False,
         )
+        from taxonomy.assignments import assert_publishable
+
+        assert_publishable(version)
         self.assert_page_attributes_publishable(version, lock_namespace=True)
         now = timezone.now()
         if effective_date <= now:

@@ -220,6 +220,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "taxonomy.context.ClassificationActorMiddleware",
     "utils.middleware.dev_auth.DevAutoLoginMiddleware",  # Auto-login for development (only active when DEBUG=True)
     "core.middleware.TenantContextMiddleware",  # Set tenant context after session/dev authentication
     "allauth.account.middleware.AccountMiddleware",
