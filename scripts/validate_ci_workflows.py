@@ -3,10 +3,16 @@
 import subprocess
 from pathlib import Path
 
-import yaml
+
+def validate_full_concurrency(workflow):
+    group = workflow["concurrency"]["group"]
+    if "${{ github.event.pull_request.number }}" not in group or "${{ github.event.label.name }}" not in group:
+        raise ValueError("Full CI concurrency must isolate both the PR and the triggering label")
 
 
 def main():
+    import yaml
+
     root = Path(__file__).resolve().parents[1]
     workflows = {}
     for path in (root / ".github/workflows").glob("ci*.yml"):
@@ -23,6 +29,7 @@ def main():
                     subprocess.run(["bash", "-n"], input=step["run"], text=True, check=True)
     fast = workflows["ci.yml"]
     full = workflows["ci-full.yml"]
+    validate_full_concurrency(full)
     reusable = workflows["ci-checks.yml"]
     # PyYAML's YAML 1.1 parser treats the Actions `on` key as the boolean True.
     full_events = full.get("on", full.get(True))

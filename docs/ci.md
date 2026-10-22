@@ -35,7 +35,9 @@ gh pr edit <number> --add-label full-ci
 A later push runs fast CI only. The new commit has no successful full gate and
 must receive another explicit full run before merge. Separate concurrency groups
 prevent a quick run cancelling a requested full run. A new full request supersedes
-an older full request on that PR. An old in-flight run may finish after a new
+an older full request on that PR. Full-workflow concurrency also includes the
+triggering label, so unrelated label events cannot cancel a requested full run
+before their reusable call is skipped. An old in-flight run may finish after a new
 push; it remains evidence for its tested revision and cannot satisfy the new one.
 
 Required job names are distinct: `Fast CI / Fast CI gate` and
