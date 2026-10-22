@@ -12,7 +12,7 @@ from rest_framework.exceptions import PermissionDenied
 from content_migration.legacy_news.media import LegacyMediaImporter
 from content_migration.models import EditorialImportBinding, EditorialImportItem, EditorialImportRun
 from object_storage.models import ObjectInstance, ObjectTypeDefinition, ObjectVersion
-from taxonomy.assignments import classification_ids, replace_assignments, validate_media_selection
+from taxonomy.assignments import links_for, replace_assignments, validate_media_selection
 from taxonomy.context import actor_context
 from taxonomy.models import ClassificationRollout, ClassificationType, Tag
 from taxonomy.services import require
@@ -104,7 +104,9 @@ def snapshot_hash(obj):
             "title": version.content_title if version else obj.title,
             "data": version.data if version else {},
             "widgets": version.widgets if version else {},
-            "classifications": classification_ids(version) if version else [],
+            # Redirect resolution is a read projection; a taxonomy merge does not
+            # change the version's stored assignments or editorial content.
+            "classifications": [str(link.tag_id) for link in links_for(version)] if version else [],
             "version": version.pk if version else None,
             "revision": version.edit_revision if version else None,
             "parent": obj.parent_id,
@@ -280,6 +282,26 @@ def apply_item(run, item, user, types, facets):
     if checksum(row) != item.source_hash:
         raise BlockedRecord("manifest_entry_changed")
     config = run.configuration
+    if f"{item.resource}:{item.source_id}" in config.get("excludedSources", []):
+        item.status = "excluded"
+        item.error_category = "reviewed_exclusion"
+        item.save(update_fields=["status", "error_category", "updated_at"])
+        return item.status
+    author_ids = {}
+    if item.resource == "columns":
+        originals = row["data"].get("authorIds", [])
+        author_ids = {
+            source_id: object_id
+            for source_id, object_id in run.items.filter(
+                resource="columnists",
+                source_id__in=[str(pk) for pk in originals],
+                status__in=["imported", "unchanged"],
+                object_instance__tenant_id=run.tenant_id,
+                object_instance__object_type=types["columnist"],
+            ).values_list("source_id", "object_instance_id")
+        }
+        if not originals or any(str(pk) not in author_ids for pk in originals):
+            raise BlockedRecord("missing_columnist_dependency")
     identity = {
         "tenant": run.tenant,
         "namespace": run.namespace,
@@ -326,18 +348,6 @@ def apply_item(run, item, user, types, facets):
         item.error_category = ""
         item.save()
         return item.status
-    exclusions = config.get("excludedSources", [])
-    if f"{item.resource}:{item.source_id}" in exclusions:
-        item.status = "excluded"
-        item.error_category = "reviewed_exclusion"
-        item.save()
-        return item.status
-    author_ids = {
-        b.source_id: b.object_instance_id
-        for b in EditorialImportBinding.objects.filter(
-            tenant=run.tenant, namespace=run.namespace, source_scope=run.source_scope, resource="columnists"
-        )
-    }
     payload = normalize(row, item.resource, author_ids=author_ids)
     tags = terms_for(row, item.resource, facets, user, config)
     media_ids = config.get("mediaClassificationIds")

@@ -48,7 +48,7 @@ def replace_assignments(instance, ids, user, *, allow_empty_transition=False):
     model, field, namespace, use, versioned = assignment_context(instance)
     if not versioned and not ids and not allow_empty_transition:
         raise ValidationError({"classification_ids": "At least one approved classification is required for media."})
-    previous = {str(link.tag_id) for link in links_for(instance)}
+    previous_links = list(links_for(instance))
     try:
         terms = {
             str(term.pk): term
@@ -62,7 +62,7 @@ def replace_assignments(instance, ids, user, *, allow_empty_transition=False):
         raise ValidationError({"classification_ids": "Invalid classification IDs."}) from exc
     # Deterministic lock order prevents opposite multi-type assignment edits deadlocking.
     definitions = {term.classification_type_id for term in terms.values() if term.classification_type_id}
-    for link in links_for(instance):
+    for link in previous_links:
         if link.tag.classification_type_id:
             definitions.add(link.tag.classification_type_id)
     from .models import ClassificationType
@@ -71,6 +71,10 @@ def replace_assignments(instance, ids, user, *, allow_empty_transition=False):
         definition.pk: definition
         for definition in ClassificationType.objects.select_for_update().filter(pk__in=definitions).order_by("pk")
     }
+    previous_by_resolved = {}
+    for link in previous_links:
+        link.tag.refresh_from_db()
+        previous_by_resolved.setdefault(str(resolve_term(link.tag).pk), []).append(link.tag)
     normalized, seen = [], set()
     for raw_id in ids:
         term = terms.get(str(raw_id))
@@ -80,7 +84,8 @@ def replace_assignments(instance, ids, user, *, allow_empty_transition=False):
         require(user, definition, "use")
         term.refresh_from_db()
         term = resolve_term(term)
-        unchanged = str(raw_id) in previous
+        resolved_id = str(term.pk)
+        unchanged = resolved_id in previous_by_resolved
         if use not in definition.allowed_uses and not unchanged:
             raise ValidationError({"classification_ids": f"{definition.name} is unavailable for this content type."})
         if term.status == "archived" and not unchanged:
@@ -89,13 +94,14 @@ def replace_assignments(instance, ids, user, *, allow_empty_transition=False):
             require(user, definition, "propose")
         elif term.status not in {"approved", "archived"}:
             raise ValidationError({"classification_ids": f"{term.name} must be approved before assigning it here."})
-        if term.pk not in seen:
-            # Keep the original redirect identity on unchanged historical assignments.
-            normalized.append(terms[str(raw_id)] if unchanged else term)
-            seen.add(term.pk)
+        if resolved_id not in seen:
+            # A round-trip through resolved IDs retains every historical link behind that ID.
+            normalized.extend(previous_by_resolved[resolved_id] if unchanged else [term])
+            seen.add(resolved_id)
     # Check permissions for removals as well as additions.
-    for link in links_for(instance):
-        if str(link.tag_id) not in {str(term.pk) for term in normalized}:
+    retained_ids = {str(term.pk) for term in normalized}
+    for link in previous_links:
+        if str(link.tag_id) not in retained_ids:
             if not link.tag.classification_type_id:
                 raise ValidationError(
                     {"classification_ids": "Reconcile existing legacy classifications before editing them."}
