@@ -311,6 +311,7 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    @transaction.atomic
     def _get_or_create_collection(self, collection_id, collection_name, namespace, user, *, media_file):
         """Get existing collection or create new one."""
         if collection_id:
@@ -319,6 +320,8 @@ class PendingMediaFileViewSet(viewsets.ReadOnlyModelViewSet):
             except MediaCollection.DoesNotExist:
                 return None
         elif collection_name:
+            # Approval treats collection assignment as optional. Roll back the whole
+            # collection attempt if its classifications cannot be copied from the file.
             collection, created = MediaCollection.objects.get_or_create(
                 title=collection_name,
                 namespace=namespace,
