@@ -22,21 +22,14 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PROVIDER = Path(
-    os.environ.get(
-        "SHARED_LOCAL_INFRA_ROOT", ROOT.parent / "shared-local-infrastructure"
-    )
+    os.environ.get("SHARED_LOCAL_INFRA_ROOT", ROOT.parent / "shared-local-infrastructure")
 ).expanduser()
 ENV_FILE = ROOT / ".env"
 TEMPLATE = ROOT / ".env.template"
 DEFAULT_PORT_REGISTRY_SCRIPT = Path(
     os.environ.get(
         "PORT_SPACE_REGISTRY_SCRIPT",
-        Path.home()
-        / ".codex"
-        / "skills"
-        / "port-space-registry"
-        / "scripts"
-        / "port_space_registry.py",
+        Path.home() / ".codex" / "skills" / "port-space-registry" / "scripts" / "port_space_registry.py",
     )
 ).expanduser()
 SHARED_MINIO_CONTAINER = "shared-local-infrastructure-minio-1"
@@ -47,9 +40,7 @@ def load_registered_ports(
     registry_script: Path = DEFAULT_PORT_REGISTRY_SCRIPT,
 ) -> dict[str, int]:
     if not registry_script.is_file():
-        raise SystemExit(
-            "machine port registry helper not found; set PORT_SPACE_REGISTRY_SCRIPT"
-        )
+        raise SystemExit("machine port registry helper not found; set PORT_SPACE_REGISTRY_SCRIPT")
 
     result = subprocess.run(
         [
@@ -65,9 +56,7 @@ def load_registered_ports(
         check=False,
     )
     if result.returncode != 0:
-        raise SystemExit(
-            "this checkout has no readable machine port registry reservation"
-        )
+        raise SystemExit("this checkout has no readable machine port registry reservation")
 
     try:
         payload = json.loads(result.stdout)
@@ -77,10 +66,7 @@ def load_registered_ports(
 
     missing = {"frontend", "backend", "imgproxy", "playwright-renderer"} - ports.keys()
     if missing:
-        raise SystemExit(
-            "machine port registry is missing required labels: "
-            + ", ".join(sorted(missing))
-        )
+        raise SystemExit("machine port registry is missing required labels: " + ", ".join(sorted(missing)))
     return ports
 
 
@@ -95,15 +81,10 @@ def validate_registered_ports(
     }
     actual = {"frontend": frontend_port, "backend": backend_port}
     mismatches = [
-        f"{name}={actual[name]} (registered {expected[name]})"
-        for name in expected
-        if actual[name] != expected[name]
+        f"{name}={actual[name]} (registered {expected[name]})" for name in expected if actual[name] != expected[name]
     ]
     if mismatches:
-        raise SystemExit(
-            "ECEEE host ports are fixed by the machine port registry: "
-            + ", ".join(mismatches)
-        )
+        raise SystemExit("ECEEE host ports are fixed by the machine port registry: " + ", ".join(mismatches))
 
 
 def checkout_redis_namespace(project_root: Path = ROOT) -> str:
@@ -122,9 +103,7 @@ def checkout_postgres_identity(project_root: Path = ROOT) -> tuple[str, str]:
     return database, f"local_{database}"
 
 
-def checkout_minio_identity(
-    frontend_port: int, project_root: Path = ROOT
-) -> tuple[str, str, str, str]:
+def checkout_minio_identity(frontend_port: int, project_root: Path = ROOT) -> tuple[str, str, str, str]:
     """Return access key, public bucket, checkpoint bucket, and secret filename."""
     if project_root.name == "eceee_v4":
         return (
@@ -145,9 +124,7 @@ def checkout_minio_identity(
 def provision_checkout_minio(provider: Path, frontend_port: int) -> None:
     script = provider / "scripts" / "admit_eceee_checkout_minio.py"
     if not script.is_file():
-        raise SystemExit(
-            "shared-local-infrastructure is missing checkout MinIO admission support"
-        )
+        raise SystemExit("shared-local-infrastructure is missing checkout MinIO admission support")
     result = subprocess.run(
         [sys.executable, str(script), "--frontend-port", str(frontend_port)],
         text=True,
@@ -162,9 +139,7 @@ def provision_checkout_minio(provider: Path, frontend_port: int) -> None:
 def support_bucket_name(provider: Path, frontend_port: int) -> str:
     record = json.loads((provider / "consumers" / "eceee-v4.json").read_text())
     base = record["services"]["minio"]["support_storage"]["bucket"]
-    if record["consumer"] != "eceee-v4" or not re.fullmatch(
-        r"[a-z0-9]+-dev-support", base
-    ):
+    if record["consumer"] != "eceee-v4" or not re.fullmatch(r"[a-z0-9]+-dev-support", base):
         raise SystemExit("invalid ECEEE private support storage registration")
     return base if frontend_port == 10100 else f"{base}-{frontend_port}"
 
@@ -183,9 +158,7 @@ def provision_support_minio(provider: Path, frontend_port: int) -> None:
         raise SystemExit("shared private support MinIO admission failed")
 
 
-def has_isolated_postgres_config(
-    present: dict[str, str], project_root: Path = ROOT
-) -> bool:
+def has_isolated_postgres_config(present: dict[str, str], project_root: Path = ROOT) -> bool:
     """Check whether the current env already targets this checkout's clone."""
     database, user = checkout_postgres_identity(project_root)
     return (
@@ -301,9 +274,7 @@ def main() -> int:
 
     validate_registered_ports(frontend_port, backend_port, registered_ports)
 
-    context = subprocess.run(
-        ["docker", "context", "show"], text=True, capture_output=True, check=False
-    ).stdout.strip()
+    context = subprocess.run(["docker", "context", "show"], text=True, capture_output=True, check=False).stdout.strip()
     if context != "orbstack":
         raise SystemExit("local ECEEE development requires the orbstack Docker context")
 
@@ -348,10 +319,7 @@ def main() -> int:
         }
         missing_keys = sorted(key for key in required_keys if not present.get(key))
         if missing_keys:
-            raise SystemExit(
-                "local .env is missing required runtime variables: "
-                + ", ".join(missing_keys)
-            )
+            raise SystemExit("local .env is missing required runtime variables: " + ", ".join(missing_keys))
         expected_public_values = {
             "COMPOSE_PROJECT_NAME": ROOT.name.replace("_", "-"),
             "ECEEE_REDIS_NAMESPACE": checkout_redis_namespace(),
@@ -364,15 +332,10 @@ def main() -> int:
             "AWS_CHECKPOINT_STORAGE_BUCKET_NAME": checkpoint_bucket,
             "SUPPORT_STORAGE_BUCKET_NAME": support_bucket,
         }
-        mismatched_keys = sorted(
-            key
-            for key, value in expected_public_values.items()
-            if present.get(key) != value
-        )
+        mismatched_keys = sorted(key for key, value in expected_public_values.items() if present.get(key) != value)
         if mismatched_keys:
             raise SystemExit(
-                "local .env does not match this checkout's registered runtime for: "
-                + ", ".join(mismatched_keys)
+                "local .env does not match this checkout's registered runtime for: " + ", ".join(mismatched_keys)
             )
         check_minio_bucket(
             present["AWS_ACCESS_KEY_ID"],
@@ -402,12 +365,8 @@ def main() -> int:
     redis_password = read_secret(password_root / "eceee-v4.redis.password")
     minio_secret = read_secret(password_root / minio_secret_filename)
 
-    if args.check_only and not all(
-        present.get(key) for key in ("IMGPROXY_KEY", "IMGPROXY_SALT")
-    ):
-        raise SystemExit(
-            "local .env needs imgproxy credentials; run make configure-local-infra"
-        )
+    if args.check_only and not all(present.get(key) for key in ("IMGPROXY_KEY", "IMGPROXY_SALT")):
+        raise SystemExit("local .env needs imgproxy credentials; run make configure-local-infra")
 
     checkout_database, checkout_user = checkout_postgres_identity()
     preserve_isolated_database = not args.demo and has_isolated_postgres_config(present)
@@ -419,8 +378,7 @@ def main() -> int:
         postgres_database = "eceee_demo" if args.demo else "eceee_v4"
         postgres_user = "local_eceee_demo" if args.demo else "local_eceee_v4"
         postgres_password = read_secret(
-            password_root
-            / ("eceee-v4-demo.password" if args.demo else "eceee-v4.password")
+            password_root / ("eceee-v4-demo.password" if args.demo else "eceee-v4.password")
         )
     updates = {
         "COMPOSE_PROJECT_NAME": ROOT.name.replace("_", "-"),
@@ -437,10 +395,7 @@ def main() -> int:
             f"postgresql://{postgres_user}:"
             f"{quote(postgres_password, safe='')}@host.docker.internal:10300/{postgres_database}"
         ),
-        "REDIS_URL": (
-            "redis://eceee_v4:"
-            f"{quote(redis_password, safe='')}@host.docker.internal:10301/0"
-        ),
+        "REDIS_URL": ("redis://eceee_v4:" f"{quote(redis_password, safe='')}@host.docker.internal:10301/0"),
         "ECEEE_REDIS_NAMESPACE": checkout_redis_namespace(),
         "AWS_ACCESS_KEY_ID": minio_access_key,
         "AWS_SECRET_ACCESS_KEY": minio_secret,
@@ -463,16 +418,12 @@ def main() -> int:
         updates["AWS_CHECKPOINT_STORAGE_BUCKET_NAME"],
     )
 
-    check_minio_bucket(
-        updates["AWS_ACCESS_KEY_ID"], updates["AWS_SECRET_ACCESS_KEY"], support_bucket
-    )
+    check_minio_bucket(updates["AWS_ACCESS_KEY_ID"], updates["AWS_SECRET_ACCESS_KEY"], support_bucket)
 
     if args.check_only:
         if not ENV_FILE.exists() or ENV_FILE.stat().st_mode & 0o077:
             raise SystemExit("local .env is missing or is not mode 0600")
-        mismatched_keys = [
-            key for key, value in updates.items() if present.get(key) != value
-        ]
+        mismatched_keys = [key for key, value in updates.items() if present.get(key) != value]
         if mismatched_keys:
             raise SystemExit(
                 "local .env needs reconfiguration for: "

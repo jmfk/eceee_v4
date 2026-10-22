@@ -6,7 +6,6 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-
 MODULE_PATH = Path(__file__).with_name("configure_orbstack.py")
 SPEC = importlib.util.spec_from_file_location("configure_orbstack", MODULE_PATH)
 configure_orbstack = importlib.util.module_from_spec(SPEC)
@@ -17,14 +16,10 @@ class DotenvHelpersTests(unittest.TestCase):
     def test_local_compose_services_use_project_scoped_container_names(self):
         for compose_file in ("docker-compose.dev.yml", "docker-compose.infra.yml"):
             with self.subTest(compose_file=compose_file):
-                content = (configure_orbstack.ROOT / compose_file).read_text(
-                    encoding="utf-8"
-                )
+                content = (configure_orbstack.ROOT / compose_file).read_text(encoding="utf-8")
                 self.assertNotIn("container_name:", content)
 
-        dev_compose = (configure_orbstack.ROOT / "docker-compose.dev.yml").read_text(
-            encoding="utf-8"
-        )
+        dev_compose = (configure_orbstack.ROOT / "docker-compose.dev.yml").read_text(encoding="utf-8")
         self.assertNotIn("http://eceee-v4-imgproxy:8080", dev_compose)
         self.assertIn("http://imgproxy:8080", dev_compose)
 
@@ -73,16 +68,8 @@ class DotenvHelpersTests(unittest.TestCase):
             "POSTGRES_PASSWORD": "not-printed",
         }
 
-        self.assertTrue(
-            configure_orbstack.has_isolated_postgres_config(
-                present, Path("/tmp/eceee_v4_2")
-            )
-        )
-        self.assertFalse(
-            configure_orbstack.has_isolated_postgres_config(
-                present, Path("/tmp/eceee_v4_3")
-            )
-        )
+        self.assertTrue(configure_orbstack.has_isolated_postgres_config(present, Path("/tmp/eceee_v4_2")))
+        self.assertFalse(configure_orbstack.has_isolated_postgres_config(present, Path("/tmp/eceee_v4_3")))
 
     def test_support_storage_uses_registered_stable_namespace_and_checkout_scope(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -93,11 +80,7 @@ class DotenvHelpersTests(unittest.TestCase):
                 json.dumps(
                     {
                         "consumer": "eceee-v4",
-                        "services": {
-                            "minio": {
-                                "support_storage": {"bucket": "w8c4m2-dev-support"}
-                            }
-                        },
+                        "services": {"minio": {"support_storage": {"bucket": "w8c4m2-dev-support"}}},
                     }
                 )
             )
@@ -113,11 +96,7 @@ class DotenvHelpersTests(unittest.TestCase):
                 json.dumps(
                     {
                         "consumer": "another-project",
-                        "services": {
-                            "minio": {
-                                "support_storage": {"bucket": "w8c4m2-dev-support"}
-                            }
-                        },
+                        "services": {"minio": {"support_storage": {"bucket": "w8c4m2-dev-support"}}},
                     }
                 )
             )
@@ -125,9 +104,7 @@ class DotenvHelpersTests(unittest.TestCase):
                 configure_orbstack.support_bucket_name(provider, 10100)
 
     def test_parse_dotenv_values_accepts_export_and_empty_values(self):
-        values = configure_orbstack.parse_dotenv_values(
-            "export PRESENT=value\nEMPTY=\n# COMMENTED=ignored\n"
-        )
+        values = configure_orbstack.parse_dotenv_values("export PRESENT=value\nEMPTY=\n# COMMENTED=ignored\n")
 
         self.assertEqual(values, {"PRESENT": "value", "EMPTY": ""})
 
@@ -139,8 +116,7 @@ class DotenvHelpersTests(unittest.TestCase):
 
         self.assertEqual(
             updated,
-            "KEEP=original\nIMGPROXY_KEY=new\n\n"
-            "# Shared OrbStack local development services\nIMGPROXY_SALT=salt\n",
+            "KEEP=original\nIMGPROXY_KEY=new\n\n" "# Shared OrbStack local development services\nIMGPROXY_SALT=salt\n",
         )
 
     def test_registered_ports_accept_the_project_assignments(self):
@@ -160,19 +136,13 @@ class DotenvHelpersTests(unittest.TestCase):
 
     @mock.patch.object(configure_orbstack.subprocess, "run")
     def test_checkpoint_bucket_check_passes_credentials_over_stdin(self, run):
-        run.return_value = subprocess.CompletedProcess(
-            args=[], returncode=0, stdout="", stderr=""
-        )
+        run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
-        configure_orbstack.check_minio_bucket(
-            "eceee-v4", "not-printed", "eceee-media-checkpoints"
-        )
+        configure_orbstack.check_minio_bucket("eceee-v4", "not-printed", "eceee-media-checkpoints")
 
         command = run.call_args.args[0]
         self.assertNotIn("not-printed", command)
-        self.assertEqual(
-            command[:4], ["docker", "exec", "-i", "shared-local-infrastructure-minio-1"]
-        )
+        self.assertEqual(command[:4], ["docker", "exec", "-i", "shared-local-infrastructure-minio-1"])
         self.assertEqual(
             run.call_args.kwargs["input"],
             "eceee-v4\nnot-printed\neceee-media-checkpoints\n",
@@ -180,14 +150,10 @@ class DotenvHelpersTests(unittest.TestCase):
 
     @mock.patch.object(configure_orbstack.subprocess, "run")
     def test_checkpoint_bucket_check_rejects_missing_or_unauthorized_bucket(self, run):
-        run.return_value = subprocess.CompletedProcess(
-            args=[], returncode=1, stdout="", stderr="AccessDenied"
-        )
+        run.return_value = subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="AccessDenied")
 
         with self.assertRaisesRegex(SystemExit, "provider must provision"):
-            configure_orbstack.check_minio_bucket(
-                "eceee-v4", "not-printed", "eceee-media-checkpoints"
-            )
+            configure_orbstack.check_minio_bucket("eceee-v4", "not-printed", "eceee-media-checkpoints")
 
     @mock.patch.object(configure_orbstack.subprocess, "run")
     def test_load_registered_ports_uses_the_checkout_path(self, run):
